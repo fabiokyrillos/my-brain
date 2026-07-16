@@ -1,66 +1,77 @@
 # My Brain
 
-Agente pessoal contextual construído com Next.js, TypeScript e Supabase. A fundação entregue inclui autenticação, perfil e preferências, isolamento por usuário, interface responsiva bilíngue e documentação do produto completo.
+Agente pessoal contextual em Next.js, TypeScript, Supabase e OpenAI. O pré-MVP já possui captura em linguagem natural, interpretação estruturada, tarefas confirmadas, chat com fontes internas, memória, heartbeat, revisões, arquivos privados e auditoria.
 
-## Pré-requisitos
+## O que funciona agora
 
-- Node.js 22+
-- Docker Desktop para Supabase local
-- Supabase CLI (`npx supabase --version`)
+- Auth por e-mail/senha, recuperação, perfil e preferências completas.
+- Supabase online com RLS forçada e políticas explícitas por usuário.
+- Captura imutável, datas retroativas, entidades, confiança e perguntas pendentes.
+- Confirmação seletiva de tarefas, subtarefas, relações, auditoria e desfazer.
+- Chat com embeddings `text-embedding-3-small`, busca pgvector e fontes internas clicáveis.
+- Tarefas, Hoje, Aguardando, Projetos, Pessoas, linhas do tempo e Memórias.
+- Heartbeat horário via Supabase Cron e Edge Function protegida por segredo.
+- Notificações internas, lembretes, revisões manuais e invalidação retroativa.
+- Upload privado de imagens, PDF, texto, CSV, DOCX e XLSX, com URL assinada, job durável e análise estruturada pela OpenAI.
+- PWA instalável; o service worker guarda somente assets públicos, nunca conteúdo autenticado.
+- Interface PT-BR/EN responsiva, com navegação lateral e inferior.
+
+Google OAuth e Vercel foram deliberadamente adiados enquanto o produto permanece em pré-MVP.
 
 ## Configuração local
 
-```bash
+Requisitos: Node.js 22+ e um projeto Supabase vinculado. Docker é necessário apenas para a suíte local do Supabase.
+
+```powershell
 npm install
 Copy-Item .env.example .env.local
-npx supabase start
-npx supabase status
+npx supabase link --project-ref SEU_PROJECT_REF
+npx supabase db push --dry-run
+npx supabase db push
 npm run dev
 ```
 
-Copie a URL, publishable key e service-role key exibidas pelo Supabase para `.env.local`. A service-role key é exclusiva do servidor e não deve ser usada em componentes cliente.
+Variáveis mínimas em `.env.local`:
 
-Abra `http://localhost:3000`. Com Supabase configurado, rotas `/pt-BR/app` e `/en/app` exigem sessão.
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+OPENAI_API_KEY=
+```
 
-## Google OAuth
-
-No Google Cloud, crie um cliente OAuth Web e use a callback fornecida pelo Supabase. Em Supabase Auth > Providers, habilite Google. Configure como URLs permitidas:
-
-- `http://localhost:3000/pt-BR/auth/callback`
-- `http://localhost:3000/en/auth/callback`
-- as URLs equivalentes da Vercel
+Não coloque service role, segredo do heartbeat ou chave OpenAI em variáveis `NEXT_PUBLIC_*`.
 
 ## Verificação
 
-```bash
+```powershell
 npm run lint
 npm run typecheck
 npm test
 npm run build
-npx supabase db reset
-npx supabase test db
+npx supabase db lint --linked --level warning
 ```
 
-Os dois últimos comandos exigem Docker. A migration cria `profiles` e `agent_preferences`, o trigger de cadastro, índices, RLS forçada e políticas explícitas de leitura, criação, atualização e exclusão.
+O E2E online usa credenciais temporárias obtidas da CLI, cria um usuário descartável, testa o fluxo completo e remove usuário, dados e arquivo ao terminar.
 
-## Vincular um projeto Supabase
-
-Depois que o projeto existir e você estiver autenticado na CLI:
-
-```bash
-npx supabase login
-npx supabase link --project-ref SEU_PROJECT_REF
-npx supabase db push --dry-run
-npx supabase db push
+```powershell
+npx playwright test e2e/intelligent-capture.spec.ts --project=desktop
+npx playwright test e2e/intelligent-capture.spec.ts --project=mobile
 ```
 
-Cadastre os secrets no Supabase/Vercel; nunca os versione. Edge Functions e Cron serão promovidos nas fases que introduzem processamento assíncrono e heartbeat.
+## Supabase operacional
+
+```powershell
+npx supabase functions deploy heartbeat --project-ref SEU_PROJECT_REF --no-verify-jwt
+npx supabase secrets set HEARTBEAT_SECRET=VALOR_FORTE --project-ref SEU_PROJECT_REF
+```
+
+O cron do banco executa `run_all_heartbeats()` a cada hora. A Edge Function oferece uma entrada operacional adicional e exige `x-heartbeat-secret`.
 
 ## Documentação
 
-- `docs/PRD.md`: visão, jornadas e critérios de produto.
-- `docs/ARCHITECTURE.md`: limites e topologia.
-- `docs/DATABASE.md`: convenções, entidades, índices e RLS.
-- `docs/AI_AGENT.md`: pipeline, autonomia, confiança e heartbeat.
-- `docs/SECURITY.md`: controles e ciclo de vida.
-- `docs/IMPLEMENTATION_PLAN.md`: oito fases verticais.
+- `docs/PRD.md` — visão e requisitos do produto.
+- `docs/ARCHITECTURE.md` — topologia e limites atuais.
+- `docs/DATABASE.md` — entidades, RLS, vetores e automações.
+- `docs/AI_AGENT.md` — contratos de extração, chat e heartbeat.
+- `docs/SECURITY.md` — controles ativos e lacunas antes de produção.
+- `docs/IMPLEMENTATION_PLAN.md` — status honesto por fase.

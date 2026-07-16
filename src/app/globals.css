@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@import "./operations.css";
+@import "./chat.css";
+@import "./agent.css";
+@import "./settings-extended.css";
+@import "./timelines.css";
+@import "./files.css";
 
 :root { --ink:#14233b; --ink-soft:#526078; --blue:#315cff; --blue-wash:#eef2ff; --mist:#f4f7fb; --paper:#fbfcfe; --line:#dce3ed; --signal:#f0a431; --white:#fff; }
 @theme inline { --color-background:var(--paper); --color-foreground:var(--ink); --font-sans:var(--font-manrope); --font-serif:var(--font-newsreader); --font-mono:var(--font-jetbrains); }

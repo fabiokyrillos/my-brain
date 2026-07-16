@@ -1,0 +1,1 @@
+.compound-field{display:grid;grid-template-columns:1.5fr 1fr;gap:7px}.settings-checkbox{display:flex!important;align-items:center;grid-auto-flow:column;justify-content:start;padding-top:24px}.settings-checkbox input{width:18px!important;min-height:18px!important}.settings-checkbox span{line-height:1.45}@media(max-width:600px){.compound-field{grid-template-columns:1fr}}

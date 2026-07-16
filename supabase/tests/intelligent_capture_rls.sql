@@ -1,0 +1,12 @@
+begin;
+select plan(8);
+select has_table('public', 'entries', 'entries exists');
+select has_table('public', 'entry_interpretations', 'interpretations exist');
+select has_table('public', 'tasks', 'tasks exist');
+select has_table('public', 'audit_logs', 'audit logs exist');
+select row_security_active('public.entries'), 'entries RLS is active';
+select row_security_active('public.tasks'), 'tasks RLS is active';
+select has_function('public', 'confirm_entry_tasks', array['uuid','integer[]']);
+select has_function('public', 'undo_operation', array['uuid']);
+select * from finish();
+rollback;

@@ -1,29 +1,40 @@
 # Database Design
 
-## Conventions
+## Convenções
 
-All user-owned tables carry `user_id uuid not null`, timestamps are `timestamptz`, ids are UUIDs, mutable tables carry `updated_at`, and soft deletion is used where retention or undo requires it. Original entry content is append-only. JSON is reserved for versioned provider payloads and undo snapshots, not core relationships.
+Todas as entidades do usuário carregam `user_id uuid not null`; horários usam `timestamptz`; conteúdo original é imutável por trigger; relações relevantes são normalizadas. RLS é habilitada e forçada, com políticas explícitas de select, insert, update e delete.
 
-## Entity groups
+## Tabelas implementadas
 
-- Identity: `profiles`, `agent_preferences`, `provider_configs`.
-- Knowledge: `contexts`, `organizations`, `projects`, `people`, temporal relationship tables, `topics`, `tags`, `entity_tags`.
-- Capture: `entries`, `entry_interpretations`, `entry_entities`, `attachments`, `entity_attachments`.
-- Work: `tasks`, `task_dependencies`, task relationship tables, `reminders`, `pending_questions`.
-- Agent: `memories`, `conversations`, `conversation_messages`, `summaries`, `notifications`.
-- Control plane: `agent_actions`, `audit_logs`, `undo_operations`, `heartbeat_runs`, `jobs`, integration and webhook tables.
+- Identidade: `profiles`, `agent_preferences`.
+- Conhecimento: `contexts`, `organizations`, `projects`, `people`, `person_relationships`, `person_contexts`, `person_projects`, `tags`, `entity_tags`.
+- Captura: `entries`, `entry_interpretations`, `entry_entities`.
+- Trabalho: `tasks`, `task_dependencies`, `task_people`, `task_projects`, `task_contexts`, `reminders`, `pending_questions`.
+- Inteligência: `memories`, `entry_embeddings`, `conversations`, `conversation_messages`.
+- Conteúdo: `summaries`, `attachments`, `attachment_interpretations`, `entity_attachments`.
+- Controle: `notifications`, `audit_logs`, `undo_operations`, `heartbeat_runs`, `jobs`.
 
-## Temporal and semantic rules
+## Regras importantes
 
-`entries.created_at` is ingestion time and `entries.occurred_at` is event time. Backdated entries invalidate overlapping summaries. Temporal associations use `valid_from` and `valid_to`. Embeddings are stored with source type/id, model, dimensions, content hash, and sensitivity.
+- `created_at` é ingestão; `occurred_at` é o momento do fato.
+- Capturas retroativas marcam revisões sobrepostas como `outdated`.
+- Pessoas, projetos e contextos que aparecem juntos criam associações temporais atuais.
+- Tarefas confirmadas preservam `candidate_index`, hierarquia e vínculos normalizados.
+- Undo cancela somente entidades criadas pela operação armazenada.
+- Notificações usam `dedupe_key`; heartbeat registra inclusive execuções silenciosas, respeita o limite diário e permite exceção apenas para lembretes importantes.
 
-## Index strategy
+## Busca vetorial
 
-Every owned table starts with a `user_id` index; hot access uses compound indexes such as `(user_id, status, due_at)`, `(user_id, occurred_at desc)`, `(user_id, available_at)` for pending jobs, and partial indexes for unread notifications and active tasks. Full-text GIN and pgvector HNSW indexes support hybrid retrieval.
+`entry_embeddings` e `memories.embedding` usam `extensions.vector(1536)` e índices HNSW de cosseno. `match_internal_knowledge` executa com a identidade do usuário e retorna somente fontes permitidas pela RLS.
 
-## RLS
+## Storage
 
-RLS is enabled and forced on every owned table. Explicit policies exist for select, insert, update, and delete using `auth.uid() = user_id`; insert/update include `with check`. Relationship rows also carry `user_id` so authorization never depends solely on joins. Storage object paths begin with the authenticated user UUID.
+O bucket `user-files` é privado, limitado a 25 MB e a MIME types permitidos. O primeiro segmento do path é o UUID autenticado. A aplicação gera URLs assinadas de dez minutos.
 
-The initial migration implements Phase 1 identity tables. Later phase migrations add one vertical slice at a time, including their policies, indexes, functions, and RLS tests.
+## Automação
 
+`pg_cron` chama `run_all_heartbeats()` a cada hora. `run_user_heartbeat` avalia silêncio, tarefas atrasadas, tarefas sem movimento e lembretes vencidos, e cria notificações deduplicadas.
+
+## Ainda planejado
+
+Provider configs/BYOK, integrações, eventos de webhook, tópicos dedicados e telemetria financeira por chamada serão adicionados antes de produção, quando seus fluxos existirem.

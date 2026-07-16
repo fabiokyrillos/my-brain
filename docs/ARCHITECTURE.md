@@ -1,41 +1,45 @@
 # Architecture
 
-## Runtime topology
+## Topologia atual
 
 ```text
 Browser/PWA -> Next.js App Router -> Supabase Auth/Postgres/Storage
                          |                    |
-                         +-> AI gateway       +-> Cron -> Edge workers
-                                  |                       |
-                                  +-> configured provider +-> jobs/outbox
+                         +-> AIProvider       +-> pg_cron -> heartbeat SQL
+                              |               +-> Edge Function heartbeat
+                              +-> OpenAI       +-> jobs duráveis
 ```
 
-Next.js is the authenticated backend-for-frontend. Direct browser access to Supabase is allowed only through RLS-safe operations. Privileged work is performed in server-only modules or Edge Functions. Postgres is the source of truth; internal notifications and integrations use durable outbox/job records instead of best-effort side effects.
+Next.js atua como backend-for-frontend autenticado. O navegador usa Supabase somente com sessão e RLS; chave OpenAI e operações administrativas permanecem no servidor ou na Edge Function. Postgres é a fonte de verdade.
 
-## Modules
+## Fatias verticais
 
-- Identity: sessions, profiles, preferences, tenant isolation.
-- Capture: immutable entries, attachments, origins, event time.
-- Interpretation: structured extraction, confidence, candidate actions, questions.
-- Work: tasks, subtasks, dependencies, waiting, reminders, priority.
-- Knowledge: people, organizations, projects, contexts, topics, tags, temporal relationships.
-- Memory and retrieval: durable memories, embeddings, hybrid search, internal citations.
-- Agent: conversation, action policy, heartbeat, summaries, notification decisions.
-- Platform: jobs, idempotency, audit, undo, observability, integrations.
+- Identidade: sessão, perfil, preferências e isolamento multitenant.
+- Captura: original imutável, origem, `created_at`, `occurred_at` e sensibilidade.
+- Interpretação: schema Zod, conceitos, confiança, entidades, tarefas e perguntas.
+- Trabalho: tarefas, subtarefas, dependências, relações, lembretes e desfazer.
+- Conhecimento: contextos, organizações, projetos, pessoas e associações temporais.
+- Inteligência: embeddings, pgvector, memórias, chat fundamentado e fontes internas.
+- Proatividade: heartbeat, silêncio, deduplicação, notificações e auditoria de execuções.
+- Conteúdo: revisões persistidas, anexos privados, URLs assinadas e jobs.
 
-## Data flow
+## Fluxo de captura
 
-Capture commits the original before enqueueing interpretation. Workers claim jobs atomically, validate structured AI output, match entities, calculate action policy, persist interpretation and safe automatic actions in a transaction, and create questions for ambiguity. Embeddings and downstream summaries are separate idempotent jobs. UI progress is driven by persisted job state.
+1. O server action autentica e grava `entries.original_content`.
+2. O provider OpenAI produz saída estruturada validada por Zod.
+3. Uma RPC transacional persiste interpretação, entidades, data do evento e auditoria.
+4. O embedding é gerado separadamente; falha de embedding não destrói a interpretação.
+5. A UI apresenta interpretação, original e tarefas candidatas.
+6. Uma RPC idempotente cria somente tarefas selecionadas, liga pessoas/projetos/contextos e grava compensação de undo.
 
-## AI portability
+## Portabilidade de IA
 
-`AIProvider` exposes structured generation, embeddings, health, and usage metadata. Capability-based routing selects only configured providers/models. Model ids are server configuration, never trusted client input. Deterministic policies remain outside providers.
+`AIProvider` expõe `extractEntry`, `embedText` e `answerFromKnowledge`. A implementação OpenAI usa Responses API com Structured Outputs e embeddings. Regras de autorização, confirmação, RLS e undo ficam fora do provider.
 
-## Asynchrony and reliability
+## Assincronia
 
-Jobs use `available_at`, leases, attempt count, exponential backoff with jitter, maximum attempts, idempotency keys, and dead-letter state. Webhook events have provider/event unique keys. Heartbeats have per-user/window idempotency keys and record both sent and silent outcomes.
+O pré-MVP possui tabela `jobs` com status, tentativas, próxima tentativa, prioridade e idempotência. Uploads criam jobs e invocam a Edge Function autenticada `process-jobs`, que usa URL assinada e persiste uma interpretação separada. Falhas ficam disponíveis para nova tentativa. Heartbeat roda no banco, independente desse worker.
 
-## Deployment
+## Ambientes adiados
 
-Vercel hosts Next.js. Supabase hosts Postgres, Auth, Storage, Cron, and Edge Functions. Local development uses Supabase CLI and `.env.local`. Migrations are promoted in order; generated database types are checked into source.
-
+Google OAuth e Vercel permanecem fora do fluxo atual por decisão de produto. Nenhum scaffold pago ou dependência externa é necessário para testar localmente.

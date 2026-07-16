@@ -1,28 +1,33 @@
 # Security
 
-## Identity and tenancy
+## Controles ativos
 
-Supabase Auth issues sessions; Next.js middleware refreshes them. Every user-owned row and private storage object is scoped by the authenticated UUID. RLS is defense in depth and is never replaced by UI filtering. OAuth redirects use an allowlist and PKCE.
+- Supabase Auth com cookies atualizados pelo proxy do Next.js.
+- `user_id` e RLS forçada em todas as tabelas pertencentes ao usuário.
+- Quatro políticas explícitas por tabela e RLS também nas relações.
+- Original imutável, saída de IA validada por Zod e RPCs transacionais.
+- Chave OpenAI somente no servidor; nenhuma chave é `NEXT_PUBLIC_*`.
+- Edge Function heartbeat protegida por segredo aleatório armazenado no Supabase.
+- Bucket privado, path por UUID, limite de 25 MB, allowlist de MIME e URL assinada curta.
+- Prompt injection tratado separando política de sistema e conteúdo do usuário.
+- Logs não incluem texto integral nem secrets; auditoria registra motivo e IDs.
+- Service worker limita cache a assets estáticos públicos.
 
-## Secrets
+## Verificações executadas
 
-Only public Supabase URL and anon key reach the browser. OpenAI, service-role, encryption, webhook, and provider secrets stay in server or platform secret stores. BYOK values will use envelope encryption with a rotated server key and masked metadata; plaintext keys are never returned.
+- `supabase db lint` sem erros.
+- Teste online cria usuário descartável e valida captura, original, IA, tarefas, undo, chat, fontes, revisão, upload e heartbeat.
+- Arquivo de teste, dados e usuário são removidos ao final.
+- Desktop e mobile executam o mesmo cenário.
 
-## Application controls
+## Necessário antes de produção
 
-- Strict input schemas, output encoding, upload MIME/signature/size checks, and safe filenames.
-- Rate limits by user, IP, route, and expensive operation.
-- CSRF-safe same-site cookies and origin validation for state-changing HTTP endpoints.
-- CSP, HSTS in production, frame denial, nosniff, restrictive referrer and permissions policies.
-- Structured logs redact secrets and truncate or hash sensitive content.
-- Prompt-injection boundary treats files, webpages, and messages as data.
-- Audit records for authentication-sensitive and agent mutations.
+- Rate limiting distribuído para operações de IA e upload.
+- CSP/HSTS e headers de produção revisados no domínio final.
+- Detecção de assinatura real de arquivos, antivírus e worker isolado.
+- Exportação, exclusão de conta e política formal de retenção.
+- BYOK com envelope encryption e rotação.
+- Observabilidade de custo/latência e alertas.
+- Teste pgTAP integral em CI com banco limpo.
 
-## Data lifecycle
-
-Exports are scoped and asynchronous. Account deletion requires reauthentication, confirmation, a cooling window where appropriate, and a traceable deletion job. Backups, retention, and deletion behavior must be documented before production.
-
-## Verification
-
-CI applies migrations to a clean database, checks all owned tables for forced RLS and four explicit policies, runs cross-user denial tests, scans browser bundles for server secrets, and tests signed private-file access.
-
+Google OAuth e callbacks públicos serão configurados somente quando o usuário retomar essa integração.

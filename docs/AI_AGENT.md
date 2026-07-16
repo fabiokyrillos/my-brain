@@ -1,26 +1,34 @@
 # AI Agent Contract
 
-## Pipeline
+## Extração
 
-Persist original -> detect language and event time -> retrieve structured candidates -> generate schema-constrained extraction -> validate -> resolve entities -> calculate confidence/action policy -> persist interpretation -> apply allowed actions -> enqueue embeddings -> audit -> notify.
+O original é salvo antes de qualquer chamada. A OpenAI recebe o texto como dado não confiável e retorna um schema validado com idioma, data, retroatividade, resumo, 19 conceitos, contextos, organizações, projetos, pessoas, tarefas candidatas, perguntas e confiança.
 
-## Provider boundary
+Modelo padrão de extração/chat: `gpt-5.6-luna`. Modelo de embedding: `text-embedding-3-small`. O modelo escolhido nas Configurações é usado em captura, chat, revisões e arquivos; variáveis server-only continuam como fallback.
 
-Providers implement structured generation, embedding, availability, and normalized usage. The application selects models by capability (`extract`, `embed`, `summarize`, `reason`) from server configuration. Unconfigured providers never appear in settings. Provider output is untrusted until schema and policy validation pass.
+## Ações e confirmação
 
-## Confidence policy
+Classificação e associações reversíveis de alta confiança podem ser persistidas. Tarefas candidatas são mostradas selecionadas, mas só são criadas depois da confirmação do usuário. A criação é auditada e gera uma operação compensatória com expiração.
 
-The decision engine combines model confidence with parse validity, ambiguity count, missing or relative dates, entity collision, semantic match margin, action impact, scope, and reversibility. Medium or low decisions become pending questions. Explicit task/reminder language lowers the confirmation threshold only when entities and time are unambiguous.
+## Chat fundamentado
 
-## Protected actions
+1. A pergunta vira embedding.
+2. A RPC pgvector recupera registros e memórias do próprio usuário.
+3. As fontes entram como dados não confiáveis, nunca como instruções.
+4. A resposta estruturada pode citar somente IDs fornecidos.
+5. IDs inexistentes são removidos deterministicamente.
+6. Mensagem, modelo, tokens e fontes ficam persistidos.
 
-Permanent deletion, cancellation, modification of completed work, outbound communication, sharing, disconnecting integrations, bulk changes, removing people/projects, deleting important memories, permission changes, public files, and irreversible actions always require confirmation.
+Se as fontes forem insuficientes, o agente deve dizer isso em vez de completar lacunas.
 
 ## Heartbeat
 
-Event triggers mark relevant signals. Periodic evaluation groups overdue, upcoming, stale, unanswered, waiting, blocked, undated, dormant-project, and tomorrow-preparation signals. Ranking applies relevance, quiet periods, cooldown per subject, repetition detection, daily caps, and conversation recency. Each run records candidates, decision reasons, sent notification ids, or the reason for silence.
+O heartbeat é determinístico no pré-MVP. Ele respeita `quiet_start`/`quiet_end`, cria avisos diários deduplicados para atrasos e stale tasks, entrega lembretes vencidos e registra quando permaneceu silencioso. O cron roda a cada hora; uma Edge Function protegida oferece acionamento operacional.
 
-## Grounding and injection safety
+## Revisões
 
-Retrieved user content is evidence, never instruction. System policy and tool permissions remain in separate channels. Answers distinguish facts from inferences and cite internal entity ids. Sensitive content is filtered before summaries, logs, notifications, and external providers according to user policy.
+Resumo diário, revisão semanal, planejamento semanal e revisão mensal usam entradas/tarefas reais como fontes. Revisões retroativas são marcadas como desatualizadas. Geração automática no horário configurado, edição versionada e aprendizado com correções ainda são próximos passos.
 
+## Arquivos
+
+Uploads privados são validados, persistidos e enfileirados. A Edge Function `process-jobs` valida a sessão, limita o job ao próprio usuário, cria uma URL assinada e envia o arquivo como `input_image` ou `input_file`. Descrição, texto, pessoas, projetos, datas e tarefas candidatas ficam em `attachment_interpretations`; o original não é alterado. Tarefas extraídas não são criadas automaticamente.

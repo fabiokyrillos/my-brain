@@ -1,43 +1,51 @@
 # Implementation Plan
 
-## Phase 1 — Foundation
+Atualizado em 2026-07-16. “Concluído” abaixo significa fluxo vertical testado; itens parciais permanecem explicitamente listados.
 
-Next.js strict TypeScript, Supabase local setup, email/password and Google auth, recovery, profile/preferences, complete RLS for Phase 1, responsive shell, PT-BR/EN i18n, security headers, unit/integration scaffolding, and Playwright setup.
+## Fase 1 — Fundação: concluída no pré-MVP
 
-## Phase 2 — Capture and interpretation
+Next.js estrito, Supabase online, auth por e-mail, recuperação, perfil, RLS, shell responsivo e PT-BR/EN. Google OAuth foi adiado por decisão do usuário.
 
-Immutable original capture, origins, event dates, contexts, people, projects, structured provider abstraction, confidence policy, candidate actions, and pending questions.
+## Fase 2 — Captura e interpretação: concluída
 
-## Phase 3 — Work and undo
+Original imutável, origem, datas retroativas, Structured Outputs, entidades, confiança, perguntas normalizadas e UI de interpretação.
 
-Tasks, subtasks, dependencies, waiting states, priority, deadlines, audit history, protected-action confirmation, and compensating undo.
+## Fase 3 — Trabalho e undo: núcleo concluído
 
-## Phase 4 — Grounded intelligence
+Tarefas, subtarefas, relações, status, prazos, confirmação seletiva, auditoria e undo estão ativos. Edição avançada de todos os 24 campos e decomposição assistida continuam como refinamento.
 
-Chat, embeddings, hybrid retrieval, memories, timelines, evidence links, and completion matching.
+## Fase 4 — Inteligência fundamentada: núcleo concluído
 
-## Phase 5 — Proactivity
+Chat, embeddings, pgvector, memórias, fontes clicáveis e timelines estão ativos. Busca híbrida textual e conclusão automática por linguagem natural ainda faltam.
 
-Durable jobs, heartbeat, quiet periods, internal notifications, reminders, cooldowns, deduplication, and technical failed-job view.
+## Fase 5 — Proatividade: núcleo concluído
 
-## Phase 6 — Reviews
+Jobs, heartbeat horário, períodos silenciosos, notificações, lembretes, deduplicação e página técnica existem. Worker genérico com backoff ainda precisa processar a fila.
 
-Daily, Friday, Monday, and monthly reviews; historical invalidation/regeneration; editable versions; correction signals.
+## Fase 6 — Revisões: parcial funcional
 
-## Phase 7 — Files
+As quatro revisões podem ser geradas e persistidas; registros retroativos invalidam períodos afetados. Agendamento automático das revisões, edição versionada e aprendizado com correções ainda faltam.
 
-Private uploads, signed URLs, image/PDF/document/spreadsheet processing, progress, retries, interpretation, and entity links.
+## Fase 7 — Arquivos: núcleo concluído
 
-## Phase 8 — Production hardening
+Upload privado, validação, URL assinada, job durável e análise de imagem/PDF/documento/planilha funcionam pela Edge Function. O original e a interpretação ficam separados. Retentativa automática periódica e associação confirmada das tarefas candidatas são os refinamentos restantes.
 
-Installable PWA, safe offline drafts and sync, accessibility refinement, end-to-end coverage, observability, cost controls, deployment runbooks, and production readiness review.
+## Fase 8 — PWA e hardening: parcial funcional
 
-## Definition of done per phase
+Manifest, ícone, service worker seguro para assets, offline sem cache sensível e layout móvel estão ativos. Sincronização persistente de rascunhos, observabilidade completa e preparação de Vercel permanecem adiadas.
 
-The slice works from UI through database; no permanent mocks or fake controls; lint, typecheck, unit/integration/E2E tests, build, migrations, RLS verification, and manual primary-flow checks pass; docs and operational notes match reality.
+## Gate atual
 
-## Phase 1 verification — 2026-07-16
+- ESLint: passou.
+- TypeScript: passou.
+- Vitest: 30 testes passaram.
+- Build Next.js: passou, incluindo todas as rotas e manifest.
+- Supabase migrations: aplicadas até `202607160014`; db lint sem erros.
+- E2E online desktop: passou.
+- E2E online mobile: passou.
+- Edge Function heartbeat: publicada e validada com HTTP 200.
+- Auditoria visual no Chrome autenticado: Início, Configurações e Arquivos aprovados; erros observados são atributos injetados por extensões do navegador no modo dev.
 
-- Passed: ESLint, TypeScript, 9 Vitest tests, production build, and 2 Playwright desktop/mobile smoke tests.
-- Visually inspected: desktop and 390 × 844 mobile home layouts.
-- Pending external prerequisite: migration execution and pgTAP RLS assertions require Docker Desktop. `supabase start` could not connect to the local Docker engine; no Supabase project credentials exist yet.
+## Próxima prioridade recomendada
+
+Implementar o worker de jobs para processar arquivos, gerar revisões programadas e aplicar retentativas; depois ampliar edição de tarefas e conclusão por linguagem natural. Google OAuth e Vercel permanecem fora do caminho crítico até nova decisão do usuário.
