@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { recoverPassword } from "@/features/auth/actions";
+export default async function RecoverPage({params}:{params:Promise<{locale:string}>}){const{locale}=await params;const pt=locale!=="en";return <div className="auth-card"><p className="eyebrow">ACESSO</p><h1>{pt?"Recupere sua senha":"Recover your password"}</h1><p>{pt?"Enviaremos um link seguro para seu e-mail.":"We will send a secure link to your email."}</p><form action={recoverPassword} className="auth-form"><input type="hidden" name="locale" value={locale}/><label>E-mail<input name="email" type="email" required/></label><button>{pt?"Enviar link":"Send link"}</button></form><Link href={`/${locale}/auth/login`}>{pt?"Voltar ao login":"Back to sign in"}</Link></div>}
