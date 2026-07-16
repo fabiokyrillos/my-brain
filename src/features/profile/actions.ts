@@ -1,14 +1,45 @@
 "use server";
+
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { profileSchema } from "./schema";
+import type { ProfileFormState } from "./settings-form";
 
-export async function updateProfile(formData: FormData) {
-  const parsed=profileSchema.safeParse(Object.fromEntries(formData)); if(!parsed.success) redirect("/pt-BR/app/settings?error=invalid");
-  const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user) redirect(`/${parsed.data.locale}/auth/login`);
-  const p=parsed.data;
-  const {error:profileError}=await supabase.from("profiles").update({display_name:p.displayName,locale:p.locale,timezone:p.timezone}).eq("user_id",user.id);
-  const {error:preferenceError}=await supabase.from("agent_preferences").update({agent_name:p.agentName,follow_up_intensity:p.followUpIntensity,daily_review_time:p.dailyReviewTime}).eq("user_id",user.id);
-  if(profileError||preferenceError) redirect(`/${p.locale}/app/settings?error=save`); revalidatePath(`/${p.locale}/app/settings`); redirect(`/${p.locale}/app/settings?saved=1`);
+export async function updateProfile(
+  _state: ProfileFormState,
+  formData: FormData,
+): Promise<ProfileFormState> {
+  const parsed = profileSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { status: "error", message: "Revise os campos antes de salvar." };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { status: "error", message: "Sua sessão expirou. Entre novamente." };
+  }
+
+  const input = parsed.data;
+  const [profileResult, preferencesResult] = await Promise.all([
+    supabase.from("profiles").upsert({
+      user_id: user.id,
+      display_name: input.displayName,
+      locale: input.locale,
+      timezone: input.timezone,
+    }, { onConflict: "user_id" }),
+    supabase.from("agent_preferences").upsert({
+      user_id: user.id,
+      agent_name: input.agentName,
+      follow_up_intensity: input.followUpIntensity,
+      daily_review_time: input.dailyReviewTime,
+    }, { onConflict: "user_id" }),
+  ]);
+
+  if (profileResult.error || preferencesResult.error) {
+    return { status: "error", message: "Não foi possível salvar. Tente novamente." };
+  }
+
+  revalidatePath(`/${input.locale}/app/settings`);
+  return { status: "success", message: "Preferências salvas." };
 }

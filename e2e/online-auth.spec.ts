@@ -31,6 +31,23 @@ test.describe("online Supabase authentication", () => {
     expect(response.ok).toBe(true);
     const user = (await response.json()) as { id: string };
     userId = user.id;
+
+    await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/profiles?user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey!,
+          authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }),
+      fetch(`${supabaseUrl}/rest/v1/agent_preferences?user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey!,
+          authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }),
+    ]);
   });
 
   test.afterAll(async () => {
@@ -54,12 +71,14 @@ test.describe("online Supabase authentication", () => {
     await expect(page.getByRole("heading", { name: /boa tarde/i })).toBeVisible();
 
     await page.goto("/pt-BR/app/settings");
+    await expect(page.getByLabel("Seu nome")).toHaveValue("Codex E2E");
     await expect(page.getByLabel("Nome do agente")).toHaveValue("Brain");
+    await expect(page.getByLabel("Fuso horário")).toHaveValue("America/Sao_Paulo");
     await page.getByLabel("Seu nome").fill("Codex E2E verificado");
     await page.getByLabel("Nome do agente").fill("Brain Online");
     await page.getByRole("button", { name: "Salvar preferências" }).click();
 
-    await expect(page).toHaveURL(/\/pt-BR\/app\/settings\?saved=1$/);
+    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
 
     const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: "POST",
