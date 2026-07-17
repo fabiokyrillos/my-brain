@@ -19,7 +19,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete password recovery code: validated request, callback/code exchange, reset form, password update, safe redirect, localized errors, and E2E specification.
 - [x] Validate signup server-side with Zod, strong password policy, password confirmation, normalized email, safe error mapping, and E2E specification.
 - [ ] Execute the authenticated signup/recovery Playwright journeys against the confirmed remote Supabase project and redirect allowlist.
-- [ ] Add complete mobile access to every information-architecture destination without crowding the primary bottom navigation.
+- [x] Add complete mobile access to every information-architecture destination without crowding the primary bottom navigation.
 - [ ] Remove direct user mutations from audit, undo, interpretation, embedding, message, summary, heartbeat, job, and other domain-controlled records.
 - [ ] Enforce ownership on relationships using composite foreign keys or validated security-definer RPCs; add cross-user denial tests.
 - [ ] Make heartbeat evaluation user-timezone-aware and locale-aware.
@@ -89,7 +89,6 @@ Do not start these during Sprint 1.5.
 ## Known bugs and risks
 
 - [ ] Password recovery and signup now have explicit PKCE contracts but still require proof against the remote redirect allowlist.
-- [ ] Mobile users cannot visibly reach all authenticated destinations.
 - [ ] Some RLS policies allow owners to mutate append-only/domain-controlled rows.
 - [ ] Relationship rows can carry the current user's `user_id` while referencing another user's guessed entity ID.
 - [ ] Heartbeat runs can use database dates instead of user-local dates, abort batches on one failure, and dismiss over-cap work.

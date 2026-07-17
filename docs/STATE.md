@@ -23,7 +23,7 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 
 ## Pending or incomplete functionality
 
-- Sprint 1.5 critical fixes: complete mobile navigation, RLS hardening, relationship ownership enforcement, heartbeat corrections, pagination, and consistent Supabase error handling.
+- Sprint 1.5 critical fixes: RLS hardening, relationship ownership enforcement, heartbeat corrections, pagination, and consistent Supabase error handling.
 - The online signup/recovery Playwright journeys are implemented but still require the remote credentials/redirect allowlist validation gate.
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
 - AI Routing and Cost Control requires behavioral SQL tests, remote migration validation/application, dashboard smoke tests, documentation, and a release commit.
@@ -131,7 +131,7 @@ These percentages apply only to modules imported by the test suite; they are not
 
 - [x] Establish permanent state, decision, changelog, and backlog documents.
 - [x] Fix password recovery and signup validation locally; online proof remains in the deployment gate.
-- [ ] Complete mobile navigation.
+- [x] Complete mobile navigation with an accessible overflow menu.
 - [ ] Harden RLS and relationship ownership.
 - [ ] Correct heartbeat behavior.
 - [ ] Add pagination and consistent Supabase error handling.

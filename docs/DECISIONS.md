@@ -102,3 +102,14 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** Use explicit same-locale callback URLs and allowlisted continuations, validate credentials with Zod, require a 12-character mixed password plus confirmation, update the password only in an authenticated recovery session, then sign out and require a fresh login. Hide Google OAuth until its provider is configured and verified.
 - **Reason:** The server-side PKCE flow matches the SSR architecture, prevents open redirects, gives deterministic errors, and avoids presenting an integration that cannot succeed.
 - **Consequences:** Supabase redirect allowlists must include the callback URLs in each environment. Changing the password policy later requires coordinated UI/schema/test updates. Google OAuth returns only through a future ADR and end-to-end proof.
+
+## ADR-010 — Mobile primary navigation with accessible overflow
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** The desktop rail exposed the application areas, but the mobile bar rendered only the first four entries and quick capture.
+- **Problem:** Most authenticated destinations were not visibly reachable on mobile without a direct URL.
+- **Alternatives considered:** Put all links in the bottom bar; replace the bar with a drawer; keep four primary links and expose the remaining destinations in a native overflow menu.
+- **Decision:** Preserve Home, Today, Inbox, Tasks, and quick capture as the persistent mobile controls, then expose every remaining destination in a localized native `details/summary` overflow menu.
+- **Reason:** It keeps the frequent actions stable, uses keyboard-accessible browser semantics, and makes the complete information architecture reachable without crowding the viewport.
+- **Consequences:** New authenticated destinations must be classified as primary or overflow and added to the mobile navigation regression test. The overflow must retain 44-pixel touch targets and remain within the viewport.

@@ -10,6 +10,7 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - Completed password-recovery journey with PKCE callback continuation, reset page, validated password update, session close, and fresh-login confirmation.
 - Zod authentication schemas and regression tests for signup, sign-in, recovery, password strength, and confirmation.
 - Public and online Playwright coverage for signup/reset form contracts and remote signup/recovery journeys.
+- Complete mobile navigation overflow with localized access to every authenticated destination and a dedicated online mobile smoke test.
 
 ### Changed
 
@@ -24,7 +25,6 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 ### Pending in this sprint
 
-- Complete mobile navigation.
 - RLS and relationship ownership hardening.
 - Heartbeat correctness and delivery semantics.
 - Pagination and Supabase error handling.
