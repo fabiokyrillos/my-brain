@@ -77,40 +77,40 @@ export function isDailyCycleSerializable(value: unknown): value is SerializableV
 }
 
 export type AvailableAction = {
-  id: DailyCycleAction;
-  href?: string;
+  readonly id: DailyCycleAction;
+  readonly href?: string;
 };
 
 export type CaptureReceipt = {
-  entryId: string;
-  persisted: true;
-  productState: ProductState;
-  messageKey: DailyCycleMessageKey;
-  safeHref?: string;
-  replayed: boolean;
+  readonly entryId: string;
+  readonly persisted: true;
+  readonly productState: ProductState;
+  readonly messageKey: DailyCycleMessageKey;
+  readonly safeHref?: string;
+  readonly replayed: boolean;
 };
 
 export type InboxItemView = {
-  entryId: string;
-  title: string;
-  originalPreview: string;
-  productState: ProductState;
-  attentionReason?: AttentionReason;
-  significantAt: string;
-  availableActions: readonly AvailableAction[];
-  originalPreserved: boolean;
+  readonly entryId: string;
+  readonly title: string;
+  readonly originalPreview: string;
+  readonly productState: ProductState;
+  readonly attentionReason?: AttentionReason;
+  readonly significantAt: string;
+  readonly availableActions: readonly AvailableAction[];
+  readonly originalPreserved: boolean;
 };
 
 export type NeedsAttentionItemView = {
-  key: string;
-  kind: AttentionReason;
-  entryId: string;
-  title: string;
-  explanation: string;
-  primaryAction: AvailableAction;
-  secondaryAction?: AvailableAction;
-  occurredAt: string;
-  groupKey: string;
+  readonly key: string;
+  readonly kind: AttentionReason;
+  readonly entryId: string;
+  readonly title: string;
+  readonly explanation: string;
+  readonly primaryAction: AvailableAction;
+  readonly secondaryAction?: AvailableAction;
+  readonly occurredAt: string;
+  readonly groupKey: string;
 };
 
 export type HumanFieldView = {
@@ -189,11 +189,11 @@ export const workItemOrigins = ["you", "brain"] as const;
 export type WorkItemOrigin = (typeof workItemOrigins)[number];
 
 export type WorkItemView = {
-  taskId: string;
-  title: string;
-  description?: string;
-  dueAt?: string;
-  humanState: WorkItemHumanState;
-  origin: WorkItemOrigin;
-  availableActions: readonly AvailableAction[];
+  readonly taskId: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly dueAt?: string;
+  readonly humanState: WorkItemHumanState;
+  readonly origin: WorkItemOrigin;
+  readonly availableActions: readonly AvailableAction[];
 };

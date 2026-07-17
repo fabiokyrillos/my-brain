@@ -2,6 +2,27 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.3 product projection contracts
+
+### Added
+
+- Pure mappers in `daily-cycle` for `CaptureReceipt`, `InboxItemView`, `NeedsAttentionItemView`, and `WorkItemView`, plus serializable source contracts for future server-side adapters.
+- Immutable product DTO outputs with cloned/frozen action data, strict required-field validation, safe local destinations, internal task-status-to-human-state conversion, and `null` fail-closed results for invalid or unknown inputs.
+- Focused architecture tests that prohibit React, Supabase, `database.types`, direct table access, and RPC calls in the projection mapper boundary.
+- Slice evidence report at `docs/reports/PHASE_2X_SLICE_03_REPORT.md`.
+
+### Changed
+
+- The four existing product DTO contracts and nested available actions are now explicitly readonly, so future UI consumers cannot mutate their public shape through TypeScript.
+- Permanent state and backlog now record the completed projection foundation and that Slice 2X.4 has not started.
+
+### Verification
+
+- Focused projection/lifecycle/contract Vitest: 3 files and 23 tests passing.
+- Full Vitest: 47 files and 204 tests passing.
+- ESLint, TypeScript, the Next.js 16.2.10 production build, and `git diff --check` passed.
+- No migration, RPC, Edge Function, route, UI, analytics integration, Playwright, or remote smoke was required or executed because this slice has no runtime consumer.
+
 ## 2026-07-17 — Phase 2X Slice 2X.2 private product-events foundation
 
 ### Added
