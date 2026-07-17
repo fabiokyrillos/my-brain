@@ -33,6 +33,10 @@ const analysisSchema = {
   },
 };
 
+const JOB_LEASE_SECONDS = 300;
+const OPENAI_TIMEOUT_MS = 120_000;
+const RETRY_BASE_DELAY_SECONDS = 60;
+
 function outputText(response: Record<string, unknown>) {
   const output = Array.isArray(response.output) ? response.output : [];
   for (const item of output as Array<{
@@ -80,15 +84,28 @@ Deno.serve(async (request) => {
   }
   const body = await request.json().catch(() => ({}));
   const jobId = typeof body.jobId === "string" ? body.jobId : "";
+  const workerId = `process-jobs:${crypto.randomUUID()}`;
+  const processingStartedAt = Date.now();
   const { data: job, error: claimError } = await service.rpc(
     "claim_attachment_job",
-    { p_job_id: jobId, p_user_id: user.id },
+    {
+      p_job_id: jobId,
+      p_user_id: user.id,
+      p_worker_id: workerId,
+      p_lease_seconds: JOB_LEASE_SECONDS,
+    },
   );
-  if (claimError || !job)
+  if (claimError) {
+    console.error("Job claim failed", { jobId, code: claimError.code });
+    return Response.json({ error: "Job is not available" }, { status: 409 });
+  }
+  if (!job)
     return Response.json({ error: "Job is not available" }, { status: 409 });
   const attachmentId = job.payload?.attachment_id;
 
   try {
+    if (typeof attachmentId !== "string")
+      throw new Error("Attachment job payload is invalid");
     const { data: attachment, error } = await service
       .from("attachments")
       .select("*")
@@ -96,6 +113,56 @@ Deno.serve(async (request) => {
       .eq("user_id", user.id)
       .single();
     if (error || !attachment) throw new Error("Attachment not found");
+
+    const existingInterpretation = requireServiceData(
+      await service
+        .from("attachment_interpretations")
+        .select("description,extracted_text,model")
+        .eq("attachment_id", attachment.id)
+        .eq("user_id", user.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      "load existing attachment interpretation",
+    );
+    if (existingInterpretation) {
+      requireServiceSuccess(
+        await service
+          .from("attachments")
+          .update({
+            status: "ready",
+            description: existingInterpretation.description,
+            extracted_text: existingInterpretation.extracted_text,
+            processing_error: null,
+          })
+          .eq("id", attachment.id),
+        "restore completed attachment state",
+      );
+      const completed = requireServiceData(
+        await service.rpc("complete_job", {
+          p_job_id: job.id,
+          p_worker_id: workerId,
+          p_result: {
+            attachment_id: attachment.id,
+            model: existingInterpretation.model,
+            reused: true,
+          },
+        }),
+        "complete restored attachment job",
+      );
+      if (!completed) throw new Error("Job lease is no longer active");
+      console.info("Attachment job completed from persisted interpretation", {
+        jobId: job.id,
+        attempt: job.attempts,
+        durationMs: Date.now() - processingStartedAt,
+      });
+      return Response.json({
+        ok: true,
+        attachmentId: attachment.id,
+        reused: true,
+      });
+    }
+
     requireServiceSuccess(
       await service
         .from("attachments")
@@ -131,6 +198,7 @@ Deno.serve(async (request) => {
         authorization: `Bearer ${openaiKey}`,
         "content-type": "application/json",
       },
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       body: JSON.stringify({
         model:
           preferences?.file_model ??
@@ -215,51 +283,72 @@ Deno.serve(async (request) => {
         .eq("id", attachment.id),
       "mark attachment ready",
     );
-    requireServiceSuccess(
-      await service
-        .from("jobs")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          result: { attachment_id: attachment.id, model },
-        })
-        .eq("id", job.id),
+    const completed = requireServiceData(
+      await service.rpc("complete_job", {
+        p_job_id: job.id,
+        p_worker_id: workerId,
+        p_result: { attachment_id: attachment.id, model },
+      }),
       "complete attachment job",
     );
+    if (!completed) throw new Error("Job lease is no longer active");
+    console.info("Attachment job completed", {
+      jobId: job.id,
+      attempt: job.attempts,
+      durationMs: Date.now() - processingStartedAt,
+    });
     return Response.json({ ok: true, attachmentId: attachment.id });
   } catch (error) {
     const safeError =
       error instanceof Error
         ? error.message.slice(0, 500)
         : "Attachment processing failed";
-    const delayMinutes = Math.min(60, 2 ** Number(job.attempts ?? 1));
-    const failedJob = await service
-      .from("jobs")
-      .update({
-        status: "failed",
-        error: safeError,
-        next_attempt_at: new Date(
-          Date.now() + delayMinutes * 60_000,
-        ).toISOString(),
-      })
-      .eq("id", job.id);
-    if (failedJob.error)
+    const failedJob = await service.rpc("fail_job", {
+      p_job_id: job.id,
+      p_worker_id: workerId,
+      p_error: safeError,
+      p_base_delay_seconds: RETRY_BASE_DELAY_SECONDS,
+    });
+    if (failedJob.error) {
       console.error("Failed to persist job failure", {
         code: failedJob.error.code,
       });
-    if (attachmentId) {
+    }
+    if (failedJob.data && attachmentId) {
       const failedAttachment = await service
         .from("attachments")
         .update({
           status: "failed",
-          processing_error: "A análise falhou e pode ser tentada novamente.",
+          processing_error: failedJob.data.status === "exhausted"
+            ? "A análise não pôde ser concluída após várias tentativas."
+            : "A análise falhou e poderá ser tentada novamente.",
         })
-        .eq("id", attachmentId);
+        .eq("id", attachmentId)
+        .neq("status", "ready");
       if (failedAttachment.error)
         console.error("Failed to persist attachment failure", {
           code: failedAttachment.error.code,
         });
     }
-    return Response.json({ error: "Processing failed" }, { status: 500 });
+    console.warn("Attachment job failed", {
+      jobId: job.id,
+      attempt: job.attempts,
+      status: failedJob.data?.status ?? "lease_lost",
+      durationMs: Date.now() - processingStartedAt,
+    });
+    if (!failedJob.data)
+      return Response.json(
+        { error: "Job lease is no longer active" },
+        { status: 409 },
+      );
+    return Response.json(
+      {
+        error: "Processing failed",
+        code: failedJob.data.status === "exhausted"
+          ? "job_exhausted"
+          : "job_retry_scheduled",
+      },
+      { status: 500 },
+    );
   }
 });
