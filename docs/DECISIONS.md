@@ -179,3 +179,14 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** Follow the reconciled slices in `PHASE_2_PLAN.md`. Start with additive leased queue semantics, atomic recovery, bounded retry/exhaustion, stale-worker protection, and minimal observability, without introducing a new queue service or a generic orchestration framework.
 - **Reason:** This preserves proven architecture, fixes the highest compounding risk first, and provides exactly the reliability required by current and near-term Phase 2 processing.
 - **Consequences:** Migration `019` must remain compatible with the deployed worker during rollout. Later slices extend existing domain models and must not recreate complete features or bypass the leased job contract.
+
+## ADR-017 — Database-owned leased job transitions
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** The attachment worker previously claimed with a row lock but then completed or failed jobs through direct service-role updates. A crashed or delayed worker could leave `running` forever or overwrite recovery.
+- **Problem:** Worker identity, lease expiry, retry eligibility, terminal exhaustion, and stale-worker rejection must remain correct across concurrent Edge Function instances and partial failures.
+- **Alternatives considered:** Keep transitions in Edge Function code; add only `locked_at`; introduce an external queue; make PostgreSQL RPCs own the complete leased state machine.
+- **Decision:** PostgreSQL is authoritative for claim, completion, failure, backoff, exhaustion, reaping, and metrics. `process-jobs` receives a unique identity, uses a bounded lease/timeout, and can change terminal state only through RPCs that match its active unexpired lease.
+- **Reason:** Atomic database transitions preserve concurrency and recovery invariants without adding a platform, and they are independently testable through pgTAP and disposable remote smoke.
+- **Consequences:** Expired workers cannot commit job state. The per-minute reaper converts expired work to recoverable `failed` or terminal `exhausted`. Current failed attachment retry remains an authenticated owning-user action after `next_attempt_at`; an unattended consumer requires a separate concrete workflow and review.

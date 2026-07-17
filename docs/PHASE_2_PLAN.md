@@ -1,6 +1,6 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: in progress  
+Status: Phase 2A complete; Phase 2B next
 Started: 2026-07-17  
 Branch: `codex/phase-2-intelligent-capture`
 
@@ -251,3 +251,34 @@ Each slice has the same smaller gate for its affected surface and cannot be mark
 - Add focused Vitest/component coverage for any TypeScript helper or UI behavior introduced.
 - Run, in order: focused red tests, focused green tests, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, relevant Playwright, `npx supabase db lint --linked --level error`, migration synchronization, Edge Function deployment, and `npm run test:remote`.
 - Update `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md` if the implemented design differs from ADR-016, and this plan with exact evidence and commit hashes after the slice.
+
+## Phase 2A execution record
+
+Delivered on 2026-07-17:
+
+- Migration `202607170019_job_queue_reliability.sql` is synchronized locally/remotely. It adds leased claims, worker identity, expiry, lease-owned completion/failure, exponential backoff, terminal exhaustion, sanitized errors, metrics, eligible/expired indexes, and the scheduled `my-brain-job-reaper`.
+- `process-jobs` version 9 is active with a 300-second lease, 120-second OpenAI timeout, persisted-interpretation reuse, no direct job mutations, and bounded operational logs.
+- The Files route shows the owning user's recoverable and terminal jobs, attempts, retry window, and no raw internal error. The retry Server Action validates Zod input, session, ownership, state, backoff, and the persisted post-invocation result.
+- `src/lib/supabase/database.types.ts` was generated from the linked `public` schema and its `jobs` row type is used by the Phase 2A page. Remaining global client typing is tracked because existing preference literals and pgvector representations require domain validation rather than casts.
+- The original plan's `scripts/remote-supabase-smoke.mjs` remained the complete regression smoke; the focused lease/concurrency coverage was isolated in `scripts/remote-job-reliability-smoke.mjs` so it stays deterministic and does not require an extra paid provider call.
+
+Verification evidence:
+
+- ESLint: passed, zero errors.
+- TypeScript: passed, zero errors.
+- Vitest: 29 files, 93 tests passed.
+- Build: Next.js 16.2.10 production build passed.
+- Playwright: linked intelligent-capture/file journey passed 2/2 on desktop and mobile.
+- Database: migrations `001`–`019` synchronized; linked db lint passed at error level.
+- Remote jobs: exclusive lease, stale-worker denial, expired recovery, exhaustion, sanitization, metrics, cross-owner denial, and RLS passed.
+- Complete remote smoke: auth, atomic settings, RLS, ownership, heartbeat, AI ledger, aggregation, and deployed file worker passed.
+- pgTAP: `supabase/tests/job_queue_reliability.sql` is committed; CLI execution remains blocked only by unavailable Docker Desktop and is not claimed as run.
+
+Implementation commits:
+
+- `437b626` — engineering standards and reconciled plan.
+- `c8365b8` — failing-first lease/recovery contracts and remote smoke.
+- `fe2f464` — migration `019` leased state machine and reaper.
+- `ab902e9` — leased worker, timeout, idempotent persisted-result reuse.
+- `86fa041` — owning-user failure visibility and retry action.
+- `ac9f08e` — generated Supabase job contract.

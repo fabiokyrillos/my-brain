@@ -2,6 +2,34 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2A operational reliability
+
+### Added
+
+- Migration `019` with worker leases (`locked_at`, `locked_by`, `lease_expires_at`), terminal `exhausted` state, failure timestamp, eligible/expired indexes, leased claim/complete/fail RPCs, queue metrics, and a per-minute expired-job reaper.
+- pgTAP contract plus a disposable remote job smoke for exclusive claims, stale-worker denial, expired recovery, bounded exhaustion, error sanitization, metrics, cross-owner denial, and RLS.
+- Owning-user Files UI for recoverable/terminal jobs, attempt counts, retry windows, and a validated authenticated retry Server Action.
+- Linked Supabase-generated TypeScript schema; the `jobs` row contract is used by the Phase 2A page.
+
+### Changed
+
+- `process-jobs` version 9 now uses a unique worker identity, 300-second lease, 120-second OpenAI timeout, persisted interpretation reuse, lease-validated completion/failure, sanitized bounded errors, backoff, and operational logs.
+- Successful or failed attachment processing no longer mutates `jobs` directly from the Edge Function.
+- Failed attachment retry is explicit and user-driven after the database `next_attempt_at`; no generic unattended consumer was introduced without a concrete workflow.
+
+### Verification
+
+- ESLint and TypeScript passed with zero errors.
+- Vitest passed 29 files and 93 tests.
+- Next.js 16.2.10 production build passed.
+- Linked intelligent-capture/file Playwright passed 2/2 across desktop and mobile.
+- Local/remote migrations are synchronized through `019`; linked database lint passed at error level.
+- Remote job smoke and complete remote smoke passed, including RLS, ownership, heartbeat, AI ledger/aggregation, and real deployed file processing.
+
+### Known external limitation
+
+- Docker Desktop remains unavailable, so the new pgTAP file could not execute locally through the Supabase CLI. Equivalent high-risk behavior passed against disposable remote data.
+
 ## 2026-07-17 — Phase 2 planning and engineering contract
 
 ### Added

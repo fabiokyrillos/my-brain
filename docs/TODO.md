@@ -1,7 +1,7 @@
 # Project Backlog
 
 Last updated: 2026-07-17  
-Active milestone: Phase 2A — operational reliability
+Active milestone: Phase 2B — interpretation revisions and trust foundation
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
 
@@ -9,12 +9,21 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 
 - [x] Adopt permanent engineering standards in `ENGINEERING_STANDARDS.md`.
 - [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
-- [ ] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
+- [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
 - [ ] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
 - [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
 - [ ] Complete Phase 2F retroactive history, mobile/localization/accessibility finish, full gates, and closeout.
+
+### Phase 2A evidence
+
+- [x] Apply and synchronize migration `019` with leased claims, stale-worker protection, retry/backoff, terminal exhaustion, metrics, and a per-minute reaper.
+- [x] Deploy `process-jobs` version 9 with authenticated ownership, 300-second lease, 120-second timeout, persisted-result reuse, and lease-validated terminal transitions.
+- [x] Expose failed/exhausted jobs, attempts, retry window, sanitized state, and a backoff-gated retry action to the owning user.
+- [x] Generate the linked Supabase TypeScript schema and use its `jobs` contract in the Phase 2A page.
+- [x] Pass lint, typecheck, 29 Vitest files/93 tests, production build, linked desktop/mobile Playwright 2/2, migration sync, db lint, remote job reliability smoke, and complete remote smoke.
+- [x] Keep Docker-backed pgTAP execution explicit as an external limitation; structural pgTAP is committed and equivalent remote behavior passed.
 
 ## Completed milestone — Sprint 1.5
 
@@ -76,9 +85,10 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 
 ## Current backlog — Phase 2 candidates
 
-Plan the first vertical slice before implementation. Do not restart the architecture.
+Continue with the reconciled slices. Do not restart the architecture.
 
-- [ ] Generic scheduled worker with leases, retries, backoff, and stale-job recovery.
+- [x] Harden the current jobs queue and attachment worker with leases, retries/backoff, stale-job recovery, exhaustion, metrics, and user visibility.
+- [ ] Add a generic unattended due-job consumer only when a concrete background workflow requires it; current attachment retries are explicit and user-initiated after persisted backoff.
 - [ ] Automatic daily/weekly review scheduling and verified delivery.
 - [ ] Task editing and richer lifecycle controls.
 - [ ] Hybrid semantic/lexical search with measured relevance.
@@ -87,6 +97,7 @@ Plan the first vertical slice before implementation. Do not restart the architec
 
 ## Technical improvements
 
+- [ ] Migrate the remaining Supabase clients to generated `Database` types domain by domain; validate existing preference literal unions and pgvector `number[]`/wire representations instead of casting them away.
 - [ ] Add cached/typed data-access helpers to reduce repeated auth and query boilerplate.
 - [ ] Use `getClaims()` where appropriate in request protection while retaining authoritative user checks for sensitive mutations.
 - [ ] Split monolithic settings and action modules by domain responsibility.

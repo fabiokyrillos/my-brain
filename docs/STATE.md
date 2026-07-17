@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Phase 2A — operational reliability in progress
+Current phase: Phase 2A complete — Phase 2B is next
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, rendered in Playwright, and remotely smoke-tested. The Sprint 1.5 quality gate is complete. Phase 2 has started with mandatory engineering standards, a reconciled reality-based plan, and operational job reliability as the first implementation slice.
+Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2 now has mandatory engineering standards and a reality-based plan. Phase 2A is implemented and deployed through migration `019` and `process-jobs` version 9: leased claims, worker identity, stale-worker denial, bounded retry/exhaustion, a scheduled reaper, timeout, persisted metrics, user-visible failure/retry state, and generated job types are remotely verified.
 
 ## Implemented functionality
 
@@ -21,12 +21,15 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 - Scheduled heartbeat generation with user-local dates/locale, quiet hours, rolling cooldown, lossless daily caps, per-user locks, and failure isolation.
 - Paginated list routes, batched signed URLs, shared Supabase result contracts, and an authenticated application error boundary.
 - AI route selection, pricing catalog, append-only usage ledger, database-side complete cost aggregation, settings, and cost dashboard.
-- Remote `process-jobs` version 8 with authenticated ownership claim, explicit persistence checks, usage recording, retries, and a real file-analysis smoke pass.
+- Remote `process-jobs` version 9 with authenticated ownership, 300-second leases, 120-second external timeout, idempotent reuse of persisted interpretations, lease-validated completion/failure, bounded backoff/exhaustion, and real file-analysis smoke coverage.
+- Scheduled per-minute abandoned-job reaper, service-only queue metrics, user-safe recoverable/terminal failure visibility, and a backoff-gated retry Server Action.
+- Linked Supabase-generated TypeScript schema with the Phase 2A `jobs` contract used by the Files route.
 
 ## Pending or incomplete functionality
 
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
-- Generic scheduled worker, automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
+- A generic unattended due-job consumer is not deployed because no current flow requires one. Failed attachment retries are explicit, user-initiated, and blocked until persisted `next_attempt_at`; add an unattended consumer only with a concrete background workflow.
+- Automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
 - The expanded pgTAP suite is committed but cannot execute through the Supabase CLI on this workstation until Docker Desktop is available; equivalent high-risk paths passed the disposable remote smoke suite.
 - Hosted Supabase email delivery is quota-limited. Signup/recovery return a localized throttling message, but production delivery requires custom SMTP before launch.
@@ -34,8 +37,8 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 
 ## Next priorities
 
-1. Plan Phase 2 as an incremental vertical slice on the current architecture.
-2. Prioritize job leases/reaper/backoff before expanding background automation.
+1. Begin Phase 2B with immutable interpretation correction versions and the trust/entity-resolution foundation defined in `PHASE_2_PLAN.md`.
+2. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 3. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
 4. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
 
@@ -44,8 +47,8 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 - `src/app`: App Router pages, layouts, styles, auth callback, and localized application routes.
 - `src/features`: domain server actions and UI for auth, capture, agent, profile, shell, and operations.
 - `src/lib`: Supabase clients, AI provider/routing/usage helpers, validation, i18n, and shared utilities.
-- `src/types`: application and generated-compatible database types.
-- `supabase/migrations`: append-only schema history (`001` through `018`).
+- `src/lib/supabase/database.types.ts`: linked Supabase-generated `public` schema used incrementally by typed data boundaries.
+- `supabase/migrations`: append-only schema history (`001` through `019`).
 - `supabase/functions/process-jobs`: authenticated Edge Function worker for queued AI jobs.
 - `supabase/tests`: pgTAP coverage for Phase 1 RLS, intelligent capture, and AI usage.
 - `e2e`: public foundation, online auth, and intelligent capture Playwright suites.
@@ -60,7 +63,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 - Work management: tasks, projects, people, reminders, reviews, and waiting-related records.
 - Agent operations: conversations, messages, operations, undo records, audit logs, jobs, notifications, heartbeat runs, and delivery state.
 - Cost control: AI model pricing, AI usage events, `record_ai_usage`, and `get_ai_cost_summary`.
-- All 18 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint passes at error level.
+- All 19 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint passes at error level.
 
 ## Existing integrations
 
@@ -72,10 +75,12 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 
 ## Existing jobs
 
-- `jobs` queue for attachment/background AI processing.
-- `process-jobs` Edge Function for authenticated job execution.
+- `jobs` queue with idempotency keys, atomic leased claims, worker identity, expiry, bounded attempts/backoff, recoverable `failed`, terminal `exhausted`, sanitized last error, and service metrics.
+- `process-jobs` Edge Function version 9 for authenticated attachment execution with timeout, persisted-result reuse, and lease-owned completion/failure.
+- `my-brain-job-reaper` pg_cron entry runs every minute and recovers expired leases or makes exhausted work terminal.
+- The Files route exposes only the current user's failed jobs, attempt state, retry window, terminal state, and authenticated retry action without rendering internal errors.
 - Database heartbeat functions and scheduled heartbeat entry points.
-- A generic periodic worker and lease/reaper strategy are not yet implemented.
+- There is intentionally no generic unattended due-job consumer yet; the current attachment retry path is explicit and user-driven after database backoff.
 
 ## Existing heartbeats
 
@@ -94,7 +99,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 
 Verified on 2026-07-17:
 
-- Vitest: 27 files and 87 tests passing.
+- Vitest: 29 files and 93 tests passing.
 - Statements: 93.66% (266/284).
 - Branches: 61.61% (305/495).
 - Functions: 90.62% (87/96).
@@ -102,11 +107,19 @@ Verified on 2026-07-17:
 - Playwright without online credentials: 4 public tests passing and 10 expected online skips.
 - Playwright with linked remote credentials: 11 tests passing and 3 explicit skips (desktop-only mobile-nav exclusion, mobile duplicate signup exclusion, and hosted email quota exhaustion).
 - Final targeted recovery journey after the harness hardening: 1/1 passing.
+- Phase 2A linked intelligent-capture/file journey: 2/2 passing across desktop and mobile.
+- Phase 2A remote job smoke: exclusive lease, stale-worker denial, recovery, exhaustion, sanitization, metrics, and RLS passing.
 
 Coverage percentages apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to, these percentages.
 
 ## Important recent commits
 
+- `ac9f08e` — `chore(supabase): generate typed job queue contract` (2026-07-17).
+- `86fa041` — `feat(files): expose recoverable and terminal job failures` (2026-07-17).
+- `ab902e9` — `feat(worker): enforce lease ownership and bounded retries` (2026-07-17).
+- `fe2f464` — `feat(jobs): add leased claims and abandoned job recovery` (2026-07-17).
+- `c8365b8` — `test(jobs): specify lease and recovery invariants` (2026-07-17).
+- `437b626` — `docs(phase-2): adopt engineering standards and reconciled plan` (2026-07-17).
 - `a89210a` — `test: close remote foundation quality gate` (2026-07-17).
 - `5099f81` — `feat: harden foundation and complete AI cost control` (2026-07-17).
 - `40272ba` — `fix: expose complete mobile navigation` (2026-07-17).
@@ -116,7 +129,8 @@ Coverage percentages apply only to modules imported by Vitest; they are not repo
 
 ## Technical pending items
 
-- No job lease/reaper and incomplete generic background scheduler deployment.
+- Generated Supabase types are active for the Phase 2A job boundary; legacy global client typing still exposes preference-literal and pgvector representation mismatches and must be migrated domain by domain.
+- A generic unattended worker remains intentionally absent until a concrete background flow requires due-job pickup.
 - Generic page metadata and partially localized operational copy.
 - CI does not yet enforce Playwright, pgTAP, database lint, audit, or a meaningful coverage threshold.
 - Upload malware scanning and stronger content validation remain pre-production work.
@@ -150,5 +164,5 @@ Coverage percentages apply only to modules imported by Vitest; they are not repo
 - [x] Foundation quality gate is green.
 - [x] Remote schema, migration history, worker, RLS, ownership, heartbeat, and AI cost paths are verified.
 - [x] Remaining risks are explicit and do not require an architectural restart.
-- [ ] Write the Phase 2 vertical-slice plan before implementation.
-- [ ] Include job recovery/observability criteria in any new background workflow.
+- [x] Write the Phase 2 vertical-slice plan before implementation.
+- [x] Include and implement job recovery/observability criteria before expanding background workflows.
