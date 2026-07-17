@@ -7,7 +7,7 @@ type SchemaModule = {
 };
 
 const modulePath = `./${"schema"}.ts`;
-const schemaModule = await vi.importActual<SchemaModule>(modulePath).catch(() => ({}));
+const schemaModule = await vi.importActual<SchemaModule>(modulePath).catch(() => ({})) as SchemaModule;
 
 const validPatch = {
   entryId: "11111111-1111-4111-8111-111111111111",

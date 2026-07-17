@@ -34,7 +34,7 @@ type TrustModule = {
 };
 
 const modulePath = `./trust-${"policy"}.ts`;
-const trust = await vi.importActual<TrustModule>(modulePath).catch(() => ({}));
+const trust = await vi.importActual<TrustModule>(modulePath).catch(() => ({})) as TrustModule;
 
 const allSignals = (value: number): TrustSignals => ({
   modelConfidence: value,

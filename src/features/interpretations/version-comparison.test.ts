@@ -18,7 +18,7 @@ type ComparisonModule = {
 };
 
 const modulePath = `./version-${"comparison"}.ts`;
-const comparison = await vi.importActual<ComparisonModule>(modulePath).catch(() => ({}));
+const comparison = await vi.importActual<ComparisonModule>(modulePath).catch(() => ({})) as ComparisonModule;
 const base: Snapshot = {
   version: 1,
   summary: "Conversei com Marina.",
