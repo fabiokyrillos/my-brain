@@ -14,6 +14,7 @@ Todas as entidades do usuário carregam `user_id uuid not null`; horários usam 
 - Conteúdo: `summaries`, `attachments`, `attachment_interpretations`, `entity_attachments`.
 - Controle: `notifications`, `audit_logs`, `undo_operations`, `heartbeat_runs`, `jobs`.
 - Custos de IA: `ai_model_pricing`, `ai_usage_events`.
+- Comportamento de produto: `product_events`.
 
 ## Regras importantes
 
@@ -25,6 +26,9 @@ Todas as entidades do usuário carregam `user_id uuid not null`; horários usam 
 - Notificações usam `dedupe_key`; heartbeat registra inclusive execuções silenciosas, respeita o limite diário e permite exceção apenas para lembretes importantes.
 - Relacionamentos concretos usam FKs compostas para impedir referências a entidades de outro usuário; `entry_entities`, `entity_attachments` e `entity_tags` validam ownership polimórfico por trigger.
 - `ai_usage_events` é append-only, isolada por usuário e idempotente por request id; cada evento congela preços e custo ou permanece explicitamente `unpriced`.
+- `product_events` é um ledger privado de comportamento do funil, separado de auditoria, jobs e custos de IA. Aceita apenas os 17 eventos e propriedades versionadas em allowlist, usa `user_id` + `idempotency_key` para deduplicação e não admite captura original, resumo, títulos, respostas, evidências, prompts, conteúdo de arquivos ou erros brutos.
+- A escrita em `product_events` ocorre somente por `record_product_event` (usuário autenticado) ou `record_product_event_for_user` (somente service role/worker). A leitura é RLS do próprio usuário; não há mutação direta para `authenticated` nem `service_role`.
+- Eventos sintéticos de desenvolvimento/teste devem usar `is_synthetic = true` e ser removidos pelo cleanup descartável. A finalidade é observar a experiência, não criar histórico de domínio; a retenção máxima é 180 dias e o purge operacional deve existir antes do piloto.
 
 ## Busca vetorial
 

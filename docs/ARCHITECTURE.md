@@ -23,6 +23,7 @@ Next.js atua como backend-for-frontend autenticado. O navegador usa Supabase som
 - Proatividade: heartbeat, silêncio, deduplicação, notificações e auditoria de execuções.
 - Conteúdo: revisões persistidas, anexos privados, URLs assinadas e jobs.
 - Controle de IA: roteamento por operação, preços versionados, ledger append-only e agregação de custo no banco.
+- Observabilidade de produto: ledger privado `product_events` com taxonomia e propriedades fechadas, projeções de funil sem conteúdo pessoal e RPCs próprias; não substitui `audit_logs`, `jobs` nem `ai_usage_events`.
 
 ## Fluxo de captura
 
@@ -46,6 +47,10 @@ O pré-MVP possui tabela `jobs` com status, tentativas, próxima tentativa, prio
 ## Limite de confiança
 
 Server actions e Edge Functions validam identidade e comandos; RLS forçada continua sendo o limite multitenant. Relacionamentos concretos provam ownership com FKs compostas `(user_id, id)` e relações polimórficas usam triggers de validação. Tabelas append-only ou controladas pelo domínio não expõem mutação direta ao papel `authenticated`.
+
+## Observabilidade de produto
+
+`product_events` existe somente para entender o ciclo diário e orientar convergência de UX. O frontend trabalha com contratos serializáveis e allowlists; o limite server-only revalida a entrada e retorna apenas um acknowledgement. PostgreSQL revalida a mesma taxonomia, ownership de IDs opacos, RLS, idempotência e privilégio mínimo. A instrumentação é best effort: indisponibilidade analítica não pode modificar o resultado da ação principal. Nenhum emissor, painel ou experiência visual é criado no Slice 2X.2.
 
 ## Ambientes adiados
 

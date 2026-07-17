@@ -1557,6 +1557,57 @@ export type Database = {
           },
         ]
       }
+      product_events: {
+        Row: {
+          app_version: string
+          created_at: string
+          event_name: string
+          id: string
+          idempotency_key: string
+          is_synthetic: boolean
+          locale: string
+          properties: Json
+          session_id: string | null
+          subject_id: string | null
+          subject_type: string | null
+          surface: string
+          user_id: string
+          viewport_class: string
+        }
+        Insert: {
+          app_version: string
+          created_at?: string
+          event_name: string
+          id?: string
+          idempotency_key: string
+          is_synthetic?: boolean
+          locale: string
+          properties?: Json
+          session_id?: string | null
+          subject_id?: string | null
+          subject_type?: string | null
+          surface: string
+          user_id: string
+          viewport_class: string
+        }
+        Update: {
+          app_version?: string
+          created_at?: string
+          event_name?: string
+          id?: string
+          idempotency_key?: string
+          is_synthetic?: boolean
+          locale?: string
+          properties?: Json
+          session_id?: string | null
+          subject_id?: string | null
+          subject_type?: string | null
+          surface?: string
+          user_id?: string
+          viewport_class?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -2337,6 +2388,45 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      record_product_event: {
+        Args: {
+          p_app_version: string
+          p_event_name: string
+          p_idempotency_key?: string
+          p_is_synthetic?: boolean
+          p_locale: string
+          p_properties: Json
+          p_session_id?: string
+          p_subject_id?: string
+          p_subject_type?: string
+          p_surface: string
+          p_viewport_class: string
+        }
+        Returns: {
+          event_id: string
+          recorded: boolean
+        }[]
+      }
+      record_product_event_for_user: {
+        Args: {
+          p_app_version: string
+          p_event_name: string
+          p_idempotency_key?: string
+          p_is_synthetic?: boolean
+          p_locale: string
+          p_properties: Json
+          p_session_id?: string
+          p_subject_id?: string
+          p_subject_type?: string
+          p_surface: string
+          p_user_id: string
+          p_viewport_class: string
+        }
+        Returns: {
+          event_id: string
+          recorded: boolean
+        }[]
       }
       request_heartbeat: { Args: never; Returns: Json }
       resolve_owned_entity_exact: {

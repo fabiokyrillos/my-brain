@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.2 private product-events foundation
+
+### Added
+
+- Migration `024` with the private `product_events` ledger, forced owner RLS, minimum read grant, per-owner idempotency, bounded indexes, synthetic-test marker, and documented 180-day retention requirement.
+- Dedicated security-definer RPCs: `record_product_event` derives the authenticated owner; `record_product_event_for_user` accepts only service-role callers. Both validate the closed taxonomy, event-specific property allowlists, opaque subject ownership, and forbidden free-content fields.
+- Pure serializable TypeScript contracts for all 17 events, closed surfaces/properties, safe parser, and discriminated telemetry result; a server-only best-effort boundary and thin acknowledgement Server Action expose no raw Supabase errors.
+- Focused Vitest suites, pgTAP contract at `supabase/tests/product_events.sql`, generated `Database` schema, and a disposable remote product-events smoke command.
+- Slice evidence report at `docs/reports/PHASE_2X_SLICE_02_REPORT.md`.
+
+### Changed
+
+- Permanent architecture, database, security, state, backlog, and decision documentation now distinguish product-behavior telemetry from audit, jobs, and AI-cost ledgers.
+
+### Verification
+
+- Migration `024` is synchronized with the linked project; linked database lint at level `error` is clean and Supabase types were regenerated from the remote schema.
+- Focused contract/server/action Vitest and disposable remote product-events smoke passed. Full quality-gate counts are recorded in the Slice 2X.2 report.
+- The committed pgTAP contract could not run on this workstation: Supabase CLI requires Docker Desktop and the remote runner also reported missing `SUPABASE_DB_PASSWORD`; the remote smoke covers the same high-risk RLS, privilege, allowlist, idempotency, ownership, and cleanup paths.
+
 ## 2026-07-17 — Phase 2X Slice 2X.1 daily-cycle product contracts
 
 ### Added

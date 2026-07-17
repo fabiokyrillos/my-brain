@@ -15,6 +15,7 @@
     "test:e2e:online": "node scripts/online-playwright.mjs",
     "test:remote:interpretations": "node scripts/remote-interpretation-revisions-smoke.mjs",
     "test:remote:jobs": "node scripts/remote-job-reliability-smoke.mjs",
+    "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "openai": "^6.47.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

@@ -11,7 +11,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
 - [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
 - [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
-- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and Slice 2X.1 is complete.
+- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and Slices 2X.1 and 2X.2 are complete.
 - [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
@@ -22,7 +22,8 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Approve `PHASE_2_ARCHITECTURE_REVIEW.md`, `PHASE_2X_PRD.md`, and `PHASE_2X_IMPLEMENTATION_PLAN.md`.
 - [x] Create the reusable `reports/SLICE_REPORT_TEMPLATE.md` for 2X execution evidence.
 - [x] Complete Slice 2X.1 — daily-cycle product contracts, typed copy, deterministic fail-closed lifecycle matrix, and architecture guardrails.
-- [ ] Begin Slice 2X.2 — private product-events foundation, only after explicit authorization.
+- [x] Complete Slice 2X.2 — private product-events foundation: migration `024`, dedicated RPCs, generated types, server-only best-effort boundary, acknowledgement action, pgTAP contract, remote smoke, and retention documentation.
+- [ ] Begin Slice 2X.3 only after explicit authorization; do not add product-event emitters, UI, routes, dashboard, or a retention worker before their authorized slices.
 
 ### Phase 2B evidence
 
