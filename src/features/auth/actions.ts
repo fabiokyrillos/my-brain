@@ -83,6 +83,7 @@ export async function updatePassword(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) redirect(`/${locale}/auth/reset?error=password-update-failed`);
 
-  await supabase.auth.signOut();
+  const { error: signOutError } = await supabase.auth.signOut();
+  if (signOutError) redirect(`/${locale}/auth/reset?error=password-update-failed`);
   redirect(`/${locale}/auth/login?message=password-updated`);
 }

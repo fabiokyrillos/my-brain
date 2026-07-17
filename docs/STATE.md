@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Sprint 1.5 — Foundation hardening (critical fixes)
+Current phase: Sprint 1.5 — Full quality gate
 Source of truth order: code, database, migrations, documentation
 
 ## Status summary
 
-Phase 1 is implemented as a functional pre-MVP foundation. The current worktree also contains the nearly complete, not-yet-committed "AI Routing and Cost Control" phase. Sprint 1.5 is intentionally limited to hardening, completing that in-progress phase, and proving the foundation before Phase 2.
+Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, and remotely smoke-tested. The remaining Sprint 1.5 work is the complete local/Playwright quality gate and final closeout report.
 
 ## Implemented functionality
 
@@ -18,24 +18,25 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 - OpenAI-backed extraction, chat, summarization, embeddings, and background job processing.
 - Semantic memory infrastructure with `pgvector` and HNSW indexes.
 - Undo/audit infrastructure and entity timelines.
-- Scheduled heartbeat generation, preference limits, notification delivery state, and background processing primitives.
-- AI route selection, pricing catalog, usage ledger, cost aggregation helpers, settings, and cost dashboard are present in the worktree but not yet released.
+- Scheduled heartbeat generation with user-local dates/locale, quiet hours, rolling cooldown, lossless daily caps, per-user locks, and failure isolation.
+- Paginated list routes, batched signed URLs, shared Supabase result contracts, and an authenticated application error boundary.
+- AI route selection, pricing catalog, append-only usage ledger, database-side complete cost aggregation, settings, and cost dashboard.
+- Remote `process-jobs` version 8 with authenticated ownership claim, explicit persistence checks, usage recording, retries, and a real file-analysis smoke pass.
 
 ## Pending or incomplete functionality
 
-- Sprint 1.5 critical fixes: RLS hardening, relationship ownership enforcement, heartbeat corrections, pagination, and consistent Supabase error handling.
 - The online signup/recovery Playwright journeys are implemented but still require the remote credentials/redirect allowlist validation gate.
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
-- AI Routing and Cost Control requires behavioral SQL tests, remote migration validation/application, dashboard smoke tests, documentation, and a release commit.
 - Generic scheduled worker, automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
+- The expanded pgTAP suite is committed but cannot execute through the Supabase CLI on this workstation until Docker Desktop is available; equivalent high-risk paths passed the disposable remote smoke suite.
 
 ## Next priorities
 
-1. Complete Sprint 1.5 foundation hardening without adding product scope.
-2. Complete and deploy AI Routing and Cost Control.
-3. Run the full quality gate and resolve every regression.
-4. Reassess readiness for Phase 2 using verified evidence.
+1. Run lint, typecheck, full Vitest/coverage, production build, and complete Playwright.
+2. Resolve any regression without adding product scope.
+3. Refresh the permanent documents with final evidence and publish the Sprint 1.5 report.
+4. Reassess readiness for Phase 2.
 
 ## Existing structure
 
@@ -43,7 +44,7 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 - `src/features`: domain server actions and UI for auth, capture, agent, profile, shell, and operations.
 - `src/lib`: Supabase clients, AI provider/routing/usage helpers, validation, i18n, and shared utilities.
 - `src/types`: application and generated-compatible database types.
-- `supabase/migrations`: append-only schema history (`001` through `015`).
+- `supabase/migrations`: append-only schema history (`001` through `018`).
 - `supabase/functions/process-jobs`: authenticated Edge Function worker for queued AI jobs.
 - `supabase/tests`: pgTAP coverage for Phase 1 RLS, intelligent capture, and AI usage.
 - `e2e`: public foundation, online auth, and intelligent capture Playwright suites.
@@ -57,8 +58,8 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 - Knowledge: entries, interpretations, pending questions, memories, embeddings, summaries, attachments, and entity relationships.
 - Work management: tasks, projects, people, reminders, reviews, and waiting-related records.
 - Agent operations: conversations, messages, operations, undo records, audit logs, jobs, notifications, heartbeat runs, and delivery state.
-- Cost control (migration `015`, pending deployment validation): AI model pricing and AI usage events.
-- All 15 migrations describe 36 tables in the projected schema. The remote database state must be verified before this count is treated as deployed state.
+- Cost control: AI model pricing, AI usage events, `record_ai_usage`, and `get_ai_cost_summary`.
+- All 18 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint passes at error level.
 
 ## Existing integrations
 
@@ -70,16 +71,16 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 
 ## Existing jobs
 
-- `ai_jobs` queue for attachment/background AI processing.
+- `jobs` queue for attachment/background AI processing.
 - `process-jobs` Edge Function for authenticated job execution.
 - Database heartbeat functions and scheduled heartbeat entry points.
 - A generic periodic worker and lease/reaper strategy are not yet implemented.
 
 ## Existing heartbeats
 
-- Event-based notification generation for overdue tasks, reminders, pending questions, reviews, and inactivity signals.
-- Per-user quiet hours, daily caps, cooldown controls, and importance preferences are represented in the schema/functions.
-- Sprint 1.5 must correct timezone/locale behavior, failure isolation, concurrency, and delivery-cap semantics so work is delayed rather than discarded.
+- Event-based notification generation for overdue/stale tasks and due reminders.
+- Per-user quiet hours, locale/timezone day boundaries, daily caps, rolling cooldown, importance override, advisory locks, and failure isolation are active.
+- Over-cap candidates remain pending and were verified remotely by withholding then delivering the same reminder after the cap changed.
 
 ## Existing tests
 
@@ -122,9 +123,8 @@ These percentages apply only to modules imported by the test suite; they are not
 
 ## External pending items
 
-- Confirm access to the linked Supabase project and remote migration history.
-- Confirm remote secrets required by `process-jobs` and OpenAI integrations.
 - Provide/use online test credentials for authenticated Playwright smoke tests.
+- Start Docker Desktop to execute the expanded pgTAP files through the Supabase CLI.
 - Keep Google OAuth disabled until a provider, redirect URLs, and secrets are configured and verified.
 
 ## Sprint 1.5 checklist
@@ -132,13 +132,13 @@ These percentages apply only to modules imported by the test suite; they are not
 - [x] Establish permanent state, decision, changelog, and backlog documents.
 - [x] Fix password recovery and signup validation locally; online proof remains in the deployment gate.
 - [x] Complete mobile navigation with an accessible overflow menu.
-- [ ] Harden RLS and relationship ownership.
-- [ ] Correct heartbeat behavior.
-- [ ] Add pagination and consistent Supabase error handling.
+- [x] Harden RLS and relationship ownership.
+- [x] Correct heartbeat behavior.
+- [x] Add pagination and consistent Supabase error handling.
 - [x] Hide the unconfigured Google OAuth entry point.
-- [ ] Finish AI Routing and Cost Control tests and migration.
-- [ ] Validate the remote database and deployed worker.
-- [ ] Smoke-test the cost dashboard.
+- [x] Finish AI Routing and Cost Control tests and migrations.
+- [x] Validate the remote database and deployed worker.
+- [x] Smoke-test the cost aggregation and deployed AI worker; rendered dashboard remains in the Playwright gate.
 - [ ] Run lint, typecheck, unit tests, coverage, build, and Playwright.
 - [ ] Update all four permanent project documents with final evidence.
 - [ ] Commit the completed sprint in reviewable units.

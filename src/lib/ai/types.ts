@@ -1,4 +1,5 @@
 import type { EntryExtraction } from "./extraction-schema";
+import type { AIUsageDetails } from "./usage-details";
 
 export type ExtractionInput = {
   content: string;
@@ -8,18 +9,15 @@ export type ExtractionInput = {
   knownContext?: string;
 };
 
-export type ExtractionResult = {
+export type ExtractionResult = AIUsageDetails & {
   extraction: EntryExtraction;
   model: string;
-  inputTokens: number;
-  outputTokens: number;
   rawOutput: unknown;
 };
 
-export type EmbeddingResult = {
+export type EmbeddingResult = AIUsageDetails & {
   embedding: number[];
   model: string;
-  inputTokens: number;
 };
 
 export type ChatSource = {
@@ -39,10 +37,8 @@ export type ChatInput = {
   agentStyle?: string;
 };
 
-export type ChatResult = {
+export type ChatResult = AIUsageDetails & {
   answer: string;
   citedSourceIds: string[];
   model: string;
-  inputTokens: number;
-  outputTokens: number;
 };

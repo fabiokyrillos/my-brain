@@ -1,10 +1,10 @@
 # Implementation Plan
 
-Atualizado em 2026-07-16. “Concluído” abaixo significa fluxo vertical testado; itens parciais permanecem explicitamente listados.
+Atualizado em 2026-07-17. “Concluído” abaixo significa fluxo vertical testado; itens parciais permanecem explicitamente listados.
 
 ## Fase 1 — Fundação: concluída no pré-MVP
 
-Next.js estrito, Supabase online, auth por e-mail, recuperação, perfil, RLS, shell responsivo e PT-BR/EN. Google OAuth foi adiado por decisão do usuário.
+Next.js estrito, Supabase online, auth por e-mail, signup validado, recuperação PKCE completa, settings atômicas, RLS/ownership endurecidos, shell responsivo e PT-BR/EN. Google OAuth permanece oculto até configuração e E2E dedicados.
 
 ## Fase 2 — Captura e interpretação: concluída
 
@@ -30,22 +30,21 @@ As quatro revisões podem ser geradas e persistidas; registros retroativos inval
 
 Upload privado, validação, URL assinada, job durável e análise de imagem/PDF/documento/planilha funcionam pela Edge Function. O original e a interpretação ficam separados. Retentativa automática periódica e associação confirmada das tarefas candidatas são os refinamentos restantes.
 
+## AI Routing and Cost Control — concluída
+
+Perfis de custo, rotas por operação, normalização de usage, pricing versionado, ledger append-only, agregação completa no PostgreSQL e dashboard estão implementados. Migrations `015` a `018` estão aplicadas e o `process-jobs` final foi publicado e exercitado com chamada real.
+
 ## Fase 8 — PWA e hardening: parcial funcional
 
 Manifest, ícone, service worker seguro para assets, offline sem cache sensível e layout móvel estão ativos. Sincronização persistente de rascunhos, observabilidade completa e preparação de Vercel permanecem adiadas.
 
-## Gate atual
+## Gate do Sprint 1.5
 
-- ESLint: passou.
-- TypeScript: passou.
-- Vitest: 30 testes passaram.
-- Build Next.js: passou, incluindo todas as rotas e manifest.
-- Supabase migrations: aplicadas até `202607160014`; db lint sem erros.
-- E2E online desktop: passou.
-- E2E online mobile: passou.
-- Edge Function heartbeat: publicada e validada com HTTP 200.
-- Auditoria visual no Chrome autenticado: Início, Configurações e Arquivos aprovados; erros observados são atributos injetados por extensões do navegador no modo dev.
+- Banco remoto: migrations aplicadas até `202607170018`, histórico sincronizado e db lint sem erros.
+- Smoke remoto: auth, settings, RLS, ownership, heartbeat, ledger/agregação e worker real passaram com dados efêmeros.
+- pgTAP está ampliado para policies, ownership e ledger; execução via CLI continua dependente de Docker Desktop.
+- Lint, typecheck, Vitest, cobertura, build e Playwright serão registrados no fechamento final do sprint.
 
 ## Próxima prioridade recomendada
 
-Implementar o worker de jobs para processar arquivos, gerar revisões programadas e aplicar retentativas; depois ampliar edição de tarefas e conclusão por linguagem natural. Google OAuth e Vercel permanecem fora do caminho crítico até nova decisão do usuário.
+Concluir o gate integral do Sprint 1.5 e decidir a entrada na próxima fase. Agendamento automático de revisões, retentativa periódica, edição avançada e conclusão por linguagem natural permanecem no roadmap; Google OAuth e Vercel continuam fora do caminho crítico.

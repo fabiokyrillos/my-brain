@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

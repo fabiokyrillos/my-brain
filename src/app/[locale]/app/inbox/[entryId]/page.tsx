@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Brain, CheckCircle2, Quote, Sparkles } from "lucide-react";
 import { entryExtractionSchema } from "@/lib/ai/extraction-schema";
 import { isLocale } from "@/lib/preferences";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth/require-user";
+import { requireSupabaseData } from "@/lib/supabase/result";
 import { confirmEntryTasks, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 
@@ -38,16 +39,18 @@ export default async function EntryDetailPage({
   if (!isLocale(rawLocale)) notFound();
   const locale = rawLocale;
   const pt = locale === "pt-BR";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/${locale}/auth/login`);
+  const { supabase } = await requireUser(locale);
 
-  const [{ data: entry }, { data: interpretation }, { data: existingTasks }, { data: availableUndo }] = await Promise.all([
+  const [entryResult, interpretationResult, taskResult, undoResult] = await Promise.all([
     supabase.from("entries").select("*").eq("id", entryId).maybeSingle(),
     supabase.from("entry_interpretations").select("*").eq("entry_id", entryId).order("version", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("tasks").select("id,title,status,due_at").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index"),
+    supabase.from("tasks").select("id,title,status,due_at").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
     supabase.from("undo_operations").select("id").eq("action_type", "confirm_entry_tasks").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  const entry = requireSupabaseData(entryResult, "load entry");
+  const interpretation = requireSupabaseData(interpretationResult, "load entry interpretation");
+  const existingTasks = requireSupabaseData(taskResult, "load entry tasks");
+  const availableUndo = requireSupabaseData(undoResult, "load entry undo state");
 
   if (!entry) notFound();
   const parsed = interpretation ? entryExtractionSchema.safeParse(interpretation.raw_output) : null;

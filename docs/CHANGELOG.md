@@ -11,6 +11,10 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - Zod authentication schemas and regression tests for signup, sign-in, recovery, password strength, and confirmation.
 - Public and online Playwright coverage for signup/reset form contracts and remote signup/recovery journeys.
 - Complete mobile navigation overflow with localized access to every authenticated destination and a dedicated online mobile smoke test.
+- Lookahead pagination, shared pagination links, batched storage URL signing, and a safe authenticated error boundary.
+- Composite ownership constraints, polymorphic ownership triggers, least-privilege grants/policies, and behavioral denial tests.
+- AI routing profiles, normalized usage metadata, versioned pricing, append-only ledger, complete database-side aggregates, and the AI cost dashboard.
+- Disposable remote Supabase smoke runner covering auth, atomic settings, RLS, ownership, heartbeat, ledger, cost aggregation, and real file processing.
 
 ### Changed
 
@@ -18,6 +22,15 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - Signup now normalizes and validates names/emails, enforces a strong confirmed password, and supplies an explicit email callback URL.
 - Authentication proxy validation uses verified claims and preserves only callback/reset continuation routes for an authenticated recovery session.
 - Provider errors are mapped to stable localized messages instead of being exposed in URLs.
+- Heartbeat now uses user-local dates/locale, advisory locks, rolling cooldown, lossless caps, sanitized failure records, and per-user batch isolation.
+- Profile/settings writes are atomic through `save_profile_settings`; application and Edge Function Supabase failures are checked explicitly.
+- Successful provider calls are recorded before downstream domain persistence so later failures do not erase usage cost.
+- Cost totals are aggregated in PostgreSQL and recent calls remain bounded to 20 rows.
+- Remote migrations are synchronized through `202607170018`; `process-jobs` is deployed with the final result-handling bundle.
+
+### Database
+
+- Added migrations `016` through `018` for foundation/RLS hardening, complete AI cost aggregation, and incremental AI ledger validation.
 
 ### Removed
 
@@ -25,11 +38,8 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 ### Pending in this sprint
 
-- RLS and relationship ownership hardening.
-- Heartbeat correctness and delivery semantics.
-- Pagination and Supabase error handling.
-- AI Routing and Cost Control validation/deployment.
-- Full lint, typecheck, unit, coverage, build, database, and Playwright quality gate.
+- Full lint, typecheck, unit, coverage, build, and Playwright quality gate.
+- Final permanent-document refresh, report, and release commit.
 
 ## 2026-07-16 — Intelligent brain pre-MVP
 

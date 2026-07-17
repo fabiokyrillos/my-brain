@@ -25,7 +25,14 @@ export const profileSchema = z.object({
   maxFollowupsPerDay: z.coerce.number().int().min(0).max(20),
   responseDetail: z.enum(["short", "balanced", "detailed"]),
   aiProvider: z.literal("openai"),
-  aiModel: z.enum(["gpt-5.6-luna", "gpt-5.6-terra"]),
+  aiProfile: z.enum(["quality", "balanced", "economy", "custom"]),
+  chatModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  extractionModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  reasoningModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  reviewModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  fileModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  backgroundModel: z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]),
+  embeddingModel: z.literal("text-embedding-3-small"),
   privacyDefault: z.enum(["normal", "private", "highly_sensitive"]),
 });
 export type ProfileInput = z.infer<typeof profileSchema>;

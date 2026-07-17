@@ -22,6 +22,7 @@ Next.js atua como backend-for-frontend autenticado. O navegador usa Supabase som
 - Inteligência: embeddings, pgvector, memórias, chat fundamentado e fontes internas.
 - Proatividade: heartbeat, silêncio, deduplicação, notificações e auditoria de execuções.
 - Conteúdo: revisões persistidas, anexos privados, URLs assinadas e jobs.
+- Controle de IA: roteamento por operação, preços versionados, ledger append-only e agregação de custo no banco.
 
 ## Fluxo de captura
 
@@ -36,9 +37,15 @@ Next.js atua como backend-for-frontend autenticado. O navegador usa Supabase som
 
 `AIProvider` expõe `extractEntry`, `embedText` e `answerFromKnowledge`. A implementação OpenAI usa Responses API com Structured Outputs e embeddings. Regras de autorização, confirmação, RLS e undo ficam fora do provider.
 
+Cada carga escolhe sua rota em `agent_preferences` (`chat`, extração, revisão, arquivo, background e embedding). Uma chamada bem-sucedida registra tokens e snapshot de preço em `ai_usage_events` antes de persistências de domínio subsequentes. O dashboard consome `get_ai_cost_summary`, evitando agregação limitada pelo teto de linhas da API.
+
 ## Assincronia
 
 O pré-MVP possui tabela `jobs` com status, tentativas, próxima tentativa, prioridade e idempotência. Uploads criam jobs e invocam a Edge Function autenticada `process-jobs`, que usa URL assinada e persiste uma interpretação separada. Falhas ficam disponíveis para nova tentativa. Heartbeat roda no banco, independente desse worker.
+
+## Limite de confiança
+
+Server actions e Edge Functions validam identidade e comandos; RLS forçada continua sendo o limite multitenant. Relacionamentos concretos provam ownership com FKs compostas `(user_id, id)` e relações polimórficas usam triggers de validação. Tabelas append-only ou controladas pelo domínio não expõem mutação direta ao papel `authenticated`.
 
 ## Ambientes adiados
 

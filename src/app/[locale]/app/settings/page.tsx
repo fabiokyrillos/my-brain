@@ -1,21 +1,21 @@
-import { redirect } from "next/navigation";
 import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
+import { requireSupabaseData } from "@/lib/supabase/result";
 
 export default async function SettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const pt = locale === "pt-BR";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/${locale}/auth/login`);
+  const { supabase, user } = await requireUser(locale);
 
-  const [{ data: profile }, { data: preferences }] = await Promise.all([
+  const [profileResult, preferencesResult] = await Promise.all([
     supabase.from("profiles").select("display_name,locale,timezone").eq("user_id", user.id).maybeSingle(),
-    supabase.from("agent_preferences").select("agent_name,follow_up_intensity,daily_review_time,personality,tone,autonomy_level,weekly_review_day,weekly_review_time,planning_day,planning_time,quiet_start,quiet_end,important_reminder_override,max_followups_per_day,response_detail,ai_provider,ai_model,privacy_default").eq("user_id", user.id).maybeSingle(),
+    supabase.from("agent_preferences").select("agent_name,follow_up_intensity,daily_review_time,personality,tone,autonomy_level,weekly_review_day,weekly_review_time,planning_day,planning_time,quiet_start,quiet_end,important_reminder_override,max_followups_per_day,response_detail,ai_provider,ai_profile,chat_model,extraction_model,reasoning_model,review_model,file_model,background_model,embedding_model,privacy_default").eq("user_id", user.id).maybeSingle(),
   ]);
+  const profile = requireSupabaseData(profileResult, "load profile settings");
+  const preferences = requireSupabaseData(preferencesResult, "load agent settings");
 
   return (
     <div className="settings-page">
@@ -48,7 +48,14 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
           maxFollowupsPerDay: preferences?.max_followups_per_day ?? 3,
           responseDetail: preferences?.response_detail ?? "short",
           aiProvider: preferences?.ai_provider ?? "openai",
-          aiModel: preferences?.ai_model ?? "gpt-5.6-luna",
+          aiProfile: preferences?.ai_profile ?? "quality",
+          chatModel: preferences?.chat_model ?? "gpt-5.6-terra",
+          extractionModel: preferences?.extraction_model ?? "gpt-5.6-luna",
+          reasoningModel: preferences?.reasoning_model ?? "gpt-5.6-terra",
+          reviewModel: preferences?.review_model ?? "gpt-5.6-terra",
+          fileModel: preferences?.file_model ?? "gpt-5.6-luna",
+          backgroundModel: preferences?.background_model ?? "gpt-5-mini",
+          embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
           privacyDefault: preferences?.privacy_default ?? "normal",
         }}
       />

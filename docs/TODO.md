@@ -20,27 +20,27 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Validate signup server-side with Zod, strong password policy, password confirmation, normalized email, safe error mapping, and E2E specification.
 - [ ] Execute the authenticated signup/recovery Playwright journeys against the confirmed remote Supabase project and redirect allowlist.
 - [x] Add complete mobile access to every information-architecture destination without crowding the primary bottom navigation.
-- [ ] Remove direct user mutations from audit, undo, interpretation, embedding, message, summary, heartbeat, job, and other domain-controlled records.
-- [ ] Enforce ownership on relationships using composite foreign keys or validated security-definer RPCs; add cross-user denial tests.
-- [ ] Make heartbeat evaluation user-timezone-aware and locale-aware.
-- [ ] Isolate heartbeat failures per user and protect evaluation with idempotent/concurrency-safe execution.
-- [ ] Delay over-cap notifications instead of marking them dismissed; preserve important work and cooldown semantics.
-- [ ] Paginate potentially unbounded lists and avoid per-row signed URL calls where possible.
-- [ ] Check and surface every relevant Supabase error; prevent partial multi-write settings updates.
+- [x] Remove direct user mutations from audit, undo, interpretation, embedding, message, summary, heartbeat, job, and other domain-controlled records.
+- [x] Enforce ownership on relationships using composite foreign keys or validated security-definer RPCs; add cross-user denial tests.
+- [x] Make heartbeat evaluation user-timezone-aware and locale-aware.
+- [x] Isolate heartbeat failures per user and protect evaluation with idempotent/concurrency-safe execution.
+- [x] Delay over-cap notifications instead of marking them dismissed; preserve important work and cooldown semantics.
+- [x] Paginate potentially unbounded lists and avoid per-row signed URL calls where possible.
+- [x] Check and surface every relevant Supabase error; prevent partial multi-write settings updates.
 - [x] Hide Google OAuth until provider configuration, secrets, redirect URLs, and E2E validation exist.
 
 ### 3. Finish AI Routing and Cost Control
 
-- [ ] Complete behavioral pgTAP assertions for pricing, immutability, user isolation, and usage-write boundaries.
-- [ ] Record provider usage before downstream domain persistence so successful provider calls cannot disappear from cost history.
-- [ ] Replace the 5,000-row client aggregation ceiling with database-side complete aggregates/pagination.
-- [ ] Re-run targeted routing, cost calculator, summary, usage, and settings tests.
-- [ ] Validate migration `015` through local reset/lint/pgTAP when Docker is available.
-- [ ] Link and inspect the remote Supabase project and migration history.
-- [ ] Apply migration `015` to the intended remote project.
-- [ ] Deploy/validate `process-jobs` configuration and required secrets.
-- [ ] Smoke-test the cost dashboard with authenticated data and failure states.
-- [ ] Update architecture, database, AI, security, and implementation documentation where behavior changed.
+- [x] Complete behavioral pgTAP assertions for pricing, immutability, user isolation, and usage-write boundaries.
+- [x] Record provider usage before downstream domain persistence so successful provider calls cannot disappear from cost history.
+- [x] Replace the 5,000-row client aggregation ceiling with database-side complete aggregates.
+- [x] Re-run targeted routing, cost calculator, summary, usage, and settings tests.
+- [ ] Execute the expanded pgTAP suite through the CLI when Docker Desktop is available; linked schema lint and equivalent remote behavioral smoke passed.
+- [x] Link and inspect the remote Supabase project and migration history.
+- [x] Confirm migration `015` was already deployed and apply incremental migrations `016` through `018`.
+- [x] Deploy/validate `process-jobs` configuration and required secrets with a real file-analysis call.
+- [x] Smoke-test cost aggregation and ledger with authenticated data; rendered dashboard remains in the Playwright gate.
+- [x] Update architecture, database, AI, security, and implementation documentation where behavior changed.
 - [ ] Commit the completed phase with an explicit migration/deployment note.
 
 ### 4. Full quality gate
@@ -89,17 +89,11 @@ Do not start these during Sprint 1.5.
 ## Known bugs and risks
 
 - [ ] Password recovery and signup now have explicit PKCE contracts but still require proof against the remote redirect allowlist.
-- [ ] Some RLS policies allow owners to mutate append-only/domain-controlled rows.
-- [ ] Relationship rows can carry the current user's `user_id` while referencing another user's guessed entity ID.
-- [ ] Heartbeat runs can use database dates instead of user-local dates, abort batches on one failure, and dismiss over-cap work.
-- [ ] Several list queries can silently truncate at the Supabase row limit.
-- [ ] Cost totals can omit successful provider calls when later persistence fails and can undercount beyond the dashboard query ceiling.
 - [ ] Jobs can remain `running` indefinitely after a worker crash.
 
 ## External dependencies
 
 - [ ] Supabase CLI/Docker availability for local database validation.
-- [ ] Access to the intended linked Supabase project for remote validation and migration deployment.
 - [ ] Valid `ONLINE_SUPABASE_*` credentials for authenticated Playwright tests.
-- [ ] Verified OpenAI and Supabase Edge Function secrets in the deployment environment.
+- [x] Verified OpenAI and Supabase Edge Function secrets through a disposable real worker call.
 - [ ] Google OAuth provider configuration if the integration is enabled in a later phase.

@@ -3,6 +3,7 @@ import { JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
 import { RegisterServiceWorker } from "@/features/pwa/register-service-worker";
 import "./globals.css";
 import "./mobile-navigation.css";
+import "./pagination.css";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const newsreader = Newsreader({ variable: "--font-newsreader", subsets: ["latin"] });

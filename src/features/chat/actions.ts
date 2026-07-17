@@ -6,6 +6,8 @@ import { z } from "zod";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
+import { recordAIUsage } from "@/lib/ai/usage";
+import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { ChatState } from "./chat-form";
 
 const chatInputSchema = z.object({
@@ -32,7 +34,8 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   let conversationId = parsed.data.conversationId || undefined;
 
   if (conversationId) {
-    const { data: ownedConversation } = await supabase.from("conversations").select("id").eq("id", conversationId).maybeSingle();
+    const { data: ownedConversation, error: conversationError } = await supabase.from("conversations").select("id").eq("id", conversationId).maybeSingle();
+    if (conversationError) return { status: "error", message: "Não foi possível abrir a conversa." };
     if (!ownedConversation) return { status: "error", message: "Conversa não encontrada." };
   } else {
     const { data: conversation, error } = await supabase.from("conversations").insert({
@@ -53,9 +56,21 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   if (userMessageError) return { status: "error", message: "Não foi possível salvar sua pergunta." };
 
   try {
-    const { data: preferences } = await supabase.from("agent_preferences").select("ai_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
-    const provider = getAIProvider({ model: preferences?.ai_model ?? undefined });
+    const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
+    const preferences = requireSupabaseData(preferencesResult, "load chat preferences");
+    const provider = getAIProvider({
+      model: preferences?.chat_model ?? "gpt-5.6-terra",
+      embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
+    });
     const embedded = await provider.embedText(parsed.data.question);
+    await recordAIUsage(supabase, {
+      operation: "semantic_search",
+      model: embedded.model,
+      userId: user.id,
+      usage: embedded,
+      sourceType: "conversation",
+      sourceId: conversationId,
+    });
     const { data: matches, error: matchError } = await supabase.rpc("match_internal_knowledge", {
       p_query_embedding: embedded.embedding,
       p_match_count: 8,
@@ -71,7 +86,8 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         occurredAt: match.occurred_at,
         similarity: match.similarity,
       }));
-    const { data: profile } = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+    const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+    const profile = requireSupabaseData(profileResult, "load chat profile");
     const answer = await provider.answerFromKnowledge({
       question: parsed.data.question,
       locale: parsed.data.locale,
@@ -79,6 +95,14 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       sources,
       responseDetail: preferences?.response_detail ?? "short",
       agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
+    });
+    await recordAIUsage(supabase, {
+      operation: "chat",
+      model: answer.model,
+      userId: user.id,
+      usage: answer,
+      sourceType: "conversation",
+      sourceId: conversationId,
     });
     const citations = answer.citedSourceIds.map((id) => {
       const source = sources.find((item) => item.id === id)!;
@@ -97,7 +121,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     });
     if (answerError) throw answerError;
 
-    await Promise.all([
+    const [conversationUpdate, auditInsert] = await Promise.all([
       supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId),
       supabase.from("audit_logs").insert({
         user_id: user.id,
@@ -109,6 +133,8 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         reason: "Grounded answer generated from internal knowledge",
       }),
     ]);
+    requireSupabaseSuccess(conversationUpdate, "update conversation timestamp");
+    requireSupabaseSuccess(auditInsert, "record chat audit");
   } catch (error) {
     console.error("Grounded chat failed", error instanceof Error ? error.message : "unknown error");
     return { status: "error", message: "O Brain não conseguiu responder agora. Sua pergunta ficou salva." };

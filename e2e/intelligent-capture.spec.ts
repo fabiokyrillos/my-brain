@@ -111,6 +111,31 @@ test.describe("intelligent capture", () => {
     expect(attachments[0].status).toBe("ready");
     storagePath = attachments[0].storage_path;
 
+    const usageResponse = await fetch(`${supabaseUrl}/rest/v1/ai_usage_events?select=operation,model,cost_status,cost_usd,input_tokens,output_tokens&user_id=eq.${userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    });
+    expect(usageResponse.ok).toBe(true);
+    const usage = (await usageResponse.json()) as Array<{ operation: string; model: string; cost_status: string; cost_usd: string | null; input_tokens: number; output_tokens: number }>;
+    expect(usage.map((item) => item.operation)).toEqual(expect.arrayContaining(["capture_extraction", "semantic_search", "chat", "review", "file_analysis"]));
+    expect(usage.every((item) => item.cost_status === "calculated" && Number(item.cost_usd) > 0)).toBe(true);
+
+    await page.goto("/pt-BR/app/costs");
+    await expect(page.getByRole("heading", { name: "Custos de IA" })).toBeVisible();
+    await expect(page.getByText("Calculado pelos tokens da API")).toBeVisible();
+    await expect(page.locator(".recent-costs tbody tr")).toHaveCount(usage.length);
+    await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
+
+    await page.goto("/pt-BR/app/settings");
+    await page.getByRole("radio", { name: /Econômico/ }).click();
+    await expect(page.getByLabel("Chat principal")).toHaveValue("gpt-5-mini");
+    await page.getByRole("button", { name: "Salvar preferências" }).click();
+    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
+    const preferencesResponse = await fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=ai_profile,chat_model,reasoning_model,review_model&user_id=eq.${userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    });
+    const savedPreferences = (await preferencesResponse.json()) as Array<{ ai_profile: string; chat_model: string; reasoning_model: string; review_model: string }>;
+    expect(savedPreferences[0]).toMatchObject({ ai_profile: "economy", chat_model: "gpt-5-mini", reasoning_model: "gpt-5.6-luna", review_model: "gpt-5-mini" });
+
     const overdueTaskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks`, {
       method: "POST",
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },

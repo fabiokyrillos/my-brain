@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { CreateRecordState } from "./inline-create-form";
 
 const createSchema = z.object({
@@ -40,12 +41,16 @@ export async function createRecord(
     ({ error } = await supabase.from("people").insert({ user_id: user.id, name: parsed.data.name }));
   } else {
     const { getAIProvider } = await import("@/lib/ai");
+    const { recordAIUsage } = await import("@/lib/ai/usage");
     let embedding: number[] | null = null;
     let embeddingModel: string | null = null;
     try {
-      const result = await getAIProvider().embedText(parsed.data.name);
+      const preferencesResult = await supabase.from("agent_preferences").select("embedding_model").eq("user_id", user.id).maybeSingle();
+      const preferences = requireSupabaseData(preferencesResult, "load embedding preference");
+      const result = await getAIProvider({ embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small" }).embedText(parsed.data.name);
       embedding = result.embedding;
       embeddingModel = result.model;
+      await recordAIUsage(supabase, { operation: "semantic_search", model: result.model, userId: user.id, usage: result, sourceType: "memory" });
     } catch (embeddingError) {
       console.error("Memory embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
     }
@@ -83,11 +88,12 @@ export async function updateTaskStatus(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  await supabase.from("tasks").update({
+  const result = await supabase.from("tasks").update({
     status: parsed.data.status,
     completed_at: parsed.data.status === "completed" ? new Date().toISOString() : null,
     cancelled_at: parsed.data.status === "cancelled" ? new Date().toISOString() : null,
   }).eq("id", parsed.data.taskId).eq("user_id", user.id);
+  requireSupabaseSuccess(result, "update task status");
 
   for (const route of ["", "/today", "/tasks", "/waiting"]) {
     revalidatePath(`/${parsed.data.locale}/app${route}`);

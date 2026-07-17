@@ -113,3 +113,36 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** Preserve Home, Today, Inbox, Tasks, and quick capture as the persistent mobile controls, then expose every remaining destination in a localized native `details/summary` overflow menu.
 - **Reason:** It keeps the frequent actions stable, uses keyboard-accessible browser semantics, and makes the complete information architecture reachable without crowding the viewport.
 - **Consequences:** New authenticated destinations must be classified as primary or overflow and added to the mobile navigation regression test. The overflow must retain 44-pixel touch targets and remain within the viewport.
+
+## ADR-011 — Least-privilege RLS plus database-enforced relationship ownership
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** Owner-only CRUD policies protected table rows but still allowed direct mutation of domain-controlled history and relationships could reference another user's guessed entity ID.
+- **Problem:** Checking only the relationship row's `user_id` does not prove ownership of every referenced entity, and mutable audit/worker records weaken invariants.
+- **Alternatives considered:** Application-only validation; policy subqueries on every relationship; composite ownership FKs plus validated triggers/RPCs.
+- **Decision:** Revoke unneeded direct mutations, route domain writes through validated security-definer RPCs/service workers, enforce concrete relationships with `(user_id, id)` FKs, and validate polymorphic targets with ownership triggers.
+- **Reason:** The database remains authoritative even when a client or server action is bypassed, while legitimate direct user commands retain only the grants they need.
+- **Consequences:** New owned entity tables need a composite ownership key before they can participate in relationships. New domain-controlled writes require an explicit RPC/worker and denial coverage.
+
+## ADR-012 — Lossless, user-local heartbeat evaluation
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** The previous wrapper created notifications before applying caps, used database dates in dedupe keys, and could discard over-cap work or stop a batch on one user failure.
+- **Problem:** Proactivity cannot lose reminders, repeat around local midnight, ignore locale, or allow concurrent evaluation for one user.
+- **Alternatives considered:** Keep post-processing caps; move heartbeat to the application worker; replace the SQL evaluator with a single candidate-first function.
+- **Decision:** Select/rank candidates before insertion, use local day boundaries and localized destinations, enforce a rolling task cooldown, lock per user, keep over-cap items pending, sanitize failure records, and isolate batch failures.
+- **Reason:** Candidate-first SQL preserves deterministic, auditable behavior near the source data without adding another scheduler.
+- **Consequences:** Heartbeat candidate types remain intentionally narrow. Any new signal must define priority, cooldown, dedupe, quiet-hour, locale, and cap semantics before release.
+
+## ADR-013 — Append-only AI ledger with database-side complete aggregation
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** Client-side aggregation was capped at 5,000 rows and provider usage could be recorded only after later domain persistence succeeded.
+- **Problem:** Successful paid calls could disappear from local cost history, and totals would become incomplete as the ledger grew.
+- **Alternatives considered:** Paginate and aggregate every ledger row in Next.js; maintain mutable rollup tables; aggregate the immutable ledger in a caller-RLS database function.
+- **Decision:** Record every successful provider call immediately, snapshot its applicable price in an append-only/idempotent ledger, and compute complete totals/breakdowns with `get_ai_cost_summary` under the caller's forced RLS.
+- **Reason:** This preserves accounting evidence, removes API row ceilings, and avoids mutable rollup drift at pre-MVP scale.
+- **Consequences:** The price catalog must be versioned via new migrations, unknown models remain explicitly unpriced, and OpenAI billing remains the reconciliation authority.

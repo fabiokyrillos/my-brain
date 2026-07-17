@@ -9,6 +9,8 @@ import {
 import { getAIProvider } from "@/lib/ai";
 import { defaultAgentPreferences } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
+import { requireSupabaseData } from "@/lib/supabase/result";
+import { recordAIUsage } from "@/lib/ai/usage";
 import { captureEntrySchema } from "./schema";
 import type { CaptureState } from "./quick-capture-form";
 
@@ -52,7 +54,7 @@ export async function captureEntry(
 
   const [profileResult, preferencesResult, contextsResult, organizationsResult, projectsResult, peopleResult] = await Promise.all([
     supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle(),
-    supabase.from("agent_preferences").select("ai_model").eq("user_id", user.id).maybeSingle(),
+    supabase.from("agent_preferences").select("extraction_model,embedding_model").eq("user_id", user.id).maybeSingle(),
     supabase.from("contexts").select("name").order("updated_at", { ascending: false }).limit(30),
     supabase.from("organizations").select("name").order("updated_at", { ascending: false }).limit(30),
     supabase.from("projects").select("name").eq("status", "active").order("updated_at", { ascending: false }).limit(30),
@@ -60,18 +62,36 @@ export async function captureEntry(
   ]);
 
   try {
-    const provider = getAIProvider({ model: preferencesResult.data?.ai_model ?? undefined });
+    const profile = requireSupabaseData(profileResult, "load capture profile");
+    const preferences = requireSupabaseData(preferencesResult, "load capture preferences");
+    const contexts = requireSupabaseData(contextsResult, "load capture contexts");
+    const organizations = requireSupabaseData(organizationsResult, "load capture organizations");
+    const projects = requireSupabaseData(projectsResult, "load capture projects");
+    const people = requireSupabaseData(peopleResult, "load capture people");
+    const provider = getAIProvider({
+      model: preferences?.extraction_model ?? "gpt-5.6-luna",
+      embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
+    });
     const result = await provider.extractEntry({
       content: parsed.data.content,
       locale: parsed.data.locale,
-      timezone: profileResult.data?.timezone ?? defaultAgentPreferences.timezone,
+      timezone: profile?.timezone ?? defaultAgentPreferences.timezone,
       currentTime: new Date().toISOString(),
       knownContext: formatKnownContext([
-        ["Contexts", contextsResult.data],
-        ["Organizations", organizationsResult.data],
-        ["Projects", projectsResult.data],
-        ["People", peopleResult.data],
+        ["Contexts", contexts],
+        ["Organizations", organizations],
+        ["Projects", projects],
+        ["People", people],
       ]),
+    });
+
+    await recordAIUsage(supabase, {
+      operation: "capture_extraction",
+      model: result.model,
+      userId: user.id,
+      usage: result,
+      sourceType: "entry",
+      sourceId: entry.id,
     });
 
     const { error: persistError } = await supabase.rpc("persist_entry_interpretation", {
@@ -88,6 +108,14 @@ export async function captureEntry(
     try {
       const embeddingContent = `${result.extraction.summary}\n\n${parsed.data.content}`;
       const embedded = await provider.embedText(embeddingContent);
+      await recordAIUsage(supabase, {
+        operation: "semantic_search",
+        model: embedded.model,
+        userId: user.id,
+        usage: embedded,
+        sourceType: "entry",
+        sourceId: entry.id,
+      });
       const { error: embeddingError } = await supabase.from("entry_embeddings").upsert({
         user_id: user.id,
         entry_id: entry.id,
@@ -102,10 +130,11 @@ export async function captureEntry(
     }
   } catch (error) {
     console.error("Entry interpretation failed", error instanceof Error ? error.message : "unknown error");
-    await supabase.from("entries").update({
+    const failureUpdate = await supabase.from("entries").update({
       status: "failed",
       processing_error: "Interpretação indisponível. O original foi preservado.",
     }).eq("id", entry.id);
+    if (failureUpdate.error) console.error("Entry failure state update failed", failureUpdate.error.code);
     return {
       status: "error",
       message: "A entrada foi salva, mas não pôde ser interpretada agora. Ela está na Caixa de entrada.",

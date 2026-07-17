@@ -5,17 +5,359 @@ import { z } from "zod";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
+import { requireSupabaseSuccess } from "@/lib/supabase/result";
+import { recordAIUsage } from "@/lib/ai/usage";
 import type { AgentFormState } from "./forms";
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 
-export async function createReminder(_state:AgentFormState,formData:FormData):Promise<AgentFormState>{const parsed=z.object({locale:localeSchema,title:z.string().trim().min(1).max(500),remindAt:z.string().min(1),important:z.string().optional()}).safeParse(Object.fromEntries(formData));if(!parsed.success)return{status:"error",message:"Revise o lembrete."};const when=new Date(parsed.data.remindAt);if(Number.isNaN(when.getTime()))return{status:"error",message:"Data inválida."};const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return{status:"error",message:"Sua sessão expirou."};const{error}=await supabase.from("reminders").insert({user_id:user.id,title:parsed.data.title,remind_at:when.toISOString(),important:parsed.data.important==="on"});if(error)return{status:"error",message:"Não foi possível criar."};revalidatePath(`/${parsed.data.locale}/app/reminders`);return{status:"success",message:"Lembrete criado."}}
+export async function createReminder(
+  _state: AgentFormState,
+  formData: FormData,
+): Promise<AgentFormState> {
+  const parsed = z
+    .object({
+      locale: localeSchema,
+      title: z.string().trim().min(1).max(500),
+      remindAt: z.string().min(1),
+      important: z.string().optional(),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { status: "error", message: "Revise o lembrete." };
+  const when = new Date(parsed.data.remindAt);
+  if (Number.isNaN(when.getTime()))
+    return { status: "error", message: "Data inválida." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  const { error } = await supabase
+    .from("reminders")
+    .insert({
+      user_id: user.id,
+      title: parsed.data.title,
+      remind_at: when.toISOString(),
+      important: parsed.data.important === "on",
+    });
+  if (error) return { status: "error", message: "Não foi possível criar." };
+  revalidatePath(`/${parsed.data.locale}/app/reminders`);
+  return { status: "success", message: "Lembrete criado." };
+}
 
-export async function answerPendingQuestion(_state:AgentFormState,formData:FormData):Promise<AgentFormState>{const parsed=z.object({locale:localeSchema,questionId:z.string().uuid(),answer:z.string().trim().min(1).max(4000)}).safeParse(Object.fromEntries(formData));if(!parsed.success)return{status:"error",message:"Escreva uma resposta."};const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return{status:"error",message:"Sua sessão expirou."};const{error}=await supabase.from("pending_questions").update({status:"answered",answer:parsed.data.answer,answered_at:new Date().toISOString()}).eq("id",parsed.data.questionId).eq("user_id",user.id);if(error)return{status:"error",message:"Não foi possível responder."};revalidatePath(`/${parsed.data.locale}/app/questions`);return{status:"success",message:"Resposta registrada."}}
+export async function answerPendingQuestion(
+  _state: AgentFormState,
+  formData: FormData,
+): Promise<AgentFormState> {
+  const parsed = z
+    .object({
+      locale: localeSchema,
+      questionId: z.string().uuid(),
+      answer: z.string().trim().min(1).max(4000),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { status: "error", message: "Escreva uma resposta." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  const { error } = await supabase
+    .from("pending_questions")
+    .update({
+      status: "answered",
+      answer: parsed.data.answer,
+      answered_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.data.questionId)
+    .eq("user_id", user.id);
+  if (error) return { status: "error", message: "Não foi possível responder." };
+  revalidatePath(`/${parsed.data.locale}/app/questions`);
+  return { status: "success", message: "Resposta registrada." };
+}
 
-export async function markNotification(formData:FormData){const parsed=z.object({locale:localeSchema,notificationId:z.string().uuid(),status:z.enum(["read","dismissed"])}).safeParse(Object.fromEntries(formData));if(!parsed.success)return;const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return;await supabase.from("notifications").update({status:parsed.data.status,read_at:parsed.data.status==="read"?new Date().toISOString():null}).eq("id",parsed.data.notificationId).eq("user_id",user.id);revalidatePath(`/${parsed.data.locale}/app/notifications`);revalidatePath(`/${parsed.data.locale}/app`)}
+export async function markNotification(formData: FormData) {
+  const parsed = z
+    .object({
+      locale: localeSchema,
+      notificationId: z.string().uuid(),
+      status: z.enum(["read", "dismissed"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const result = await supabase
+    .from("notifications")
+    .update({
+      status: parsed.data.status,
+      read_at: parsed.data.status === "read" ? new Date().toISOString() : null,
+    })
+    .eq("id", parsed.data.notificationId)
+    .eq("user_id", user.id);
+  requireSupabaseSuccess(result, "update notification status");
+  revalidatePath(`/${parsed.data.locale}/app/notifications`);
+  revalidatePath(`/${parsed.data.locale}/app`);
+}
 
-const allowedMimeTypes=new Set(["image/jpeg","image/png","image/webp","application/pdf","text/plain","text/csv","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]);
-export async function uploadAttachment(_state:AgentFormState,formData:FormData):Promise<AgentFormState>{const locale=localeSchema.safeParse(formData.get("locale"));const file=formData.get("file");if(!locale.success||!(file instanceof File)||file.size===0)return{status:"error",message:"Selecione um arquivo."};if(file.size>26214400)return{status:"error",message:"O arquivo ultrapassa 25 MB."};if(!allowedMimeTypes.has(file.type))return{status:"error",message:"Formato não permitido."};const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return{status:"error",message:"Sua sessão expirou."};const safeName=file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(-120);const path=`${user.id}/${crypto.randomUUID()}-${safeName}`;const{error:storageError}=await supabase.storage.from("user-files").upload(path,file,{contentType:file.type,upsert:false});if(storageError)return{status:"error",message:"Não foi possível enviar."};const{data:attachment,error}=await supabase.from("attachments").insert({user_id:user.id,storage_path:path,original_name:file.name,mime_type:file.type,size_bytes:file.size,status:"uploaded"}).select("id").single();if(error||!attachment){await supabase.storage.from("user-files").remove([path]);return{status:"error",message:"Não foi possível registrar o arquivo."}}const{data:job,error:jobError}=await supabase.from("jobs").insert({user_id:user.id,type:"process_attachment",payload:{attachment_id:attachment.id},idempotency_key:`attachment:${attachment.id}:process:v1`}).select("id").single();if(jobError||!job)return{status:"error",message:"O arquivo foi salvo, mas não entrou na fila de análise."};const{data:{session}}=await supabase.auth.getSession();const{error:invokeError}=await supabase.functions.invoke("process-jobs",{body:{jobId:job.id},headers:session?{authorization:`Bearer ${session.access_token}`}:{}});revalidatePath(`/${locale.data}/app/files`);return{status:"success",message:invokeError?"Arquivo privado enviado e enfileirado para nova tentativa.":"Arquivo privado enviado e analisado."}}
+const allowedMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+export async function uploadAttachment(
+  _state: AgentFormState,
+  formData: FormData,
+): Promise<AgentFormState> {
+  const locale = localeSchema.safeParse(formData.get("locale"));
+  const file = formData.get("file");
+  if (!locale.success || !(file instanceof File) || file.size === 0)
+    return { status: "error", message: "Selecione um arquivo." };
+  if (file.size > 26214400)
+    return { status: "error", message: "O arquivo ultrapassa 25 MB." };
+  if (!allowedMimeTypes.has(file.type))
+    return { status: "error", message: "Formato não permitido." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  const safeName = file.name
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(-120);
+  const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
+  const { error: storageError } = await supabase.storage
+    .from("user-files")
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (storageError)
+    return { status: "error", message: "Não foi possível enviar." };
+  const { data: attachment, error } = await supabase
+    .from("attachments")
+    .insert({
+      user_id: user.id,
+      storage_path: path,
+      original_name: file.name,
+      mime_type: file.type,
+      size_bytes: file.size,
+      status: "uploaded",
+    })
+    .select("id")
+    .single();
+  if (error || !attachment) {
+    const cleanup = await supabase.storage.from("user-files").remove([path]);
+    if (cleanup.error) console.error("Attachment cleanup failed", cleanup.error.message);
+    return {
+      status: "error",
+      message: "Não foi possível registrar o arquivo.",
+    };
+  }
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .insert({
+      user_id: user.id,
+      type: "process_attachment",
+      payload: { attachment_id: attachment.id },
+      idempotency_key: `attachment:${attachment.id}:process:v1`,
+    })
+    .select("id")
+    .single();
+  if (jobError || !job)
+    return {
+      status: "error",
+      message: "O arquivo foi salvo, mas não entrou na fila de análise.",
+    };
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+  if (sessionError) {
+    revalidatePath(`/${locale.data}/app/files`);
+    return {
+      status: "success",
+      message: "Arquivo privado enviado e enfileirado para nova tentativa.",
+    };
+  }
+  const { error: invokeError } = await supabase.functions.invoke(
+    "process-jobs",
+    {
+      body: { jobId: job.id },
+      headers: session
+        ? { authorization: `Bearer ${session.access_token}` }
+        : {},
+    },
+  );
+  revalidatePath(`/${locale.data}/app/files`);
+  return {
+    status: "success",
+    message: invokeError
+      ? "Arquivo privado enviado e enfileirado para nova tentativa."
+      : "Arquivo privado enviado e analisado.",
+  };
+}
 
-export async function generateReview(_state:AgentFormState,formData:FormData):Promise<AgentFormState>{const parsed=z.object({locale:localeSchema,period:z.enum(["daily","weekly_review","weekly_plan","monthly"])}).safeParse(Object.fromEntries(formData));if(!parsed.success)return{status:"error",message:"Revisão inválida."};const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return{status:"error",message:"Sua sessão expirou."};const now=new Date();let start=new Date(now);if(parsed.data.period==="daily")start.setHours(0,0,0,0);else if(parsed.data.period.startsWith("weekly")){const day=(now.getDay()+6)%7;start.setDate(now.getDate()-day);start.setHours(0,0,0,0)}else{start=new Date(now.getFullYear(),now.getMonth(),1)}const[entriesResult,tasksResult,profileResult,preferencesResult]=await Promise.all([supabase.from("entries").select("id,original_content,occurred_at").gte("occurred_at",start.toISOString()).lte("occurred_at",now.toISOString()).order("occurred_at").limit(100),supabase.from("tasks").select("id,title,status,due_at,updated_at").gte("updated_at",start.toISOString()).order("updated_at").limit(100),supabase.from("profiles").select("timezone").eq("user_id",user.id).maybeSingle(),supabase.from("agent_preferences").select("ai_model,personality,tone,response_detail").eq("user_id",user.id).maybeSingle()]);if(!(entriesResult.data?.length||tasksResult.data?.length))return{status:"error",message:"Ainda não há atividade suficiente nesse período."};const sources:ChatSource[]=[...(entriesResult.data??[]).map(item=>({id:`entry:${item.id}`,type:"entry" as const,content:item.original_content,occurredAt:item.occurred_at,similarity:1})),...(tasksResult.data??[]).map(item=>({id:`memory:${item.id}`,type:"memory" as const,content:`Tarefa: ${item.title}. Status: ${item.status}. Prazo: ${item.due_at??"sem prazo"}.`,occurredAt:item.updated_at,similarity:1}))];const prompts={daily:"Crie um resumo diário executivo com atividades, decisões, tarefas, pendências, bloqueios, itens aguardando e próximos passos.",weekly_review:"Crie uma revisão da semana com entregas, tarefas concluídas e abertas, bloqueios, projetos movimentados, pessoas com pendências e melhorias.",weekly_plan:"Crie um planejamento semanal com prioridades, prazos próximos, pendências, itens aguardando, riscos e foco sugerido.",monthly:"Crie uma revisão mensal com entregas, projetos, tarefas abertas, assuntos, bloqueios recorrentes e objetivos para o próximo mês."};try{const preferences=preferencesResult.data;const answer=await getAIProvider({model:preferences?.ai_model??undefined}).answerFromKnowledge({question:prompts[parsed.data.period],locale:parsed.data.locale,timezone:profileResult.data?.timezone??defaultAgentPreferences.timezone,sources,responseDetail:preferences?.response_detail??"short",agentStyle:`${preferences?.personality??"proactive"}, ${preferences?.tone??"direct"}`});const startDate=start.toISOString().slice(0,10);const endDate=now.toISOString().slice(0,10);const titleMap={daily:"Resumo diário",weekly_review:"Revisão semanal",weekly_plan:"Planejamento semanal",monthly:"Revisão mensal"};const{error}=await supabase.from("summaries").upsert({user_id:user.id,period_type:parsed.data.period,period_start:startDate,period_end:endDate,title:titleMap[parsed.data.period],content:answer.answer,original_content:answer.answer,status:"generated",model:answer.model,input_tokens:answer.inputTokens,output_tokens:answer.outputTokens,generated_at:new Date().toISOString()},{onConflict:"user_id,period_type,period_start,period_end"});if(error)throw error}catch(error){console.error("Review generation failed",error instanceof Error?error.message:"unknown error");return{status:"error",message:"Não foi possível gerar a revisão agora."}}revalidatePath(`/${parsed.data.locale}/app/reviews`);return{status:"success",message:"Revisão gerada."}}
+export async function generateReview(
+  _state: AgentFormState,
+  formData: FormData,
+): Promise<AgentFormState> {
+  const parsed = z
+    .object({
+      locale: localeSchema,
+      period: z.enum(["daily", "weekly_review", "weekly_plan", "monthly"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { status: "error", message: "Revisão inválida." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  const now = new Date();
+  let start = new Date(now);
+  if (parsed.data.period === "daily") start.setHours(0, 0, 0, 0);
+  else if (parsed.data.period.startsWith("weekly")) {
+    const day = (now.getDay() + 6) % 7;
+    start.setDate(now.getDate() - day);
+    start.setHours(0, 0, 0, 0);
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const [entriesResult, tasksResult, profileResult, preferencesResult] =
+    await Promise.all([
+      supabase
+        .from("entries")
+        .select("id,original_content,occurred_at")
+        .gte("occurred_at", start.toISOString())
+        .lte("occurred_at", now.toISOString())
+        .order("occurred_at")
+        .limit(100),
+      supabase
+        .from("tasks")
+        .select("id,title,status,due_at,updated_at")
+        .gte("updated_at", start.toISOString())
+        .order("updated_at")
+        .limit(100),
+      supabase
+        .from("profiles")
+        .select("timezone")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("agent_preferences")
+        .select("review_model,personality,tone,response_detail")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+  if (
+    entriesResult.error ||
+    tasksResult.error ||
+    profileResult.error ||
+    preferencesResult.error
+  ) {
+    return {
+      status: "error",
+      message: "Não foi possível carregar os dados da revisão.",
+    };
+  }
+  if (!(entriesResult.data?.length || tasksResult.data?.length))
+    return {
+      status: "error",
+      message: "Ainda não há atividade suficiente nesse período.",
+    };
+  const sources: ChatSource[] = [
+    ...(entriesResult.data ?? []).map((item) => ({
+      id: `entry:${item.id}`,
+      type: "entry" as const,
+      content: item.original_content,
+      occurredAt: item.occurred_at,
+      similarity: 1,
+    })),
+    ...(tasksResult.data ?? []).map((item) => ({
+      id: `memory:${item.id}`,
+      type: "memory" as const,
+      content: `Tarefa: ${item.title}. Status: ${item.status}. Prazo: ${item.due_at ?? "sem prazo"}.`,
+      occurredAt: item.updated_at,
+      similarity: 1,
+    })),
+  ];
+  const prompts = {
+    daily:
+      "Crie um resumo diário executivo com atividades, decisões, tarefas, pendências, bloqueios, itens aguardando e próximos passos.",
+    weekly_review:
+      "Crie uma revisão da semana com entregas, tarefas concluídas e abertas, bloqueios, projetos movimentados, pessoas com pendências e melhorias.",
+    weekly_plan:
+      "Crie um planejamento semanal com prioridades, prazos próximos, pendências, itens aguardando, riscos e foco sugerido.",
+    monthly:
+      "Crie uma revisão mensal com entregas, projetos, tarefas abertas, assuntos, bloqueios recorrentes e objetivos para o próximo mês.",
+  };
+  try {
+    const preferences = preferencesResult.data;
+    const answer = await getAIProvider({
+      model: preferences?.review_model ?? "gpt-5.6-terra",
+    }).answerFromKnowledge({
+      question: prompts[parsed.data.period],
+      locale: parsed.data.locale,
+      timezone:
+        profileResult.data?.timezone ?? defaultAgentPreferences.timezone,
+      sources,
+      responseDetail: preferences?.response_detail ?? "short",
+      agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
+    });
+    await recordAIUsage(supabase, {
+      operation: "review",
+      model: answer.model,
+      userId: user.id,
+      usage: answer,
+      sourceType: "summary",
+    });
+    const startDate = start.toISOString().slice(0, 10);
+    const endDate = now.toISOString().slice(0, 10);
+    const titleMap = {
+      daily: "Resumo diário",
+      weekly_review: "Revisão semanal",
+      weekly_plan: "Planejamento semanal",
+      monthly: "Revisão mensal",
+    };
+    const { error } = await supabase
+      .from("summaries")
+      .upsert(
+        {
+          user_id: user.id,
+          period_type: parsed.data.period,
+          period_start: startDate,
+          period_end: endDate,
+          title: titleMap[parsed.data.period],
+          content: answer.answer,
+          original_content: answer.answer,
+          status: "generated",
+          model: answer.model,
+          input_tokens: answer.inputTokens,
+          output_tokens: answer.outputTokens,
+          generated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,period_type,period_start,period_end" },
+      );
+    if (error) throw error;
+  } catch (error) {
+    console.error(
+      "Review generation failed",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return {
+      status: "error",
+      message: "Não foi possível gerar a revisão agora.",
+    };
+  }
+  revalidatePath(`/${parsed.data.locale}/app/reviews`);
+  return { status: "success", message: "Revisão gerada." };
+}

@@ -4,7 +4,7 @@
 
 O original é salvo antes de qualquer chamada. A OpenAI recebe o texto como dado não confiável e retorna um schema validado com idioma, data, retroatividade, resumo, 19 conceitos, contextos, organizações, projetos, pessoas, tarefas candidatas, perguntas e confiança.
 
-Modelo padrão de extração/chat: `gpt-5.6-luna`. Modelo de embedding: `text-embedding-3-small`. O modelo escolhido nas Configurações é usado em captura, chat, revisões e arquivos; variáveis server-only continuam como fallback.
+O perfil padrão prioriza qualidade: chat e revisões usam `gpt-5.6-terra`, extração e arquivos usam `gpt-5.6-luna`, rotinas previsíveis usam `gpt-5-mini` e embeddings usam `text-embedding-3-small`. Perfis e overrides por operação são validados nas Configurações; variáveis server-only continuam como fallback operacional.
 
 ## Ações e confirmação
 
@@ -23,7 +23,11 @@ Se as fontes forem insuficientes, o agente deve dizer isso em vez de completar l
 
 ## Heartbeat
 
-O heartbeat é determinístico no pré-MVP. Ele respeita `quiet_start`/`quiet_end`, cria avisos diários deduplicados para atrasos e stale tasks, entrega lembretes vencidos e registra quando permaneceu silencioso. O cron roda a cada hora; uma Edge Function protegida oferece acionamento operacional.
+O heartbeat é determinístico no pré-MVP. Ele calcula o dia no fuso e locale do usuário, respeita `quiet_start`/`quiet_end`, limite diário e cooldown de 24 horas, entrega lembretes vencidos e registra silêncio ou falha. Candidatos acima do limite não são descartados. Lock por usuário evita concorrência e uma falha não interrompe o lote.
+
+## Roteamento e custos
+
+Cada resposta ou embedding bem-sucedido registra request id, modelo, tokens de entrada/cache/saída/raciocínio, entidade de origem e snapshot de preço. Nenhum prompt ou conteúdo de arquivo entra no ledger. O custo local usa preço Standard por milhão de tokens, aplica regras de contexto longo do catálogo e não cobra reasoning tokens duas vezes. A fatura da OpenAI permanece a autoridade para impostos, créditos, cache writes e service tiers.
 
 ## Revisões
 
