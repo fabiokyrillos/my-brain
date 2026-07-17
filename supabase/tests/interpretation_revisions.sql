@@ -1,8 +1,13 @@
 begin;
 
-select plan(43);
+select plan(44);
 
 select has_column('public', 'entries', 'current_interpretation_id', 'entries points to the current immutable interpretation');
+select results_eq(
+  $$ select provolatile from pg_proc where oid = 'public.model_only_element_trust(numeric)'::regprocedure $$,
+  array['s'::"char"],
+  'model-only trust declares the stable volatility detected by database lint'
+);
 select has_column('public', 'entries', 'reprocessing_key', 'entries records the active reprocessing operation');
 select has_column('public', 'entries', 'reprocessing_started_at', 'entries records when reprocessing started');
 select has_column('public', 'entries', 'reprocessing_lease_expires_at', 'entries bounds a reprocessing lease');
