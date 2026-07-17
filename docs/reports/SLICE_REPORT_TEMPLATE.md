@@ -10,11 +10,22 @@ Descreva o resultado verificável entregue pelo slice.
 
 Liste os requisitos, superfícies e limites efetivamente abordados.
 
+# Critérios de aceite
+
+Relacione os critérios previstos para o slice e indique:
+
+- atendido;
+- não atendido;
+- não aplicável;
+- desvio aprovado.
+
+Explique objetivamente qualquer divergência em relação ao plano.
+
 # Arquivos alterados
 
 Relacione cada arquivo criado, modificado ou removido e sua responsabilidade.
 
-# Decisions tomadas
+# Decisões tomadas
 
 Registre decisões de implementação, alternativas descartadas e a justificativa objetiva.
 
@@ -36,7 +47,7 @@ Registre comandos, escopo, resultado, quantidade de testes e qualquer limitaçã
 
 # Evidências
 
-Inclua links ou referências para logs, screenshots, smokes remotos, deploys, migrations e verificações relevantes.
+Inclua somente evidências realmente existentes, como logs, screenshots, smokes remotos, deploys, migrations, hashes e verificações relevantes.
 
 # Limitações
 
