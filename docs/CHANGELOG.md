@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.1 daily-cycle product contracts
+
+### Added
+
+- Pure `daily-cycle` contracts for the five public product states, five attention reasons, product-oriented DTOs, and user-available action identifiers.
+- Stable discriminated Action-result codes and safe runtime guards that keep localized copy, provider details, and database errors outside the contract.
+- Typed PT-BR and English product copy for states, attention reasons, actions, and Action-result messages.
+- One deterministic, fail-closed internal-lifecycle-to-product-state mapper covering the eight known entry states, job status, retry scheduling, questions, candidates, record-only entries, materialized tasks, and consistency fallbacks.
+- Four colocated Vitest suites, including an architectural source guard that prevents React, Supabase, database types, and UI-module imports in the new boundary.
+- Slice evidence report at `docs/reports/PHASE_2X_SLICE_01_REPORT.md`.
+
+### Changed
+
+- Permanent state and backlog now record that Phase 2X implementation is in progress, Slice 2X.1 is complete, and Slice 2X.2 has not started.
+
+### Verification
+
+- Focused daily-cycle Vitest: 4 files and 24 tests passing.
+- Full Vitest: 43 files and 171 tests passing.
+- ESLint, TypeScript, and the Next.js 16.2.10 production build passed.
+- No migration, RPC, Edge Function, route, UI, telemetry, remote smoke, or Playwright work was required or executed because this slice has no runtime consumer.
+
 ## 2026-07-17 — Phase 2X — Product Convergence planning checkpoint
 
 ### Added

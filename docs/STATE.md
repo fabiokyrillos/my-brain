@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Phase 2X — Product Convergence planned and approved — implementation has not started
+Current phase: Phase 2X — Product Convergence in progress — Slice 2X.1 complete
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified. Phase 2X — Product Convergence has an approved architecture review, PRD, and implementation plan; no 2X code, migration, Edge Function, or slice has been started.
+Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified. Phase 2X — Product Convergence has an approved architecture review, PRD, and implementation plan. Slice 2X.1 is complete: pure, serializable daily-cycle DTOs, discriminated Action-result contracts, typed PT-BR/English copy, and one fail-closed lifecycle mapper now exist with no visual consumer or product-behavior change. No 2X migration, RPC, Edge Function, route, or UI has been created.
 
 ## Implemented functionality
 
@@ -29,11 +29,12 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - Deterministic per-element trust weights/policies/evidence plus bounded owned entity ranking across normalized names, aliases, history, organization context, temporal validity, optional semantic input, and candidate margin.
 - Shared capture/reprocessing extraction pipeline with paid-usage ordering, 120-second provider bound, persisted reprocessing lease, safe failure recovery, and no duplicate AI implementation.
 - Typed interpretation review DAL and localized accessible inbox UI for correction, dates, concepts, entity links, classifications, pending-question retention, record-only mode, trust evidence, history/comparison, undo, and reprocessing.
+- Daily-cycle product contracts for five public states, five attention reasons, product DTOs, stable Action results, PT-BR/English copy, and a deterministic lifecycle projection that fails closed on unknown states.
 
 ## Pending or incomplete functionality
 
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
-- Phase 2X — Product Convergence is planned and approved but not implemented; the delivered product behavior remains the Phase 2B baseline until Slice 2X.1 is explicitly authorized.
+- Phase 2X — Product Convergence is in progress. Slice 2X.1 supplies contracts and guardrails only; the delivered user experience remains the Phase 2B baseline until later slices add verified consumers.
 - A generic unattended due-job consumer is not deployed because no current flow requires one. Failed attachment retries are explicit, user-initiated, and blocked until persisted `next_attempt_at`; add an unattended consumer only with a concrete background workflow.
 - Automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
@@ -43,7 +44,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Next priorities
 
-1. Begin Phase 2X — Product Convergence only when implementation is explicitly authorized, starting with Slice 2X.1 — contracts do ciclo diário e guardrails arquiteturais.
+1. Continue Phase 2X only with explicit authorization for Slice 2X.2 — private product-events foundation; Slice 2X.2 has not started.
 2. Begin Phase 2C only after Phase 2X converges the daily cycle and preserves the Phase 2B revision/trust boundary.
 3. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 4. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
@@ -97,7 +98,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Existing tests
 
-- Vitest unit/component tests for auth UI, profile/settings, capture, AI parsing/routing/cost math/usage, and shared behavior.
+- Vitest unit/component tests for auth UI, profile/settings, capture, AI parsing/routing/cost math/usage, and daily-cycle product contracts/lifecycle guardrails.
 - Playwright public foundation, online auth, and intelligent capture suites.
 - pgTAP tests for foundational RLS, capture RLS, and AI usage schema/RLS.
 - CI currently runs lint, typecheck, unit tests, and production build.
@@ -106,7 +107,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 Verified on 2026-07-17:
 
-- Vitest: 39 files and 147 tests passing.
+- Vitest: 43 files and 171 tests passing after Slice 2X.1.
 - Statements: 93.66% (266/284).
 - Branches: 61.61% (305/495).
 - Functions: 90.62% (87/96).
@@ -120,7 +121,7 @@ Verified on 2026-07-17:
 - Phase 2B remote interpretation smoke: immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup passing.
 - Complete remote Supabase regression smoke: auth, atomic settings, RLS, ownership, heartbeat, AI ledger/aggregation, and deployed file worker passing after Phase 2B.
 
-Coverage percentages apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to, these percentages.
+Coverage percentages are the last explicit coverage measurement from the Phase 2B baseline and were not recomputed for this contracts-only slice. They apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to these percentages.
 
 ## Important recent commits
 
