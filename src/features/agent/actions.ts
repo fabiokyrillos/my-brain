@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import {
+  createDailyCycleActionFailure,
+  createDailyCycleActionSuccess,
+  type DailyCycleActionResult,
+} from "@/features/daily-cycle/action-result";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
+import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { defaultAgentPreferences } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
@@ -10,6 +17,79 @@ import { recordAIUsage } from "@/lib/ai/usage";
 import type { AgentFormState } from "./forms";
 
 const localeSchema = z.enum(["pt-BR", "en"]);
+
+const retryProcessingJobSchema = z.object({
+  locale: localeSchema,
+  entryId: z.string().uuid(),
+});
+
+function refreshDailyCycleSurfaces(locale: "pt-BR" | "en", entryId: string) {
+  revalidatePath(`/${locale}/app`);
+  revalidatePath(`/${locale}/app/inbox`);
+  revalidatePath(`/${locale}/app/inbox/${entryId}`);
+}
+
+// Generalizes retry to interpret_entry jobs alongside the existing,
+// attachment-only retryAttachmentJob below (left unchanged). Entries have
+// automatic per-minute dispatch (Slice 2X.4), so an eligible failed job
+// only needs a non-blocking kick; an exhausted job needs a fresh
+// enqueue_entry_reprocessing job, since exhausted work is never re-claimed.
+export async function retryProcessingJob(
+  _state: DailyCycleActionResult | undefined,
+  formData: FormData,
+): Promise<DailyCycleActionResult> {
+  const parsed = retryProcessingJobSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return createDailyCycleActionFailure({ code: "validation_failed", messageKey: "validation_failed", retryable: false });
+  }
+  const { locale, entryId } = parsed.data;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return createDailyCycleActionFailure({ code: "unauthenticated", messageKey: "session_expired", retryable: false });
+
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .select("id,status,attempts,max_attempts,next_attempt_at")
+    .eq("user_id", user.id)
+    .eq("type", "interpret_entry")
+    .eq("payload->>entry_id", entryId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (jobError || !job) {
+    return createDailyCycleActionFailure({ code: "not_found", messageKey: "item_not_found", retryable: false });
+  }
+
+  if (job.status === "exhausted") {
+    const operationKey = crypto.randomUUID();
+    const { error } = await supabase.rpc("enqueue_entry_reprocessing", {
+      p_entry_id: entryId,
+      p_operation_key: operationKey,
+    });
+    if (error) return createDailyCycleActionFailure({ code: "operation_failed", messageKey: "action_failed", retryable: true });
+
+    const jobKey = `entry-reprocess:${entryId}:${operationKey}`;
+    const freshJob = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("idempotency_key", jobKey).maybeSingle();
+    after(async () => {
+      if (freshJob.data?.id) await kickEntryInterpretationWorker(supabase, freshJob.data.id);
+    });
+    refreshDailyCycleSurfaces(locale, entryId);
+    return createDailyCycleActionSuccess({ code: "retry_scheduled", messageKey: "retry_scheduled", entityId: entryId });
+  }
+
+  if (job.status === "failed") {
+    const retryAt = job.next_attempt_at ? Date.parse(job.next_attempt_at) : Number.NaN;
+    if (Number.isFinite(retryAt) && retryAt > Date.now()) {
+      return createDailyCycleActionFailure({ code: "retry_not_available", messageKey: "retry_not_available", retryable: true });
+    }
+    after(() => kickEntryInterpretationWorker(supabase, job.id));
+    refreshDailyCycleSurfaces(locale, entryId);
+    return createDailyCycleActionSuccess({ code: "retry_scheduled", messageKey: "retry_scheduled", entityId: entryId });
+  }
+
+  return createDailyCycleActionFailure({ code: "action_unavailable", messageKey: "action_unavailable", retryable: false });
+}
 
 export async function createReminder(
   _state: AgentFormState,

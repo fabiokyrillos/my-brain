@@ -1,4 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function waitForOrganized(page: Page, href: string, timeoutMs = 90_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    await page.goto(href);
+    const ready = await page.getByRole("heading", { name: "Confiança por elemento" }).isVisible().catch(() => false);
+    if (ready) return;
+    if (Date.now() > deadline) throw new Error("Entry did not finish organizing before the timeout.");
+    await page.waitForTimeout(2_000);
+  }
+}
 
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
@@ -63,10 +74,26 @@ test.describe("intelligent capture", () => {
     await expect(page).toHaveURL(/\/pt-BR\/app$/);
     await page.goto("/pt-BR/app/capture");
 
-    await page.getByRole("textbox", { name: "Nova entrada" }).fill(original);
+    const captureField = page.getByRole("textbox", { name: "Nova entrada" });
+    await captureField.fill(original);
     await page.getByRole("button", { name: "Registrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app\/inbox\/[0-9a-f-]+$/, { timeout: 120_000 });
-    const capturedEntryId = page.url().split("/").at(-1)!;
+
+    // The Action returns immediately after the durable atomic enqueue: no
+    // redirect and no wait for AI. The receipt renders in place and the
+    // field is already cleared and refocused for the next capture, which
+    // proves the UI is interactive before interpretation completes.
+    await expect(page).toHaveURL(/\/pt-BR\/app\/capture$/);
+    await expect(page.getByRole("status")).toContainText("Salvo. Estou organizando.");
+    await expect(captureField).toHaveValue("");
+    await expect(captureField).toBeFocused();
+    await expect(page.getByRole("button", { name: "Registrar" })).toBeEnabled();
+
+    const viewRecordLink = page.getByRole("link", { name: "Ver registro" });
+    await expect(viewRecordLink).toBeVisible();
+    const recordHref = await viewRecordLink.getAttribute("href");
+    const capturedEntryId = recordHref!.split("/").at(-1)!;
+
+    await waitForOrganized(page, recordHref!);
     await expect(page.locator(".entry-heading h1")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Confiança por elemento" })).toBeVisible();
     await page.getByText("Ver registro original").click();

@@ -15,7 +15,7 @@ export default async function CapturePage({ params }: { params: Promise<{ locale
       <p>{pt
         ? "Escreva do seu jeito. O Brain preserva o original, identifica o contexto e pede sua confirmação antes de criar tarefas."
         : "Write naturally. Brain preserves the original, finds the context, and asks before creating tasks."}</p>
-      <QuickCaptureForm action={captureEntry} locale={locale} />
+      <QuickCaptureForm action={captureEntry} locale={locale} captureSource="capture_page" />
     </div>
   );
 }

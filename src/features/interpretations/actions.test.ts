@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { extractEntryForUser, persistEntryEmbedding } from "./interpret-entry";
+import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
+import { recordProductEvent } from "@/features/product-analytics/server";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/ai/openai-provider", () => ({
-  EXTRACTION_PROMPT_VERSION: "2026-07-16.1",
-  EXTRACTION_STRATEGY_VERSION: "entry-extraction-v1",
-}));
-vi.mock("./interpret-entry", () => ({ extractEntryForUser: vi.fn(), persistEntryEmbedding: vi.fn() }));
+vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
+vi.mock("@/features/product-analytics/server", () => ({ recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })) }));
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 const operationKey = "6118fb25-2f80-432a-aa96-0e76d924862e";
+const jobId = "94f6c9d0-2f4e-4a2e-8f2c-9b2a3c4d5e6f";
 
 function correctionForm() {
   const form = new FormData();
@@ -44,6 +45,11 @@ function authenticatedClient() {
     },
     rpc,
   };
+}
+
+async function flushAfter() {
+  const calls = vi.mocked(after).mock.calls;
+  await Promise.all(calls.map(([task]) => (typeof task === "function" ? task() : task)));
 }
 
 describe("interpretation actions", () => {
@@ -96,32 +102,19 @@ describe("interpretation actions", () => {
     expect(rpc).toHaveBeenCalledWith("undo_operation", { p_undo_id: "4b3700f0-3300-452a-af18-70427f788ff7" });
   });
 
-  it("reprocesses through the shared extraction pipeline and the persisted lease", async () => {
-    const rpc = vi.fn(async (name: string) => ({ data: name === "begin_entry_reprocessing" ? { acquired: true } : { version: 4 }, error: null }));
-    const maybeSingle = vi.fn(async () => ({ data: { id: entryId, original_content: "Conversei com Marina.", locale: "pt-BR" }, error: null }));
+  it("enqueues reprocessing atomically instead of running extraction synchronously", async () => {
+    const rpc = vi.fn(async () => ({ data: { entry_id: entryId, status: "queued", replayed: false }, error: null }));
+    const jobsQuery = {
+      select: vi.fn(function (this: unknown) { return this; }),
+      eq: vi.fn(function (this: unknown) { return this; }),
+      maybeSingle: vi.fn(async () => ({ data: { id: jobId, status: "pending" }, error: null })),
+    };
     const client = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
       rpc,
-      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) })),
+      from: vi.fn(() => jobsQuery),
     };
     vi.mocked(createClient).mockResolvedValue(client as never);
-    vi.mocked(extractEntryForUser).mockResolvedValue({
-      result: {
-        model: "gpt-5.6-luna",
-        extraction: {
-          language: "pt-BR", occurredAt: "2026-07-17T14:00:00.000Z", isRetroactive: false,
-          summary: "Conversa com Marina", concepts: ["person_note"], contexts: [], organizations: [], projects: [],
-          people: [{ name: "Marina", confidence: 0.9, evidence: "menção explícita", inferred: false }],
-          taskCandidates: [], pendingQuestions: [], confidence: 0.88,
-        },
-        inputTokens: 120,
-        outputTokens: 80,
-      },
-      entityResolutions: [{ query: "Marina", topScore: 0.7, margin: 0.7, ambiguous: false, evidence: ["normalized_exact_name"] }],
-      priorCorrectionAgreement: 0.5,
-      provider: {} as never,
-    } as never);
-    vi.mocked(persistEntryEmbedding).mockResolvedValue(undefined);
     const form = new FormData();
     form.set("entryId", entryId);
     form.set("operationKey", operationKey);
@@ -129,12 +122,41 @@ describe("interpretation actions", () => {
 
     const result = await reprocessEntry({ status: "idle", message: "" }, form);
 
-    expect(result).toEqual({ status: "success", message: "Entrada reinterpretada." });
-    expect(rpc).toHaveBeenNthCalledWith(1, "begin_entry_reprocessing", { p_entry_id: entryId, p_operation_key: operationKey, p_lease_seconds: 180 });
-    expect(rpc).toHaveBeenNthCalledWith(2, "persist_reprocessed_entry_interpretation", expect.objectContaining({
+    expect(result).toEqual({ status: "success", message: "Vou organizar este registro novamente." });
+    expect(rpc).toHaveBeenCalledWith("enqueue_entry_reprocessing", {
       p_entry_id: entryId,
       p_operation_key: operationKey,
-      p_element_trust: expect.objectContaining({ entities: expect.objectContaining({ evidence: expect.arrayContaining(["normalized_exact_name"]) }) }),
+    });
+    expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+
+    expect(kickEntryInterpretationWorker).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(kickEntryInterpretationWorker).toHaveBeenCalledWith(client, jobId);
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "capture_processing_enqueued",
+      properties: { processingMode: "reprocess" },
     }));
+  });
+
+  it("preserves the original and reports a sanitized failure when enqueueing fails", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "55P03", message: "already queued detail" } }));
+    const client = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
+      rpc,
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const form = new FormData();
+    form.set("entryId", entryId);
+    form.set("operationKey", operationKey);
+    form.set("locale", "pt-BR");
+
+    const result = await reprocessEntry({ status: "idle", message: "" }, form);
+
+    expect(result).toEqual({
+      status: "error",
+      message: "Não foi possível reinterpretar agora. O original foi preservado.",
+    });
+    expect(client.from).not.toHaveBeenCalled();
   });
 });

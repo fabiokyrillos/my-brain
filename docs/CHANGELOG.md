@@ -2,6 +2,40 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.5 asynchronous capture cutover
+
+### Added
+
+- `src/lib/jobs/entry-worker.ts` (`kickEntryInterpretationWorker`): shared, fire-and-forget nudge that invokes the deployed `process-jobs` worker for a given job id using the caller's own authenticated session (same `{ jobId }` contract as existing direct invocation); every internal error is swallowed since the `pg_cron` drain (Slice 2X.4) is the correctness backstop, not this nudge.
+- `src/features/daily-cycle/capture-receipt.tsx` (`CaptureReceiptView`): renders a `CaptureReceipt` as a `role="status"` region with the localized save/replay message and, when the Action supplied one, a safe "Ver registro"/"View record" link. First production consumer of the previously-unconsumed `toCaptureReceipt` projection mapper.
+- `retryProcessingJob` in `src/features/agent/actions.ts`: generalizes manual retry to `interpret_entry` jobs. A `failed` job whose backoff has elapsed only gets a worker kick (it is still automatically re-claimed by the dispatch drain); an `exhausted` job gets a fresh `enqueue_entry_reprocessing` job, since exhausted work is never re-claimed. `retryAttachmentJob` is untouched. No UI consumes this Action yet — it lands with the Needs-Attention slices (2X.10–2X.11).
+- Official Slice 2X.5 evidence report at `docs/reports/PHASE_2X_SLICE_05_REPORT.md`.
+- `docs/DECISIONS.md` ADR-023: the `after()` mechanism, the entry-retry generalization, and the `interpret-entry.ts` removal.
+
+### Changed
+
+- `src/features/capture/actions.ts` (`captureEntry`): calls `capture_entry_async` and returns as soon as it (plus one lightweight indexed lookup for job/entry state) settles — no redirect, no synchronous AI call. Builds a `CaptureReceipt` through `toCaptureReceipt`, only including a `safeHref` when captured from the dedicated `/capture` page (not Home), and schedules the worker nudge plus best-effort `capture_save_succeeded`/`capture_save_failed`/`capture_processing_enqueued` product events inside `next/server`'s `after()` so neither adds latency to the response.
+- `src/features/capture/quick-capture-form.tsx`: `CaptureState` is now a discriminated `idle | success (receipt) | error (code, message)` union. The button reads "Salvando…"/"Saving…" while pending (not "Interpretando…"/"Interpreting…"); on success the form resets and the field regains focus so consecutive captures do not wait on interpretation, and a client-generated idempotency key rotates only after a confirmed success so a failed-attempt retry cannot create a duplicate entry.
+- `src/features/shell/home-dashboard.tsx` and `src/app/[locale]/app/capture/page.tsx` pass the new required `captureSource` prop (`"home"` / `"capture_page"`) so the Action knows which surface to attribute analytics to and whether to include the receipt's record link.
+- `src/features/interpretations/actions.ts` (`reprocessEntry`): calls `enqueue_entry_reprocessing` instead of running extraction synchronously; returns the honest "Vou organizar este registro novamente."/"I will organize this record again." message instead of claiming completion, and schedules the same worker-nudge/analytics pattern as `captureEntry`.
+- `src/features/interpretations/copy.ts`: the reprocess button's pending label changed from "Reinterpretando…"/"Reinterpreting…" to "Enfileirando…"/"Queueing…", matching what the click now actually does (an enqueue, not a live AI call).
+- `e2e/intelligent-capture.spec.ts`: the capture step now asserts the immediate receipt, the cleared/refocused field, and an enabled submit button — proving the UI is interactive before interpretation completes — then polls the entry-detail route until the worker finishes before continuing into the existing correction/task-confirmation journey.
+
+### Removed
+
+- `src/features/interpretations/interpret-entry.ts`: the synchronous Node extraction orchestrator, now unreachable since neither `captureEntry` nor `reprocessEntry` calls it. All production entry-interpretation extraction now runs exclusively in the Deno worker (`supabase/functions/process-jobs/entry.ts`, Slice 2X.4).
+- Two now-superseded assertions in `src/lib/ai/usage-order.test.ts` that checked the deleted Node synchronous ordering; the two Deno-worker ordering assertions are unchanged and still pass.
+
+### Fixed
+
+- `src/test/setup.ts` now registers Testing Library's `cleanup()` in a global `afterEach`. Vitest's config never enabled `globals: true`, so the library's automatic cleanup had never been active in this project — a render from one `it()` block could leak into the next within the same file. Caught while writing the `CaptureReceiptView` test; fixed once, project-wide, rather than worked around locally.
+
+### Verification
+
+- Vitest: 50 files / 228 tests passing (up from 47/205), ESLint, TypeScript, and the Next.js 16.2.10 production build all clean.
+- `npm run test:remote:entry-processing`, `test:remote:jobs`, `test:remote:product-events`, and `test:remote` all re-run against the linked project after the cutover and passed unchanged.
+- Online Playwright (`intelligent-capture.spec.ts`) passed on both `desktop` (~1.1 min) and `mobile` (~1.0 min) against the linked project, including the full downstream journey (correction, undo, task confirmation, chat, reviews, files, settings, heartbeat, final undo).
+
 ## 2026-07-17 — Phase 2X Slice 2X.4 entry-interpretation worker and automatic dispatch
 
 ### Added

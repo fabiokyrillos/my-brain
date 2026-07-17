@@ -44,7 +44,7 @@ const copy = {
     undo: "Desfazer última correção",
     undoing: "Desfazendo…",
     reprocess: "Reinterpretar entrada",
-    reprocessing: "Reinterpretando…",
+    reprocessing: "Enfileirando…",
     noEntities: "Nenhum vínculo disponível.",
   },
   en: {
@@ -68,7 +68,7 @@ const copy = {
     undo: "Undo latest correction",
     undoing: "Undoing…",
     reprocess: "Reinterpret entry",
-    reprocessing: "Reinterpreting…",
+    reprocessing: "Queueing…",
     noEntities: "No links available.",
   },
 } as const;

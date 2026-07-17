@@ -1,89 +1,198 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { extractEntryForUser, persistEntryEmbedding } from "@/features/interpretations/interpret-entry";
+import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
+import { recordProductEvent } from "@/features/product-analytics/server";
 import { captureEntry } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/ai/openai-provider", () => ({
-  EXTRACTION_PROMPT_VERSION: "2026-07-16.1",
-  EXTRACTION_STRATEGY_VERSION: "entry-extraction-v1",
-}));
-vi.mock("@/features/interpretations/interpret-entry", () => ({ extractEntryForUser: vi.fn(), persistEntryEmbedding: vi.fn() }));
+vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
+vi.mock("@/features/product-analytics/server", () => ({ recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })) }));
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
+const jobId = "6118fb25-2f80-432a-aa96-0e76d924862e";
 
-function form() {
+function form(overrides: Record<string, string> = {}) {
   const data = new FormData();
   data.set("content", "Conversei com Marina sobre o Atlas.");
   data.set("locale", "pt-BR");
   data.set("source", "web");
+  data.set("captureSource", "home");
+  data.set("idempotencyKey", "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f");
+  Object.entries(overrides).forEach(([key, value]) => data.set(key, value));
   return data;
 }
 
-function clientMock() {
-  const single = vi.fn(async () => ({ data: { id: entryId }, error: null }));
-  const select = vi.fn(() => ({ single }));
-  const insert = vi.fn(() => ({ select }));
-  const rpc = vi.fn(async () => ({ data: {}, error: null }));
-  const client = {
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
-    from: vi.fn(() => ({ insert })),
-    rpc,
-  };
-  return { client, insert, rpc };
+async function flushAfter() {
+  const calls = vi.mocked(after).mock.calls;
+  await Promise.all(calls.map(([task]) => (typeof task === "function" ? task() : task)));
 }
 
-const extraction = {
-  result: {
-    model: "gpt-5.6-luna",
-    extraction: {
-      language: "pt-BR", occurredAt: "2026-07-17T14:00:00.000Z", isRetroactive: false,
-      summary: "Conversa com Marina", concepts: ["person_note"], contexts: [], organizations: [], projects: [], people: [], taskCandidates: [], pendingQuestions: [], confidence: 0.86,
-    },
-    inputTokens: 100,
-    outputTokens: 50,
-  },
-  provider: {},
-  entityResolutions: [],
-  priorCorrectionAgreement: 0,
-};
+function clientMock(options: {
+  rpc?: { data: unknown; error: unknown };
+  entryRow?: { status: string } | null;
+  jobRow?: { id: string; status: string; next_attempt_at: string | null } | null;
+  authenticated?: boolean;
+} = {}) {
+  const {
+    rpc: rpcResult = { data: { entry_id: entryId, status: "saved", replayed: false }, error: null },
+    entryRow = { status: "saved" },
+    jobRow = { id: jobId, status: "pending", next_attempt_at: null },
+    authenticated = true,
+  } = options;
 
-describe("captureEntry lifecycle", () => {
+  const entriesQuery = {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: entryRow, error: null })),
+  };
+  const jobsQuery = {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: jobRow, error: null })),
+  };
+  const from = vi.fn((table: string) => (table === "entries" ? entriesQuery : jobsQuery));
+  const rpc = vi.fn(async () => rpcResult);
+  const client = {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: authenticated ? { id: "user-1" } : null } })),
+    },
+    from,
+    rpc,
+  };
+  return { client, rpc, from, entriesQuery, jobsQuery };
+}
+
+describe("captureEntry", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("preserves first, starts interpretation, and uses the shared extraction pipeline", async () => {
-    const { client, insert, rpc } = clientMock();
-    vi.mocked(createClient).mockResolvedValue(client as never);
-    vi.mocked(extractEntryForUser).mockResolvedValue(extraction as never);
-    vi.mocked(persistEntryEmbedding).mockResolvedValue(undefined);
+  it("rejects invalid content before opening a data client", async () => {
+    const result = await captureEntry({ status: "idle" }, form({ content: "" }));
 
-    await captureEntry({ status: "idle", message: "" }, form());
-
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "saved", original_content: "Conversei com Marina sobre o Atlas." }));
-    expect(rpc).toHaveBeenNthCalledWith(1, "begin_entry_interpretation", { p_entry_id: entryId });
-    expect(rpc).toHaveBeenNthCalledWith(2, "persist_entry_interpretation", expect.objectContaining({ p_entry_id: entryId, p_extraction: extraction.result.extraction }));
-    expect(extractEntryForUser).toHaveBeenCalledWith(expect.objectContaining({ entryId, userId: "user-1" }));
-    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/inbox");
-    expect(redirect).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+    expect(result.status).toBe("error");
+    if (result.status === "error") expect(result.code).toBe("validation_failed");
+    expect(createClient).not.toHaveBeenCalled();
   });
 
-  it("persists a recoverable sanitized failure without mutating the entry directly", async () => {
+  it("reports an expired session without touching the database", async () => {
+    const { client } = clientMock({ authenticated: false });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await captureEntry({ status: "idle" }, form());
+
+    expect(result).toEqual({ status: "error", code: "unauthenticated", message: "Sua sessão expirou. Entre novamente." });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("persists through the atomic RPC and returns an organizing receipt without a redirect", async () => {
     const { client, rpc } = clientMock();
     vi.mocked(createClient).mockResolvedValue(client as never);
-    vi.mocked(extractEntryForUser).mockRejectedValue(new Error("provider secret detail"));
 
-    const result = await captureEntry({ status: "idle", message: "" }, form());
+    const result = await captureEntry({ status: "idle" }, form());
 
-    expect(result).toMatchObject({ status: "error" });
-    expect(rpc).toHaveBeenLastCalledWith("fail_entry_interpretation", {
-      p_entry_id: entryId,
-      p_error: "Interpretation unavailable. The original was preserved.",
-      p_terminal: false,
+    expect(rpc).toHaveBeenCalledWith("capture_entry_async", {
+      p_original_content: "Conversei com Marina sobre o Atlas.",
+      p_locale: "pt-BR",
+      p_source: "web",
+      p_idempotency_key: "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f",
     });
-    expect(client.from).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      status: "success",
+      receipt: {
+        entryId,
+        persisted: true,
+        productState: "organizing",
+        messageKey: "capture_saved",
+        replayed: false,
+      },
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app");
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/inbox");
+  });
+
+  it("never returns a redirect and omits safeHref when captured from Home", async () => {
+    const { client } = clientMock();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await captureEntry({ status: "idle" }, form({ captureSource: "home" }));
+
+    expect(result.status).toBe("success");
+    if (result.status === "success") expect(result.receipt.safeHref).toBeUndefined();
+  });
+
+  it("includes a safe link to the record when captured from the dedicated capture page", async () => {
+    const { client } = clientMock();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await captureEntry({ status: "idle" }, form({ captureSource: "capture_page" }));
+
+    expect(result.status).toBe("success");
+    if (result.status === "success") expect(result.receipt.safeHref).toBe(`/pt-BR/app/inbox/${entryId}`);
+  });
+
+  it("kicks the worker and records analytics after the response, without blocking it", async () => {
+    const { client } = clientMock();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await captureEntry({ status: "idle" }, form());
+
+    expect(kickEntryInterpretationWorker).not.toHaveBeenCalled();
+    expect(recordProductEvent).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledTimes(1);
+
+    await flushAfter();
+
+    expect(kickEntryInterpretationWorker).toHaveBeenCalledWith(client, jobId);
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "capture_save_succeeded",
+      surface: "capture",
+      properties: expect.objectContaining({ captureSource: "home" }),
+    }));
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "capture_processing_enqueued",
+      properties: { processingMode: "initial" },
+    }));
+  });
+
+  it("reflects the true current state on an idempotent replay instead of always claiming organizing", async () => {
+    const { client } = clientMock({
+      rpc: { data: { entry_id: entryId, status: "saved", replayed: true }, error: null },
+      entryRow: { status: "completed" },
+      jobRow: { id: jobId, status: "completed", next_attempt_at: null },
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await captureEntry({ status: "idle" }, form());
+
+    expect(result).toEqual({
+      status: "success",
+      receipt: {
+        entryId,
+        persisted: true,
+        productState: "ready",
+        messageKey: "capture_replayed",
+        replayed: true,
+      },
+    });
+
+    await flushAfter();
+    expect(kickEntryInterpretationWorker).not.toHaveBeenCalled();
+    expect(recordProductEvent).not.toHaveBeenCalledWith(expect.objectContaining({ name: "capture_processing_enqueued" }));
+  });
+
+  it("reports a sanitized failure when the atomic RPC itself fails", async () => {
+    const { client } = clientMock({ rpc: { data: null, error: { code: "XXNEW", message: "db secret detail" } } });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await captureEntry({ status: "idle" }, form());
+
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.code).toBe("operation_failed");
+      expect(result.message).not.toContain("db secret detail");
+    }
   });
 });

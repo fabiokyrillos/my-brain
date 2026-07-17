@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
-import { EXTRACTION_PROMPT_VERSION, EXTRACTION_STRATEGY_VERSION } from "@/lib/ai/openai-provider";
+import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
+import { recordProductEvent } from "@/features/product-analytics/server";
+import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createClient } from "@/lib/supabase/server";
 import type { RevisionActionState } from "./revision-editor";
 import { parseCorrectionFormData } from "./form-parser";
-import { buildCorrectionElementTrust, buildExtractionElementTrust } from "./trust-builders";
-import { extractEntryForUser, persistEntryEmbedding } from "./interpret-entry";
+import { buildCorrectionElementTrust } from "./trust-builders";
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 const uuidSchema = z.string().uuid();
@@ -104,69 +106,37 @@ export async function reprocessEntry(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
 
-  const entryResult = await supabase.from("entries").select("id,original_content,locale").eq("id", entryId.data).maybeSingle();
-  if (entryResult.error || !entryResult.data) {
-    return { status: "error", message: localized(locale.data, "Entrada não encontrada.", "Entry not found.") };
+  const { data, error } = await supabase.rpc("enqueue_entry_reprocessing", {
+    p_entry_id: entryId.data,
+    p_operation_key: operationKey.data,
+  });
+  if (error || !data) {
+    return {
+      status: "error",
+      message: localized(locale.data, "Não foi possível reinterpretar agora. O original foi preservado.", "Could not reinterpret now. The original was preserved."),
+    };
   }
-  let leaseAcquired = false;
-  try {
-    const begin = await supabase.rpc("begin_entry_reprocessing", {
-      p_entry_id: entryId.data,
-      p_operation_key: operationKey.data,
-      p_lease_seconds: 180,
-    });
-    if (begin.error) throw begin.error;
-    leaseAcquired = true;
 
-    const extraction = await extractEntryForUser({
-      supabase,
-      userId: user.id,
-      entryId: entryId.data,
-      content: entryResult.data.original_content,
+  const jobKey = `entry-reprocess:${entryId.data}:${operationKey.data}`;
+  const jobLookup = await supabase.from("jobs").select("id,status").eq("user_id", user.id).eq("idempotency_key", jobKey).maybeSingle();
+  const job = jobLookup.data;
+
+  after(async () => {
+    if (job?.id && (job.status === "pending" || job.status === "failed")) {
+      await kickEntryInterpretationWorker(supabase, job.id);
+    }
+    await recordProductEvent({
+      name: "capture_processing_enqueued",
+      surface: "interpretation_review",
       locale: locale.data,
-    });
-    const elementTrust = buildExtractionElementTrust({
-      modelConfidence: extraction.result.extraction.confidence,
-      occurredAt: extraction.result.extraction.occurredAt,
-      entityResolutions: extraction.entityResolutions,
-      priorCorrectionAgreement: extraction.priorCorrectionAgreement,
-    });
-    const persist = await supabase.rpc("persist_reprocessed_entry_interpretation", {
-      p_entry_id: entryId.data,
-      p_operation_key: operationKey.data,
-      p_extraction: extraction.result.extraction,
-      p_model: extraction.result.model,
-      p_strategy_version: EXTRACTION_STRATEGY_VERSION,
-      p_prompt_version: EXTRACTION_PROMPT_VERSION,
-      p_input_tokens: extraction.result.inputTokens,
-      p_output_tokens: extraction.result.outputTokens,
-      p_element_trust: elementTrust,
-    });
-    if (persist.error) throw persist.error;
-    try {
-      await persistEntryEmbedding({
-        supabase,
-        userId: user.id,
-        entryId: entryId.data,
-        content: entryResult.data.original_content,
-        summary: extraction.result.extraction.summary,
-        provider: extraction.provider,
-      });
-    } catch (embeddingError) {
-      console.error("Entry reprocessing embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
-    }
-  } catch (error) {
-    console.error("Entry reprocessing failed", error instanceof Error ? error.message : "unknown error");
-    if (leaseAcquired) {
-      await supabase.rpc("fail_entry_reprocessing", {
-        p_entry_id: entryId.data,
-        p_operation_key: operationKey.data,
-        p_error: "Reprocessing unavailable. The original was preserved.",
-      });
-    }
-    refreshEntry(locale.data, entryId.data);
-    return { status: "error", message: localized(locale.data, "Não foi possível reinterpretar agora. O original foi preservado.", "Could not reinterpret now. The original was preserved.") };
-  }
+      viewportClass: "unknown",
+      appVersion: "server",
+      idempotencyKey: crypto.randomUUID(),
+      subject: { type: "entry", id: entryId.data },
+      properties: { processingMode: "reprocess" },
+    }).catch(() => {});
+  });
+
   refreshEntry(locale.data, entryId.data);
-  return { status: "success", message: localized(locale.data, "Entrada reinterpretada.", "Entry reinterpreted.") };
+  return { status: "success", message: getDailyCycleCopy(locale.data).messages.reprocessing_queued };
 }
