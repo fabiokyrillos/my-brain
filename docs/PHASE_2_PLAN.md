@@ -1,6 +1,6 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: Phase 2B complete and published; Phase 2C is next
+Status: Phase 2B complete and published; Phase 2X — Product Convergence is planned and approved; implementation has not started
 Started: 2026-07-17  
 Branch: `codex/phase-2-intelligent-capture`
 
@@ -105,6 +105,10 @@ Add expiring leases, worker identity, atomic claim, bounded exponential backoff,
 
 Add persisted lifecycle states, a correction RPC that appends a new interpretation version, editable concepts/dates/entity links, deterministic entity candidates, per-element confidence, policy classification, audit, and undo. Confidence and entity resolution move into this slice because correction decisions cannot be trustworthy without them.
 
+### Phase 2X — Product Convergence
+
+Converge the existing daily cycle before expanding the task domain: asynchronous capture with the existing queue, immediate receipt, product-oriented state and attention projections, simplified review, coherent candidate actions, Home/Inbox/Work convergence, truthful information architecture, and private funnel instrumentation. The approved scope and execution order are defined in `PHASE_2X_PRD.md` and `PHASE_2X_IMPLEMENTATION_PLAN.md`; no 2X slice has started.
+
 ### Phase 2C — Editable candidate tasks
 
 Add a typed editor, selective confirmation, title/description/status/priority/due/planned dates, project/context/person links, dependencies, subtasks, no-due reason, split/merge, record-only/reject/cancel choices, transactional creation, audit, and undo.
@@ -121,7 +125,7 @@ Combine structured and semantic task search, calculate match margins, apply only
 
 Finalize occurrence/planned/due/completion/reminder date semantics, historical timeline placement, review invalidation, pagination, responsive and accessible UI, localization, complete automated matrices, linked smoke, permanent documentation, and phase closeout.
 
-The suggested A–F shape is retained, but deterministic entity resolution and the confidence policy move into 2B instead of waiting for a later entity-only pass. They are prerequisites for safe corrections, candidate edits, questions, and task updates.
+The approved order is 2A, 2B, 2X, 2C, 2D, 2E, and 2F. Deterministic entity resolution and the confidence policy remain in 2B because they are prerequisites for safe corrections, candidate actions, questions, and task updates.
 
 ## 8. Dependencies
 
@@ -344,4 +348,4 @@ Completed on 2026-07-17 on `codex/phase-2-intelligent-capture`.
 - The focused remote interpretation smoke passes immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup. The complete remote Supabase smoke also passes auth, atomic settings, ownership, heartbeat, AI accounting, and the deployed file worker.
 - Linked database lint has no Phase 2B issue. Two pre-existing `run_user_heartbeat` text-to-time warnings remain outside this slice. Docker-backed pgTAP execution remains unavailable on this workstation; the 44-assertion structural contract is committed and equivalent high-risk behavior passed remotely.
 - Implementation commits: `c0f038c`, `981b39e`, `9a87c54`, `ae0be18`, `91c1722`, `8331e68`, `8fbd615`, `9e894de`, `00eabe5`, and `80bb233`. The final documentation/push commit follows this record.
-- Phase 2C should extend the existing task candidate contract into an editable desired-state editor and one transactional confirmation RPC; it should not create a second task workflow or weaken the revision/trust boundary completed here.
+- Phase 2X precedes Phase 2C and must converge the current daily cycle without expanding the task domain. After 2X is complete, Phase 2C should extend the stable task-candidate contract into an editable desired-state editor and one transactional confirmation RPC; it should not create a second task workflow or weaken the revision/trust boundary completed here.

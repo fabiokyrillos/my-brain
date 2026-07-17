@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Phase 2B complete — Phase 2C is next
+Current phase: Phase 2X — Product Convergence planned and approved — implementation has not started
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified.
+Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified. Phase 2X — Product Convergence has an approved architecture review, PRD, and implementation plan; no 2X code, migration, Edge Function, or slice has been started.
 
 ## Implemented functionality
 
@@ -33,6 +33,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 ## Pending or incomplete functionality
 
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
+- Phase 2X — Product Convergence is planned and approved but not implemented; the delivered product behavior remains the Phase 2B baseline until Slice 2X.1 is explicitly authorized.
 - A generic unattended due-job consumer is not deployed because no current flow requires one. Failed attachment retries are explicit, user-initiated, and blocked until persisted `next_attempt_at`; add an unattended consumer only with a concrete background workflow.
 - Automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
@@ -42,10 +43,11 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Next priorities
 
-1. Begin Phase 2C with an editable task-candidate desired-state contract and one transactional selective-confirmation RPC, preserving the Phase 2B revision/trust boundary.
-2. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
-3. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
-4. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
+1. Begin Phase 2X — Product Convergence only when implementation is explicitly authorized, starting with Slice 2X.1 — contracts do ciclo diário e guardrails arquiteturais.
+2. Begin Phase 2C only after Phase 2X converges the daily cycle and preserves the Phase 2B revision/trust boundary.
+3. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
+4. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
+5. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
 
 ## Existing structure
 
