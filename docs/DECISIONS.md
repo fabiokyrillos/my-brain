@@ -157,3 +157,25 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** Retrieve linked project credentials only in process through the authenticated Supabase CLI, run disposable remote smoke and online Playwright suites, delete test users/files automatically, and classify hosted email throttling as a stable localized error. Exercise provider email delivery once per matrix and keep custom SMTP as a pre-production dependency.
 - **Reason:** The gate remains reproducible and secret-safe while distinguishing product regressions from external delivery quotas.
 - **Consequences:** `npm run test:remote` and `npm run test:e2e:online` require an authenticated, linked Supabase CLI session. Signup delivery may be explicitly skipped when the hosted quota is exhausted, but validation, error UX, recovery token exchange, protected password update, fresh login, RLS, ownership, heartbeat, cost aggregation, dashboard, and worker execution remain mandatory. CI must later receive equivalent short-lived credentials and custom SMTP coverage.
+
+## ADR-015 — Mandatory permanent engineering standards
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** Phase 2 expands trusted interpretation, automation, and user-controlled actions across frontend, AI, jobs, and database boundaries.
+- **Problem:** A feature checklist alone cannot prevent drift toward client-side authority, mutable evidence, unleased jobs, unvalidated model output, false controls, or unverified completion.
+- **Alternatives considered:** Keep standards implicit in reviews; copy a checklist into each phase plan; adopt one permanent mandatory engineering contract.
+- **Decision:** Adopt `ENGINEERING_STANDARDS.md` as the permanent minimum for all new code and every existing file changed after 2026-07-17. Temporary or architectural deviations must be documented with risk and a removal condition.
+- **Reason:** A stable contract makes trust, ownership, test evidence, job safety, UI truthfulness, and repository hygiene enforceable across sessions and contributors.
+- **Consequences:** A slice is not complete until applicable standards and permanent documentation gates pass. Existing out-of-scope debt is tracked in `TODO.md`; blocking correctness/security debt is fixed in the active slice.
+
+## ADR-016 — Reconcile Phase 2 and harden the existing queue incrementally
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** The pre-MVP already implemented large parts of the original capture, task, chat, embedding, heartbeat, file, and AI-cost roadmap, while reliable job leasing and several correction/trust workflows remain incomplete.
+- **Problem:** Replaying the original roadmap would duplicate working behavior, while expanding asynchronous processing on the current queue could strand jobs in `running` or allow stale workers to overwrite recovery.
+- **Alternatives considered:** Rebuild Phase 2 from the original roadmap; replace `jobs` with a generic external orchestration platform; keep attachment-only claim logic; harden the shared `jobs` core and retain attachment processing as its first real consumer.
+- **Decision:** Follow the reconciled slices in `PHASE_2_PLAN.md`. Start with additive leased queue semantics, atomic recovery, bounded retry/exhaustion, stale-worker protection, and minimal observability, without introducing a new queue service or a generic orchestration framework.
+- **Reason:** This preserves proven architecture, fixes the highest compounding risk first, and provides exactly the reliability required by current and near-term Phase 2 processing.
+- **Consequences:** Migration `019` must remain compatible with the deployed worker during rollout. Later slices extend existing domain models and must not recreate complete features or bypass the leased job contract.

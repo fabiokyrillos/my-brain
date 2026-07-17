@@ -1,9 +1,20 @@
 # Project Backlog
 
 Last updated: 2026-07-17  
-Active milestone: Phase 2 planning — implementation not started
+Active milestone: Phase 2A — operational reliability
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
+
+## Active milestone — Phase 2
+
+- [x] Adopt permanent engineering standards in `ENGINEERING_STANDARDS.md`.
+- [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
+- [ ] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
+- [ ] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
+- [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
+- [ ] Complete Phase 2D conversational pending questions.
+- [ ] Complete Phase 2E natural-language updates to existing tasks.
+- [ ] Complete Phase 2F retroactive history, mobile/localization/accessibility finish, full gates, and closeout.
 
 ## Completed milestone — Sprint 1.5
 

@@ -2,6 +2,18 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2 planning and engineering contract
+
+### Added
+
+- Mandatory permanent engineering standards covering architecture, database, security, AI, jobs, interface, tests, commits, dead code, and external dependencies.
+- Reality-based `PHASE_2_PLAN.md` that preserves complete pre-MVP capabilities, identifies partial/missing behavior, defines trust thresholds, and starts with operational queue reliability.
+
+### Changed
+
+- Project state and backlog now identify Phase 2A as the active milestone instead of treating the original roadmap as unimplemented.
+- Permanent source-of-truth precedence is explicit from current code and linked database through the project documents.
+
 ## 2026-07-17 — Sprint 1.5 foundation hardening
 
 ### Added

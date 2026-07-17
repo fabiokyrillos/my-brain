@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Sprint 1.5 complete — Phase 2 authorized for planning
-Source of truth order: code, database, migrations, documentation
+Current phase: Phase 2A — operational reliability in progress
+Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, rendered in Playwright, and remotely smoke-tested. The Sprint 1.5 quality gate is complete; Phase 2 may begin without an architectural reset.
+Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, rendered in Playwright, and remotely smoke-tested. The Sprint 1.5 quality gate is complete. Phase 2 has started with mandatory engineering standards, a reconciled reality-based plan, and operational job reliability as the first implementation slice.
 
 ## Implemented functionality
 
