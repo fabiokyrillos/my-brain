@@ -38,10 +38,18 @@ export async function correctInterpretation(
   }
 
   const { entryId, expectedVersion, operationKey, correctionReason, ...patch } = parsed.data;
+  const correctionHistory = await supabase
+    .from("entry_interpretations")
+    .select("id", { count: "exact", head: true })
+    .eq("entry_id", entryId)
+    .eq("origin", "user_corrected");
+  if (correctionHistory.error) {
+    return { status: "error", message: localized(locale.data, "Não foi possível validar o histórico da correção.", "Could not validate correction history.") };
+  }
   const elementTrust = buildCorrectionElementTrust({
     occurredAt: patch.occurredAt,
     hasEntities: patch.entityLinks.length > 0,
-    priorCorrectionAgreement: 0,
+    priorCorrectionAgreement: Math.min(1, (correctionHistory.count ?? 0) / 5),
   });
   const { error } = await supabase.rpc("correct_entry_interpretation", {
     p_entry_id: entryId,

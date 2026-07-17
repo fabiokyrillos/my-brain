@@ -35,8 +35,13 @@ function correctionForm() {
 
 function authenticatedClient() {
   const rpc = vi.fn(async () => ({ data: { version: 3, undo_id: "4b3700f0-3300-452a-af18-70427f788ff7" }, error: null }));
+  const history = vi.fn(async () => ({ data: null, count: 2, error: null }));
   return {
-    client: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) }, rpc },
+    client: {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
+      rpc,
+      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) })),
+    },
     rpc,
   };
 }
@@ -66,7 +71,10 @@ describe("interpretation actions", () => {
       p_patch: expect.objectContaining({
         summary: "Resumo confirmado",
         elementTrust: expect.objectContaining({
-          summary: expect.objectContaining({ policy: "apply_and_flag" }),
+          summary: expect.objectContaining({
+            policy: "apply_and_flag",
+            signals: expect.objectContaining({ correctionHistoryAgreement: 0.4 }),
+          }),
           occurredAt: expect.objectContaining({ evidence: expect.arrayContaining(["explicit_user_confirmation"]) }),
         }),
       }),
