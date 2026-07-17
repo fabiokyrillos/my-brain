@@ -206,6 +206,116 @@ export async function uploadAttachment(
   };
 }
 
+const jobRetryMessages = {
+  "pt-BR": {
+    invalid: "Não foi possível tentar novamente.",
+    session: "Sua sessão expirou.",
+    unavailable: "O processamento não está disponível.",
+    exhausted: "O limite de tentativas foi atingido.",
+    completed: "Análise concluída.",
+    processing: "A análise continua em processamento.",
+    scheduled: "A tentativa falhou e uma nova janela foi programada.",
+    retryAt: "Nova tentativa disponível em",
+  },
+  en: {
+    invalid: "Could not retry.",
+    session: "Your session expired.",
+    unavailable: "Job is not available.",
+    exhausted: "The retry limit has been reached.",
+    completed: "Analysis completed.",
+    processing: "Analysis is still processing.",
+    scheduled: "The attempt failed and another retry window was scheduled.",
+    retryAt: "Retry available",
+  },
+} as const;
+
+export async function retryAttachmentJob(
+  _state: AgentFormState,
+  formData: FormData,
+): Promise<AgentFormState> {
+  const parsed = z
+    .object({
+      locale: localeSchema,
+      jobId: z.string().uuid(),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return {
+      status: "error",
+      message: jobRetryMessages["pt-BR"].invalid,
+    };
+
+  const messages = jobRetryMessages[parsed.data.locale];
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: messages.session };
+
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .select("id,status,attempts,max_attempts,next_attempt_at")
+    .eq("id", parsed.data.jobId)
+    .eq("user_id", user.id)
+    .eq("type", "process_attachment")
+    .maybeSingle();
+  if (jobError || !job)
+    return { status: "error", message: messages.unavailable };
+  if (job.status === "completed")
+    return { status: "success", message: messages.completed };
+  if (job.status === "exhausted" || job.attempts >= job.max_attempts)
+    return { status: "error", message: messages.exhausted };
+  if (job.status !== "failed")
+    return { status: "success", message: messages.processing };
+
+  const retryAt = new Date(job.next_attempt_at);
+  if (retryAt.getTime() > Date.now()) {
+    const formatted = new Intl.DateTimeFormat(parsed.data.locale, {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(retryAt);
+    return {
+      status: "error",
+      message: `${messages.retryAt} ${formatted}.`,
+    };
+  }
+
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+  if (sessionError || !session)
+    return { status: "error", message: messages.session };
+
+  const { error: invokeError } = await supabase.functions.invoke(
+    "process-jobs",
+    {
+      body: { jobId: job.id },
+      headers: { authorization: `Bearer ${session.access_token}` },
+    },
+  );
+  revalidatePath(`/${parsed.data.locale}/app/files`);
+
+  const { data: refreshed, error: refreshError } = await supabase
+    .from("jobs")
+    .select("status,next_attempt_at")
+    .eq("id", job.id)
+    .eq("user_id", user.id)
+    .eq("type", "process_attachment")
+    .maybeSingle();
+  if (refreshError || !refreshed)
+    return { status: "error", message: messages.unavailable };
+  if (refreshed.status === "completed")
+    return { status: "success", message: messages.completed };
+  if (refreshed.status === "exhausted")
+    return { status: "error", message: messages.exhausted };
+  if (refreshed.status === "running")
+    return { status: "success", message: messages.processing };
+  if (invokeError || refreshed.status === "failed")
+    return { status: "error", message: messages.scheduled };
+  return { status: "error", message: messages.unavailable };
+}
+
 export async function generateReview(
   _state: AgentFormState,
   formData: FormData,

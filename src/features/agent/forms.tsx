@@ -26,6 +26,17 @@ export function UploadForm({ action, locale }: { action: AgentFormAction; locale
   return <div><form action={formAction} className="upload-form"><input type="hidden" name="locale" value={locale}/><label><FileUp size={25}/><span>{pt?"Imagem, PDF, documento ou planilha":"Image, PDF, document, or spreadsheet"}</span><small>{pt?"Privado · até 25 MB":"Private · up to 25 MB"}</small><input name="file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,.docx,.xlsx"/></label><button type="submit" disabled={pending}>{pending?<LoaderCircle className="spin" size={16}/>:<FileUp size={16}/>} {pt?"Enviar arquivo":"Upload file"}</button></form><Feedback state={state}/></div>;
 }
 
+const jobRetryLabels = {
+  "pt-BR": { idle: "Tentar novamente", pending: "Tentando…" },
+  en: { idle: "Try again", pending: "Retrying…" },
+} as const;
+
+export function JobRetryForm({ action, locale, jobId }: { action: AgentFormAction; locale: "pt-BR" | "en"; jobId: string }) {
+  const [state, formAction, pending] = useActionState(action, idleState);
+  const labels = jobRetryLabels[locale];
+  return <div><form action={formAction} className="job-retry-form"><input type="hidden" name="locale" value={locale}/><input type="hidden" name="jobId" value={jobId}/><button type="submit" disabled={pending}>{pending?<LoaderCircle className="spin" size={16}/>:null} {pending?labels.pending:labels.idle}</button></form><Feedback state={state}/></div>;
+}
+
 export function ReviewButton({ action, locale, period }: { action: AgentFormAction; locale: "pt-BR" | "en"; period: "daily" | "weekly_review" | "weekly_plan" | "monthly" }) {
   const [state, formAction, pending] = useActionState(action, idleState);const pt=locale==="pt-BR";const labels={daily:pt?"Resumo do dia":"Daily summary",weekly_review:pt?"Revisão da semana":"Weekly review",weekly_plan:pt?"Planejar a semana":"Plan the week",monthly:pt?"Revisão do mês":"Monthly review"};
   return <div className="review-action"><form action={formAction}><input type="hidden" name="locale" value={locale}/><input type="hidden" name="period" value={period}/><button type="submit" disabled={pending}>{pending?<LoaderCircle className="spin" size={16}/>:<Sparkles size={16}/>} {labels[period]}</button></form><Feedback state={state}/></div>;
