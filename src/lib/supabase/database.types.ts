@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -538,6 +538,45 @@ export type Database = {
         }
         Relationships: []
       }
+      entity_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          normalized_alias: string
+          updated_at: string
+          user_id: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          normalized_alias: string
+          updated_at?: string
+          user_id: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          normalized_alias?: string
+          updated_at?: string
+          user_id?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: []
+      }
       entity_attachments: {
         Row: {
           attachment_id: string
@@ -625,12 +664,16 @@ export type Database = {
       entries: {
         Row: {
           created_at: string
+          current_interpretation_id: string | null
           id: string
           is_retroactive: boolean
           locale: string
           occurred_at: string
           original_content: string
           processing_error: string | null
+          reprocessing_key: string | null
+          reprocessing_lease_expires_at: string | null
+          reprocessing_started_at: string | null
           sensitivity: string
           source: string
           status: string
@@ -639,12 +682,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_interpretation_id?: string | null
           id?: string
           is_retroactive?: boolean
           locale?: string
           occurred_at?: string
           original_content: string
           processing_error?: string | null
+          reprocessing_key?: string | null
+          reprocessing_lease_expires_at?: string | null
+          reprocessing_started_at?: string | null
           sensitivity?: string
           source?: string
           status?: string
@@ -653,19 +700,31 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_interpretation_id?: string | null
           id?: string
           is_retroactive?: boolean
           locale?: string
           occurred_at?: string
           original_content?: string
           processing_error?: string | null
+          reprocessing_key?: string | null
+          reprocessing_lease_expires_at?: string | null
+          reprocessing_started_at?: string | null
           sensitivity?: string
           source?: string
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "entries_current_interpretation_owner_fk"
+            columns: ["user_id", "id", "current_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "entry_id", "id"]
+          },
+        ]
       }
       entry_embeddings: {
         Row: {
@@ -784,19 +843,29 @@ export type Database = {
         Row: {
           concepts: string[]
           confidence: number
+          corrected_by: string | null
+          correction_reason: string | null
           created_at: string
+          element_classifications: Json
+          element_confidence: Json
+          element_policy: Json
           entry_id: string
           extracted_contexts: Json
+          extracted_dates: Json
           extracted_organizations: Json
           extracted_people: Json
           extracted_projects: Json
           id: string
           input_tokens: number
           model: string
+          operation_key: string | null
+          origin: string
           output_tokens: number
+          parent_interpretation_id: string | null
           pending_questions: Json
           prompt_version: string
           raw_output: Json
+          resolution_evidence: Json
           strategy_version: string
           summary: string
           task_candidates: Json
@@ -806,19 +875,29 @@ export type Database = {
         Insert: {
           concepts?: string[]
           confidence: number
+          corrected_by?: string | null
+          correction_reason?: string | null
           created_at?: string
+          element_classifications?: Json
+          element_confidence?: Json
+          element_policy?: Json
           entry_id: string
           extracted_contexts?: Json
+          extracted_dates?: Json
           extracted_organizations?: Json
           extracted_people?: Json
           extracted_projects?: Json
           id?: string
           input_tokens?: number
           model: string
+          operation_key?: string | null
+          origin?: string
           output_tokens?: number
+          parent_interpretation_id?: string | null
           pending_questions?: Json
           prompt_version: string
           raw_output: Json
+          resolution_evidence?: Json
           strategy_version: string
           summary: string
           task_candidates?: Json
@@ -828,19 +907,29 @@ export type Database = {
         Update: {
           concepts?: string[]
           confidence?: number
+          corrected_by?: string | null
+          correction_reason?: string | null
           created_at?: string
+          element_classifications?: Json
+          element_confidence?: Json
+          element_policy?: Json
           entry_id?: string
           extracted_contexts?: Json
+          extracted_dates?: Json
           extracted_organizations?: Json
           extracted_people?: Json
           extracted_projects?: Json
           id?: string
           input_tokens?: number
           model?: string
+          operation_key?: string | null
+          origin?: string
           output_tokens?: number
+          parent_interpretation_id?: string | null
           pending_questions?: Json
           prompt_version?: string
           raw_output?: Json
+          resolution_evidence?: Json
           strategy_version?: string
           summary?: string
           task_candidates?: Json
@@ -861,6 +950,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entries"
             referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_interpretations_parent_owner_fk"
+            columns: ["user_id", "entry_id", "parent_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "entry_id", "id"]
           },
         ]
       }
@@ -2022,6 +2118,10 @@ export type Database = {
           entity_type: string
           expires_at: string
           id: string
+          operation_key: string | null
+          result_interpretation_id: string | null
+          source_entry_id: string | null
+          source_interpretation_id: string | null
           status: string
           undone_at: string | null
           user_id: string
@@ -2035,6 +2135,10 @@ export type Database = {
           entity_type: string
           expires_at?: string
           id?: string
+          operation_key?: string | null
+          result_interpretation_id?: string | null
+          source_entry_id?: string | null
+          source_interpretation_id?: string | null
           status?: string
           undone_at?: string | null
           user_id: string
@@ -2048,17 +2152,55 @@ export type Database = {
           entity_type?: string
           expires_at?: string
           id?: string
+          operation_key?: string | null
+          result_interpretation_id?: string | null
+          source_entry_id?: string | null
+          source_interpretation_id?: string | null
           status?: string
           undone_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "undo_operations_result_interpretation_owner_fk"
+            columns: ["user_id", "result_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "undo_operations_source_entry_owner_fk"
+            columns: ["user_id", "source_entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "undo_operations_source_interpretation_owner_fk"
+            columns: ["user_id", "source_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      begin_entry_interpretation: {
+        Args: { p_entry_id: string }
+        Returns: Json
+      }
+      begin_entry_reprocessing: {
+        Args: {
+          p_entry_id: string
+          p_lease_seconds?: number
+          p_operation_key: string
+        }
+        Returns: Json
+      }
       claim_attachment_job: {
         Args: {
           p_job_id: string
@@ -2076,9 +2218,30 @@ export type Database = {
         Args: { p_candidate_indexes: number[]; p_entry_id: string }
         Returns: Json
       }
+      correct_entry_interpretation: {
+        Args: {
+          p_entry_id: string
+          p_expected_version: number
+          p_operation_key: string
+          p_patch: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      element_trust_evidence: { Args: { p_element_trust: Json }; Returns: Json }
+      element_trust_policies: { Args: { p_element_trust: Json }; Returns: Json }
+      element_trust_scores: { Args: { p_element_trust: Json }; Returns: Json }
       entity_is_owned: {
         Args: { p_entity_id: string; p_entity_type: string; p_user_id: string }
         Returns: boolean
+      }
+      fail_entry_interpretation: {
+        Args: { p_entry_id: string; p_error: string; p_terminal?: boolean }
+        Returns: Json
+      }
+      fail_entry_reprocessing: {
+        Args: { p_entry_id: string; p_error: string; p_operation_key: string }
+        Returns: Json
       }
       fail_job: {
         Args: {
@@ -2091,6 +2254,14 @@ export type Database = {
       }
       get_ai_cost_summary: { Args: { p_timezone?: string }; Returns: Json }
       get_job_queue_metrics: { Args: never; Returns: Json }
+      interpretation_lifecycle_status: {
+        Args: {
+          p_element_trust: Json
+          p_pending_questions: Json
+          p_record_only?: boolean
+        }
+        Returns: string
+      }
       match_internal_knowledge: {
         Args: { p_match_count?: number; p_query_embedding: string }
         Returns: {
@@ -2101,6 +2272,11 @@ export type Database = {
           source_type: string
         }[]
       }
+      model_only_element_trust: {
+        Args: { p_model_confidence: number }
+        Returns: Json
+      }
+      normalize_entity_alias: { Args: { p_value: string }; Returns: string }
       persist_entry_interpretation: {
         Args: {
           p_entry_id: string
@@ -2112,6 +2288,39 @@ export type Database = {
           p_strategy_version: string
         }
         Returns: string
+      }
+      persist_interpretation_questions: {
+        Args: {
+          p_entry_id: string
+          p_interpretation_id: string
+          p_questions: Json
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      persist_reprocessed_entry_interpretation: {
+        Args: {
+          p_element_trust: Json
+          p_entry_id: string
+          p_extraction: Json
+          p_input_tokens: number
+          p_model: string
+          p_operation_key: string
+          p_output_tokens: number
+          p_prompt_version: string
+          p_strategy_version: string
+        }
+        Returns: Json
+      }
+      persist_resolved_entry_entities: {
+        Args: {
+          p_entry_id: string
+          p_extraction: Json
+          p_interpretation_id: string
+          p_occurred_at: string
+          p_user_id: string
+        }
+        Returns: undefined
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
       record_ai_usage: {
@@ -2130,6 +2339,15 @@ export type Database = {
         Returns: string
       }
       request_heartbeat: { Args: never; Returns: Json }
+      resolve_owned_entity_exact: {
+        Args: {
+          p_entity_type: string
+          p_name: string
+          p_occurred_at: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       run_all_heartbeats: { Args: never; Returns: number }
       run_user_heartbeat: { Args: { p_user_id: string }; Returns: Json }
       save_profile_settings: {
@@ -2137,6 +2355,10 @@ export type Database = {
         Returns: undefined
       }
       undo_operation: { Args: { p_undo_id: string }; Returns: Json }
+      validate_element_trust: {
+        Args: { p_element_trust: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
