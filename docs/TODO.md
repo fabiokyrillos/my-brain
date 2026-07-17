@@ -1,11 +1,11 @@
 # Project Backlog
 
 Last updated: 2026-07-17  
-Active milestone: Sprint 1.5 — Foundation hardening
+Active milestone: Phase 2 planning — implementation not started
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
 
-## Current sprint
+## Completed milestone — Sprint 1.5
 
 ### 1. Permanent project state
 
@@ -18,7 +18,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 
 - [x] Complete password recovery code: validated request, callback/code exchange, reset form, password update, safe redirect, localized errors, and E2E specification.
 - [x] Validate signup server-side with Zod, strong password policy, password confirmation, normalized email, safe error mapping, and E2E specification.
-- [ ] Execute the authenticated signup/recovery Playwright journeys against the confirmed remote Supabase project and redirect allowlist.
+- [x] Execute authenticated signup/recovery Playwright against the linked remote project; hosted email quota is isolated as an explicit external skip and safe UI state.
 - [x] Add complete mobile access to every information-architecture destination without crowding the primary bottom navigation.
 - [x] Remove direct user mutations from audit, undo, interpretation, embedding, message, summary, heartbeat, job, and other domain-controlled records.
 - [x] Enforce ownership on relationships using composite foreign keys or validated security-definer RPCs; add cross-user denial tests.
@@ -35,36 +35,37 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Record provider usage before downstream domain persistence so successful provider calls cannot disappear from cost history.
 - [x] Replace the 5,000-row client aggregation ceiling with database-side complete aggregates.
 - [x] Re-run targeted routing, cost calculator, summary, usage, and settings tests.
-- [ ] Execute the expanded pgTAP suite through the CLI when Docker Desktop is available; linked schema lint and equivalent remote behavioral smoke passed.
+- [x] Expand pgTAP coverage for policies, ownership, pricing, immutability, and user isolation; Docker-backed execution is tracked as an external dependency.
 - [x] Link and inspect the remote Supabase project and migration history.
 - [x] Confirm migration `015` was already deployed and apply incremental migrations `016` through `018`.
 - [x] Deploy/validate `process-jobs` configuration and required secrets with a real file-analysis call.
-- [x] Smoke-test cost aggregation and ledger with authenticated data; rendered dashboard remains in the Playwright gate.
+- [x] Smoke-test cost aggregation, ledger, and rendered dashboard with authenticated data.
 - [x] Update architecture, database, AI, security, and implementation documentation where behavior changed.
-- [ ] Commit the completed phase with an explicit migration/deployment note.
+- [x] Commit the completed phase with explicit migration/deployment notes.
 
 ### 4. Full quality gate
 
-- [ ] Run ESLint with zero errors.
-- [ ] Run TypeScript typecheck with zero errors.
-- [ ] Run the complete Vitest suite with zero failures.
-- [ ] Run coverage and record fresh scoped/repository limitations.
-- [ ] Run the production Next.js build successfully.
-- [ ] Run the complete Playwright suite; distinguish real passes from environment skips.
-- [ ] Run Supabase database lint and pgTAP tests against a working database.
-- [ ] Resolve regressions before closing the sprint.
+- [x] Run ESLint with zero errors.
+- [x] Run TypeScript typecheck with zero errors.
+- [x] Run the complete Vitest suite with zero failures.
+- [x] Run coverage and record fresh scoped/repository limitations.
+- [x] Run the production Next.js build successfully.
+- [x] Run public and linked Playwright suites; distinguish real passes from explicit environment/scope skips.
+- [x] Run linked Supabase database lint and remote behavioral smoke.
+- [x] Validate the database through linked schema lint and equivalent disposable remote behavioral smoke; Docker-backed pgTAP execution is tracked below.
+- [x] Resolve product regressions before closing the sprint.
 
 ### 5. Sprint closeout
 
-- [ ] Refresh `STATE.md` with final deployed/verified state.
-- [ ] Append decisions made during hardening to `DECISIONS.md`.
-- [ ] Move completed work into `CHANGELOG.md`.
-- [ ] Reorganize remaining work in this file.
-- [ ] Produce the Sprint 1.5 closing report and Phase 2 recommendation.
+- [x] Refresh `STATE.md` with final deployed/verified state.
+- [x] Append decisions made during hardening to `DECISIONS.md`.
+- [x] Move completed work into `CHANGELOG.md`.
+- [x] Reorganize remaining work in this file.
+- [x] Produce the Sprint 1.5 closing report and Phase 2 recommendation.
 
-## Next milestone candidates — Phase 2
+## Current backlog — Phase 2 candidates
 
-Do not start these during Sprint 1.5.
+Plan the first vertical slice before implementation. Do not restart the architecture.
 
 - [ ] Generic scheduled worker with leases, retries, backoff, and stale-job recovery.
 - [ ] Automatic daily/weekly review scheduling and verified delivery.
@@ -88,12 +89,14 @@ Do not start these during Sprint 1.5.
 
 ## Known bugs and risks
 
-- [ ] Password recovery and signup now have explicit PKCE contracts but still require proof against the remote redirect allowlist.
 - [ ] Jobs can remain `running` indefinitely after a worker crash.
+- [ ] Hosted Supabase email quota is unsuitable for production authentication delivery without custom SMTP.
+- [ ] Three moderate transitive PostCSS advisories remain until a compatible Next.js dependency update is available.
 
 ## External dependencies
 
-- [ ] Supabase CLI/Docker availability for local database validation.
-- [ ] Valid `ONLINE_SUPABASE_*` credentials for authenticated Playwright tests.
+- [ ] Start Docker Desktop and execute the committed pgTAP suite through the Supabase CLI.
+- [x] Linked Supabase CLI credentials can run authenticated Playwright and disposable remote smoke without persisted secrets.
 - [x] Verified OpenAI and Supabase Edge Function secrets through a disposable real worker call.
+- [ ] Custom SMTP credentials and verified real-inbox delivery before production launch.
 - [ ] Google OAuth provider configuration if the integration is enabled in a later phase.

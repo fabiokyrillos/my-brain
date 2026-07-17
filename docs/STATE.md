@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Sprint 1.5 — Full quality gate
+Current phase: Sprint 1.5 complete — Phase 2 authorized for planning
 Source of truth order: code, database, migrations, documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, and remotely smoke-tested. The remaining Sprint 1.5 work is the complete local/Playwright quality gate and final closeout report.
+Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, RLS, ownership, heartbeat, pagination, error-handling, and atomic-settings corrections are complete. AI Routing and Cost Control is implemented, migrated through `018`, deployed, rendered in Playwright, and remotely smoke-tested. The Sprint 1.5 quality gate is complete; Phase 2 may begin without an architectural reset.
 
 ## Implemented functionality
 
@@ -25,18 +25,19 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 
 ## Pending or incomplete functionality
 
-- The online signup/recovery Playwright journeys are implemented but still require the remote credentials/redirect allowlist validation gate.
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
 - Generic scheduled worker, automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
 - The expanded pgTAP suite is committed but cannot execute through the Supabase CLI on this workstation until Docker Desktop is available; equivalent high-risk paths passed the disposable remote smoke suite.
+- Hosted Supabase email delivery is quota-limited. Signup/recovery return a localized throttling message, but production delivery requires custom SMTP before launch.
+- Three moderate `npm audit` advisories remain transitively inside the current Next.js/PostCSS dependency graph; the npm-proposed forced fix is an incompatible downgrade and was not applied.
 
 ## Next priorities
 
-1. Run lint, typecheck, full Vitest/coverage, production build, and complete Playwright.
-2. Resolve any regression without adding product scope.
-3. Refresh the permanent documents with final evidence and publish the Sprint 1.5 report.
-4. Reassess readiness for Phase 2.
+1. Plan Phase 2 as an incremental vertical slice on the current architecture.
+2. Prioritize job leases/reaper/backoff before expanding background automation.
+3. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
+4. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
 
 ## Existing structure
 
@@ -91,40 +92,41 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Critical auth, mobile, 
 
 ## Known coverage
 
-Last verified baseline from the 2026-07-16 review:
+Verified on 2026-07-17:
 
-- 18 Vitest files, 46 tests passing.
-- Statements: 89.20%.
-- Branches: 58.39%.
-- Functions: 86.11%.
-- Lines: 91.80%.
-- Playwright: 2 public tests passing; 4 authenticated/online tests skipped without `ONLINE_SUPABASE_*` credentials.
+- Vitest: 27 files and 87 tests passing.
+- Statements: 93.66% (266/284).
+- Branches: 61.61% (305/495).
+- Functions: 90.62% (87/96).
+- Lines: 95.88% (233/243).
+- Playwright without online credentials: 4 public tests passing and 10 expected online skips.
+- Playwright with linked remote credentials: 11 tests passing and 3 explicit skips (desktop-only mobile-nav exclusion, mobile duplicate signup exclusion, and hosted email quota exhaustion).
+- Final targeted recovery journey after the harness hardening: 1/1 passing.
 
-These percentages apply only to modules imported by the test suite; they are not repository-wide coverage. Fresh post-sprint numbers replace this baseline at the final quality gate.
+Coverage percentages apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to, these percentages.
 
 ## Important recent commits
 
+- `a89210a` — `test: close remote foundation quality gate` (2026-07-17).
+- `5099f81` — `feat: harden foundation and complete AI cost control` (2026-07-17).
+- `40272ba` — `fix: expose complete mobile navigation` (2026-07-17).
+- `0201963` — `fix: complete secure authentication journeys` (2026-07-17).
+- `3aa0946` — `docs: establish permanent project state` (2026-07-17).
 - `107a65f` — `feat: deliver intelligent brain pre-mvp` (2026-07-16).
-- `7b79b70` — `fix: make profile settings reliably save` (2026-07-16).
-- `60adc7b` — `test: verify online supabase auth flow` (2026-07-16).
-- `87d7aff` — `feat: deliver my brain phase one foundation` (2026-07-16).
 
 ## Technical pending items
 
-- Over-permissive CRUD policies on append-oriented/domain-controlled tables.
-- Missing composite ownership constraints for related records.
-- Remote verification of the completed recovery/signup flows and callback allowlist.
-- Heartbeat date, locale, cap, failure-isolation, and concurrency weaknesses.
-- Unbounded queries and N+1 signed URL generation on file listings.
-- Inconsistent Supabase result/error handling and multi-write atomicity.
-- No job lease/reaper and incomplete background scheduler deployment.
+- No job lease/reaper and incomplete generic background scheduler deployment.
 - Generic page metadata and partially localized operational copy.
 - CI does not yet enforce Playwright, pgTAP, database lint, audit, or a meaningful coverage threshold.
+- Upload malware scanning and stronger content validation remain pre-production work.
+- Some server/data-access and page patterns remain duplicated and should be refactored incrementally.
 
 ## External pending items
 
-- Provide/use online test credentials for authenticated Playwright smoke tests.
 - Start Docker Desktop to execute the expanded pgTAP files through the Supabase CLI.
+- Configure custom SMTP and verify real inbox delivery before production launch.
+- Wait for a compatible Next.js/PostCSS dependency release that resolves the moderate audit advisories without a forced downgrade.
 - Keep Google OAuth disabled until a provider, redirect URLs, and secrets are configured and verified.
 
 ## Sprint 1.5 checklist
@@ -138,7 +140,15 @@ These percentages apply only to modules imported by the test suite; they are not
 - [x] Hide the unconfigured Google OAuth entry point.
 - [x] Finish AI Routing and Cost Control tests and migrations.
 - [x] Validate the remote database and deployed worker.
-- [x] Smoke-test the cost aggregation and deployed AI worker; rendered dashboard remains in the Playwright gate.
-- [ ] Run lint, typecheck, unit tests, coverage, build, and Playwright.
-- [ ] Update all four permanent project documents with final evidence.
-- [ ] Commit the completed sprint in reviewable units.
+- [x] Smoke-test cost aggregation, rendered dashboard, and the deployed AI worker.
+- [x] Run lint, typecheck, unit tests, coverage, build, and Playwright.
+- [x] Update all four permanent project documents with final evidence.
+- [x] Commit the completed sprint in reviewable units.
+
+## Phase 2 entry checklist
+
+- [x] Foundation quality gate is green.
+- [x] Remote schema, migration history, worker, RLS, ownership, heartbeat, and AI cost paths are verified.
+- [x] Remaining risks are explicit and do not require an architectural restart.
+- [ ] Write the Phase 2 vertical-slice plan before implementation.
+- [ ] Include job recovery/observability criteria in any new background workflow.

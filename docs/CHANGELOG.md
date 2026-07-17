@@ -2,7 +2,7 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
-## Unreleased — Sprint 1.5
+## 2026-07-17 — Sprint 1.5 foundation hardening
 
 ### Added
 
@@ -15,6 +15,7 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - Composite ownership constraints, polymorphic ownership triggers, least-privilege grants/policies, and behavioral denial tests.
 - AI routing profiles, normalized usage metadata, versioned pricing, append-only ledger, complete database-side aggregates, and the AI cost dashboard.
 - Disposable remote Supabase smoke runner covering auth, atomic settings, RLS, ownership, heartbeat, ledger, cost aggregation, and real file processing.
+- Linked-environment Playwright runner that obtains credentials in process without persisting or printing privileged keys.
 
 ### Changed
 
@@ -22,11 +23,13 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - Signup now normalizes and validates names/emails, enforces a strong confirmed password, and supplies an explicit email callback URL.
 - Authentication proxy validation uses verified claims and preserves only callback/reset continuation routes for an authenticated recovery session.
 - Provider errors are mapped to stable localized messages instead of being exposed in URLs.
+- Hosted email throttling is classified explicitly and shown as a safe localized retry-later message.
 - Heartbeat now uses user-local dates/locale, advisory locks, rolling cooldown, lossless caps, sanitized failure records, and per-user batch isolation.
 - Profile/settings writes are atomic through `save_profile_settings`; application and Edge Function Supabase failures are checked explicitly.
 - Successful provider calls are recorded before downstream domain persistence so later failures do not erase usage cost.
 - Cost totals are aggregated in PostgreSQL and recent calls remain bounded to 20 rows.
 - Remote migrations are synchronized through `202607170018`; `process-jobs` is deployed with the final result-handling bundle.
+- The final gate passes ESLint, TypeScript, 87 Vitest tests, production build, public Playwright, linked online Playwright, remote Supabase smoke, and linked schema lint.
 
 ### Database
 
@@ -36,10 +39,20 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 - Hid the Google OAuth action until the provider, redirect URLs, and end-to-end journey are configured.
 
-### Pending in this sprint
+### Verification
 
-- Full lint, typecheck, unit, coverage, build, and Playwright quality gate.
-- Final permanent-document refresh, report, and release commit.
+- Vitest: 27 files, 87 tests passing.
+- Scoped coverage: 93.66% statements, 61.61% branches, 90.62% functions, and 95.88% lines.
+- Playwright public matrix: 4 passing, 10 expected online skips without credentials.
+- Playwright linked matrix: 11 passing, 3 explicit environment/scope skips; final targeted recovery journey 1/1 passing.
+- Remote smoke: auth, settings, RLS, ownership, lossless heartbeat, AI ledger/aggregation, dashboard data, and real deployed file worker passing.
+- Supabase: local/remote migrations synchronized through `018`, schema lint clean, `process-jobs` active at version 8.
+
+### Known external limitations
+
+- Expanded pgTAP execution remains dependent on Docker Desktop, while equivalent high-risk behaviors passed against the disposable remote project.
+- Hosted Auth email quota prevented a final non-throttled delivery assertion; custom SMTP is required before production launch.
+- Three moderate transitive PostCSS advisories remain in the current Next.js dependency graph; the incompatible forced downgrade proposed by npm was rejected.
 
 ## 2026-07-16 — Intelligent brain pre-MVP
 

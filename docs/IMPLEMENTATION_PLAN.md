@@ -43,8 +43,12 @@ Manifest, ícone, service worker seguro para assets, offline sem cache sensível
 - Banco remoto: migrations aplicadas até `202607170018`, histórico sincronizado e db lint sem erros.
 - Smoke remoto: auth, settings, RLS, ownership, heartbeat, ledger/agregação e worker real passaram com dados efêmeros.
 - pgTAP está ampliado para policies, ownership e ledger; execução via CLI continua dependente de Docker Desktop.
-- Lint, typecheck, Vitest, cobertura, build e Playwright serão registrados no fechamento final do sprint.
+- ESLint e TypeScript passaram sem erros; o build de produção do Next.js 16.2.10 foi concluído.
+- Vitest passou em 27 arquivos e 87 testes; cobertura instrumentada: 93,66% statements, 61,61% branches, 90,62% functions e 95,88% lines.
+- Playwright público passou 4 testes com 10 skips online esperados; a matriz ligada ao Supabase passou 11 testes com 3 skips explícitos de escopo/quota, e o fluxo final de recuperação passou novamente de forma direcionada.
+- `npm run test:remote` validou auth, settings atômicas, RLS, ownership, heartbeat, ledger, agregação e o worker publicado com dados descartáveis.
+- O Sprint 1.5 está concluído. As limitações externas restantes são Docker para pgTAP, SMTP próprio antes de produção e atualização compatível do Next/PostCSS.
 
 ## Próxima prioridade recomendada
 
-Concluir o gate integral do Sprint 1.5 e decidir a entrada na próxima fase. Agendamento automático de revisões, retentativa periódica, edição avançada e conclusão por linguagem natural permanecem no roadmap; Google OAuth e Vercel continuam fora do caminho crítico.
+Iniciar o planejamento da Fase 2 sobre a arquitetura atual, sem recomeço. A primeira fatia deve incluir critérios operacionais de lease, retry/backoff, recuperação de jobs e observabilidade antes de ampliar automações. Agendamento automático de revisões, edição avançada e conclusão por linguagem natural permanecem no roadmap; Google OAuth e Vercel continuam fora do caminho crítico.

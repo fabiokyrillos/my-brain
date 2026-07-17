@@ -40,7 +40,7 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 ## ADR-004 — Row-level security as the tenant boundary
 
 - **Date:** 2026-07-16
-- **Status:** Accepted; hardening in progress
+- **Status:** Accepted; hardening completed in Sprint 1.5 (see ADR-014)
 - **Context:** Every user-owned record must remain isolated even if client/server queries are incorrect.
 - **Problem:** Application-only filters are insufficient as a security boundary.
 - **Alternatives considered:** Service-role-only backend access; shared tables with application filters; user-scoped RLS.
@@ -51,7 +51,7 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 ## ADR-005 — Typed AI provider, routing, and immutable usage ledger
 
 - **Date:** 2026-07-16
-- **Status:** Accepted; deployment pending
+- **Status:** Accepted; deployed and verified in Sprint 1.5 (see ADR-014)
 - **Context:** Different AI operations need different quality/cost profiles and every provider call must be explainable.
 - **Problem:** A single hard-coded model hides operational cost and makes future model changes risky.
 - **Alternatives considered:** One global model environment variable; model choice in every call site; central typed routing and pricing catalog.
@@ -146,3 +146,14 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** Record every successful provider call immediately, snapshot its applicable price in an append-only/idempotent ledger, and compute complete totals/breakdowns with `get_ai_cost_summary` under the caller's forced RLS.
 - **Reason:** This preserves accounting evidence, removes API row ceilings, and avoids mutable rollup drift at pre-MVP scale.
 - **Consequences:** The price catalog must be versioned via new migrations, unknown models remain explicitly unpriced, and OpenAI billing remains the reconciliation authority.
+
+## ADR-014 — Reproducible linked-environment release gate
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** Sprint 1.5 needed to prove authentication, RLS, ownership, heartbeat, AI accounting, dashboard rendering, and the deployed worker against the linked Supabase project without persisting privileged credentials.
+- **Problem:** Local-only tests miss hosted configuration and deployment drift, while manual credential copying is fragile and risks secret leakage. Hosted Auth email quotas also make repeated delivery tests nondeterministic.
+- **Alternatives considered:** Keep online validation manual; store remote test secrets in `.env.local`; use linked CLI credentials at runtime with disposable data and explicit provider-limit handling.
+- **Decision:** Retrieve linked project credentials only in process through the authenticated Supabase CLI, run disposable remote smoke and online Playwright suites, delete test users/files automatically, and classify hosted email throttling as a stable localized error. Exercise provider email delivery once per matrix and keep custom SMTP as a pre-production dependency.
+- **Reason:** The gate remains reproducible and secret-safe while distinguishing product regressions from external delivery quotas.
+- **Consequences:** `npm run test:remote` and `npm run test:e2e:online` require an authenticated, linked Supabase CLI session. Signup delivery may be explicitly skipped when the hosted quota is exhausted, but validation, error UX, recovery token exchange, protected password update, fresh login, RLS, ownership, heartbeat, cost aggregation, dashboard, and worker execution remain mandatory. CI must later receive equivalent short-lived credentials and custom SMTP coverage.
