@@ -8,20 +8,23 @@ function source(relativePath: string) {
 describe("AI usage ledger ordering", () => {
   it("records capture extraction before interpretation persistence", () => {
     const capture = source("../../features/capture/actions.ts");
-    const providerSuccess = capture.indexOf("const result = await provider.extractEntry");
-    const usageRecord = capture.indexOf("operation: \"capture_extraction\"");
+    const pipeline = source("../../features/interpretations/interpret-entry.ts");
+    const providerSuccess = pipeline.indexOf("const result = await withTimeout(provider.extractEntry");
+    const usageRecord = pipeline.indexOf("operation: \"capture_extraction\"");
+    const pipelineCall = capture.indexOf("const extraction = await extractEntryForUser");
     const domainPersistence = capture.indexOf("persist_entry_interpretation");
 
     expect(providerSuccess).toBeGreaterThan(-1);
     expect(usageRecord).toBeGreaterThan(providerSuccess);
-    expect(usageRecord).toBeLessThan(domainPersistence);
+    expect(pipelineCall).toBeGreaterThan(-1);
+    expect(domainPersistence).toBeGreaterThan(pipelineCall);
   });
 
   it("records capture embedding before vector persistence", () => {
-    const capture = source("../../features/capture/actions.ts");
-    const providerSuccess = capture.indexOf("const embedded = await provider.embedText");
-    const usageRecord = capture.indexOf("operation: \"semantic_search\"", providerSuccess);
-    const domainPersistence = capture.indexOf('.from("entry_embeddings")', providerSuccess);
+    const pipeline = source("../../features/interpretations/interpret-entry.ts");
+    const providerSuccess = pipeline.indexOf("const embedded = await input.provider.embedText");
+    const usageRecord = pipeline.indexOf("operation: \"semantic_search\"", providerSuccess);
+    const domainPersistence = pipeline.indexOf('.from("entry_embeddings")', providerSuccess);
 
     expect(providerSuccess).toBeGreaterThan(-1);
     expect(usageRecord).toBeGreaterThan(providerSuccess);

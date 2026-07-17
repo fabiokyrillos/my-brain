@@ -67,6 +67,7 @@ export function calculateTrustPolicy(input: {
   lowImpact?: boolean;
   reversible?: boolean;
   autonomyAllowed?: boolean;
+  userConfirmed?: boolean;
 }): TrustDecision {
   const signals = Object.fromEntries(
     Object.keys(TRUST_WEIGHTS).map((key) => [key, normalize(input.signals[key as keyof TrustSignals])]),
@@ -80,6 +81,8 @@ export function calculateTrustPolicy(input: {
 
   if (overrides.length > 0) {
     policy = "block_until_confirmation";
+  } else if (input.userConfirmed === true) {
+    policy = "apply_and_flag";
   } else if (score >= TRUST_THRESHOLDS.autoApply) {
     policy = input.lowImpact === true && input.reversible === true && input.autonomyAllowed === true
       ? "auto_apply"
