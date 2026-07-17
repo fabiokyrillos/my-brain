@@ -9,6 +9,7 @@ import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
+import type { Database } from "@/lib/supabase/database.types";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
 type FileAnalysis = {
@@ -23,14 +24,17 @@ type FileAnalysis = {
   version: number;
 };
 
-type FailedJob = {
-  id: string;
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
+type FailedJob = Pick<
+  JobRow,
+  | "id"
+  | "payload"
+  | "attempts"
+  | "max_attempts"
+  | "next_attempt_at"
+  | "failed_at"
+> & {
   status: "failed" | "exhausted";
-  payload: { attachment_id?: unknown } | null;
-  attempts: number;
-  max_attempts: number;
-  next_attempt_at: string;
-  failed_at: string | null;
 };
 
 const filesCopy = {
@@ -118,12 +122,21 @@ export default async function FilesPage({
     "load failed jobs",
   ) ?? []) as FailedJob[];
   const ids = paginated.items.map((file) => file.id);
+  const attachmentIdsByJob = new Map(
+    failedJobs.map((job) => {
+      const payload = job.payload;
+      const attachmentId =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? payload.attachment_id
+          : null;
+      return [job.id, typeof attachmentId === "string" ? attachmentId : null];
+    }),
+  );
   const failedAttachmentIds = [
     ...new Set(
-      failedJobs.flatMap((job) => {
-        const attachmentId = job.payload?.attachment_id;
-        return typeof attachmentId === "string" ? [attachmentId] : [];
-      }),
+      [...attachmentIdsByJob.values()].filter(
+        (attachmentId): attachmentId is string => attachmentId !== null,
+      ),
     ),
   ];
 
@@ -208,9 +221,9 @@ export default async function FilesPage({
           </header>
           <div className="failed-job-list">
             {failedJobs.map((job) => {
-              const attachmentId = job.payload?.attachment_id;
+              const attachmentId = attachmentIdsByJob.get(job.id);
               const originalName =
-                typeof attachmentId === "string"
+                attachmentId
                   ? attachmentNames.get(attachmentId)
                   : null;
               const terminal =
