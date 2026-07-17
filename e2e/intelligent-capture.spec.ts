@@ -136,10 +136,28 @@ test.describe("intelligent capture", () => {
     const savedPreferences = (await preferencesResponse.json()) as Array<{ ai_profile: string; chat_model: string; reasoning_model: string; review_model: string }>;
     expect(savedPreferences[0]).toMatchObject({ ai_profile: "economy", chat_model: "gpt-5-mini", reasoning_model: "gpt-5.6-luna", review_model: "gpt-5-mini" });
 
+    const quietStartHour = (new Date().getUTCHours() + 6) % 24;
+    const quietEndHour = (quietStartHour + 1) % 24;
+    const formatHour = (hour: number) => `${hour.toString().padStart(2, "0")}:00:00`;
+    const [profileHeartbeatResponse, preferencesHeartbeatResponse] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/profiles?user_id=eq.${userId}`, {
+        method: "PATCH",
+        headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ timezone: "UTC", locale: "pt-BR" }),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/agent_preferences?user_id=eq.${userId}`, {
+        method: "PATCH",
+        headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ quiet_start: formatHour(quietStartHour), quiet_end: formatHour(quietEndHour) }),
+      }),
+    ]);
+    expect(profileHeartbeatResponse.ok).toBe(true);
+    expect(preferencesHeartbeatResponse.ok).toBe(true);
+
     const overdueTaskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks`, {
       method: "POST",
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ user_id: userId, title: "Tarefa atrasada E2E", status: "todo", due_at: "2026-07-15T12:00:00.000Z", confidence: 1, created_by: "user" }),
+      body: JSON.stringify({ user_id: userId, title: "Tarefa atrasada E2E", status: "todo", due_at: new Date(Date.now() - 86_400_000).toISOString(), confidence: 1, created_by: "user" }),
     });
     expect(overdueTaskResponse.ok).toBe(true);
     const heartbeatResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/request_heartbeat`, {
@@ -148,6 +166,10 @@ test.describe("intelligent capture", () => {
       body: "{}",
     });
     expect(heartbeatResponse.ok).toBe(true);
+    expect(await heartbeatResponse.json()).toMatchObject({
+      silent: false,
+      notifications_created: expect.any(Number),
+    });
     const notificationResponse = await fetch(`${supabaseUrl}/rest/v1/notifications?select=type,body&user_id=eq.${userId}`, {
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
     });

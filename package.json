@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:online": "node scripts/online-playwright.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {

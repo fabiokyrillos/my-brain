@@ -2,7 +2,10 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { buildAuthCallbackUrl } from "@/features/auth/flow";
+import {
+  authProviderErrorCode,
+  buildAuthCallbackUrl,
+} from "@/features/auth/flow";
 import {
   recoverySchema,
   resetPasswordSchema,
@@ -52,7 +55,10 @@ export async function signUp(formData: FormData) {
     },
   });
 
-  if (error) redirect(`/${locale}/auth/register?error=signup-failed`);
+  if (error) {
+    const code = authProviderErrorCode(error, "signup-failed");
+    redirect(`/${locale}/auth/register?error=${code}`);
+  }
   redirect(`/${locale}/auth/login?message=check-email`);
 }
 
@@ -67,7 +73,10 @@ export async function recoverPassword(formData: FormData) {
     redirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/auth/reset`),
   });
 
-  if (error) redirect(`/${locale}/auth/recover?error=recovery-failed`);
+  if (error) {
+    const code = authProviderErrorCode(error, "recovery-failed");
+    redirect(`/${locale}/auth/recover?error=${code}`);
+  }
   redirect(`/${locale}/auth/login?message=recovery-sent`);
 }
 

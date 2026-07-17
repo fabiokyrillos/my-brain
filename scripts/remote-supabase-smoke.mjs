@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
 
 function assert(condition, label) {
   if (!condition) throw new Error(label);
@@ -11,30 +10,10 @@ function dataOrThrow(result, label) {
   return result.data;
 }
 
-function apiKeyValue(key) {
-  return key.api_key ?? key.key ?? key.value;
-}
-
-const projectRef = readFileSync(new URL("../supabase/.temp/project-ref", import.meta.url), "utf8").trim();
-assert(/^[a-z0-9]{20}$/.test(projectRef), "Linked project reference is invalid");
-const npx = process.platform === "win32" ? process.env.ComSpec : "npx";
-const keyArguments = process.platform === "win32"
-  ? ["/d", "/s", "/c", `npx supabase projects api-keys --project-ref ${projectRef} --output json`]
-  : ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"];
-const keyOutput = execFileSync(
-  npx,
-  keyArguments,
-  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-);
-const keys = JSON.parse(keyOutput);
-const serviceKey = keys.find((key) => key.name === "service_role") ?? keys.find((key) => key.type === "secret");
-const publicKey = keys.find((key) => key.name === "anon") ?? keys.find((key) => key.type === "publishable");
-assert(serviceKey && publicKey, "Project API keys are unavailable");
-
-const url = `https://${projectRef}.supabase.co`;
+const credentials = getLinkedSupabaseCredentials();
 const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
-const admin = createClient(url, apiKeyValue(serviceKey), clientOptions);
-const publicApiKey = apiKeyValue(publicKey);
+const admin = createClient(credentials.url, credentials.serviceRoleKey, clientOptions);
+const publicApiKey = credentials.publishableKey;
 const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 const password = `Sprint-1.5-${crypto.randomUUID()}!`;
 const createdUsers = [];
@@ -50,7 +29,7 @@ async function createTestUser(index) {
   assert(user, `Test user ${index} was not returned`);
   createdUsers.push(user.id);
 
-  const client = createClient(url, publicApiKey, clientOptions);
+  const client = createClient(credentials.url, publicApiKey, clientOptions);
   dataOrThrow(
     await client.auth.signInWithPassword({ email: user.email, password }),
     `sign in test user ${index}`,

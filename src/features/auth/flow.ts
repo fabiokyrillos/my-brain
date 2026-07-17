@@ -13,6 +13,10 @@ const messages = {
     "pt-BR": "Não foi possível criar a conta. Tente novamente.",
     en: "We could not create the account. Try again.",
   },
+  "email-rate-limited": {
+    "pt-BR": "Muitas solicitações de e-mail. Aguarde alguns minutos e tente novamente.",
+    en: "Too many email requests. Wait a few minutes and try again.",
+  },
   "recovery-failed": {
     "pt-BR": "Não foi possível enviar o link. Tente novamente.",
     en: "We could not send the link. Try again.",
@@ -29,11 +33,25 @@ const messages = {
 
 export type AuthErrorCode = keyof typeof messages;
 
+type ProviderAuthError = {
+  code?: string;
+  message?: string;
+};
+
 export function authErrorMessage(code: string, locale: Locale) {
   return messages[code as AuthErrorCode]?.[locale]
     ?? (locale === "pt-BR"
       ? "Não foi possível continuar. Tente novamente."
       : "We could not continue. Try again.");
+}
+
+export function authProviderErrorCode(
+  error: ProviderAuthError,
+  fallback: AuthErrorCode,
+): AuthErrorCode {
+  return error.code === "over_email_send_rate_limit"
+    ? "email-rate-limited"
+    : fallback;
 }
 
 export function safeAuthNext(value: string | null, locale: Locale) {

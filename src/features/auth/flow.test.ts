@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   authErrorMessage,
+  authProviderErrorCode,
   buildAuthCallbackUrl,
   isAuthSessionContinuation,
   safeAuthNext,
@@ -27,6 +28,22 @@ describe("authentication flow helpers", () => {
     expect(authErrorMessage("invalid-form", "pt-BR")).toMatch(/campos/i);
     expect(authErrorMessage("signup-failed", "en")).toMatch(/account/i);
     expect(authErrorMessage("provider stack trace", "pt-BR")).toMatch(/tente novamente/i);
+  });
+
+  it("classifies provider email throttling without exposing provider details", () => {
+    expect(
+      authProviderErrorCode(
+        { code: "over_email_send_rate_limit", message: "provider details" },
+        "signup-failed",
+      ),
+    ).toBe("email-rate-limited");
+    expect(
+      authProviderErrorCode(
+        { code: "unexpected_provider_error" },
+        "recovery-failed",
+      ),
+    ).toBe("recovery-failed");
+    expect(authErrorMessage("email-rate-limited", "pt-BR")).toMatch(/aguarde/i);
   });
 
   it("keeps only callback and password reset available to an authenticated auth session", () => {
