@@ -14,13 +14,16 @@
 - Logs não incluem texto integral nem secrets; auditoria registra motivo e IDs.
 - Ledger de IA append-only, RPC restrita ao próprio usuário, metadados com allowlist e agregação sob RLS do chamador.
 - Ledger privado de comportamento do produto separado de auditoria, jobs e custos de IA, com RLS forçada, escrita exclusiva por RPC, allowlist de eventos/propriedades, IDs opacos opcionais, idempotência por usuário e bloqueio de qualquer texto pessoal, evidência, prompt, resposta ou erro bruto.
+- Captura de entrada assíncrona preparada por RPCs transacionais: `capture_entry_async` deriva o usuário de `auth.uid()`, valida entrada e persiste entry + job na mesma transação; `enqueue_entry_reprocessing` exige a entry owned e não toca a interpretação corrente. Recibos não retornam conteúdo, detalhes de job ou erros internos.
+- Jobs `interpret_entry` aceitam somente payloads mínimos validados. Seus claims são restritos a `service_role`, conferem tipo, payload, ownership, elegibilidade, tentativas e lease com `SKIP LOCKED`; chamadas autenticadas não podem reivindicar trabalho. Nenhum worker ou dispatch foi implantado neste slice.
 - Service worker limita cache a assets estáticos públicos.
 
 ## Verificações executadas
 
-- Migrations remotas sincronizadas até `202607170018`; `supabase db lint --linked --level error` sem erros.
+- Migrations remotas sincronizadas até `202607170025`; `supabase db lint --linked --level error` sem erros.
 - Smoke remoto descartável valida auth, settings atômicas, RLS, ownership, heartbeat lossless/localizado, ledger/agregação de IA e o worker de arquivo publicado.
 - Migration `024` está sincronizada e o smoke remoto descartável valida allowlist, payload proibido, idempotência, RLS, negação cross-user e a RPC restrita a service role para `product_events`.
+- Migration `025` está sincronizada; o smoke remoto descartável valida capture/replay atômicos, payload sem conteúdo, ownership, negação de claim autenticado, lease exclusivo, retry, stale worker, recuperação por reaper e isolamento de reprocessamento.
 - Arquivo de teste, dados e usuário são removidos ao final.
 - Desktop e mobile executam o mesmo cenário.
 

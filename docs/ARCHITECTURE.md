@@ -44,6 +44,8 @@ Cada carga escolhe sua rota em `agent_preferences` (`chat`, extração, revisão
 
 O pré-MVP possui tabela `jobs` com status, tentativas, próxima tentativa, prioridade e idempotência. Uploads criam jobs e invocam a Edge Function autenticada `process-jobs`, que usa URL assinada e persiste uma interpretação separada. Falhas ficam disponíveis para nova tentativa. Heartbeat roda no banco, independente desse worker.
 
+O Slice 2X.3 adiciona somente o contrato de entrada: `capture_entry_async` persiste uma entry `saved` e um job `interpret_entry` mínimo de forma atômica; `enqueue_entry_reprocessing` cria o job correspondente sem executar IA ou trocar a revisão atual. Claims por ID e por próximo elegível reutilizam as transições de lease da fila, mas aceitam somente `service_role`, payload válido e entry owned. A UI, Server Actions existentes, Edge Function `process-jobs` e dispatch continuam no fluxo síncrono/attachment atual até o Slice 2X.4/2X.5.
+
 ## Limite de confiança
 
 Server actions e Edge Functions validam identidade e comandos; RLS forçada continua sendo o limite multitenant. Relacionamentos concretos provam ownership com FKs compostas `(user_id, id)` e relações polimórficas usam triggers de validação. Tabelas append-only ou controladas pelo domínio não expõem mutação direta ao papel `authenticated`.

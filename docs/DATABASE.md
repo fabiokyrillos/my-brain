@@ -29,6 +29,9 @@ Todas as entidades do usuário carregam `user_id uuid not null`; horários usam 
 - `product_events` é um ledger privado de comportamento do funil, separado de auditoria, jobs e custos de IA. Aceita apenas os 17 eventos e propriedades versionadas em allowlist, usa `user_id` + `idempotency_key` para deduplicação e não admite captura original, resumo, títulos, respostas, evidências, prompts, conteúdo de arquivos ou erros brutos.
 - A escrita em `product_events` ocorre somente por `record_product_event` (usuário autenticado) ou `record_product_event_for_user` (somente service role/worker). A leitura é RLS do próprio usuário; não há mutação direta para `authenticated` nem `service_role`.
 - Eventos sintéticos de desenvolvimento/teste devem usar `is_synthetic = true` e ser removidos pelo cleanup descartável. A finalidade é observar a experiência, não criar histórico de domínio; a retenção máxima é 180 dias e o purge operacional deve existir antes do piloto.
+- A migration `025` adiciona o tipo de job `interpret_entry` sem mudar o contrato de `process_attachment`. O payload é validado no banco: captura inicial contém apenas `entry_id` e `mode: initial`; reprocessamento adiciona somente `operation_key` validada. Conteúdo original, output de IA e detalhes internos não entram em `jobs.payload`.
+- `capture_entry_async` grava `entries` e o job inicial na mesma transação e usa chave de idempotência por usuário. `enqueue_entry_reprocessing` exige ownership, é idempotente pela operation key e não altera a interpretação/revisão corrente. Ambas retornam somente recibos sanitizados.
+- Claims de entrada são exclusivos de `service_role`: `claim_entry_interpretation_job` e `claim_next_entry_interpretation_job` aceitam somente jobs elegíveis e owned, validam tipo/payload, usam lease, attempts e `FOR UPDATE SKIP LOCKED`. A migration não cria worker, dispatch ou uma nova tabela.
 
 ## Busca vetorial
 

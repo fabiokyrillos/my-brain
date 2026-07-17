@@ -2,19 +2,40 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
-## 2026-07-17 — Phase 2X Slice 2X.3 product projection contracts
+## 2026-07-17 — Phase 2X Slice 2X.3 atomic entry capture and input jobs
+
+### Added
+
+- Migration `025` with a bounded `interpret_entry` payload contract, lookup/active-job indexes, and atomic authenticated RPCs `capture_entry_async` and `enqueue_entry_reprocessing`.
+- Service-role-only `claim_entry_interpretation_job` and `claim_next_entry_interpretation_job` contracts with type/payload/ownership guards, retry eligibility, attempts, leases, and `SKIP LOCKED` concurrency control; existing attachment claim, completion, failure, and reaper contracts remain unchanged.
+- Linked Supabase-generated types, pgTAP contract at `supabase/tests/entry_processing_jobs.sql`, and disposable remote smoke at `npm run test:remote:entry-processing`.
+- Official Slice 2X.3 evidence report at `docs/reports/PHASE_2X_SLICE_03_REPORT.md`.
+
+### Changed
+
+- The historical projection commit `9f0c1e6` is preserved and reclassified as prework; it is not credited as the official database Slice 2X.3.
+- Permanent architecture, database, security, state, backlog, and decision documentation now distinguish durable entry jobs from the future worker/dispatch and the current synchronous UI path.
+
+### Verification
+
+- Migration `025` is synchronized with the linked project; linked database lint at level `error` is clean and Supabase types were regenerated from the remote schema.
+- Disposable remote smoke passed atomic capture, bounded payloads, replay, ownership denial, exclusive lease, retry eligibility, stale-worker denial, lease recovery, and reprocessing isolation.
+- The committed pgTAP contract could not run on this workstation because Supabase CLI requires Docker Desktop; the exact limitation is recorded in the Slice 2X.3 report.
+- Vitest (47 files/204 tests), ESLint, TypeScript, the Next.js 16.2.10 production build, and `git diff --check` passed.
+
+## 2026-07-17 — Phase 2X Product Projections prework (historical commit `9f0c1e6`)
 
 ### Added
 
 - Pure mappers in `daily-cycle` for `CaptureReceipt`, `InboxItemView`, `NeedsAttentionItemView`, and `WorkItemView`, plus serializable source contracts for future server-side adapters.
 - Immutable product DTO outputs with cloned/frozen action data, strict required-field validation, safe local destinations, internal task-status-to-human-state conversion, and `null` fail-closed results for invalid or unknown inputs.
 - Focused architecture tests that prohibit React, Supabase, `database.types`, direct table access, and RPC calls in the projection mapper boundary.
-- Slice evidence report at `docs/reports/PHASE_2X_SLICE_03_REPORT.md`.
+- Prework evidence report at `docs/reports/PHASE_2X_PROJECTIONS_PREWORK_REPORT.md`.
 
 ### Changed
 
 - The four existing product DTO contracts and nested available actions are now explicitly readonly, so future UI consumers cannot mutate their public shape through TypeScript.
-- Permanent state and backlog now record the completed projection foundation and that Slice 2X.4 has not started.
+- The original prework documentation is retained for historical evidence; planning/status documents now distinguish it from the official Slice 2X.3.
 
 ### Verification
 

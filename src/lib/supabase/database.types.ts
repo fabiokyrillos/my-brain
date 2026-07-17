@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_preferences: {
@@ -2252,6 +2277,15 @@ export type Database = {
         }
         Returns: Json
       }
+      capture_entry_async: {
+        Args: {
+          p_idempotency_key: string
+          p_locale: string
+          p_original_content: string
+          p_source: string
+        }
+        Returns: Json
+      }
       claim_attachment_job: {
         Args: {
           p_job_id: string
@@ -2259,6 +2293,19 @@ export type Database = {
           p_user_id: string
           p_worker_id: string
         }
+        Returns: Json
+      }
+      claim_entry_interpretation_job: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds: number
+          p_user_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+      claim_next_entry_interpretation_job: {
+        Args: { p_lease_seconds: number; p_worker_id: string }
         Returns: Json
       }
       complete_job: {
@@ -2282,6 +2329,10 @@ export type Database = {
       element_trust_evidence: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_policies: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_scores: { Args: { p_element_trust: Json }; Returns: Json }
+      enqueue_entry_reprocessing: {
+        Args: { p_entry_id: string; p_operation_key: string }
+        Returns: Json
+      }
       entity_is_owned: {
         Args: { p_entity_id: string; p_entity_type: string; p_user_id: string }
         Returns: boolean
@@ -2577,6 +2628,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
