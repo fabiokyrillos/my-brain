@@ -1,6 +1,6 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: Phase 2A complete; Phase 2B next
+Status: Phase 2A complete and published; Phase 2B in progress
 Started: 2026-07-17  
 Branch: `codex/phase-2-intelligent-capture`
 
@@ -282,3 +282,56 @@ Implementation commits:
 - `ab902e9` — leased worker, timeout, idempotent persisted-result reuse.
 - `86fa041` — owning-user failure visibility and retry action.
 - `ac9f08e` — generated Supabase job contract.
+
+## Phase 2B design and execution checklist
+
+### Selected design
+
+Phase 2B keeps `entry_interpretations` append-only. The current version is identified by a mutable `entries.current_interpretation_id` pointer instead of an `is_current` flag on interpretation rows, so selecting a new current version never rewrites historical evidence. Every correction locks the owned entry, validates the expected current version and complete desired entity links, appends one interpretation snapshot, moves the pointer, refreshes derived links/questions, records audit and undo, and returns the same result for a repeated operation key.
+
+Trust is calculated from explicit normalized signals by a small deterministic TypeScript domain module with centralized weights, thresholds, policies, and hard overrides. The database stores the per-element score, policy, signals, and bounded user-facing evidence on the immutable interpretation snapshot; ownership and relationship validity remain database-enforced. Entity ranking is a separate deterministic module over a bounded owned candidate set and considers normalized exact name, alias, history, organization/context consistency, temporal validity, optional semantic similarity, and the top-versus-second margin. Missing signals contribute zero and are reported as unavailable rather than fabricated.
+
+Reprocessing remains a typed synchronous domain operation in this slice because the existing Next.js provider is the only extraction implementation. It uses a persisted entry-level expiring lease to prevent concurrent reprocessing, reuses the same extraction provider and usage ledger, and appends an `ai_reprocessed` version. The Phase 2A job worker is therefore not duplicated or expanded into a second AI extraction implementation; if reprocessing becomes detached/asynchronous later, it must move behind the leased queue contract before release.
+
+Alternatives rejected for this slice:
+
+- An `is_current` flag on interpretations would require updating historical rows on every correction and weaken the immutability promise.
+- A separate editable interpretation table plus snapshot table would duplicate the current model and add synchronization failure modes.
+- A new generic reprocessing worker would duplicate the existing extraction prompt/provider or broaden the job platform before a detached consumer is required.
+
+### File map
+
+- Create `supabase/migrations/202607170020_interpretation_revisions.sql` for lifecycle expansion, the current-version pointer, immutable revision metadata, entity aliases, reprocessing lease fields, correction/reprocessing RPCs, audit, undo, ownership constraints, RLS, grants, and compatible evolution of the existing persistence RPC.
+- Create `supabase/tests/interpretation_revisions.sql` for immutability, append-only revisions, one current pointer, ownership, cross-user denial, aliases, idempotency, concurrency, undo, reprocessing, and rollback behavior.
+- Create `src/features/interpretations/trust-policy.ts` and its Vitest contract for weighted scores, centralized thresholds, hard overrides, correction history, date clarity, and final policy.
+- Create `src/features/interpretations/entity-resolution.ts` and its Vitest contract for normalization, exact/alias ranking, recurrence/context/temporal signals, bounded retrieval, margins, ambiguity, and owner filtering.
+- Create `src/features/interpretations/schema.ts`, `version-comparison.ts`, `copy.ts`, `data.ts`, `actions.ts`, `revision-editor.tsx`, and focused tests so validation, reads, mutations, localized copy, comparison, and interaction remain independently understandable.
+- Refactor `src/features/capture/actions.ts` only enough to use the persisted lifecycle and shared interpretation operation without duplicating extraction behavior.
+- Modify `src/app/[locale]/app/inbox/[entryId]/page.tsx` and `src/app/operations.css` to render persisted status, immutable version metadata, per-element trust/evidence, ranked candidates, an accessible editor, adjacent-version comparison, undo, and reprocessing on desktop/mobile in both locales.
+- Extend `e2e/intelligent-capture.spec.ts`; create `scripts/remote-interpretation-revisions-smoke.mjs`; add the focused remote script to `package.json`; regenerate `src/lib/supabase/database.types.ts` from the linked schema after migration deployment.
+- Update `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md`, and this plan with deployed behavior, evidence, limitations, commit hashes, and the Phase 2C recommendation.
+
+### Test-first implementation checklist
+
+- [ ] Confirm remote migration sequence still ends at `019`, linked branch SHA matches local Phase 2A, and no schema drift exists.
+- [ ] Add failing trust-policy tests for every weight, the `0.90`, `0.78`, and `0.55` boundaries, all hard overrides, low candidate margin, date conflict, missing evidence, recurring correction, and policy output.
+- [ ] Add failing entity-resolution tests for exact name, normalized name, alias, historical/context/temporal signals, semantic input, cross-owner filtering, duplicate ambiguity, margin, and result bounds.
+- [ ] Add failing patch/comparison tests for summary, concepts, occurrence, extracted dates, entity add/remove/replace, element classification, pending questions, invalid IDs/dates, and adjacent immutable snapshots.
+- [ ] Add failing structural/behavioral SQL tests and a disposable remote smoke before the migration exists; prove the failure is the missing Phase 2B contract.
+- [ ] Append migration `020`; map `processing` to `interpreting`, `interpreted` to `completed`, and `failed` to `recoverable_error` while accepting only the eight Phase 2B lifecycle states.
+- [ ] Backfill `entries.current_interpretation_id` to the latest owned interpretation and add the composite ownership foreign key without mutating prior interpretation payloads.
+- [ ] Add immutable revision origin, parent, corrected-by/reason, operation key, extracted dates, element classifications, confidence, policy, and bounded resolution evidence.
+- [ ] Add owned `entity_aliases` with temporal validity, forced RLS, least privilege, polymorphic ownership validation, and cross-user denial.
+- [ ] Implement the correction RPC with entry locking, expected-version concurrency control, idempotency, complete-link ownership validation, append-only snapshot creation, derived entity/question refresh, current pointer update, lifecycle update, audit, and undo creation.
+- [ ] Extend undo so an interpretation correction appends a compensating version based on the prior snapshot, never deletes/reactivates history, audits the result, denies cross-user access, and returns the same result when repeated.
+- [ ] Implement leased begin/complete/fail reprocessing transitions; append `ai_reprocessed` results through the same persistence invariants and reject a stale operation key.
+- [ ] Make the focused Vitest and remote database contracts green, apply migration `020` to the linked project, confirm local/remote synchronization, run linked db lint, and regenerate Supabase types.
+- [ ] Implement the typed DAL and Server Actions with Zod validation, session validation, bounded reads, sanitized errors, immediate route revalidation, and no direct UI mutation of append-only tables.
+- [ ] Implement the localized accessible review UI with only working controls: edit/cancel/save, entity add/remove/replace, concepts, occurrence/extracted dates, classifications, pending-question retention, record-only mode, history, comparison, undo, and reprocess.
+- [ ] Add component/action tests and Playwright coverage for the complete desktop/mobile, `pt-BR`/English correction journey.
+- [ ] Run focused tests, full Vitest, lint, TypeScript, production build, linked Playwright, migration synchronization, db lint, RLS/ownership/correction/undo/reprocessing remote smoke, full regression smoke, and disposable-data cleanup.
+- [ ] Review every Phase 2B requirement and engineering standard, remove dead paths/false controls, update permanent documentation, commit thematically, and push all Phase 2B commits to the same branch without merging `main`.
+
+### Phase 2B completion evidence
+
+Pending implementation and fresh verification. This section must contain exact migration/RPC names, deployed versions, commands, test counts, remote behaviors, limitations, risks, commit hashes, and push confirmation before the slice can be marked complete.
