@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       agent_preferences: {
@@ -2266,7 +2241,7 @@ export type Database = {
     }
     Functions: {
       begin_entry_interpretation: {
-        Args: { p_entry_id: string }
+        Args: { p_entry_id: string; p_service_user_id?: string }
         Returns: Json
       }
       begin_entry_reprocessing: {
@@ -2274,6 +2249,7 @@ export type Database = {
           p_entry_id: string
           p_lease_seconds?: number
           p_operation_key: string
+          p_service_user_id?: string
         }
         Returns: Json
       }
@@ -2338,11 +2314,21 @@ export type Database = {
         Returns: boolean
       }
       fail_entry_interpretation: {
-        Args: { p_entry_id: string; p_error: string; p_terminal?: boolean }
+        Args: {
+          p_entry_id: string
+          p_error: string
+          p_service_user_id?: string
+          p_terminal?: boolean
+        }
         Returns: Json
       }
       fail_entry_reprocessing: {
-        Args: { p_entry_id: string; p_error: string; p_operation_key: string }
+        Args: {
+          p_entry_id: string
+          p_error: string
+          p_operation_key: string
+          p_service_user_id?: string
+        }
         Returns: Json
       }
       fail_job: {
@@ -2387,6 +2373,7 @@ export type Database = {
           p_model: string
           p_output_tokens: number
           p_prompt_version: string
+          p_service_user_id?: string
           p_strategy_version: string
         }
         Returns: string
@@ -2410,6 +2397,7 @@ export type Database = {
           p_operation_key: string
           p_output_tokens: number
           p_prompt_version: string
+          p_service_user_id?: string
           p_strategy_version: string
         }
         Returns: Json
@@ -2628,9 +2616,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

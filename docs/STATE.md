@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Phase 2X — Product Convergence in progress — official Slice 2X.3 complete
+Current phase: Phase 2X — Product Convergence in progress — official Slice 2X.4 complete
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified. Phase 2X — Product Convergence has an approved architecture review, PRD, and implementation plan. Slice 2X.1 supplies pure daily-cycle contracts and guardrails. Slice 2X.2 is complete and deployed through migration `024`: a private, allowlisted, idempotent product-events ledger now has distinct user/server RPCs, generated schema types, a server-only best-effort boundary, a thin acknowledgement action, pgTAP coverage, and a disposable remote smoke. The historical product-projection commit `9f0c1e6` is preserved and reclassified as reusable prework. The official Slice 2X.3 is complete and deployed through migration `025`: authenticated capture/reprocessing enqueue RPCs atomically persist only an entry plus a bounded `interpret_entry` job, while service-role claims use the existing leased queue. The current UI remains on the Phase 2B synchronous flow; no entry worker, dispatch, route, action, or UI consumer was added.
+Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified. Phase 2X — Product Convergence has an approved architecture review, PRD, and implementation plan. Slice 2X.1 supplies pure daily-cycle contracts and guardrails. Slice 2X.2 is complete and deployed through migration `024`: a private, allowlisted, idempotent product-events ledger now has distinct user/server RPCs, generated schema types, a server-only best-effort boundary, a thin acknowledgement action, pgTAP coverage, and a disposable remote smoke. The historical product-projection commit `9f0c1e6` is preserved and reclassified as reusable prework. Slice 2X.3 is deployed through migration `025`: authenticated capture/reprocessing enqueue RPCs atomically persist only an entry plus a bounded `interpret_entry` job, while service-role claims use the existing leased queue. The official Slice 2X.4 is complete and deployed through migrations `026` and `027`: `interpret_entry` jobs are now actually processed end to end by a deployed worker (`supabase/functions/process-jobs/entry.ts`), reachable both by direct authenticated invocation and by an unattended per-minute `pg_cron`/`pg_net` dispatch drain authenticated by a Vault-backed secret; `process-jobs` was split into `index.ts` (auth/routing), `dispatch.ts` (fail-closed type router and drain loop), `attachment.ts` (unchanged attachment behavior, extracted), and `entry.ts` (new). Migration `027` additionally fixed a Slice 2X.3 regression that had been silently breaking every real file upload since migration `025` shipped (see ADR-022). The current UI remains on the Phase 2B synchronous capture flow; no Server Action, route, or UI consumer switched to `capture_entry_async` in this slice.
 
 ## Implemented functionality
 
@@ -32,12 +32,13 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - Daily-cycle product contracts for five public states, five attention reasons, product DTOs, stable Action results, PT-BR/English copy, and a deterministic lifecycle projection that fails closed on unknown states.
 - Private `product_events` funnel ledger with 17 closed event names, event-specific property allowlists, no personal-content fields, owner RLS, per-user idempotency, synthetic-test marking, dedicated authenticated/service-role RPCs, and 180-day retention requirement.
 - Durable entry-processing job contracts: `capture_entry_async` atomically persists a saved entry and a minimal `interpret_entry` job; `enqueue_entry_reprocessing` creates an idempotent job without changing the current interpretation; service-only claims use leases, retry eligibility, `SKIP LOCKED`, and ownership guards. Payloads contain only `entry_id`, `mode`, and a reprocess operation key when applicable.
+- Deployed entry-interpretation worker and automatic dispatch: `interpret_entry` jobs (both `initial` and `reprocess` modes) are processed end to end by `supabase/functions/process-jobs/entry.ts` through a single pipeline that reloads the entry, reuses the same deterministic entity-resolution/trust modules as the synchronous path, calls the OpenAI extraction/embedding APIs, and persists through the same RPCs the synchronous UI path uses (now service-role-callable via an explicit, gated `p_service_user_id`). `process-jobs` now routes by job type through a fail-closed dispatcher; unknown types and invalid payloads fail immediately without a claim attempt. Direct authenticated invocation (`{ jobId }`, unchanged contract) and an unattended `pg_cron`/`pg_net` scheduled drain (entry jobs only, Vault-backed secret) are both live and remotely verified. AI usage and a best-effort `capture_processing_completed`/`capture_processing_failed` product event are recorded as effects independent of the job's own completion.
 - Pure product-projection mappers for capture receipts, Inbox, Needs Attention, and Work are preserved as prework. They emit immutable, serializable DTOs only; reject invalid or unknown lifecycle/status/action inputs; and have no React, Supabase, database-type, RPC, or table dependency.
 
 ## Pending or incomplete functionality
 
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
-- Phase 2X — Product Convergence is in progress. Slices 2X.1–2X.3 provide daily-cycle contracts, lifecycle guardrails, private analytics, durable but unconsumed entry-processing contracts, and an unconsumed product-projection prework; the delivered user experience remains the Phase 2B baseline until later slices add verified consumers.
+- Phase 2X — Product Convergence is in progress. Slices 2X.1–2X.4 provide daily-cycle contracts, lifecycle guardrails, private analytics, a deployed and remotely verified entry-interpretation worker/dispatch, and an unconsumed product-projection prework; the delivered user experience remains the Phase 2B baseline. Slice 2X.5 (switching `captureEntry`/`reprocessEntry` to the async path) has not been started.
 - A generic unattended due-job consumer is not deployed because no current flow requires one. Failed attachment retries are explicit, user-initiated, and blocked until persisted `next_attempt_at`; add an unattended consumer only with a concrete background workflow.
 - Automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
@@ -47,7 +48,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Next priorities
 
-1. Continue Phase 2X only with explicit authorization for Slice 2X.4; implement the entry worker and automatic dispatch without changing the current UI capture path, and keep product projections unconsumed until an authorized loader or UI slice establishes ownership-scoped data access.
+1. Continue Phase 2X only with explicit authorization for Slice 2X.5; switch `captureEntry`/`reprocessEntry` to the async path only after this slice's worker/dispatch proof, and keep product projections unconsumed until an authorized loader or UI slice establishes ownership-scoped data access.
 2. Begin Phase 2C only after Phase 2X converges the daily cycle and preserves the Phase 2B revision/trust boundary.
 3. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 4. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
@@ -60,7 +61,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - `src/lib`: Supabase clients, AI provider/routing/usage helpers, validation, i18n, and shared utilities.
 - `src/lib/supabase/database.types.ts`: linked Supabase-generated `public` schema used incrementally by typed data boundaries.
 - `supabase/migrations`: append-only schema history (`001` through `025`).
-- `supabase/functions/process-jobs`: authenticated Edge Function worker for queued AI jobs.
+- `supabase/functions/process-jobs`: authenticated Edge Function worker for queued AI jobs, split into `index.ts` (auth/routing), `dispatch.ts` (type router and unattended drain loop), `attachment.ts`, and `entry.ts`; `supabase/functions/_shared`: cross-function Deno modules, including Deno-runtime copies of the entity-resolution/trust-scoring domain logic.
 - `supabase/tests`: pgTAP coverage for Phase 1 RLS, intelligent capture, and AI usage.
 - `e2e`: public foundation, online auth, and intelligent capture Playwright suites.
 - `.github/workflows`: CI quality checks.
@@ -75,8 +76,9 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - Agent operations: conversations, messages, operations, undo records, audit logs, jobs, notifications, heartbeat runs, and delivery state.
 - Cost control: AI model pricing, AI usage events, `record_ai_usage`, and `get_ai_cost_summary`.
 - Product observability: private `product_events`, `record_product_event`, and service-only `record_product_event_for_user`.
-- Entry-processing contract: `capture_entry_async`, `enqueue_entry_reprocessing`, `claim_entry_interpretation_job`, and `claim_next_entry_interpretation_job`.
-- All 25 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint at level `error` is clean.
+- Entry-processing contract: `capture_entry_async`, `enqueue_entry_reprocessing`, `claim_entry_interpretation_job`, and `claim_next_entry_interpretation_job`; the interpretation persistence RPCs are now service-role-callable via an explicit `p_service_user_id`.
+- `pg_net` is enabled; `my-brain-entry-dispatch` is a per-minute `pg_cron` job that calls the deployed `process-jobs` function in dispatch mode via Vault-backed URL/secret.
+- All 27 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint at level `error` is clean.
 
 ## Existing integrations
 
@@ -89,12 +91,12 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 ## Existing jobs
 
 - `jobs` queue with idempotency keys, atomic leased claims, worker identity, expiry, bounded attempts/backoff, recoverable `failed`, terminal `exhausted`, sanitized last error, and service metrics.
-- `interpret_entry` is a bounded new queue type. Initial capture payloads contain only `{ entry_id, mode: "initial" }`; reprocessing adds a validated operation key. It has no deployed worker or automatic dispatch until Slice 2X.4.
-- `process-jobs` Edge Function version 9 for authenticated attachment execution with timeout, persisted-result reuse, and lease-owned completion/failure.
-- `my-brain-job-reaper` pg_cron entry runs every minute and recovers expired leases or makes exhausted work terminal.
+- `interpret_entry` is a bounded queue type. Initial capture payloads contain only `{ entry_id, mode: "initial" }`; reprocessing adds a validated operation key. It now has a deployed worker and automatic dispatch (Slice 2X.4): direct authenticated invocation and an unattended per-minute drain, both remotely verified end to end.
+- `process-jobs` Edge Function for authenticated attachment execution (unchanged behavior, extracted into `attachment.ts`) and entry interpretation (`entry.ts`), routed by a fail-closed dispatcher (`dispatch.ts`) that rejects unknown job types before attempting any claim.
+- `my-brain-job-reaper` pg_cron entry runs every minute and recovers expired leases or makes exhausted work terminal; `my-brain-entry-dispatch` runs every minute and drains eligible `interpret_entry` jobs across all owners via `claim_next_entry_interpretation_job`.
 - The Files route exposes only the current user's failed jobs, attempt state, retry window, terminal state, and authenticated retry action without rendering internal errors.
 - Database heartbeat functions and scheduled heartbeat entry points.
-- There is intentionally no generic unattended due-job consumer yet; the current attachment retry path is explicit and user-driven after database backoff.
+- There is intentionally no generic unattended due-job consumer for attachments; the current attachment retry path remains explicit and user-driven after database backoff. Unattended dispatch exists only for `interpret_entry`, which has no user-facing consumer yet (Slice 2X.5).
 
 ## Existing heartbeats
 
@@ -104,16 +106,17 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Existing tests
 
-- Vitest unit/component tests for auth UI, profile/settings, capture, AI parsing/routing/cost math/usage, daily-cycle contracts/lifecycle/projection-mapper guardrails, and product-analytics contracts/server/action behavior.
+- Vitest unit/component tests for auth UI, profile/settings, capture, AI parsing/routing/cost math/usage (including AI-usage-ordering guardrails for both the attachment and entry Edge Function workers), daily-cycle contracts/lifecycle/projection-mapper guardrails, and product-analytics contracts/server/action behavior.
 - Playwright public foundation, online auth, and intelligent capture suites.
-- pgTAP tests for foundational RLS, capture RLS, AI usage schema/RLS, product-events schema/RLS/RPC contracts, and entry-processing queue contracts.
+- pgTAP tests for foundational RLS, capture RLS, AI usage schema/RLS, product-events schema/RLS/RPC contracts, entry-processing queue contracts, and the Slice 2X.4 service-role interpretation access surface (`entry_interpretation_worker.sql`).
+- A Deno test file (`supabase/functions/process-jobs/dispatch.test.ts`) specifies the dispatcher's fail-closed type-routing guard; it could not be executed on this workstation (no Deno runtime installed) — deployment plus the remote smoke served as the equivalent verification.
 - CI currently runs lint, typecheck, unit tests, and production build.
 
 ## Known coverage
 
 Verified on 2026-07-17:
 
-- Vitest: 47 files and 204 tests passing after official Slice 2X.3.
+- Vitest: 47 files and 205 tests passing after official Slice 2X.4.
 - Statements: 93.66% (266/284).
 - Branches: 61.61% (305/495).
 - Functions: 90.62% (87/96).
@@ -128,6 +131,10 @@ Verified on 2026-07-17:
 - Complete remote Supabase regression smoke: auth, atomic settings, RLS, ownership, heartbeat, AI ledger/aggregation, and deployed file worker passing after Phase 2B.
 - Slice 2X.2 remote product-events smoke: allowlist, forbidden payloads, idempotency, RLS, service-role worker control, and disposable-user cleanup passing.
 - Slice 2X.3 remote entry-processing smoke: atomic capture/replay, bounded payloads, owner isolation, service-only claims, exclusive lease, retry eligibility, stale-worker denial, reaper recovery, reprocess isolation, and cleanup passing.
+- Slice 2X.4 remote entry-processing smoke (extended): the deployed worker completes both `initial` and `reprocess` direct invocations end to end (real OpenAI extraction, real entity-resolution/trust computation, real persistence via the service-role-extended RPCs), rejects an incorrect dispatch secret, and the unattended dispatch drain processes a pending fixture job with no `jobId` supplied — passing.
+- Slice 2X.4 remote job-reliability smoke (attachment regression, re-verified after the migration `027` fix): exclusive lease, stale-worker denial, recovery, exhaustion, sanitization, metrics, and RLS passing.
+- Slice 2X.4 remote full regression (`test:remote`): auth, atomic settings, RLS, ownership, heartbeat, AI ledger/aggregation, and the deployed file worker (now routed through `dispatch.ts`/`attachment.ts`) passing.
+- Slice 2X.4 ad hoc verification: the worker's best-effort `capture_processing_completed` product event was confirmed persisted with the expected properties for a disposable test user before cleanup.
 
 Coverage percentages are the last explicit coverage measurement from the Phase 2B baseline and were not recomputed for this contracts-only slice. They apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to these percentages.
 
@@ -157,7 +164,7 @@ Coverage percentages are the last explicit coverage measurement from the Phase 2
 ## Technical pending items
 
 - Generated Supabase types are active for the Phase 2A job boundary and Phase 2B interpretation DAL; legacy global client typing still exposes preference-literal and pgvector representation mismatches and must be migrated domain by domain.
-- A generic unattended worker remains intentionally absent until a concrete background flow requires due-job pickup.
+- Unattended dispatch exists only for `interpret_entry` jobs (Slice 2X.4); attachments intentionally remain without a generic unattended consumer until a concrete background flow requires due-job pickup.
 - Generic page metadata and partially localized operational copy.
 - CI does not yet enforce Playwright, pgTAP, database lint, audit, or a meaningful coverage threshold.
 - Upload malware scanning and stronger content validation remain pre-production work.

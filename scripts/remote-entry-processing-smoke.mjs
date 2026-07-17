@@ -258,7 +258,138 @@ try {
   });
   assert(crossUserReprocess.error?.code === "P0002", "Cross-user reprocessing disclosed or accepted another user's entry");
 
-  console.log("Remote entry-processing smoke passed: atomic capture, bounded payloads, idempotency, ownership, exclusive leases, retries, stale-worker protection, recovery, and reprocessing isolation.");
+  // Slice 2X.4: the deployed worker actually processes interpret_entry jobs
+  // end to end, both by direct authenticated invocation and by the
+  // unattended secret-authenticated dispatch drain.
+  const workerCaptureKey = `remote-entry-worker-initial:${suffix}`;
+  const workerCapture = dataOrThrow(
+    await first.rpc("capture_entry_async", {
+      p_original_content: "Remote worker fixture: buy milk tomorrow and follow up with Alice about the roadmap.",
+      p_locale: "en",
+      p_source: "web",
+      p_idempotency_key: workerCaptureKey,
+    }),
+    "capture entry for direct worker invocation",
+  );
+  const workerInitialJob = dataOrThrow(
+    await first
+      .from("jobs")
+      .select("id")
+      .eq("idempotency_key", `entry-capture:${workerCaptureKey}`)
+      .single(),
+    "read initial job for direct worker invocation",
+  );
+  const directInvoke = await first.functions.invoke("process-jobs", {
+    body: { jobId: workerInitialJob.id },
+  });
+  assert(!directInvoke.error, `Direct worker invocation failed: ${directInvoke.error?.message ?? "unknown"}`);
+  assert(directInvoke.data?.ok === true && directInvoke.data?.mode === "initial", "Direct worker invocation did not report a completed initial run");
+
+  const interpretedEntry = dataOrThrow(
+    await first.from("entries").select("status,current_interpretation_id").eq("id", workerCapture.entry_id).single(),
+    "read entry after direct worker invocation",
+  );
+  assert(
+    !["saved", "interpreting", "reprocessing"].includes(interpretedEntry.status) && interpretedEntry.current_interpretation_id,
+    "Direct worker invocation did not persist an interpretation",
+  );
+  const persistedInterpretation = dataOrThrow(
+    await first
+      .from("entry_interpretations")
+      .select("origin,strategy_version,prompt_version")
+      .eq("id", interpretedEntry.current_interpretation_id)
+      .single(),
+    "read interpretation persisted by the worker",
+  );
+  assert(persistedInterpretation.origin === "ai_generated", "Worker-persisted interpretation did not use the shared extraction origin");
+  assert(persistedInterpretation.strategy_version === "entry-extraction-v1", "Worker used a different extraction strategy version than the synchronous pipeline");
+  const workerUsage = dataOrThrow(
+    await first.from("ai_usage_events").select("id").eq("operation", "capture_extraction").eq("source_id", workerCapture.entry_id),
+    "read AI usage recorded by the worker",
+  );
+  assert(workerUsage.length >= 1, "Worker did not record AI usage for the shared ledger");
+
+  const workerReprocessKey = `remote-entry-worker-reprocess:${suffix}`;
+  const workerReprocess = dataOrThrow(
+    await first.rpc("enqueue_entry_reprocessing", {
+      p_entry_id: workerCapture.entry_id,
+      p_operation_key: workerReprocessKey,
+    }),
+    "enqueue reprocessing for direct worker invocation",
+  );
+  assert(workerReprocess.replayed === false, "Reprocessing enqueue for the worker fixture was unexpectedly replayed");
+  const workerReprocessJob = dataOrThrow(
+    await first
+      .from("jobs")
+      .select("id")
+      .eq("idempotency_key", `entry-reprocess:${workerCapture.entry_id}:${workerReprocessKey}`)
+      .single(),
+    "read reprocessing job for direct worker invocation",
+  );
+  const reprocessInvoke = await first.functions.invoke("process-jobs", {
+    body: { jobId: workerReprocessJob.id },
+  });
+  assert(!reprocessInvoke.error, `Direct worker reprocess invocation failed: ${reprocessInvoke.error?.message ?? "unknown"}`);
+  assert(reprocessInvoke.data?.ok === true && reprocessInvoke.data?.mode === "reprocess", "Direct worker invocation did not report a completed reprocess run");
+  const reprocessedEntry = dataOrThrow(
+    await first.from("entries").select("current_interpretation_id").eq("id", workerCapture.entry_id).single(),
+    "read entry after direct worker reprocess invocation",
+  );
+  assert(reprocessedEntry.current_interpretation_id !== interpretedEntry.current_interpretation_id, "Reprocessing did not append a new current interpretation");
+  const reprocessedInterpretation = dataOrThrow(
+    await first
+      .from("entry_interpretations")
+      .select("origin,element_confidence")
+      .eq("id", reprocessedEntry.current_interpretation_id)
+      .single(),
+    "read interpretation persisted by the worker reprocess run",
+  );
+  assert(reprocessedInterpretation.origin === "ai_reprocessed", "Worker reprocess did not append an ai_reprocessed revision");
+  assert(Object.keys(reprocessedInterpretation.element_confidence ?? {}).length > 0, "Worker reprocess did not persist computed element trust");
+
+  const dispatchSecret = process.env.WORKER_DISPATCH_SECRET;
+  if (!dispatchSecret) {
+    console.warn("WORKER_DISPATCH_SECRET not provided; skipping the unattended dispatch-drain assertions.");
+  } else {
+    const unauthorizedDispatch = await admin.functions.invoke("process-jobs", {
+      body: { mode: "dispatch" },
+      headers: { "x-dispatch-secret": "wrong-secret" },
+    });
+    assert(unauthorizedDispatch.error, "A wrong dispatch secret was accepted");
+
+    const drainCaptureKey = `remote-entry-worker-drain:${suffix}`;
+    const drainCapture = dataOrThrow(
+      await first.rpc("capture_entry_async", {
+        p_original_content: "Remote worker fixture for the unattended dispatch drain.",
+        p_locale: "en",
+        p_source: "web",
+        p_idempotency_key: drainCaptureKey,
+      }),
+      "capture entry for dispatch-drain invocation",
+    );
+    const drainInvoke = await admin.functions.invoke("process-jobs", {
+      body: { mode: "dispatch" },
+      headers: { "x-dispatch-secret": dispatchSecret },
+    });
+    assert(!drainInvoke.error, `Dispatch-drain invocation failed: ${drainInvoke.error?.message ?? "unknown"}`);
+    assert(drainInvoke.data?.ok === true && drainInvoke.data?.mode === "dispatch", "Dispatch-drain invocation did not report a drain run");
+    assert(Number(drainInvoke.data?.processed ?? 0) >= 1, "Dispatch-drain invocation did not process any eligible entry job");
+
+    const drainedEntry = await waitFor(
+      async () => {
+        const row = dataOrThrow(
+          await first.from("entries").select("status").eq("id", drainCapture.entry_id).single(),
+          "read entry after dispatch-drain invocation",
+        );
+        return ["saved", "interpreting"].includes(row.status) ? null : row;
+      },
+      "dispatch-drain entry processing",
+      10_000,
+    );
+    assert(drainedEntry, "The unattended dispatch drain did not process its fixture entry");
+  }
+
+  console.log("Remote entry-processing smoke passed: atomic capture, bounded payloads, idempotency, ownership, exclusive leases, retries, stale-worker protection, recovery, reprocessing isolation, direct worker invocation (initial and reprocess), and unattended dispatch drain.");
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);

@@ -2,6 +2,40 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.4 entry-interpretation worker and automatic dispatch
+
+### Added
+
+- Migration `026`: extends `begin_entry_interpretation`, `fail_entry_interpretation`, `persist_entry_interpretation`, `begin_entry_reprocessing`, `persist_reprocessed_entry_interpretation`, and `fail_entry_reprocessing` with an optional `p_service_user_id` parameter honored only for `service_role`, so an unattended worker can call the same RPCs the synchronous UI path already uses; the `auth.uid()` path is unchanged. Enables `pg_net` and schedules `my-brain-entry-dispatch` (`pg_cron`, every minute), reading the dispatch URL and secret from Supabase Vault by name — no value lives in the migration or the repository.
+- `supabase/functions/process-jobs/entry.ts`: a single pipeline for `interpret_entry` jobs in both `initial` and `reprocess` modes. Never trusts the job payload beyond `entry_id`/`mode`/`operation_key`; reloads the entry, calls `begin_entry_interpretation`/`begin_entry_reprocessing`, runs the OpenAI extraction and (for reprocessing) the same deterministic entity-resolution/trust computation as the synchronous path, persists via the service-role-extended RPCs, and independently records AI usage and a best-effort `capture_processing_completed`/`capture_processing_failed` product event.
+- `supabase/functions/_shared/entity-resolution.ts`, `trust-builders.ts`, `trust-policy.ts`: Deno-runtime copies of the corresponding `src/features/interpretations/` modules, genuinely reused (not reimplemented) because those Node modules have no Node/Next.js-specific imports; kept in sync manually and flagged in each file's header.
+- `supabase/functions/process-jobs/dispatch.ts`: a fail-closed type router (`process_attachment` | `interpret_entry`; unknown types are rejected before any claim) and the unattended dispatch-drain loop for `interpret_entry` jobs only.
+- `supabase/functions/process-jobs/attachment.ts`: the existing attachment-processing behavior, extracted verbatim from `index.ts` with no behavioral change (payload, model, usage, lease, and messages all unchanged).
+- `supabase/functions/process-jobs/dispatch.test.ts`: a Deno test file for the type-routing guard; written for `deno test` but not executable on this workstation (no Deno runtime installed).
+- `supabase/tests/entry_interpretation_worker.sql`: pgTAP contract for the migration `026` signature/privilege surface and a full service-role initial/reprocess/failure round trip.
+- Extended `scripts/remote-entry-processing-smoke.mjs` with real end-to-end worker coverage: direct invocation (initial and reprocess), an incorrect-dispatch-secret denial, and the unattended dispatch drain processing a fixture job with no `jobId` supplied.
+- Migration `027`: fixes a Slice 2X.3 regression (see below) by replacing a CHECK constraint with a `SECURITY DEFINER` trigger, gated by `WHEN (new.type = 'interpret_entry')`.
+- Official Slice 2X.4 evidence report at `docs/reports/PHASE_2X_SLICE_04_REPORT.md`.
+
+### Fixed
+
+- **Slice 2X.3 regression (broke every real file upload since migration `025`):** the `jobs` CHECK constraint added in migration `025` referenced `private.is_valid_entry_interpretation_job_payload`, whose `EXECUTE` privilege had been revoked from every role. PostgreSQL checks a referenced function's ACL when the executor initializes the CHECK constraint's expression tree, not only when the branch that calls it is actually evaluated — so even a `process_attachment` insert, where the constraint's `OR` should short-circuit on `type`, failed with `permission denied for function is_valid_entry_interpretation_job_payload`. Migration `027` replaces the CHECK constraint with trigger `jobs_interpret_entry_payload_trigger` (`before insert or update ... when (new.type = 'interpret_entry')`) backed by a `SECURITY DEFINER` function; trigger firing does not require the writing role to hold `EXECUTE` on the function it calls, so the private validator keeps its original `revoke all` — no privilege was broadened. See `DECISIONS.md` ADR-022.
+
+### Changed
+
+- `supabase/functions/process-jobs/index.ts`: reduced to authentication, job-type lookup, claim, and routing (via `dispatch.ts`); no longer contains attachment- or entry-specific logic directly.
+- Direct invocation keeps its exact existing request contract (`{ jobId }`) for both job types; no Server Action, route, or UI consumer changed.
+
+### Verification
+
+- Migrations `026` and `027` are synchronized with the linked project; linked database lint at level `error` is clean and Supabase types were regenerated from the remote schema.
+- `npm run test:remote:entry-processing` (extended) passed: 2X.3's atomic-capture/lease/retry/reaper assertions plus real direct worker invocation (initial and reprocess), dispatch-secret denial, and unattended dispatch-drain processing.
+- `npm run test:remote:jobs` (attachment regression) failed before the migration `027` fix and passed after it.
+- `npm run test:remote` (full regression, including the deployed attachment worker over HTTP) passed after the fix.
+- An ad hoc disposable-user check confirmed the worker's best-effort `capture_processing_completed` product event is actually persisted with the expected properties.
+- The committed pgTAP contract (`entry_interpretation_worker.sql`) could not run on this workstation because Supabase CLI requires Docker Desktop; the Deno test file could not run because no Deno runtime is installed. Deployment (`supabase functions deploy`, which bundles/resolves the full Deno module graph including the `_shared` imports) plus the remote smokes above served as the equivalent real verification.
+- Vitest (47 files/205 tests — one new AI-usage-ordering assertion for `entry.ts`, and the existing attachment-worker assertion repointed from `index.ts` to `attachment.ts`), ESLint, TypeScript, the Next.js 16.2.10 production build, and `git diff --check` passed.
+
 ## 2026-07-17 — Phase 2X Slice 2X.3 atomic entry capture and input jobs
 
 ### Added

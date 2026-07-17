@@ -11,7 +11,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
 - [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
 - [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
-- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and official Slices 2X.1–2X.3 are complete.
+- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and official Slices 2X.1–2X.4 are complete.
 - [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
@@ -25,7 +25,8 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete Slice 2X.2 — private product-events foundation: migration `024`, dedicated RPCs, generated types, server-only best-effort boundary, acknowledgement action, pgTAP contract, remote smoke, and retention documentation.
 - [x] Preserve Product Projections prework from `9f0c1e6` — immutable, serializable DTOs and pure fail-closed mappers for CaptureReceipt, Inbox, Needs Attention, and Work; it is not the official Slice 2X.3 and has no consumer.
 - [x] Complete Slice 2X.3 — atomic entry capture and input jobs: migration `025`, bounded `interpret_entry` payload, authenticated capture/reprocessing enqueue RPCs, service-only claims, generated types, pgTAP contract, and disposable remote smoke. No UI, route, Server Action, Edge Function, worker, or dispatch was added.
-- [ ] Begin Slice 2X.4 only after explicit authorization; implement the entry worker and dispatch without changing the current UI capture path or integrating the projection prework with UI/routes.
+- [x] Complete Slice 2X.4 — entry-interpretation worker and automatic dispatch: migrations `026` (service-role interpretation access, `pg_net`, scheduled dispatch cron) and `027` (fixes a Slice 2X.3 privilege regression that broke authenticated attachment-job inserts — see `DECISIONS.md` ADR-022); `process-jobs` split into `index.ts`/`dispatch.ts`/`attachment.ts`/`entry.ts`; direct and unattended-drain invocation both remotely verified. No UI, route, or Server Action switched to the async capture path.
+- [ ] Begin Slice 2X.5 only after explicit authorization; switch `captureEntry`/`reprocessEntry` to the async path only after this slice's worker/dispatch proof.
 
 ### Phase 2B evidence
 
@@ -108,7 +109,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 Continue with the reconciled slices. Do not restart the architecture.
 
 - [x] Harden the current jobs queue and attachment worker with leases, retries/backoff, stale-job recovery, exhaustion, metrics, and user visibility.
-- [ ] Add a generic unattended due-job consumer only when a concrete background workflow requires it; current attachment retries are explicit and user-initiated after persisted backoff.
+- [ ] Add a generic unattended due-job consumer for attachments only when a concrete background workflow requires it; current attachment retries remain explicit and user-initiated after persisted backoff. (`interpret_entry` jobs already have unattended dispatch as of Slice 2X.4.)
 - [ ] Automatic daily/weekly review scheduling and verified delivery.
 - [ ] Task editing and richer lifecycle controls.
 - [ ] Hybrid semantic/lexical search with measured relevance.
