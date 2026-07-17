@@ -68,6 +68,26 @@ test.describe("intelligent capture", () => {
     await expect(page.getByText(original)).toBeVisible();
     await expect(page.getByText("Marina", { exact: true })).toBeVisible();
 
+    await expect(page.getByRole("button", { name: "Corrigir interpretação" })).toBeVisible();
+    await page.getByRole("button", { name: "Corrigir interpretação" }).click();
+    await page.getByRole("textbox", { name: "Resumo" }).fill("Resumo confirmado: conversa com Marina sobre o Atlas");
+    await page.getByLabel("Data e hora do acontecimento (ISO)").fill("2026-07-17T14:00:00.000Z");
+    await page.getByRole("button", { name: "Adicionar data" }).click();
+    await page.getByLabel("Data identificada 2").fill("2026-07-21");
+    await page.getByRole("checkbox", { name: "Somente registrar, sem executar ações derivadas" }).check();
+    await page.getByRole("textbox", { name: "Motivo da correção" }).fill("Confirmação E2E da interpretação.");
+    await page.getByRole("button", { name: "Salvar nova versão" }).click();
+    await expect(page.getByRole("status")).toHaveText("Nova versão salva.");
+    await expect(page.getByText(/v2 · Correção do usuário/)).toBeVisible();
+    await page.getByRole("button", { name: "Cancelar correção" }).click();
+    await page.getByRole("button", { name: "Desfazer última correção" }).click();
+    await expect(page.getByText(/v3 · Correção do usuário/)).toBeVisible();
+
+    await page.goto(page.url().replace("/pt-BR/", "/en/"));
+    await expect(page.getByRole("button", { name: "Correct interpretation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Immutable history" })).toBeVisible();
+    await page.goto(page.url().replace("/en/", "/pt-BR/"));
+
     const createButton = page.getByRole("button", { name: /Criar \d+ tarefas?/ });
     await expect(createButton).toBeVisible();
     await createButton.click();
@@ -78,13 +98,18 @@ test.describe("intelligent capture", () => {
     });
     const entries = (await entryResponse.json()) as Array<{ id: string; original_content: string; status: string }>;
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ original_content: original, status: "interpreted" });
+    expect(entries[0]).toMatchObject({ original_content: original, status: "awaiting_review" });
 
     const auditResponse = await fetch(`${supabaseUrl}/rest/v1/audit_logs?select=action_type&user_id=eq.${userId}`, {
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
     });
     const audit = (await auditResponse.json()) as Array<{ action_type: string }>;
-    expect(audit.map((item) => item.action_type)).toEqual(expect.arrayContaining(["entry_interpreted", "tasks_confirmed"]));
+    expect(audit.map((item) => item.action_type)).toEqual(expect.arrayContaining([
+      "entry_interpreted",
+      "entry_interpretation_corrected",
+      "entry_interpretation_correction_undone",
+      "tasks_confirmed",
+    ]));
 
     await page.goto("/pt-BR/app/chat");
     await page.getByRole("textbox", { name: "Pergunte ao Brain" }).fill("Com quem conversei sobre o projeto Atlas?");
