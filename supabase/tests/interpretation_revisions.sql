@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(43);
 
 select has_column('public', 'entries', 'current_interpretation_id', 'entries points to the current immutable interpretation');
 select has_column('public', 'entries', 'reprocessing_key', 'entries records the active reprocessing operation');
@@ -80,8 +80,8 @@ select results_eq(
 
 select results_eq(
   $$ select prosecdef from pg_proc where oid = 'public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure $$,
-  array[false],
-  'correction executes with the authenticated caller identity'
+  array[true],
+  'correction is security definer and validates the authenticated owner internally'
 );
 select results_eq(
   $$ select pg_get_functiondef('public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure) like '%set search_path = ''''%' $$,
@@ -134,6 +134,23 @@ select results_eq(
   $$,
   array[true],
   'the immutability trigger does not block entry cascade deletion'
+);
+select results_eq(
+  $$ select prosecdef from pg_proc where oid = 'public.prepare_entity_alias()'::regprocedure $$,
+  array[true],
+  'alias normalization runs with its internal function privilege only'
+);
+select results_eq(
+  $$
+    select bool_and(position('occurred_at = occurred_at' in pg_get_functiondef(signature)) = 0)
+    from unnest(array[
+      'public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer)'::regprocedure,
+      'public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure,
+      'public.persist_reprocessed_entry_interpretation(uuid,text,jsonb,text,text,text,integer,integer,jsonb)'::regprocedure
+    ]) signature
+  $$,
+  array[true],
+  'entry mutation functions avoid timestamp variable and column ambiguity'
 );
 
 select * from finish();
