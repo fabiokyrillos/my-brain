@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { signUp } from "@/features/auth/actions";
+import { updatePassword } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { isLocale } from "@/lib/preferences";
 
-export default async function RegisterPage({
+export default async function ResetPasswordPage({
   params,
   searchParams,
 }: {
@@ -19,22 +19,14 @@ export default async function RegisterPage({
 
   return (
     <div className="auth-card">
-      <p className="eyebrow">MY BRAIN</p>
-      <h1>{pt ? "Crie seu espaço" : "Create your space"}</h1>
-      <p>{pt ? "Privado, contextual e pronto para acompanhar seu ritmo." : "Private, contextual, and ready for your rhythm."}</p>
+      <p className="eyebrow">{pt ? "ACESSO SEGURO" : "SECURE ACCESS"}</p>
+      <h1>{pt ? "Defina uma nova senha" : "Set a new password"}</h1>
+      <p>{pt ? "A nova senha encerrará esta sessão de recuperação." : "The new password will close this recovery session."}</p>
       {error && <div className="form-alert">{authErrorMessage(error, locale)}</div>}
-      <form action={signUp} className="auth-form">
+      <form action={updatePassword} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
         <label>
-          {pt ? "Nome" : "Name"}
-          <input name="displayName" required minLength={2} maxLength={100} autoComplete="name" />
-        </label>
-        <label>
-          E-mail
-          <input name="email" type="email" required maxLength={254} autoComplete="email" />
-        </label>
-        <label>
-          {pt ? "Senha" : "Password"}
+          {pt ? "Nova senha" : "New password"}
           <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
         </label>
         <small>
@@ -43,12 +35,12 @@ export default async function RegisterPage({
             : "Use 12 or more characters with uppercase, lowercase, number, and symbol."}
         </small>
         <label>
-          {pt ? "Confirme a senha" : "Confirm password"}
+          {pt ? "Confirme a nova senha" : "Confirm new password"}
           <input name="passwordConfirmation" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
         </label>
-        <button>{pt ? "Criar conta" : "Create account"}</button>
+        <button>{pt ? "Atualizar senha" : "Update password"}</button>
       </form>
-      <Link href={`/${locale}/auth/login`}>{pt ? "Já tenho conta" : "I already have an account"}</Link>
+      <Link href={`/${locale}/auth/recover`}>{pt ? "Solicitar outro link" : "Request another link"}</Link>
     </div>
   );
 }

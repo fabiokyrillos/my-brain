@@ -1,7 +1,7 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Sprint 1.5 — Foundation hardening  
+Current phase: Sprint 1.5 — Foundation hardening (critical fixes)
 Source of truth order: code, database, migrations, documentation
 
 ## Status summary
@@ -11,7 +11,7 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 ## Implemented functionality
 
 - Localized public and authenticated Next.js application shell (`pt-BR` and `en`).
-- Supabase email/password authentication, session refresh, protected application routes, sign-out, and OAuth callback infrastructure.
+- Supabase email/password authentication, session refresh, protected application routes, sign-out, explicit PKCE callback continuations, validated signup, and complete password reset UI/actions.
 - User profile and agent preference management.
 - Intelligent capture with AI interpretation, confirmations, pending questions, and task materialization.
 - Inbox, Today, Tasks, Waiting, Projects, People, Reminders, Reviews, Agent chat, Memories, Files, Notifications, Change history, Settings, and entity detail routes.
@@ -23,8 +23,9 @@ Phase 1 is implemented as a functional pre-MVP foundation. The current worktree 
 
 ## Pending or incomplete functionality
 
-- Sprint 1.5 critical fixes: password reset completion, full signup validation, complete mobile navigation, RLS hardening, relationship ownership enforcement, heartbeat corrections, pagination, and consistent Supabase error handling.
-- Google OAuth must remain hidden until provider configuration and end-to-end validation exist.
+- Sprint 1.5 critical fixes: complete mobile navigation, RLS hardening, relationship ownership enforcement, heartbeat corrections, pagination, and consistent Supabase error handling.
+- The online signup/recovery Playwright journeys are implemented but still require the remote credentials/redirect allowlist validation gate.
+- Google OAuth is hidden until provider configuration and end-to-end validation exist.
 - AI Routing and Cost Control requires behavioral SQL tests, remote migration validation/application, dashboard smoke tests, documentation, and a release commit.
 - Generic scheduled worker, automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
@@ -111,7 +112,7 @@ These percentages apply only to modules imported by the test suite; they are not
 
 - Over-permissive CRUD policies on append-oriented/domain-controlled tables.
 - Missing composite ownership constraints for related records.
-- Incomplete recovery/signup flows and provider configuration drift.
+- Remote verification of the completed recovery/signup flows and callback allowlist.
 - Heartbeat date, locale, cap, failure-isolation, and concurrency weaknesses.
 - Unbounded queries and N+1 signed URL generation on file listings.
 - Inconsistent Supabase result/error handling and multi-write atomicity.
@@ -129,16 +130,15 @@ These percentages apply only to modules imported by the test suite; they are not
 ## Sprint 1.5 checklist
 
 - [x] Establish permanent state, decision, changelog, and backlog documents.
-- [ ] Fix password recovery and signup validation.
+- [x] Fix password recovery and signup validation locally; online proof remains in the deployment gate.
 - [ ] Complete mobile navigation.
 - [ ] Harden RLS and relationship ownership.
 - [ ] Correct heartbeat behavior.
 - [ ] Add pagination and consistent Supabase error handling.
-- [ ] Hide or validate partially configured integrations.
+- [x] Hide the unconfigured Google OAuth entry point.
 - [ ] Finish AI Routing and Cost Control tests and migration.
 - [ ] Validate the remote database and deployed worker.
 - [ ] Smoke-test the cost dashboard.
 - [ ] Run lint, typecheck, unit tests, coverage, build, and Playwright.
 - [ ] Update all four permanent project documents with final evidence.
 - [ ] Commit the completed sprint in reviewable units.
-

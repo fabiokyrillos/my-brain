@@ -92,3 +92,13 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Reason:** It reduces compounding risk without restarting architecture or expanding scope.
 - **Consequences:** No new product capability is accepted in this sprint. Deferred improvements must be explicit in `TODO.md` and the closing report.
 
+## ADR-009 — Explicit PKCE continuations and local credential policy
+
+- **Date:** 2026-07-17
+- **Status:** Accepted
+- **Context:** Signup and recovery relied on implicit Supabase defaults; recovery targeted a missing page and authenticated auth routes were redirected away from reset.
+- **Problem:** The application could send a recovery email without providing a complete, safe password-update journey, while raw provider errors and a visible unconfigured Google action created unreliable authentication behavior.
+- **Alternatives considered:** Keep Supabase defaults; implement client-fragment recovery; use explicit server-side PKCE callback continuations with validated forms.
+- **Decision:** Use explicit same-locale callback URLs and allowlisted continuations, validate credentials with Zod, require a 12-character mixed password plus confirmation, update the password only in an authenticated recovery session, then sign out and require a fresh login. Hide Google OAuth until its provider is configured and verified.
+- **Reason:** The server-side PKCE flow matches the SSR architecture, prevents open redirects, gives deterministic errors, and avoids presenting an integration that cannot succeed.
+- **Consequences:** Supabase redirect allowlists must include the callback URLs in each environment. Changing the password policy later requires coordinated UI/schema/test updates. Google OAuth returns only through a future ADR and end-to-end proof.

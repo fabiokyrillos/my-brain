@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
@@ -6,6 +7,7 @@ const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
 const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
 
 test.describe("online Supabase authentication", () => {
+  test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
   const email = `codex-e2e-${crypto.randomUUID()}@example.com`;
@@ -100,5 +102,58 @@ test.describe("online Supabase authentication", () => {
     const preferences = (await preferencesResponse.json()) as Array<{ agent_name: string }>;
     expect(profiles).toEqual([{ display_name: "Codex E2E verificado" }]);
     expect(preferences).toEqual([{ agent_name: "Brain Online" }]);
+  });
+
+  test("creates an account through the validated signup journey", async ({ page }) => {
+    const signupEmail = `codex-signup-${crypto.randomUUID()}@example.com`;
+    const signupPassword = `Signup!${crypto.randomUUID()}A7`;
+
+    await page.goto("/pt-BR/auth/register");
+    await page.getByLabel("Nome").fill("Signup E2E");
+    await page.getByLabel("E-mail").fill(signupEmail);
+    await page.getByLabel("Senha", { exact: true }).fill(signupPassword);
+    await page.getByLabel("Confirme a senha").fill(signupPassword);
+    await page.getByRole("button", { name: "Criar conta" }).click();
+
+    await expect(page).toHaveURL(/\/pt-BR\/auth\/login\?message=check-email/);
+    await expect(page.getByText("Confira seu e-mail para confirmar a conta.")).toBeVisible();
+
+    const admin = createClient(supabaseUrl!, serviceRoleKey!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    expect(error).toBeNull();
+    const createdUser = data.users.find((candidate) => candidate.email === signupEmail);
+    expect(createdUser).toBeDefined();
+    if (createdUser) await admin.auth.admin.deleteUser(createdUser.id);
+  });
+
+  test("exchanges a recovery link, updates the password, and signs in again", async ({ page }) => {
+    const admin = createClient(supabaseUrl!, serviceRoleKey!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const redirectTo = "http://localhost:3000/pt-BR/auth/callback?next=%2Fpt-BR%2Fauth%2Freset";
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
+    expect(error).toBeNull();
+    expect(data.properties).not.toBeNull();
+    if (!data.properties) throw new Error("Supabase did not return a recovery action link.");
+
+    await page.goto(data.properties.action_link);
+    await expect(page).toHaveURL(/\/pt-BR\/auth\/reset/);
+
+    const newPassword = `Recovered!${crypto.randomUUID()}A7`;
+    await page.getByLabel("Nova senha", { exact: true }).fill(newPassword);
+    await page.getByLabel("Confirme a nova senha").fill(newPassword);
+    await page.getByRole("button", { name: "Atualizar senha" }).click();
+
+    await expect(page).toHaveURL(/\/pt-BR\/auth\/login\?message=password-updated/);
+    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Senha").fill(newPassword);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app$/);
   });
 });

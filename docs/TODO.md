@@ -16,8 +16,9 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 
 ### 2. Critical foundation fixes
 
-- [ ] Complete password recovery: validated request, callback/code exchange, reset form, password update, safe redirect, localized errors, and E2E coverage.
-- [ ] Validate signup server-side with Zod, strong password policy, password confirmation, normalized email, safe error mapping, and online E2E coverage.
+- [x] Complete password recovery code: validated request, callback/code exchange, reset form, password update, safe redirect, localized errors, and E2E specification.
+- [x] Validate signup server-side with Zod, strong password policy, password confirmation, normalized email, safe error mapping, and E2E specification.
+- [ ] Execute the authenticated signup/recovery Playwright journeys against the confirmed remote Supabase project and redirect allowlist.
 - [ ] Add complete mobile access to every information-architecture destination without crowding the primary bottom navigation.
 - [ ] Remove direct user mutations from audit, undo, interpretation, embedding, message, summary, heartbeat, job, and other domain-controlled records.
 - [ ] Enforce ownership on relationships using composite foreign keys or validated security-definer RPCs; add cross-user denial tests.
@@ -26,7 +27,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [ ] Delay over-cap notifications instead of marking them dismissed; preserve important work and cooldown semantics.
 - [ ] Paginate potentially unbounded lists and avoid per-row signed URL calls where possible.
 - [ ] Check and surface every relevant Supabase error; prevent partial multi-write settings updates.
-- [ ] Hide Google OAuth until provider configuration, secrets, redirect URLs, and E2E validation exist.
+- [x] Hide Google OAuth until provider configuration, secrets, redirect URLs, and E2E validation exist.
 
 ### 3. Finish AI Routing and Cost Control
 
@@ -87,8 +88,7 @@ Do not start these during Sprint 1.5.
 
 ## Known bugs and risks
 
-- [ ] Password recovery currently points to a reset route that does not exist, and auth-route protection would redirect a recovered session away from that route.
-- [ ] Signup confirmation may not complete the SSR PKCE journey without an explicit email redirect/callback contract.
+- [ ] Password recovery and signup now have explicit PKCE contracts but still require proof against the remote redirect allowlist.
 - [ ] Mobile users cannot visibly reach all authenticated destinations.
 - [ ] Some RLS policies allow owners to mutate append-only/domain-controlled rows.
 - [ ] Relationship rows can carry the current user's `user_id` while referencing another user's guessed entity ID.
@@ -104,4 +104,3 @@ Do not start these during Sprint 1.5.
 - [ ] Valid `ONLINE_SUPABASE_*` credentials for authenticated Playwright tests.
 - [ ] Verified OpenAI and Supabase Edge Function secrets in the deployment environment.
 - [ ] Google OAuth provider configuration if the integration is enabled in a later phase.
-
