@@ -1,12 +1,12 @@
 # Project State
 
 Last updated: 2026-07-17  
-Current phase: Phase 2A complete — Phase 2B is next
+Current phase: Phase 2B complete — Phase 2C is next
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
 
-Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2 now has mandatory engineering standards and a reality-based plan. Phase 2A is implemented and deployed through migration `019` and `process-jobs` version 9: leased claims, worker identity, stale-worker denial, bounded retry/exhaustion, a scheduled reaper, timeout, persisted metrics, user-visible failure/retry state, and generated job types are remotely verified.
+Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains closed. Phase 2A operational reliability remains deployed. Phase 2B is implemented and deployed through migration `023`: captures use the persisted lifecycle, interpretations are immutable snapshots selected by an owned current pointer, corrections and undo append versions, trust/entity evidence is deterministic and persisted per element, and synchronous reprocessing is protected by an expiring database lease. Desktop/mobile and remote behavior are verified.
 
 ## Implemented functionality
 
@@ -24,6 +24,11 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - Remote `process-jobs` version 9 with authenticated ownership, 300-second leases, 120-second external timeout, idempotent reuse of persisted interpretations, lease-validated completion/failure, bounded backoff/exhaustion, and real file-analysis smoke coverage.
 - Scheduled per-minute abandoned-job reaper, service-only queue metrics, user-safe recoverable/terminal failure visibility, and a backoff-gated retry Server Action.
 - Linked Supabase-generated TypeScript schema with the Phase 2A `jobs` contract used by the Files route.
+- Eight-state entry lifecycle with immutable interpretation origin/parent/correction metadata and `entries.current_interpretation_id` as the authoritative current pointer.
+- Transactional correction with optimistic concurrency, operation-key idempotency, owned complete-link validation, audit, and compensating append-only undo.
+- Deterministic per-element trust weights/policies/evidence plus bounded owned entity ranking across normalized names, aliases, history, organization context, temporal validity, optional semantic input, and candidate margin.
+- Shared capture/reprocessing extraction pipeline with paid-usage ordering, 120-second provider bound, persisted reprocessing lease, safe failure recovery, and no duplicate AI implementation.
+- Typed interpretation review DAL and localized accessible inbox UI for correction, dates, concepts, entity links, classifications, pending-question retention, record-only mode, trust evidence, history/comparison, undo, and reprocessing.
 
 ## Pending or incomplete functionality
 
@@ -37,7 +42,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 ## Next priorities
 
-1. Begin Phase 2B with immutable interpretation correction versions and the trust/entity-resolution foundation defined in `PHASE_2_PLAN.md`.
+1. Begin Phase 2C with an editable task-candidate desired-state contract and one transactional selective-confirmation RPC, preserving the Phase 2B revision/trust boundary.
 2. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 3. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
 4. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
@@ -48,7 +53,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - `src/features`: domain server actions and UI for auth, capture, agent, profile, shell, and operations.
 - `src/lib`: Supabase clients, AI provider/routing/usage helpers, validation, i18n, and shared utilities.
 - `src/lib/supabase/database.types.ts`: linked Supabase-generated `public` schema used incrementally by typed data boundaries.
-- `supabase/migrations`: append-only schema history (`001` through `019`).
+- `supabase/migrations`: append-only schema history (`001` through `023`).
 - `supabase/functions/process-jobs`: authenticated Edge Function worker for queued AI jobs.
 - `supabase/tests`: pgTAP coverage for Phase 1 RLS, intelligent capture, and AI usage.
 - `e2e`: public foundation, online auth, and intelligent capture Playwright suites.
@@ -63,7 +68,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 - Work management: tasks, projects, people, reminders, reviews, and waiting-related records.
 - Agent operations: conversations, messages, operations, undo records, audit logs, jobs, notifications, heartbeat runs, and delivery state.
 - Cost control: AI model pricing, AI usage events, `record_ai_usage`, and `get_ai_cost_summary`.
-- All 19 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized and linked schema lint passes at error level.
+- All 23 migrations are applied to the linked `my-brain` project; local/remote migration history is synchronized. Linked schema lint has no Phase 2B issue and reports two pre-existing text-to-time warnings in `run_user_heartbeat`.
 
 ## Existing integrations
 
@@ -99,7 +104,7 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 
 Verified on 2026-07-17:
 
-- Vitest: 29 files and 93 tests passing.
+- Vitest: 39 files and 147 tests passing.
 - Statements: 93.66% (266/284).
 - Branches: 61.61% (305/495).
 - Functions: 90.62% (87/96).
@@ -109,11 +114,22 @@ Verified on 2026-07-17:
 - Final targeted recovery journey after the harness hardening: 1/1 passing.
 - Phase 2A linked intelligent-capture/file journey: 2/2 passing across desktop and mobile.
 - Phase 2A remote job smoke: exclusive lease, stale-worker denial, recovery, exhaustion, sanitization, metrics, and RLS passing.
+- Phase 2B linked intelligent-capture/revision journey: passing separately on desktop and Pixel 7 mobile, including correction, dates, classifications, record-only mode, immutable history, undo, `pt-BR`/English, and cleanup.
+- Phase 2B remote interpretation smoke: immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup passing.
+- Complete remote Supabase regression smoke: auth, atomic settings, RLS, ownership, heartbeat, AI ledger/aggregation, and deployed file worker passing after Phase 2B.
 
 Coverage percentages apply only to modules imported by Vitest; they are not repository-wide coverage. Remote smoke and Playwright complement, but do not numerically contribute to, these percentages.
 
 ## Important recent commits
 
+- `80bb233` — `fix(interpretations): include correction history trust signal` (2026-07-17).
+- `00eabe5` — `test(e2e): stabilize interpretation revision journey` (2026-07-17).
+- `9e894de` — `fix(db): align trust fallback volatility` (2026-07-17).
+- `8fbd615` — `feat(inbox): add immutable interpretation review` (2026-07-17).
+- `8331e68` — `feat(interpretations): add correction and reprocessing actions` (2026-07-17).
+- `91c1722` — `chore(supabase): generate interpretation revision contract` (2026-07-17).
+- `ae0be18` — `feat(db): add immutable interpretation revision operations` (2026-07-17).
+- `9a87c54` — `feat(interpretations): add deterministic trust and entity contracts` (2026-07-17).
 - `ac9f08e` — `chore(supabase): generate typed job queue contract` (2026-07-17).
 - `86fa041` — `feat(files): expose recoverable and terminal job failures` (2026-07-17).
 - `ab902e9` — `feat(worker): enforce lease ownership and bounded retries` (2026-07-17).
@@ -129,7 +145,7 @@ Coverage percentages apply only to modules imported by Vitest; they are not repo
 
 ## Technical pending items
 
-- Generated Supabase types are active for the Phase 2A job boundary; legacy global client typing still exposes preference-literal and pgvector representation mismatches and must be migrated domain by domain.
+- Generated Supabase types are active for the Phase 2A job boundary and Phase 2B interpretation DAL; legacy global client typing still exposes preference-literal and pgvector representation mismatches and must be migrated domain by domain.
 - A generic unattended worker remains intentionally absent until a concrete background flow requires due-job pickup.
 - Generic page metadata and partially localized operational copy.
 - CI does not yet enforce Playwright, pgTAP, database lint, audit, or a meaningful coverage threshold.

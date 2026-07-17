@@ -190,3 +190,14 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Decision:** PostgreSQL is authoritative for claim, completion, failure, backoff, exhaustion, reaping, and metrics. `process-jobs` receives a unique identity, uses a bounded lease/timeout, and can change terminal state only through RPCs that match its active unexpired lease.
 - **Reason:** Atomic database transitions preserve concurrency and recovery invariants without adding a platform, and they are independently testable through pgTAP and disposable remote smoke.
 - **Consequences:** Expired workers cannot commit job state. The per-minute reaper converts expired work to recoverable `failed` or terminal `exhausted`. Current failed attachment retry remains an authenticated owning-user action after `next_attempt_at`; an unattended consumer requires a separate concrete workflow and review.
+
+## ADR-018 — Immutable interpretation snapshots with an owned current pointer
+
+- **Date:** 2026-07-17
+- **Status:** Accepted; deployed and remotely verified in Phase 2B
+- **Context:** Users must correct AI interpretations, inspect why each element was trusted, undo mistakes, and retry interpretation without losing the original or rewriting evidence.
+- **Problem:** Updating a latest interpretation row or maintaining an `is_current` flag would mutate historical evidence. Model confidence alone cannot authorize entity links or derived actions, and concurrent correction/reprocessing needs explicit ownership and idempotency.
+- **Alternatives considered:** Mutable latest interpretation; an `is_current` flag on every revision; separate editable and snapshot tables; a new generic reprocessing worker; append-only snapshots selected by an owned entry pointer.
+- **Decision:** Keep `entry_interpretations` immutable and append-only. Select the active version through `entries.current_interpretation_id`; make PostgreSQL RPCs own locking, expected-version checks, operation-key idempotency, complete-link ownership, lifecycle updates, audit, and compensating undo. Calculate trust and entity ranking deterministically in typed domain modules, persist bounded per-element evidence, and use a synchronous expiring reprocessing lease around the single shared extraction pipeline.
+- **Reason:** This preserves an auditable history, makes concurrency and tenant boundaries database-enforced, reports missing evidence instead of inventing confidence, and avoids duplicating the provider/prompt or introducing infrastructure without a detached consumer.
+- **Consequences:** Corrections and undo add rows rather than replacing them. The current pointer is mutable but can reference only an owned interpretation of the same entry. Reprocessing is bounded and synchronous until a concrete detached workflow justifies moving it behind the existing leased queue. Phase 2C must consume this trust/revision boundary rather than create a parallel task workflow.

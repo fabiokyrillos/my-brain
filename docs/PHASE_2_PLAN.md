@@ -1,6 +1,6 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: Phase 2A complete and published; Phase 2B in progress
+Status: Phase 2B complete and published; Phase 2C is next
 Started: 2026-07-17  
 Branch: `codex/phase-2-intelligent-capture`
 
@@ -313,25 +313,35 @@ Alternatives rejected for this slice:
 
 ### Test-first implementation checklist
 
-- [ ] Confirm remote migration sequence still ends at `019`, linked branch SHA matches local Phase 2A, and no schema drift exists.
-- [ ] Add failing trust-policy tests for every weight, the `0.90`, `0.78`, and `0.55` boundaries, all hard overrides, low candidate margin, date conflict, missing evidence, recurring correction, and policy output.
-- [ ] Add failing entity-resolution tests for exact name, normalized name, alias, historical/context/temporal signals, semantic input, cross-owner filtering, duplicate ambiguity, margin, and result bounds.
-- [ ] Add failing patch/comparison tests for summary, concepts, occurrence, extracted dates, entity add/remove/replace, element classification, pending questions, invalid IDs/dates, and adjacent immutable snapshots.
-- [ ] Add failing structural/behavioral SQL tests and a disposable remote smoke before the migration exists; prove the failure is the missing Phase 2B contract.
-- [ ] Append migration `020`; map `processing` to `interpreting`, `interpreted` to `completed`, and `failed` to `recoverable_error` while accepting only the eight Phase 2B lifecycle states.
-- [ ] Backfill `entries.current_interpretation_id` to the latest owned interpretation and add the composite ownership foreign key without mutating prior interpretation payloads.
-- [ ] Add immutable revision origin, parent, corrected-by/reason, operation key, extracted dates, element classifications, confidence, policy, and bounded resolution evidence.
-- [ ] Add owned `entity_aliases` with temporal validity, forced RLS, least privilege, polymorphic ownership validation, and cross-user denial.
-- [ ] Implement the correction RPC with entry locking, expected-version concurrency control, idempotency, complete-link ownership validation, append-only snapshot creation, derived entity/question refresh, current pointer update, lifecycle update, audit, and undo creation.
-- [ ] Extend undo so an interpretation correction appends a compensating version based on the prior snapshot, never deletes/reactivates history, audits the result, denies cross-user access, and returns the same result when repeated.
-- [ ] Implement leased begin/complete/fail reprocessing transitions; append `ai_reprocessed` results through the same persistence invariants and reject a stale operation key.
-- [ ] Make the focused Vitest and remote database contracts green, apply migration `020` to the linked project, confirm local/remote synchronization, run linked db lint, and regenerate Supabase types.
-- [ ] Implement the typed DAL and Server Actions with Zod validation, session validation, bounded reads, sanitized errors, immediate route revalidation, and no direct UI mutation of append-only tables.
-- [ ] Implement the localized accessible review UI with only working controls: edit/cancel/save, entity add/remove/replace, concepts, occurrence/extracted dates, classifications, pending-question retention, record-only mode, history, comparison, undo, and reprocess.
-- [ ] Add component/action tests and Playwright coverage for the complete desktop/mobile, `pt-BR`/English correction journey.
-- [ ] Run focused tests, full Vitest, lint, TypeScript, production build, linked Playwright, migration synchronization, db lint, RLS/ownership/correction/undo/reprocessing remote smoke, full regression smoke, and disposable-data cleanup.
-- [ ] Review every Phase 2B requirement and engineering standard, remove dead paths/false controls, update permanent documentation, commit thematically, and push all Phase 2B commits to the same branch without merging `main`.
+- [x] Confirm remote migration sequence still ends at `019`, linked branch SHA matches local Phase 2A, and no schema drift exists.
+- [x] Add failing trust-policy tests for every weight, the `0.90`, `0.78`, and `0.55` boundaries, all hard overrides, low candidate margin, date conflict, missing evidence, recurring correction, and policy output.
+- [x] Add failing entity-resolution tests for exact name, normalized name, alias, historical/context/temporal signals, semantic input, cross-owner filtering, duplicate ambiguity, margin, and result bounds.
+- [x] Add failing patch/comparison tests for summary, concepts, occurrence, extracted dates, entity add/remove/replace, element classification, pending questions, invalid IDs/dates, and adjacent immutable snapshots.
+- [x] Add failing structural/behavioral SQL tests and a disposable remote smoke before the migration exists; prove the failure is the missing Phase 2B contract.
+- [x] Append migration `020`; map `processing` to `interpreting`, `interpreted` to `completed`, and `failed` to `recoverable_error` while accepting only the eight Phase 2B lifecycle states.
+- [x] Backfill `entries.current_interpretation_id` to the latest owned interpretation and add the composite ownership foreign key without mutating prior interpretation payloads.
+- [x] Add immutable revision origin, parent, corrected-by/reason, operation key, extracted dates, element classifications, confidence, policy, and bounded resolution evidence.
+- [x] Add owned `entity_aliases` with temporal validity, forced RLS, least privilege, polymorphic ownership validation, and cross-user denial.
+- [x] Implement the correction RPC with entry locking, expected-version concurrency control, idempotency, complete-link ownership validation, append-only snapshot creation, derived entity/question refresh, current pointer update, lifecycle update, audit, and undo creation.
+- [x] Extend undo so an interpretation correction appends a compensating version based on the prior snapshot, never deletes/reactivates history, audits the result, denies cross-user access, and returns the same result when repeated.
+- [x] Implement leased begin/complete/fail reprocessing transitions; append `ai_reprocessed` results through the same persistence invariants and reject a stale operation key.
+- [x] Make the focused Vitest and remote database contracts green, apply migrations `020` through `023` to the linked project, confirm local/remote synchronization, run linked db lint, and regenerate Supabase types.
+- [x] Implement the typed DAL and Server Actions with Zod validation, session validation, bounded reads, sanitized errors, immediate route revalidation, and no direct UI mutation of append-only tables.
+- [x] Implement the localized accessible review UI with only working controls: edit/cancel/save, entity add/remove/replace, concepts, occurrence/extracted dates, classifications, pending-question retention, record-only mode, history, comparison, undo, and reprocess.
+- [x] Add component/action tests and Playwright coverage for the complete desktop/mobile, `pt-BR`/English correction journey.
+- [x] Run focused tests, full Vitest, lint, TypeScript, production build, linked Playwright, migration synchronization, db lint, RLS/ownership/correction/undo/reprocessing remote smoke, full regression smoke, and disposable-data cleanup.
+- [x] Review every Phase 2B requirement and engineering standard, remove dead paths/false controls, update permanent documentation, commit thematically, and push all Phase 2B commits to the same branch without merging `main`.
 
 ### Phase 2B completion evidence
 
-Pending implementation and fresh verification. This section must contain exact migration/RPC names, deployed versions, commands, test counts, remote behaviors, limitations, risks, commit hashes, and push confirmation before the slice can be marked complete.
+Completed on 2026-07-17 on `codex/phase-2-intelligent-capture`.
+
+- Migrations `020` through `023` are applied and local/remote history is synchronized. `020` adds the lifecycle/revision/entity/reprocessing contract; `021` fixes timestamp name resolution; `022` fixes least-privilege alias trigger execution; `023` declares truthful `STABLE` volatility for the model-only fallback.
+- The deployed operation boundary includes `begin_entry_interpretation`, `fail_entry_interpretation`, `correct_entry_interpretation`, `begin_entry_reprocessing`, `persist_reprocessed_entry_interpretation`, `fail_entry_reprocessing`, and compensating `undo_operation` behavior.
+- The shared extraction pipeline records paid usage before domain persistence, bounds provider work to 120 seconds, ranks only owned candidates, persists missing semantic evidence as unavailable, and reuses the same strategy/prompt for capture and reprocessing.
+- Vitest passes 39 files/147 tests; ESLint, TypeScript, and the Next.js 16.2.10 production build pass.
+- Linked Playwright passes the complete intelligent-capture/revision regression separately on desktop (54.2 s) and Pixel 7 mobile (53.1 s), including `pt-BR`, English, correction, date editing, record-only, history, undo, task confirmation, and cleanup.
+- The focused remote interpretation smoke passes immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup. The complete remote Supabase smoke also passes auth, atomic settings, ownership, heartbeat, AI accounting, and the deployed file worker.
+- Linked database lint has no Phase 2B issue. Two pre-existing `run_user_heartbeat` text-to-time warnings remain outside this slice. Docker-backed pgTAP execution remains unavailable on this workstation; the 44-assertion structural contract is committed and equivalent high-risk behavior passed remotely.
+- Implementation commits: `c0f038c`, `981b39e`, `9a87c54`, `ae0be18`, `91c1722`, `8331e68`, `8fbd615`, `9e894de`, `00eabe5`, and `80bb233`. The final documentation/push commit follows this record.
+- Phase 2C should extend the existing task candidate contract into an editable desired-state editor and one transactional confirmation RPC; it should not create a second task workflow or weaken the revision/trust boundary completed here.

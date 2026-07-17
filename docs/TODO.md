@@ -1,7 +1,7 @@
 # Project Backlog
 
 Last updated: 2026-07-17  
-Active milestone: Phase 2B — interpretation revisions and trust foundation
+Active milestone: Phase 2C — editable candidate tasks
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
 
@@ -10,11 +10,20 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Adopt permanent engineering standards in `ENGINEERING_STANDARDS.md`.
 - [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
 - [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
-- [ ] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
+- [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
 - [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
 - [ ] Complete Phase 2F retroactive history, mobile/localization/accessibility finish, full gates, and closeout.
+
+### Phase 2B evidence
+
+- [x] Apply and synchronize append-only migrations `020` through `023` for lifecycle states, current-version ownership, immutable revisions, aliases, reprocessing leases, runtime fixes, and truthful volatility.
+- [x] Deploy correction, initial interpretation failure, leased reprocessing, idempotency, optimistic concurrency, audit, and compensating undo RPC contracts.
+- [x] Add deterministic trust scoring/policies and bounded owned entity ranking with exact/alias/history/context/temporal/margin evidence and explicit missing-signal handling.
+- [x] Add the typed review DAL, shared extraction pipeline, safe Server Actions, localized editor, per-element trust/evidence, current pointer, immutable history/comparison, undo, and recovery controls.
+- [x] Pass 39 Vitest files/147 tests, lint, typecheck, production build, linked desktop/mobile Playwright, migration synchronization, focused interpretation smoke, and complete remote Supabase smoke.
+- [x] Keep the 44-assertion pgTAP contract committed while Docker is unavailable; record the two pre-existing heartbeat lint warnings separately from a Phase 2B-clean database lint result.
 
 ### Phase 2A evidence
 
