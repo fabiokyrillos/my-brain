@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Phase 2X Slice 2X.8 separated review and technical-details projections
+
+### Added
+
+- `src/features/daily-cycle/review-projection.ts`: pure `toEntryReviewProjection` mapper producing the Slice 2X.1 `InterpretationReviewView` (understanding, human fields, attention items, actionable candidates, materialized tasks, available actions, original record, no scores/policies/evidence) plus the non-frozen editable/candidate data the still-unchanged `InterpretationRevisionEditor`/`TaskCandidateForm` components require; `productState`/`availableActions` are computed through the shared `resolveDailyCycleLifecycle` mapper (Slice 2X.1/2X.6), never a raw `entries.status` read. A thin `server-only` `loadEntryReviewProjection` wrapper reuses `loadInterpretationReview` plus an owner-scoped `interpret_entry` job lookup and `pending_questions` check (mirroring `inbox-projection.ts`'s Slice 2X.6 query shape) to feed the mapper.
+- `src/features/daily-cycle/technical-details-projection.ts`: pure `toEntryTechnicalDetailsView` mapper producing the complete Slice 2X.1 `InterpretationTechnicalDetailsView` (per-element scores/policies/signals/evidence/overrides, version-to-version field comparisons, per-task candidate provenance, model/source) plus a thin `loadEntryTechnicalDetailsProjection` wrapper performing its own independent `loadInterpretationReview` call — deliberately separate from the review loader so a technical-detail failure can never block or misreport the primary review.
+- `src/app/[locale]/app/inbox/[entryId]/page.architecture.test.ts` (new): forbids `database.types`, `Database["public"]`, `@/lib/supabase/server`, and raw `entry.status` reads in the page file, and asserts it only loads data through the two new daily-cycle projections.
+- 19 new Vitest cases across `review-projection.test.ts` (10), `technical-details-projection.test.ts` (7), and `page.architecture.test.ts` (2) covering: the human contract never containing a score/policy/evidence/signal key; lifecycle-driven `productState` instead of a raw internal status; record-only interpretations hiding candidates and the confirm action; unavailable-candidate-index exclusion; materialized tasks scoped to the current interpretation only; `retry_processing` gated strictly by `could_not_organize`; original content/`isRetroactive` preserved even with no interpretation yet; full `isDailyCycleSerializable` conformance of both DTOs; per-element score/policy/signal/evidence/override extraction; version-to-version comparisons; per-task provenance; loader-level null/ownership propagation; and the page's import boundary.
+
+### Changed
+
+- `src/features/interpretations/data.ts`: `loadInterpretationReview` is now internal infrastructure — its new exported `InterpretationReviewData` type documents that only the two daily-cycle projection modules above are its intended consumers, not page components.
+- `src/app/[locale]/app/inbox/[entryId]/page.tsx`: rewritten to load exclusively through `loadEntryReviewProjection`/`loadEntryTechnicalDetailsProjection`. No Supabase row or `Database` type is imported by the page. The status badge, the error/organizing notice cards, and the retry button's visibility are now driven by `productState`/`availableActions` instead of `entries.status`/`entry.processing_error`. Two small, deliberate consequences of centralizing lifecycle through the shared mapper: `recoverable_error` and `terminal_error` (previously only the former offered a retry button) both now map to `could_not_organize`/`retry_processing` and both offer retry; and the old `reprocessing`-only "reinterpretation in progress" banner is now the same shared `organizing` banner already used by Caixa/Início since Slice 2X.6, also shown for a first-ever interpretation still in flight (previously silent). All existing Playwright-load-bearing text and selectors (`.entry-heading h1`, the exact "Confiança por elemento"/"Trust by element" and "Immutable history" headings, `.revision-timeline` version/origin text, the original-record `<details>`, correction/reprocess/undo/confirm button labels) are unchanged.
+- `src/app/operations.css`: `.entry-status-*` modifier classes now key off the five `ProductState` values (`saved`, `organizing`, `needs_attention`, `could_not_organize`, `ready`) instead of the eight internal `entries.status` values, reusing the same colors already established for `.status-badge.*` (Slice 2X.6).
+
+### Verification
+
+- `npm test`: 57 files / 286 tests passing (19 new). `npm run lint` and `npx tsc --noEmit`: clean. `npm run build`: production build passing.
+- Offline Playwright (`desktop`+`mobile`, public foundation only): 4/4 passing, 10 expected online skips — this workstation has no `ONLINE_SUPABASE_*` credentials, so `intelligent-capture.spec.ts` (the load-bearing regression for this page, including the trust-panel heading, revision-timeline text, and record-only/undo journey) could not be re-run live here; the rewrite was designed against its exact assertions (selectors and copy) rather than left unverified.
+- No migration in this slice (`Nenhuma exclusiva` per the implementation plan); local/remote migrations remain synchronized through `029` from the prior hotfix, unaffected by this change.
+- `git diff --check`: clean (only pre-existing LF/CRLF advisories, no whitespace errors); `git status` shows only the files listed above.
+
+### Known limitation
+
+- `src/features/daily-cycle/review-projection.ts` and `technical-details-projection.ts` each independently call `loadInterpretationReview`, so the entry-detail page now issues two parallel sets of Supabase reads instead of one. This keeps the two projections genuinely independent (a technical-detail failure literally cannot affect the review query), matching the slice's fail-closed requirement, at the cost of roughly doubling read volume for this page. Not a regression target of this slice; a future slice could share one load between both projections if this becomes measurably significant.
+
 ## 2026-07-18 — Hotfix: correction conflict no longer hangs until gateway timeout
 
 ### Fixed

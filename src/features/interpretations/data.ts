@@ -213,3 +213,12 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     unavailableCandidateIndexes: computeUnavailableCandidateIndexes(current?.id ?? null, tasks),
   };
 }
+
+/**
+ * Internal infrastructure (Slice 2X.8): this loader is no longer imported
+ * directly by page components. `daily-cycle/review-projection.ts` and
+ * `daily-cycle/technical-details-projection.ts` are the only intended
+ * consumers, each projecting a narrower, page-appropriate DTO from this
+ * shared result.
+ */
+export type InterpretationReviewData = NonNullable<Awaited<ReturnType<typeof loadInterpretationReview>>>;

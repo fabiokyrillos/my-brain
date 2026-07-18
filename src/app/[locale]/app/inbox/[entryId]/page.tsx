@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Brain, CheckCircle2, Clock3, History, Quote, ShieldCheck, Sparkles } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
+import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
+import type { InterpretationTechnicalDetailsView } from "@/features/daily-cycle/contracts";
+import { loadEntryReviewProjection } from "@/features/daily-cycle/review-projection";
+import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
-import { conceptLabels, getInterpretationCopy, lifecycleLabels } from "@/features/interpretations/copy";
-import { loadInterpretationReview, type InterpretationRevision } from "@/features/interpretations/data";
+import { conceptLabels, getInterpretationCopy } from "@/features/interpretations/copy";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
-import { compareInterpretationVersions, type InterpretationChange } from "@/features/interpretations/version-comparison";
 import { confirmEntryTasks, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 
@@ -48,7 +50,7 @@ const overrideLabels: Record<string, { "pt-BR": string; en: string }> = {
   cross_user_entity: { "pt-BR": "Vínculo pertence a outro usuário", en: "Link belongs to another user" },
 };
 
-const fieldLabels: Record<InterpretationChange["field"], { "pt-BR": string; en: string }> = {
+const fieldLabels: Record<string, { "pt-BR": string; en: string }> = {
   summary: { "pt-BR": "Resumo", en: "Summary" },
   concepts: { "pt-BR": "Conceitos", en: "Concepts" },
   occurredAt: { "pt-BR": "Data do acontecimento", en: "Event date" },
@@ -61,7 +63,7 @@ function humanEvidence(value: string, locale: "pt-BR" | "en") {
   return evidenceLabels[value]?.[locale] ?? value.replaceAll("_", " ");
 }
 
-function changeValue(field: InterpretationChange["field"], value: unknown, locale: "pt-BR" | "en") {
+function changeValue(field: string, value: unknown, locale: "pt-BR" | "en") {
   if (field === "concepts" && Array.isArray(value)) {
     return value.map((concept) => typeof concept === "string" ? conceptLabels[concept as keyof typeof conceptLabels]?.[locale] ?? concept : "").filter(Boolean).join(", ");
   }
@@ -78,18 +80,6 @@ function changeValue(field: InterpretationChange["field"], value: unknown, local
   return String(value ?? "—");
 }
 
-function revisionSnapshot(revision: InterpretationRevision) {
-  return {
-    version: revision.version,
-    summary: revision.summary,
-    concepts: revision.concepts,
-    occurredAt: revision.occurredAt,
-    extractedDates: revision.extractedDates,
-    entityLinks: revision.entityLinks.map((link) => ({ entityType: link.entityType, entityId: link.entityId, name: link.name })),
-    classifications: revision.classifications,
-  };
-}
-
 export default async function EntryDetailPage({
   params,
 }: {
@@ -100,32 +90,32 @@ export default async function EntryDetailPage({
   const locale = rawLocale;
   const pt = locale === "pt-BR";
   const { supabase } = await requireUser(locale);
-  const review = await loadInterpretationReview(supabase, entryId);
+
+  const review = await loadEntryReviewProjection(supabase, { entryId, locale });
   if (!review) notFound();
 
-  const { entry, current, revisions, extraction } = review;
-  // Scoped to the current interpretation's own confirmed tasks: a task
-  // confirmed under an older version must not be shown as if it answered
-  // for candidates the current version is now offering (COH-005/COH-006).
-  const createdCount = current ? review.tasks.filter((task) => task.source_interpretation_id === current.id).length : 0;
-  const taskInitialState = createdCount > 0 ? {
+  let technical: InterpretationTechnicalDetailsView | null = null;
+  try {
+    technical = await loadEntryTechnicalDetailsProjection(supabase, entryId);
+  } catch {
+    // Technical detail is a secondary, best-effort concern (Slice 2X.8): a
+    // failure here must never block the primary review flow or misreport
+    // the entry as ready. Rendering continues without the trust panel.
+    technical = null;
+  }
+
+  const { view, editableCurrent, entityOptions, taskCandidates, extractedMentions, history, taskUndoId, correctionUndoId, unavailableCandidateIndexes } = review;
+  const statusCopy = getDailyCycleCopy(locale).productStates[view.productState];
+  const canRetry = view.availableActions.some((action) => action.id === "retry_processing");
+  const materializedCount = view.materializedTasks.length;
+  const taskInitialState = materializedCount > 0 ? {
     status: "success" as const,
-    message: pt ? `${createdCount} ${createdCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${createdCount} ${createdCount === 1 ? "task created" : "tasks created"}.`,
-    undoId: review.taskUndoId,
+    message: pt ? `${materializedCount} ${materializedCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${materializedCount} ${materializedCount === 1 ? "task created" : "tasks created"}.`,
+    undoId: taskUndoId,
   } : undefined;
-  const lifecycle = entry.status in lifecycleLabels
-    ? lifecycleLabels[entry.status as keyof typeof lifecycleLabels][locale]
-    : entry.status;
-  const occurredAt = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at));
-  const historyAscending = [...revisions].sort((left, right) => left.version - right.version);
-  const comparisons = historyAscending.slice(1).map((revision, index) => ({
-    from: historyAscending[index],
-    to: revision,
-    changes: compareInterpretationVersions(revisionSnapshot(historyAscending[index]), revisionSnapshot(revision)),
-  }));
-  const extractedMentions = extraction
-    ? [...extraction.contexts, ...extraction.organizations, ...extraction.projects, ...extraction.people]
-    : [];
+  const occurredAt = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(view.original.occurredAt));
+  const comparisons = technical ? Object.entries(technical.comparisons) : [];
+  const currentOrigin = history.find((revision) => revision.isCurrent)?.origin ?? "";
 
   return (
     <div className="content-page entry-detail-page">
@@ -134,71 +124,71 @@ export default async function EntryDetailPage({
       <header className="entry-heading">
         <div>
           <p className="eyebrow">{pt ? "INTERPRETAÇÃO DO BRAIN" : "BRAIN INTERPRETATION"}</p>
-          <h1>{current?.summary ?? (pt ? "Entrada preservada" : "Entry preserved")}</h1>
+          <h1>{view.understanding}</h1>
           <p>{occurredAt}</p>
         </div>
-        <span className={`entry-status entry-status-${entry.status}`}><Clock3 size={16} />{lifecycle}</span>
+        <span className={`entry-status entry-status-${view.productState}`}><Clock3 size={16} />{statusCopy.label}</span>
       </header>
 
-      {(entry.status === "recoverable_error" || entry.status === "terminal_error") && (
+      {view.productState === "could_not_organize" && (
         <section className="notice-card error-notice">
           <AlertTriangle size={20} />
           <div>
             <strong>{pt ? "O original está seguro" : "The original is safe"}</strong>
-            <p>{entry.processing_error ?? (pt ? "A interpretação não foi concluída." : "Interpretation did not complete.")}</p>
-            {entry.status === "recoverable_error" && (
+            <p>{review.errorMessage ?? (pt ? "A interpretação não foi concluída." : "Interpretation did not complete.")}</p>
+            {canRetry && (
               <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />
             )}
           </div>
         </section>
       )}
 
-      {entry.status === "reprocessing" && (
-        <section className="notice-card"><Sparkles size={20} /><div><strong>{pt ? "Reinterpretação em andamento" : "Reinterpretation in progress"}</strong><p>{pt ? "Esta operação tem tempo limitado e preserva a versão atual até terminar." : "This bounded operation keeps the current version until it finishes."}</p></div></section>
+      {view.productState === "organizing" && (
+        <section className="notice-card"><Sparkles size={20} /><div><strong>{statusCopy.label}</strong><p>{statusCopy.description}</p></div></section>
       )}
 
-      <details className="original-entry" open={!current}>
+      <details className="original-entry" open={!editableCurrent}>
         <summary><Quote size={17} />{pt ? "Ver registro original" : "View original entry"}</summary>
-        <p>{entry.original_content}</p>
+        <p>{view.original.content}</p>
       </details>
 
-      {current ? (
+      {editableCurrent ? (
         <>
           <InterpretationRevisionEditor
-            canUndo={Boolean(review.correctionUndoId)}
+            canUndo={Boolean(correctionUndoId)}
             correctionAction={correctInterpretation}
             current={{
-              version: current.version,
-              summary: current.summary,
-              concepts: current.concepts,
-              occurredAt: current.occurredAt,
-              extractedDates: current.extractedDates,
-              entityLinks: current.entityLinks.map(({ entityType, entityId, mention, confidence }) => ({ entityType, entityId, mention, confidence })),
-              classifications: current.classifications,
-              pendingQuestions: current.pendingQuestions,
+              version: editableCurrent.version,
+              summary: editableCurrent.summary,
+              concepts: editableCurrent.concepts,
+              occurredAt: editableCurrent.occurredAt,
+              extractedDates: editableCurrent.extractedDates,
+              entityLinks: editableCurrent.entityLinks.map(({ entityType, entityId, mention, confidence }) => ({ entityType, entityId, mention, confidence })),
+              classifications: editableCurrent.classifications,
+              pendingQuestions: editableCurrent.pendingQuestions,
             }}
-            entityOptions={review.entityOptions}
+            entityOptions={entityOptions}
             entryId={entryId}
             locale={locale}
             operationKey={randomUUID()}
             reprocessAction={reprocessEntry}
             reprocessOperationKey={randomUUID()}
             undoAction={undoInterpretationCorrection}
-            undoId={review.correctionUndoId ?? undefined}
+            undoId={correctionUndoId ?? undefined}
           />
 
           <div className="interpretation-grid phase-2b-review-grid">
             <section className="interpretation-main">
               <div className="section-heading"><span>01</span><div><h2>{pt ? "Versão atual" : "Current version"}</h2><p>{pt ? "Dados estruturados sem alterar o registro original." : "Structured data without changing the original record."}</p></div></div>
               <div className="tag-cloud">
-                {current.concepts.map((concept) => <span key={concept}>{conceptLabels[concept][locale]}</span>)}
+                {editableCurrent.concepts.map((concept) => <span key={concept}>{conceptLabels[concept]?.[locale] ?? concept}</span>)}
               </div>
-              {current.extractedDates.length > 0 && (
-                <div className="identified-dates"><h3>{pt ? "Datas identificadas" : "Identified dates"}</h3>{current.extractedDates.map((date, index) => <p key={`${date.value}-${index}`}><time>{date.value}</time>{date.label ? ` · ${date.label}` : ""}</p>)}</div>
+              {editableCurrent.extractedDates.length > 0 && (
+                <div className="identified-dates"><h3>{pt ? "Datas identificadas" : "Identified dates"}</h3>{editableCurrent.extractedDates.map((date, index) => <p key={`${date.value}-${index}`}><time>{date.value}</time>{date.label ? ` · ${date.label}` : ""}</p>)}</div>
               )}
-              {current.entityLinks.length > 0 && (
+              {editableCurrent.entityLinks.length > 0 && (
                 <div className="entity-list">
-                  {current.entityLinks.map((entity) => <article key={`${entity.entityType}:${entity.entityId}`}><strong>{entity.name}</strong><span>{entity.mention}</span><small>{Math.round(entity.confidence * 100)}%</small></article>)}
+                  {editableCurrent.entityLinks.map((entity) => <article key={`${entity.entityType}:${entity.entityId}`}><strong>{entity.name}</strong><span>{entity.mention}</span><small>{Math.round(entity.confidence * 100)}%</small></article>)}
                 </div>
               )}
               {extractedMentions.length > 0 && (
@@ -210,56 +200,65 @@ export default async function EntryDetailPage({
                 </div>
               )}
               <div className="classification-grid">
-                {Object.entries(current.classifications).map(([field, classification]) => <p key={field}><span>{field}</span><strong>{classification}</strong></p>)}
+                {Object.entries(editableCurrent.classifications).map(([field, classification]) => <p key={field}><span>{field}</span><strong>{classification}</strong></p>)}
               </div>
-              {current.pendingQuestions.length > 0 && (
-                <div className="question-block"><h3>{pt ? "Perguntas pendentes" : "Pending questions"}</h3>{current.pendingQuestions.map((question) => <p key={question.question}>{question.question}<small>{question.reason}</small></p>)}</div>
+              {editableCurrent.pendingQuestions.length > 0 && (
+                <div className="question-block"><h3>{pt ? "Perguntas pendentes" : "Pending questions"}</h3>{editableCurrent.pendingQuestions.map((question) => <p key={question.question}>{question.question}<small>{question.reason}</small></p>)}</div>
               )}
             </section>
 
-            <section className="interpretation-trust-panel">
-              <div className="section-heading"><span>02</span><div><h2>{pt ? "Confiança por elemento" : "Trust by element"}</h2><p>{pt ? "Sinais, política e evidências persistidos nesta versão." : "Signals, policy, and evidence persisted for this version."}</p></div></div>
-              <div className="trust-list">
-                {Object.entries(current.trust).map(([element, trust]) => (
-                  <details key={element} className={`trust-card trust-policy-${trust.policy}`}>
-                    <summary><span><ShieldCheck size={17} />{element}</span><strong>{Math.round(trust.score * 100)}%</strong><small>{policyLabels[trust.policy][locale]}</small></summary>
-                    {trust.evidence.length > 0 && <ul>{trust.evidence.map((evidence) => <li key={evidence}>{humanEvidence(evidence, locale)}</li>)}</ul>}
-                    {trust.overrides.length > 0 && <div className="trust-overrides"><strong>{pt ? "Bloqueios" : "Overrides"}</strong>{trust.overrides.map((override) => <p key={override}>{overrideLabels[override]?.[locale] ?? override.replaceAll("_", " ")}</p>)}</div>}
-                    <div className="trust-signals">{Object.entries(trust.signals).map(([signal, value]) => <span key={signal}>{signal.replaceAll(/([A-Z])/g, " $1")}: {Math.round(value * 100)}%</span>)}</div>
-                  </details>
-                ))}
-              </div>
-            </section>
+            {technical && (
+              <section className="interpretation-trust-panel">
+                <div className="section-heading"><span>02</span><div><h2>{pt ? "Confiança por elemento" : "Trust by element"}</h2><p>{pt ? "Sinais, política e evidências persistidos nesta versão." : "Signals, policy, and evidence persisted for this version."}</p></div></div>
+                <div className="trust-list">
+                  {Object.keys(technical.scores).map((element) => {
+                    const policy = technical.policies[element] as keyof typeof policyLabels;
+                    const evidenceList = Array.isArray(technical.evidence[element]) ? technical.evidence[element] as string[] : [];
+                    const overrideList = Array.isArray(technical.overrides[element]) ? technical.overrides[element] as string[] : [];
+                    const signalRecord = technical.signals[element];
+                    const signalEntries = signalRecord && typeof signalRecord === "object" && !Array.isArray(signalRecord)
+                      ? Object.entries(signalRecord as Record<string, number>)
+                      : [];
+                    return (
+                      <details key={element} className={`trust-card trust-policy-${policy}`}>
+                        <summary><span><ShieldCheck size={17} />{element}</span><strong>{Math.round(Number(technical.scores[element]) * 100)}%</strong><small>{policyLabels[policy]?.[locale] ?? policy}</small></summary>
+                        {evidenceList.length > 0 && <ul>{evidenceList.map((evidence) => <li key={evidence}>{humanEvidence(evidence, locale)}</li>)}</ul>}
+                        {overrideList.length > 0 && <div className="trust-overrides"><strong>{pt ? "Bloqueios" : "Overrides"}</strong>{overrideList.map((override) => <p key={override}>{overrideLabels[override]?.[locale] ?? override.replaceAll("_", " ")}</p>)}</div>}
+                        <div className="trust-signals">{signalEntries.map(([signal, value]) => <span key={signal}>{signal.replaceAll(/([A-Z])/g, " $1")}: {Math.round(Number(value) * 100)}%</span>)}</div>
+                      </details>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </div>
 
-          {extraction && (
-            <section className="interpretation-actions phase-2b-task-actions">
-              <div className="section-heading"><span>03</span><div><h2>{pt ? "Próximas ações" : "Next actions"}</h2><p>{pt ? "Nada vira tarefa sem sua confirmação." : "Nothing becomes a task without your confirmation."}</p></div></div>
-              {current.isRecordOnly ? (
-                <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
-              ) : extraction.taskCandidates.length > 0 ? (
-                <TaskCandidateForm
-                  action={confirmEntryTasks}
-                  candidates={extraction.taskCandidates}
-                  entryId={entryId}
-                  initialState={taskInitialState}
-                  interpretationId={current.id}
-                  locale={locale}
-                  operationKey={randomUUID()}
-                  undoAction={undoAgentAction}
-                  unavailableIndexes={review.unavailableCandidateIndexes}
-                />
-              ) : (
-                <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
-              )}
-            </section>
-          )}
+          <section className="interpretation-actions phase-2b-task-actions">
+            <div className="section-heading"><span>03</span><div><h2>{pt ? "Próximas ações" : "Next actions"}</h2><p>{pt ? "Nada vira tarefa sem sua confirmação." : "Nothing becomes a task without your confirmation."}</p></div></div>
+            {editableCurrent.isRecordOnly ? (
+              <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
+            ) : taskCandidates.length > 0 ? (
+              <TaskCandidateForm
+                action={confirmEntryTasks}
+                candidates={taskCandidates}
+                entryId={entryId}
+                initialState={taskInitialState}
+                interpretationId={editableCurrent.interpretationId}
+                locale={locale}
+                operationKey={randomUUID()}
+                undoAction={undoAgentAction}
+                unavailableIndexes={unavailableCandidateIndexes}
+              />
+            ) : (
+              <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
+            )}
+          </section>
 
           <section className="interpretation-history">
             <div className="section-heading"><span>04</span><div><h2>{pt ? "Histórico imutável" : "Immutable history"}</h2><p>{pt ? "Cada correção, undo e reinterpretação acrescenta uma versão." : "Every correction, undo, and reinterpretation appends a version."}</p></div></div>
             <ol className="revision-timeline">
-              {revisions.map((revision) => (
-                <li key={revision.id} className={revision.id === current.id ? "revision-current" : undefined}>
+              {history.map((revision) => (
+                <li key={revision.interpretationId} className={revision.isCurrent ? "revision-current" : undefined}>
                   <History size={17} />
                   <div><strong>v{revision.version} · {originLabels[revision.origin]?.[locale] ?? revision.origin}</strong><p>{revision.summary}</p>{revision.correctionReason && <small>{revision.correctionReason}</small>}</div>
                   <time>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(revision.createdAt))}</time>
@@ -269,19 +268,23 @@ export default async function EntryDetailPage({
             {comparisons.length > 0 && (
               <div className="revision-comparisons">
                 <h3>{pt ? "O que mudou" : "What changed"}</h3>
-                {comparisons.map((comparison) => (
-                  <details key={`${comparison.from.id}:${comparison.to.id}`}>
-                    <summary>v{comparison.from.version} → v{comparison.to.version} · {comparison.changes.length} {pt ? "alterações" : "changes"}</summary>
-                    {comparison.changes.length === 0 ? <p>{pt ? "Sem mudança de conteúdo." : "No content change."}</p> : comparison.changes.map((change) => (
-                      <article key={change.field}><strong>{fieldLabels[change.field][locale]}</strong><p><del>{changeValue(change.field, change.before, locale)}</del></p><p><ins>{changeValue(change.field, change.after, locale)}</ins></p></article>
-                    ))}
-                  </details>
-                ))}
+                {comparisons.map(([key, changes]) => {
+                  const [from, to] = key.split("-");
+                  const changeList = Array.isArray(changes) ? changes as Array<{ field: string; before: unknown; after: unknown }> : [];
+                  return (
+                    <details key={key}>
+                      <summary>v{from} → v{to} · {changeList.length} {pt ? "alterações" : "changes"}</summary>
+                      {changeList.length === 0 ? <p>{pt ? "Sem mudança de conteúdo." : "No content change."}</p> : changeList.map((change) => (
+                        <article key={change.field}><strong>{fieldLabels[change.field]?.[locale] ?? change.field}</strong><p><del>{changeValue(change.field, change.before, locale)}</del></p><p><ins>{changeValue(change.field, change.after, locale)}</ins></p></article>
+                      ))}
+                    </details>
+                  );
+                })}
               </div>
             )}
           </section>
 
-          <footer className="model-note"><Brain size={14} />v{current.version} · {originLabels[current.origin]?.[locale] ?? current.origin} · {current.model}</footer>
+          <footer className="model-note"><Brain size={14} />v{editableCurrent.version} · {originLabels[currentOrigin]?.[locale] ?? currentOrigin}{technical?.model ? ` · ${technical.model}` : ""}</footer>
         </>
       ) : (
         <section className="empty-interpretation-state">
