@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Slice 2X.9: decision-first progressive-disclosure entry review
+
+### Added
+
+- `src/features/daily-cycle/entry-review.tsx`: `EntryReview` composes four always-visible blocks in order — `ReviewUnderstanding` (the interpretation's `understanding` text, status badge, and the DTO's `humanFields`, rendered for the first time), `ReviewAttention` (`view.attentionItems`, with the retry button and a specific error/pending-question detail injected by the page as slot content — the component itself never branches on internal state or reads Supabase), `ReviewNextActions` (a labeled wrapper around whatever action content the page supplies), and `OriginalRecord` (the existing collapsed-by-default original-entry disclosure). 13 new tests (`entry-review.test.tsx`).
+- `src/features/daily-cycle/technical-details.tsx`: `TechnicalDetails` consolidates the former two-column grid — per-element trust/scores/policy/evidence/overrides, the immutable version history with field-by-field comparisons, and the structured extraction (concepts, dates, entity links, mentions, none of which are part of a public DTO but all of which continue to come from the review projection's `editableCurrent`) — behind a single native `<details>`, collapsed by default. When `hasTechnicalDetails` is `false` it renders nothing; when the technical-details load failed but a current interpretation exists, it renders a fallback message instead of blocking or hiding the main review (matching the Slice 2X.8 independent-failure guarantee). 7 new tests (`technical-details.test.tsx`).
+
+### Changed
+
+- `src/app/[locale]/app/inbox/[entryId]/page.tsx`: rewritten to compose `EntryReview`/`TechnicalDetails` instead of rendering the interpretation grid, trust panel, and revision history inline. Visibility of the correction editor, its undo button, and the candidate-confirmation form is now derived exclusively from `view.availableActions` (`correct_interpretation`, `undo_correction`, `confirm_existing_candidates`) instead of ad hoc truthiness checks on raw arrays — `confirm_existing_candidates` in particular now gates on the interpretation-scoped `actionableCandidates` count rather than the unfiltered `taskCandidates.length`, so a fully-covered candidate set never renders a form only to have it immediately report "nothing pending." The page still loads exclusively through the two Slice 2X.8 projections; `page.architecture.test.ts` continues to pass unchanged.
+- `src/features/interpretations/revision-editor.tsx`: `InterpretationRevisionEditor` gained an optional `showSummary` prop (default `true`). The entry-detail page now passes `showSummary={false}` because the same summary text is already the page's primary heading (`ReviewUnderstanding`'s `view.understanding`); no other prop or behavior changed. 1 new test.
+- `src/app/operations.css`: added styles for `.entry-review`, `.review-facts`, `.review-organizing-note`, `.attention-notice`/`.attention-safety-note`/`.attention-detail`, and `.technical-details`/`.technical-details-body`, including a `max-width:600px` adjustment and a `:focus-visible` outline on the technical-details `<summary>`; no existing selector was renamed or removed.
+- `e2e/intelligent-capture.spec.ts`: `waitForOrganized` now polls for the "Ver detalhes técnicos" disclosure summary instead of the (now-collapsed) "Confiança por elemento" heading; the pt-BR and en assertions against the trust panel and immutable-history heading now click that disclosure open first. No other journey step, selector, or assertion changed.
+
+### Known limitation
+
+- The online authenticated Playwright journey (`e2e/intelligent-capture.spec.ts`) was updated to match the new markup but could not be re-executed in this environment — no `ONLINE_SUPABASE_*` credentials are configured. Offline Playwright (desktop+mobile, 4 passed / 10 skipped, unchanged from the pre-slice baseline), the full unit suite (323 tests, 21 new), lint, typecheck, and the production build all passed.
+
 ## 2026-07-18 — Hotfix: candidate lifecycle scoped to the current interpretation (F1)
 
 ### Fixed

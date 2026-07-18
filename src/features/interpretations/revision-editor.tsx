@@ -128,6 +128,7 @@ export function InterpretationRevisionEditor({
   operationKey: suppliedOperationKey,
   reprocessAction,
   reprocessOperationKey: suppliedReprocessOperationKey,
+  showSummary = true,
   undoId,
   undoAction,
 }: {
@@ -140,6 +141,7 @@ export function InterpretationRevisionEditor({
   operationKey?: string;
   reprocessAction: ReprocessAction;
   reprocessOperationKey?: string;
+  showSummary?: boolean;
   undoId?: string;
   undoAction: UndoCorrectionAction;
 }) {
@@ -158,7 +160,7 @@ export function InterpretationRevisionEditor({
   if (!editing) {
     return (
       <section className="interpretation-editor" aria-label={locale === "pt-BR" ? "Revisão da interpretação" : "Interpretation review"}>
-        <p className="interpretation-current-summary">{current.summary}</p>
+        {showSummary && <p className="interpretation-current-summary">{current.summary}</p>}
         <div className="interpretation-editor-actions">
           <button type="button" className="button-primary" onClick={startCorrection}>{labels.correct}</button>
           <SecondaryActions

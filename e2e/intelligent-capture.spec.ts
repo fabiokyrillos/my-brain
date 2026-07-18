@@ -4,7 +4,7 @@ async function waitForOrganized(page: Page, href: string, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     await page.goto(href);
-    const ready = await page.getByRole("heading", { name: "Confiança por elemento" }).isVisible().catch(() => false);
+    const ready = await page.getByText("Ver detalhes técnicos").isVisible().catch(() => false);
     if (ready) return;
     if (Date.now() > deadline) throw new Error("Entry did not finish organizing before the timeout.");
     await page.waitForTimeout(2_000);
@@ -95,6 +95,7 @@ test.describe("intelligent capture", () => {
 
     await waitForOrganized(page, recordHref!);
     await expect(page.locator(".entry-heading h1")).toBeVisible();
+    await page.getByText("Ver detalhes técnicos").click();
     await expect(page.getByRole("heading", { name: "Confiança por elemento" })).toBeVisible();
     await page.getByText("Ver registro original").click();
     await expect(page.getByText(original)).toBeVisible();
@@ -116,6 +117,7 @@ test.describe("intelligent capture", () => {
 
     await page.goto(page.url().replace("/pt-BR/", "/en/"));
     await expect(page.getByRole("button", { name: "Correct interpretation" })).toBeVisible();
+    await page.getByText("View technical details").click();
     await expect(page.getByRole("heading", { name: "Immutable history" })).toBeVisible();
     await page.goto(page.url().replace("/en/", "/pt-BR/"));
 

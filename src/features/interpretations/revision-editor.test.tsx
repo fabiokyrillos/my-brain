@@ -69,4 +69,11 @@ describe("InterpretationRevisionEditor", () => {
     expect(screen.getByRole("button", { name: "Desfazer última correção" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Reinterpretar entrada" })).toHaveAttribute("type", "submit");
   });
+
+  it("omits the redundant current-summary paragraph when the caller already displays it elsewhere", () => {
+    render(<InterpretationRevisionEditor {...props} showSummary={false} />);
+
+    expect(screen.queryByText("Resumo original")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Corrigir interpretação" })).toBeVisible();
+  });
 });
