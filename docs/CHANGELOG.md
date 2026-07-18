@@ -2,6 +2,25 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-17 — Phase 2X Slice 2X.6 human processing states in Inbox and Home
+
+### Added
+
+- `src/features/daily-cycle/inbox-projection.ts` (`loadInboxProjection`): owner-scoped, paginated query that reads a page of `entries`, each entry's latest `interpret_entry` job (matched by `payload->>entry_id`), its current interpretation's `task_candidates`, open `pending_questions`, and non-cancelled materialized `tasks`, then feeds `resolveDailyCycleLifecycle` (Slice 2X.1) per entry to produce `InboxItemView[]`. When the mapper returns `null` for an unrecognized internal combination, the loader builds an explicit `could_not_organize`/`resolve_consistency` item instead of dropping the entry — the original is always preserved, so it is always shown.
+- `src/features/daily-cycle/inbox-item.tsx` (`InboxItemRow`): presentational component that renders an `InboxItemView` — title, original preview, localized product-state badge, and attention-reason hint — through `getDailyCycleCopy`. Receives only the DTO, never a Supabase row or an internal lifecycle string.
+- Tests: `inbox-projection.test.ts` (12 cases covering every product-state/attention-reason combination reachable from real query data, the fail-closed fallback, pagination, and the locale-scoped safe href), `inbox-item.test.tsx` (4 cases), `home-dashboard.test.tsx` (4 cases — first test coverage for this component).
+
+### Changed
+
+- `src/app/[locale]/app/inbox/page.tsx`: now calls `loadInboxProjection` and renders `InboxItemRow` instead of reading `entries.status` directly through `lifecycleLabels`; pagination is driven by the projection's own `hasNext`.
+- `src/features/shell/home-dashboard.tsx`: adds a fifth "05 / RECENTE" panel that calls the same `loadInboxProjection` and renders the same `InboxItemRow`, so Home and Inbox are guaranteed to agree on an entry's state. Wires up the previously-unused `home.recent` copy key.
+- `src/app/operations.css`: `.status-badge` modifiers for the Caixa list changed from the eight internal `entries.status` values (`awaiting_review`, `partially_processed`, `recoverable_error`, `terminal_error`, `interpreting`, `reprocessing`, ...) to the five product states (`saved`, `organizing`, `needs_attention`, `ready`, `could_not_organize`). The entry-detail page's separate `.entry-status-*` rules (Slice 2X.8/2X.9 scope) are untouched.
+- `docs/ARCHITECTURE.md`: documents the daily-cycle vertical slice and the Slice 2X.6 projection wiring, including the known limitation that `recordOnly`/`hasConsistencyIssue` are conservatively `false` until Slice 2X.7's `is_record_only` column exists.
+
+### Known limitation
+
+- A candidate corrected as record-only still has its original `task_candidates` JSON on the interpretation row (the correction RPC does not clear it), and there is no persisted `is_record_only` column yet. Until Slice 2X.7 lands, such an entry is shown as `needs_attention`/`confirm_existing_candidates` rather than `ready`. This is a known, documented gap, not a regression — `2X.6`'s own dependency list is `2X.1` and `2X.5` only.
+
 ## 2026-07-17 — Phase 2X Slice 2X.5 asynchronous capture cutover
 
 ### Added
