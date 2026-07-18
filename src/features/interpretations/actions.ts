@@ -61,7 +61,7 @@ export async function correctInterpretation(
     p_reason: correctionReason,
   });
   if (error) {
-    const conflict = error.code === "40001" || /version|concurrent/i.test(error.message ?? "");
+    const conflict = error.code === "55P03" || /version|concurrent/i.test(error.message ?? "");
     return {
       status: "error",
       message: conflict

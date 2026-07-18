@@ -160,6 +160,11 @@ try {
   assert(repeated.interpretation_id === corrected.interpretation_id && repeated.idempotent === true, "Repeated correction was not idempotent");
 
   const beforeConcurrent = corrected.version;
+  const interpretationCountBeforeConcurrent = countOrThrow(
+    await first.from("entry_interpretations").select("id", { count: "exact", head: true }).eq("entry_id", entry.id),
+    "count revisions before version-conflict race",
+  );
+  const concurrentStartedAt = Date.now();
   const concurrent = await Promise.all([
     first.rpc("correct_entry_interpretation", {
       p_entry_id: entry.id,
@@ -176,12 +181,41 @@ try {
       p_reason: "Concorrência B",
     }),
   ]);
+  const concurrentElapsedMs = Date.now() - concurrentStartedAt;
   assert(concurrent.filter((result) => !result.error).length === 1, "Concurrent corrections did not allow exactly one winner");
-  assert(concurrent.filter((result) => result.error).length === 1, "Concurrent correction loser did not receive a conflict");
+  const conflictResults = concurrent.filter((result) => result.error);
+  assert(conflictResults.length === 1, "Concurrent correction loser did not receive a conflict");
+  // Hotfix (202607180029): SQLSTATE 40001 was independently confirmed to
+  // hang every request on the linked project until gateway timeout instead
+  // of returning. This is the real authenticated-user proof that the
+  // version-conflict path now returns promptly instead of hanging: the
+  // bounded elapsed-time assertion is the actual regression check, not the
+  // error-code assertion alone.
+  assert(
+    concurrentElapsedMs < 15_000,
+    `Version-conflict correction did not return promptly (${concurrentElapsedMs}ms) — possible regression to the gateway-hanging SQLSTATE 40001`,
+  );
+  assert(
+    conflictResults[0].error.code === "55P03",
+    `Version conflict used an unexpected SQLSTATE (${conflictResults[0].error.code}); expected the replacement 55P03`,
+  );
+  console.log(`Version-conflict correction returned in ${concurrentElapsedMs}ms with SQLSTATE ${conflictResults[0].error.code}.`);
 
   const currentAfterConcurrent = dataOrThrow(
     await first.from("entry_interpretations").select("version").eq("entry_id", entry.id).order("version", { ascending: false }).limit(1).single(),
     "read current version after concurrency",
+  );
+  const interpretationCountAfterConcurrent = countOrThrow(
+    await first.from("entry_interpretations").select("id", { count: "exact", head: true }).eq("entry_id", entry.id),
+    "count revisions after version-conflict race",
+  );
+  assert(
+    interpretationCountAfterConcurrent === interpretationCountBeforeConcurrent + 1,
+    "The rejected concurrent correction left a partial interpretation row instead of writing nothing",
+  );
+  assert(
+    currentAfterConcurrent.version === beforeConcurrent + 1,
+    "The current interpretation pointer was overwritten by the losing (stale) concurrent correction",
   );
   const rollbackCountBefore = countOrThrow(
     await first.from("entry_interpretations").select("id", { count: "exact", head: true }).eq("entry_id", entry.id),
@@ -294,7 +328,7 @@ try {
   assert(actionTypes.includes("entry_interpretation_correction_undone"), "Undo audit is missing");
   assert(actionTypes.includes("entry_reprocessed"), "Reprocessing audit is missing");
 
-  console.log("Remote interpretation revision smoke passed: immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup.");
+  console.log("Remote interpretation revision smoke passed: immutability, append-only correction, idempotency, concurrency (bounded-time 55P03 conflict, no gateway hang), ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup.");
 } finally {
   for (const userId of createdUsers) {
     const cleanup = await admin.auth.admin.deleteUser(userId);

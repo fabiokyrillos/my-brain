@@ -1,6 +1,6 @@
 begin;
 
-select plan(44);
+select plan(46);
 
 select has_column('public', 'entries', 'current_interpretation_id', 'entries points to the current immutable interpretation');
 select results_eq(
@@ -156,6 +156,23 @@ select results_eq(
   $$,
   array[true],
   'entry mutation functions avoid timestamp variable and column ambiguity'
+);
+
+-- Hotfix (202607180029): correct_entry_interpretation's version-conflict
+-- path used to raise SQLSTATE 40001, which was independently confirmed to
+-- hang every request on the linked project until gateway timeout instead of
+-- returning. It now raises 55P03, the same fast-returning retryable code
+-- already proven correct in production by begin_entry_reprocessing and
+-- confirm_entry_task_candidates.
+select results_eq(
+  $$ select pg_get_functiondef('public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure) like '%Interpretation changed; reload before saving%errcode = ''55P03''%' $$,
+  array[true],
+  'the version-conflict path signals the fast-returning retryable SQLSTATE 55P03'
+);
+select results_eq(
+  $$ select position('40001' in pg_get_functiondef('public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure)) $$,
+  array[0],
+  'correction no longer raises the gateway-hanging SQLSTATE 40001'
 );
 
 select * from finish();

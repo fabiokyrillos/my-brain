@@ -88,6 +88,24 @@ describe("interpretation actions", () => {
     expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
   });
 
+  it("reports a reload/retry conflict when the interpretation changed concurrently", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "55P03", message: "Interpretation changed; reload before saving" } }));
+    const history = vi.fn(async () => ({ data: null, count: 0, error: null }));
+    const client = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
+      rpc,
+      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await correctInterpretation({ status: "idle", message: "" }, correctionForm());
+
+    expect(result).toEqual({
+      status: "error",
+      message: "A interpretação mudou. Recarregue antes de corrigir novamente.",
+    });
+  });
+
   it("uses the existing undo ledger instead of mutating an old interpretation", async () => {
     const { client, rpc } = authenticatedClient();
     vi.mocked(createClient).mockResolvedValue(client as never);

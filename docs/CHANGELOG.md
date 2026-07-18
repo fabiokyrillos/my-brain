@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Hotfix: correction conflict no longer hangs until gateway timeout
+
+### Fixed
+
+- `correct_entry_interpretation` (Phase 2B, already shipped) signaled its optimistic-concurrency version conflict with SQLSTATE `40001`. Slice 2X.7 independently confirmed — via a raw `fetch()` against the linked project's REST endpoint, no application code involved — that any RPC raising `40001` on this platform hangs the request until the gateway times out instead of returning an error, and deliberately left this specific already-shipped path unfixed because `interpretations/actions.ts` and this function were outside that slice's file list (see ADR-025). Migration `202607180029` closes that follow-up: `correct_entry_interpretation` is redefined (`create or replace`, identical signature `(uuid, integer, jsonb, text, text)`) with the single version-conflict raise now using `errcode = '55P03'` instead of `'40001'`. Every other line — ownership checks, the idempotent-replay short-circuit, patch/entity-link validation, and all inserts/updates/audit/undo writes — is unchanged. `src/features/interpretations/actions.ts`'s `correctInterpretation` conflict detection now checks `error.code === "55P03"` instead of `"40001"`; the reload/retry message shown to the user is unchanged. See ADR-026.
+
+### Added
+
+- `src/features/interpretations/actions.test.ts`: a new case asserting the `55P03` conflict maps to the same localized "reload and retry" message.
+- `supabase/tests/interpretation_revisions.sql`: two new pgTAP assertions (plan raised to 46) confirming `correct_entry_interpretation`'s published body raises `55P03` for the version-conflict message and no longer contains an `errcode = '40001'` raise.
+- `scripts/remote-interpretation-revisions-smoke.mjs`: the existing concurrent-correction race now asserts a bounded elapsed time (< 15s, actually observed ~530ms), the `55P03` SQLSTATE on the losing call, that the interpretation-row count advanced by exactly one (no partial write from the rejected side), and that the current-interpretation pointer was not overwritten by the losing correction.
+- `docs/reports/PHASE_2X_CORRECTION_CONFLICT_HOTFIX_REPORT.md`: official hotfix report.
+
+### Verification
+
+- `npm test`: 54 files / 267 tests passing (1 new). `npm run lint` and `npx tsc --noEmit`: clean. `npm run build`: production build passing.
+- `supabase db push` applied migration `029` to the linked project; `supabase migration list --linked` shows local/remote in sync through `029`. `supabase db lint --linked --level warning`: unchanged, only the pre-existing unrelated `run_user_heartbeat` finding.
+- `npm run test:remote:interpretations` (extended) executed against the linked project with disposable users and passed: the version-conflict correction returned in ~530ms with SQLSTATE `55P03` (no gateway hang), no partial interpretation row was left by the rejected side, and the current interpretation pointer still reflected the winning correction.
+- `supabase gen types typescript --linked` regenerated with no diff (beyond a BOM artifact from the shell redirect used to compare), confirming the RPC signature was fully preserved.
+- pgTAP (`interpretation_revisions.sql`) could not be executed locally — Docker unavailable on this workstation, the same pre-existing environment gap documented elsewhere in this file. The two new assertions are committed and correct syntactically/logically; the authenticated remote smoke is the equivalent, and in this case stronger, verification (it caught a genuine issue on the first migration attempt — see Known limitation).
+
+### Known limitation
+
+- The first version of migration `029` failed its own post-deploy verification: an inline PL/pgSQL comment explaining the fix happened to contain the literal digits `40001`, and PostgreSQL stores a function's body as literal source text, so `pg_get_functiondef()` returned that comment verbatim and tripped a naive substring check. The whole migration (including the otherwise-correct `create or replace`) rolled back as one transaction — confirmed via `supabase migration list --linked` showing no partial application — before being fixed (reworded comment; verification narrowed to inspect the literal `errcode = '40001'`/`errcode = '55P03'` assignment instead of an arbitrary numeric substring) and re-pushed successfully.
+- `undo_operation` raises a separate SQLSTATE `40001` for its own conflict (`'Cannot undo after a newer interpretation revision'`). It was not touched by this hotfix — a single-RPC fix, not a schema-wide sweep — and is not confirmed to hang the gateway, but is the same class of platform risk. See `TODO.md`/`SECURITY.md`.
+
 ## 2026-07-18 — Phase 2X Slice 2X.7 candidate provenance and safe task confirmation
 
 ### Added
