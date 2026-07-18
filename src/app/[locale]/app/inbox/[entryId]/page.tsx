@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowLeft, Brain, CheckCircle2, Clock3, History, Quote, 
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
-import { conceptLabels, lifecycleLabels } from "@/features/interpretations/copy";
+import { conceptLabels, getInterpretationCopy, lifecycleLabels } from "@/features/interpretations/copy";
 import { loadInterpretationReview, type InterpretationRevision } from "@/features/interpretations/data";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { compareInterpretationVersions, type InterpretationChange } from "@/features/interpretations/version-comparison";
@@ -104,7 +104,10 @@ export default async function EntryDetailPage({
   if (!review) notFound();
 
   const { entry, current, revisions, extraction } = review;
-  const createdCount = review.tasks.length;
+  // Scoped to the current interpretation's own confirmed tasks: a task
+  // confirmed under an older version must not be shown as if it answered
+  // for candidates the current version is now offering (COH-005/COH-006).
+  const createdCount = current ? review.tasks.filter((task) => task.source_interpretation_id === current.id).length : 0;
   const taskInitialState = createdCount > 0 ? {
     status: "success" as const,
     message: pt ? `${createdCount} ${createdCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${createdCount} ${createdCount === 1 ? "task created" : "tasks created"}.`,
@@ -232,8 +235,20 @@ export default async function EntryDetailPage({
           {extraction && (
             <section className="interpretation-actions phase-2b-task-actions">
               <div className="section-heading"><span>03</span><div><h2>{pt ? "Próximas ações" : "Next actions"}</h2><p>{pt ? "Nada vira tarefa sem sua confirmação." : "Nothing becomes a task without your confirmation."}</p></div></div>
-              {extraction.taskCandidates.length > 0 ? (
-                <TaskCandidateForm action={confirmEntryTasks} candidates={extraction.taskCandidates} entryId={entryId} initialState={taskInitialState} locale={locale} undoAction={undoAgentAction} />
+              {current.isRecordOnly ? (
+                <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
+              ) : extraction.taskCandidates.length > 0 ? (
+                <TaskCandidateForm
+                  action={confirmEntryTasks}
+                  candidates={extraction.taskCandidates}
+                  entryId={entryId}
+                  initialState={taskInitialState}
+                  interpretationId={current.id}
+                  locale={locale}
+                  operationKey={randomUUID()}
+                  undoAction={undoAgentAction}
+                  unavailableIndexes={review.unavailableCandidateIndexes}
+                />
               ) : (
                 <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
               )}

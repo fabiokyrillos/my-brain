@@ -1,6 +1,6 @@
 # Project Backlog
 
-Last updated: 2026-07-17  
+Last updated: 2026-07-18  
 Active milestone: Phase 2X — Product Convergence planned and approved
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
@@ -11,7 +11,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Reconcile existing capture, interpretation, tasks, questions, entity, dates, jobs, and AI capabilities in `PHASE_2_PLAN.md`.
 - [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
 - [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
-- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and official Slices 2X.1–2X.6 are complete.
+- [ ] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; implementation is in progress and official Slices 2X.1–2X.7 are complete.
 - [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
@@ -28,7 +28,11 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete Slice 2X.4 — entry-interpretation worker and automatic dispatch: migrations `026` (service-role interpretation access, `pg_net`, scheduled dispatch cron) and `027` (fixes a Slice 2X.3 privilege regression that broke authenticated attachment-job inserts — see `DECISIONS.md` ADR-022); `process-jobs` split into `index.ts`/`dispatch.ts`/`attachment.ts`/`entry.ts`; direct and unattended-drain invocation both remotely verified. No UI, route, or Server Action switched to the async capture path.
 - [x] Complete Slice 2X.5 — asynchronous capture cutover: `captureEntry`/`reprocessEntry` call `capture_entry_async`/`enqueue_entry_reprocessing` and return immediately (no migration); a `next/server` `after()` callback nudges the deployed worker and records best-effort product events; `QuickCaptureForm` shows an inline receipt, clears/refocuses for consecutive captures, and rotates its idempotency key; `agent/actions.ts` gained a generalized `retryProcessingJob` for entry jobs (no UI consumer yet); the now-unreachable synchronous Node extraction orchestrator was removed (see `DECISIONS.md` ADR-023). Remote entry-processing/jobs/product-events/full smokes and online Playwright (desktop+mobile) all passed after the cutover.
 - [x] Complete Slice 2X.6 — human processing states in Inbox and Home: `src/features/daily-cycle/inbox-projection.ts` owner-scoped query feeds the Slice 2X.1 lifecycle mapper per entry (no migration); `InboxItemRow` renders the resulting DTO; `/inbox` and a new "Atividade recente" Home panel share the same projection and row component, so both surfaces agree on an entry's state. `recordOnly`/`hasConsistencyIssue` remain `false` until Slice 2X.7's `is_record_only` column exists (documented known limitation, not a regression).
-- [ ] Begin Slice 2X.7 only after explicit authorization; bind candidate confirmation/undo to the current interpretation and add candidate provenance/`is_record_only` (next available migration — the implementation plan's original `026` numbering was already consumed by Slice 2X.4's service-role interpretation access; renumber monotonically per the plan's own §3.2 rule).
+- [x] Complete Slice 2X.7 — candidate provenance and safe task confirmation: migration `028` persists `entry_interpretations.is_record_only`, adds `tasks.source_interpretation_id`/`operation_key`, replaces the entry-wide unique constraint with an interpretation-scoped one, and adds `confirm_entry_task_candidates` (only confirms candidates from the entry's actual current interpretation, rejects `record-only`, idempotent by operation key); `confirm_entry_tasks` kept for compatibility with only its `ON CONFLICT` target adjusted. Exercising both as a real `authenticated` role against the linked project (not just pgTAP/`service_role`) surfaced and fixed two pre-existing defects unrelated to this slice's own logic — see `DECISIONS.md` ADR-025: `confirm_entry_tasks` was `SECURITY INVOKER` and had never worked for a real user (`permission denied` on the `entry_interpretations` lock and the `undo_operations`/`audit_logs` inserts), and any RPC raising SQLSTATE `40001` — including the already-shipped `correct_entry_interpretation` — hangs until gateway timeout on the linked project. Both `confirm_*` functions are now `SECURITY DEFINER`; the new RPC signals its version conflict with `55P03` instead of `40001`. `scripts/remote-daily-cycle-smoke.mjs` (new) was executed, not just written, against the linked project and passed.
+
+### Urgent — discovered during Slice 2X.7, not fixed in it (out of scope for that file list)
+
+- [ ] `correct_entry_interpretation` (Phase 2B, already shipped) raises SQLSTATE `40001` for its version-conflict check. On the linked project this hangs the request until the platform gateway times out instead of returning an error — confirmed via a raw `fetch()` against the REST endpoint with no application code involved. A real user hitting this conflict today has their correction request hang for roughly a minute instead of seeing "reload and try again." Needs its own investigation (root cause is believed to be a Supabase pooler/PostgREST behavior around SQLSTATE class 40, not this repo's code) and fix — most likely switching to `55P03` to match `confirm_entry_task_candidates` and `begin_entry_reprocessing`, but confirm before changing a shipped Action contract (`src/features/interpretations/actions.ts` currently keys off `error.code === "40001"`). See `DECISIONS.md` ADR-025 and `SECURITY.md`.
 
 ### Phase 2B evidence
 
@@ -134,6 +138,7 @@ Continue with the reconciled slices. Do not restart the architecture.
 
 ## Known bugs and risks
 
+- [ ] `correct_entry_interpretation`'s version-conflict path (SQLSTATE `40001`) hangs until gateway timeout on the linked project instead of returning an error to the user; see the "Urgent" item under Slice 2X.7 above and `DECISIONS.md` ADR-025.
 - [ ] Jobs can remain `running` indefinitely after a worker crash.
 - [ ] Hosted Supabase email quota is unsuitable for production authentication delivery without custom SMTP.
 - [ ] Three moderate transitive PostCSS advisories remain until a compatible Next.js dependency update is available.

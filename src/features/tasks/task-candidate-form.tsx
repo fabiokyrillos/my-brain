@@ -71,18 +71,28 @@ export function TaskCandidateForm({
   candidates,
   entryId,
   initialState = idleConfirmState,
+  interpretationId,
   locale,
+  operationKey,
   undoAction,
+  unavailableIndexes = [],
 }: {
   action: ConfirmTasksAction;
   candidates: TaskCandidate[];
   entryId: string;
   initialState?: ConfirmTasksState;
+  interpretationId: string;
   locale: "pt-BR" | "en";
+  operationKey: string;
   undoAction?: UndoTasksAction;
+  unavailableIndexes?: readonly number[];
 }) {
+  const unavailable = new Set(unavailableIndexes);
+  const availableEntries = candidates
+    .map((candidate, index) => ({ candidate, index }))
+    .filter((entry) => !unavailable.has(entry.index));
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [selected, setSelected] = useState(() => candidates.map((_, index) => index));
+  const [selected, setSelected] = useState(() => availableEntries.map((entry) => entry.index));
   const pt = locale === "pt-BR";
 
   if (state.status === "success") {
@@ -94,11 +104,22 @@ export function TaskCandidateForm({
     );
   }
 
+  if (availableEntries.length === 0) {
+    return (
+      <div className="no-action-state">
+        <Check size={22} />
+        <strong>{pt ? "Nenhuma sugestão pendente para confirmar." : "No pending suggestion to confirm."}</strong>
+      </div>
+    );
+  }
+
   return (
     <form action={formAction} className="candidate-form">
       <input type="hidden" name="entryId" value={entryId} />
+      <input type="hidden" name="interpretationId" value={interpretationId} />
+      <input type="hidden" name="operationKey" value={operationKey} />
       <div className="candidate-list">
-        {candidates.map((candidate, index) => {
+        {availableEntries.map(({ candidate, index }) => {
           const checked = selected.includes(index);
           return (
             <label className="candidate-item" key={`${candidate.title}-${index}`}>

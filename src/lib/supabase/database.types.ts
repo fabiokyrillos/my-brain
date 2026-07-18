@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_preferences: {
@@ -857,6 +882,7 @@ export type Database = {
           extracted_projects: Json
           id: string
           input_tokens: number
+          is_record_only: boolean
           model: string
           operation_key: string | null
           origin: string
@@ -889,6 +915,7 @@ export type Database = {
           extracted_projects?: Json
           id?: string
           input_tokens?: number
+          is_record_only?: boolean
           model: string
           operation_key?: string | null
           origin?: string
@@ -921,6 +948,7 @@ export type Database = {
           extracted_projects?: Json
           id?: string
           input_tokens?: number
+          is_record_only?: boolean
           model?: string
           operation_key?: string | null
           origin?: string
@@ -2059,9 +2087,11 @@ export type Database = {
           intentional_no_due: boolean
           manual_priority: string | null
           no_due_reason: string | null
+          operation_key: string | null
           parent_task_id: string | null
           planned_at: string | null
           source_entry_id: string | null
+          source_interpretation_id: string | null
           status: string
           title: string
           updated_at: string
@@ -2082,9 +2112,11 @@ export type Database = {
           intentional_no_due?: boolean
           manual_priority?: string | null
           no_due_reason?: string | null
+          operation_key?: string | null
           parent_task_id?: string | null
           planned_at?: string | null
           source_entry_id?: string | null
+          source_interpretation_id?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -2105,9 +2137,11 @@ export type Database = {
           intentional_no_due?: boolean
           manual_priority?: string | null
           no_due_reason?: string | null
+          operation_key?: string | null
           parent_task_id?: string | null
           planned_at?: string | null
           source_entry_id?: string | null
+          source_interpretation_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -2141,6 +2175,13 @@ export type Database = {
             columns: ["user_id", "source_entry_id"]
             isOneToOne: false
             referencedRelation: "entries"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "tasks_source_interpretation_owner_fk"
+            columns: ["user_id", "source_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
             referencedColumns: ["user_id", "id"]
           },
           {
@@ -2286,6 +2327,15 @@ export type Database = {
       }
       complete_job: {
         Args: { p_job_id: string; p_result: Json; p_worker_id: string }
+        Returns: Json
+      }
+      confirm_entry_task_candidates: {
+        Args: {
+          p_candidate_indexes: number[]
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
         Returns: Json
       }
       confirm_entry_tasks: {
@@ -2616,6 +2666,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

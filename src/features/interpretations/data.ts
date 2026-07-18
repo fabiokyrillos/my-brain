@@ -48,12 +48,37 @@ export type InterpretationRevision = {
   correctionReason: string | null;
   createdAt: string;
   parentInterpretationId: string | null;
+  isRecordOnly: boolean;
 };
 
 type InterpretationSource = Pick<
   InterpretationRow,
-  "id" | "version" | "summary" | "concepts" | "extracted_dates" | "element_classifications" | "element_confidence" | "element_policy" | "resolution_evidence" | "pending_questions" | "origin" | "model" | "confidence" | "correction_reason" | "created_at" | "parent_interpretation_id"
+  "id" | "version" | "summary" | "concepts" | "extracted_dates" | "element_classifications" | "element_confidence" | "element_policy" | "resolution_evidence" | "pending_questions" | "origin" | "model" | "confidence" | "correction_reason" | "created_at" | "parent_interpretation_id" | "is_record_only"
 > & Partial<Pick<InterpretationRow, "raw_output">>;
+
+/**
+ * A candidate's own index carries no proof of which interpretation produced
+ * it (COH-001/COH-011). A task is only safely re-confirmable for the
+ * current interpretation when its provenance is either that exact
+ * interpretation or, conservatively, entirely unproven (legacy rows created
+ * before candidate provenance existed) — in which case consistency cannot
+ * be verified either way, so the candidate is hidden rather than risking a
+ * duplicate or an unhandled database conflict.
+ */
+export function computeUnavailableCandidateIndexes(
+  currentInterpretationId: string | null,
+  tasks: ReadonlyArray<{ candidate_index: number | null; source_interpretation_id: string | null }>,
+): number[] {
+  if (!currentInterpretationId) return [];
+  const indexes = new Set<number>();
+  for (const task of tasks) {
+    if (task.candidate_index === null) continue;
+    if (task.source_interpretation_id === currentInterpretationId || task.source_interpretation_id === null) {
+      indexes.add(task.candidate_index);
+    }
+  }
+  return [...indexes].sort((left, right) => left - right);
+}
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -139,6 +164,7 @@ export function parseInterpretationRevision(
     correctionReason: row.correction_reason,
     createdAt: row.created_at,
     parentInterpretationId: row.parent_interpretation_id,
+    isRecordOnly: row.is_record_only,
   };
 }
 
@@ -147,8 +173,8 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     supabase.from("entries").select("*").eq("id", entryId).maybeSingle(),
     supabase.from("entry_interpretations").select("*").eq("entry_id", entryId).order("version", { ascending: false }).limit(50),
     supabase.from("entry_entities").select("interpretation_id,entity_type,entity_id,mention,confidence").eq("entry_id", entryId).limit(500),
-    supabase.from("tasks").select("id,title,status,due_at").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
-    supabase.from("undo_operations").select("id").eq("action_type", "confirm_entry_tasks").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("tasks").select("id,title,status,due_at,candidate_index,source_interpretation_id").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
+    supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("undo_operations").select("id").eq("action_type", "correct_entry_interpretation").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("contexts").select("id,name").order("updated_at", { ascending: false }).limit(50),
     supabase.from("organizations").select("id,name").order("updated_at", { ascending: false }).limit(50),
@@ -184,5 +210,6 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     tasks,
     taskUndoId: taskUndo?.id ?? null,
     correctionUndoId: correctionUndo?.id ?? null,
+    unavailableCandidateIndexes: computeUnavailableCandidateIndexes(current?.id ?? null, tasks),
   };
 }

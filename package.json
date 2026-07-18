@@ -17,6 +17,7 @@
     "test:remote:jobs": "node scripts/remote-job-reliability-smoke.mjs",
     "test:remote:entry-processing": "node scripts/remote-entry-processing-smoke.mjs",
     "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
+    "test:remote:daily-cycle": "node scripts/remote-daily-cycle-smoke.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {

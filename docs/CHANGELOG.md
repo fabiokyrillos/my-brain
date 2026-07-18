@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Phase 2X Slice 2X.7 candidate provenance and safe task confirmation
+
+### Added
+
+- Migration `202607170028_phase_2x_candidate_action_consistency.sql`: `entry_interpretations.is_record_only` (persisted at creation/correction/reprocess/undo instead of only ever existing as a transient correction input); `tasks.source_interpretation_id` (FK-composite-proven `(user_id, id)` against `entry_interpretations`) and `tasks.operation_key`; two partial unique indexes replacing the old entry-wide `(source_entry_id, candidate_index)` constraint (`tasks_legacy_source_entry_candidate_key` for provenance-less rows, `tasks_source_interpretation_candidate_key` as the new authoritative interpretation-scoped uniqueness); a conservative backfill that only sets `source_interpretation_id` for tasks on entries with exactly one interpretation ever created. New RPC `confirm_entry_task_candidates(entry_id, expected_interpretation_id, candidate_indexes, operation_key)`: confirms only candidates belonging to `entries.current_interpretation_id`, rejects `record-only` interpretations, is idempotent per operation key, and preserves the existing person/project/context linking and `parentIndex` chaining behavior (now scoped by interpretation). `confirm_entry_tasks` is preserved for compatibility with no new consumer.
+- `src/features/interpretations/data.ts`: `computeUnavailableCandidateIndexes` (new, pure, tested) — a candidate index is unavailable when its task belongs to the current interpretation, or, conservatively, when its provenance is unproven (legacy rows with `source_interpretation_id = null`), since consistency cannot be verified either way. `InterpretationRevision` gained `isRecordOnly`; `loadInterpretationReview` returns `unavailableCandidateIndexes` and scopes `taskUndoId`'s lookup to both `confirm_entry_tasks` and `confirm_entry_task_candidates` action types.
+- `src/features/tasks/actions.test.ts` (new, 9 cases) and 5 new `task-candidate-form.test.tsx` cases covering interpretation binding, unavailable-index filtering, and the record-only empty state.
+- `scripts/remote-daily-cycle-smoke.mjs` (new; `npm run test:remote:daily-cycle`): executed, not just written, against the linked project with disposable users. Covers current-interpretation binding, stale/out-of-range rejection, idempotent replay, a task confirmed under an older version surviving a later correction, a concurrent confirmation race for the same candidate producing exactly one task, record-only rejection, cross-user isolation, and undo scoped to the correct task.
+- `supabase/tests/candidate_action_consistency.sql` (33 pgTAP assertions; committed, not executed locally — see Known limitation).
+
+### Changed
+
+- `src/features/tasks/actions.ts` (`confirmEntryTasks`): now validates and forwards `interpretationId`/`operationKey`, calls `confirm_entry_task_candidates`, and maps `55P03`/`55000` to distinct sanitized messages instead of one generic failure string.
+- `src/features/tasks/task-candidate-form.tsx`: new required `interpretationId`/`operationKey` props (sent as hidden fields) and optional `unavailableIndexes` prop; renders neither a checkbox nor a submit button for an unavailable index, and shows an explicit "nothing pending" state when every candidate is unavailable, instead of an empty-but-interactive form.
+- `src/app/[locale]/app/inbox/[entryId]/page.tsx`: the confirmed-task count driving the pre-filled success state is now scoped to the current interpretation's own tasks, not every task ever confirmed for the entry; a record-only current interpretation shows an explicit "record only" message instead of the confirmation form; `TaskCandidateForm` receives `interpretationId`, a fresh `operationKey`, and `unavailableIndexes`.
+
+### Fixed
+
+- `confirm_entry_tasks` — pre-existing, unrelated to this slice's own candidate-provenance work — was `SECURITY INVOKER` and took `SELECT ... FOR UPDATE` on `entry_interpretations` (no `UPDATE` grant for `authenticated`) and inserted into `undo_operations`/`audit_logs` (no `INSERT` grant for `authenticated`). It had never successfully completed for a real signed-in user; every call failed with `permission denied`. Both `confirm_entry_tasks` and the new `confirm_entry_task_candidates` are now `SECURITY DEFINER`, matching every other RPC in this schema that writes to those tables. `confirm_entry_tasks` also gained the `grant ... to authenticated` / `revoke ... from public, anon` pair it was missing (it had been reachable, harmlessly, by `anon`).
+- The first version of `confirm_entry_task_candidates` signaled a stale interpretation with SQLSTATE `40001`, mirroring `correct_entry_interpretation`. Direct testing against the linked project's live REST gateway showed any request raising `40001` — including calls to the already-shipped `correct_entry_interpretation` — hangs until the platform gateway times out. `confirm_entry_task_candidates` now uses `55P03`. See `DECISIONS.md` ADR-025 and the urgent, explicitly out-of-scope-for-this-slice follow-up recorded in `TODO.md`/`SECURITY.md` for `correct_entry_interpretation`'s own equivalent path.
+
+### Known limitation
+
+- `supabase/tests/candidate_action_consistency.sql` could not be executed locally (Docker unavailable on this workstation, the same pre-existing environment gap documented elsewhere in this file). The migration itself was applied to and verified against the linked project directly (`supabase db push`, `supabase db lint --linked`), and the equivalent behavior was proven by actually running `scripts/remote-daily-cycle-smoke.mjs` against real authenticated users on that same project — which is how the two SECURITY DEFINER/grant defects and the `40001` gateway hang above were found in the first place.
+- `ActionableCandidateView`/`InterpretationReviewView` (Slice 2X.1 prework) still have no consumer; `/inbox/{entryId}` remains the broad Phase 2B revision page for this slice, only adapted enough (`isRecordOnly`, `unavailableCandidateIndexes`) to stop offering an unconfirmable or already-confirmed candidate. The full projection split is Slice 2X.8.
+
 ## 2026-07-17 — Phase 2X Slice 2X.6 human processing states in Inbox and Home
 
 ### Added
