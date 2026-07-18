@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeUnavailableCandidateIndexes, parseInterpretationRevision, selectCurrentInterpretation } from "./data";
+import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates, parseInterpretationRevision, selectCurrentInterpretation } from "./data";
 
 const base = {
   id: "interpretation-1",
@@ -93,5 +93,31 @@ describe("computeUnavailableCandidateIndexes", () => {
       { candidate_index: 2, source_interpretation_id: "interpretation-2" },
       { candidate_index: 2, source_interpretation_id: "interpretation-2" },
     ])).toEqual([2]);
+  });
+});
+
+describe("hasUnconfirmedTaskCandidates", () => {
+  it("is false when there are no candidates at all", () => {
+    expect(hasUnconfirmedTaskCandidates(0, [])).toBe(false);
+  });
+
+  it("is true for a single candidate that has not been confirmed", () => {
+    expect(hasUnconfirmedTaskCandidates(1, [])).toBe(true);
+  });
+
+  it("is false once the single candidate is covered", () => {
+    expect(hasUnconfirmedTaskCandidates(1, [0])).toBe(false);
+  });
+
+  it("is true when only one of two candidates is covered", () => {
+    expect(hasUnconfirmedTaskCandidates(2, [0])).toBe(true);
+  });
+
+  it("is false once both candidates are covered", () => {
+    expect(hasUnconfirmedTaskCandidates(2, [0, 1])).toBe(false);
+  });
+
+  it("ignores unavailable indexes that fall outside the current candidate count", () => {
+    expect(hasUnconfirmedTaskCandidates(1, [0, 5])).toBe(false);
   });
 });

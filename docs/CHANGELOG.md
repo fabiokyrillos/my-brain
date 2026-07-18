@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Hotfix: candidate lifecycle scoped to the current interpretation (F1)
+
+### Fixed
+
+- The architecture review of Slices 2X.5–2X.8 (`docs/reports/PHASE_2X_SLICES_2X5_2X8_ARCHITECTURE_REVIEW.md`, finding F1) found that `hasMaterializedTaskForCandidates` — the lifecycle input that decides whether an entry's `productState` can resolve to `ready` — was computed entry-wide in both `src/features/daily-cycle/inbox-projection.ts` and `src/features/daily-cycle/review-projection.ts` ("does any non-cancelled task exist for this entry") instead of interpretation/candidate-scoped ("does every one of the current interpretation's task candidates already have a matching materialized task"). Confirming only one of two candidates from a single, uncorrected interpretation made the entry read `ready` on Inbox/Home/entry-detail while the still-unconfirmed second candidate remained visible in `TaskCandidateForm` — a status badge, an available-actions list, and a rendered form disagreeing about the same entry. `lifecycle.ts` itself was already correctly specified (verified by its own unit tests); only the two loaders computed its input incorrectly.
+- Both loaders now derive `hasMaterializedTaskForCandidates` from the same interpretation-scoped source `review-projection.ts` already used correctly for `actionableCandidates`: a new pure helper `hasUnconfirmedTaskCandidates(candidateCount, unavailableCandidateIndexes)` (`src/features/interpretations/data.ts`, colocated with `computeUnavailableCandidateIndexes`) returns whether any candidate index in `[0, candidateCount)` is missing from the already-covered set. `review-projection.ts`'s `loadEntryReviewProjection` now feeds it the `unavailableCandidateIndexes` `loadInterpretationReview` already computes. `inbox-projection.ts`'s `tasks` query now additionally selects `source_interpretation_id`/`candidate_index` (previously only `source_entry_id`), groups tasks per entry, and runs `computeUnavailableCandidateIndexes` per entry against that entry's `current_interpretation_id` before the same helper decides coverage. Neither `lifecycle.ts`, `resolveDailyCycleLifecycle`'s contract, candidate confirmation semantics, `TaskCandidateForm`, nor any RPC/migration changed.
+
+### Added
+
+- `src/features/interpretations/data.test.ts`: 6 new cases for `hasUnconfirmedTaskCandidates`.
+- `src/features/daily-cycle/inbox-projection.test.ts`: 4 new cases — partial confirmation stays `needs_attention`, full confirmation resolves `ready`, a task from an older interpretation doesn't count, a task for a mismatched candidate index doesn't count.
+- `src/features/daily-cycle/review-projection.test.ts`: 5 new cases covering the same partial/full/older-interpretation/mismatched-index/zero-candidates matrix at the `loadEntryReviewProjection` level.
+- `src/features/daily-cycle/lifecycle-consistency.test.ts` (new file): drives equivalent fixtures through `loadInboxProjection` and `loadEntryReviewProjection` and asserts both resolve the same `productState`/`attentionReason` for the same entry.
+
+### Verification
+
+- `npm test`: 58 files / 302 tests passing (35 new). `npm run lint` and `npx tsc --noEmit`: clean. `npm run build`: production build passing.
+- Offline Playwright (`desktop`+`mobile`): 4/4 passing, 10 expected online skips — unchanged from the Slice 2X.8 baseline.
+- No migration, RPC, or schema change — `tasks.source_interpretation_id`/`candidate_index` already existed and were already read by `interpretations/data.ts`. Local/remote migrations remain synchronized through `029`.
+- `git diff --check`: clean (only pre-existing LF/CRLF advisories).
+- Full report: `docs/reports/PHASE_2X_CANDIDATE_LIFECYCLE_HOTFIX_REPORT.md`.
+
 ## 2026-07-18 — Phase 2X Slice 2X.8 separated review and technical-details projections
 
 ### Added

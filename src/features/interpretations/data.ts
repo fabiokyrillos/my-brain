@@ -80,6 +80,25 @@ export function computeUnavailableCandidateIndexes(
   return [...indexes].sort((left, right) => left - right);
 }
 
+/**
+ * The lifecycle mapper needs one fact: does the current interpretation still
+ * have an actionable candidate nothing has covered yet? "Some task exists for
+ * this entry" is not that fact — a candidate is only covered when its own
+ * index is in `unavailableCandidateIndexes` (computed above from the current
+ * interpretation's provenance, not from entry-wide task existence).
+ */
+export function hasUnconfirmedTaskCandidates(
+  candidateCount: number,
+  unavailableCandidateIndexes: ReadonlyArray<number>,
+): boolean {
+  if (candidateCount <= 0) return false;
+  const unavailable = new Set(unavailableCandidateIndexes);
+  for (let index = 0; index < candidateCount; index += 1) {
+    if (!unavailable.has(index)) return true;
+  }
+  return false;
+}
+
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

@@ -205,6 +205,199 @@ describe("loadEntryReviewProjection", () => {
     expect(result).toBeNull();
   });
 
+  it("keeps productState at needs_attention when one of two current-interpretation candidates is still unconfirmed (F1 regression)", async () => {
+    const current = revision();
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: { status: "completed", original_content: "Texto original", occurred_at: "2026-07-18T09:00:00.000Z", processing_error: null } as never,
+      current,
+      revisions: [current],
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-07-18T09:00:00.000Z",
+        isRetroactive: false,
+        summary: "Ligar para a Marina",
+        concepts: ["task"],
+        contexts: [],
+        organizations: [],
+        projects: [],
+        people: [],
+        taskCandidates: [
+          { title: "Ligar para a Marina", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.9, explicit: true },
+          { title: "Enviar contrato", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.8, explicit: true },
+        ],
+        pendingQuestions: [],
+        confidence: 0.9,
+      },
+      entityOptions: [],
+      tasks: [{ id: "task-1", title: "Ligar para a Marina", status: "todo", due_at: null, candidate_index: 0, source_interpretation_id: "interp-1" }],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [0],
+    });
+
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => (table === "jobs" ? jobsStub : questionsStub));
+    const client = { from };
+
+    const result = await loadEntryReviewProjection(client as never, { entryId: "entry-1", locale: "pt-BR" });
+
+    expect(result?.view.productState).toBe("needs_attention");
+    expect(result?.view.attentionItems[0]?.reason).toBe("confirm_existing_candidates");
+    expect(result?.view.actionableCandidates).toEqual([{ key: "1", title: "Enviar contrato" }]);
+  });
+
+  it("resolves productState to ready once both current-interpretation candidates are confirmed", async () => {
+    const current = revision();
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: { status: "completed", original_content: "Texto original", occurred_at: "2026-07-18T09:00:00.000Z", processing_error: null } as never,
+      current,
+      revisions: [current],
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-07-18T09:00:00.000Z",
+        isRetroactive: false,
+        summary: "Ligar para a Marina",
+        concepts: ["task"],
+        contexts: [],
+        organizations: [],
+        projects: [],
+        people: [],
+        taskCandidates: [
+          { title: "Ligar para a Marina", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.9, explicit: true },
+          { title: "Enviar contrato", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.8, explicit: true },
+        ],
+        pendingQuestions: [],
+        confidence: 0.9,
+      },
+      entityOptions: [],
+      tasks: [
+        { id: "task-1", title: "Ligar para a Marina", status: "todo", due_at: null, candidate_index: 0, source_interpretation_id: "interp-1" },
+        { id: "task-2", title: "Enviar contrato", status: "todo", due_at: null, candidate_index: 1, source_interpretation_id: "interp-1" },
+      ],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [0, 1],
+    });
+
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => (table === "jobs" ? jobsStub : questionsStub));
+    const client = { from };
+
+    const result = await loadEntryReviewProjection(client as never, { entryId: "entry-1", locale: "pt-BR" });
+
+    expect(result?.view.productState).toBe("ready");
+    expect(result?.view.actionableCandidates).toEqual([]);
+  });
+
+  it("does not let a task from an older interpretation mark the current candidate as handled", async () => {
+    const current = revision({ id: "interp-2", version: 2 });
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: { status: "completed", original_content: "Texto original", occurred_at: "2026-07-18T09:00:00.000Z", processing_error: null } as never,
+      current,
+      revisions: [revision(), current],
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-07-18T09:00:00.000Z",
+        isRetroactive: false,
+        summary: "Ligar para a Marina",
+        concepts: ["task"],
+        contexts: [],
+        organizations: [],
+        projects: [],
+        people: [],
+        taskCandidates: [
+          { title: "Ligar para a Marina", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.9, explicit: true },
+        ],
+        pendingQuestions: [],
+        confidence: 0.9,
+      },
+      entityOptions: [],
+      // Task exists for the entry, but from the older interpretation "interp-1" — must not cover interp-2's candidate.
+      tasks: [{ id: "task-1", title: "Ligar para a Marina", status: "todo", due_at: null, candidate_index: 0, source_interpretation_id: "interp-1" }],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [],
+    });
+
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => (table === "jobs" ? jobsStub : questionsStub));
+    const client = { from };
+
+    const result = await loadEntryReviewProjection(client as never, { entryId: "entry-1", locale: "pt-BR" });
+
+    expect(result?.view.productState).toBe("needs_attention");
+    expect(result?.view.attentionItems[0]?.reason).toBe("confirm_existing_candidates");
+  });
+
+  it("does not let a task materialized for a mismatched candidate index mark the remaining candidate as handled", async () => {
+    const current = revision();
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: { status: "completed", original_content: "Texto original", occurred_at: "2026-07-18T09:00:00.000Z", processing_error: null } as never,
+      current,
+      revisions: [current],
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-07-18T09:00:00.000Z",
+        isRetroactive: false,
+        summary: "Ligar para a Marina",
+        concepts: ["task"],
+        contexts: [],
+        organizations: [],
+        projects: [],
+        people: [],
+        taskCandidates: [
+          { title: "Ligar para a Marina", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.9, explicit: true },
+          { title: "Enviar contrato", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.8, explicit: true },
+        ],
+        pendingQuestions: [],
+        confidence: 0.9,
+      },
+      entityOptions: [],
+      // Only candidate_index 0 is materialized under the current interpretation — index 1 remains uncovered.
+      tasks: [{ id: "task-1", title: "Ligar para a Marina", status: "todo", due_at: null, candidate_index: 0, source_interpretation_id: "interp-1" }],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [0],
+    });
+
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => (table === "jobs" ? jobsStub : questionsStub));
+    const client = { from };
+
+    const result = await loadEntryReviewProjection(client as never, { entryId: "entry-1", locale: "pt-BR" });
+
+    expect(result?.view.productState).toBe("needs_attention");
+    expect(result?.view.actionableCandidates).toEqual([{ key: "1", title: "Enviar contrato" }]);
+  });
+
+  it("stays ready when the interpretation has zero task candidates", async () => {
+    const current = revision();
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: { status: "completed", original_content: "Texto original", occurred_at: "2026-07-18T09:00:00.000Z", processing_error: null } as never,
+      current,
+      revisions: [current],
+      extraction: null,
+      entityOptions: [],
+      tasks: [],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [],
+    });
+
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => (table === "jobs" ? jobsStub : questionsStub));
+    const client = { from };
+
+    const result = await loadEntryReviewProjection(client as never, { entryId: "entry-1", locale: "pt-BR" });
+
+    expect(result?.view.productState).toBe("ready");
+  });
+
   it("feeds the entry lifecycle, job status, and open question signal into the lifecycle mapper", async () => {
     const current = revision();
     vi.mocked(loadInterpretationReview).mockResolvedValueOnce({

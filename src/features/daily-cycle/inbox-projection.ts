@@ -1,4 +1,5 @@
 import "server-only";
+import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates } from "@/features/interpretations/data";
 import { pageRange, paginateRows } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -75,7 +76,7 @@ export async function loadInboxProjection(
       ? supabase.from("entry_interpretations").select("id,summary,task_candidates").in("id", interpretationIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("pending_questions").select("entry_id").eq("status", "open").in("entry_id", entryIds),
-    supabase.from("tasks").select("source_entry_id").neq("status", "cancelled").in("source_entry_id", entryIds),
+    supabase.from("tasks").select("source_entry_id,source_interpretation_id,candidate_index").neq("status", "cancelled").in("source_entry_id", entryIds),
   ]);
   const jobs = requireSupabaseData(jobsResult, "load inbox interpretation jobs") ?? [];
   const interpretations = requireSupabaseData(interpretationsResult, "load inbox current interpretations") ?? [];
@@ -89,7 +90,12 @@ export async function loadInboxProjection(
   }
   const interpretationById = new Map(interpretations.map((row) => [row.id, row]));
   const openQuestionEntryIds = new Set(openQuestions.map((row) => row.entry_id));
-  const materializedEntryIds = new Set(materializedTasks.map((row) => row.source_entry_id));
+  const tasksByEntryId = new Map<string, typeof materializedTasks>();
+  for (const task of materializedTasks) {
+    const tasksForEntry = tasksByEntryId.get(task.source_entry_id);
+    if (tasksForEntry) tasksForEntry.push(task);
+    else tasksByEntryId.set(task.source_entry_id, [task]);
+  }
   const now = new Date().toISOString();
 
   const items = paginated.items.map((entry) => {
@@ -100,9 +106,14 @@ export async function loadInboxProjection(
     const originalPreview = toOriginalPreview(entry.original_content);
     const title = interpretation?.summary?.trim() || originalPreview;
     const availableActions = [{ id: "open_entry" as const, href: `/${locale}/app/inbox/${entry.id}` }];
-    const hasValidTaskCandidates = interpretation !== undefined
-      && Array.isArray(interpretation.task_candidates)
-      && interpretation.task_candidates.length > 0;
+    const taskCandidateCount = interpretation !== undefined && Array.isArray(interpretation.task_candidates)
+      ? interpretation.task_candidates.length
+      : 0;
+    const hasValidTaskCandidates = taskCandidateCount > 0;
+    const unavailableCandidateIndexes = computeUnavailableCandidateIndexes(
+      entry.current_interpretation_id,
+      tasksByEntryId.get(entry.id) ?? [],
+    );
 
     const source: InboxItemSource = {
       entryId: entry.id,
@@ -117,7 +128,7 @@ export async function loadInboxProjection(
         hasValidTaskCandidates,
         hasOpenQuestion: openQuestionEntryIds.has(entry.id),
         recordOnly: false,
-        hasMaterializedTaskForCandidates: materializedEntryIds.has(entry.id),
+        hasMaterializedTaskForCandidates: !hasUnconfirmedTaskCandidates(taskCandidateCount, unavailableCandidateIndexes),
         hasConsistencyIssue: false,
         now,
       },

@@ -1,7 +1,7 @@
 import "server-only";
 import type { EntryExtraction, TaskCandidate } from "@/lib/ai/extraction-schema";
 import type { InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
-import { loadInterpretationReview } from "@/features/interpretations/data";
+import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
 import type { EntityOption } from "@/features/interpretations/revision-editor";
 import { requireSupabaseData } from "@/lib/supabase/result";
 import type { createClient } from "@/lib/supabase/server";
@@ -263,6 +263,7 @@ export async function loadEntryReviewProjection(
   ]);
   const job = requireSupabaseData(jobResult, "load entry interpretation job") as { status: string; next_attempt_at: string | null } | null;
   const openQuestions = requireSupabaseData(questionsResult, "load entry open questions") ?? [];
+  const taskCandidateCount = data.extraction?.taskCandidates.length ?? 0;
 
   return toEntryReviewProjection({
     entryId,
@@ -282,10 +283,10 @@ export async function loadEntryReviewProjection(
     lifecycle: {
       entryLifecycle: data.entry.status,
       job: job ? { status: job.status, retryAt: job.next_attempt_at } : undefined,
-      hasValidTaskCandidates: (data.extraction?.taskCandidates.length ?? 0) > 0,
+      hasValidTaskCandidates: taskCandidateCount > 0,
       hasOpenQuestion: openQuestions.length > 0,
       recordOnly: data.current?.isRecordOnly ?? false,
-      hasMaterializedTaskForCandidates: data.tasks.length > 0,
+      hasMaterializedTaskForCandidates: !hasUnconfirmedTaskCandidates(taskCandidateCount, data.unavailableCandidateIndexes),
       hasConsistencyIssue: false,
       now: new Date().toISOString(),
     },

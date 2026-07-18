@@ -36,12 +36,14 @@ function entry(overrides: Partial<Entry> = {}): Entry {
   };
 }
 
+type InboxTaskRow = { source_entry_id: string; source_interpretation_id?: string | null; candidate_index?: number | null };
+
 function clientMock(options: {
   entries?: Entry[];
   jobs?: Array<{ status: string; next_attempt_at: string | null; payload: unknown }>;
   interpretations?: Array<{ id: string; summary: string; task_candidates: unknown }>;
   openQuestions?: Array<{ entry_id: string }>;
-  tasks?: Array<{ source_entry_id: string }>;
+  tasks?: InboxTaskRow[];
 } = {}) {
   const {
     entries = [entry()],
@@ -103,12 +105,78 @@ describe("loadInboxProjection", () => {
     const { client } = clientMock({
       entries: [entry({ status: "completed", current_interpretation_id: "interp-1" })],
       interpretations: [{ id: "interp-1", summary: "Ligar para a Marina", task_candidates: [{ title: "Ligar para a Marina" }] }],
-      tasks: [{ source_entry_id: "entry-1" }],
+      tasks: [{ source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 0 }],
     });
 
     const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
 
     expect(page.items[0].productState).toBe("ready");
+  });
+
+  it("keeps needs_attention/confirm_existing_candidates when only one of two current-interpretation candidates is confirmed (F1 regression)", async () => {
+    const { client } = clientMock({
+      entries: [entry({ status: "completed", current_interpretation_id: "interp-1" })],
+      interpretations: [{
+        id: "interp-1",
+        summary: "Ligar para a Marina",
+        task_candidates: [{ title: "Ligar para a Marina" }, { title: "Enviar contrato" }],
+      }],
+      tasks: [{ source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 0 }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" });
+  });
+
+  it("resolves to ready once both current-interpretation candidates are confirmed", async () => {
+    const { client } = clientMock({
+      entries: [entry({ status: "completed", current_interpretation_id: "interp-1" })],
+      interpretations: [{
+        id: "interp-1",
+        summary: "Ligar para a Marina",
+        task_candidates: [{ title: "Ligar para a Marina" }, { title: "Enviar contrato" }],
+      }],
+      tasks: [
+        { source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 0 },
+        { source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 1 },
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0].productState).toBe("ready");
+  });
+
+  it("does not let a task from an older interpretation mark the current candidate as handled", async () => {
+    const { client } = clientMock({
+      entries: [entry({ status: "completed", current_interpretation_id: "interp-2" })],
+      interpretations: [{ id: "interp-2", summary: "Ligar para a Marina", task_candidates: [{ title: "Ligar para a Marina" }] }],
+      tasks: [{ source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 0 }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" });
+  });
+
+  it("does not let a task for a mismatched candidate index mark the remaining candidate as handled", async () => {
+    const { client } = clientMock({
+      entries: [entry({ status: "completed", current_interpretation_id: "interp-1" })],
+      interpretations: [{
+        id: "interp-1",
+        summary: "Ligar para a Marina",
+        task_candidates: [{ title: "Ligar para a Marina" }, { title: "Enviar contrato" }],
+      }],
+      // Both materialized tasks point at candidate_index 0 — index 1 remains uncovered.
+      tasks: [
+        { source_entry_id: "entry-1", source_interpretation_id: "interp-1", candidate_index: 0 },
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" });
   });
 
   it("maps an entry with an open pending question to needs_attention/answer_existing_question", async () => {
