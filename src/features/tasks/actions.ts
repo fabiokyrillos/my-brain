@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ConfirmTasksState,
@@ -11,6 +13,7 @@ import type {
 const entryIdSchema = z.string().uuid();
 const interpretationIdSchema = z.string().uuid();
 const operationKeySchema = z.string().min(8).max(240);
+const localeSchema = z.enum(["pt-BR", "en"]);
 const undoIdSchema = z.string().uuid();
 
 function refreshTaskSurfaces(entryId: string) {
@@ -31,13 +34,14 @@ export async function confirmEntryTasks(
   const entryId = entryIdSchema.safeParse(formData.get("entryId"));
   const interpretationId = interpretationIdSchema.safeParse(formData.get("interpretationId"));
   const operationKey = operationKeySchema.safeParse(formData.get("operationKey"));
+  const locale = localeSchema.safeParse(formData.get("locale") ?? "pt-BR");
   const candidateIndexes = [...new Set(
     formData.getAll("candidateIndex")
       .map((value) => Number(value))
       .filter((value) => Number.isInteger(value) && value >= 0),
   )];
 
-  if (!entryId.success || !interpretationId.success || !operationKey.success || candidateIndexes.length === 0) {
+  if (!entryId.success || !interpretationId.success || !operationKey.success || !locale.success || candidateIndexes.length === 0) {
     return { status: "error", message: "Selecione pelo menos uma tarefa.", undoId: null };
   }
 
@@ -71,6 +75,17 @@ export async function confirmEntryTasks(
   const taskIds = data && typeof data === "object" && "task_ids" in data && Array.isArray(data.task_ids)
     ? data.task_ids
     : [];
+
+  after(() => recordProductEvent({
+    name: "task_candidates_confirmed",
+    surface: "interpretation_review",
+    locale: locale.data,
+    viewportClass: "unknown",
+    appVersion: "server",
+    idempotencyKey: createProductEventIdempotencyKey("task_candidates_confirmed", operationKey.data),
+    subject: { type: "entry", id: entryId.data },
+    properties: { candidateCount: candidateIndexes.length },
+  }).catch(() => {}));
 
   refreshTaskSurfaces(entryId.data);
   return {

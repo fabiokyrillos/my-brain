@@ -3,12 +3,17 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { retryProcessingJob } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
+vi.mock("@/features/product-analytics/server", () => ({
+  createProductEventIdempotencyKey: vi.fn(() => "44444444-4444-5444-8444-444444444444"),
+  recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),
+}));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
 vi.mock("@/lib/preferences", () => ({ defaultAgentPreferences: {} }));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn() }));
@@ -86,6 +91,12 @@ describe("retryProcessingJob", () => {
     expect(kickEntryInterpretationWorker).not.toHaveBeenCalled();
     await flushAfter();
     expect(kickEntryInterpretationWorker).toHaveBeenCalledWith(client, jobId);
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "processing_retry_requested",
+      subject: { type: "entry", id: entryId },
+      properties: { retrySource: "user" },
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("processing_retry_requested", jobId, "1", "user");
   });
 
   it("honors the persisted backoff instead of kicking a job too early", async () => {
@@ -112,6 +123,10 @@ describe("retryProcessingJob", () => {
     expect(result).toEqual(expect.objectContaining({ ok: true, code: "retry_scheduled", entityId: entryId }));
     await flushAfter();
     expect(kickEntryInterpretationWorker).toHaveBeenCalledWith(client, "b8b0f2b1-3f2e-4b2c-9c3a-1b2c3d4e5f60");
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "processing_retry_requested",
+      properties: { retrySource: "user" },
+    }));
   });
 
   it("reports action_unavailable for a job that is already in flight", async () => {
@@ -121,6 +136,8 @@ describe("retryProcessingJob", () => {
     const result = await retryProcessingJob(undefined, form());
 
     expect(result).toEqual(expect.objectContaining({ ok: false, code: "action_unavailable" }));
+    await flushAfter();
+    expect(recordProductEvent).not.toHaveBeenCalled();
   });
 
   it("revalidates the daily-cycle surfaces after successfully scheduling a retry", async () => {

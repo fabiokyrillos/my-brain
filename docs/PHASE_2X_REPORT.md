@@ -1,7 +1,7 @@
 # Phase 2X Product Promise Inventory
 
 Last updated: 2026-07-19
-Current checkpoint: Slice 2X.14 complete
+Current checkpoint: Slice 2X.15 complete
 
 This inventory records which visible promises have a real consumer or observable evidence. It is the product-facing complement to the implementation plan: operational controls stay visible, advanced controls use progressive disclosure, informational capabilities do not imply configuration, and future capabilities stay hidden until they have a consumer.
 
@@ -35,6 +35,12 @@ This inventory records which visible promises have a real consumer or observable
 | Retry/attention | Derived from existing retry and Needs Attention projections | Daily-cycle and Home tests |
 | Completed | Used only after a synchronous operation or a product projection proves completion | Review action and review projection tests |
 
+## Daily product funnel inventory
+
+The 17 version-1 events are now wired over the existing private ledger: capture intent/save/enqueue/processing outcomes; Needs Attention view/open; interpretation view/correction/technical disclosure; candidate presentation/confirmation; basic question answer; retry; Work view; and task status change. Outcome events live beside the successful domain mutation, worker outcomes require a persisted result, and browser views require confirmed visibility with session deduplication.
+
+Payloads contain only approved categorical values, bounded counts/durations/statuses and opaque owned IDs. No entry/task/question/review content, prompts, evidence, raw errors, user identity fields, hidden settings or model/service metadata is collected. Events support bounded internal conversion/latency checks but are not a lifecycle source and have no dashboard or scheduled consumer. The complete trigger/subject/payload matrix is in `docs/reports/PHASE_2X_SLICE_15_REPORT.md`.
+
 ## Enforcement
 
 - `src/features/shell/capabilities.ts` is the static capability registry. Every visible definition names a surface and consumer evidence; future definitions are not visible.
@@ -45,4 +51,4 @@ This inventory records which visible promises have a real consumer or observable
 
 ## Rollback boundary
 
-Slice 2X.14 adds no migration, RPC, Edge Function, generated database type, deployment, or infrastructure mutation. Its rollback boundary is UI copy, capability metadata, server-side projections, Settings payload preservation, and tests.
+Slices 2X.14 and 2X.15 add no migration, RPC, generated database type or infrastructure mutation. Slice 2X.15 changes the local Edge Function source but does not deploy it. Its rollback boundary is the application/worker emitters, tests and documentation; the existing migration-024 ledger/RPC remain inert and domain behavior is unchanged.

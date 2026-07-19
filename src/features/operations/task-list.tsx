@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Check, Clock3, Inbox, RotateCcw } from "lucide-react";
 import type { WorkItemHumanState, WorkItemView } from "@/features/daily-cycle/contracts";
 import type { Locale } from "@/lib/preferences";
@@ -56,6 +57,7 @@ export function TaskList({
                   <input type="hidden" name="taskId" value={task.taskId} />
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="action" value={action.id} />
+                  <input type="hidden" name="operationKey" value={randomUUID()} />
                   <button className="row-action" type="submit"><Icon size={13} /> {copy[pt ? "pt" : "en"]}</button>
                 </form>];
               })}

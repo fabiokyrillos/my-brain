@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import {
   createDailyCycleActionFailure,
   createDailyCycleActionSuccess,
@@ -72,7 +73,18 @@ export async function retryProcessingJob(
     const jobKey = `entry-reprocess:${entryId}:${operationKey}`;
     const freshJob = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("idempotency_key", jobKey).maybeSingle();
     after(async () => {
-      if (freshJob.data?.id) await kickEntryInterpretationWorker(supabase, freshJob.data.id);
+      const sideEffects: Promise<unknown>[] = [recordProductEvent({
+        name: "processing_retry_requested",
+        surface: "interpretation_review",
+        locale,
+        viewportClass: "unknown",
+        appVersion: "server",
+        idempotencyKey: createProductEventIdempotencyKey("processing_retry_requested", job.id, String(job.attempts), "user"),
+        subject: { type: "entry", id: entryId },
+        properties: { retrySource: "user" },
+      })];
+      if (freshJob.data?.id) sideEffects.push(kickEntryInterpretationWorker(supabase, freshJob.data.id));
+      await Promise.allSettled(sideEffects);
     });
     refreshDailyCycleSurfaces(locale, entryId);
     return createDailyCycleActionSuccess({ code: "retry_scheduled", messageKey: "retry_scheduled", entityId: entryId });
@@ -83,7 +95,21 @@ export async function retryProcessingJob(
     if (Number.isFinite(retryAt) && retryAt > Date.now()) {
       return createDailyCycleActionFailure({ code: "retry_not_available", messageKey: "retry_not_available", retryable: true });
     }
-    after(() => kickEntryInterpretationWorker(supabase, job.id));
+    after(async () => {
+      await Promise.allSettled([
+        kickEntryInterpretationWorker(supabase, job.id),
+        recordProductEvent({
+          name: "processing_retry_requested",
+          surface: "interpretation_review",
+          locale,
+          viewportClass: "unknown",
+          appVersion: "server",
+          idempotencyKey: createProductEventIdempotencyKey("processing_retry_requested", job.id, String(job.attempts), "user"),
+          subject: { type: "entry", id: entryId },
+          properties: { retrySource: "user" },
+        }),
+      ]);
+    });
     refreshDailyCycleSurfaces(locale, entryId);
     return createDailyCycleActionSuccess({ code: "retry_scheduled", messageKey: "retry_scheduled", entityId: entryId });
   }
@@ -144,7 +170,7 @@ export async function answerPendingQuestion(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: "Sua sessão expirou." };
-  const { error } = await supabase
+  const { data: answeredQuestion, error } = await supabase
     .from("pending_questions")
     .update({
       status: "answered",
@@ -152,8 +178,21 @@ export async function answerPendingQuestion(
       answered_at: new Date().toISOString(),
     })
     .eq("id", parsed.data.questionId)
-    .eq("user_id", user.id);
-  if (error) return { status: "error", message: "Não foi possível responder." };
+    .eq("user_id", user.id)
+    .eq("status", "open")
+    .select("id")
+    .maybeSingle();
+  if (error || !answeredQuestion) return { status: "error", message: "Não foi possível responder." };
+  after(() => recordProductEvent({
+    name: "question_answered_basic",
+    surface: "server",
+    locale: parsed.data.locale,
+    viewportClass: "unknown",
+    appVersion: "server",
+    idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", parsed.data.questionId),
+    subject: { type: "pending_question", id: parsed.data.questionId },
+    properties: {},
+  }).catch(() => {}));
   revalidatePath(`/${parsed.data.locale}/app/questions`);
   return { status: "success", message: "Resposta registrada." };
 }

@@ -4,6 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkItemView } from "./contracts";
 
 vi.mock("server-only", () => ({}));
+const workViewViewed = vi.hoisted(() => vi.fn(() => null));
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  WorkViewViewed: workViewViewed,
+}));
 
 type WorkViewModule = {
   WorkView?: (props: {
@@ -36,6 +40,15 @@ function renderWork(overrides: Partial<Parameters<NonNullable<WorkViewModule["Wo
 }
 
 describe("WorkView", () => {
+  it("records the visible work view with its canonical filter", () => {
+    renderWork({ locale: "en", view: "waiting" });
+
+    expect(workViewViewed).toHaveBeenCalledWith(
+      expect.objectContaining({ locale: "en", view: "waiting" }),
+      undefined,
+    );
+  });
+
   it("localizes the accessible view control and marks the active view", () => {
     renderWork({ locale: "pt-BR", view: "today" });
 
@@ -73,6 +86,7 @@ describe("WorkView", () => {
     expect(screen.queryByText("waiting_on_someone")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Complete" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Resume" })).toBeVisible();
+    expect((document.querySelector('input[name="operationKey"]') as HTMLInputElement).value).toMatch(/^[0-9a-f-]{36}$/i);
   });
 
   it("explains the intentionally limited Waiting view without presenting a fake follow-up control", () => {

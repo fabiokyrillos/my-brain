@@ -3,14 +3,17 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
-import { recordProductEvent } from "@/features/product-analytics/server";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { captureEntry } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
-vi.mock("@/features/product-analytics/server", () => ({ recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })) }));
+vi.mock("@/features/product-analytics/server", () => ({
+  createProductEventIdempotencyKey: vi.fn(() => "11111111-1111-5111-8111-111111111111"),
+  recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),
+}));
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 const jobId = "6118fb25-2f80-432a-aa96-0e76d924862e";
@@ -155,6 +158,14 @@ describe("captureEntry", () => {
       name: "capture_processing_enqueued",
       properties: { processingMode: "initial" },
     }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith(
+      "capture_save_succeeded",
+      "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f",
+    );
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith(
+      "capture_processing_enqueued",
+      "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f",
+    );
   });
 
   it("reflects the true current state on an idempotent replay instead of always claiming organizing", async () => {
@@ -194,5 +205,29 @@ describe("captureEntry", () => {
       expect(result.code).toBe("operation_failed");
       expect(result.message).not.toContain("db secret detail");
     }
+
+    expect(recordProductEvent).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "capture_save_failed",
+      idempotencyKey: "11111111-1111-5111-8111-111111111111",
+      properties: expect.objectContaining({ failureKind: "storage" }),
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith(
+      "capture_save_failed",
+      "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f",
+    );
+  });
+
+  it("records successful outcomes even when the non-critical worker nudge rejects", async () => {
+    const { client } = clientMock();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(kickEntryInterpretationWorker).mockRejectedValueOnce(new Error("worker unavailable"));
+
+    await captureEntry({ status: "idle" }, form());
+
+    await expect(flushAfter()).resolves.toBeUndefined();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({ name: "capture_save_succeeded" }));
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({ name: "capture_processing_enqueued" }));
   });
 });

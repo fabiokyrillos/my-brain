@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import type { AttentionItemView, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import {
   EntryReview,
@@ -9,7 +10,14 @@ import {
   ReviewUnderstanding,
 } from "./entry-review";
 
-afterEach(cleanup);
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  InterpretationReviewViewed: vi.fn(() => null),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function baseView(overrides: Partial<InterpretationReviewView> = {}): InterpretationReviewView {
   return {
@@ -157,6 +165,10 @@ describe("EntryReview", () => {
     expect(screen.getByText("Tente organizar novamente")).toBeVisible();
     expect(screen.getByTestId("next-actions-slot")).toBeVisible();
     expect(screen.getByTestId("technical-slot")).toBeVisible();
+    expect(InterpretationReviewViewed).toHaveBeenCalledWith(
+      expect.objectContaining({ entryId: "entry-1", locale: "pt-BR" }),
+      undefined,
+    );
   });
 
   it("omits the technical details slot entirely when there is nothing to show", () => {

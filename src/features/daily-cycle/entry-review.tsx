@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
 import type { AttentionItemView, AttentionReason, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
@@ -132,6 +133,7 @@ export function EntryReview({
 }) {
   return (
     <div className="entry-review">
+      <InterpretationReviewViewed entryId={view.entryId} locale={locale} />
       <ReviewUnderstanding view={view} locale={locale} occurredAtLabel={occurredAtLabel} />
       <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
         {slots.attentionAction}

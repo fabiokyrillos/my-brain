@@ -20,6 +20,11 @@ export const productEventNames = [
 
 export type ProductEventName = (typeof productEventNames)[number];
 
+export const productEventContractVersion = 1 as const;
+export const productEventVersionByName = Object.fromEntries(
+  productEventNames.map((name) => [name, productEventContractVersion]),
+) as { readonly [Name in ProductEventName]: typeof productEventContractVersion };
+
 export const productSurfaces = [
   "home",
   "capture",
@@ -117,7 +122,7 @@ export type ProductEventResult =
   | { accepted: true; recorded: true; eventId: string; code: "recorded" }
   | { accepted: true; recorded: false; eventId: string; code: "deduplicated" }
   | { accepted: true; recorded: false; eventId: null; code: "telemetry_unavailable" }
-  | { accepted: false; recorded: false; eventId: null; code: "invalid_payload" | "unauthenticated" };
+  | { accepted: false; recorded: false; eventId: null; code: "invalid_payload" | "unauthenticated" | "forbidden" };
 
 export type ProductAnalyticsSerializable =
   | string

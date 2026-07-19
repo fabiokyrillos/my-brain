@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { resolveDailyCycleLifecycle } from "@/features/daily-cycle/lifecycle";
 import { toCaptureReceipt } from "@/features/daily-cycle/projection-mappers";
-import { recordProductEvent } from "@/features/product-analytics/server";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createClient } from "@/lib/supabase/server";
 import { captureEntrySchema } from "./schema";
@@ -59,6 +59,7 @@ export async function captureEntry(
   });
 
   if (error || !isCaptureAsyncRow(data)) {
+    const saveDurationMs = Math.min(Date.now() - startedAt, 86_400_000);
     after(() => {
       recordProductEvent({
         name: "capture_save_failed",
@@ -66,8 +67,8 @@ export async function captureEntry(
         locale,
         viewportClass: "unknown",
         appVersion: "server",
-        idempotencyKey: crypto.randomUUID(),
-        properties: { captureSource, durationMs: Date.now() - startedAt, failureKind: "storage" },
+        idempotencyKey: createProductEventIdempotencyKey("capture_save_failed", idempotencyKey),
+        properties: { captureSource, durationMs: saveDurationMs, failureKind: "storage" },
       }).catch(() => {});
     });
     return { status: "error", code: "operation_failed", message: actionFailedMessage[locale] };
@@ -96,33 +97,36 @@ export async function captureEntry(
     replayed,
   });
   if (!receipt) return { status: "error", code: "operation_failed", message: actionFailedMessage[locale] };
+  const saveDurationMs = Math.min(Date.now() - startedAt, 86_400_000);
 
   after(async () => {
+    const sideEffects: Promise<unknown>[] = [];
     if (job?.id && (job.status === "pending" || job.status === "failed")) {
-      await kickEntryInterpretationWorker(supabase, job.id);
+      sideEffects.push(kickEntryInterpretationWorker(supabase, job.id));
     }
-    await recordProductEvent({
+    sideEffects.push(recordProductEvent({
       name: "capture_save_succeeded",
       surface: "capture",
       locale,
       viewportClass: "unknown",
       appVersion: "server",
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: createProductEventIdempotencyKey("capture_save_succeeded", idempotencyKey),
       subject: { type: "entry", id: entryId },
-      properties: { captureSource, durationMs: Date.now() - startedAt },
-    }).catch(() => {});
+      properties: { captureSource, durationMs: saveDurationMs },
+    }));
     if (!replayed) {
-      await recordProductEvent({
+      sideEffects.push(recordProductEvent({
         name: "capture_processing_enqueued",
         surface: "capture",
         locale,
         viewportClass: "unknown",
         appVersion: "server",
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createProductEventIdempotencyKey("capture_processing_enqueued", idempotencyKey),
         subject: { type: "entry", id: entryId },
         properties: { processingMode: "initial" },
-      }).catch(() => {});
+      }));
     }
+    await Promise.allSettled(sideEffects);
   });
 
   revalidatePath(`/${locale}/app`);

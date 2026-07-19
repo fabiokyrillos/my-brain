@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { LoaderCircle } from "lucide-react";
+import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { NeedsAttentionItemRow } from "./needs-attention-item";
 import type { NeedsAttentionItemView } from "./contracts";
 import type { AttentionCursor } from "./attention-projection";
@@ -67,7 +68,8 @@ export function NeedsAttentionList({
 
   return (
     <div className="list-stack needs-attention-list">
-      {items.map((item) => <NeedsAttentionItemRow item={item} locale={locale} key={item.key} />)}
+      <NeedsAttentionViewed surface="needs_attention" itemCount={items.length} locale={locale} />
+      {items.map((item) => <NeedsAttentionItemRow item={item} locale={locale} surface="needs_attention" key={item.key} />)}
       {error && <p role="alert" className="form-error needs-attention-error">{error}</p>}
       {hasNext && (
         <button

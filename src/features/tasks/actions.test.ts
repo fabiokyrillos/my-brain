@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import { confirmEntryTasks, undoAgentAction } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/features/product-analytics/server", () => ({
+  createProductEventIdempotencyKey: vi.fn(() => "33333333-3333-5333-8333-333333333333"),
+  recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),
+}));
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 const interpretationId = "94f6c9d0-2f4e-4a2e-8f2c-9b2a3c4d5e6f";
@@ -42,6 +49,10 @@ function clientWithRpc(result: { data: unknown; error: { code?: string; message?
     },
     rpc,
   };
+}
+
+async function flushAfter() {
+  await Promise.all(vi.mocked(after).mock.calls.map(([task]) => (typeof task === "function" ? task() : task)));
 }
 
 describe("confirmEntryTasks", () => {
@@ -83,6 +94,14 @@ describe("confirmEntryTasks", () => {
     expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
     expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
     expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
+    expect(recordProductEvent).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      subject: { type: "entry", id: entryId },
+      properties: { candidateCount: 2 },
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("task_candidates_confirmed", operationKey);
   });
 
   it("deduplicates repeated candidate indexes before calling the database", async () => {
@@ -128,6 +147,8 @@ describe("confirmEntryTasks", () => {
     const result = await confirmEntryTasks({ status: "idle", message: "", undoId: null }, confirmForm());
 
     expect(result).toEqual({ status: "error", message: "Não foi possível criar as tarefas.", undoId: null });
+    await flushAfter();
+    expect(recordProductEvent).not.toHaveBeenCalled();
   });
 
   it("requires an authenticated session", async () => {

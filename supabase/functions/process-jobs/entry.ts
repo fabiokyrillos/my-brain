@@ -2,6 +2,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceData, requireServiceSuccess } from "../_shared/result.ts";
 import { rankEntityCandidates, type EntityCandidate, type EntityType } from "../_shared/entity-resolution.ts";
 import { buildExtractionElementTrust } from "../_shared/trust-builders.ts";
+import { recordEntryProcessingEvent, toProcessingOutcome } from "./product-events.ts";
 
 // Mirrors src/lib/ai/openai-provider.ts EXTRACTION_STRATEGY_VERSION /
 // EXTRACTION_PROMPT_VERSION and system prompt. openai-provider.ts cannot be
@@ -356,32 +357,6 @@ async function persistEmbedding(input: {
   if (error) throw error;
 }
 
-async function recordProcessingEvent(
-  service: SupabaseClient,
-  userId: string,
-  event: "capture_processing_completed" | "capture_processing_failed",
-  properties: Record<string, unknown>,
-) {
-  try {
-    await service.rpc("record_product_event_for_user", {
-      p_user_id: userId,
-      p_event_name: event,
-      p_surface: "server",
-      p_locale: "en",
-      p_viewport_class: "unknown",
-      p_app_version: "worker",
-      p_properties: properties,
-      p_idempotency_key: crypto.randomUUID(),
-      p_is_synthetic: false,
-    });
-  } catch (telemetryError) {
-    console.error("Product event recording failed", {
-      event,
-      code: telemetryError instanceof Error ? telemetryError.name : "unknown_error",
-    });
-  }
-}
-
 // Single pipeline for both interpret_entry modes ("initial" and
 // "reprocess"). Never trusts the job payload beyond entry_id/mode/
 // operation_key: the entry row itself is loaded and re-validated, and all
@@ -397,6 +372,7 @@ export async function processEntryJob(
   const entryId = job.payload?.entry_id;
   const mode = job.payload?.mode;
   const operationKey = job.payload?.operation_key;
+  let eventLocale: "pt-BR" | "en" = "en";
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   if (typeof entryId !== "string" || !uuidPattern.test(entryId) || (mode !== "initial" && mode !== "reprocess")) {
@@ -428,6 +404,7 @@ export async function processEntryJob(
       .eq("user_id", job.user_id)
       .single();
     if (entryError || !entry) throw new Error("Entry not found");
+    eventLocale = entry.locale === "pt-BR" ? "pt-BR" : "en";
 
     if (mode === "initial") {
       const begin = await service.rpc("begin_entry_interpretation", {
@@ -512,11 +489,28 @@ export async function processEntryJob(
     );
     if (!completed) throw new Error("Job lease is no longer active");
 
-    await recordProcessingEvent(service, job.user_id, "capture_processing_completed", {
-      processingMode: mode,
-      durationMs: Math.min(Date.now() - processingStartedAt, 86_400_000),
-      outcome: "ready",
-    });
+    try {
+      const persistedEntry = await service.from("entries").select("status").eq("id", entryId).eq("user_id", job.user_id).maybeSingle();
+      const outcome = toProcessingOutcome(persistedEntry.data?.status);
+      if (!persistedEntry.error && outcome) {
+        await recordEntryProcessingEvent(service, {
+          userId: job.user_id,
+          entryId,
+          locale: eventLocale,
+          event: "capture_processing_completed",
+          properties: {
+            processingMode: mode,
+            durationMs: Math.min(Date.now() - processingStartedAt, 86_400_000),
+            outcome,
+          },
+          idempotencyScope: [job.id, String(job.attempts), "completed"],
+        });
+      } else {
+        console.warn("[product-analytics] persisted processing outcome unavailable", { code: persistedEntry.error?.code ?? "unknown_status" });
+      }
+    } catch {
+      console.warn("[product-analytics] persisted processing outcome unavailable", { code: "query_failed" });
+    }
 
     console.info("Entry interpretation job completed", {
       jobId: job.id,
@@ -556,11 +550,30 @@ export async function processEntryJob(
       console.error("Entry failure state update failed", entryFailureError instanceof Error ? entryFailureError.message : "unknown error");
     }
 
-    await recordProcessingEvent(service, job.user_id, "capture_processing_failed", {
-      processingMode: mode,
-      durationMs: Math.min(Date.now() - processingStartedAt, 86_400_000),
-      failureKind: terminal ? "terminal" : "retryable",
-    });
+    if (failedJob.data) {
+      await recordEntryProcessingEvent(service, {
+        userId: job.user_id,
+        entryId,
+        locale: eventLocale,
+        event: "capture_processing_failed",
+        properties: {
+          processingMode: mode,
+          durationMs: Math.min(Date.now() - processingStartedAt, 86_400_000),
+          failureKind: terminal ? "terminal" : "retryable",
+        },
+        idempotencyScope: [job.id, String(job.attempts), "failed"],
+      });
+      if (!terminal) {
+        await recordEntryProcessingEvent(service, {
+          userId: job.user_id,
+          entryId,
+          locale: eventLocale,
+          event: "processing_retry_requested",
+          properties: { retrySource: "worker" },
+          idempotencyScope: [job.id, String(job.attempts), "worker-retry"],
+        });
+      }
+    }
 
     console.warn("Entry interpretation job failed", {
       jobId: job.id,

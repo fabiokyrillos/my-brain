@@ -5,6 +5,7 @@ import { ArrowUpRight, LoaderCircle, Sparkles } from "lucide-react";
 import { CaptureReceiptView } from "@/features/daily-cycle/capture-receipt";
 import type { CaptureReceipt } from "@/features/daily-cycle/contracts";
 import type { DailyCycleActionFailureCode } from "@/features/daily-cycle/action-result";
+import { recordCaptureStarted } from "@/features/product-analytics/interaction-events";
 
 export type CaptureState =
   | { status: "idle" }
@@ -31,12 +32,16 @@ export function QuickCaptureForm({
 }) {
   const idempotencyKeyRef = useRef<string | null>(null);
   if (idempotencyKeyRef.current === null) idempotencyKeyRef.current = crypto.randomUUID();
+  const attemptIdRef = useRef<string | null>(null);
+  if (attemptIdRef.current === null) attemptIdRef.current = crypto.randomUUID();
 
   async function submitCapture(state: CaptureState, formData: FormData): Promise<CaptureState> {
+    recordCaptureStarted({ attemptId: attemptIdRef.current!, captureSource, locale });
     formData.set("idempotencyKey", idempotencyKeyRef.current!);
     formData.set("captureSource", captureSource);
     const result = await action(state, formData);
     if (result.status === "success") idempotencyKeyRef.current = crypto.randomUUID();
+    attemptIdRef.current = crypto.randomUUID();
     return result;
   }
 

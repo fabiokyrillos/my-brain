@@ -1,7 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { recordCaptureStarted } from "@/features/product-analytics/interaction-events";
 import { QuickCaptureForm, type CaptureAction } from "./quick-capture-form";
+
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  recordCaptureStarted: vi.fn(),
+}));
 
 const receipt = {
   entryId: "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6",
@@ -12,6 +17,8 @@ const receipt = {
 };
 
 describe("QuickCaptureForm", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("submits a web entry with a generated idempotency key and the supplied capture source", async () => {
     const action = vi.fn<CaptureAction>(async () => ({ status: "success" as const, receipt }));
     const user = userEvent.setup();
@@ -26,6 +33,11 @@ describe("QuickCaptureForm", () => {
     expect(submitted.get("source")).toBe("web");
     expect(submitted.get("captureSource")).toBe("home");
     expect(String(submitted.get("idempotencyKey"))).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(recordCaptureStarted).toHaveBeenCalledWith({
+      attemptId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      captureSource: "home",
+      locale: "pt-BR",
+    });
   });
 
   it("shows a validation failure without losing the typed text", async () => {

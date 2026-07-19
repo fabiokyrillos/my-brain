@@ -16,6 +16,25 @@ const admin = createClient(credentials.url, credentials.serviceRoleKey, clientOp
 const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 const password = `Phase-2X-${crypto.randomUUID()}!`;
 const createdUsers = [];
+const expectedEventNames = [
+  "capture_started",
+  "capture_save_succeeded",
+  "capture_save_failed",
+  "capture_processing_enqueued",
+  "capture_processing_completed",
+  "capture_processing_failed",
+  "needs_attention_viewed",
+  "needs_attention_item_opened",
+  "interpretation_review_viewed",
+  "interpretation_corrected",
+  "technical_details_opened",
+  "task_candidates_presented",
+  "task_candidates_confirmed",
+  "question_answered_basic",
+  "processing_retry_requested",
+  "work_view_viewed",
+  "task_status_changed",
+];
 
 function baseEvent(overrides = {}) {
   return {
@@ -54,30 +73,125 @@ async function createTestUser(index) {
   return { client, user: created };
 }
 
+function eventMatrix({ entryId, taskId, questionId }) {
+  const entrySubject = { p_subject_type: "entry", p_subject_id: entryId };
+  return [
+    { name: "capture_started", surface: "capture", properties: { captureSource: "capture_page" } },
+    { name: "capture_save_succeeded", surface: "capture", properties: { captureSource: "capture_page", durationMs: 4 }, ...entrySubject },
+    { name: "capture_save_failed", surface: "capture", properties: { captureSource: "capture_page", durationMs: 5, failureKind: "storage" } },
+    { name: "capture_processing_enqueued", surface: "capture", properties: { processingMode: "initial" }, ...entrySubject },
+    { name: "capture_processing_completed", surface: "server", properties: { processingMode: "initial", durationMs: 6, outcome: "ready" }, ...entrySubject },
+    { name: "capture_processing_failed", surface: "server", properties: { processingMode: "reprocess", durationMs: 7, failureKind: "retryable" }, ...entrySubject },
+    { name: "needs_attention_viewed", surface: "needs_attention", properties: { itemCount: 2 } },
+    { name: "needs_attention_item_opened", surface: "needs_attention", properties: { attentionReason: "review_interpretation" }, ...entrySubject },
+    { name: "interpretation_review_viewed", surface: "interpretation_review", properties: {}, ...entrySubject },
+    { name: "interpretation_corrected", surface: "interpretation_review", properties: { fieldCount: 2 }, ...entrySubject },
+    { name: "technical_details_opened", surface: "technical_details", properties: {}, ...entrySubject },
+    { name: "task_candidates_presented", surface: "interpretation_review", properties: { candidateCount: 2 }, ...entrySubject },
+    { name: "task_candidates_confirmed", surface: "interpretation_review", properties: { candidateCount: 1 }, ...entrySubject },
+    { name: "question_answered_basic", surface: "server", properties: {}, p_subject_type: "pending_question", p_subject_id: questionId },
+    { name: "processing_retry_requested", surface: "interpretation_review", properties: { retrySource: "user" }, ...entrySubject },
+    { name: "work_view_viewed", surface: "work", properties: { workView: "today" } },
+    { name: "task_status_changed", surface: "work", properties: { fromStatus: "waiting", toStatus: "todo" }, p_subject_type: "task", p_subject_id: taskId },
+  ];
+}
+
 try {
   const [{ client: first, user: firstUser }, { client: second, user: secondUser }] = await Promise.all([
     createTestUser(1),
     createTestUser(2),
   ]);
 
-  const idempotencyKey = crypto.randomUUID();
-  const ownEvent = dataOrThrow(
-    await first.rpc("record_product_event", baseEvent({ p_idempotency_key: idempotencyKey })),
-    "record allowlisted product event",
+  const ownedEntry = dataOrThrow(
+    await admin.from("entries").insert({
+      user_id: firstUser.id,
+      original_content: "Disposable product-events subject fixture",
+      source: "web",
+      locale: "en",
+    }).select("id").single(),
+    "create owned product-event entry subject",
   );
-  assert(Array.isArray(ownEvent) && ownEvent.length === 1 && ownEvent[0].recorded === true, "Allowlisted event was not recorded");
+  const ownedInterpretation = dataOrThrow(
+    await admin.from("entry_interpretations").insert({
+      user_id: firstUser.id,
+      entry_id: ownedEntry.id,
+      summary: "Disposable fixture",
+      confidence: 1,
+      model: "smoke-fixture",
+      strategy_version: "smoke-v1",
+      prompt_version: "smoke-v1",
+      raw_output: {},
+    }).select("id").single(),
+    "create owned product-event interpretation fixture",
+  );
+  const ownedTask = dataOrThrow(
+    await admin.from("tasks").insert({ user_id: firstUser.id, title: "Disposable task fixture", status: "waiting" }).select("id").single(),
+    "create owned product-event task subject",
+  );
+  const ownedQuestion = dataOrThrow(
+    await admin.from("pending_questions").insert({
+      user_id: firstUser.id,
+      entry_id: ownedEntry.id,
+      interpretation_id: ownedInterpretation.id,
+      candidate_index: 0,
+      question: "Disposable question fixture?",
+      reason: "smoke",
+      confidence: 1,
+    }).select("id").single(),
+    "create owned product-event question subject",
+  );
 
+  const sessionId = crypto.randomUUID();
+  const matrix = eventMatrix({ entryId: ownedEntry.id, taskId: ownedTask.id, questionId: ownedQuestion.id });
+  assert(matrix.map((event) => event.name).join("|") === expectedEventNames.join("|"), "Smoke event matrix drifted from the canonical taxonomy");
+  const recordedByName = new Map();
+  for (const event of matrix) {
+    const idempotencyKey = crypto.randomUUID();
+    const response = dataOrThrow(
+      await first.rpc("record_product_event", baseEvent({
+        p_event_name: event.name,
+        p_surface: event.surface,
+        p_properties: event.properties,
+        p_subject_type: event.p_subject_type ?? null,
+        p_subject_id: event.p_subject_id ?? null,
+        p_session_id: sessionId,
+        p_idempotency_key: idempotencyKey,
+      })),
+      `record ${event.name}`,
+    );
+    assert(Array.isArray(response) && response.length === 1 && response[0].recorded === true, `${event.name} was not recorded`);
+    assert(Object.keys(response[0]).sort().join("|") === "event_id|recorded", `${event.name} returned an unbounded response shape`);
+    recordedByName.set(event.name, { eventId: response[0].event_id, idempotencyKey });
+  }
+
+  const firstCapture = recordedByName.get("capture_started");
   const duplicatedEvent = dataOrThrow(
-    await first.rpc("record_product_event", baseEvent({ p_idempotency_key: idempotencyKey })),
+    await first.rpc("record_product_event", baseEvent({
+      p_event_name: "capture_started",
+      p_properties: { captureSource: "capture_page" },
+      p_session_id: sessionId,
+      p_idempotency_key: firstCapture.idempotencyKey,
+    })),
     "deduplicate product event",
   );
   assert(
     Array.isArray(duplicatedEvent)
       && duplicatedEvent.length === 1
       && duplicatedEvent[0].recorded === false
-      && duplicatedEvent[0].event_id === ownEvent[0].event_id,
+      && duplicatedEvent[0].event_id === firstCapture.eventId,
     "Product event idempotency did not return the existing event",
   );
+
+  const distinctCapture = dataOrThrow(
+    await first.rpc("record_product_event", baseEvent({
+      p_event_name: "capture_started",
+      p_properties: { captureSource: "home" },
+      p_session_id: sessionId,
+      p_idempotency_key: crypto.randomUUID(),
+    })),
+    "record a distinct meaningful interaction",
+  );
+  assert(distinctCapture[0]?.recorded === true && distinctCapture[0]?.event_id !== firstCapture.eventId, "Distinct interaction was incorrectly deduplicated");
 
   const invalidEvent = await first.rpc("record_product_event", baseEvent({ p_event_name: "unknown_event" }));
   assert(invalidEvent.error?.code === "22023", "Unknown product event was not denied");
@@ -124,13 +238,14 @@ try {
   }));
   assert(foreignSubject.error?.code === "42501", "Cross-user product-event subject was not denied");
   const firstVisibleEvents = dataOrThrow(
-    await first.from("product_events").select("user_id,event_name,id").order("created_at", { ascending: true }),
+    await first.from("product_events").select("user_id,event_name,id,properties,created_at,is_synthetic").order("created_at", { ascending: true }),
     "read owner-isolated product events",
   );
   assert(
-    firstVisibleEvents.length === 1 && firstVisibleEvents.every((event) => event.user_id === firstUser.id),
+    firstVisibleEvents.length === expectedEventNames.length + 1 && firstVisibleEvents.every((event) => event.user_id === firstUser.id),
     "Product-events RLS leaked another user row or duplicated rows",
   );
+  assert(expectedEventNames.every((name) => firstVisibleEvents.some((event) => event.event_name === name)), "One or more canonical events were absent from the owner query");
 
   const crossUserWorkerEvent = await first.rpc("record_product_event_for_user", {
     p_user_id: secondUser.id,
@@ -145,11 +260,19 @@ try {
         p_event_name: "capture_processing_completed",
         p_surface: "server",
         p_properties: { processingMode: "initial", durationMs: 1, outcome: "ready" },
+        p_subject_type: "entry",
+        p_subject_id: ownedEntry.id,
       }),
     }),
     "record service-role worker event",
   );
   assert(Array.isArray(workerEvent) && workerEvent.length === 1 && workerEvent[0].recorded === true, "Service-role worker event was not recorded");
+
+  const crossOwnerWorkerEvent = await admin.rpc("record_product_event_for_user", {
+    p_user_id: firstUser.id,
+    ...baseEvent({ p_subject_type: "entry", p_subject_id: foreignEntry.id }),
+  });
+  assert(crossOwnerWorkerEvent.error?.code === "42501", "Service-role RPC accepted a subject owned by another user");
 
   const ownerWorkerEvent = dataOrThrow(
     await first.from("product_events").select("id,is_synthetic").eq("id", workerEvent[0].event_id).single(),
@@ -157,7 +280,30 @@ try {
   );
   assert(ownerWorkerEvent.is_synthetic === true, "Synthetic smoke traffic was not marked for cleanup");
 
-  console.log("Remote product-events smoke passed: allowlist, forbidden payloads, idempotency, subject ownership, RLS, service-role worker control, and disposable cleanup.");
+  const verificationEvents = dataOrThrow(
+    await first.from("product_events").select("event_name,properties,is_synthetic").order("created_at", { ascending: true }),
+    "run safe product funnel verification query",
+  );
+  const counts = Object.fromEntries(expectedEventNames.map((name) => [name, verificationEvents.filter((event) => event.event_name === name).length]));
+  const durations = verificationEvents
+    .map((event) => event.properties?.durationMs)
+    .filter((value) => typeof value === "number");
+  assert(expectedEventNames.every((name) => counts[name] >= 1), "Funnel count query found a missing canonical event");
+  assert(durations.length >= 4 && durations.every((value) => value >= 0 && value <= 86_400_000), "Latency query found an invalid duration");
+  assert(verificationEvents.every((event) => event.is_synthetic === true), "Disposable smoke traffic was not uniformly synthetic");
+  assert(!/original|summary|title|answer|prompt|error/i.test(JSON.stringify(verificationEvents.map((event) => event.properties))), "Verification query exposed a forbidden free-content property");
+
+  console.log("Remote product-events smoke passed:", {
+    taxonomyEvents: expectedEventNames.length,
+    ownerVisibleRows: verificationEvents.length,
+    conversion: {
+      captureStarted: counts.capture_started,
+      captureSaved: counts.capture_save_succeeded,
+      processingCompleted: counts.capture_processing_completed,
+    },
+    latencySamplesMs: durations,
+    controls: ["allowlist", "privacy", "idempotency", "distinct-interactions", "subject-ownership", "RLS", "service-role", "bounded-response", "synthetic-cleanup"],
+  });
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
+import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
@@ -51,6 +52,7 @@ export function WorkView({
   const active = text.views[view];
 
   return <div className="content-page work-page">
+    <WorkViewViewed locale={locale} view={view} />
     <header className="list-header">
       <div>
         <p className="eyebrow">{text.eyebrow}</p>

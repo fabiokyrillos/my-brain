@@ -2,6 +2,29 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.15: complete daily product funnel instrumentation
+
+### Added
+
+- A closed browser interaction boundary for capture intent, confirmed views, item opens and technical disclosure, with per-tab session identity, logical deduplication and no arbitrary client event names.
+- Deterministic UUID idempotency keys for domain and worker outcomes, plus owner-scoped worker emission after persisted completion/failure.
+- Complete focused tests, a 17-event authenticated remote smoke, safe bounded conversion/latency checks and owner-token-only Playwright event-name/count assertions.
+- The durable trigger/subject/payload/failure inventory in `docs/reports/PHASE_2X_SLICE_15_REPORT.md`.
+
+### Changed
+
+- Capture, correction, candidate confirmation, question answer, processing retry and task-status Actions now record their approved outcome events only after the underlying mutation succeeds and independently of the product response.
+- Home/Needs Attention, entry review/candidates/technical details and canonical Work now emit only meaningful visible/open interactions; render, hydration, prefetch, rerender, nested disclosure and no-op task updates do not overcount.
+- The entry worker now records completion/failure/retry only after the respective persistence RPC succeeds, using the existing service-role owner-scoped event RPC.
+- Event contracts expose an explicit version-1 map and preserve exact content-free payload allowlists.
+
+### Verification
+
+- Strict TDD recorded 18 focused files with 25 failures/60 passes before production changes and reached 18 files/134 tests green after the separate review regressions.
+- Full Vitest passed 78 files/425 tests. ESLint, TypeScript, Next.js 16.2.10 production build and `git diff --check` pass. Offline Playwright desktop/mobile passed 6 tests with 10 credential-gated skips.
+- Authenticated online Playwright passed intelligent capture on desktop/mobile and navigation on desktop/mobile (4 tests total). The expanded remote product-events smoke passed all 17 names, privacy/allowlist rejection, idempotency/meaningful repeat, ownership/RLS/service-role controls, bounded queries and cleanup.
+- No migration, RPC, grant, generated database type, secret, schedule, deployment or remote infrastructure mutation. Local Edge Function source changed but was not deployed.
+
 ## 2026-07-19 — Slice 2X.14: visible promises aligned with behavior
 
 ### Added

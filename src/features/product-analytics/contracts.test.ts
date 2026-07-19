@@ -3,6 +3,8 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 type ProductAnalyticsContracts = {
+  productEventContractVersion?: number;
+  productEventVersionByName?: Record<string, number>;
   productEventNames?: readonly string[];
   productSurfaces?: readonly string[];
   parseProductEventPayload?: (value: unknown) => unknown | null;
@@ -73,6 +75,13 @@ describe("product analytics contracts", () => {
       "work",
       "server",
     ]);
+  });
+
+  it("keeps every event on the explicit v1 contract while appVersion remains the stored experience version", () => {
+    expect(contracts.productEventContractVersion).toBe(1);
+    expect(contracts.productEventVersionByName).toEqual(
+      Object.fromEntries(eventNames.map((name) => [name, 1])),
+    );
   });
 
   it.each(eventNames)("accepts the allowlisted payload for %s", (name) => {

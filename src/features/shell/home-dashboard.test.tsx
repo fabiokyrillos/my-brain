@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/auth/require-user";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
 import { HomeDashboard } from "./home-dashboard";
 
@@ -11,6 +12,10 @@ vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
 vi.mock("@/features/daily-cycle/inbox-projection", () => ({ loadInboxProjection: vi.fn() }));
 vi.mock("@/features/daily-cycle/attention-projection", () => ({ loadAttentionProjection: vi.fn() }));
 vi.mock("@/features/capture/actions", () => ({ captureEntry: vi.fn() }));
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  NeedsAttentionViewed: vi.fn(() => <span data-testid="needs-attention-view-marker" />),
+  recordNeedsAttentionItemOpened: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
@@ -158,6 +163,11 @@ describe("HomeDashboard", () => {
     expect(screen.getByText("Confirmar proposta do Atlas")).toBeInTheDocument();
     expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
     expect(screen.getByText("2", { selector: ".attention-count" })).toBeInTheDocument();
+    expect(NeedsAttentionViewed).toHaveBeenCalledWith(
+      expect.objectContaining({ itemCount: 2, locale: "pt-BR", surface: "home" }),
+      undefined,
+    );
+    expect(screen.getByTestId("needs-attention-view-marker").closest(".attention-panel")).not.toBeNull();
     expect(screen.getByText("2 itens precisam de você")).toBeInTheDocument();
   });
 

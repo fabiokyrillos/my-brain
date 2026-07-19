@@ -11,6 +11,7 @@ test.describe("authenticated converged navigation", () => {
   const email = `codex-navigation-${crypto.randomUUID()}@example.com`;
   const password = `Navigation!${crypto.randomUUID()}A7`;
   let userId: string | undefined;
+  let accessToken: string | undefined;
 
   test.beforeAll(async () => {
     const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
@@ -29,6 +30,14 @@ test.describe("authenticated converged navigation", () => {
     });
     expect(response.ok).toBe(true);
     userId = ((await response.json()) as { id: string }).id;
+
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: publishableKey!, "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    expect(authResponse.ok).toBe(true);
+    accessToken = ((await authResponse.json()) as { access_token: string }).access_token;
   });
 
   test.afterAll(async () => {
@@ -108,6 +117,9 @@ test.describe("authenticated converged navigation", () => {
 
       await page.goto(`/${locale}/app`);
       await expect(page.getByText(labels.allSaved, { exact: true })).toBeVisible();
+      const attentionPanel = page.locator(".attention-panel");
+      await attentionPanel.scrollIntoViewIfNeeded();
+      await expect(attentionPanel).toBeVisible();
       const navigation = page.getByRole("navigation", { name: labels.navigation });
       await expect(navigation).toBeVisible();
 
@@ -191,5 +203,17 @@ test.describe("authenticated converged navigation", () => {
         await expect(summary.locator("xpath=ancestor::details")).not.toHaveAttribute("open", "");
       }
     }
+
+    await expect.poll(async () => {
+      const response = await fetch(`${supabaseUrl}/rest/v1/product_events?select=event_name&user_id=eq.${userId}&is_synthetic=eq.false`, {
+        headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+      });
+      expect(response.ok).toBe(true);
+      const names = ((await response.json()) as Array<{ event_name: string }>).map((event) => event.event_name);
+      return {
+        needsAttentionViews: names.filter((name) => name === "needs_attention_viewed").length,
+        workViews: names.filter((name) => name === "work_view_viewed").length,
+      };
+    }, { timeout: 20_000 }).toEqual({ needsAttentionViews: 2, workViews: 1 });
   });
 });

@@ -3,14 +3,17 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
-import { recordProductEvent } from "@/features/product-analytics/server";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
-vi.mock("@/features/product-analytics/server", () => ({ recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })) }));
+vi.mock("@/features/product-analytics/server", () => ({
+  createProductEventIdempotencyKey: vi.fn(() => "22222222-2222-5222-8222-222222222222"),
+  recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),
+}));
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 const operationKey = "6118fb25-2f80-432a-aa96-0e76d924862e";
@@ -86,6 +89,14 @@ describe("interpretation actions", () => {
       }),
     }));
     expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+    expect(recordProductEvent).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "interpretation_corrected",
+      subject: { type: "entry", id: entryId },
+      properties: { fieldCount: 8 },
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("interpretation_corrected", operationKey);
   });
 
   it("reports a reload/retry conflict when the interpretation changed concurrently", async () => {
@@ -154,6 +165,7 @@ describe("interpretation actions", () => {
       name: "capture_processing_enqueued",
       properties: { processingMode: "reprocess" },
     }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("capture_processing_enqueued", operationKey);
   });
 
   it("preserves the original and reports a sanitized failure when enqueueing fails", async () => {
@@ -176,5 +188,7 @@ describe("interpretation actions", () => {
       message: "Não foi possível reinterpretar agora. O original foi preservado.",
     });
     expect(client.from).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).not.toHaveBeenCalled();
   });
 });

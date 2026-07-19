@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Check, LoaderCircle, RotateCcw } from "lucide-react";
+import { TaskCandidatesPresented } from "@/features/product-analytics/interaction-events";
 import type { TaskCandidate } from "@/lib/ai/extraction-schema";
 
 export type ConfirmTasksState = {
@@ -115,9 +116,16 @@ export function TaskCandidateForm({
 
   return (
     <form action={formAction} className="candidate-form">
+      <TaskCandidatesPresented
+        candidateCount={availableEntries.length}
+        entryId={entryId}
+        interpretationId={interpretationId}
+        locale={locale}
+      />
       <input type="hidden" name="entryId" value={entryId} />
       <input type="hidden" name="interpretationId" value={interpretationId} />
       <input type="hidden" name="operationKey" value={operationKey} />
+      <input type="hidden" name="locale" value={locale} />
       <div className="candidate-list">
         {availableEntries.map(({ candidate, index }) => {
           const checked = selected.includes(index);

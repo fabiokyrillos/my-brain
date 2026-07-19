@@ -1,8 +1,14 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { NeedsAttentionList, type LoadMoreNeedsAttention } from "./needs-attention-list";
 import type { NeedsAttentionItemView } from "./contracts";
+
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  NeedsAttentionViewed: vi.fn(() => null),
+  recordNeedsAttentionItemOpened: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
@@ -37,6 +43,10 @@ describe("NeedsAttentionList", () => {
 
     expect(screen.getByText("Ligar para a Marina")).toBeInTheDocument();
     expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
+    expect(NeedsAttentionViewed).toHaveBeenCalledWith(
+      expect.objectContaining({ itemCount: 2, locale: "pt-BR", surface: "needs_attention" }),
+      undefined,
+    );
   });
 
   it("does not render a load-more control when there is no next page", () => {

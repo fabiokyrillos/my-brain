@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { CreateRecordState } from "./inline-create-form";
@@ -83,12 +85,14 @@ const statusSchema = z.object({
   taskId: z.string().uuid(),
   locale: z.enum(["pt-BR", "en"]),
   status: z.enum(["inbox", "todo", "in_progress", "waiting", "blocked", "deferred", "completed", "cancelled"]),
+  operationKey: z.string().uuid().optional(),
 });
 
 const workItemActionSchema = z.object({
   taskId: z.string().uuid(),
   locale: z.enum(["pt-BR", "en"]),
   action: z.enum(["complete_task", "wait_task", "resume_task", "reopen_task"]),
+  operationKey: z.string().uuid(),
 });
 
 const statusByWorkItemAction = {
@@ -98,17 +102,33 @@ const statusByWorkItemAction = {
   reopen_task: "todo",
 } as const;
 
-async function persistTaskStatus(input: z.infer<typeof statusSchema>) {
+async function persistTaskStatus(input: z.infer<typeof statusSchema> & { operationKey: string }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
+
+  const currentResult = await supabase.from("tasks").select("status").eq("id", input.taskId).eq("user_id", user.id).maybeSingle();
+  const currentStatus = statusSchema.shape.status.safeParse(currentResult.data?.status);
 
   const result = await supabase.from("tasks").update({
     status: input.status,
     completed_at: input.status === "completed" ? new Date().toISOString() : null,
     cancelled_at: input.status === "cancelled" ? new Date().toISOString() : null,
-  }).eq("id", input.taskId).eq("user_id", user.id);
+  }).eq("id", input.taskId).eq("user_id", user.id).select("id").maybeSingle();
   requireSupabaseSuccess(result, "update task status");
+
+  if (result.data && currentStatus.success && currentStatus.data !== input.status) {
+    after(() => recordProductEvent({
+      name: "task_status_changed",
+      surface: "work",
+      locale: input.locale,
+      viewportClass: "unknown",
+      appVersion: "server",
+      idempotencyKey: createProductEventIdempotencyKey("task_status_changed", input.operationKey),
+      subject: { type: "task", id: input.taskId },
+      properties: { fromStatus: currentStatus.data, toStatus: input.status },
+    }).catch(() => {}));
+  }
 
   for (const route of ["", "/today", "/tasks", "/waiting"]) {
     revalidatePath(`/${input.locale}/app${route}`);
@@ -120,7 +140,7 @@ async function persistTaskStatus(input: z.infer<typeof statusSchema>) {
 export async function updateTaskStatus(formData: FormData) {
   const parsed = statusSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
-  await persistTaskStatus(parsed.data);
+  await persistTaskStatus({ ...parsed.data, operationKey: parsed.data.operationKey ?? crypto.randomUUID() });
 }
 
 export async function applyWorkItemAction(formData: FormData) {
@@ -130,5 +150,6 @@ export async function applyWorkItemAction(formData: FormData) {
     taskId: parsed.data.taskId,
     locale: parsed.data.locale,
     status: statusByWorkItemAction[parsed.data.action],
+    operationKey: parsed.data.operationKey,
   });
 }

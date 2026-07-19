@@ -1,10 +1,19 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { TrackedTechnicalDetails } from "@/features/product-analytics/interaction-events";
 import type { InterpretationTechnicalDetailsView } from "./contracts";
 import type { EntryReviewHistoryItem } from "./review-projection";
 import { TechnicalDetails } from "./technical-details";
 
-afterEach(cleanup);
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  TrackedTechnicalDetails: vi.fn(({ children }: { children: ReactNode }) => <details>{children}</details>),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function technicalView(overrides: Partial<InterpretationTechnicalDetailsView> = {}): InterpretationTechnicalDetailsView {
   return {
@@ -39,7 +48,7 @@ function historyItem(overrides: Partial<EntryReviewHistoryItem> = {}): EntryRevi
 describe("TechnicalDetails", () => {
   it("renders nothing when the entry has no technical details to show", () => {
     const { container } = render(
-      <TechnicalDetails technical={null} history={[]} hasTechnicalDetails={false} locale="pt-BR" />,
+      <TechnicalDetails entryId="entry-1" technical={null} history={[]} hasTechnicalDetails={false} locale="pt-BR" />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -47,6 +56,7 @@ describe("TechnicalDetails", () => {
   it("renders the extracted concepts, dates, entity links, and mentions when structured content is provided", () => {
     render(
       <TechnicalDetails
+        entryId="entry-1"
         technical={null}
         history={[]}
         hasTechnicalDetails
@@ -66,20 +76,24 @@ describe("TechnicalDetails", () => {
   });
 
   it("stays collapsed by default behind a details/summary disclosure", () => {
-    render(<TechnicalDetails technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     const summary = screen.getByText("Ver detalhes técnicos");
     const details = summary.closest("details");
     expect(details).not.toHaveAttribute("open");
+    expect(TrackedTechnicalDetails).toHaveBeenCalledWith(
+      expect.objectContaining({ entryId: "entry-1", locale: "pt-BR" }),
+      undefined,
+    );
   });
 
   it("degrades gracefully when technical details failed to load but the entry has a current interpretation", () => {
-    render(<TechnicalDetails technical={null} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails entryId="entry-1" technical={null} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     expect(screen.getByText(/Não foi possível carregar os detalhes técnicos/)).toBeInTheDocument();
     expect(screen.getByText("v1 · Interpretação inicial")).toBeInTheDocument();
   });
 
   it("renders trust scores and policies for each interpreted element", () => {
-    render(<TechnicalDetails technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     expect(screen.getByText("90%")).toBeInTheDocument();
     expect(screen.getByText("Aplicação automática")).toBeInTheDocument();
   });
@@ -87,6 +101,7 @@ describe("TechnicalDetails", () => {
   it("renders the immutable revision timeline", () => {
     render(
       <TechnicalDetails
+        entryId="entry-1"
         technical={technicalView()}
         history={[historyItem(), historyItem({ interpretationId: "interp-2", version: 2, origin: "user_corrected", isCurrent: false })]}
         hasTechnicalDetails
@@ -98,7 +113,7 @@ describe("TechnicalDetails", () => {
   });
 
   it("localizes labels in English", () => {
-    render(<TechnicalDetails technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="en" />);
+    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="en" />);
     expect(screen.getByText("View technical details")).toBeInTheDocument();
     expect(screen.getByText("Auto-apply")).toBeInTheDocument();
   });

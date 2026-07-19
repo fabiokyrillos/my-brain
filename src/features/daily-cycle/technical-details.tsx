@@ -1,4 +1,5 @@
 import { Brain, History, ShieldCheck } from "lucide-react";
+import { TrackedTechnicalDetails } from "@/features/product-analytics/interaction-events";
 import { conceptLabels } from "@/features/interpretations/copy";
 import type { InterpretationTechnicalDetailsView } from "./contracts";
 import type { DailyCycleLocale } from "./copy";
@@ -78,12 +79,14 @@ function changeValue(field: string, value: unknown, locale: DailyCycleLocale) {
 }
 
 export function TechnicalDetails({
+  entryId,
   technical,
   history,
   hasTechnicalDetails,
   locale,
   structured,
 }: {
+  entryId: string;
   technical: InterpretationTechnicalDetailsView | null;
   history: readonly EntryReviewHistoryItem[];
   hasTechnicalDetails: boolean;
@@ -95,7 +98,7 @@ export function TechnicalDetails({
   const comparisons = technical ? Object.entries(technical.comparisons) : [];
 
   return (
-    <details className="technical-details">
+    <TrackedTechnicalDetails entryId={entryId} locale={locale} className="technical-details">
       <summary>{pt ? "Ver detalhes técnicos" : "View technical details"}</summary>
       <div className="technical-details-body">
         {!technical && (
@@ -192,6 +195,6 @@ export function TechnicalDetails({
 
         {technical?.model && <p className="model-note"><Brain size={14} aria-hidden="true" />{technical.model}</p>}
       </div>
-    </details>
+    </TrackedTechnicalDetails>
   );
 }

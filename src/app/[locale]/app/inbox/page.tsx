@@ -6,6 +6,7 @@ import { loadAttentionProjection } from "@/features/daily-cycle/attention-projec
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import { NeedsAttentionList } from "@/features/daily-cycle/needs-attention-list";
+import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
@@ -58,7 +59,10 @@ export default async function InboxPage({
             loadMore={loadMoreNeedsAttention}
           />
         ) : (
-          <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Nada precisa de você agora" : "Nothing needs you right now"}</strong><p>{pt ? "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." : "When an already-supported decision needs your confirmation, it appears here."}</p></div>
+          <>
+            <NeedsAttentionViewed surface="needs_attention" itemCount={0} locale={locale} />
+            <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Nada precisa de você agora" : "Nothing needs you right now"}</strong><p>{pt ? "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." : "When an already-supported decision needs your confirmation, it appears here."}</p></div>
+          </>
         )}
       </div>
     );

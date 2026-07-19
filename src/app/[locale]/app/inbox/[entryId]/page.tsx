@@ -75,7 +75,7 @@ export default async function EntryDetailPage({
     <>
       {editableCurrent.isRecordOnly ? (
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
-      ) : canConfirmCandidates ? (
+      ) : canConfirmCandidates || taskInitialState ? (
         <TaskCandidateForm
           action={confirmEntryTasks}
           candidates={taskCandidates}
@@ -142,6 +142,7 @@ export default async function EntryDetailPage({
           nextActions,
           technicalDetails: (
             <TechnicalDetails
+              entryId={view.entryId}
               technical={technical}
               history={history}
               hasTechnicalDetails={view.hasTechnicalDetails}

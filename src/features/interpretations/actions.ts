@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
-import { recordProductEvent } from "@/features/product-analytics/server";
+import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createClient } from "@/lib/supabase/server";
 import type { RevisionActionState } from "./revision-editor";
@@ -69,6 +69,16 @@ export async function correctInterpretation(
         : localized(locale.data, "Não foi possível salvar a nova versão.", "Could not save the new version."),
     };
   }
+  after(() => recordProductEvent({
+    name: "interpretation_corrected",
+    surface: "interpretation_review",
+    locale: locale.data,
+    viewportClass: "unknown",
+    appVersion: "server",
+    idempotencyKey: createProductEventIdempotencyKey("interpretation_corrected", operationKey),
+    subject: { type: "entry", id: entryId },
+    properties: { fieldCount: Object.keys(patch).length },
+  }).catch(() => {}));
   refreshEntry(locale.data, entryId);
   return { status: "success", message: localized(locale.data, "Nova versão salva.", "New version saved.") };
 }
@@ -122,19 +132,21 @@ export async function reprocessEntry(
   const job = jobLookup.data;
 
   after(async () => {
+    const sideEffects: Promise<unknown>[] = [];
     if (job?.id && (job.status === "pending" || job.status === "failed")) {
-      await kickEntryInterpretationWorker(supabase, job.id);
+      sideEffects.push(kickEntryInterpretationWorker(supabase, job.id));
     }
-    await recordProductEvent({
+    sideEffects.push(recordProductEvent({
       name: "capture_processing_enqueued",
       surface: "interpretation_review",
       locale: locale.data,
       viewportClass: "unknown",
       appVersion: "server",
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: createProductEventIdempotencyKey("capture_processing_enqueued", operationKey.data),
       subject: { type: "entry", id: entryId.data },
       properties: { processingMode: "reprocess" },
-    }).catch(() => {});
+    }));
+    await Promise.allSettled(sideEffects);
   });
 
   refreshEntry(locale.data, entryId.data);

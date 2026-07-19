@@ -11,6 +11,14 @@ async function waitForOrganized(page: Page, href: string, timeoutMs = 90_000) {
   }
 }
 
+async function loadProductEventNames(userId: string, accessToken: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/product_events?select=event_name&user_id=eq.${userId}&is_synthetic=eq.false&order=created_at.asc`, {
+    headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+  });
+  expect(response.ok).toBe(true);
+  return ((await response.json()) as Array<{ event_name: string }>).map((event) => event.event_name);
+}
+
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
@@ -71,7 +79,7 @@ test.describe("intelligent capture", () => {
     await page.getByLabel("E-mail").fill(email);
     await page.getByLabel("Senha").fill(password);
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/);
+    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
 
     for (const [source, target] of [
       ["/pt-BR/app/today?page=3", "/pt-BR/app/work?view=today&page=3"],
@@ -169,6 +177,7 @@ test.describe("intelligent capture", () => {
           p_operation_key: operationKey,
           p_extraction: {
             ...currentState.raw_output,
+            recordOnly: false,
             taskCandidates: [{ title: "Enviar a proposta", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 1, explicit: true }],
           },
           p_model: currentState.model,
@@ -220,6 +229,29 @@ test.describe("intelligent capture", () => {
     await expect(page.getByRole("link", { name: "Todas" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(confirmedTaskTitle, { exact: true })).toBeVisible();
 
+    const expectedJourneyEvents = [
+      "capture_started",
+      "capture_save_succeeded",
+      "capture_processing_enqueued",
+      "capture_processing_completed",
+      "needs_attention_viewed",
+      "needs_attention_item_opened",
+      "interpretation_review_viewed",
+      "interpretation_corrected",
+      "technical_details_opened",
+      "task_candidates_presented",
+      "task_candidates_confirmed",
+      "work_view_viewed",
+    ];
+    await expect.poll(async () => {
+      const names = await loadProductEventNames(userId!, accessToken!);
+      return expectedJourneyEvents.every((name) => names.includes(name));
+    }, { timeout: 30_000 }).toBe(true);
+    const productEventNames = await loadProductEventNames(userId!, accessToken!);
+    const productEventCounts = Object.fromEntries(expectedJourneyEvents.map((name) => [name, productEventNames.filter((eventName) => eventName === name).length]));
+    expect(expectedJourneyEvents.every((name) => productEventCounts[name] >= 1)).toBe(true);
+    expect(productEventCounts.needs_attention_viewed).toBeGreaterThanOrEqual(2);
+
     const entryResponse = await fetch(`${supabaseUrl}/rest/v1/entries?select=id,original_content,status&user_id=eq.${userId}`, {
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
     });
@@ -248,7 +280,7 @@ test.describe("intelligent capture", () => {
 
     await page.goto("/pt-BR/app/reviews");
     await page.getByRole("button", { name: "Resumo do dia" }).click();
-    await expect(page.getByRole("status")).toHaveText("Revisão gerada.", { timeout: 120_000 });
+    await expect(page.getByRole("status")).toHaveText("Revisão concluída.", { timeout: 120_000 });
     await page.reload();
     await expect(page.locator(".review-card")).toHaveCount(1);
 

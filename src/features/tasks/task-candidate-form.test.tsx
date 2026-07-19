@@ -1,6 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TaskCandidateForm, type ConfirmTasksAction } from "./task-candidate-form";
+
+const taskCandidatesPresented = vi.hoisted(() => vi.fn(() => null));
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  TaskCandidatesPresented: taskCandidatesPresented,
+}));
 
 const candidates = [
   { title: "Atualizar o relatório", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.95, explicit: false },
@@ -12,6 +18,46 @@ const interpretationId = "94f6c9d0-2f4e-4a2e-8f2c-9b2a3c4d5e6f";
 const operationKey = "6118fb25-2f80-432a-aa96-0e76d924862e";
 
 describe("TaskCandidateForm", () => {
+  it("keeps the confirmation acknowledgement and undo control after submitting", async () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "2 tarefas criadas.", undoId: "undo-id" })) as ConfirmTasksAction;
+    const user = userEvent.setup();
+    render(
+      <TaskCandidateForm
+        action={action}
+        candidates={candidates}
+        entryId={entryId}
+        interpretationId={interpretationId}
+        locale="pt-BR"
+        operationKey={operationKey}
+        undoAction={vi.fn(async () => ({ status: "success" as const, message: "Criação desfeita." }))}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("2 tarefas criadas.");
+    expect(screen.getByRole("button", { name: "Desfazer criação" })).toBeVisible();
+  });
+
+  it("records when the available candidate set becomes visible", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "Tarefas criadas.", undoId: null })) as ConfirmTasksAction;
+    render(
+      <TaskCandidateForm
+        action={action}
+        candidates={candidates}
+        entryId={entryId}
+        interpretationId={interpretationId}
+        locale="pt-BR"
+        operationKey={operationKey}
+      />,
+    );
+
+    expect(taskCandidatesPresented).toHaveBeenCalledWith(
+      expect.objectContaining({ candidateCount: 2, entryId, interpretationId, locale: "pt-BR" }),
+      undefined,
+    );
+  });
+
   it("starts with every candidate selected and permits selecting only some", () => {
     const action = vi.fn(async () => ({ status: "success" as const, message: "Tarefas criadas.", undoId: null })) as ConfirmTasksAction;
     render(
