@@ -1,34 +1,178 @@
 "use client";
 
+import type { KeyboardEvent, MouseEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BellRing, BrainCircuit, CalendarDays, CircleHelp, Clock3, Files, FolderKanban, History, Home, Inbox, ListTodo, MessageCircleMore, NotebookTabs, Plus, Settings, UsersRound } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  Bell,
+  BellRing,
+  BrainCircuit,
+  BriefcaseBusiness,
+  CircleDollarSign,
+  CircleHelp,
+  Files,
+  FolderKanban,
+  History,
+  Home,
+  Inbox,
+  Menu,
+  MessageCircleMore,
+  NotebookTabs,
+  Plus,
+  Settings,
+  UsersRound,
+  Wrench,
+} from "lucide-react";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
+import {
+  getLocaleSwitchHref,
+  getNavigationHref,
+  isNavigationActive,
+  moreNavigationGroups,
+  type NavigationKey,
+  primaryNavigationKeys,
+  type VisibleNavigationKey,
+} from "./capabilities";
 
-const icons = { home: Home, today: CalendarDays, inbox: Inbox, tasks: ListTodo, waiting: Clock3, projects: FolderKanban, people: UsersRound, reminders: BellRing, questions: CircleHelp, chat: MessageCircleMore, memories: BrainCircuit, reviews: NotebookTabs, files: Files, history: History, settings: Settings };
-const items = ["home", "today", "inbox", "tasks", "waiting", "projects", "people", "reminders", "questions", "chat", "memories", "reviews", "files", "history", "settings"] as const;
+const icons = {
+  home: Home,
+  inbox: Inbox,
+  work: BriefcaseBusiness,
+  chat: MessageCircleMore,
+  projects: FolderKanban,
+  people: UsersRound,
+  memories: BrainCircuit,
+  files: Files,
+  reviews: NotebookTabs,
+  questions: CircleHelp,
+  reminders: BellRing,
+  history: History,
+  costs: CircleDollarSign,
+  settings: Settings,
+  capture: Plus,
+  notifications: Bell,
+  jobs: Wrench,
+} as const satisfies Record<NavigationKey, typeof Home>;
 
-function hrefFor(locale: Locale, key: typeof items[number]) {
-  return `/${locale}/app${key === "home" ? "" : `/${key}`}`;
+function closeMobileMore(event: MouseEvent<HTMLAnchorElement>) {
+  event.currentTarget.closest("details")?.removeAttribute("open");
 }
 
-function isActive(pathname: string, href: string, key: typeof items[number]) {
-  if (key === "home") return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+function closeMobileMoreWithEscape(event: KeyboardEvent<HTMLDetailsElement>) {
+  if (event.key !== "Escape" || !event.currentTarget.open) return;
+  event.preventDefault();
+  event.currentTarget.open = false;
+  event.currentTarget.querySelector("summary")?.focus();
 }
 
-export function NavigationLinks({ locale, mobile = false }: { locale: Locale; mobile?: boolean }) {
+export function LocaleSwitchLink({ locale }: { locale: Locale }) {
+  const pathname = usePathname() ?? `/${locale}/app`;
+  const searchParams = useSearchParams();
+  const targetLocale = locale === "pt-BR" ? "en" : "pt-BR";
+  const t = getMessages(locale);
+
+  return (
+    <Link
+      href={getLocaleSwitchHref(pathname, searchParams?.toString() ?? "", targetLocale)}
+      aria-label={t.shell.switchLanguage}
+    >
+      {locale === "pt-BR" ? "EN" : "PT"}
+    </Link>
+  );
+}
+
+export function NavigationLinks({
+  locale,
+  mobile = false,
+}: {
+  locale: Locale;
+  mobile?: boolean;
+}) {
   const pathname = usePathname() ?? `/${locale}/app`;
   const t = getMessages(locale);
-  const visible = mobile ? items.slice(0, 4) : items;
+  const renderLink = (
+    key: VisibleNavigationKey,
+    options: { compact?: boolean; capture?: boolean; closeMore?: boolean } = {},
+  ) => {
+    const Icon = icons[key];
+    const href = getNavigationHref(locale, key);
+    const active = isNavigationActive(pathname, key);
+    const className = options.capture
+      ? `capture-fab${active ? " active" : ""}`
+      : `${options.compact ? "mobile-primary-link" : "nav-item"}${active ? " active" : ""}`;
 
-  return <>
-    {visible.map((key) => {
-      const Icon = icons[key];
-      const href = hrefFor(locale, key);
-      return <Link key={key} href={href} className={`${mobile ? "" : "nav-item"}${isActive(pathname, href, key) ? " active" : ""}`} aria-current={isActive(pathname, href, key) ? "page" : undefined}><Icon size={mobile ? 20 : 18}/><span>{t.nav[key]}</span></Link>;
-    })}
-    {mobile && <Link href={`/${locale}/app/capture`} className="capture-fab" aria-label={t.nav.capture}><Plus size={24}/><span>{t.nav.capture}</span></Link>}
-  </>;
+    return (
+      <Link
+        key={key}
+        href={href}
+        className={className}
+        aria-current={active ? "page" : undefined}
+        aria-label={options.capture ? t.nav.capture : undefined}
+        onClick={options.closeMore ? closeMobileMore : undefined}
+      >
+        <Icon size={options.capture ? 24 : options.compact ? 20 : 18} aria-hidden="true" />
+        <span>{t.nav[key]}</span>
+      </Link>
+    );
+  };
+
+  if (!mobile) {
+    return (
+      <>
+        <div className="nav-group nav-group-primary" role="group" aria-label={t.navGroups.primary}>
+          <div className="nav-group-items">
+            {primaryNavigationKeys.map((key) => renderLink(key))}
+          </div>
+        </div>
+        {renderLink("capture", { capture: true })}
+        {moreNavigationGroups.map((group) => (
+          <div className="nav-group" role="group" aria-label={t.navGroups[group.key]} key={group.key}>
+            <span className="nav-group-label" aria-hidden="true">{t.navGroups[group.key]}</span>
+            <div className="nav-group-items">
+              {group.items.map((key) => renderLink(key))}
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  const overflowActive = moreNavigationGroups
+    .flatMap((group) => group.items)
+    .some((key) => isNavigationActive(pathname, key));
+
+  return (
+    <>
+      {primaryNavigationKeys.slice(0, 2).map((key) => renderLink(key, { compact: true }))}
+      {renderLink("capture", { capture: true })}
+      {primaryNavigationKeys.slice(2).map((key) => renderLink(key, { compact: true }))}
+      <details
+        className={`mobile-more${overflowActive ? " active" : ""}`}
+        onKeyDown={closeMobileMoreWithEscape}
+      >
+        <summary aria-label={t.nav.more}>
+          <Menu size={20} aria-hidden="true" />
+          <span>{t.nav.more}</span>
+        </summary>
+        <div className="mobile-more-menu">
+          {moreNavigationGroups.map((group) => (
+            <div
+              className="mobile-nav-group"
+              role="group"
+              aria-label={t.navGroups[group.key]}
+              key={group.key}
+            >
+              <span className="mobile-nav-group-label" aria-hidden="true">
+                {t.navGroups[group.key]}
+              </span>
+              <div className="nav-group-items">
+                {group.items.map((key) => renderLink(key, { closeMore: true }))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    </>
+  );
 }

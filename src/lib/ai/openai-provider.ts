@@ -6,6 +6,7 @@ import { chatAnswerSchema } from "./chat-schema";
 import { entryExtractionSchema } from "./extraction-schema";
 import type { AIProvider } from "./provider";
 import type { ChatInput, ChatResult, EmbeddingResult, ExtractionInput, ExtractionResult } from "./types";
+import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details";
 
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
 export const EXTRACTION_PROMPT_VERSION = "2026-07-16.1";
@@ -30,12 +31,14 @@ export class OpenAIProvider implements AIProvider {
   readonly id = "openai";
   private readonly client: OpenAI;
   private readonly model: string;
+  private readonly embeddingModel: string;
 
-  constructor(options?: { apiKey?: string; model?: string }) {
+  constructor(options?: { apiKey?: string; model?: string; embeddingModel?: string }) {
     const apiKey = options?.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
     this.client = new OpenAI({ apiKey });
     this.model = options?.model ?? process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-5.6-luna";
+    this.embeddingModel = options?.embeddingModel ?? process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
   }
 
   async extractEntry(input: ExtractionInput): Promise<ExtractionResult> {
@@ -63,20 +66,19 @@ export class OpenAIProvider implements AIProvider {
     }
 
     return {
+      ...normalizeResponseUsage(response),
       extraction: entryExtractionSchema.parse(response.output_parsed),
       model: response.model ?? this.model,
-      inputTokens: response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.output_tokens ?? 0,
       rawOutput: response.output_parsed,
     };
   }
 
   async embedText(input: string): Promise<EmbeddingResult> {
-    const model = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+    const model = this.embeddingModel;
     const response = await this.client.embeddings.create({ model, input, encoding_format: "float" });
     const embedding = response.data[0]?.embedding;
     if (!embedding) throw new Error("OpenAI returned no embedding");
-    return { embedding, model, inputTokens: response.usage?.prompt_tokens ?? 0 };
+    return { embedding, model, ...normalizeEmbeddingUsage(response) };
   }
 
   async answerFromKnowledge(input: ChatInput): Promise<ChatResult> {
@@ -87,7 +89,7 @@ export class OpenAIProvider implements AIProvider {
       "</source>",
     ].join("\n")).join("\n\n");
     const response = await this.client.responses.parse({
-      model: process.env.OPENAI_CHAT_MODEL ?? this.model,
+      model: this.model,
       reasoning: { effort: "low" },
       input: [
         {
@@ -104,11 +106,10 @@ export class OpenAIProvider implements AIProvider {
     if (!response.output_parsed) throw new Error("OpenAI returned no structured answer");
     const parsed = chatAnswerSchema.parse(response.output_parsed);
     return {
+      ...normalizeResponseUsage(response),
       answer: parsed.answer,
       citedSourceIds: parsed.citedSourceIds.filter((id) => availableIds.has(id)),
       model: response.model ?? this.model,
-      inputTokens: response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.output_tokens ?? 0,
     };
   }
 }

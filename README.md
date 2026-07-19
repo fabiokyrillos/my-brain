@@ -4,8 +4,8 @@ Agente pessoal contextual em Next.js, TypeScript, Supabase e OpenAI. O pré-MVP 
 
 ## O que funciona agora
 
-- Auth por e-mail/senha, recuperação, perfil e preferências completas.
-- Supabase online com RLS forçada e políticas explícitas por usuário.
+- Auth por e-mail/senha, signup validado, recuperação PKCE completa, perfil e preferências atômicas.
+- Supabase online com RLS forçada, policies de menor privilégio e ownership composto nos relacionamentos.
 - Captura imutável, datas retroativas, entidades, confiança e perguntas pendentes.
 - Confirmação seletiva de tarefas, subtarefas, relações, auditoria e desfazer.
 - Chat com embeddings `text-embedding-3-small`, busca pgvector e fontes internas clicáveis.
@@ -14,7 +14,8 @@ Agente pessoal contextual em Next.js, TypeScript, Supabase e OpenAI. O pré-MVP 
 - Notificações internas, lembretes, revisões manuais e invalidação retroativa.
 - Upload privado de imagens, PDF, texto, CSV, DOCX e XLSX, com URL assinada, job durável e análise estruturada pela OpenAI.
 - PWA instalável; o service worker guarda somente assets públicos, nunca conteúdo autenticado.
-- Interface PT-BR/EN responsiva, com navegação lateral e inferior.
+- Rotas de IA por tipo de trabalho, ledger imutável de uso, preços versionados e dashboard de custos calculados.
+- Interface PT-BR/EN responsiva, com acesso mobile a toda a arquitetura de informação.
 
 Google OAuth e Vercel foram deliberadamente adiados enquanto o produto permanece em pré-MVP.
 
@@ -47,7 +48,10 @@ Não coloque service role, segredo do heartbeat ou chave OpenAI em variáveis `N
 npm run lint
 npm run typecheck
 npm test
+npm run test:coverage
 npm run build
+npm run test:e2e
+npm run test:remote
 npx supabase db lint --linked --level warning
 ```
 
@@ -62,6 +66,7 @@ npx playwright test e2e/intelligent-capture.spec.ts --project=mobile
 
 ```powershell
 npx supabase functions deploy heartbeat --project-ref SEU_PROJECT_REF --no-verify-jwt
+npx supabase functions deploy process-jobs --project-ref SEU_PROJECT_REF
 npx supabase secrets set HEARTBEAT_SECRET=VALOR_FORTE --project-ref SEU_PROJECT_REF
 ```
 
@@ -75,3 +80,7 @@ O cron do banco executa `run_all_heartbeats()` a cada hora. A Edge Function ofer
 - `docs/AI_AGENT.md` — contratos de extração, chat e heartbeat.
 - `docs/SECURITY.md` — controles ativos e lacunas antes de produção.
 - `docs/IMPLEMENTATION_PLAN.md` — status honesto por fase.
+- `docs/STATE.md` — estado operacional atual e gate da próxima fase.
+- `docs/DECISIONS.md` — ADRs append-only.
+- `docs/CHANGELOG.md` — mudanças técnicas por fase.
+- `docs/TODO.md` — backlog, riscos e trabalho atual.

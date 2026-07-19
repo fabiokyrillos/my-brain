@@ -1,42 +1,98 @@
 "use server";
-import { redirect } from "next/navigation";
+
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import {
+  authProviderErrorCode,
+  buildAuthCallbackUrl,
+} from "@/features/auth/flow";
+import {
+  recoverySchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+} from "@/features/auth/schema";
+import type { Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 
-function safeLocale(value: FormDataEntryValue | null) { return value === "en" ? "en" : "pt-BR"; }
-function credentials(formData: FormData) { return { email: String(formData.get("email") ?? "").trim(), password: String(formData.get("password") ?? "") }; }
+function safeLocale(value: FormDataEntryValue | null): Locale {
+  return value === "en" ? "en" : "pt-BR";
+}
+
+function formValues(formData: FormData) {
+  return Object.fromEntries(formData.entries());
+}
+
+async function requestOrigin() {
+  return (await headers()).get("origin") ?? "http://localhost:3000";
+}
 
 export async function signIn(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
+  const parsed = signInSchema.safeParse(formValues(formData));
+  if (!parsed.success) redirect(`/${locale}/auth/login?error=invalid-form`);
+
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(credentials(formData));
-  if (error) redirect(`/${locale}/auth/login?error=${encodeURIComponent(error.message)}`);
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error) redirect(`/${locale}/auth/login?error=invalid-credentials`);
+
   redirect(`/${locale}/app`);
 }
 
 export async function signUp(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
-  const data = credentials(formData);
+  const parsed = signUpSchema.safeParse(formValues(formData));
+  if (!parsed.success) redirect(`/${locale}/auth/register?error=invalid-form`);
+
+  const origin = await requestOrigin();
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({ ...data, options: { data: { display_name: String(formData.get("displayName") ?? "").trim() } } });
-  if (error) redirect(`/${locale}/auth/register?error=${encodeURIComponent(error.message)}`);
+  const { error } = await supabase.auth.signUp({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    options: {
+      data: { display_name: parsed.data.displayName },
+      emailRedirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/app`),
+    },
+  });
+
+  if (error) {
+    const code = authProviderErrorCode(error, "signup-failed");
+    redirect(`/${locale}/auth/register?error=${code}`);
+  }
   redirect(`/${locale}/auth/login?message=check-email`);
 }
 
 export async function recoverPassword(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
-  const origin = (await headers()).get("origin") ?? "http://localhost:3000";
+  const parsed = recoverySchema.safeParse(formValues(formData));
+  if (!parsed.success) redirect(`/${locale}/auth/recover?error=invalid-form`);
+
+  const origin = await requestOrigin();
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(String(formData.get("email") ?? ""), { redirectTo: `${origin}/${locale}/auth/reset` });
-  if (error) redirect(`/${locale}/auth/recover?error=${encodeURIComponent(error.message)}`);
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/auth/reset`),
+  });
+
+  if (error) {
+    const code = authProviderErrorCode(error, "recovery-failed");
+    redirect(`/${locale}/auth/recover?error=${code}`);
+  }
   redirect(`/${locale}/auth/login?message=recovery-sent`);
 }
 
-export async function signInWithGoogle(formData: FormData) {
+export async function updatePassword(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
-  const origin = (await headers()).get("origin") ?? "http://localhost:3000";
+  const parsed = resetPasswordSchema.safeParse(formValues(formData));
+  if (!parsed.success) redirect(`/${locale}/auth/reset?error=invalid-form`);
+
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${origin}/${locale}/auth/callback` } });
-  if (error || !data.url) redirect(`/${locale}/auth/login?error=oauth`);
-  redirect(data.url);
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) redirect(`/${locale}/auth/login?error=callback-failed`);
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) redirect(`/${locale}/auth/reset?error=password-update-failed`);
+
+  const { error: signOutError } = await supabase.auth.signOut();
+  if (signOutError) redirect(`/${locale}/auth/reset?error=password-update-failed`);
+  redirect(`/${locale}/auth/login?message=password-updated`);
 }

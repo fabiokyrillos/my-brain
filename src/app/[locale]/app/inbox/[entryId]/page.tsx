@@ -1,33 +1,19 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Brain, CheckCircle2, Quote, Sparkles } from "lucide-react";
-import { entryExtractionSchema } from "@/lib/ai/extraction-schema";
+import { notFound } from "next/navigation";
+import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
-import { createClient } from "@/lib/supabase/server";
+import type { InterpretationTechnicalDetailsView } from "@/features/daily-cycle/contracts";
+import { EntryReview } from "@/features/daily-cycle/entry-review";
+import { loadEntryReviewProjection } from "@/features/daily-cycle/review-projection";
+import { TechnicalDetails } from "@/features/daily-cycle/technical-details";
+import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
+import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
+import { getInterpretationCopy } from "@/features/interpretations/copy";
+import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { confirmEntryTasks, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
-
-const conceptLabels: Record<string, { pt: string; en: string }> = {
-  raw_record: { pt: "registro", en: "record" },
-  completed_activity: { pt: "atividade concluída", en: "completed activity" },
-  task: { pt: "tarefa", en: "task" },
-  subtask: { pt: "subtarefa", en: "subtask" },
-  reminder: { pt: "lembrete", en: "reminder" },
-  appointment: { pt: "compromisso", en: "appointment" },
-  reference: { pt: "referência", en: "reference" },
-  decision: { pt: "decisão", en: "decision" },
-  idea: { pt: "ideia", en: "idea" },
-  person_note: { pt: "nota sobre pessoa", en: "person note" },
-  project_note: { pt: "nota de projeto", en: "project note" },
-  pending_question: { pt: "pergunta pendente", en: "pending question" },
-  blocker: { pt: "bloqueio", en: "blocker" },
-  dependency: { pt: "dependência", en: "dependency" },
-  status_update: { pt: "atualização", en: "status update" },
-  lasting_preference: { pt: "preferência", en: "preference" },
-  personal_memory: { pt: "memória", en: "memory" },
-  request_received: { pt: "pedido recebido", en: "request received" },
-  waiting_for_third_party: { pt: "aguardando terceiro", en: "waiting on someone" },
-};
 
 export default async function EntryDetailPage({
   params,
@@ -38,104 +24,136 @@ export default async function EntryDetailPage({
   if (!isLocale(rawLocale)) notFound();
   const locale = rawLocale;
   const pt = locale === "pt-BR";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/${locale}/auth/login`);
+  const { supabase } = await requireUser(locale);
 
-  const [{ data: entry }, { data: interpretation }, { data: existingTasks }, { data: availableUndo }] = await Promise.all([
-    supabase.from("entries").select("*").eq("id", entryId).maybeSingle(),
-    supabase.from("entry_interpretations").select("*").eq("entry_id", entryId).order("version", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("tasks").select("id,title,status,due_at").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index"),
-    supabase.from("undo_operations").select("id").eq("action_type", "confirm_entry_tasks").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-  ]);
+  const review = await loadEntryReviewProjection(supabase, { entryId, locale });
+  if (!review) notFound();
 
-  if (!entry) notFound();
-  const parsed = interpretation ? entryExtractionSchema.safeParse(interpretation.raw_output) : null;
-  const extraction = parsed?.success ? parsed.data : null;
-  const createdCount = existingTasks?.length ?? 0;
-  const initialState = createdCount > 0
-    ? {
-        status: "success" as const,
-        message: createdCount === 1 ? "1 tarefa criada." : `${createdCount} tarefas criadas.`,
-        undoId: availableUndo?.id ?? null,
-      }
-    : undefined;
-  const occurredAt = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at));
-  const entities = extraction
-    ? [...extraction.contexts, ...extraction.organizations, ...extraction.projects, ...extraction.people]
-    : [];
+  let technical: InterpretationTechnicalDetailsView | null = null;
+  try {
+    technical = await loadEntryTechnicalDetailsProjection(supabase, entryId);
+  } catch {
+    // Technical detail is a secondary, best-effort concern (Slice 2X.8): a
+    // failure here must never block the primary review flow or misreport
+    // the entry as ready. Rendering continues without the trust panel.
+    technical = null;
+  }
+
+  const {
+    view,
+    errorMessage,
+    editableCurrent,
+    entityOptions,
+    extractedMentions,
+    history,
+    taskUndoId,
+    correctionUndoId,
+  } = review;
+
+  const canRetry = view.availableActions.some((action) => action.id === "retry_processing");
+  const canCorrect = view.availableActions.some((action) => action.id === "correct_interpretation");
+  const canUndoCorrection = view.availableActions.some((action) => action.id === "undo_correction");
+  const canConfirmCandidates = view.availableActions.some((action) => action.id === "confirm_existing_candidates");
+
+  const attentionReason = view.attentionItems[0]?.reason;
+  const attentionDetail = attentionReason === "answer_existing_question"
+    ? editableCurrent?.pendingQuestions.map((question) => question.question).join(" · ") || null
+    : errorMessage;
+
+  const materializedCount = view.materializedTasks.length;
+  const taskInitialState = materializedCount > 0 ? {
+    status: "success" as const,
+    message: pt ? `${materializedCount} ${materializedCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${materializedCount} ${materializedCount === 1 ? "task created" : "tasks created"}.`,
+    undoId: taskUndoId,
+  } : undefined;
+
+  const occurredAtLabel = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(view.original.occurredAt));
+
+  const nextActions = editableCurrent ? (
+    <>
+      {editableCurrent.isRecordOnly ? (
+        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
+      ) : canConfirmCandidates || taskInitialState ? (
+        <TaskCandidateForm
+          action={confirmEntryTasks}
+          candidates={view.actionableCandidates}
+          entryId={entryId}
+          initialState={taskInitialState}
+          interpretationId={editableCurrent.interpretationId}
+          locale={locale}
+          operationKey={randomUUID()}
+          undoAction={undoAgentAction}
+        />
+      ) : (
+        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
+      )}
+      {canCorrect && (
+        <InterpretationRevisionEditor
+          canUndo={canUndoCorrection}
+          correctionAction={correctInterpretation}
+          current={{
+            version: editableCurrent.version,
+            summary: editableCurrent.summary,
+            concepts: editableCurrent.concepts,
+            occurredAt: editableCurrent.occurredAt,
+            extractedDates: editableCurrent.extractedDates,
+            entityLinks: editableCurrent.entityLinks.map(({ entityType, entityId, mention, confidence }) => ({ entityType, entityId, mention, confidence })),
+            classifications: editableCurrent.classifications,
+            pendingQuestions: editableCurrent.pendingQuestions,
+          }}
+          entityOptions={entityOptions}
+          entryId={entryId}
+          locale={locale}
+          operationKey={randomUUID()}
+          reprocessAction={reprocessEntry}
+          reprocessOperationKey={randomUUID()}
+          showSummary={false}
+          undoAction={undoInterpretationCorrection}
+          undoId={correctionUndoId ?? undefined}
+        />
+      )}
+    </>
+  ) : (
+    <div className="empty-interpretation-state">
+      <AlertTriangle size={24} />
+      <h2>{pt ? "Ainda não há interpretação" : "There is no interpretation yet"}</h2>
+      <p>{pt ? "O registro original permanece disponível. Você pode tentar novamente." : "The original record remains available. You can try again."}</p>
+      {!canRetry && <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
+    </div>
+  );
 
   return (
     <div className="content-page entry-detail-page">
       <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Caixa de entrada" : "Inbox"}</Link>
 
-      <header className="entry-heading">
-        <div>
-          <p className="eyebrow">{pt ? "INTERPRETAÇÃO DO BRAIN" : "BRAIN INTERPRETATION"}</p>
-          <h1>{extraction?.summary ?? (pt ? "Entrada preservada" : "Entry preserved")}</h1>
-          <p>{occurredAt}</p>
-        </div>
-        {extraction && <span className="entry-confidence"><Brain size={17} />{Math.round(extraction.confidence * 100)}% {pt ? "de confiança" : "confidence"}</span>}
-      </header>
-
-      {entry.status === "failed" && (
-        <section className="notice-card error-notice">
-          <AlertTriangle size={20} />
-          <div><strong>{pt ? "O original está seguro" : "The original is safe"}</strong><p>{entry.processing_error}</p></div>
-        </section>
-      )}
-
-      <details className="original-entry" open={!extraction}>
-        <summary><Quote size={17} />{pt ? "Ver registro original" : "View original entry"}</summary>
-        <p>{entry.original_content}</p>
-      </details>
-
-      {extraction && (
-        <div className="interpretation-grid">
-          <section className="interpretation-main">
-            <div className="section-heading"><span>01</span><div><h2>{pt ? "O que encontrei" : "What I found"}</h2><p>{pt ? "Contexto extraído sem modificar seu registro." : "Context extracted without changing your record."}</p></div></div>
-            <div className="tag-cloud">
-              {extraction.concepts.map((concept) => <span key={concept}>{conceptLabels[concept]?.[pt ? "pt" : "en"] ?? concept}</span>)}
-            </div>
-            {entities.length > 0 && (
-              <div className="entity-list">
-                {entities.map((entity, index) => (
-                  <article key={`${entity.name}-${index}`}>
-                    <strong>{entity.name}</strong><span>{entity.evidence}</span><small>{Math.round(entity.confidence * 100)}%</small>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {extraction.pendingQuestions.length > 0 && (
-              <div className="question-block">
-                <h3>{pt ? "Ficou uma dúvida" : "One question remains"}</h3>
-                {extraction.pendingQuestions.map((question) => <p key={question.question}>{question.question}</p>)}
-              </div>
-            )}
-          </section>
-
-          <section className="interpretation-actions">
-            <div className="section-heading"><span>02</span><div><h2>{pt ? "Próximas ações" : "Next actions"}</h2><p>{pt ? "Nada vira tarefa sem sua confirmação." : "Nothing becomes a task without your confirmation."}</p></div></div>
-            {extraction.taskCandidates.length > 0 ? (
-              <TaskCandidateForm
-                action={confirmEntryTasks}
-                candidates={extraction.taskCandidates}
-                entryId={entryId}
-                initialState={initialState}
-                locale={locale}
-                undoAction={undoAgentAction}
-              />
-            ) : (
-              <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Este registro ficou salvo como referência e contexto." : "This entry was saved as reference and context."}</p></div>
-            )}
-          </section>
-        </div>
-      )}
-
-      {interpretation && (
-        <footer className="model-note"><Sparkles size={14} />{pt ? "Interpretação estruturada" : "Structured interpretation"} · {interpretation.model}</footer>
-      )}
+      <EntryReview
+        view={view}
+        locale={locale}
+        occurredAtLabel={occurredAtLabel}
+        originalDefaultOpen={!editableCurrent}
+        slots={{
+          attentionAction: canRetry
+            ? <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />
+            : undefined,
+          attentionDetail,
+          nextActions,
+          technicalDetails: (
+            <TechnicalDetails
+              entryId={view.entryId}
+              technical={technical}
+              history={history}
+              hasTechnicalDetails={view.hasTechnicalDetails}
+              locale={locale}
+              structured={editableCurrent ? {
+                concepts: editableCurrent.concepts,
+                extractedDates: editableCurrent.extractedDates,
+                entityLinks: editableCurrent.entityLinks,
+                extractedMentions,
+              } : null}
+            />
+          ),
+        }}
+      />
     </div>
   );
 }
