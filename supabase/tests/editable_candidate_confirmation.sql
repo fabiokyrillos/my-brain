@@ -2,8 +2,8 @@ begin;
 
 select plan(74);
 
--- Structural RED: migration 032 does not exist yet. Every lookup is guarded so
--- the file reports contract failures instead of aborting on an undefined RPC.
+-- Structural guards keep missing or unapplied migrations readable as contract
+-- failures instead of aborting the file on an undefined RPC.
 select has_function(
   'public',
   'confirm_entry_task_candidates_v2',
@@ -111,10 +111,10 @@ select has_function(
 );
 
 select has_function(
-  'extensions',
+  'pg_catalog',
   'encode',
   array['bytea', 'text'],
-  'the authorized database exposes extensions.encode(bytea, text) for hexadecimal fingerprints'
+  'the authorized database exposes pg_catalog.encode(bytea, text) for hexadecimal fingerprints'
 );
 
 select has_column(
@@ -158,7 +158,7 @@ select ok(
     )) like '%extensions.digest%'
     and pg_get_functiondef(to_regprocedure(
       'public.confirm_entry_task_candidates_v2(uuid,uuid,integer[],jsonb,text)'
-    )) like '%extensions.encode%',
+    )) like '%pg_catalog.encode%',
     false
   )
   and coalesce(
@@ -272,13 +272,13 @@ declare
   fingerprint text;
 begin
   if to_regprocedure('extensions.digest(bytea,text)') is null
-    or to_regprocedure('extensions.encode(bytea,text)') is null
+    or to_regprocedure('pg_catalog.encode(bytea,text)') is null
   then
     return null;
   end if;
 
   execute $sha$
-    select extensions.encode(
+    select pg_catalog.encode(
       extensions.digest(convert_to($1::text, 'UTF8'), 'sha256'),
       'hex'
     )
