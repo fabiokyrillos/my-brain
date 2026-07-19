@@ -332,6 +332,9 @@ try {
 } finally {
   for (const userId of createdUsers) {
     const cleanup = await admin.auth.admin.deleteUser(userId);
-    if (cleanup.error) console.error(`Remote interpretation smoke cleanup failed (${cleanup.error.code ?? "unknown"})`);
+    if (cleanup.error) {
+      console.error(`Remote interpretation smoke cleanup failed (${cleanup.error.code ?? "unknown"})`);
+      process.exitCode = 1;
+    }
   }
 }

@@ -89,3 +89,7 @@ Server actions e Edge Functions validam identidade e comandos; RLS forçada cont
 ## Ambientes adiados
 
 Google OAuth e Vercel permanecem fora do fluxo atual por decisão de produto. Nenhum scaffold pago ou dependência externa é necessário para testar localmente.
+
+## Encerramento remoto da Phase 2X
+
+O Slice 2X.18 implantou o runtime local completo de `process-jobs` como versão 13, preservando a versão 12 para rollback. A única diferença acumulada de runtime era `entry.ts` mais o novo helper `product-events.ts`; `_shared`, attachment, dispatch, index e `deno.json` permaneceram idênticos. Um download fresco da v13 foi comparado ao código local com zero divergências. Eventos de conclusão/falha/retry são registrados somente depois da persistência correspondente, usam job+tentativa para idempotência, chamam a RPC owner-scoped `record_product_event_for_user` e permanecem fail-open. O ledger continua fora do lifecycle e nenhum consumidor de produto depende de analytics.

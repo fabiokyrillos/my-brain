@@ -127,3 +127,12 @@ A feature or vertical slice is complete only when all applicable items are true:
 - Automated gates enforce the mechanically verifiable subset; review enforces architecture, security, trust, and scope.
 - An exception must be written in `DECISIONS.md` when it changes architecture or trust, or in `TODO.md` when it is temporary debt.
 - A phase cannot be closed while an undocumented standards exception remains.
+
+## Phase 2X remote gate precedent
+
+- Hosted worker changes require preservation of the prior complete bundle, exact local/deployed source comparison, and attributable post-deploy entry plus attachment health smoke.
+- `npm run test:remote:2x` is the Phase 2X fail-fast aggregate for jobs, interpretations, product events, entry processing, daily cycle, the complete Supabase baseline, and final residual-data cleanup.
+- Shared-project queue smokes must use ID-scoped claims. A necessarily global reaper must first prove the disposable fixture is the only `running` job, make it deterministically first, and use `p_limit: 1`; a scheduled-drain check observes the existing schedule instead of manually draining the shared queue.
+- Remote cleanup errors are gate failures, not log-only warnings. `npm run test:remote:2x:cleanup` verifies disposable Auth prefixes, accessible owner-row orphans, and storage leftovers; deliberately private tables use an owner-scoped post-delete assertion rather than widening service-role read grants.
+- When Deno or Docker is unavailable, the missing gate must be named explicitly; successful deployment bundling, downloaded-source parity, focused tests, linked lint, and remote behavioral smoke are evidence, not a false `deno check` or pgTAP pass.
+- Provider-dependent browser results are reported separately. A stable external skip is never summarized as green and must not obscure the core authenticated product matrix.

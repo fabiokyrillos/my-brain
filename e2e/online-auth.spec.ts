@@ -4,13 +4,15 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
+const providerEmailDomain = process.env.ONLINE_AUTH_TEST_EMAIL_DOMAIN?.trim();
+const fixtureEmailDomain = providerEmailDomain || "example.com";
 const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
 
 test.describe("online Supabase authentication", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
-  const email = `codex-e2e-${crypto.randomUUID()}@example.com`;
+  const email = `codex-e2e-${crypto.randomUUID()}@${fixtureEmailDomain}`;
   const password = `E2e!${crypto.randomUUID()}a7`;
   let userId: string | undefined;
 
@@ -111,8 +113,12 @@ test.describe("online Supabase authentication", () => {
       testInfo.project.name === "mobile",
       "Provider email delivery is exercised once; mobile form access is covered by navigation tests.",
     );
-    const signupEmail = `codex-signup-${crypto.randomUUID()}@example.com`;
+    const signupEmail = `codex-signup-${crypto.randomUUID()}@${fixtureEmailDomain}`;
     const signupPassword = `Signup!${crypto.randomUUID()}A7`;
+    test.skip(
+      !providerEmailDomain,
+      "No provider-routable test email domain is configured; provider signup delivery remains an explicit external limitation.",
+    );
 
     await page.goto("/pt-BR/auth/register");
     await page.getByLabel("Nome").fill("Signup E2E");
@@ -146,22 +152,29 @@ test.describe("online Supabase authentication", () => {
     if (createdUser) await admin.auth.admin.deleteUser(createdUser.id);
   });
 
-  test("exchanges a recovery link, updates the password, and signs in again", async ({ page }) => {
+  test("exchanges a recovery link, updates the password, and signs in again", async ({ page }, testInfo) => {
     const admin = createClient(supabaseUrl!, serviceRoleKey!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    await page.goto("/pt-BR/auth/recover");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByRole("button", { name: "Enviar link" }).click();
-    await page.waitForURL((url) => url.searchParams.has("message") || url.searchParams.has("error"));
-    const recoveryRequestUrl = new URL(page.url());
-    expect([
-      recoveryRequestUrl.searchParams.get("message"),
-      recoveryRequestUrl.searchParams.get("error"),
-    ]).toEqual(expect.arrayContaining([
-      expect.stringMatching(/^(?:recovery-sent|email-rate-limited)$/),
-    ]));
+    if (!providerEmailDomain) {
+      testInfo.annotations.push({
+        type: "provider-limitation",
+        description: "No provider-routable test email domain is configured, so provider recovery-email delivery was not retried.",
+      });
+    } else {
+      await page.goto("/pt-BR/auth/recover");
+      await page.getByLabel("E-mail").fill(email);
+      await page.getByRole("button", { name: "Enviar link" }).click();
+      await page.waitForURL((url) => url.searchParams.has("message") || url.searchParams.has("error"));
+      const recoveryRequestUrl = new URL(page.url());
+      expect([
+        recoveryRequestUrl.searchParams.get("message"),
+        recoveryRequestUrl.searchParams.get("error"),
+      ]).toEqual(expect.arrayContaining([
+        expect.stringMatching(/^(?:recovery-sent|email-rate-limited)$/),
+      ]));
+    }
 
     // Admin-generated links cannot reproduce the PKCE verifier cookie created
     // by the production recovery action. Verify the one-time token directly

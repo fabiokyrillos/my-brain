@@ -57,3 +57,7 @@ O bucket `user-files` é privado, limitado a 25 MB e a MIME types permitidos. O 
 ## Ainda planejado
 
 Provider configs/BYOK, integrações, eventos de webhook, tópicos dedicados e reconciliação com a fatura do provedor permanecem planejados para depois do pré-MVP.
+
+## Encerramento da Phase 2X
+
+O gate final confirmou migrations locais/remotas sincronizadas até `202607180031` e saída de `supabase gen types typescript --linked` idêntica ao arquivo versionado. Nenhuma migration foi aplicada no Slice 2X.18. O lint linked encerrou com somente os dois avisos preexistentes SQLSTATE `42804` de inicialização texto→`time` em `run_user_heartbeat`; não há finding novo. `test:remote:2x:cleanup` encontrou zero usuários descartáveis e zero órfãos acessíveis em `entries`, `jobs`, `attachments`, `pending_questions` e `tasks`; `product_events`, corretamente ilegível por service role, prova o cascade com o JWT owner após a exclusão Auth. As tabelas mantêm `on delete cascade` para `auth.users`.

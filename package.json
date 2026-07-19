@@ -18,6 +18,9 @@
     "test:remote:entry-processing": "node scripts/remote-entry-processing-smoke.mjs",
     "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
     "test:remote:daily-cycle": "node scripts/remote-daily-cycle-smoke.mjs",
+    "test:remote:2x": "node scripts/remote-supabase-smoke.mjs --phase-2x",
+    "test:remote:2x:cleanup": "node scripts/verify-phase-2x-cleanup.mjs",
+    "docs:phase-2x:traceability": "node scripts/generate-phase-2x-traceability.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {

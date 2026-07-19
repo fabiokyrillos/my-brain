@@ -1,5 +1,32 @@
+import { spawnSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
+
+if (process.argv.includes("--phase-2x")) {
+  const suites = [
+    ["test:remote:jobs", "Phase 2A job reliability"],
+    ["test:remote:interpretations", "Phase 2B interpretation revisions"],
+    ["test:remote:product-events", "Phase 2X product events"],
+    ["test:remote:entry-processing", "Phase 2X entry processing"],
+    ["test:remote:daily-cycle", "Phase 2X daily cycle"],
+    ["test:remote", "complete Supabase baseline"],
+    ["test:remote:2x:cleanup", "Phase 2X residual-data cleanup"],
+  ];
+
+  for (const [script, label] of suites) {
+    console.log(`\n[remote:2x] ${label} (${script})`);
+    const command = process.platform === "win32" ? process.env.ComSpec : "npm";
+    const args = process.platform === "win32"
+      ? ["/d", "/s", "/c", `npm run ${script}`]
+      : ["run", script];
+    const result = spawnSync(command, args, { stdio: "inherit" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
+
+  console.log("\nPhase 2X aggregate remote gate passed: jobs, interpretations, product events, entry processing, daily cycle, complete Supabase baseline, and residual-data cleanup.");
+  process.exit(0);
+}
 
 function assert(condition, label) {
   if (!condition) throw new Error(label);
@@ -236,10 +263,16 @@ try {
 } finally {
   if (uploadedPaths.length > 0) {
     const storageCleanup = await admin.storage.from("user-files").remove(uploadedPaths);
-    if (storageCleanup.error) console.error(`Remote smoke storage cleanup failed (${storageCleanup.error.code ?? "unknown"})`);
+    if (storageCleanup.error) {
+      console.error(`Remote smoke storage cleanup failed (${storageCleanup.error.code ?? "unknown"})`);
+      process.exitCode = 1;
+    }
   }
   for (const userId of createdUsers) {
     const cleanup = await admin.auth.admin.deleteUser(userId);
-    if (cleanup.error) console.error(`Remote smoke cleanup failed (${cleanup.error.code ?? "unknown"})`);
+    if (cleanup.error) {
+      console.error(`Remote smoke cleanup failed (${cleanup.error.code ?? "unknown"})`);
+      process.exitCode = 1;
+    }
   }
 }

@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.18: close remote parity and Phase 2X evidence
+
+### Added
+
+- `test:remote:2x`, a sequential fail-fast aggregate covering jobs, interpretation revisions, product events, entry processing, daily-cycle behavior, the complete Supabase baseline, and residual-data cleanup.
+- `test:remote:2x:cleanup`, a read-only linked verifier for disposable Auth prefixes, owner-row orphans, and storage leftovers.
+- Remote entry-worker assertions for persisted completion events, same-attempt deduplication, distinct reprocessing-attempt events, and unattended scheduled drain when the worker secret is not locally readable.
+- A reproducible 283-row PRD traceability annex plus sanitized deployment/parity/Auth/cleanup evidence, alongside `docs/reports/PHASE_2X_SLICE_18_REPORT.md` and the complete `docs/PHASE_2X_REPORT.md` crosswalk.
+
+### Changed
+
+- Deployed only the accumulated committed `process-jobs` runtime from remote v12 to v13 after preserving the complete v12 rollback input. A fresh v13 download matches the local runtime and `_shared` dependencies exactly; the local-only Deno test was not deployed.
+- The provider-auth E2E harness now avoids retrying email delivery to the reserved `example.com` domain after redacted linked Auth logs established HTTP 400 `email_address_invalid`; signup remains an explicit external skip and recovery core remains independently verified through a disposable administrative link.
+- Shared-project smokes now use job-scoped claims, preflight and single-row reaping for disposable fixtures, rely on the existing scheduled drain instead of manually draining the global queue, and make every cleanup failure process-fatal.
+- Permanent architecture, database, agent, security, standards, decision, state, backlog, and Phase 2 plan documents now describe the deployed Phase 2X closeout.
+
+### Verification
+
+- Remote aggregate passed all seven gates; direct initial/reprocess worker, scheduled drain, attachment compatibility, owner/RLS boundaries, idempotency, and final residual-data cleanup passed against active v13.
+- Local Vitest passed 80 files/443 tests; lint, typecheck, Next.js 16.2.10 production build, and `git diff --check` passed.
+- Playwright passed Foundation 3/3 per viewport, authenticated daily journey 18/18 per viewport, navigation 1/1 per viewport, sign-in/profile 2/2, and recovery core 2/2; provider signup is 2 explicit skips, not passes.
+- Local and linked migrations match through `202607180031`; generated linked types match exactly; linked DB lint has only the two pre-existing `run_user_heartbeat` SQLSTATE `42804` warnings.
+- Final cleanup found zero disposable users, zero orphaned entries/jobs/attachments/pending questions/tasks, zero owner-visible disposable product events after Auth deletion, and zero `remote-smoke.txt` storage leftovers.
+- Independent final closeout review returned READY with no critical or important finding after shared-queue, cleanup, drain-outcome, and per-ID traceability remediation.
+- No Deno or Docker/pgTAP pass is claimed. No migration, secret, schedule, grant, RLS, Auth/email configuration, other Edge Function, branch push, or non-disposable data change occurred.
+
 ## 2026-07-19 — Slice 2X.17: cover the converged daily journey
 
 ### Added

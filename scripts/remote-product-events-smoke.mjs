@@ -16,6 +16,7 @@ const admin = createClient(credentials.url, credentials.serviceRoleKey, clientOp
 const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 const password = `Phase-2X-${crypto.randomUUID()}!`;
 const createdUsers = [];
+const createdClients = [];
 const expectedEventNames = [
   "capture_started",
   "capture_save_succeeded",
@@ -70,6 +71,7 @@ async function createTestUser(index) {
     await client.auth.signInWithPassword({ email: created.email, password }),
     `sign in product-events test user ${index}`,
   );
+  createdClients.push({ client, userId: created.id });
   return { client, user: created };
 }
 
@@ -307,6 +309,20 @@ try {
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);
-    if (cleanup.error) console.error(`Could not remove product-events test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+    if (cleanup.error) {
+      console.error(`Could not remove product-events test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+      process.exitCode = 1;
+    }
+  }));
+
+  await Promise.all(createdClients.map(async ({ client, userId }) => {
+    const orphanCheck = await client.from("product_events").select("id").limit(1);
+    if (orphanCheck.error) {
+      console.error(`Could not verify product-event cascade for ${userId}: ${orphanCheck.error.code ?? "unknown"}`);
+      process.exitCode = 1;
+    } else if (orphanCheck.data.length > 0) {
+      console.error(`Product-event cleanup left owner-visible rows for ${userId}`);
+      process.exitCode = 1;
+    }
   }));
 }

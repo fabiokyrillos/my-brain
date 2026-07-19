@@ -148,7 +148,9 @@ try {
   );
   assert(failed.status === "failed" && failed.next_attempt_at, "A failed entry job did not retain retry state");
   const noFutureClaim = dataOrThrow(
-    await admin.rpc("claim_next_entry_interpretation_job", {
+    await admin.rpc("claim_entry_interpretation_job", {
+      p_job_id: initialJob.id,
+      p_user_id: firstUser.id,
       p_worker_id: "remote-entry-worker-next",
       p_lease_seconds: 120,
     }),
@@ -158,7 +160,9 @@ try {
 
   const retried = await waitFor(
     async () => dataOrThrow(
-      await admin.rpc("claim_next_entry_interpretation_job", {
+      await admin.rpc("claim_entry_interpretation_job", {
+        p_job_id: initialJob.id,
+        p_user_id: firstUser.id,
         p_worker_id: "remote-entry-worker-next",
         p_lease_seconds: 30,
       }),
@@ -169,21 +173,35 @@ try {
   );
   assert(retried?.id === initialJob.id && retried.status === "running", "Next-entry claim did not select the eligible entry job");
 
-  const reaped = await waitFor(
-    async () => {
-      const result = dataOrThrow(
-        await admin.rpc("reap_expired_jobs", { p_limit: 100 }),
-        "reap expired entry job",
-      );
-      return Number(result.requeued) >= 1 ? result : null;
-    },
-    "expired entry lease recovery",
-    35_000,
-    1_000,
+  dataOrThrow(
+    await admin
+      .from("jobs")
+      .update({ lease_expires_at: "1970-01-01T00:00:00.000Z" })
+      .eq("id", initialJob.id)
+      .eq("user_id", firstUser.id)
+      .eq("locked_by", "remote-entry-worker-next"),
+    "expire the disposable entry lease",
   );
-  assert(Number(reaped.requeued) >= 1, "The existing reaper did not recover an expired entry lease");
+
+  const runningJobs = dataOrThrow(
+    await admin.from("jobs").select("id,lease_expires_at").eq("status", "running"),
+    "preflight running jobs before entry reaper",
+  );
+  assert(
+    runningJobs.length === 1 && runningJobs[0].id === initialJob.id,
+    "Entry reaper preflight found an unrelated running job; refusing to mutate the shared queue",
+  );
+  assert(Date.parse(runningJobs[0].lease_expires_at) <= Date.now(), "The disposable entry lease was not expired before reaping");
+
+  const reaped = dataOrThrow(
+    await admin.rpc("reap_expired_jobs", { p_limit: 1 }),
+    "reap the disposable expired entry job",
+  );
+  assert(Number(reaped.requeued) === 1 && Number(reaped.exhausted) === 0, "The existing reaper did not recover only the disposable expired entry lease");
   const reclaimed = dataOrThrow(
-    await admin.rpc("claim_next_entry_interpretation_job", {
+    await admin.rpc("claim_entry_interpretation_job", {
+      p_job_id: initialJob.id,
+      p_user_id: firstUser.id,
       p_worker_id: "remote-entry-worker-after-reap",
       p_lease_seconds: 120,
     }),
@@ -309,6 +327,38 @@ try {
   );
   assert(workerUsage.length >= 1, "Worker did not record AI usage for the shared ledger");
 
+  const initialWorkerEvents = dataOrThrow(
+    await first
+      .from("product_events")
+      .select("id,event_name,properties,idempotency_key,subject_id")
+      .eq("event_name", "capture_processing_completed")
+      .eq("subject_id", workerCapture.entry_id),
+    "read completion event recorded by the deployed worker",
+  );
+  const expectedInitialOutcome = interpretedEntry.status === "completed" ? "ready" : "needs_attention";
+  assert(initialWorkerEvents.length === 1, "The deployed worker did not record exactly one initial completion event");
+  assert(initialWorkerEvents[0].properties?.processingMode === "initial", "The initial worker event has the wrong processing mode");
+  assert(initialWorkerEvents[0].properties?.outcome === expectedInitialOutcome, "The initial worker event does not reflect the persisted entry state");
+
+  const duplicateInitialInvoke = await first.functions.invoke("process-jobs", {
+    body: { jobId: workerInitialJob.id },
+  });
+  assert(duplicateInitialInvoke.error, "A completed worker job was unexpectedly processed twice");
+  const eventsAfterDuplicateInvoke = dataOrThrow(
+    await first
+      .from("product_events")
+      .select("id,idempotency_key")
+      .eq("event_name", "capture_processing_completed")
+      .eq("subject_id", workerCapture.entry_id),
+    "verify worker completion-event idempotency",
+  );
+  assert(
+    eventsAfterDuplicateInvoke.length === 1
+      && eventsAfterDuplicateInvoke[0].id === initialWorkerEvents[0].id
+      && eventsAfterDuplicateInvoke[0].idempotency_key === initialWorkerEvents[0].idempotency_key,
+    "Re-invoking the same completed job introduced a duplicate product event",
+  );
+
   const workerReprocessKey = `remote-entry-worker-reprocess:${suffix}`;
   const workerReprocess = dataOrThrow(
     await first.rpc("enqueue_entry_reprocessing", {
@@ -347,52 +397,88 @@ try {
   assert(reprocessedInterpretation.origin === "ai_reprocessed", "Worker reprocess did not append an ai_reprocessed revision");
   assert(Object.keys(reprocessedInterpretation.element_confidence ?? {}).length > 0, "Worker reprocess did not persist computed element trust");
 
-  const dispatchSecret = process.env.WORKER_DISPATCH_SECRET;
-  if (!dispatchSecret) {
-    console.warn("WORKER_DISPATCH_SECRET not provided; skipping the unattended dispatch-drain assertions.");
-  } else {
-    const unauthorizedDispatch = await admin.functions.invoke("process-jobs", {
-      body: { mode: "dispatch" },
-      headers: { "x-dispatch-secret": "wrong-secret" },
-    });
-    assert(unauthorizedDispatch.error, "A wrong dispatch secret was accepted");
+  const completedWorkerEvents = dataOrThrow(
+    await first
+      .from("product_events")
+      .select("id,properties,idempotency_key")
+      .eq("event_name", "capture_processing_completed")
+      .eq("subject_id", workerCapture.entry_id),
+    "read initial and reprocess completion events",
+  );
+  assert(completedWorkerEvents.length === 2, "Initial and reprocess attempts did not produce exactly two completion events");
+  assert(
+    completedWorkerEvents.some((event) => event.properties?.processingMode === "initial")
+      && completedWorkerEvents.some((event) => event.properties?.processingMode === "reprocess"),
+    "Worker completion events are not scoped to their processing mode",
+  );
+  assert(new Set(completedWorkerEvents.map((event) => event.idempotency_key)).size === 2, "Distinct worker jobs reused one product-event idempotency key");
 
-    const drainCaptureKey = `remote-entry-worker-drain:${suffix}`;
-    const drainCapture = dataOrThrow(
-      await first.rpc("capture_entry_async", {
-        p_original_content: "Remote worker fixture for the unattended dispatch drain.",
-        p_locale: "en",
-        p_source: "web",
-        p_idempotency_key: drainCaptureKey,
-      }),
-      "capture entry for dispatch-drain invocation",
-    );
-    const drainInvoke = await admin.functions.invoke("process-jobs", {
-      body: { mode: "dispatch" },
-      headers: { "x-dispatch-secret": dispatchSecret },
-    });
-    assert(!drainInvoke.error, `Dispatch-drain invocation failed: ${drainInvoke.error?.message ?? "unknown"}`);
-    assert(drainInvoke.data?.ok === true && drainInvoke.data?.mode === "dispatch", "Dispatch-drain invocation did not report a drain run");
-    assert(Number(drainInvoke.data?.processed ?? 0) >= 1, "Dispatch-drain invocation did not process any eligible entry job");
+  const unauthorizedDispatch = await admin.functions.invoke("process-jobs", {
+    body: { mode: "dispatch" },
+    headers: { "x-dispatch-secret": "wrong-secret" },
+  });
+  assert(unauthorizedDispatch.error, "A wrong dispatch secret was accepted");
 
-    const drainedEntry = await waitFor(
-      async () => {
-        const row = dataOrThrow(
-          await first.from("entries").select("status").eq("id", drainCapture.entry_id).single(),
-          "read entry after dispatch-drain invocation",
-        );
-        return ["saved", "interpreting"].includes(row.status) ? null : row;
-      },
-      "dispatch-drain entry processing",
-      10_000,
-    );
-    assert(drainedEntry, "The unattended dispatch drain did not process its fixture entry");
-  }
+  const drainCaptureKey = `remote-entry-worker-drain:${suffix}`;
+  const drainCapture = dataOrThrow(
+    await first.rpc("capture_entry_async", {
+      p_original_content: "Remote worker fixture for the unattended dispatch drain.",
+      p_locale: "en",
+      p_source: "web",
+      p_idempotency_key: drainCaptureKey,
+    }),
+    "capture entry for dispatch-drain invocation",
+  );
+
+  console.log("Verifying the existing scheduled dispatch drain without manually draining the shared queue.");
+
+  const drainedEntry = await waitFor(
+    async () => {
+      const row = dataOrThrow(
+        await first.from("entries").select("status,current_interpretation_id").eq("id", drainCapture.entry_id).single(),
+        "read entry after dispatch-drain invocation",
+      );
+      if (["recoverable_error", "terminal_error"].includes(row.status)) {
+        throw new Error(`The unattended dispatch drain failed its fixture entry with status ${row.status}`);
+      }
+      return ["completed", "partially_processed", "awaiting_review"].includes(row.status) ? row : null;
+    },
+    "dispatch-drain entry processing",
+    240_000,
+    1_000,
+  );
+  assert(drainedEntry.current_interpretation_id, "The unattended dispatch drain did not persist a current interpretation");
+
+  const drainedJob = dataOrThrow(
+    await first
+      .from("jobs")
+      .select("id,status,attempts")
+      .eq("idempotency_key", `entry-capture:${drainCaptureKey}`)
+      .single(),
+    "read dispatch-drain fixture job",
+  );
+  assert(drainedJob.status === "completed" && drainedJob.attempts >= 1, "The unattended dispatch drain did not persist job completion");
+
+  const drainedEvents = dataOrThrow(
+    await first
+      .from("product_events")
+      .select("id,idempotency_key,properties")
+      .eq("event_name", "capture_processing_completed")
+      .eq("subject_id", drainCapture.entry_id),
+    "read dispatch-drain completion event",
+  );
+  assert(drainedEvents.length === 1, "The unattended dispatch drain did not emit exactly one completion event");
+  assert(drainedEvents[0].properties?.processingMode === "initial", "The unattended dispatch completion event used the wrong processing mode");
+  const expectedDrainOutcome = drainedEntry.status === "completed" ? "ready" : "needs_attention";
+  assert(drainedEvents[0].properties?.outcome === expectedDrainOutcome, "The unattended dispatch completion event did not match the persisted entry outcome");
 
   console.log("Remote entry-processing smoke passed: atomic capture, bounded payloads, idempotency, ownership, exclusive leases, retries, stale-worker protection, recovery, reprocessing isolation, direct worker invocation (initial and reprocess), and unattended dispatch drain.");
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);
-    if (cleanup.error) console.error(`Could not remove entry-processing test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+    if (cleanup.error) {
+      console.error(`Could not remove entry-processing test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+      process.exitCode = 1;
+    }
   }));
 }

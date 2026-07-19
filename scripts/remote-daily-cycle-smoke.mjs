@@ -496,6 +496,9 @@ try {
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);
-    if (cleanup.error) console.error(`Could not remove daily-cycle test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+    if (cleanup.error) {
+      console.error(`Could not remove daily-cycle test user ${userId}: ${cleanup.error.code ?? "unknown"}`);
+      process.exitCode = 1;
+    }
   }));
 }

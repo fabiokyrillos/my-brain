@@ -27,11 +27,12 @@
 - O mesmo exercício revelou que levantar SQLSTATE `40001` de qualquer RPC neste projeto trava a requisição até o timeout do gateway — reproduzido inclusive na já publicada `correct_entry_interpretation` (Fase 2B) via chamada direta ao REST, sem nenhum código deste repositório envolvido. `confirm_entry_task_candidates` usa `55P03` em vez disso.
 - **Hotfix (migration `202607180029`, 2026-07-18):** o caminho equivalente de `correct_entry_interpretation` — deixado pendente na Slice 2X.7 por estar fora do escopo do arquivo — agora também usa `55P03` em vez de `40001`. Assinatura, checagens de ownership, replay idempotente, validação de patch/entity-links e toda a persistência (interpretação, entidades, undo, auditoria) permanecem idênticas; a única mudança é o SQLSTATE do conflito de versão. `src/features/interpretations/actions.ts` (`correctInterpretation`) passou a comparar `error.code === "55P03"` em vez de `"40001"`. Verificado com o smoke remoto autenticado real (`scripts/remote-interpretation-revisions-smoke.mjs`, estendido): a correção concorrente perdedora retornou em ~530ms com `55P03`, sem travar até o timeout do gateway, sem escrita parcial (contagem de revisões avançou exatamente uma, não duas) e sem sobrescrever o ponteiro de interpretação atual com a versão perdedora. O SQLSTATE `40001` remanescente em `undo_operation` (`'Cannot undo after a newer interpretation revision'`) é um sinal de conflito distinto, em uma ação diferente, e não fez parte deste hotfix de RPC único — ver ADR-026 e a pendência abaixo.
 - Migrações `030`/`031` (Slice 2X.10): a nova RPC `list_needs_attention` é somente leitura, `SECURITY DEFINER` com `set search_path = ''`, deriva o usuário de `auth.uid()` e filtra toda consulta por esse id — nenhum parâmetro aceita um `user_id` informado pelo chamador. `grant execute` é restrito a `authenticated`; `public`/`anon` são explicitamente revogados. O retorno contém somente ids, código do motivo, timestamps e chaves — nunca copy, trust, score ou conteúdo do registro; a hidratação de título/prévia acontece na camada TypeScript (`attention-projection.ts`), sob as mesmas policies RLS já existentes para `entries`/`entry_interpretations`. A migration `031` corrige um defeito funcional (colisão de nome de alias, ver `DECISIONS.md` ADR-027) sem alterar assinatura, grants, `security definer` ou `search_path`.
+- Smokes de fila no projeto compartilhado usam claims por job. Qualquer teste inevitável do reaper global exige que a fixture descartável seja o único job `running`, posiciona-a como a mais antiga e usa `p_limit = 1`; o cron é observado sem disparar manualmente o drain global. Falha de cleanup encerra o gate com código não zero.
 - Service worker limita cache a assets estáticos públicos.
 
 ## Verificações executadas
 
-- Migrations remotas sincronizadas até `202607170025`; `supabase db lint --linked --level error` sem erros.
+- Migrations remotas sincronizadas até `202607180031`; o gate final `supabase db lint --linked --level warning` retornou somente os dois avisos preexistentes SQLSTATE `42804` em `run_user_heartbeat`.
 - Smoke remoto descartável valida auth, settings atômicas, RLS, ownership, heartbeat lossless/localizado, ledger/agregação de IA e o worker de arquivo publicado.
 - Migration `024` está sincronizada e o smoke remoto descartável valida allowlist, payload proibido, idempotência, RLS, negação cross-user e a RPC restrita a service role para `product_events`.
 - Slice 2X.15: o smoke remoto de eventos foi ampliado e executado com dois usuários descartáveis e subjects reais; registrou os 17 nomes, provou idempotência e repetição significativa, rejeitou evento/payload proibidos, insert direto, cross-owner e uso indevido de service role, verificou RLS/consultas internas bounded e limpou todos os registros/usuários sintéticos. Playwright autenticado consultou somente nomes/contagens sob o token do owner e passou nos journeys de captura e navegação desktop/mobile. Nenhuma migration foi criada e nenhuma Edge Function foi implantada.
@@ -57,3 +58,12 @@
 - Teste pgTAP integral em CI com banco limpo.
 
 Google OAuth e callbacks públicos serão configurados somente quando o usuário retomar essa integração.
+
+## Evidência de segurança do encerramento 2X
+
+- O único deploy remoto foi `process-jobs` v13; bundle baixado corresponde ao runtime local e não contém o teste Deno.
+- O worker grava eventos exclusivamente por `record_product_event_for_user`; ownership, RLS, negação cross-user, insert direto e uso indevido de service role passaram no smoke remoto.
+- Analytics permanece best effort/fail-open e não altera job, entry, Action ou UI em falha.
+- Nenhuma migration, secret, schedule, grant, RLS, Auth/email setting ou outra Edge Function mudou.
+- A limpeza final encontrou zero usuários descartáveis e zero objetos de storage `remote-smoke.txt`.
+- Auth provider: o domínio E2E reservado recebeu `email_address_invalid`; signup delivery continua skip externo e custom SMTP/endereço roteável continuam obrigatórios antes de produção.

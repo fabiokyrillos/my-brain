@@ -126,15 +126,26 @@ try {
   dataOrThrow(
     await admin
       .from("jobs")
-      .update({ lease_expires_at: new Date(Date.now() - 1_000).toISOString() })
+      .update({ lease_expires_at: "1970-01-01T00:00:00.000Z" })
       .eq("id", recoveryJob.id),
     "expire recovery lease",
   );
-  const reaped = dataOrThrow(
-    await admin.rpc("reap_expired_jobs", { p_limit: 100 }),
-    "reap expired job",
+
+  const runningJobs = dataOrThrow(
+    await admin.from("jobs").select("id,lease_expires_at").eq("status", "running"),
+    "preflight running jobs before reliability reaper",
   );
-  assert(Number(reaped.requeued) >= 1, "Expired recoverable job was not requeued");
+  assert(
+    runningJobs.length === 1 && runningJobs[0].id === recoveryJob.id,
+    "Reliability reaper preflight found an unrelated running job; refusing to mutate the shared queue",
+  );
+  assert(Date.parse(runningJobs[0].lease_expires_at) <= Date.now(), "The disposable reliability lease was not expired before reaping");
+
+  const reaped = dataOrThrow(
+    await admin.rpc("reap_expired_jobs", { p_limit: 1 }),
+    "reap the disposable expired job",
+  );
+  assert(Number(reaped.requeued) === 1 && Number(reaped.exhausted) === 0, "The reaper did not recover only the disposable expired job");
 
   const reclaimed = dataOrThrow(
     await admin.rpc("claim_attachment_job", {
@@ -194,6 +205,7 @@ try {
     const cleanup = await admin.auth.admin.deleteUser(userId);
     if (cleanup.error) {
       console.error(`Remote job smoke cleanup failed (${cleanup.error.code ?? "unknown"})`);
+      process.exitCode = 1;
     }
   }
 }

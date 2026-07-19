@@ -1,6 +1,6 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: Phase 2B complete and published; Phase 2X — Product Convergence is planned and approved; implementation has not started
+Status: Phase 2B complete and published; Phase 2X — Product Convergence complete through Slice 2X.18
 Started: 2026-07-17  
 Branch: `codex/phase-2-intelligent-capture`
 
@@ -107,7 +107,7 @@ Add persisted lifecycle states, a correction RPC that appends a new interpretati
 
 ### Phase 2X — Product Convergence
 
-Converge the existing daily cycle before expanding the task domain: asynchronous capture with the existing queue, immediate receipt, product-oriented state and attention projections, simplified review, coherent candidate actions, Home/Inbox/Work convergence, truthful information architecture, and private funnel instrumentation. The approved scope and execution order are defined in `PHASE_2X_PRD.md` and `PHASE_2X_IMPLEMENTATION_PLAN.md`; no 2X slice has started.
+Converge the existing daily cycle before expanding the task domain: asynchronous capture with the existing queue, immediate receipt, product-oriented state and attention projections, simplified review, coherent candidate actions, Home/Inbox/Work convergence, truthful information architecture, and private funnel instrumentation. The approved scope and execution order are defined in `PHASE_2X_PRD.md` and `PHASE_2X_IMPLEMENTATION_PLAN.md`. All official Slices 2X.1–2X.18 are complete; migrations are synchronized through `202607180031`, `process-jobs` v13 carries the deployed Slice 2X.15 worker instrumentation, and the final evidence is in `PHASE_2X_REPORT.md`.
 
 ### Phase 2C — Editable candidate tasks
 

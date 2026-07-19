@@ -36,3 +36,7 @@ Resumo diário, revisão semanal, planejamento semanal e revisão mensal usam en
 ## Arquivos
 
 Uploads privados são validados, persistidos e enfileirados. A Edge Function `process-jobs` valida a sessão, limita o job ao próprio usuário, cria uma URL assinada e envia o arquivo como `input_image` ou `input_file`. Descrição, texto, pessoas, projetos, datas e tarefas candidatas ficam em `attachment_interpretations`; o original não é alterado. Tarefas extraídas não são criadas automaticamente.
+
+## Worker de entradas e telemetria
+
+`process-jobs` v13 é o runtime implantado para anexos e interpretações de entrada. A conclusão de uma entrada é emitida somente depois de `complete_job`; a falha/retry somente depois de `fail_job`. As chaves de evento incluem job e tentativa, replays não duplicam o mesmo outcome e um reprocessamento válido cria uma tentativa distinta. O helper usa `record_product_event_for_user` e absorve falhas de analytics sem alterar o resultado do domínio. Invocação direta initial/reprocess, drain agendado e regressão de anexos passaram no gate remoto final.
