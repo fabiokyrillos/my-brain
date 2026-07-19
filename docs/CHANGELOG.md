@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.13: converged primary navigation and More grouping
+
+### Added
+
+- `src/features/shell/capabilities.ts` as the pure, tested route/product navigation contract: all authenticated pages are classified into primary, Context, Reflection, Organization, Transparency, Preferences, global, or advanced/context-only destinations; Jobs is never surfaced by common navigation.
+- Deterministic active-state mapping for nested Inbox/review and Brain routes, canonical Work query views, and the localized `/today`, `/tasks`, and `/waiting` compatibility aliases. Canonical link and locale-switch helpers preserve locale plus meaningful query state without reading Supabase or persisted-domain state.
+- Grouped desktop navigation and the same conceptual hierarchy inside mobile Mais/More, with localized accessible group names, visible focus, 44 px targets, bounded viewport overflow, Escape close/focus restoration, and DOM order aligned with visual/tab order.
+
+### Changed
+
+- Início/Home, Caixa/Inbox, Trabalho/Work, and Brain are now the only primary destinations on desktop and mobile. Capture remains global and visually distinct; Notifications remains the global icon; Projects, People, Memories, Files, Reviews, Questions, Reminders, History, Costs, and Settings remain reachable through their approved groups.
+- The locale switch preserves the current localized pathname and supported query string instead of returning to Home.
+- The shell no longer presents the static, unobservable "Brain atento" and "Brain ativo" claims. Existing canonical routes, nested routes, query views, legacy redirects, and direct technical access to Jobs remain unchanged.
+
+### Verification
+
+- Strict TDD: the initial focused run failed because `capabilities.ts` and the new hierarchy did not exist; a second RED exposed DOM/visual tab-order drift. Final focused GREEN: 2 files/9 tests. Full Vitest: 69 files/382 tests. ESLint, TypeScript, the Next.js 16.2.10 production build, and `git diff --check` pass.
+- Offline Playwright desktop/mobile: 6 passed and 10 credential-gated online tests skipped, as expected for the standard offline command. Targeted authenticated online Playwright obtained all three linked `ONLINE_SUPABASE_*` credentials and passed desktop/mobile in PT-BR and English: 2 passed.
+- No migration, RPC, Edge Function, generated type, secret, deployment, or infrastructure change. `supabase migration list --linked` confirms local and remote histories synchronized through `202607180031`.
+
 ## 2026-07-18 — Slice 2X.12: canonical Work route and task projection
 
 ### Added

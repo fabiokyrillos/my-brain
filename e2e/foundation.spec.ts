@@ -21,8 +21,12 @@ test("signup and password reset forms expose the complete validated fields", asy
   await expect(page.getByLabel("Confirme a nova senha")).toBeVisible();
 });
 
-test("legacy task routes remain protected in both locales", async ({ request }) => {
+test("canonical and legacy daily routes remain protected in both locales", async ({ request }) => {
   for (const [source, target] of [
+    ["/pt-BR/app/inbox?view=needs-you", "/pt-BR/auth/login"],
+    ["/en/app/inbox/entry-1", "/en/auth/login"],
+    ["/pt-BR/app/work?view=waiting&page=2", "/pt-BR/auth/login"],
+    ["/en/app/chat/conversation-1", "/en/auth/login"],
     ["/pt-BR/app/today?page=3", "/pt-BR/auth/login"],
     ["/en/app/tasks?page=2", "/en/auth/login"],
     ["/pt-BR/app/waiting?page=4", "/pt-BR/auth/login"],

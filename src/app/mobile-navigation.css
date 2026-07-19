@@ -1,3 +1,71 @@
+.top-actions > a {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.side-nav {
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+
+.nav-group {
+  display: grid;
+  gap: 5px;
+}
+
+.nav-group + .nav-group {
+  margin-top: 14px;
+}
+
+.nav-group-items {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-group-label,
+.mobile-nav-group-label {
+  padding: 0 12px;
+  color: var(--ink-soft);
+  font: 700 9px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.side-nav > .capture-fab {
+  position: relative;
+  display: flex;
+  width: auto;
+  height: auto;
+  margin: 12px 0 2px;
+  padding: 11px 12px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  border-radius: 11px;
+  background: var(--ink);
+  color: var(--white);
+  box-shadow: 0 8px 20px rgba(20, 35, 59, 0.16);
+  font-size: 14px;
+  font-weight: 700;
+  transform: none;
+}
+
+.side-nav > .capture-fab:hover,
+.side-nav > .capture-fab.active {
+  background: var(--blue);
+}
+
+.top-bar {
+  justify-content: flex-end;
+}
+
 @media (max-width: 760px) {
   .bottom-nav {
     display: flex;
@@ -5,10 +73,10 @@
     overflow: visible;
   }
 
-  .bottom-nav > a:nth-of-type(1) { order: 1; }
-  .bottom-nav > a:nth-of-type(2) { order: 2; }
-  .bottom-nav > a:nth-of-type(3) { order: 4; }
-  .bottom-nav > a:nth-of-type(4) { order: 5; }
+  .bottom-nav > a,
+  .bottom-nav > .mobile-more {
+    order: initial;
+  }
 
   .bottom-nav > a:not(.capture-fab),
   .mobile-more > summary {
@@ -24,12 +92,7 @@
     font-weight: 700;
   }
 
-  .bottom-nav .capture-fab {
-    order: 3;
-  }
-
   .mobile-more {
-    order: 6;
     position: relative;
   }
 
@@ -37,6 +100,11 @@
     cursor: pointer;
     list-style: none;
     user-select: none;
+    outline-offset: 2px;
+  }
+
+  .mobile-more > summary:focus-visible {
+    outline: 2px solid var(--blue);
   }
 
   .mobile-more > summary::-webkit-details-marker {
@@ -64,6 +132,17 @@
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.98);
     box-shadow: 0 18px 45px rgba(20, 35, 59, 0.18);
+  }
+
+  .mobile-nav-group {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: 6px;
+  }
+
+  .mobile-nav-group-label {
+    padding: 5px 10px 2px;
   }
 
   .mobile-more-menu .nav-item {
