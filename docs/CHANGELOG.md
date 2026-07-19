@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Phase 2C planning checkpoint
+
+### Added
+
+- `docs/PHASE_2C_PRD.md`, the canonical product contract for Editable Candidate Tasks and Transactional Materialization, including stable requirement IDs, exact 2C.1 semantics, UX, security/privacy, analytics, acceptance, risks, rollout, rollback, and full-phase Definition of Done.
+- `docs/PHASE_2C_IMPLEMENTATION_PLAN.md`, the ordered 2C.1–2C.6 execution plan with an exact versioned RPC direction, transient edit command, atomic transaction, compatibility boundary, test matrix, per-slice gates, and authorization stops.
+- ADR-031, accepting transient candidate edits, immutable suggestion provenance, a persistent task as the sole edited truth, and a versioned materialization contract while preserving the legacy RPC.
+
+### Changed
+
+- Current state, backlog, and Phase 2 roadmap now identify Phase 2C planning as approved and implementation as not started; Phase 2C.1 is limited to title, description, and due date, while split/merge remains isolated in Slice 2C.5.
+
+### Verification
+
+- Repository preflight matched clean `main`/`origin/main` at `89af5abad497fd2220ceac22704cf6abc57a20fe` before documentation work.
+- Planning was reconciled against current candidate projection/form/action, `confirm_entry_task_candidates`, provenance, audit/undo, Needs Attention, Work, product events, generated types, pgTAP, remote smoke, authenticated Playwright, and installed Next.js 16.2.10 forms/Server Action guides.
+- No product code, migration, generated type, Supabase state, Edge Function, secret, schedule, grant, RLS, Auth/email setting, remote infrastructure, feature branch, deployment, push, or PR changed.
+
 ## 2026-07-19 — Slice 2X.18: close remote parity and Phase 2X evidence
 
 ### Added

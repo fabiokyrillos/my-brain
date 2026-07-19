@@ -1,7 +1,7 @@
 # Project State
 
 Last updated: 2026-07-19
-Current phase: Phase 2X — Product Convergence complete — official Slice 2X.18 closed
+Current phase: Phase 2C — planning approved; implementation not started
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
@@ -21,6 +21,8 @@ The official Slice 2X.16 is complete with no migration: an audit of the four dai
 The official Slice 2X.17 is complete with no migration: `e2e/intelligent-capture.spec.ts` is reorganized from one 379-line serial test into deterministic, independently-attributable scenarios by contract inside two `test.describe` blocks — the existing real capture→correction→confirmation→chat→reviews→files→costs→settings→heartbeat→undo→product-events journey (unchanged behavior, one disposable user, 13 named tests), plus a new, previously entirely absent describe covering basic pending question, recoverable retry, and terminal retry through deterministic direct-RPC fixtures (`begin_entry_interpretation`/`fail_entry_interpretation`/`persist_entry_interpretation`/`begin_entry_reprocessing`/`persist_reprocessed_entry_interpretation`, all already-granted `authenticated` RPCs from Slices 2X.3/2X.4/2X.7) rather than unreliable real-AI-failure induction. Keyboard/focus/live-region/touch-target assertions were added for the entry-review page's progressive disclosure. `e2e/foundation.spec.ts`, `e2e/online-mobile-navigation.spec.ts`, and `scripts/online-playwright.mjs` were reviewed and confirmed — by running them, not by inspection — to already satisfy the plan's Home/Caixa/Trabalho/Brain/Mais/legacy-redirect and desktop+Pixel-7×pt-BR/en-matrix requirements; none needed a change. Real execution (not just authoring) of the new retry scenarios found and fixed one genuine in-scope defect: `src/app/[locale]/app/inbox/[entryId]/page.tsx` rendered two identical "Reinterpretar entrada"/"Reinterpret entry" retry buttons whenever an entry had never had a successful interpretation and its latest state was `recoverable_error`/`terminal_error` (the attention-notice slot and the "no interpretation yet" fallback block both offered it); the fallback's own button is now conditioned on `!canRetry`, removing the duplicate with no capability lost. `e2e/online-auth.spec.ts` was not modified in that slice; its historical provider result remains recorded in the Slice 2X.17 report.
 
 The official Slice 2X.18 closes Phase 2X with no migration or product-source change. The authorized complete local `process-jobs` function was deployed from v12 to v13 after preserving the v12 rollback bundle and confirming the only accumulated runtime delta was `entry.ts` plus new `product-events.ts`; a fresh v13 download matches every local runtime/dependency file and excludes the local-only Deno test. The full fail-fast `test:remote:2x` aggregate, local 80-file/443-test suite, lint, typecheck, production build, desktop/mobile core browser matrix, migration/type synchronization, linked DB lint, worker outcome/idempotency checks, and fail-closed disposable cleanup all passed. Provider-delivered signup remains an explicit external skip: current redacted Auth logs return `email_address_invalid` for the reserved test domain, while sign-in/profile and the independently generated recovery-link/password-reset core passed on desktop/mobile. Deno and Docker remain unavailable and are not claimed. See ADR-030, `docs/PHASE_2X_REPORT.md`, `docs/reports/PHASE_2X_SLICE_18_REPORT.md`, the 283-row `docs/reports/PHASE_2X_TRACEABILITY_MATRIX.md`, and the sanitized `docs/reports/PHASE_2X_SLICE_18_EVIDENCE.md`.
+
+Phase 2C — Editable Candidate Tasks and Transactional Materialization now has an approved canonical PRD and implementation plan. The recommended first slice is 2C.1 — Editable Core Confirmation, limited to title, description, and due date. Planning created no product code, migration, generated type, branch, deployment, or remote mutation. Implementation still requires separate authorization; see `docs/PHASE_2C_PRD.md`, `docs/PHASE_2C_IMPLEMENTATION_PLAN.md`, and ADR-031.
 
 ## Implemented functionality
 
@@ -61,11 +63,11 @@ The official Slice 2X.18 closes Phase 2X with no migration or product-source cha
 ## Pending or incomplete functionality
 
 - Google OAuth is hidden until provider configuration and end-to-end validation exist.
-- Phase 2X — Product Convergence is complete through Slice 2X.18. Later Phase 2C–2F functionality remains pending and was not started by this closeout.
+- Phase 2X — Product Convergence is complete through Slice 2X.18. Phase 2C planning is approved, but Slices 2C.1–2C.6 remain unimplemented; Phases 2D–2F also remain pending.
 - ~~The architecture review of Slices 2X.5–2X.8 found `hasMaterializedTaskForCandidates` computed entry-wide instead of interpretation/candidate-scoped in `inbox-projection.ts` and `review-projection.ts` (F1), letting `productState` report `ready` while a genuinely unconfirmed candidate from the current interpretation remained visible~~ — fixed 2026-07-18 by a standalone hotfix, outside the slice sequence. Both loaders now derive that input from the same interpretation-scoped source (`computeUnavailableCandidateIndexes`) `actionableCandidates` already used correctly, via a new shared pure helper `hasUnconfirmedTaskCandidates` in `src/features/interpretations/data.ts`. No migration, RPC, or `lifecycle.ts` change was needed. See `docs/reports/PHASE_2X_CANDIDATE_LIFECYCLE_HOTFIX_REPORT.md`.
 - ~~`correct_entry_interpretation`'s version-conflict path raises SQLSTATE `40001`~~ — fixed 2026-07-18 by the standalone hotfix migration `202607180029` (ADR-026), outside the Slice 2X.8 sequence. The RPC now raises `55P03` for that conflict with its signature, ownership checks, idempotent replay, and every other behavior otherwise byte-for-byte unchanged; the authenticated remote smoke proved a ~530ms bounded response with no gateway hang and no partial write. `undo_operation`'s own separate `40001` raise (a different action, not exercised by this hotfix) remains an explicit, untouched risk — see `SECURITY.md`.
 - A generic unattended due-job consumer is not deployed because no current flow requires one. Failed attachment retries are explicit, user-initiated, and blocked until persisted `next_attempt_at`; add an unattended consumer only with a concrete background workflow.
-- Automatic weekly reviews, task editing, hybrid search, and broader NLP completion remain future roadmap work.
+- Automatic weekly reviews, Phase 2C task editing/materialization, hybrid search, and broader NLP completion remain future implementation work.
 - Some preference fields are stored but do not yet have an operational consumer; they must not be presented as effective behavior until wired.
 - The expanded pgTAP suite is committed but cannot execute through the Supabase CLI on this workstation until Docker Desktop and `SUPABASE_DB_PASSWORD` are available; equivalent high-risk paths passed the disposable remote smoke suite.
 - Provider-delivered signup remains unverified: the linked Supabase Auth service currently rejects the reserved `example.com` E2E domain with `email_address_invalid`. Production delivery requires custom SMTP and a provider-routable test address before launch.
@@ -74,7 +76,7 @@ The official Slice 2X.18 closes Phase 2X with no migration or product-source cha
 ## Next priorities
 
 1. Keep Phase 2X closed; use `docs/PHASE_2X_REPORT.md`, the Slice 2X.18 report, its evidence manifest, and the per-ID traceability annex as the deployed handoff.
-2. Begin Phase 2C only with separate authorization, preserving the completed Phase 2B revision/trust and Phase 2X product-projection boundaries.
+2. When separately authorized, create the Phase 2C feature branch and execute Slice 2C.1 from `docs/PHASE_2C_PRD.md` and `docs/PHASE_2C_IMPLEMENTATION_PLAN.md`; do not widen it beyond title, description, and due date.
 3. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 4. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.
 5. Execute pgTAP locally/CI when Docker is available and add the database gate to CI.
@@ -248,3 +250,4 @@ Coverage percentages are the last explicit coverage measurement from the Phase 2
 - [x] Remaining risks are explicit and do not require an architectural restart.
 - [x] Write the Phase 2 vertical-slice plan before implementation.
 - [x] Include and implement job recovery/observability criteria before expanding background workflows.
+- [x] Approve the canonical Phase 2C PRD and implementation plan without starting implementation.

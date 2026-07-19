@@ -1,8 +1,8 @@
 # Phase 2 — Intelligent Capture Implementation Plan
 
-Status: Phase 2B complete and published; Phase 2X — Product Convergence complete through Slice 2X.18
+Status: Phase 2B complete and published; Phase 2X complete through Slice 2X.18; Phase 2C planning approved and implementation not started
 Started: 2026-07-17  
-Branch: `codex/phase-2-intelligent-capture`
+Planning reference: `main` at `89af5abad497fd2220ceac22704cf6abc57a20fe`
 
 **Goal:** Consolidate the daily My Brain experience so a user can record natural language, understand and correct the interpretation, safely materialize actions, resolve ambiguity conversationally, and later retrieve the original and derived history.
 
@@ -29,7 +29,7 @@ The phase finishes the central daily journey rather than adding new channels or 
 
 ## 2. Product problem
 
-The pre-MVP already accepts captures and produces useful extractions, tasks, questions, embeddings, chat, and files, but the experience is still optimistic and coarse. Interpretations cannot be corrected as immutable versions, candidate tasks are selectable but not editable, pending answers do not update the originating interpretation, entity matching is mostly prompt context, task updates are not resolved from natural language, retroactive dates are not consistently materialized, and the queue can strand work in `running`. Users need to see what happened, correct it, control risky actions, and recover from failures without losing the original.
+The completed Phase 2B and Phase 2X foundation now provides immutable correction revisions, current-interpretation candidate provenance, reliable asynchronous processing, Needs Attention, Work, audit/undo, and product projections. The next unresolved product boundary is that candidate tasks are selectable but not editable before commitment; later questions, natural-language task updates, and retroactive-history work also remain. Users need to control the exact durable action without losing the immutable suggestion or creating a second draft truth.
 
 ## 3. Current state reconciled with the code
 
@@ -109,9 +109,11 @@ Add persisted lifecycle states, a correction RPC that appends a new interpretati
 
 Converge the existing daily cycle before expanding the task domain: asynchronous capture with the existing queue, immediate receipt, product-oriented state and attention projections, simplified review, coherent candidate actions, Home/Inbox/Work convergence, truthful information architecture, and private funnel instrumentation. The approved scope and execution order are defined in `PHASE_2X_PRD.md` and `PHASE_2X_IMPLEMENTATION_PLAN.md`. All official Slices 2X.1–2X.18 are complete; migrations are synchronized through `202607180031`, `process-jobs` v13 carries the deployed Slice 2X.15 worker instrumentation, and the final evidence is in `PHASE_2X_REPORT.md`.
 
-### Phase 2C — Editable candidate tasks
+### Phase 2C — Editable Candidate Tasks and Transactional Materialization
 
-Add a typed editor, selective confirmation, title/description/status/priority/due/planned dates, project/context/person links, dependencies, subtasks, no-due reason, split/merge, record-only/reject/cancel choices, transactional creation, audit, and undo.
+The approved scope is defined by `PHASE_2C_PRD.md` and `PHASE_2C_IMPLEMENTATION_PLAN.md`. Deliver in six ordered slices: 2C.1 editable core confirmation; 2C.2 planning, priority, and no-due semantics; 2C.3 owned relations; 2C.4 candidate dispositions; 2C.5 subtasks, dependencies, and isolated split/merge; 2C.6 convergence and closeout.
+
+Slice 2C.1 is strictly limited to title, description, and due date. Edits remain in local form state until confirmation; no candidate-draft table, autosave, or offline draft is introduced. Preserve the immutable suggestion and legacy confirmation RPC during rollout, add a strict versioned transactional materialization contract, and keep status/priority/planned date/no-due metadata/relations/waiting-on/subtasks/dependencies/split/merge/dispositions out of the first slice.
 
 ### Phase 2D — Conversational questions
 
@@ -348,4 +350,4 @@ Completed on 2026-07-17 on `codex/phase-2-intelligent-capture`.
 - The focused remote interpretation smoke passes immutability, append-only correction, idempotency, concurrency, ownership, rollback, audit, undo, aliases, reprocessing, sanitization, RLS, and cleanup. The complete remote Supabase smoke also passes auth, atomic settings, ownership, heartbeat, AI accounting, and the deployed file worker.
 - Linked database lint has no Phase 2B issue. Two pre-existing `run_user_heartbeat` text-to-time warnings remain outside this slice. Docker-backed pgTAP execution remains unavailable on this workstation; the 44-assertion structural contract is committed and equivalent high-risk behavior passed remotely.
 - Implementation commits: `c0f038c`, `981b39e`, `9a87c54`, `ae0be18`, `91c1722`, `8331e68`, `8fbd615`, `9e894de`, `00eabe5`, and `80bb233`. The final documentation/push commit follows this record.
-- Phase 2X precedes Phase 2C and must converge the current daily cycle without expanding the task domain. After 2X is complete, Phase 2C should extend the stable task-candidate contract into an editable desired-state editor and one transactional confirmation RPC; it should not create a second task workflow or weaken the revision/trust boundary completed here.
+- Phase 2X is complete. The recommendation is now resolved by the canonical Phase 2C PRD and implementation plan: extend the stable task-candidate contract with transient edits and a versioned transactional RPC, never a second task workflow or weakened revision/trust boundary.

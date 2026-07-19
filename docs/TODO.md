@@ -1,7 +1,7 @@
 # Project Backlog
 
 Last updated: 2026-07-19
-Active milestone: Phase 2X — Product Convergence complete; Phase 2C not started
+Active milestone: Phase 2C planning complete; implementation not started
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
 
@@ -12,7 +12,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete Phase 2A leased job reliability, recovery, observability, remote validation, documentation, and thematic commits.
 - [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
 - [x] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; official Slices 2X.1–2X.18 are complete.
-- [ ] Complete Phase 2C editable candidate tasks and transactional selective confirmation.
+- [ ] Complete Phase 2C editable candidate tasks and transactional materialization according to `PHASE_2C_PRD.md` and `PHASE_2C_IMPLEMENTATION_PLAN.md`.
 - [ ] Complete Phase 2D conversational pending questions.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
 - [ ] Complete Phase 2F retroactive history, mobile/localization/accessibility finish, full gates, and closeout.
@@ -42,6 +42,16 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete Slice 2X.16 — close the projection boundary across Home/Caixa/Work/review, no migration: Home's priority panel now reads `loadWorkProjection(..., { view: "today" })` instead of a raw, divergent `tasks` query (removing both the raw-row access and a second, incorrect "due" rule that ignored `FLOW-003`); Home's waiting-count/open-question panels read the new `loadHomeSupplementalProjection` instead of raw `tasks`/`pending_questions` queries. `TaskCandidateForm` now renders `ActionableCandidateView[]` only — no AI-extraction confidence score, no client-side re-filtering of a validity rule `review-projection.ts` already applies once. `src/features/interpretations/data.ts` is now guarded `server-only`. New `src/features/daily-cycle/architecture.test.ts` locks the no-raw-row/no-raw-enum/no-raw-score boundary across all five touched surfaces. Full gate: 80 files/443 tests, lint, typecheck, build, offline Playwright desktop/mobile (3 passed/5 online-gated skips each), authenticated online Playwright (12/16 passed — 2 unrelated pre-existing signup/recovery-email failures, likely rate-limiting from the smoke runs just executed, in a file this slice never touched), remote daily-cycle and product-events smoke both passed, linked migration sync confirmed through `031`. See `docs/reports/PHASE_2X_SLICE_16_REPORT.md`.
 - [x] Complete Slice 2X.17 — converged daily journey E2E, no migration: `e2e/intelligent-capture.spec.ts` reorganized into deterministic per-contract scenarios across two `test.describe` blocks (13 named tests reorganizing the existing real journey unchanged, plus 3 new tests for basic pending question, recoverable retry, and terminal retry via deterministic direct-RPC fixtures, previously entirely uncovered) with added keyboard/focus/live-region/touch-target assertions. `e2e/foundation.spec.ts`, `e2e/online-mobile-navigation.spec.ts`, and `scripts/online-playwright.mjs` reviewed and confirmed sufficient by running them, left unchanged. Real execution found and fixed one in-scope defect: a duplicate retry button on the entry-detail page for `recoverable_error`/`terminal_error` entries with no prior successful interpretation (`page.tsx`, one-line conditional, no capability removed). Its historical auth/provider observations remain in the slice report. Full gate: 80 files/443 tests (unchanged — E2E-only slice), lint, typecheck, build, offline Playwright 3/3 both projects, authenticated online `intelligent-capture.spec.ts` 18/18 both projects, `online-mobile-navigation.spec.ts` 1/1 both projects, remote daily-cycle and product-events smoke both passed, linked migration sync confirmed through `031`. See `docs/reports/PHASE_2X_SLICE_17_REPORT.md`.
 - [x] Complete Slice 2X.18 — remote gate and permanent closeout, no migration/product-source change: preserved the deployed v12 rollback bundle; deployed only the complete committed `process-jobs` function as v13; downloaded v13 and proved exact local runtime parity; added the fail-fast `test:remote:2x` aggregate, fail-closed cleanup verifier, safe shared-queue assertions, and a reproducible 283-row PRD traceability annex; passed jobs, interpretations, product-events, entry-processing, daily-cycle, baseline, 80-file/443-test local suite, lint, typecheck, build, desktop/mobile core E2E, migration/type sync, linked lint, and cleanup. Auth logs established the provider's new `email_address_invalid` rejection for the reserved E2E domain; signup remains an explicit external skip, while sign-in/profile and the independently generated recovery-link/password-reset core pass on both projects. Deno/Docker remain explicit unavailable gates. See ADR-030, `docs/PHASE_2X_REPORT.md`, `docs/reports/PHASE_2X_SLICE_18_REPORT.md`, `docs/reports/PHASE_2X_SLICE_18_EVIDENCE.md`, and `docs/reports/PHASE_2X_TRACEABILITY_MATRIX.md`.
+
+### Phase 2C approved plan — implementation pending
+
+- [x] Approve `PHASE_2C_PRD.md` and `PHASE_2C_IMPLEMENTATION_PLAN.md`, reconcile the current roadmap, and preserve Phase 2X historical evidence unchanged.
+- [ ] Complete Slice 2C.1 — Editable Core Confirmation: transient edits to title, description, and due date only; versioned transactional RPC; generated types; audit/undo; local, database, remote, and desktop/mobile PT-BR/English gates. No Edge Function change.
+- [ ] Complete Slice 2C.2 — Planning, Priority and No-Due Semantics.
+- [ ] Complete Slice 2C.3 — Owned Relations for project, context, person, and waiting-on.
+- [ ] Complete Slice 2C.4 — Candidate Dispositions without a candidate-draft table.
+- [ ] Complete Slice 2C.5 — Subtasks, Dependencies and isolated Split/Merge.
+- [ ] Complete Slice 2C.6 — Product Convergence and Closeout.
 
 ### Resolved — hotfix outside the slice sequence (2026-07-18)
 
@@ -135,7 +145,7 @@ Continue with the reconciled slices. Do not restart the architecture.
 - [x] Harden the current jobs queue and attachment worker with leases, retries/backoff, stale-job recovery, exhaustion, metrics, and user visibility.
 - [ ] Add a generic unattended due-job consumer for attachments only when a concrete background workflow requires it; current attachment retries remain explicit and user-initiated after persisted backoff. (`interpret_entry` jobs already have unattended dispatch as of Slice 2X.4.)
 - [ ] Automatic daily/weekly review scheduling and verified delivery.
-- [ ] Task editing and richer lifecycle controls.
+- [ ] Execute Phase 2C task editing and richer lifecycle controls in the approved 2C.1–2C.6 order; do not restart the architecture.
 - [ ] Hybrid semantic/lexical search with measured relevance.
 - [ ] Confidence-aware AI materialization and undo-first autonomy rules.
 - [ ] Complete operational consumers for currently inert agent preference fields.
