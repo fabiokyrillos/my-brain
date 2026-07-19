@@ -78,8 +78,81 @@ async function currentInterpretationId(client, entryId) {
   return entry.current_interpretation_id;
 }
 
+// persist_entry_interpretation always scores through model_only_element_trust,
+// whose score never reaches the auto_apply threshold (see
+// interpretation_lifecycle_status/model_only_element_trust in migration 020) —
+// every AI-only interpretation therefore lands in awaiting_review, by design,
+// never completed. Reaching a completed entry with actionable-but-unconfirmed
+// candidates (the needs-attention "confirm_existing_candidates" case) requires
+// a real correction with an explicit auto_apply element trust, exactly like a
+// user resolving the review would produce.
+async function moveToCompletedWithSameCandidates(client, entryId, expectedVersion, label) {
+  return dataOrThrow(
+    await client.rpc("correct_entry_interpretation", {
+      p_entry_id: entryId,
+      p_expected_version: expectedVersion,
+      p_operation_key: `remote-daily-cycle:${label}:${suffix}`,
+      p_patch: {
+        summary: `Remote daily-cycle fixture, completed: ${label}`,
+        concepts: ["task"],
+        occurredAt: new Date().toISOString(),
+        extractedDates: [],
+        entityLinks: [],
+        classifications: { summary: "interpretation", concepts: "interpretation", occurredAt: "fact", entities: "interpretation" },
+        pendingQuestions: [],
+        elementTrust: { summary: { score: 0.9, policy: "auto_apply", signals: {}, overrides: [], evidence: [] } },
+        recordOnly: false,
+      },
+      p_reason: `Remote daily-cycle smoke: move ${label} to completed`,
+    }),
+    `correct ${label} to a completed, auto_apply interpretation`,
+  );
+}
+
+// capture_entry_async atomically enqueues an interpret_entry job alongside
+// the entry; the deployed worker always claims and completes that exact job
+// in the same cycle it calls persist_entry_interpretation. This smoke calls
+// persist_entry_interpretation directly (a real fixture shortcut used
+// throughout this file), which leaves the job at its default "pending"
+// status unless something settles it — and list_needs_attention correctly
+// treats a still-pending interpret_entry job as "organizing" regardless of
+// entries.status, exactly like the daily-cycle lifecycle mapper already does
+// for Inbox/Home. Settling the job here reproduces what the real worker
+// guarantees, using the service-role client since claim/complete are
+// service_role-only.
+async function settleInterpretEntryJob(userId, entryId, label) {
+  const jobRow = dataOrThrow(
+    await admin
+      .from("jobs")
+      .select("id")
+      .eq("type", "interpret_entry")
+      .eq("user_id", userId)
+      .eq("payload->>entry_id", entryId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single(),
+    `find the interpret_entry job for ${label}`,
+  );
+  const workerId = `remote-daily-cycle-smoke-worker:${suffix}`;
+  const claimed = dataOrThrow(
+    await admin.rpc("claim_entry_interpretation_job", {
+      p_job_id: jobRow.id,
+      p_user_id: userId,
+      p_worker_id: workerId,
+      p_lease_seconds: 120,
+    }),
+    `claim the interpret_entry job for ${label}`,
+  );
+  assert(claimed?.id === jobRow.id, `Could not claim the interpret_entry job for ${label}`);
+  const completed = dataOrThrow(
+    await admin.rpc("complete_job", { p_job_id: jobRow.id, p_worker_id: workerId, p_result: {} }),
+    `complete the interpret_entry job for ${label}`,
+  );
+  assert(completed?.id === jobRow.id, `Could not complete the interpret_entry job for ${label}`);
+}
+
 try {
-  const [{ client: owner }, { client: other }] = await Promise.all([
+  const [{ client: owner, user: ownerUser }, { client: other, user: otherUser }] = await Promise.all([
     createTestUser(1),
     createTestUser(2),
   ]);
@@ -286,7 +359,140 @@ try {
   );
   assert(v1TaskAfterV2Undo.status !== "cancelled", "Undoing the v2 confirmation incorrectly touched the unrelated v1 task");
 
-  console.log("Remote daily-cycle smoke passed: current-interpretation binding, stale/out-of-range rejection, idempotent replay, correction survivability, concurrent confirmation race safety, record-only enforcement, cross-user isolation, and scoped undo.");
+  // --- Slice 2X.10: the Needs Attention queue (list_needs_attention) reads
+  // real captured/interpreted/confirmed state, not injected booleans. -------
+  const attentionEntryId = await captureFixtureEntry(owner, "needs-attention-candidates");
+  dataOrThrow(
+    await owner.rpc("persist_entry_interpretation", {
+      p_entry_id: attentionEntryId,
+      p_extraction: fixtureExtraction(),
+      p_model: "gpt-test",
+      p_strategy_version: "smoke-v1",
+      p_prompt_version: "smoke-v1",
+      p_input_tokens: 10,
+      p_output_tokens: 10,
+    }),
+    "persist interpretation for the needs-attention fixture",
+  );
+  await settleInterpretEntryJob(ownerUser.id, attentionEntryId, "attention-candidates");
+  const attentionCompletion = await moveToCompletedWithSameCandidates(owner, attentionEntryId, 1, "attention-candidates");
+  const attentionInterpretationId = attentionCompletion.interpretation_id;
+
+  const listOwnerAttention = async () => dataOrThrow(
+    await owner.rpc("list_needs_attention", { p_limit: 50, p_cursor_occurred_at: null, p_cursor_entry_id: null }),
+    "list needs-attention queue as owner",
+  );
+  const findAttentionRow = (rows, id) => rows.find((candidateRow) => candidateRow.entry_id === id);
+
+  const beforeConfirmStart = Date.now();
+  const beforeConfirm = await listOwnerAttention();
+  const beforeConfirmElapsedMs = Date.now() - beforeConfirmStart;
+  assert(beforeConfirmElapsedMs < 5000, `list_needs_attention took ${beforeConfirmElapsedMs}ms, expected a bounded response`);
+  const qualifyingRow = findAttentionRow(beforeConfirm, attentionEntryId);
+  assert(qualifyingRow?.reason === "confirm_existing_candidates", "an entry with unconfirmed current-interpretation candidates did not appear in the needs-attention queue");
+  assert(qualifyingRow.current_interpretation_id === attentionInterpretationId, "the queued row did not carry the current interpretation id for candidate-confirmation binding");
+
+  dataOrThrow(
+    await owner.rpc("confirm_entry_task_candidates", {
+      p_entry_id: attentionEntryId,
+      p_expected_interpretation_id: attentionInterpretationId,
+      p_candidate_indexes: [0],
+      p_operation_key: `remote-daily-cycle:attention-partial:${suffix}`,
+    }),
+    "partially confirm the needs-attention fixture's candidates",
+  );
+  const afterPartialConfirm = await listOwnerAttention();
+  assert(
+    findAttentionRow(afterPartialConfirm, attentionEntryId)?.reason === "confirm_existing_candidates",
+    "an entry with one of two current candidates confirmed was removed from the queue instead of remaining actionable",
+  );
+
+  dataOrThrow(
+    await owner.rpc("confirm_entry_task_candidates", {
+      p_entry_id: attentionEntryId,
+      p_expected_interpretation_id: attentionInterpretationId,
+      p_candidate_indexes: [1],
+      p_operation_key: `remote-daily-cycle:attention-final:${suffix}`,
+    }),
+    "confirm the needs-attention fixture's remaining candidate",
+  );
+  const afterFullConfirm = await listOwnerAttention();
+  assert(
+    findAttentionRow(afterFullConfirm, attentionEntryId) === undefined,
+    "an entry with every current candidate confirmed was not resolved out of the needs-attention queue (NY-013)",
+  );
+
+  // --- Cross-user isolation for the aggregated queue itself, not just a
+  // single RPC call. ----------------------------------------------------
+  const otherAttentionEntryId = await captureFixtureEntry(other, "needs-attention-other-owner");
+  dataOrThrow(
+    await other.rpc("persist_entry_interpretation", {
+      p_entry_id: otherAttentionEntryId,
+      p_extraction: fixtureExtraction(),
+      p_model: "gpt-test",
+      p_strategy_version: "smoke-v1",
+      p_prompt_version: "smoke-v1",
+      p_input_tokens: 10,
+      p_output_tokens: 10,
+    }),
+    "persist interpretation for the other-owner needs-attention fixture",
+  );
+  await settleInterpretEntryJob(otherUser.id, otherAttentionEntryId, "attention-other-owner");
+  await moveToCompletedWithSameCandidates(other, otherAttentionEntryId, 1, "attention-other-owner");
+  const ownerAttentionAfterOtherCapture = await listOwnerAttention();
+  assert(
+    findAttentionRow(ownerAttentionAfterOtherCapture, otherAttentionEntryId) === undefined,
+    "the owner's needs-attention queue leaked another owner's entry",
+  );
+  const otherAttentionRows = dataOrThrow(
+    await other.rpc("list_needs_attention", { p_limit: 50, p_cursor_occurred_at: null, p_cursor_entry_id: null }),
+    "list needs-attention queue as the other owner",
+  );
+  assert(
+    findAttentionRow(otherAttentionRows, otherAttentionEntryId)?.reason === "confirm_existing_candidates",
+    "the other owner's own needs-attention entry did not appear in their own queue",
+  );
+  assert(
+    findAttentionRow(otherAttentionRows, attentionEntryId) === undefined,
+    "the other owner's needs-attention queue leaked the first owner's entry",
+  );
+
+  // --- Deterministic keyset pagination across a real, larger fixture set. -
+  for (let index = 0; index < 3; index += 1) {
+    const paginationEntryId = await captureFixtureEntry(owner, `needs-attention-pagination-${index}`);
+    dataOrThrow(
+      await owner.rpc("persist_entry_interpretation", {
+        p_entry_id: paginationEntryId,
+        p_extraction: fixtureExtraction(),
+        p_model: "gpt-test",
+        p_strategy_version: "smoke-v1",
+        p_prompt_version: "smoke-v1",
+        p_input_tokens: 10,
+        p_output_tokens: 10,
+      }),
+      `persist interpretation for needs-attention pagination fixture ${index}`,
+    );
+    await settleInterpretEntryJob(ownerUser.id, paginationEntryId, `attention-pagination-${index}`);
+  }
+  const paginationPageOne = dataOrThrow(
+    await owner.rpc("list_needs_attention", { p_limit: 2, p_cursor_occurred_at: null, p_cursor_entry_id: null }),
+    "load the first needs-attention pagination page",
+  );
+  assert(paginationPageOne.length === 2, "the first keyset page did not honor the requested limit");
+  const cursorRow = paginationPageOne[paginationPageOne.length - 1];
+  const paginationPageTwo = dataOrThrow(
+    await owner.rpc("list_needs_attention", {
+      p_limit: 50,
+      p_cursor_occurred_at: cursorRow.occurred_at,
+      p_cursor_entry_id: cursorRow.entry_id,
+    }),
+    "load the next needs-attention pagination page",
+  );
+  const pageOneIds = new Set(paginationPageOne.map((pageRow) => pageRow.entry_id));
+  const overlap = paginationPageTwo.filter((pageRow) => pageOneIds.has(pageRow.entry_id));
+  assert(overlap.length === 0, "consecutive keyset pages returned an overlapping/duplicated row");
+
+  console.log("Remote daily-cycle smoke passed: current-interpretation binding, stale/out-of-range rejection, idempotent replay, correction survivability, concurrent confirmation race safety, record-only enforcement, cross-user isolation, scoped undo, and the needs-attention queue's real qualification/resolution/isolation/pagination behavior.");
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);

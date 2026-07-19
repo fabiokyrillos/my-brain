@@ -8,6 +8,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type {
   ActionableCandidateView,
   AttentionItemView,
+  AttentionReason,
   AvailableAction,
   DailyCycleAction,
   HumanFieldView,
@@ -102,7 +103,12 @@ function action(id: DailyCycleAction): AvailableAction {
   return Object.freeze({ id });
 }
 
-function attentionActionId(reason: NonNullable<ReturnType<typeof resolveDailyCycleLifecycle>["attentionReason"]>): DailyCycleAction {
+/**
+ * Shared with attention-projection.ts (Slice 2X.10) so the Needs Attention
+ * queue's primary action always agrees with the entry-review page's own
+ * attention item for the same reason, instead of a second, drifting mapping.
+ */
+export function attentionActionId(reason: AttentionReason): DailyCycleAction {
   switch (reason) {
     case "review_interpretation": return "correct_interpretation";
     case "confirm_existing_candidates": return "confirm_existing_candidates";

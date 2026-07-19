@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -2399,6 +2399,21 @@ export type Database = {
           p_record_only?: boolean
         }
         Returns: string
+      }
+      list_needs_attention: {
+        Args: {
+          p_cursor_entry_id?: string
+          p_cursor_occurred_at?: string
+          p_limit?: number
+        }
+        Returns: {
+          current_interpretation_id: string
+          entry_id: string
+          job_id: string
+          occurred_at: string
+          open_question_id: string
+          reason: string
+        }[]
       }
       match_internal_knowledge: {
         Args: { p_match_count?: number; p_query_embedding: string }
