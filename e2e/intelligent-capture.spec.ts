@@ -173,6 +173,24 @@ test.describe("intelligent capture", () => {
       await page.reload();
     }
 
+    // The entry has an unconfirmed candidate and no open question at this
+    // point, so it must appear in the "Precisa de você" queue on both Home
+    // and Caixa before the candidate is confirmed below.
+    await page.goto("/pt-BR/app");
+    await expect(page.getByRole("heading", { name: "Precisa de você" })).toBeVisible();
+    await expect(page.locator(".attention-count")).not.toHaveText("0");
+    await page.getByRole("link", { name: "Ver tudo" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app\/inbox\?view=needs-you$/);
+    await expect(page.getByRole("link", { name: "Precisa de você", exact: true })).toHaveAttribute("aria-current", "page");
+    const attentionRow = page.locator(`a.needs-attention-row[href="/pt-BR/app/inbox/${capturedEntryId}"]`);
+    await expect(attentionRow).toBeVisible();
+    await attentionRow.click();
+    await expect(page).toHaveURL(new RegExp(`/pt-BR/app/inbox/${capturedEntryId}$`));
+
+    await page.goto(page.url().replace("/pt-BR/", "/en/").replace(`/inbox/${capturedEntryId}`, "/inbox?view=needs-you"));
+    await expect(page.getByRole("link", { name: "Needs you", exact: true })).toHaveAttribute("aria-current", "page");
+    await page.goto(`/pt-BR/app/inbox/${capturedEntryId}`);
+
     const createButton = page.getByRole("button", { name: /Criar \d+ tarefas?/ });
     await expect(createButton).toBeVisible();
     await createButton.click();

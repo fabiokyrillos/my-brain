@@ -36,6 +36,9 @@ const messages = {
       nextReview: "Preferência de revisão",
       empty: "Seu dia começa aqui",
       emptyHint: "Registre algo e o Brain organiza o contexto sem tirar você do fluxo.",
+      needsAttention: "Precisa de você",
+      needsAttentionEmpty: "Nada precisa de você agora.",
+      viewAll: "Ver tudo",
     },
   },
   en: {
@@ -73,6 +76,9 @@ const messages = {
       nextReview: "Review preference",
       empty: "Your day starts here",
       emptyHint: "Capture something and Brain organizes the context without breaking your flow.",
+      needsAttention: "Needs you",
+      needsAttentionEmpty: "Nothing needs you right now.",
+      viewAll: "View all",
     },
   },
 } as const;

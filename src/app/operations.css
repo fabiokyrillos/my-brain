@@ -39,3 +39,16 @@
 .technical-details-unavailable{margin:0;color:var(--ink-soft);font-size:12px}
 .technical-details>summary:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
 @media(max-width:600px){.technical-details-body{padding:18px 16px}.review-facts{gap:6px}}
+
+/* Phase 2X.11: Needs Attention on Home and Caixa */
+.attention-panel .count{background:#fff8e8;color:#855f12}
+.needs-attention-row .list-attention-hint,.needs-attention-action-hint{color:var(--blue);font-weight:700}
+.panel-view-all{display:inline-block;margin-top:16px;color:var(--blue);font:700 11px var(--font-jetbrains)}
+.panel-view-all:hover{text-decoration:underline}
+.inbox-view-tabs{display:flex;gap:8px;margin-bottom:20px}
+.inbox-view-tabs a{border:1px solid var(--line);border-radius:999px;padding:9px 15px;min-height:44px;display:inline-flex;align-items:center;color:var(--ink-soft);font:600 12px var(--font-sans);background:white}
+.inbox-view-tabs a[aria-current="page"]{background:var(--ink);color:white;border-color:var(--ink)}
+.needs-attention-list{margin-top:4px}
+.load-more-button{width:auto;margin:6px auto 0}
+.needs-attention-error{margin-top:6px}
+@media(max-width:600px){.inbox-view-tabs{flex-wrap:wrap}}
