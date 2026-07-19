@@ -1,7 +1,7 @@
 # Project State
 
 Last updated: 2026-07-19
-Current phase: Phase 2X — Product Convergence in progress — official Slice 2X.13 complete
+Current phase: Phase 2X — Product Convergence in progress — official Slice 2X.14 complete
 Source of truth order: current code; linked remote database and migrations; `STATE.md`; `TODO.md`; `DECISIONS.md`; `CHANGELOG.md`; `SPRINT_1_5_REPORT.md`; implementation plans; remaining documentation
 
 ## Status summary
@@ -11,6 +11,8 @@ Phase 1 is implemented as a hardened pre-MVP foundation. Sprint 1.5 remains clos
 The official Slice 2X.12 is complete with no migration: `/{locale}/app/work` is now the canonical Work surface with `today`/`all`/`waiting` product views, while localized `/today`, `/tasks`, and `/waiting` routes redirect safely with equivalent view and page. The server-only, explicitly owner-scoped `loadWorkProjection` is the canonical page's only task-table reader, uses the authenticated profile timezone (safe fallback on invalid/missing values), applies deterministic ordering and page-based lookahead, and reuses `toWorkItemView` so invalid rows fail closed. `WorkView` and the adapted `TaskList` consume product DTOs only, localize human state/origin/date, preserve manual creation and complete/wait/resume/reopen actions, and preserve `view` in pagination URLs. Relevant task Actions revalidate canonical Work in both locales. See `docs/reports/PHASE_2X_SLICE_12_REPORT.md`.
 
 The official Slice 2X.13 is complete with no migration or backend change: `src/features/shell/capabilities.ts` is the pure route/product navigation contract for every authenticated destination. Início/Home, Caixa/Inbox, Trabalho/Work, and Brain are the shared desktop/mobile primary set; capture is a distinct global action; notifications remain global; Contexto, Reflexão, Organização, Transparência, and Preferências share one order between the desktop tree and mobile Mais; Jobs remains directly reachable only for explicit technical support and never appears in common navigation. Active state maps nested Inbox/review and Brain routes plus canonical Work and `/today`/`tasks`/`waiting` aliases to exactly one primary destination, independently of supported query views. Locale switching preserves pathname and query, mobile DOM order matches visual/tab order, Mais closes on Escape with restored focus, visible targets remain at least 44 px, and the shell no longer displays the unobservable static claims "Brain atento"/"Brain ativo". See ADR-028 and `docs/reports/PHASE_2X_SLICE_13_REPORT.md`.
+
+The official Slice 2X.14 is complete with no migration or infrastructure change: the static capability registry now records operational, informational, advanced, and future product promises with a visible surface and consumer evidence. Home derives an honest all-saved/organizing/needs-attention state from the existing Inbox and Needs Attention projections; Settings exposes only proven controls, places model routing/cost transparency under accessible progressive disclosure, and preserves hidden legacy values through owner-scoped server reads before calling the existing full-payload RPC; Reviews loads owner-scoped summaries through a server-only localized product DTO and describes generation as manual/on demand. Capture, enqueue, organizing, retry, and completion copy are distinct in PT-BR and English. See `docs/PHASE_2X_REPORT.md` and `docs/reports/PHASE_2X_SLICE_14_REPORT.md`.
 
 ## Implemented functionality
 
@@ -61,7 +63,7 @@ The official Slice 2X.13 is complete with no migration or backend change: `src/f
 
 ## Next priorities
 
-1. Continue Phase 2X only with explicit authorization for Slice 2X.14; Slice 2X.13's primary navigation and More grouping are complete, so no blocker remains there.
+1. Continue Phase 2X only with explicit authorization for Slice 2X.15; Slice 2X.14's product-promise convergence is complete, so no blocker remains there.
 2. Begin Phase 2C only after Phase 2X converges the daily cycle and preserves the Phase 2B revision/trust boundary.
 3. Adopt generated Supabase client types incrementally as each legacy preference/vector contract is validated.
 4. Add custom SMTP and re-run the non-throttled signup delivery smoke before production launch.

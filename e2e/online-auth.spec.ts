@@ -63,7 +63,7 @@ test.describe("online Supabase authentication", () => {
     });
   });
 
-  test("signs in and persists profile preferences", async ({ page }) => {
+  test("signs in and persists only operational profile preferences", async ({ page }) => {
     await page.goto("/pt-BR/auth/login");
     await page.getByLabel("E-mail").fill(email);
     await page.getByLabel("Senha").fill(password);
@@ -73,11 +73,13 @@ test.describe("online Supabase authentication", () => {
     await expect(page.getByRole("heading", { name: /boa tarde/i })).toBeVisible();
 
     await page.goto("/pt-BR/app/settings");
-    await expect(page.getByLabel("Seu nome")).toHaveValue("Codex E2E");
-    await expect(page.getByLabel("Nome do agente")).toHaveValue("Brain");
     await expect(page.getByLabel("Fuso horário")).toHaveValue("America/Sao_Paulo");
-    await page.getByLabel("Seu nome").fill("Codex E2E verificado");
-    await page.getByLabel("Nome do agente").fill("Brain Online");
+    await expect(page.getByLabel("Seu nome")).toHaveCount(0);
+    await expect(page.getByLabel("Nome do agente")).toHaveCount(0);
+    await expect(page.getByLabel("Resumo diário")).toHaveCount(0);
+    await expect(page.getByLabel("Nível de autonomia")).toHaveCount(0);
+    await page.getByLabel("Fuso horário").selectOption("America/Cayenne");
+    await page.getByLabel("Detalhe das respostas").selectOption("detailed");
     await page.getByRole("button", { name: "Salvar preferências" }).click();
 
     await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
@@ -90,18 +92,18 @@ test.describe("online Supabase authentication", () => {
     const auth = (await authResponse.json()) as { access_token: string };
 
     const [profileResponse, preferencesResponse] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/profiles?select=display_name&user_id=eq.${userId}`, {
+      fetch(`${supabaseUrl}/rest/v1/profiles?select=display_name,timezone&user_id=eq.${userId}`, {
         headers: { apikey: publishableKey!, authorization: `Bearer ${auth.access_token}` },
       }),
-      fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=agent_name&user_id=eq.${userId}`, {
+      fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=agent_name,response_detail&user_id=eq.${userId}`, {
         headers: { apikey: publishableKey!, authorization: `Bearer ${auth.access_token}` },
       }),
     ]);
 
-    const profiles = (await profileResponse.json()) as Array<{ display_name: string }>;
-    const preferences = (await preferencesResponse.json()) as Array<{ agent_name: string }>;
-    expect(profiles).toEqual([{ display_name: "Codex E2E verificado" }]);
-    expect(preferences).toEqual([{ agent_name: "Brain Online" }]);
+    const profiles = (await profileResponse.json()) as Array<{ display_name: string; timezone: string }>;
+    const preferences = (await preferencesResponse.json()) as Array<{ agent_name: string; response_detail: string }>;
+    expect(profiles).toEqual([{ display_name: "Codex E2E", timezone: "America/Cayenne" }]);
+    expect(preferences).toEqual([{ agent_name: "Brain", response_detail: "detailed" }]);
   });
 
   test("creates an account through the validated signup journey", async ({ page }, testInfo) => {

@@ -400,18 +400,36 @@ export async function generateReview(
   _state: AgentFormState,
   formData: FormData,
 ): Promise<AgentFormState> {
+  const requestedLocale = formData.get("locale") === "en" ? "en" : "pt-BR";
+  const messages = requestedLocale === "pt-BR"
+    ? {
+        invalid: "Revisão inválida.",
+        session: "Sua sessão expirou.",
+        load: "Não foi possível carregar os dados da revisão.",
+        empty: "Ainda não há atividade suficiente nesse período.",
+        failed: "Não foi possível gerar a revisão agora.",
+        completed: "Revisão concluída.",
+      }
+    : {
+        invalid: "Invalid review.",
+        session: "Your session expired.",
+        load: "Could not load the review data.",
+        empty: "There is not enough activity in this period yet.",
+        failed: "Could not generate the review right now.",
+        completed: "Review completed.",
+      };
   const parsed = z
     .object({
       locale: localeSchema,
       period: z.enum(["daily", "weekly_review", "weekly_plan", "monthly"]),
     })
     .safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { status: "error", message: "Revisão inválida." };
+  if (!parsed.success) return { status: "error", message: messages.invalid };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  if (!user) return { status: "error", message: messages.session };
   const now = new Date();
   let start = new Date(now);
   if (parsed.data.period === "daily") start.setHours(0, 0, 0, 0);
@@ -456,13 +474,13 @@ export async function generateReview(
   ) {
     return {
       status: "error",
-      message: "Não foi possível carregar os dados da revisão.",
+      message: messages.load,
     };
   }
   if (!(entriesResult.data?.length || tasksResult.data?.length))
     return {
       status: "error",
-      message: "Ainda não há atividade suficiente nesse período.",
+      message: messages.empty,
     };
   const sources: ChatSource[] = [
     ...(entriesResult.data ?? []).map((item) => ({
@@ -512,12 +530,9 @@ export async function generateReview(
     });
     const startDate = start.toISOString().slice(0, 10);
     const endDate = now.toISOString().slice(0, 10);
-    const titleMap = {
-      daily: "Resumo diário",
-      weekly_review: "Revisão semanal",
-      weekly_plan: "Planejamento semanal",
-      monthly: "Revisão mensal",
-    };
+    const titleMap = parsed.data.locale === "pt-BR"
+      ? { daily: "Resumo diário", weekly_review: "Revisão semanal", weekly_plan: "Planejamento semanal", monthly: "Revisão mensal" }
+      : { daily: "Daily summary", weekly_review: "Weekly review", weekly_plan: "Weekly plan", monthly: "Monthly review" };
     const { error } = await supabase
       .from("summaries")
       .upsert(
@@ -545,9 +560,9 @@ export async function generateReview(
     );
     return {
       status: "error",
-      message: "Não foi possível gerar a revisão agora.",
+      message: messages.failed,
     };
   }
   revalidatePath(`/${parsed.data.locale}/app/reviews`);
-  return { status: "success", message: "Revisão gerada." };
+  return { status: "success", message: messages.completed };
 }

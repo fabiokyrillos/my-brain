@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  capabilityRegistry,
   classifyNavigationPath,
+  deriveHomeOperationalStatus,
+  getCapabilityRegistryView,
   getLocaleSwitchHref,
   getNavigationHref,
   isNavigationActive,
@@ -100,5 +103,46 @@ describe("navigation capabilities", () => {
     expect(
       getLocaleSwitchHref("/pt-BR/app/inbox", "view=needs-you&page=2", "en"),
     ).toBe("/en/app/inbox?view=needs-you&page=2");
+  });
+
+  it("classifies visible product promises by real consumer evidence", () => {
+    expect(getCapabilityRegistryView("settings").map(({ key, state, visible }) => ({ key, state, visible }))).toEqual([
+      { key: "timezone", state: "operational", visible: true },
+      { key: "response_style", state: "operational", visible: true },
+      { key: "quiet_hours", state: "operational", visible: true },
+      { key: "ai_routing", state: "advanced", visible: true },
+      { key: "identity_names", state: "future", visible: false },
+      { key: "locale_preference", state: "future", visible: false },
+      { key: "scheduled_reviews", state: "future", visible: false },
+      { key: "autonomy", state: "future", visible: false },
+      { key: "follow_up_intensity", state: "future", visible: false },
+      { key: "privacy_default", state: "future", visible: false },
+      { key: "reasoning_route", state: "future", visible: false },
+      { key: "background_route", state: "future", visible: false },
+    ]);
+
+    for (const capability of capabilityRegistry.filter((item) => item.visible)) {
+      expect(capability.consumerEvidence.length, capability.key).toBeGreaterThan(0);
+    }
+  });
+
+  it("derives the observable Home status with attention before organizing before saved", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "organizing" }],
+      attentionCount: 2,
+      attentionHasNext: true,
+    })).toEqual({ kind: "attention", count: 2, hasMore: true });
+
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "saved" }, { productState: "organizing" }],
+      attentionCount: 0,
+      attentionHasNext: false,
+    })).toEqual({ kind: "organizing", count: 1, hasMore: false });
+
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "saved" }, { productState: "ready" }],
+      attentionCount: 0,
+      attentionHasNext: false,
+    })).toEqual({ kind: "saved", count: 0, hasMore: false });
   });
 });

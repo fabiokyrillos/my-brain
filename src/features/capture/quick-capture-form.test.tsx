@@ -51,7 +51,7 @@ describe("QuickCaptureForm", () => {
     await user.type(textbox, "Primeira captura");
     await user.click(screen.getByRole("button", { name: "Registrar" }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Salvo. Estou organizando."));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Salvo. A organização foi solicitada."));
     await waitFor(() => expect(textbox.value).toBe(""));
     await waitFor(() => expect(textbox).toHaveFocus());
   });

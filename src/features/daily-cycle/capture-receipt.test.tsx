@@ -18,7 +18,7 @@ describe("CaptureReceiptView", () => {
   it("announces the localized save message as a status region", () => {
     render(<CaptureReceiptView receipt={receipt()} locale="pt-BR" />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("Salvo. Estou organizando.");
+    expect(screen.getByRole("status")).toHaveTextContent("Salvo. A organização foi solicitada.");
   });
 
   it("renders the English replay message when the capture was deduplicated", () => {

@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.14: visible promises aligned with behavior
+
+### Added
+
+- A static capability registry that records each authenticated product promise as operational, informational, advanced, or future, with its visible surface and consumer evidence.
+- Owner-scoped server-only Settings and Reviews projections that return localized product DTOs and fail closed on unsupported persisted values.
+- Home operational status derived from the existing Inbox and Needs Attention projections, plus PT-BR/English lexical and product-contract tests.
+- The permanent capability inventory in `docs/PHASE_2X_REPORT.md` and execution evidence in `docs/reports/PHASE_2X_SLICE_14_REPORT.md`.
+
+### Changed
+
+- Settings now exposes only controls with real consumers. Proven AI routing and cost transparency use accessible progressive disclosure; identity, persisted locale, automatic review schedules, autonomy, privacy, follow-up intensity, and unused reasoning/background routes remain hidden.
+- Saving Settings submits only visible fields, ignores reserved Next.js `$ACTION_` transport metadata, rejects unknown product keys, and preserves every hidden legacy value through owner-scoped server reads before calling the existing full-payload RPC.
+- Reviews presents localized product period/status labels and on-demand generation language without exposing raw storage enums or `model_used`.
+- Capture and reprocessing copy now distinguishes durable save, enqueue request, organizing, retry, and completion. Home no longer implies an automatic next review.
+
+### Verification
+
+- Strict TDD recorded the focused RED (10 files, 13 failures) and final focused GREEN (43 tests plus the Settings action regression). Full Vitest passes 75 files/404 tests; ESLint, TypeScript, Next.js 16.2.10 production build, and `git diff --check` pass.
+- Offline Playwright desktop/mobile passes 6 tests with 10 credential-gated skips. Targeted authenticated Playwright passes 4 tests covering real Settings persistence and Home/Settings/Reviews reachability in PT-BR/English on desktop/mobile.
+- No migration, RPC, Edge Function, generated database type, deployment, secret, or infrastructure mutation. Linked local/remote migration histories remain synchronized through `202607180031`.
+
 ## 2026-07-19 — Slice 2X.13: converged primary navigation and More grouping
 
 ### Added

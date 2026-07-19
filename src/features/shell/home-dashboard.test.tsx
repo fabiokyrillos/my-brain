@@ -51,7 +51,7 @@ function setup(options: {
   vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: "user-1" } } as never);
   vi.mocked(loadInboxProjection).mockResolvedValue({ items, hasNext: false });
   vi.mocked(loadAttentionProjection).mockResolvedValue({ items: attentionItems, hasNext: attentionHasNext, nextCursor: null });
-  return { supabase };
+  return { supabase, from };
 }
 
 function item(overrides: Partial<InboxItemView> = {}): InboxItemView {
@@ -118,6 +118,24 @@ describe("HomeDashboard", () => {
     expect(screen.getByText(/Nada por aqui ainda/)).toBeInTheDocument();
   });
 
+  it("shows an observable all-saved status without a review-time promise", async () => {
+    const { from } = setup({ items: [item({ productState: "saved" })] });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getByText("Tudo salvo")).toBeInTheDocument();
+    expect(screen.queryByText("Preferência de revisão")).not.toBeInTheDocument();
+    expect(from).not.toHaveBeenCalledWith("agent_preferences");
+  });
+
+  it("shows the real number of records being organized", async () => {
+    setup({ items: [item({ entryId: "entry-1", productState: "organizing" }), item({ entryId: "entry-2", productState: "organizing" })] });
+
+    render(await HomeDashboard({ locale: "en" }));
+
+    expect(screen.getByText("2 records being organized")).toBeInTheDocument();
+  });
+
   it("still renders the existing priority task panel unchanged", async () => {
     setup({ tasks: [{ id: "task-1", title: "Preparar reunião", due_at: null, status: "todo" }] });
 
@@ -140,6 +158,7 @@ describe("HomeDashboard", () => {
     expect(screen.getByText("Confirmar proposta do Atlas")).toBeInTheDocument();
     expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
     expect(screen.getByText("2", { selector: ".attention-count" })).toBeInTheDocument();
+    expect(screen.getByText("2 itens precisam de você")).toBeInTheDocument();
   });
 
   it("shows a `+` suffix on the count when the queue has more items than the preview page", async () => {

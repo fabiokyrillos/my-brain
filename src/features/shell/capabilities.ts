@@ -1,4 +1,60 @@
+import type { ProductState } from "@/features/daily-cycle/contracts";
 import type { Locale } from "@/lib/preferences";
+
+export type ProductCapabilityState = "operational" | "informative" | "advanced" | "future";
+export type ProductCapabilitySurface = "shell" | "settings" | "reviews" | "transparency";
+
+export type CapabilityDefinition = Readonly<{
+  key: string;
+  state: ProductCapabilityState;
+  surface: ProductCapabilitySurface;
+  consumerEvidence: readonly string[];
+  visible: boolean;
+}>;
+
+export const capabilityRegistry = [
+  { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true },
+  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true },
+  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true },
+  { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true },
+  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true },
+  { key: "identity_names", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "scheduled_reviews", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  { key: "manual_reviews", state: "operational", surface: "reviews", consumerEvidence: ["generateReview"], visible: true },
+  { key: "cost_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["get_ai_cost_summary", "ai_usage_events"], visible: true },
+  { key: "history_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["audit_events"], visible: true },
+] as const satisfies readonly CapabilityDefinition[];
+
+export type CapabilityRegistryView = readonly CapabilityDefinition[];
+
+export function getCapabilityRegistryView(surface: ProductCapabilitySurface): CapabilityRegistryView {
+  return capabilityRegistry.filter((capability) => capability.surface === surface);
+}
+
+export function deriveHomeOperationalStatus({
+  items,
+  attentionCount,
+  attentionHasNext,
+}: {
+  items: readonly { productState: ProductState }[];
+  attentionCount: number;
+  attentionHasNext: boolean;
+}) {
+  if (attentionCount > 0) {
+    return { kind: "attention" as const, count: attentionCount, hasMore: attentionHasNext };
+  }
+  const organizingCount = items.filter((item) => item.productState === "organizing").length;
+  if (organizingCount > 0) {
+    return { kind: "organizing" as const, count: organizingCount, hasMore: false };
+  }
+  return { kind: "saved" as const, count: 0, hasMore: false };
+}
 
 export type NavigationGroupKey =
   | "primary"

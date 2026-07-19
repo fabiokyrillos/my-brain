@@ -93,7 +93,7 @@ test.describe("intelligent capture", () => {
     // field is already cleared and refocused for the next capture, which
     // proves the UI is interactive before interpretation completes.
     await expect(page).toHaveURL(/\/pt-BR\/app\/capture$/);
-    await expect(page.getByRole("status")).toContainText("Salvo. Estou organizando.");
+    await expect(page.getByRole("status")).toContainText("Salvo. A organização foi solicitada.");
     await expect(captureField).toHaveValue("");
     await expect(captureField).toBeFocused();
     await expect(page.getByRole("button", { name: "Registrar" })).toBeEnabled();
@@ -279,6 +279,7 @@ test.describe("intelligent capture", () => {
     await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
 
     await page.goto("/pt-BR/app/settings");
+    await page.getByText("IA avançada").click();
     await page.getByRole("radio", { name: /Econômico/ }).click();
     await expect(page.getByLabel("Chat principal")).toHaveValue("gpt-5-mini");
     await page.getByRole("button", { name: "Salvar preferências" }).click();

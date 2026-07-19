@@ -45,13 +45,13 @@ describe("daily cycle copy", () => {
 
   it("keeps action-result copy semantic rather than exposing internal failures", () => {
     expect(copy.dailyCycleCopy?.["pt-BR"]?.messages).toMatchObject({
-      capture_saved: "Salvo. Estou organizando.",
+      capture_saved: "Salvo. A organização foi solicitada.",
       retry_scheduled: expect.any(String),
       version_conflict: expect.any(String),
       action_failed: expect.any(String),
     });
     expect(copy.dailyCycleCopy?.en?.messages).toMatchObject({
-      capture_saved: "Saved. I am organizing it.",
+      capture_saved: "Saved. Organization was queued.",
       retry_scheduled: expect.any(String),
       version_conflict: expect.any(String),
       action_failed: expect.any(String),

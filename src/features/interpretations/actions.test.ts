@@ -140,7 +140,7 @@ describe("interpretation actions", () => {
 
     const result = await reprocessEntry({ status: "idle", message: "" }, form);
 
-    expect(result).toEqual({ status: "success", message: "Vou organizar este registro novamente." });
+    expect(result).toEqual({ status: "success", message: "Nova organização solicitada." });
     expect(rpc).toHaveBeenCalledWith("enqueue_entry_reprocessing", {
       p_entry_id: entryId,
       p_operation_key: operationKey,

@@ -59,6 +59,12 @@ test.describe("authenticated converged navigation", () => {
             groups: ["Contexto", "Reflexão", "Organização", "Transparência", "Preferências"],
             notification: "Notificações",
             switchLanguage: "Mudar idioma para inglês",
+            allSaved: "Tudo salvo",
+            advanced: "IA avançada",
+            costsLink: "Ver custos de IA",
+            hiddenSettings: ["Resumo diário", "Nível de autonomia", "Privacidade padrão"],
+            reviewsHeading: "Revisões",
+            onDemandReview: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
             secondary: [
               ["Projetos", "projects"],
               ["Pessoas", "people"],
@@ -80,6 +86,12 @@ test.describe("authenticated converged navigation", () => {
             groups: ["Context", "Reflection", "Organization", "Transparency", "Preferences"],
             notification: "Notifications",
             switchLanguage: "Switch language to Portuguese",
+            allSaved: "All saved",
+            advanced: "Advanced AI",
+            costsLink: "View AI costs",
+            hiddenSettings: ["Daily review", "Autonomy level", "Default privacy"],
+            reviewsHeading: "Reviews",
+            onDemandReview: "Generate a review when you choose; nothing runs from a configured schedule.",
             secondary: [
               ["Projects", "projects"],
               ["People", "people"],
@@ -95,6 +107,7 @@ test.describe("authenticated converged navigation", () => {
           };
 
       await page.goto(`/${locale}/app`);
+      await expect(page.getByText(labels.allSaved, { exact: true })).toBeVisible();
       const navigation = page.getByRole("navigation", { name: labels.navigation });
       await expect(navigation).toBeVisible();
 
@@ -141,6 +154,21 @@ test.describe("authenticated converged navigation", () => {
       }
       await expect(page.getByRole("link", { name: labels.notification })).toBeVisible();
       await expect(page.locator(`a[href="/${locale}/app/jobs"]`)).toHaveCount(0);
+
+      await page.goto(`/${locale}/app/settings`);
+      for (const hiddenSetting of labels.hiddenSettings) {
+        await expect(page.getByLabel(hiddenSetting, { exact: true })).toHaveCount(0);
+      }
+      const advancedSummary = page.locator("summary").filter({ hasText: labels.advanced });
+      const advancedBox = await advancedSummary.boundingBox();
+      expect(advancedBox?.width).toBeGreaterThanOrEqual(44);
+      expect(advancedBox?.height).toBeGreaterThanOrEqual(44);
+      await advancedSummary.click();
+      await expect(page.getByRole("link", { name: labels.costsLink })).toHaveAttribute("href", `/${locale}/app/costs`);
+
+      await page.goto(`/${locale}/app/reviews`);
+      await expect(page.getByRole("heading", { name: labels.reviewsHeading })).toBeVisible();
+      await expect(page.getByText(labels.onDemandReview, { exact: true })).toBeVisible();
 
       await page.goto(`/${locale}/app/inbox?view=needs-you`);
       await expect(
