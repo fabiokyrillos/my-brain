@@ -2211,6 +2211,7 @@ export type Database = {
           expires_at: string
           id: string
           operation_key: string | null
+          request_fingerprint: string | null
           result_interpretation_id: string | null
           source_entry_id: string | null
           source_interpretation_id: string | null
@@ -2228,6 +2229,7 @@ export type Database = {
           expires_at?: string
           id?: string
           operation_key?: string | null
+          request_fingerprint?: string | null
           result_interpretation_id?: string | null
           source_entry_id?: string | null
           source_interpretation_id?: string | null
@@ -2245,6 +2247,7 @@ export type Database = {
           expires_at?: string
           id?: string
           operation_key?: string | null
+          request_fingerprint?: string | null
           result_interpretation_id?: string | null
           source_entry_id?: string | null
           source_interpretation_id?: string | null
@@ -2331,6 +2334,16 @@ export type Database = {
       }
       confirm_entry_task_candidates: {
         Args: {
+          p_candidate_indexes: number[]
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
+        Returns: Json
+      }
+      confirm_entry_task_candidates_v2: {
+        Args: {
+          p_candidate_edits: Json
           p_candidate_indexes: number[]
           p_entry_id: string
           p_expected_interpretation_id: string

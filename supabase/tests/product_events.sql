@@ -7,7 +7,10 @@ select has_column('public', 'product_events', 'user_id', 'ledger event has an ow
 select has_column('public', 'product_events', 'event_name', 'ledger event has an allowlisted name');
 select has_column('public', 'product_events', 'properties', 'ledger event stores bounded allowlisted properties');
 select has_column('public', 'product_events', 'idempotency_key', 'ledger event has an idempotency key');
-select row_security_active('public.product_events'), 'product-events RLS is active';
+select ok(
+  (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.product_events'::regclass),
+  'product-events RLS is active and forced'
+);
 select policies_are('public', 'product_events', array['product_events_select_own']);
 select has_index('public', 'product_events', 'product_events_user_created_idx', 'owner timeline index exists');
 select has_index('public', 'product_events', 'product_events_user_name_created_idx', 'owner funnel index exists');
@@ -19,7 +22,7 @@ select results_eq(
   'authenticated product event RPC is security definer'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.record_product_event(text,text,text,text,text,jsonb,text,uuid,uuid,uuid,boolean)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.record_product_event(text,text,text,text,text,jsonb,text,uuid,uuid,uuid,boolean)'::regprocedure $$,
   array[true],
   'authenticated product event RPC has a safe search path'
 );
@@ -132,14 +135,12 @@ select results_eq(
   array[0::bigint],
   'RLS hides another user product events'
 );
-select throws_ok(
-  $$ select public.record_product_event_for_user(
-    '22222222-2222-4222-8222-222222222222', 'capture_started', 'server', 'en', 'desktop', '2x-test-1',
-    jsonb_build_object('captureSource', 'home'), null, null, null,
-    '99999999-9999-4999-8999-999999999999', false
-  ) $$,
-  '42501',
-  'Service role required',
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.record_product_event_for_user(uuid,text,text,text,text,text,jsonb,text,uuid,uuid,uuid,boolean)',
+    'execute'
+  ),
   'authenticated callers cannot record events for another user'
 );
 

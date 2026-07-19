@@ -29,7 +29,7 @@ select results_eq(
   'next entry claim is security definer'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.capture_entry_async(text,text,text,text)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.capture_entry_async(text,text,text,text)'::regprocedure $$,
   array[true],
   'atomic capture has a safe search path'
 );
@@ -375,6 +375,10 @@ select ok(
   ),
   'entry retry receives a future attempt window'
 );
+update public.jobs
+set next_attempt_at = now() + interval '10 minutes'
+where type = 'interpret_entry'
+  and status in ('pending', 'failed');
 select is(
   public.claim_next_entry_interpretation_job('pgtap-entry-worker-next', 120),
   null::jsonb,

@@ -2,8 +2,14 @@ begin;
 select plan(8);
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'agent_preferences', 'agent preferences exists');
-select row_security_active('public.profiles'), 'profiles RLS is active';
-select row_security_active('public.agent_preferences'), 'preferences RLS is active';
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.profiles'::regclass),
+  'profiles RLS is active'
+);
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.agent_preferences'::regclass),
+  'preferences RLS is active'
+);
 select policies_are('public', 'profiles', array['profiles_delete_own','profiles_insert_own','profiles_select_own','profiles_update_own']);
 select policies_are('public', 'agent_preferences', array['agent_preferences_delete_own','agent_preferences_insert_own','agent_preferences_select_own','agent_preferences_update_own']);
 select col_is_pk('public', 'profiles', 'user_id', 'profile ownership is the primary key');

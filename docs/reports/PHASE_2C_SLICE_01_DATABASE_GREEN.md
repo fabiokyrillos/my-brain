@@ -1,258 +1,186 @@
-# Phase 2C Slice 01 — Database Gate Report
+# Phase 2C Slice 01 — Database GREEN Report
 
 ## Status
 
-**READY FOR LINKED EXECUTION — NOT YET DATABASE GREEN.**
+**DATABASE GREEN** for the editable candidate confirmation contract in linked
+Supabase project `ulvwzqlpsjyrnqzfxmck`.
 
-The Phase 2C.1 database implementation has passed static review, lint, and
-typecheck. Because the local Supabase/PostgreSQL runtime is unavailable, the
-authorized linked project will provide the required runtime execution. At this
-checkpoint migration `032` has not been applied remotely, the 74 pgTAP
-assertions and the relevant legacy suites have not yet executed there, and this
-report must not yet be read as deployment or acceptance evidence.
+This gate covers migrations, PostgreSQL functions and triggers, RLS-facing
+privileges, idempotency, undo, authenticated behavior, concurrency, generated
+database types, and repository checks. The TypeScript edit contract, due-date
+utilities, `CandidateEditor`, and Server Action integration are intentionally
+outside this database slice and remain unimplemented.
 
-## Baseline and scope
+## Baseline and commits
 
 - Date: 2026-07-19
 - Branch: `codex/phase-2c-editable-candidate-tasks`
 - Approved base: `7d550cafa3f3346811b7c293d6d3d99f69813925`
 - Starting RED commit: `c292301fc3641162056b30b9ea7aa680983d157b`
-- Starting commit subject: `test(phase-2c): define editable candidate confirmation behavior`
-- Migration tail before implementation: local and linked history both ended at `202607180031`
-- Migration drafted: `supabase/migrations/202607190032_phase_2c_editable_candidate_confirmation.sql`
+- Reviewed implementation commit:
+  `495cf1671b258101f3a0975a5fde4fd0babe70ec`
+  (`feat(db): add editable candidate confirmation contract`)
+- Migration history before execution: local and linked both ended at
+  `202607180031`
+- Database contract migration:
+  `202607190032_phase_2c_editable_candidate_confirmation.sql`
+- Forward-only concurrency correction:
+  `202607190033_guard_v2_confirmation_correction_race.sql`
+- Verification commit subject:
+  `chore(db): verify editable confirmation remotely`
 
-Only the database migration, the two directly relevant pgTAP files, and this
-report were changed. The UI, TypeScript edit contract, Server Actions, Edge
-Functions, queues, workers, Auth, providers, and generated database types were
-not changed.
+The linked project was not empty, contrary to the premise in the execution
+request. Before testing it contained 2 Auth users, 2 profiles, 2 entries,
+2 interpretations, 3 tasks, 1 undo operation, and 6 audit rows. The test
+harness therefore used uniquely prefixed, user-scoped fixtures and preserved
+all pre-existing rows. No claim is made that the project contained no important
+data.
 
-## Drafted database contract
+## Deployed contract
 
-Exact RPC:
+Migration `032` adds:
 
-```sql
-public.confirm_entry_task_candidates_v2(
-  p_entry_id uuid,
-  p_expected_interpretation_id uuid,
-  p_candidate_indexes integer[],
-  p_candidate_edits jsonb,
-  p_operation_key text
-) returns jsonb
-```
+- nullable `public.undo_operations.request_fingerprint text`;
+- a constraint accepting only `NULL` or a 64-character lowercase SHA-256
+  hexadecimal fingerprint;
+- `public.confirm_entry_task_candidates_v2(
+  uuid, uuid, integer[], jsonb, text) returns jsonb`;
+- canonical edit normalization and fingerprinting with
+  `extensions.digest` plus `pg_catalog.encode`;
+- editable `title`, `description`, and `due_at` fields without mutating the
+  stored interpretation candidate;
+- stale-interpretation, ownership, selection, duplicate, unknown-field,
+  malformed-payload, due-date, and already-materialized guards;
+- same-key/same-payload replay, same-key/different-payload rejection, atomic
+  task/evidence/audit/undo creation, and replay-after-undo behavior;
+- `SECURITY DEFINER`, explicit empty `search_path`, authenticated-only execute,
+  and preserved legacy RPC compatibility.
 
-Schema delta:
+Real two-session testing exposed a correction-versus-confirmation race after
+`032`: confirmation and a new `user_corrected` interpretation could both commit
+when they started against the same current interpretation. Because `032` was
+already applied, the defect was corrected only through forward migration `033`.
 
-- Adds nullable `public.undo_operations.request_fingerprint text`.
-- Adds a check requiring every non-null fingerprint to match
-  `^[0-9a-f]{64}$`.
-- Adds the versioned RPC without replacing or redefining
-  `public.confirm_entry_task_candidates(uuid,uuid,integer[],text)`.
+Migration `033` installs a private `SECURITY DEFINER` trigger function with an
+empty `search_path`. Its `BEFORE INSERT` trigger rejects a new
+`user_corrected` interpretation with SQLSTATE `55P03` while active tasks from a
+v2 confirmation still exist. Undo cancels those tasks and releases the
+correction boundary. The trigger function has no execute grant for `PUBLIC`,
+`anon`, or `authenticated`.
 
-Security and grants:
+## Linked migration execution
 
-- `language plpgsql`, `security definer`, `set search_path = ''`.
-- Caller identity comes only from `auth.uid()`; there is no owner argument.
-- Relations and security-sensitive functions are schema-qualified.
-- No dynamic SQL is used.
-- Execute is revoked from `public` and `anon` and granted to `authenticated`.
-- Owner/entry/interpretation lookups use the same generic `P0002` boundary, so
-  cross-owner existence is not disclosed.
+1. The first linked dry-run listed only migration `202607190032`.
+2. Migration `032` applied successfully.
+3. The focused contract and authenticated smokes passed, but the real
+   correction race identified the defect described above.
+4. The next linked dry-run listed only migration `202607190033`.
+5. Migration `033` applied successfully.
+6. Final migration listing confirmed local/remote parity through `033`.
 
-## Input and materialization rules
-
-- Normalized operation key length: 8–240; internal namespace:
-  `confirm-v2:<normalized-key>`.
-- Selected indices: one-dimensional, non-null, 1–50, non-negative, unique, and
-  sorted canonically.
-- Candidate edits: JSON array, 0–50 objects, no more than 131,072 serialized
-  UTF-8 bytes, one edit per selected candidate, and closed keys only.
-- Editable fields: `title`, `description`, and `dueAt` only.
-- Title is trimmed, non-empty, non-null, and at most 240 characters.
-- Description is trimmed, at most 2,000 characters, and explicit null or blank
-  canonicalizes to SQL null.
-- Due date is null or an offset-bearing ISO-8601 instant accepted as
-  `timestamptz`; offsetless and malformed values are rejected.
-- Effective values are resolved from the immutable candidate plus normalized
-  edits. Values equal to the immutable suggestion are removed from canonical
-  changes.
-- Created tasks are `inbox`, have no parent, waiting person, planned date,
-  manual priority, no-due reason, relation rows, or dependency rows, and retain
-  entry/interpretation/candidate/operation/confidence/creator provenance.
-
-## Canonical fingerprint
-
-The deterministic jsonb request is:
-
-```json
-{
-  "entryId": "uuid",
-  "interpretationId": "uuid",
-  "selectedCandidateIndexes": [0, 1],
-  "candidateEdits": [
-    {
-      "candidateIndex": 0,
-      "changes": {
-        "title": "normalized text",
-        "description": null,
-        "dueAt": "2026-07-22T09:00:00-03:00"
-      }
-    }
-  ]
-}
-```
-
-Selected indices and edit objects are ordered by candidate index. Empty changes
-and values equal to the immutable suggestion are omitted. The function hashes
-the PostgreSQL jsonb text representation as UTF-8 and persists lowercase
-SHA-256 hexadecimal.
-
-Read-only inspection of the linked catalog found:
-
-- `extensions.digest(bytea,text)` from `pgcrypto 1.3`;
-- `pg_catalog.encode(bytea,text)`, the PostgreSQL built-in hexadecimal encoder;
-- no `extensions.encode(bytea,text)` function.
-
-The RED pgTAP expectation and its SHA helper were corrected to use the actual
-deployed qualification, `extensions.digest` plus `pg_catalog.encode`. No schema
-wrapper or substitute hash was introduced.
-
-## Transaction and idempotency sequence
-
-1. Require `auth.uid()` and validate all bounded input before writes.
-2. Load the immutable owner/entry/interpretation tuple and reject record-only or
-   out-of-range candidates.
-3. Resolve effective values, canonical edits, edited-field names, and SHA-256.
-4. Reserve `undo_operations(user_id, operation_key)` with the namespaced key,
-   fingerprint, and bounded placeholder evidence.
-5. On conflict, lock the existing operation: an equal fingerprint returns the
-   original task IDs/undo ID; a different fingerprint raises
-   `2C_IDEMPOTENCY_MISMATCH`.
-6. For a new request, lock the owner-scoped entry and require the supplied
-   interpretation to remain current.
-7. Reject a candidate already materialized by another operation with
-   `2C_ALREADY_MATERIALIZED`.
-8. Insert tasks in candidate-index order, finalize undo evidence, append one
-   bounded audit row, and return the deterministic IDs.
-
-Any downstream exception rolls back the reservation, tasks, audit row, and undo
-evidence together. Replay ignores undo/expiry status and returns the original
-result without rematerializing.
-
-## Closed failure contract
-
-- `42501`: unauthenticated/forbidden.
-- `P0002`: owner-scoped entry or interpretation not found.
-- `55P03`: stale expected interpretation.
-- `55000`: record-only interpretation.
-- `22023`: malformed selection, edit, or editable value.
-- `P0001`, detail `2C_IDEMPOTENCY_MISMATCH`: same key, different canonical request.
-- `P0001`, detail `2C_ALREADY_MATERIALIZED`: another operation already resolved a candidate.
-
-Database messages contain no private row content. The only application-facing
-details are the two approved closed tokens.
-
-## Legacy security reconciliation
-
-`supabase/tests/candidate_action_consistency.sql` expected the legacy candidate
-RPC to be `SECURITY INVOKER`. Migration `028`, `docs/SECURITY.md`, and
-`docs/DECISIONS.md` establish `SECURITY DEFINER` with an empty search path,
-explicit owner checks, authenticated execute, and public/anonymous denial as
-the intended architecture. Only that stale expectation and its explanatory
-text were changed; production security and the legacy RPC definition were not.
-
-## `undo_operation` `40001` investigation
-
-The remaining `40001` branch belongs to undoing an interpretation correction
-after a newer revision. Candidate-confirmation undo takes the earlier
-`action_type in ('confirm_entry_tasks', 'confirm_entry_task_candidates')` path,
-cancels only the stored task IDs, records audit evidence, and supports repeated
-undo. The v2 RPC intentionally reuses `confirm_entry_task_candidates`, so its
-undo does not enter the correction-conflict branch. No `undo_operation` rewrite
-is required for the Phase 2C.1 candidate acceptance boundary, and concurrency
-semantics were not weakened.
+No reset, drop, migration-history rewrite, or production deployment was used.
 
 ## Validation evidence
 
 | Gate | Result |
 | --- | --- |
-| Branch/base/RED SHA and clean starting worktree | Pass |
-| Local and linked migration parity through `031` | Pass, read-only |
-| Linked cryptographic catalog inspection | Pass, read-only |
-| Focused local pgTAP (`editable_candidate_confirmation.sql`) | **Blocked before execution** |
-| Full local pgTAP suite | **Blocked before execution** |
-| Declared pgTAP plan/assertion count | Pass: 74/74 statically |
-| Inline JSON fixture parsing | Pass: 0 invalid literals |
-| PostgreSQL SQL parser | Pass: 5 statements |
-| PL/pgSQL parser | Pass: 1 function |
-| Static SQL/security/scope checks | Pass: 16/16 |
-| Ephemeral local PostgreSQL-WASM semantic smoke | Pass, supplemental only |
-| `npm run lint` | Pass |
-| `npm run typecheck` | Pass |
-| Intentional Phase 2C TypeScript RED boundary | Preserved: 104 failed, 2 passed |
-| `npx supabase db lint --linked --level error` | Pass, read-only baseline only |
-| `git diff --check` plus untracked migration whitespace check | Pass |
+| Focused linked pgTAP | **74/74 passed** |
+| Complete linked pgTAP suite | **385/385 passed** across 13 files |
+| pgTAP failures, skips, errors, or plan mismatches | **0** |
+| Authenticated disposable smoke cases | **25/25 passed** |
+| Same key, same payload race | Passed; one semantic result, 15.584 s |
+| Same key, different payload race | Passed; mismatch rejected, 14.232 s |
+| Different keys, same candidate race | Passed; duplicate materialization prevented, 12.917 s |
+| Confirmation-first correction race | Confirmation committed; correction rejected `55P03`, 4.976 s |
+| Correction-first confirmation race | Correction committed; confirmation rejected `55P03`, 4.289 s |
+| Linked catalog/security inspection | Passed |
+| Linked migration parity | `032` and `033` local/remote |
+| `supabase db lint --linked --level error` | Passed |
+| Generated database types | Passed; 13 expected additions, 0 removals |
+| `npm run lint` | Passed |
+| `npm run typecheck` | Passed |
+| `git diff --check` | Passed; only line-ending notices |
 
-The supplemental PostgreSQL-WASM smoke applied migration `032` to an in-memory
-schema and confirmed: two ordered task IDs, a non-idempotent first result,
-same-ID/same-undo replay, mismatch and already-materialized detail tokens,
-`22023` due-date rejection, one audit/undo row, rollback of failed reservations,
-and a 64-character lowercase fingerprint. It does not include Supabase RLS,
-pgTAP, the complete migration history, or real two-session concurrency and is
-not a substitute for the blocked gates.
+The full pgTAP result was:
 
-## Local environment blocker
+- `ai_usage_rls.sql`: 19
+- `candidate_action_consistency.sql`: 33
+- `editable_candidate_confirmation.sql`: 74
+- `editable_candidate_confirmation_race.sql`: 6
+- `entry_interpretation_worker.sql`: 25
+- `entry_processing_jobs.sql`: 46
+- `foundation_hardening.sql`: 36
+- `intelligent_capture_rls.sql`: 8
+- `interpretation_revisions.sql`: 46
+- `job_queue_reliability.sql`: 26
+- `needs_attention_projection.sql`: 35
+- `phase1_rls.sql`: 8
+- `product_events.sql`: 23
 
-- `docker` is not installed or discoverable.
-- No Docker/PostgreSQL Windows service is present.
-- No listener exists on ports `5432` or `54322`.
-- No WSL distribution or PostgreSQL executable is available.
-- `npx supabase status` cannot find the local Docker engine.
-- Both focused and full `npx supabase test db --local` attempts fail while
-  connecting to `127.0.0.1:54322`; no pgTAP assertion executes.
+The installed Supabase CLI still attempted to use Docker for `supabase test db
+--linked`, and Docker was unavailable. The linked test harness therefore used
+temporary CLI database credentials without printing them, executed each pgTAP
+file as PostgreSQL in an isolated transaction, and rolled every file back. The
+temporary `pgtap` extension creation was also transactional; final catalog
+inspection confirmed that it was not left installed.
 
-Local runtime execution remains unavailable. The user has explicitly authorized
-replacing it with execution against the linked development project, which has
-zero users and zero important data. The database boundary is not GREEN until
-all linked pgTAP, authenticated smoke, concurrency, cleanup, and review gates
-pass.
+## Authenticated smoke coverage
+
+Disposable Auth users exercised:
+
+- no-edit confirmation;
+- title edit, description edit and clear, due-date edit and clear, and combined
+  edits;
+- anonymous and cross-owner rejection;
+- malformed JSON, unknown fields, duplicate indexes, unselected candidates,
+  stale interpretations, and record-only candidates;
+- same-key replay and mismatch, already-materialized behavior, undo, repeated
+  undo, and replay after undo;
+- audit and undo privacy;
+- partial confirmation with `needs_attention` projection;
+- immutable interpretation candidates;
+- excluded relation behavior;
+- real separate-session races in both transaction orderings.
+
+Cleanup removed the exact disposable Auth users and their cascaded rows. Final
+inspection found 0 `phase-2c-test-*` users, 0 Phase 2C smoke entries, and the
+same pre-existing row counts recorded before testing.
+
+## Generated types and test reconciliation
+
+`src/lib/supabase/database.types.ts` was regenerated from the linked project in
+the repository-standard location. Its diff contains only the expected three
+`request_fingerprint` row/insert/update properties and the v2 RPC signature.
+
+The complete linked suite also exposed stale assertions in older pgTAP files:
+old function signatures, brittle `proconfig` comparisons, invalid pgTAP helper
+usage, missing RLS assertions, and fixtures that could claim unrelated queued
+jobs. Those tests were reconciled with the migration-backed current schema and
+made transaction-scoped; no unrelated production behavior was changed.
 
 ## Independent review
 
-Three local review passes were completed:
+- **PostgreSQL:** checked function signatures, JSON normalization, constraints,
+  lock ordering, atomic writes, undo behavior, migration forward compatibility,
+  and transactional test isolation.
+- **Security:** checked ownership and stale-state guards, `SECURITY DEFINER`
+  search paths, execute grants, RLS-facing authenticated behavior, privacy of
+  audit/undo rows, and absence of direct trigger-function execution grants.
+- **Concurrency:** checked same-key replay/mismatch, competing keys for one
+  candidate, confirmation-versus-correction in both orderings, and release of
+  the guard after undo.
 
-1. PostgreSQL: additive schema, bounds, canonical values, exact evidence, parser
-   validity, and legacy coexistence.
-2. Application security: caller derivation, closed JSON, empty search path,
-   qualification, grants, cross-owner disclosure, and audit privacy.
-3. Concurrency/idempotency: owner/key reservation, same/different payload,
-   entry locking, candidate uniqueness, rollback, replay after undo, and atomic
-   task/audit/undo writes.
+No unresolved database blocker remains for Phase 2C.1.
 
-No critical or important static/supplemental finding remains. The review is not
-complete for acceptance until real two-session confirmation and
-correction-versus-confirmation races run against the local Supabase stack.
+## Rollback and remaining scope
 
-## No remote mutation and rollback
+The old UI continues to call the preserved legacy RPC, so application rollback
+does not require reverting the database. If either deployed contract must be
+changed, use a new forward migration (`034+`); do not edit applied migrations
+`032` or `033`.
 
-No migration was applied locally, to the linked project, or to production. The
-only linked operations were read-only migration listing, catalog queries, and
-database lint. No deployment, push, or pull request occurred.
+No UI, Server Action, Edge Function, provider, queue, worker, push, or pull
+request is part of this closeout.
 
-Before deployment, rollback is simply discarding the uncommitted migration and
-test/report edits. After a future authorized migration application, the old UI
-continues using the preserved legacy signature, so UI rollback requires no
-database rollback. Any schema removal would require a new forward migration.
-
-## Linked execution authorization and next gates
-
-The user explicitly authorized the linked online Supabase project as the
-development and validation environment for this slice. The project reference is
-`ulvwzqlpsjyrnqzfxmck`; no credential, token, connection string, or secret is
-recorded here.
-
-After the reviewed implementation commit, the remaining gates are: dry-run and
-apply only migration `032`, confirm migration parity and the deployed contract,
-run focused and complete linked pgTAP suites, run authenticated disposable
-smokes and real two-session races, prove fixture cleanup, regenerate the
-repository-standard database types, and complete the final independent review.
-Only then may this report be changed to GREEN.
+The exact next task is: implement the TypeScript edit contract, due-date
+utilities, `CandidateEditor`, and Server Action integration for Phase 2C.1.
