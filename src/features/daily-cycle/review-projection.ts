@@ -1,5 +1,5 @@
 import "server-only";
-import type { EntryExtraction, TaskCandidate } from "@/lib/ai/extraction-schema";
+import type { EntryExtraction } from "@/lib/ai/extraction-schema";
 import type { InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
 import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
 import type { EntityOption } from "@/features/interpretations/revision-editor";
@@ -48,12 +48,10 @@ export type EntryReviewProjection = {
   errorMessage: string | null;
   editableCurrent: EntryReviewEditableCurrent | null;
   entityOptions: EntityOption[];
-  taskCandidates: TaskCandidate[];
   extractedMentions: Array<{ name: string; evidence: string; confidence: number }>;
   history: EntryReviewHistoryItem[];
   taskUndoId: string | null;
   correctionUndoId: string | null;
-  unavailableCandidateIndexes: readonly number[];
 };
 
 export type EntryReviewProjectionInput = {
@@ -235,12 +233,10 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
     errorMessage: input.errorMessage,
     editableCurrent,
     entityOptions: input.entityOptions,
-    taskCandidates: input.extraction?.taskCandidates ?? [],
     extractedMentions,
     history,
     taskUndoId: input.taskUndoId,
     correctionUndoId: input.correctionUndoId,
-    unavailableCandidateIndexes: input.unavailableCandidateIndexes,
   };
 }
 

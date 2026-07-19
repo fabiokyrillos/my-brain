@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import { TaskCandidateForm, type ConfirmTasksAction } from "./task-candidate-form";
 
 const taskCandidatesPresented = vi.hoisted(() => vi.fn(() => null));
@@ -8,9 +9,9 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
   TaskCandidatesPresented: taskCandidatesPresented,
 }));
 
-const candidates = [
-  { title: "Atualizar o relatório", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.95, explicit: false },
-  { title: "Conversar com Maria", description: null, dueAt: null, waitingOn: null, parentIndex: 0, confidence: 0.91, explicit: false },
+const candidates: ActionableCandidateView[] = [
+  { key: "0", title: "Atualizar o relatório" },
+  { key: "1", title: "Conversar com Maria" },
 ];
 
 const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
@@ -114,42 +115,59 @@ describe("TaskCandidateForm", () => {
     expect(screen.getByRole("button", { name: "Desfazer criação" })).toBeInTheDocument();
   });
 
-  it("does not offer a candidate the server marked unavailable for the current interpretation", () => {
-    const action = vi.fn(async () => ({ status: "success" as const, message: "Tarefas criadas.", undoId: null })) as ConfirmTasksAction;
-    render(
-      <TaskCandidateForm
-        action={action}
-        candidates={candidates}
-        entryId={entryId}
-        interpretationId={interpretationId}
-        locale="pt-BR"
-        operationKey={operationKey}
-        unavailableIndexes={[0]}
-      />,
-    );
-
-    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
-    expect(screen.getByText("Conversar com Maria")).toBeInTheDocument();
-    expect(screen.queryByText("Atualizar o relatório")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Criar 1 tarefa" })).toBeInTheDocument();
-  });
-
-  it("shows an explicit empty state instead of an unusable form when every candidate is unavailable", () => {
+  it("shows an explicit empty state instead of an unusable form when no candidate is available", () => {
     const action = vi.fn(async () => ({ status: "success" as const, message: "", undoId: null })) as ConfirmTasksAction;
     render(
       <TaskCandidateForm
         action={action}
-        candidates={candidates}
+        candidates={[]}
         entryId={entryId}
         interpretationId={interpretationId}
         locale="pt-BR"
         operationKey={operationKey}
-        unavailableIndexes={[0, 1]}
       />,
     );
 
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Criar/ })).not.toBeInTheDocument();
     expect(screen.getByText("Nenhuma sugestão pendente para confirmar.")).toBeInTheDocument();
+  });
+
+  it("submits each candidate's own key as candidateIndex, not its position in the (already-filtered) list", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "Tarefas criadas.", undoId: null })) as ConfirmTasksAction;
+    const preFiltered: ActionableCandidateView[] = [
+      { key: "1", title: "Conversar com Maria" },
+      { key: "2", title: "Enviar contrato" },
+    ];
+    render(
+      <TaskCandidateForm
+        action={action}
+        candidates={preFiltered}
+        entryId={entryId}
+        interpretationId={interpretationId}
+        locale="pt-BR"
+        operationKey={operationKey}
+      />,
+    );
+
+    const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(checkboxes.map((checkbox) => checkbox.value)).toEqual(["1", "2"]);
+  });
+
+  it("never renders a raw AI extraction confidence score (PROJ-005/REV-002)", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "Tarefas criadas.", undoId: null })) as ConfirmTasksAction;
+    const { container } = render(
+      <TaskCandidateForm
+        action={action}
+        candidates={candidates}
+        entryId={entryId}
+        interpretationId={interpretationId}
+        locale="pt-BR"
+        operationKey={operationKey}
+      />,
+    );
+
+    expect(container.querySelector(".confidence-pill")).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\d+%/);
   });
 });

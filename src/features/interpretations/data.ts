@@ -1,3 +1,4 @@
+import "server-only";
 import { z } from "zod";
 import { conceptSchema, entryExtractionSchema, pendingQuestionSchema } from "@/lib/ai/extraction-schema";
 import type { Database } from "@/lib/supabase/database.types";

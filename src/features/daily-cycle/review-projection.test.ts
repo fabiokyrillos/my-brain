@@ -137,6 +137,29 @@ describe("toEntryReviewProjection", () => {
     expect(projection.view.actionableCandidates).toEqual([{ key: "1", title: "Enviar contrato" }]);
   });
 
+  it("does not expose a raw task-candidate list or confidence score outside actionableCandidates (PROJ-005/PROJ-017)", () => {
+    const projection = toEntryReviewProjection(baseInput({
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-07-18T09:00:00.000Z",
+        isRetroactive: false,
+        summary: "Ligar para a Marina",
+        concepts: ["task"],
+        contexts: [],
+        organizations: [],
+        projects: [],
+        people: [],
+        taskCandidates: [{ title: "Ligar para a Marina", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 0.9, explicit: true }],
+        pendingQuestions: [],
+        confidence: 0.9,
+      },
+      lifecycle: { entryLifecycle: "completed", hasValidTaskCandidates: true },
+    }));
+
+    expect(projection).not.toHaveProperty("taskCandidates");
+    expect(JSON.stringify(projection.view.actionableCandidates)).not.toMatch(/confidence/i);
+  });
+
   it("only includes materialized tasks confirmed under the current interpretation", () => {
     const current = revision({ id: "interp-2", version: 2 });
     const projection = toEntryReviewProjection(baseInput({

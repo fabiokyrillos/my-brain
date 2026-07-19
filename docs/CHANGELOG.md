@@ -2,6 +2,30 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.16: close the projection boundary across Home/Caixa/Work/review
+
+### Added
+
+- `src/features/daily-cycle/home-projection.ts` (`loadHomeSupplementalProjection`): a minimal `server-only` module owning Home's waiting-count and newest-open-question queries, explicitly owner-scoped.
+- `src/features/daily-cycle/architecture.test.ts`: a table-driven architecture guardrail asserting forbidden/required source patterns (no `database.types`, no raw `.from()` table calls, no raw enum/score rendering) across Home, Caixa, Work, the entry review, and the candidate-confirmation form.
+- `docs/reports/PHASE_2X_SLICE_16_REPORT.md` with full scope, evidence, and rollback.
+
+### Changed
+
+- Home's priority panel now reads `loadWorkProjection(..., { view: "today" })` directly — the same due-today/overdue rule, profile timezone, and fallback Work already uses — instead of a raw, divergent `tasks` query that ignored due dates entirely; it links to `/{locale}/app/work?view=today`. This also removes a raw internal-enum fallback (`task.status.replaceAll(...)`) since every `today` item has a `due_at`.
+- `TaskCandidateForm` now accepts `ActionableCandidateView[]` (from `@/features/daily-cycle/contracts`) instead of the raw AI-extraction `TaskCandidate[]`: the confidence-score badge is gone, and the component no longer re-filters `unavailableIndexes` on the client — that validity rule is applied once, upstream, in `review-projection.ts`. Each candidate's own `key` (its true original extraction index) is now the submitted `candidateIndex` value.
+- `EntryReviewProjection`'s public output no longer exposes the raw `taskCandidates`/`unavailableCandidateIndexes` fields; nothing outside `review-projection.ts` consumed them once the form moved to `actionableCandidates`.
+- `src/features/interpretations/data.ts` now imports `server-only`, making its previously-only-conventional server boundary a build-time guarantee.
+
+### Verification
+
+- Strict TDD: focused RED confirmed missing modules/updated contracts before implementation; focused GREEN reached 28 files/196 tests across all touched surfaces.
+- Full Vitest passed 80 files/443 tests (up from 78/425). ESLint, TypeScript, Next.js 16.2.10 production build, and `git diff --check` passed.
+- Offline Playwright desktop and mobile each passed 3/3 with the same 5 expected credential-gated skips as the Slice 2X.15 baseline.
+- Authenticated online Playwright passed 12/16; the 2 failures (`online-auth.spec.ts` signup and password-recovery journeys) are unrelated to this slice's file list and most likely reflect Supabase email-sending rate limits from the remote smoke scripts run immediately beforehand in the same session.
+- Remote daily-cycle smoke and remote product-events smoke both passed against the linked project; linked migration status confirmed synchronized through `202607180031`; `supabase db lint --linked` showed only a pre-existing, unrelated warning in `run_user_heartbeat`.
+- No migration, RPC, grant, generated database type, secret, schedule, deployment, or remote infrastructure mutation. No product-event contract changed.
+
 ## 2026-07-19 — Slice 2X.15: complete daily product funnel instrumentation
 
 ### Added

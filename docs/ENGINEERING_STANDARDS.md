@@ -20,6 +20,7 @@ These standards define the minimum engineering contract for My Brain. A deviatio
 10. Functions, modules, and components must have one clear responsibility, explicit inputs and outputs, and names that describe domain intent.
 11. Validate every untrusted boundary with a schema or an equivalent explicit parser: forms, model output, webhook payloads, route input, worker payloads, and environment-derived configuration.
 12. Follow the installed Next.js documentation in `node_modules/next/dist/docs/` before changing framework APIs or conventions.
+13. The four daily-cycle product surfaces (Home, Inbox/Caixa, Work, and the entry review) never import a generated `Database["public"]["Tables"]` row type, never call `supabase.from(...)` directly, never parse `element_confidence`/`element_policy`/`resolution_evidence`, and never render a raw internal enum or a numeric confidence score. Each surface's query and DTO mapping live in a dedicated `src/features/daily-cycle/*-projection.ts` server-only module; a page or client component receives only the resulting product DTO. `src/features/daily-cycle/architecture.test.ts` enforces this boundary by asserting on each surface's source text (forbidden/required import patterns) — extend that table, not the enforcement mechanism, when a new surface or central component is added. When two surfaces need the same rule (e.g., what counts as "due"), the rule is implemented once in the owning projection module and reused, never re-derived per surface (Slice 2X.16).
 
 ## Database
 

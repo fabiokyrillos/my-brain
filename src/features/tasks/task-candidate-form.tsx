@@ -2,8 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { Check, LoaderCircle, RotateCcw } from "lucide-react";
+import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import { TaskCandidatesPresented } from "@/features/product-analytics/interaction-events";
-import type { TaskCandidate } from "@/lib/ai/extraction-schema";
 
 export type ConfirmTasksState = {
   status: "idle" | "success" | "error";
@@ -76,24 +76,18 @@ export function TaskCandidateForm({
   locale,
   operationKey,
   undoAction,
-  unavailableIndexes = [],
 }: {
   action: ConfirmTasksAction;
-  candidates: TaskCandidate[];
+  candidates: readonly ActionableCandidateView[];
   entryId: string;
   initialState?: ConfirmTasksState;
   interpretationId: string;
   locale: "pt-BR" | "en";
   operationKey: string;
   undoAction?: UndoTasksAction;
-  unavailableIndexes?: readonly number[];
 }) {
-  const unavailable = new Set(unavailableIndexes);
-  const availableEntries = candidates
-    .map((candidate, index) => ({ candidate, index }))
-    .filter((entry) => !unavailable.has(entry.index));
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [selected, setSelected] = useState(() => availableEntries.map((entry) => entry.index));
+  const [selected, setSelected] = useState(() => candidates.map((candidate) => Number(candidate.key)));
   const pt = locale === "pt-BR";
 
   if (state.status === "success") {
@@ -105,7 +99,7 @@ export function TaskCandidateForm({
     );
   }
 
-  if (availableEntries.length === 0) {
+  if (candidates.length === 0) {
     return (
       <div className="no-action-state">
         <Check size={22} />
@@ -117,7 +111,7 @@ export function TaskCandidateForm({
   return (
     <form action={formAction} className="candidate-form">
       <TaskCandidatesPresented
-        candidateCount={availableEntries.length}
+        candidateCount={candidates.length}
         entryId={entryId}
         interpretationId={interpretationId}
         locale={locale}
@@ -127,10 +121,11 @@ export function TaskCandidateForm({
       <input type="hidden" name="operationKey" value={operationKey} />
       <input type="hidden" name="locale" value={locale} />
       <div className="candidate-list">
-        {availableEntries.map(({ candidate, index }) => {
+        {candidates.map((candidate) => {
+          const index = Number(candidate.key);
           const checked = selected.includes(index);
           return (
-            <label className="candidate-item" key={`${candidate.title}-${index}`}>
+            <label className="candidate-item" key={candidate.key}>
               <input
                 type="checkbox"
                 name="candidateIndex"
@@ -146,7 +141,6 @@ export function TaskCandidateForm({
                 {candidate.description && <small>{candidate.description}</small>}
                 {candidate.dueAt && <small>{pt ? "Prazo" : "Due"}: {formatDueDate(candidate.dueAt, locale)}</small>}
               </span>
-              <span className="confidence-pill">{Math.round(candidate.confidence * 100)}%</span>
             </label>
           );
         })}

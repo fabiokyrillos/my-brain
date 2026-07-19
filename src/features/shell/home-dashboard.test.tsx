@@ -3,14 +3,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/auth/require-user";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
+import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
-import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
+import type { InboxItemView, NeedsAttentionItemView, WorkItemView } from "@/features/daily-cycle/contracts";
 import { HomeDashboard } from "./home-dashboard";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
 vi.mock("@/features/daily-cycle/inbox-projection", () => ({ loadInboxProjection: vi.fn() }));
 vi.mock("@/features/daily-cycle/attention-projection", () => ({ loadAttentionProjection: vi.fn() }));
+vi.mock("@/features/daily-cycle/work-projection", () => ({ loadWorkProjection: vi.fn() }));
+vi.mock("@/features/daily-cycle/home-projection", () => ({ loadHomeSupplementalProjection: vi.fn() }));
 vi.mock("@/features/capture/actions", () => ({ captureEntry: vi.fn() }));
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   NeedsAttentionViewed: vi.fn(() => <span data-testid="needs-attention-view-marker" />),
@@ -22,41 +26,30 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-type Result = { data: unknown; error: unknown; count?: number | null };
-
-function queryStub(result: Result) {
-  const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "order", "limit"]) {
-    stub[method] = vi.fn(() => stub);
-  }
-  stub.maybeSingle = vi.fn(async () => result);
-  stub.then = (onFulfilled: (value: Result) => unknown, onRejected?: (reason: unknown) => unknown) =>
-    Promise.resolve(result).then(onFulfilled, onRejected);
-  return stub;
-}
-
 function setup(options: {
   items?: readonly InboxItemView[];
-  tasks?: Array<{ id: string; title: string; due_at: string | null; status: string }>;
+  workItems?: readonly WorkItemView[];
+  waitingCount?: number;
+  openQuestionPreview?: string | null;
   attentionItems?: readonly NeedsAttentionItemView[];
   attentionHasNext?: boolean;
 } = {}) {
-  const { items = [], tasks = [], attentionItems = [], attentionHasNext = false } = options;
+  const {
+    items = [],
+    workItems = [],
+    waitingCount = 0,
+    openQuestionPreview = null,
+    attentionItems = [],
+    attentionHasNext = false,
+  } = options;
 
-  const tasksBuilders = [
-    queryStub({ data: tasks, error: null }),
-    queryStub({ data: null, error: null, count: 0 }),
-  ];
-  const from = vi.fn((table: string) => {
-    if (table === "tasks") return tasksBuilders.shift();
-    if (table === "pending_questions") return queryStub({ data: [], error: null });
-    return queryStub({ data: null, error: null });
-  });
-  const supabase = { from };
+  const supabase = { from: vi.fn() };
   vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: "user-1" } } as never);
   vi.mocked(loadInboxProjection).mockResolvedValue({ items, hasNext: false });
   vi.mocked(loadAttentionProjection).mockResolvedValue({ items: attentionItems, hasNext: attentionHasNext, nextCursor: null });
-  return { supabase, from };
+  vi.mocked(loadWorkProjection).mockResolvedValue({ items: workItems, hasNext: false, timezone: "America/Sao_Paulo" });
+  vi.mocked(loadHomeSupplementalProjection).mockResolvedValue({ waitingCount, openQuestionPreview });
+  return { supabase };
 }
 
 function item(overrides: Partial<InboxItemView> = {}): InboxItemView {
@@ -82,6 +75,18 @@ function attentionItem(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAt
     primaryAction: { id: "confirm_existing_candidates", href: "/pt-BR/app/inbox/entry-9" },
     occurredAt: "2026-07-17T12:00:00.000Z",
     groupKey: "entry-9",
+    ...overrides,
+  };
+}
+
+function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
+  return {
+    taskId: "task-1",
+    title: "Preparar reunião",
+    dueAt: "2026-07-19T14:00:00.000Z",
+    humanState: "not_started",
+    origin: "you",
+    availableActions: [],
     ...overrides,
   };
 }
@@ -124,13 +129,12 @@ describe("HomeDashboard", () => {
   });
 
   it("shows an observable all-saved status without a review-time promise", async () => {
-    const { from } = setup({ items: [item({ productState: "saved" })] });
+    setup({ items: [item({ productState: "saved" })] });
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
     expect(screen.getByText("Tudo salvo")).toBeInTheDocument();
     expect(screen.queryByText("Preferência de revisão")).not.toBeInTheDocument();
-    expect(from).not.toHaveBeenCalledWith("agent_preferences");
   });
 
   it("shows the real number of records being organized", async () => {
@@ -141,12 +145,64 @@ describe("HomeDashboard", () => {
     expect(screen.getByText("2 records being organized")).toBeInTheDocument();
   });
 
-  it("still renders the existing priority task panel unchanged", async () => {
-    setup({ tasks: [{ id: "task-1", title: "Preparar reunião", due_at: null, status: "todo" }] });
+  it("renders priority tasks from the shared Work today projection", async () => {
+    setup({ workItems: [workItem({ title: "Preparar reunião" })] });
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
     expect(screen.getByText("Preparar reunião")).toBeInTheDocument();
+  });
+
+  it("asks the Work projection for the authenticated owner's today/overdue tasks, not a generic query", async () => {
+    setup({ workItems: [] });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(loadWorkProjection).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: "user-1", locale: "pt-BR", view: "today", page: 1 }),
+    );
+  });
+
+  it("bounds the priority panel to the first five today/overdue tasks", async () => {
+    const items = Array.from({ length: 8 }, (_, index) => workItem({ taskId: `task-${index}`, title: `Tarefa ${index}` }));
+    setup({ workItems: items });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getAllByText(/^Tarefa \d$/)).toHaveLength(5);
+  });
+
+  it("links the priority panel to the canonical Work today view", async () => {
+    setup({ workItems: [workItem()] });
+
+    render(await HomeDashboard({ locale: "en" }));
+
+    expect(screen.getByText("Preparar reunião").closest("a")).toHaveAttribute("href", "/en/app/work?view=today");
+  });
+
+  it("shows the empty state when the Work today projection has no due/overdue tasks", async () => {
+    setup({ workItems: [] });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getByText("Seu dia começa aqui")).toBeInTheDocument();
+  });
+
+  it("shows the waiting count from the home supplemental projection, not a raw table query", async () => {
+    setup({ waitingCount: 3 });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getByText("3 itens dependem de retorno.")).toBeInTheDocument();
+  });
+
+  it("shows the newest open question from the home supplemental projection", async () => {
+    setup({ openQuestionPreview: "Isso é um retrabalho ou uma tarefa nova?" });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getByText("Isso é um retrabalho ou uma tarefa nova?")).toBeInTheDocument();
   });
 
   it("shows the Needs Attention panel with a count and preview items", async () => {

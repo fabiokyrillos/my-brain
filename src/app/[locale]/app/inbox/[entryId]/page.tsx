@@ -44,12 +44,10 @@ export default async function EntryDetailPage({
     errorMessage,
     editableCurrent,
     entityOptions,
-    taskCandidates,
     extractedMentions,
     history,
     taskUndoId,
     correctionUndoId,
-    unavailableCandidateIndexes,
   } = review;
 
   const canRetry = view.availableActions.some((action) => action.id === "retry_processing");
@@ -78,14 +76,13 @@ export default async function EntryDetailPage({
       ) : canConfirmCandidates || taskInitialState ? (
         <TaskCandidateForm
           action={confirmEntryTasks}
-          candidates={taskCandidates}
+          candidates={view.actionableCandidates}
           entryId={entryId}
           initialState={taskInitialState}
           interpretationId={editableCurrent.interpretationId}
           locale={locale}
           operationKey={randomUUID()}
           undoAction={undoAgentAction}
-          unavailableIndexes={unavailableCandidateIndexes}
         />
       ) : (
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>

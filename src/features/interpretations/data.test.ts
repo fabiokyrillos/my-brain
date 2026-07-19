@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates, parseInterpretationRevision, selectCurrentInterpretation } from "./data";
+
+vi.mock("server-only", () => ({}));
 
 const base = {
   id: "interpretation-1",
