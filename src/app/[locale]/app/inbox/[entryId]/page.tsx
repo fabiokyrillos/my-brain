@@ -118,7 +118,7 @@ export default async function EntryDetailPage({
       <AlertTriangle size={24} />
       <h2>{pt ? "Ainda não há interpretação" : "There is no interpretation yet"}</h2>
       <p>{pt ? "O registro original permanece disponível. Você pode tentar novamente." : "The original record remains available. You can try again."}</p>
-      <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />
+      {!canRetry && <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
     </div>
   );
 

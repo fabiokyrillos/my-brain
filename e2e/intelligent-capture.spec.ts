@@ -1,5 +1,86 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
+const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
+const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
+const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
+
+type DisposableUser = { userId: string; accessToken: string; email: string; password: string };
+
+async function createDisposableUser(namePrefix: string): Promise<DisposableUser> {
+  const email = `codex-${namePrefix}-${crypto.randomUUID()}@example.com`;
+  const password = `${namePrefix[0]!.toUpperCase()}${namePrefix.slice(1)}!${crypto.randomUUID()}a7`;
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
+    body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { display_name: `${namePrefix} E2E` } }),
+  });
+  expect(userResponse.ok).toBe(true);
+  const userId = ((await userResponse.json()) as { id: string }).id;
+
+  const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: publishableKey!, "content-type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  expect(authResponse.ok).toBe(true);
+  const accessToken = ((await authResponse.json()) as { access_token: string }).access_token;
+  return { userId, accessToken, email, password };
+}
+
+async function deleteDisposableUser(userId: string | undefined) {
+  if (!userId) return;
+  await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}` },
+  });
+}
+
+async function restRpc(accessToken: string, fn: string, body: Record<string, unknown>) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  expect(response.ok, `${fn} failed: ${await response.clone().text()}`).toBe(true);
+  return response;
+}
+
+// Bypasses capture_entry_async on purpose: no interpret_entry job is created,
+// so nothing but this test ever touches the entry — the deployed worker and
+// the per-minute dispatch drain have nothing to claim, which is what makes
+// the attention-state fixtures below deterministic instead of racing
+// production automation.
+async function insertBareEntry(accessToken: string, userId: string, content: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/entries`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey!,
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+      prefer: "return=representation",
+    },
+    body: JSON.stringify({ user_id: userId, original_content: content }),
+  });
+  expect(response.ok, `insert entry failed: ${await response.clone().text()}`).toBe(true);
+  const [row] = (await response.json()) as Array<{ id: string }>;
+  return row.id;
+}
+
+function trustDecision(policy: "apply_and_flag" | "request_review") {
+  return {
+    score: policy === "apply_and_flag" ? 0.835 : 0.4,
+    policy,
+    signals: {
+      modelConfidence: 0.8, candidateMargin: 1, entityExactness: 1, semanticSimilarity: 0,
+      dateClarity: 1, contextConsistency: 1, reversibility: 1, autonomyAllowed: 1,
+      correctionHistoryAgreement: 0.5,
+    },
+    overrides: [] as string[],
+    evidence: ["deterministic_e2e_fixture"],
+  };
+}
+
 async function waitForOrganized(page: Page, href: string, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -7,6 +88,18 @@ async function waitForOrganized(page: Page, href: string, timeoutMs = 90_000) {
     const ready = await page.getByText("Ver detalhes técnicos").isVisible().catch(() => false);
     if (ready) return;
     if (Date.now() > deadline) throw new Error("Entry did not finish organizing before the timeout.");
+    await page.waitForTimeout(2_000);
+  }
+}
+
+async function waitForRecovered(page: Page, href: string, timeoutMs = 90_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    await page.goto(href);
+    const stillBlocked = await page.locator(".entry-status-could_not_organize").isVisible().catch(() => false);
+    const stillOrganizing = await page.locator(".entry-status-organizing").isVisible().catch(() => false);
+    if (!stillBlocked && !stillOrganizing) return;
+    if (Date.now() > deadline) throw new Error("Entry did not recover from retry before the timeout.");
     await page.waitForTimeout(2_000);
   }
 }
@@ -19,48 +112,29 @@ async function loadProductEventNames(userId: string, accessToken: string) {
   return ((await response.json()) as Array<{ event_name: string }>).map((event) => event.event_name);
 }
 
-const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
-const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
-const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
-const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
-
-test.describe("intelligent capture", () => {
+test.describe("converged daily journey — capture, review, and confirmation", () => {
+  test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
-  test.setTimeout(420_000);
+  test.setTimeout(180_000);
 
-  const email = `codex-capture-${crypto.randomUUID()}@example.com`;
-  const password = `Capture!${crypto.randomUUID()}a7`;
   const original = "Hoje conversei com Marina sobre o projeto Atlas. Crie uma tarefa para enviar a proposta amanhã às 15h.";
-  let userId: string | undefined;
-  let accessToken: string | undefined;
+  let page: Page;
+  let user: DisposableUser | undefined;
+  let capturedEntryId: string;
+  let confirmedTaskTitle: string;
   let storagePath: string | undefined;
 
-  test.beforeAll(async () => {
-    test.setTimeout(120_000);
-    const userResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey!,
-        authorization: `Bearer ${serviceRoleKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { display_name: "Capture E2E" } }),
-    });
-    expect(userResponse.ok).toBe(true);
-    userId = ((await userResponse.json()) as { id: string }).id;
-
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    expect(authResponse.ok).toBe(true);
-    accessToken = ((await authResponse.json()) as { access_token: string }).access_token;
+  test.beforeAll(async ({ browser }) => {
+    user = await createDisposableUser("capture");
+    page = await browser.newPage();
+    await page.goto("/pt-BR/auth/login");
+    await page.getByLabel("E-mail").fill(user.email);
+    await page.getByLabel("Senha").fill(user.password);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
   });
 
   test.afterAll(async () => {
-    test.setTimeout(120_000);
-    if (!userId) return;
     if (storagePath) {
       const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
       await fetch(`${supabaseUrl}/storage/v1/object/user-files/${encodedPath}`, {
@@ -68,19 +142,11 @@ test.describe("intelligent capture", () => {
         headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}` },
       });
     }
-    await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
-      method: "DELETE",
-      headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}` },
-    });
+    await deleteDisposableUser(user?.userId);
+    await page.close();
   });
 
-  test("preserves, interprets, confirms, audits, and undoes", async ({ page }) => {
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(password);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
-
+  test("legacy Today/Tasks/Waiting routes redirect to canonical Work views", async () => {
     for (const [source, target] of [
       ["/pt-BR/app/today?page=3", "/pt-BR/app/work?view=today&page=3"],
       ["/en/app/tasks?page=2", "/en/app/work?view=all&page=2"],
@@ -89,17 +155,18 @@ test.describe("intelligent capture", () => {
       await page.goto(source);
       await expect(page).toHaveURL(new RegExp(`${target.replaceAll("?", "\\?")}$`));
     }
+  });
 
+  test("capture returns an immediate receipt without waiting for AI", async () => {
     await page.goto("/pt-BR/app/capture");
-
     const captureField = page.getByRole("textbox", { name: "Nova entrada" });
     await captureField.fill(original);
     await page.getByRole("button", { name: "Registrar" }).click();
 
     // The Action returns immediately after the durable atomic enqueue: no
-    // redirect and no wait for AI. The receipt renders in place and the
-    // field is already cleared and refocused for the next capture, which
-    // proves the UI is interactive before interpretation completes.
+    // redirect and no wait for AI. The field is already cleared and
+    // refocused for the next capture, proving the UI is interactive before
+    // interpretation completes.
     await expect(page).toHaveURL(/\/pt-BR\/app\/capture$/);
     await expect(page.getByRole("status")).toContainText("Salvo. A organização foi solicitada.");
     await expect(captureField).toHaveValue("");
@@ -109,15 +176,25 @@ test.describe("intelligent capture", () => {
     const viewRecordLink = page.getByRole("link", { name: "Ver registro" });
     await expect(viewRecordLink).toBeVisible();
     const recordHref = await viewRecordLink.getAttribute("href");
-    const capturedEntryId = recordHref!.split("/").at(-1)!;
+    capturedEntryId = recordHref!.split("/").at(-1)!;
+  });
 
-    await waitForOrganized(page, recordHref!);
+  test("organizes into a reviewable interpretation with accessible progressive disclosure", async () => {
+    const href = `/pt-BR/app/inbox/${capturedEntryId}`;
+    await waitForOrganized(page, href);
     await expect(page.locator(".entry-heading h1")).toBeVisible();
-    await page.getByText("Ver detalhes técnicos").click();
+
+    const technicalSummary = page.getByText("Ver detalhes técnicos");
+    await technicalSummary.focus();
+    await expect(technicalSummary).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Confiança por elemento" })).toBeVisible();
+
     await page.getByText("Ver registro original").click();
     await expect(page.getByText(original)).toBeVisible();
+  });
 
+  test("corrects the interpretation, supports record-only, and can be undone", async () => {
     await expect(page.getByRole("button", { name: "Corrigir interpretação" })).toBeVisible();
     await page.getByRole("button", { name: "Corrigir interpretação" }).click();
     await page.getByRole("textbox", { name: "Resumo" }).fill("Resumo confirmado: conversa com Marina sobre o Atlas");
@@ -138,14 +215,16 @@ test.describe("intelligent capture", () => {
     await page.getByText("View technical details").click();
     await expect(page.getByRole("heading", { name: "Immutable history" })).toBeVisible();
     await page.goto(page.url().replace("/en/", "/pt-BR/"));
+  });
 
+  test("surfaces an unconfirmed candidate as Precisa de você on Home and Caixa", async () => {
     const entryStateResponse = await fetch(`${supabaseUrl}/rest/v1/entries?select=current_interpretation_id&id=eq.${capturedEntryId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
     });
     expect(entryStateResponse.ok).toBe(true);
     const [entryState] = (await entryStateResponse.json()) as Array<{ current_interpretation_id: string }>;
     const currentResponse = await fetch(`${supabaseUrl}/rest/v1/entry_interpretations?select=raw_output,model,strategy_version,prompt_version&id=eq.${entryState.current_interpretation_id}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
     });
     expect(currentResponse.ok).toBe(true);
     const [currentState] = (await currentResponse.json()) as Array<{
@@ -156,45 +235,31 @@ test.describe("intelligent capture", () => {
     }>;
     if (!currentState.raw_output.taskCandidates?.length) {
       const operationKey = crypto.randomUUID();
-      const rpcHeaders = { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" };
-      const beginResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/begin_entry_reprocessing`, {
-        method: "POST",
-        headers: rpcHeaders,
-        body: JSON.stringify({ p_entry_id: capturedEntryId, p_operation_key: operationKey, p_lease_seconds: 180 }),
+      await restRpc(user!.accessToken, "begin_entry_reprocessing", { p_entry_id: capturedEntryId, p_operation_key: operationKey, p_lease_seconds: 180 });
+      await restRpc(user!.accessToken, "persist_reprocessed_entry_interpretation", {
+        p_entry_id: capturedEntryId,
+        p_operation_key: operationKey,
+        p_extraction: {
+          ...currentState.raw_output,
+          recordOnly: false,
+          taskCandidates: [{ title: "Enviar a proposta", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 1, explicit: true }],
+        },
+        p_model: currentState.model,
+        p_strategy_version: currentState.strategy_version,
+        p_prompt_version: currentState.prompt_version,
+        p_input_tokens: 0,
+        p_output_tokens: 0,
+        p_element_trust: {
+          summary: trustDecision("apply_and_flag"), concepts: trustDecision("apply_and_flag"), occurredAt: trustDecision("apply_and_flag"),
+          extractedDates: trustDecision("apply_and_flag"), entities: trustDecision("apply_and_flag"),
+        },
       });
-      expect(beginResponse.ok).toBe(true);
-      const signals = {
-        modelConfidence: 0.8, candidateMargin: 1, entityExactness: 1, semanticSimilarity: 0,
-        dateClarity: 1, contextConsistency: 1, reversibility: 1, autonomyAllowed: 1,
-        correctionHistoryAgreement: 0.5,
-      };
-      const decision = { score: 0.835, policy: "apply_and_flag", signals, overrides: [], evidence: ["deterministic_e2e_task_fixture"] };
-      const persistResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/persist_reprocessed_entry_interpretation`, {
-        method: "POST",
-        headers: rpcHeaders,
-        body: JSON.stringify({
-          p_entry_id: capturedEntryId,
-          p_operation_key: operationKey,
-          p_extraction: {
-            ...currentState.raw_output,
-            recordOnly: false,
-            taskCandidates: [{ title: "Enviar a proposta", description: null, dueAt: null, waitingOn: null, parentIndex: null, confidence: 1, explicit: true }],
-          },
-          p_model: currentState.model,
-          p_strategy_version: currentState.strategy_version,
-          p_prompt_version: currentState.prompt_version,
-          p_input_tokens: 0,
-          p_output_tokens: 0,
-          p_element_trust: { summary: decision, concepts: decision, occurredAt: decision, extractedDates: decision, entities: decision },
-        }),
-      });
-      expect(persistResponse.ok).toBe(true);
       await page.reload();
     }
 
     // The entry has an unconfirmed candidate and no open question at this
-    // point, so it must appear in the "Precisa de você" queue on both Home
-    // and Caixa before the candidate is confirmed below.
+    // point, so it must appear in the queue on both Home and Caixa before
+    // the candidate is confirmed below.
     await page.goto("/pt-BR/app");
     await expect(page.getByRole("heading", { name: "Precisa de você" })).toBeVisible();
     await expect(page.locator(".attention-count")).not.toHaveText("0");
@@ -209,26 +274,162 @@ test.describe("intelligent capture", () => {
     await page.goto(page.url().replace("/pt-BR/", "/en/").replace(`/inbox/${capturedEntryId}`, "/inbox?view=needs-you"));
     await expect(page.getByRole("link", { name: "Needs you", exact: true })).toHaveAttribute("aria-current", "page");
     await page.goto(`/pt-BR/app/inbox/${capturedEntryId}`);
+  });
 
+  test("confirms candidates, materializes a task, and reflects it in canonical Work", async () => {
     const createButton = page.getByRole("button", { name: /Criar \d+ tarefas?/ });
     await expect(createButton).toBeVisible();
     await createButton.click();
     await expect(page.getByRole("button", { name: "Desfazer criação" })).toBeVisible();
 
-    const confirmedTasksResponse = await fetch(`${supabaseUrl}/rest/v1/tasks?select=title,status&user_id=eq.${userId}&source_entry_id=eq.${capturedEntryId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    const confirmedTasksResponse = await fetch(`${supabaseUrl}/rest/v1/tasks?select=title,status&user_id=eq.${user!.userId}&source_entry_id=eq.${capturedEntryId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
     });
     expect(confirmedTasksResponse.ok).toBe(true);
     const confirmedTasks = (await confirmedTasksResponse.json()) as Array<{ title: string; status: string }>;
     const confirmedTask = confirmedTasks.find((task) => task.status !== "cancelled");
     expect(confirmedTask).toBeDefined();
-    const confirmedTaskTitle = confirmedTask!.title;
+    confirmedTaskTitle = confirmedTask!.title;
 
     await page.goto("/pt-BR/app/work?view=all");
     await expect(page.getByRole("heading", { name: "Trabalho" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Todas" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(confirmedTaskTitle, { exact: true })).toBeVisible();
+  });
 
+  test("keeps the original entry immutable and audits every step so far", async () => {
+    const entryResponse = await fetch(`${supabaseUrl}/rest/v1/entries?select=id,original_content,status&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const entries = (await entryResponse.json()) as Array<{ id: string; original_content: string; status: string }>;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].original_content).toBe(original);
+    expect(["awaiting_review", "completed"]).toContain(entries[0].status);
+
+    const auditResponse = await fetch(`${supabaseUrl}/rest/v1/audit_logs?select=action_type&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const audit = (await auditResponse.json()) as Array<{ action_type: string }>;
+    expect(audit.map((item) => item.action_type)).toEqual(expect.arrayContaining([
+      "entry_interpreted",
+      "entry_interpretation_corrected",
+      "entry_interpretation_correction_undone",
+      "tasks_confirmed",
+    ]));
+  });
+
+  test("Brain chat answers grounded in the captured entry", async () => {
+    await page.goto("/pt-BR/app/chat");
+    await page.getByRole("textbox", { name: "Pergunte ao Brain" }).fill("Com quem conversei sobre o projeto Atlas?");
+    await page.getByRole("button", { name: "Enviar pergunta" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app\/chat\/[0-9a-f-]+$/, { timeout: 120_000 });
+    await expect(page.locator(".chat-message.assistant")).toContainText("Marina");
+    await expect(page.getByRole("link", { name: /Marina.*Atlas/i })).toBeVisible();
+  });
+
+  test("Reviews generates a review manually, on demand", async () => {
+    await page.goto("/pt-BR/app/reviews");
+    await page.getByRole("button", { name: "Resumo do dia" }).click();
+    await expect(page.getByRole("status")).toHaveText("Revisão concluída.", { timeout: 120_000 });
+    await page.reload();
+    await expect(page.locator(".review-card")).toHaveCount(1);
+  });
+
+  test("Files uploads and analyzes a private attachment", async () => {
+    await page.goto("/pt-BR/app/files");
+    await page.locator('input[type="file"]').setInputFiles({ name: "nota.txt", mimeType: "text/plain", buffer: Buffer.from("Documento de teste do fluxo privado.") });
+    await page.getByRole("button", { name: "Enviar arquivo" }).click();
+    await expect(page.getByRole("status")).toContainText("Arquivo privado enviado", { timeout: 120_000 });
+    const attachmentResponse = await fetch(`${supabaseUrl}/rest/v1/attachments?select=storage_path,status&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const attachments = (await attachmentResponse.json()) as Array<{ storage_path: string; status: string }>;
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0].status).toBe("ready");
+    storagePath = attachments[0].storage_path;
+  });
+
+  test("Costs shows AI usage transparency for every real paid call", async () => {
+    const usageResponse = await fetch(`${supabaseUrl}/rest/v1/ai_usage_events?select=operation,model,cost_status,cost_usd,input_tokens,output_tokens&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    expect(usageResponse.ok).toBe(true);
+    const usage = (await usageResponse.json()) as Array<{ operation: string; model: string; cost_status: string; cost_usd: string | null; input_tokens: number; output_tokens: number }>;
+    expect(usage.map((item) => item.operation)).toEqual(expect.arrayContaining(["capture_extraction", "semantic_search", "chat", "review", "file_analysis"]));
+    expect(usage.every((item) => item.cost_status === "calculated" && Number(item.cost_usd) > 0)).toBe(true);
+
+    await page.goto("/pt-BR/app/costs");
+    await expect(page.getByRole("heading", { name: "Custos de IA" })).toBeVisible();
+    await expect(page.getByText("Calculado pelos tokens da API")).toBeVisible();
+    await expect(page.locator(".recent-costs tbody tr")).toHaveCount(usage.length);
+    await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
+  });
+
+  test("Settings persists AI routing preferences under progressive disclosure", async () => {
+    await page.goto("/pt-BR/app/settings");
+    await page.getByText("IA avançada").click();
+    await page.getByRole("radio", { name: /Econômico/ }).click();
+    await expect(page.getByLabel("Chat principal")).toHaveValue("gpt-5-mini");
+    await page.getByRole("button", { name: "Salvar preferências" }).click();
+    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
+    const preferencesResponse = await fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=ai_profile,chat_model,reasoning_model,review_model&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const savedPreferences = (await preferencesResponse.json()) as Array<{ ai_profile: string; chat_model: string; reasoning_model: string; review_model: string }>;
+    expect(savedPreferences[0]).toMatchObject({ ai_profile: "economy", chat_model: "gpt-5-mini", reasoning_model: "gpt-5.6-luna", review_model: "gpt-5-mini" });
+  });
+
+  test("heartbeat delivers an overdue task notification within quiet-hours/cap rules", async () => {
+    const quietStartHour = (new Date().getUTCHours() + 6) % 24;
+    const quietEndHour = (quietStartHour + 1) % 24;
+    const formatHour = (hour: number) => `${hour.toString().padStart(2, "0")}:00:00`;
+    const [profileHeartbeatResponse, preferencesHeartbeatResponse] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/profiles?user_id=eq.${user!.userId}`, {
+        method: "PATCH",
+        headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ timezone: "UTC", locale: "pt-BR" }),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/agent_preferences?user_id=eq.${user!.userId}`, {
+        method: "PATCH",
+        headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ quiet_start: formatHour(quietStartHour), quiet_end: formatHour(quietEndHour) }),
+      }),
+    ]);
+    expect(profileHeartbeatResponse.ok).toBe(true);
+    expect(preferencesHeartbeatResponse.ok).toBe(true);
+
+    const overdueTaskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks`, {
+      method: "POST",
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ user_id: user!.userId, title: "Tarefa atrasada E2E", status: "todo", due_at: new Date(Date.now() - 86_400_000).toISOString(), confidence: 1, created_by: "user" }),
+    });
+    expect(overdueTaskResponse.ok).toBe(true);
+    const heartbeatResponse = await restRpc(user!.accessToken, "request_heartbeat", {});
+    expect(await heartbeatResponse.json()).toMatchObject({ silent: false, notifications_created: expect.any(Number) });
+    const notificationResponse = await fetch(`${supabaseUrl}/rest/v1/notifications?select=type,body&user_id=eq.${user!.userId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const notifications = (await notificationResponse.json()) as Array<{ type: string; body: string }>;
+    expect(notifications).toEqual(expect.arrayContaining([expect.objectContaining({ type: "task_overdue", body: "Tarefa atrasada E2E" })]));
+  });
+
+  test("undoes task creation and reflects cancellation across Work", async () => {
+    await page.goto(`/pt-BR/app/inbox/${capturedEntryId}`);
+    await page.getByRole("button", { name: "Desfazer criação" }).click();
+    await expect(page.getByText("Criação desfeita.")).toBeVisible();
+
+    const taskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks?select=status&user_id=eq.${user!.userId}&source_entry_id=eq.${capturedEntryId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
+    });
+    const tasks = (await taskResponse.json()) as Array<{ status: string }>;
+    expect(tasks.length).toBeGreaterThan(0);
+    expect(tasks.every((task) => task.status === "cancelled")).toBe(true);
+
+    await page.goto("/pt-BR/app/work?view=all");
+    await expect(page.getByText(confirmedTaskTitle, { exact: true })).toHaveCount(0);
+  });
+
+  test("records the complete daily-funnel product-event contract", async () => {
     const expectedJourneyEvents = [
       "capture_started",
       "capture_save_succeeded",
@@ -244,136 +445,145 @@ test.describe("intelligent capture", () => {
       "work_view_viewed",
     ];
     await expect.poll(async () => {
-      const names = await loadProductEventNames(userId!, accessToken!);
+      const names = await loadProductEventNames(user!.userId, user!.accessToken);
       return expectedJourneyEvents.every((name) => names.includes(name));
     }, { timeout: 30_000 }).toBe(true);
-    const productEventNames = await loadProductEventNames(userId!, accessToken!);
+    const productEventNames = await loadProductEventNames(user!.userId, user!.accessToken);
     const productEventCounts = Object.fromEntries(expectedJourneyEvents.map((name) => [name, productEventNames.filter((eventName) => eventName === name).length]));
     expect(expectedJourneyEvents.every((name) => productEventCounts[name] >= 1)).toBe(true);
     expect(productEventCounts.needs_attention_viewed).toBeGreaterThanOrEqual(2);
+  });
+});
 
-    const entryResponse = await fetch(`${supabaseUrl}/rest/v1/entries?select=id,original_content,status&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+test.describe("converged daily journey — basic question, recoverable retry, and terminal retry", () => {
+  test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
+  test.setTimeout(150_000);
+
+  let page: Page;
+  let user: DisposableUser | undefined;
+
+  test.beforeAll(async ({ browser }) => {
+    user = await createDisposableUser("attention-states");
+    page = await browser.newPage();
+    await page.goto("/pt-BR/auth/login");
+    await page.getByLabel("E-mail").fill(user.email);
+    await page.getByLabel("Senha").fill(user.password);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+  });
+
+  test.afterAll(async () => {
+    await deleteDisposableUser(user?.userId);
+    await page.close();
+  });
+
+  test("surfaces a still-open basic question as needs-attention once the entry is otherwise complete", async ({}, testInfo) => {
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, "Preciso decidir algo, mas falta um detalhe.");
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Registro com pergunta pendente.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: "Qual é o prazo final?", reason: "Nenhum prazo foi mencionado.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
     });
-    const entries = (await entryResponse.json()) as Array<{ id: string; original_content: string; status: string }>;
-    expect(entries).toHaveLength(1);
-    expect(entries[0].original_content).toBe(original);
-    expect(["awaiting_review", "completed"]).toContain(entries[0].status);
 
-    const auditResponse = await fetch(`${supabaseUrl}/rest/v1/audit_logs?select=action_type&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    // The initial interpretation's own open question keeps entries.status at
+    // partially_processed. A reprocess that resolves with no pendingQuestions
+    // of its own moves the entry to completed while the earlier question row
+    // is still open (entry-scoped, not interpretation-scoped) — the one real
+    // path this product currently has to "completed + an open question".
+    const operationKey = crypto.randomUUID();
+    await restRpc(user!.accessToken, "begin_entry_reprocessing", { p_entry_id: entryId, p_operation_key: operationKey, p_lease_seconds: 180 });
+    await restRpc(user!.accessToken, "persist_reprocessed_entry_interpretation", {
+      p_entry_id: entryId,
+      p_operation_key: operationKey,
+      p_extraction: {
+        language: "pt-BR", occurredAt: new Date().toISOString(), isRetroactive: false,
+        summary: "Registro reprocessado sem novas pendências.",
+        concepts: ["raw_record"], contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [], pendingQuestions: [], confidence: 0.9,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+      p_element_trust: {
+        summary: trustDecision("apply_and_flag"), concepts: trustDecision("apply_and_flag"), occurredAt: trustDecision("apply_and_flag"),
+        extractedDates: trustDecision("apply_and_flag"), entities: trustDecision("apply_and_flag"),
+      },
     });
-    const audit = (await auditResponse.json()) as Array<{ action_type: string }>;
-    expect(audit.map((item) => item.action_type)).toEqual(expect.arrayContaining([
-      "entry_interpreted",
-      "entry_interpretation_corrected",
-      "entry_interpretation_correction_undone",
-      "tasks_confirmed",
-    ]));
 
-    await page.goto("/pt-BR/app/chat");
-    await page.getByRole("textbox", { name: "Pergunte ao Brain" }).fill("Com quem conversei sobre o projeto Atlas?");
-    await page.getByRole("button", { name: "Enviar pergunta" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app\/chat\/[0-9a-f-]+$/, { timeout: 120_000 });
-    await expect(page.locator(".chat-message.assistant")).toContainText("Marina");
-    await expect(page.getByRole("link", { name: /Marina.*Atlas/i })).toBeVisible();
+    await page.goto(`/pt-BR/app/inbox/${entryId}`);
+    const attentionRegion = page.getByRole("region", { name: "Precisa de você" });
+    await expect(attentionRegion).toBeVisible();
+    await expect(attentionRegion).toContainText("Responda uma pergunta");
+    await expect(page.getByText("O original está seguro.")).toHaveCount(0);
 
-    await page.goto("/pt-BR/app/reviews");
-    await page.getByRole("button", { name: "Resumo do dia" }).click();
-    await expect(page.getByRole("status")).toHaveText("Revisão concluída.", { timeout: 120_000 });
-    await page.reload();
-    await expect(page.locator(".review-card")).toHaveCount(1);
+    await page.goto("/pt-BR/app");
+    await expect(page.getByRole("heading", { name: "Precisa de você" })).toBeVisible();
+    await page.getByRole("link", { name: "Ver tudo" }).click();
+    await expect(page).toHaveURL(/\/pt-BR\/app\/inbox\?view=needs-you$/);
+    await expect(page.locator(`a.needs-attention-row[href="/pt-BR/app/inbox/${entryId}"]`)).toBeVisible();
 
-    await page.goto("/pt-BR/app/files");
-    await page.locator('input[type="file"]').setInputFiles({ name: "nota.txt", mimeType: "text/plain", buffer: Buffer.from("Documento de teste do fluxo privado.") });
-    await page.getByRole("button", { name: "Enviar arquivo" }).click();
-    await expect(page.getByRole("status")).toContainText("Arquivo privado enviado", { timeout: 120_000 });
-    const attachmentResponse = await fetch(`${supabaseUrl}/rest/v1/attachments?select=storage_path,status&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
-    });
-    const attachments = (await attachmentResponse.json()) as Array<{ storage_path: string; status: string }>;
-    expect(attachments).toHaveLength(1);
-    expect(attachments[0].status).toBe("ready");
-    storagePath = attachments[0].storage_path;
+    if (testInfo.project.name === "mobile") {
+      const row = page.locator(`a.needs-attention-row[href="/pt-BR/app/inbox/${entryId}"]`);
+      const box = await row.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+  });
 
-    const usageResponse = await fetch(`${supabaseUrl}/rest/v1/ai_usage_events?select=operation,model,cost_status,cost_usd,input_tokens,output_tokens&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
-    });
-    expect(usageResponse.ok).toBe(true);
-    const usage = (await usageResponse.json()) as Array<{ operation: string; model: string; cost_status: string; cost_usd: string | null; input_tokens: number; output_tokens: number }>;
-    expect(usage.map((item) => item.operation)).toEqual(expect.arrayContaining(["capture_extraction", "semantic_search", "chat", "review", "file_analysis"]));
-    expect(usage.every((item) => item.cost_status === "calculated" && Number(item.cost_usd) > 0)).toBe(true);
+  test("offers retry after a recoverable processing failure and recovers on retry", async ({}, testInfo) => {
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, "Anotação simples para verificar recuperação de falha.");
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "fail_entry_interpretation", { p_entry_id: entryId, p_error: "Falha simulada e2e recuperável", p_terminal: false });
 
-    await page.goto("/pt-BR/app/costs");
-    await expect(page.getByRole("heading", { name: "Custos de IA" })).toBeVisible();
-    await expect(page.getByText("Calculado pelos tokens da API")).toBeVisible();
-    await expect(page.locator(".recent-costs tbody tr")).toHaveCount(usage.length);
-    await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
+    const href = `/pt-BR/app/inbox/${entryId}`;
+    await page.goto(href);
+    await expect(page.locator(".entry-status-could_not_organize")).toBeVisible();
+    const attentionRegion = page.getByRole("region", { name: "Precisa de você" });
+    await expect(attentionRegion).toContainText("Tente organizar novamente");
+    await expect(page.getByText("O original está seguro.")).toBeVisible();
 
-    await page.goto("/pt-BR/app/settings");
-    await page.getByText("IA avançada").click();
-    await page.getByRole("radio", { name: /Econômico/ }).click();
-    await expect(page.getByLabel("Chat principal")).toHaveValue("gpt-5-mini");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
-    const preferencesResponse = await fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=ai_profile,chat_model,reasoning_model,review_model&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
-    });
-    const savedPreferences = (await preferencesResponse.json()) as Array<{ ai_profile: string; chat_model: string; reasoning_model: string; review_model: string }>;
-    expect(savedPreferences[0]).toMatchObject({ ai_profile: "economy", chat_model: "gpt-5-mini", reasoning_model: "gpt-5.6-luna", review_model: "gpt-5-mini" });
+    const retryButton = page.getByRole("button", { name: "Reinterpretar entrada" });
+    await expect(retryButton).toBeVisible();
+    await retryButton.focus();
+    await expect(retryButton).toBeFocused();
+    if (testInfo.project.name === "mobile") {
+      const box = await retryButton.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+    // The success toast is ephemeral client state (useActionState) and races
+    // against how fast the real deployed worker picks the new job up: a fast
+    // kick can revalidate the page before Playwright observes the toast. The
+    // durable, meaningful signal is that the entry actually recovers.
+    await retryButton.click();
+    await waitForRecovered(page, href);
+    await expect(page.locator(".entry-status-could_not_organize")).toHaveCount(0);
+  });
 
-    const quietStartHour = (new Date().getUTCHours() + 6) % 24;
-    const quietEndHour = (quietStartHour + 1) % 24;
-    const formatHour = (hour: number) => `${hour.toString().padStart(2, "0")}:00:00`;
-    const [profileHeartbeatResponse, preferencesHeartbeatResponse] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/profiles?user_id=eq.${userId}`, {
-        method: "PATCH",
-        headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-        body: JSON.stringify({ timezone: "UTC", locale: "pt-BR" }),
-      }),
-      fetch(`${supabaseUrl}/rest/v1/agent_preferences?user_id=eq.${userId}`, {
-        method: "PATCH",
-        headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-        body: JSON.stringify({ quiet_start: formatHour(quietStartHour), quiet_end: formatHour(quietEndHour) }),
-      }),
-    ]);
-    expect(profileHeartbeatResponse.ok).toBe(true);
-    expect(preferencesHeartbeatResponse.ok).toBe(true);
+  test("offers retry after terminal exhaustion and recovers on retry", async () => {
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, "Anotação simples para verificar recuperação de exaustão terminal.");
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "fail_entry_interpretation", { p_entry_id: entryId, p_error: "Falha simulada e2e terminal", p_terminal: true });
 
-    const overdueTaskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ user_id: userId, title: "Tarefa atrasada E2E", status: "todo", due_at: new Date(Date.now() - 86_400_000).toISOString(), confidence: 1, created_by: "user" }),
-    });
-    expect(overdueTaskResponse.ok).toBe(true);
-    const heartbeatResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/request_heartbeat`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      body: "{}",
-    });
-    expect(heartbeatResponse.ok).toBe(true);
-    expect(await heartbeatResponse.json()).toMatchObject({
-      silent: false,
-      notifications_created: expect.any(Number),
-    });
-    const notificationResponse = await fetch(`${supabaseUrl}/rest/v1/notifications?select=type,body&user_id=eq.${userId}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
-    });
-    const notifications = (await notificationResponse.json()) as Array<{ type: string; body: string }>;
-    expect(notifications).toEqual(expect.arrayContaining([expect.objectContaining({ type: "task_overdue", body: "Tarefa atrasada E2E" })]));
+    const href = `/pt-BR/app/inbox/${entryId}`;
+    await page.goto(href);
+    await expect(page.locator(".entry-status-could_not_organize")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Precisa de você" })).toContainText("Tente organizar novamente");
 
-    await page.goto(`/pt-BR/app/inbox/${entries[0].id}`);
-    await page.getByRole("button", { name: "Desfazer criação" }).click();
-    await expect(page.getByText("Criação desfeita.")).toBeVisible();
-
-    const taskResponse = await fetch(`${supabaseUrl}/rest/v1/tasks?select=status&user_id=eq.${userId}&source_entry_id=eq.${entries[0].id}`, {
-      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
-    });
-    const tasks = (await taskResponse.json()) as Array<{ status: string }>;
-    expect(tasks.length).toBeGreaterThan(0);
-    expect(tasks.every((task) => task.status === "cancelled")).toBe(true);
-
-    await page.goto("/pt-BR/app/work?view=all");
-    await expect(page.getByText(confirmedTaskTitle, { exact: true })).toHaveCount(0);
+    const retryButton = page.getByRole("button", { name: "Reinterpretar entrada" });
+    await expect(retryButton).toBeVisible();
+    await retryButton.click();
+    await waitForRecovered(page, href);
+    await expect(page.locator(".entry-status-could_not_organize")).toHaveCount(0);
   });
 });

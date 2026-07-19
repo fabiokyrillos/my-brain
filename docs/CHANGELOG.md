@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Slice 2X.17: cover the converged daily journey
+
+### Added
+
+- Deterministic coverage for basic pending question, recoverable retry, and terminal retry in `e2e/intelligent-capture.spec.ts` — previously entirely absent, since these entry states are not reliably reachable through real, unambiguous AI extraction. Uses already-granted `authenticated` RPCs (`begin_entry_interpretation`, `fail_entry_interpretation`, `persist_entry_interpretation`, `begin_entry_reprocessing`, `persist_reprocessed_entry_interpretation`) to force the exact state directly, the same technique the existing suite already used for forcing an unconfirmed candidate.
+- Keyboard/focus/live-region/touch-target assertions on the entry-review page's progressive disclosure (native `<details>` technical panel, retry control).
+- `docs/reports/PHASE_2X_SLICE_17_REPORT.md` with full scope, RED/GREEN evidence, and rollback.
+
+### Changed
+
+- `e2e/intelligent-capture.spec.ts` reorganized from one 379-line serial test into deterministic, independently-attributable named scenarios across two `test.describe` blocks — the existing real capture→review→confirmation→chat→reviews→files→costs→settings→heartbeat→undo→product-events journey is unchanged in behavior, only reorganized into 13 named tests; a second, new describe adds the 3 tests above.
+- `src/app/[locale]/app/inbox/[entryId]/page.tsx`: the "no interpretation yet" fallback's own retry button is now conditioned on `!canRetry`, removing a duplicate "Reinterpretar entrada"/"Reinterpret entry" button that appeared whenever an entry had never had a successful interpretation and its latest state was `recoverable_error`/`terminal_error` — found by real execution of the new retry scenarios, not by inspection. No capability was removed; retry is still offered exactly once, from whichever location is contextually correct.
+
+### Verification
+
+- Real RED found and fixed via actual online execution, not predicted: an initial wrong button-label assumption, then the duplicate-button defect above, then a flaky assertion on the ephemeral `useActionState` success toast (which races a legitimately fast worker pickup) — replaced with an assertion on the durable recovery signal instead.
+- Full Vitest unchanged at 80 files/443 tests (E2E-only slice; the touched page has no render-based test harness in this codebase, only a source-text architecture guardrail — its behavior is validated through Playwright). ESLint, TypeScript, Next.js 16.2.10 production build, and `git diff --check` passed.
+- Offline Playwright (`foundation.spec.ts`) desktop and mobile each passed 3/3, unaffected.
+- Authenticated online `intelligent-capture.spec.ts` passed 18/18 on both desktop and mobile (full matrix, run twice during RED/GREEN iteration). `online-mobile-navigation.spec.ts` re-run 1/1 both projects to confirm no regression. `online-auth.spec.ts` re-run once (not modified): password recovery now genuinely passes both projects, resolving Slice 2X.16's `recovery-failed` observation as transient rate limiting; signup remains explicitly, traceably skipped on confirmed ongoing hosted-email quota exhaustion.
+- Remote daily-cycle smoke and remote product-events smoke both passed against the linked project; linked migration status confirmed synchronized through `202607180031`; `supabase db lint --linked` showed only the same pre-existing, unrelated `run_user_heartbeat` warning.
+- No migration, RPC, grant, generated database type, secret, schedule, deployment, or remote infrastructure mutation. No product-event contract changed. Does not close Phase 2X — Slice 2X.18 does.
+
 ## 2026-07-19 — Slice 2X.16: close the projection boundary across Home/Caixa/Work/review
 
 ### Added
