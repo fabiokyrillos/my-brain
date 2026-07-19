@@ -14,6 +14,8 @@ const operationKeySchema = z.string().min(8).max(240);
 const undoIdSchema = z.string().uuid();
 
 function refreshTaskSurfaces(entryId: string) {
+  revalidatePath("/pt-BR/app/work");
+  revalidatePath("/en/app/work");
   revalidatePath("/pt-BR/app/tasks");
   revalidatePath("/en/app/tasks");
   revalidatePath("/pt-BR/app/inbox");
@@ -96,5 +98,7 @@ export async function undoAgentAction(
 
   revalidatePath("/pt-BR/app/tasks");
   revalidatePath("/en/app/tasks");
+  revalidatePath("/pt-BR/app/work");
+  revalidatePath("/en/app/work");
   return { status: "success", message: "Criação desfeita." };
 }

@@ -72,6 +72,16 @@ test.describe("intelligent capture", () => {
     await page.getByLabel("Senha").fill(password);
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page).toHaveURL(/\/pt-BR\/app$/);
+
+    for (const [source, target] of [
+      ["/pt-BR/app/today?page=3", "/pt-BR/app/work?view=today&page=3"],
+      ["/en/app/tasks?page=2", "/en/app/work?view=all&page=2"],
+      ["/pt-BR/app/waiting?page=4", "/pt-BR/app/work?view=waiting&page=4"],
+    ] as const) {
+      await page.goto(source);
+      await expect(page).toHaveURL(new RegExp(`${target.replaceAll("?", "\\?")}$`));
+    }
+
     await page.goto("/pt-BR/app/capture");
 
     const captureField = page.getByRole("textbox", { name: "Nova entrada" });
@@ -196,6 +206,20 @@ test.describe("intelligent capture", () => {
     await createButton.click();
     await expect(page.getByRole("button", { name: "Desfazer criação" })).toBeVisible();
 
+    const confirmedTasksResponse = await fetch(`${supabaseUrl}/rest/v1/tasks?select=title,status&user_id=eq.${userId}&source_entry_id=eq.${capturedEntryId}`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    });
+    expect(confirmedTasksResponse.ok).toBe(true);
+    const confirmedTasks = (await confirmedTasksResponse.json()) as Array<{ title: string; status: string }>;
+    const confirmedTask = confirmedTasks.find((task) => task.status !== "cancelled");
+    expect(confirmedTask).toBeDefined();
+    const confirmedTaskTitle = confirmedTask!.title;
+
+    await page.goto("/pt-BR/app/work?view=all");
+    await expect(page.getByRole("heading", { name: "Trabalho" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Todas" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText(confirmedTaskTitle, { exact: true })).toBeVisible();
+
     const entryResponse = await fetch(`${supabaseUrl}/rest/v1/entries?select=id,original_content,status&user_id=eq.${userId}`, {
       headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
     });
@@ -315,5 +339,8 @@ test.describe("intelligent capture", () => {
     const tasks = (await taskResponse.json()) as Array<{ status: string }>;
     expect(tasks.length).toBeGreaterThan(0);
     expect(tasks.every((task) => task.status === "cancelled")).toBe(true);
+
+    await page.goto("/pt-BR/app/work?view=all");
+    await expect(page.getByText(confirmedTaskTitle, { exact: true })).toHaveCount(0);
   });
 });

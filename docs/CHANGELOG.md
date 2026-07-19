@@ -2,6 +2,33 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-18 — Slice 2X.12: canonical Work route and task projection
+
+### Added
+
+- `src/features/daily-cycle/work-projection.ts`: server-only `loadWorkProjection`, the canonical Work page's only `tasks` reader. It scopes both profile and task queries to the authenticated owner, resolves an IANA timezone with the existing `America/Sao_Paulo` fallback, implements Today (overdue + due today, open, `due_at asc/id asc`), All (non-cancelled, `updated_at desc/id asc`) and Waiting (`waiting`, same stable updated ordering), retains the existing 50-item page/lookahead contract, and maps each row through the existing fail-closed `toWorkItemView` mapper.
+- `src/features/daily-cycle/work-view.tsx`: localized PT-BR/English canonical Work presentation with accessible view links (`aria-current="page"`, native links, visible focus, 44px touch targets), short criteria copy per view, honest Waiting limitation copy, manual creation on All, DTO-only task rendering, and pagination URLs that preserve `view`.
+- `src/app/[locale]/app/work/page.tsx` plus architecture/route tests. The page authenticates, parses the product view/page, calls only `loadWorkProjection`, and passes product DTOs to `WorkView`; it never imports database types or reads `tasks` directly.
+- Focused tests for projection filtering/ordering/ownership/pagination/timezone/DTO actions/fail-closed mapping, Work presentation/localization/accessibility/actions/manual creation/pagination, exact route aliases, and canonical Work revalidation after creation/mutation/confirmation/undo. Playwright coverage now includes offline protection for every legacy route and credential-gated authenticated alias plus confirmed-task/undo Work assertions.
+
+### Changed
+
+- Localized `/today`, `/tasks`, and `/waiting` page modules are now safe redirects to `/{locale}/app/work?view=today|all|waiting&page=N`; locale, equivalent filter, and page are retained. Existing primary navigation destinations are deliberately unchanged until Slice 2X.13.
+- `TaskList` now consumes `WorkItemView[]` instead of raw task rows/status strings, localizes the complete human-state/origin vocabulary without raw-enum fallback, formats deadlines in the authenticated profile timezone, and renders only actions supplied by `availableActions` (complete, wait, resume, reopen).
+- `PaginationLinks` gained an optional product-query map so Work retains `view` while changing pages; all existing callers retain their original `?page=N` URLs.
+- Manual task creation, task-status mutation, candidate confirmation, and candidate-creation undo now revalidate canonical Work in both locales while preserving their genuinely affected pre-existing Home/Inbox/legacy surfaces.
+
+### Verification
+
+- Strict TDD: the initial focused suite failed with 18 expected missing-slice failures; a second focused RED proved the product-action translation was still absent from the Server Action. Final focused GREEN: 6 files/29 tests. Full Vitest: 68 files/375 tests. Lint, typecheck, production Next 16.2.10 build, and `git diff --check` pass.
+- Offline Playwright desktop/mobile: 6 passing, 10 credential-gated skips. Authenticated online alias/confirmed-task/undo assertions were authored but not run because `ONLINE_SUPABASE_URL`, `ONLINE_SUPABASE_PUBLISHABLE_KEY`, and `ONLINE_SUPABASE_SERVICE_ROLE_KEY` are absent; no online pass is claimed.
+- No migration, RPC, Edge Function, generated type, or infrastructure change. `supabase migration list --linked` confirms local and remote histories synchronized through `202607180031`.
+
+### Known limitation
+
+- Primary navigation still points to some legacy task URLs; those destinations now converge through redirects, while reorganizing the navigation itself remains explicitly Slice 2X.13.
+- The authenticated online Work journey is skipped in this environment due to absent `ONLINE_SUPABASE_*` credentials. Unit/architecture coverage and offline desktop/mobile route protection passed, but no live authenticated browser result is claimed.
+
 ## 2026-07-18 — Slice 2X.11: Needs Attention on Home and Caixa
 
 ### Added

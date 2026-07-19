@@ -72,6 +72,10 @@ export async function createRecord(
   const route = parsed.data.kind === "task" ? "tasks" : parsed.data.kind === "project" ? "projects" : parsed.data.kind === "person" ? "people" : "memories";
   revalidatePath(`/${parsed.data.locale}/app/${route}`);
   revalidatePath(`/${parsed.data.locale}/app`);
+  if (parsed.data.kind === "task") {
+    revalidatePath("/pt-BR/app/work");
+    revalidatePath("/en/app/work");
+  }
   return { status: "success", message: "Adicionado." };
 }
 
@@ -81,21 +85,50 @@ const statusSchema = z.object({
   status: z.enum(["inbox", "todo", "in_progress", "waiting", "blocked", "deferred", "completed", "cancelled"]),
 });
 
-export async function updateTaskStatus(formData: FormData) {
-  const parsed = statusSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+const workItemActionSchema = z.object({
+  taskId: z.string().uuid(),
+  locale: z.enum(["pt-BR", "en"]),
+  action: z.enum(["complete_task", "wait_task", "resume_task", "reopen_task"]),
+});
+
+const statusByWorkItemAction = {
+  complete_task: "completed",
+  wait_task: "waiting",
+  resume_task: "todo",
+  reopen_task: "todo",
+} as const;
+
+async function persistTaskStatus(input: z.infer<typeof statusSchema>) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
   const result = await supabase.from("tasks").update({
-    status: parsed.data.status,
-    completed_at: parsed.data.status === "completed" ? new Date().toISOString() : null,
-    cancelled_at: parsed.data.status === "cancelled" ? new Date().toISOString() : null,
-  }).eq("id", parsed.data.taskId).eq("user_id", user.id);
+    status: input.status,
+    completed_at: input.status === "completed" ? new Date().toISOString() : null,
+    cancelled_at: input.status === "cancelled" ? new Date().toISOString() : null,
+  }).eq("id", input.taskId).eq("user_id", user.id);
   requireSupabaseSuccess(result, "update task status");
 
   for (const route of ["", "/today", "/tasks", "/waiting"]) {
-    revalidatePath(`/${parsed.data.locale}/app${route}`);
+    revalidatePath(`/${input.locale}/app${route}`);
   }
+  revalidatePath("/pt-BR/app/work");
+  revalidatePath("/en/app/work");
+}
+
+export async function updateTaskStatus(formData: FormData) {
+  const parsed = statusSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  await persistTaskStatus(parsed.data);
+}
+
+export async function applyWorkItemAction(formData: FormData) {
+  const parsed = workItemActionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  await persistTaskStatus({
+    taskId: parsed.data.taskId,
+    locale: parsed.data.locale,
+    status: statusByWorkItemAction[parsed.data.action],
+  });
 }

@@ -20,3 +20,18 @@ test("signup and password reset forms expose the complete validated fields", asy
   await expect(page.getByLabel("Nova senha", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Confirme a nova senha")).toBeVisible();
 });
+
+test("legacy task routes remain protected in both locales", async ({ request }) => {
+  for (const [source, target] of [
+    ["/pt-BR/app/today?page=3", "/pt-BR/auth/login"],
+    ["/en/app/tasks?page=2", "/en/auth/login"],
+    ["/pt-BR/app/waiting?page=4", "/pt-BR/auth/login"],
+  ] as const) {
+    const response = await request.get(source, { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    const location = response.headers().location;
+    expect(location).toBeDefined();
+    const redirected = new URL(location!, "http://localhost:3000");
+    expect(`${redirected.pathname}${redirected.search}`).toBe(target);
+  }
+});

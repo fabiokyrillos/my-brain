@@ -52,3 +52,13 @@
 .load-more-button{width:auto;margin:6px auto 0}
 .needs-attention-error{margin-top:6px}
 @media(max-width:600px){.inbox-view-tabs{flex-wrap:wrap}}
+
+/* Phase 2X.12: canonical Work surface */
+.work-view-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.work-view-tabs a{border:1px solid var(--line);border-radius:999px;padding:9px 15px;min-height:44px;display:inline-flex;align-items:center;color:var(--ink-soft);font:600 12px var(--font-sans);background:white}
+.work-view-tabs a[aria-current="page"]{background:var(--ink);color:white;border-color:var(--ink)}
+.work-view-tabs a:focus-visible,.row-action:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-view-note{margin-top:7px!important;font-size:11px!important}
+.work-origin{display:block;color:var(--ink-soft);font-size:10px;margin-top:5px}
+.work-page .row-action{min-height:44px;display:inline-flex;align-items:center;gap:5px}
+@media(max-width:600px){.work-page .list-meta{align-items:flex-start;flex-wrap:wrap}.work-page .row-actions{width:100%}.work-page .row-actions form{flex:1}.work-page .row-action{justify-content:center;width:100%}}

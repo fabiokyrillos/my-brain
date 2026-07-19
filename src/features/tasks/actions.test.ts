@@ -81,6 +81,8 @@ describe("confirmEntryTasks", () => {
     });
     expect(result).toEqual({ status: "success", message: "2 tarefas criadas.", undoId });
     expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
+    expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
   });
 
   it("deduplicates repeated candidate indexes before calling the database", async () => {
@@ -151,5 +153,7 @@ describe("undoAgentAction", () => {
 
     expect(rpc).toHaveBeenCalledWith("undo_operation", { p_undo_id: undoId });
     expect(result).toEqual({ status: "success", message: "Criação desfeita." });
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
+    expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
   });
 });
