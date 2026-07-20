@@ -2,6 +2,35 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-19 — Phase 2C Slice 2C.1: editable candidate confirmation (branch, not merged)
+
+### Added
+
+- Migration `202607190032`: `confirm_entry_task_candidates_v2` RPC (`SECURITY DEFINER`, `set search_path = ''`, `auth.uid()`-only identity) accepting a bounded, closed-allowlist edit array (`title`/`description`/`dueAt`) per selected candidate index; rejects duplicate/out-of-range/unselected-candidate edits, empty/overlong title, overlong description, and invalid/nonexistent/ambiguous due dates at the database boundary; canonicalizes effective values, stores a SHA-256 request fingerprint on `undo_operations` for same-key/different-payload replay rejection, and atomically materializes all selected tasks with a `2C_ALREADY_MATERIALIZED` guard against double confirmation. The legacy `confirm_entry_task_candidates(uuid, uuid, integer[], text)` RPC is unchanged and remains callable.
+- Migration `202607190033`: `guard_v2_confirmed_interpretation_correction` trigger on `entry_interpretations` (`SECURITY DEFINER`, no public/authenticated execute grant) rejecting a `user_corrected` interpretation insert that would supersede an interpretation still backing active tasks from a v2 confirmation, closing a confirmation/correction race.
+- `src/features/tasks/candidate-edit-contract.ts`: closed Zod schemas and canonicalization for candidate edit commands, byte-bounded serialization, and unique-index enforcement.
+- `src/features/tasks/candidate-due-date.ts`: local wall-time↔offset-instant conversion against the profile IANA timezone, explicitly rejecting nonexistent (DST gap) and ambiguous (DST overlap) local times via a bounded ±24h-minute scan.
+- `src/features/tasks/candidate-editor.tsx`: per-candidate inline edit/reset/explicit-clear UI with an "Edited" indicator, visible immutable suggestion, accessible fieldset/legend, keyboard/focus/live-region support, and 44px touch targets.
+- `e2e/editable-candidate-confirmation.spec.ts` and `scripts/remote-editable-candidate-confirmation-smoke.mjs`: disposable-fixture live journeys through the real Server Action and linked database.
+- `supabase/tests/editable_candidate_confirmation.sql` and `editable_candidate_confirmation_race.sql`: pgTAP coverage for the new RPC and the correction-race guard.
+
+### Changed
+
+- `src/features/tasks/task-candidate-form.tsx`: rewritten to hold an edit map keyed by candidate index (retained across deselect/reselect within the mounted page, excluded from the submitted command while deselected), rotate the operation key only when the canonical payload signature actually changes, and surface stable per-failure result codes instead of raw errors.
+- `src/features/tasks/actions.ts` (`confirmEntryTasks`): re-validates every field server-side, never forwards client-supplied ownership or task identifiers, calls `confirm_entry_task_candidates_v2`, and maps every RPC error to a localized, stable code with no raw SQL/PostgREST text reaching the UI.
+- `src/features/daily-cycle/review-projection.ts` / `src/app/[locale]/app/inbox/[entryId]/page.tsx`: thread the authenticated profile timezone (server-validated, default `America/Sao_Paulo`) into the editor.
+
+### Known gap
+
+- The PRD §14 / implementation-plan Task 5 analytics extension — `candidate_edit_started`, `candidate_edit_reset` events, and `editedCandidateCount`/`editedFieldCount` on `task_candidates_confirmed` — was not implemented in this slice; `task_candidates_confirmed` currently records only `candidateCount`. See `docs/reports/PHASE_2C_SLICE_01_FINAL_ACCEPTANCE.md`.
+
+### Verification
+
+- 579/579 unit/component tests (83 files), 0 ESLint errors, 0 `tsc --noEmit` errors, production build green, `git diff --check` clean.
+- Migrations `202607190032`/`202607190033` at local/remote parity; `supabase db lint --linked --level error` clean.
+- Live authenticated Playwright run (desktop + Pixel 7 projects) against the linked development database exercised edit, confirm, audit, and undo through the real production Server Action with a disposable fixture torn down afterward.
+- Not pushed; no pull request opened; no hosting deployment occurred.
+
 ## 2026-07-19 — Phase 2C planning checkpoint
 
 ### Added
