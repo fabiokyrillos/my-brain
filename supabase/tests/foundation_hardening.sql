@@ -76,7 +76,7 @@ select policies_are(
 );
 
 select results_eq(
-  $$ select prosecdef from pg_proc where oid = 'public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer)'::regprocedure $$,
+  $$ select prosecdef from pg_proc where oid = 'public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer,uuid)'::regprocedure $$,
   array[true],
   'interpretation persistence executes through its validated definer RPC'
 );
@@ -92,14 +92,14 @@ select results_eq(
 );
 select has_function('public', 'save_profile_settings', array['jsonb', 'jsonb']);
 
-select has_constraint('public', 'task_projects', 'task_projects_task_owner_fk');
-select has_constraint('public', 'task_projects', 'task_projects_project_owner_fk');
-select has_constraint('public', 'person_projects', 'person_projects_person_owner_fk');
-select has_constraint('public', 'person_projects', 'person_projects_project_owner_fk');
-select has_constraint('public', 'conversation_messages', 'conversation_messages_conversation_owner_fk');
-select has_constraint('public', 'pending_questions', 'pending_questions_interpretation_owner_fk');
-select has_trigger('public', 'entity_attachments', 'entity_attachments_validate_owner');
-select has_trigger('public', 'entity_tags', 'entity_tags_validate_owner');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.task_projects'::regclass and conname = 'task_projects_task_owner_fk'), 'task projects enforce task ownership');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.task_projects'::regclass and conname = 'task_projects_project_owner_fk'), 'task projects enforce project ownership');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.person_projects'::regclass and conname = 'person_projects_person_owner_fk'), 'person projects enforce person ownership');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.person_projects'::regclass and conname = 'person_projects_project_owner_fk'), 'person projects enforce project ownership');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.conversation_messages'::regclass and conname = 'conversation_messages_conversation_owner_fk'), 'messages enforce conversation ownership');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.pending_questions'::regclass and conname = 'pending_questions_interpretation_owner_fk'), 'pending questions enforce interpretation ownership');
+select has_trigger('public', 'entity_attachments', 'entity_attachments_validate_owner', 'entity attachments validate ownership');
+select has_trigger('public', 'entity_tags', 'entity_tags_validate_owner', 'entity tags validate ownership');
 
 select results_eq(
   $$ select pg_get_functiondef('public.run_user_heartbeat(uuid)'::regprocedure) not like '%current_date%' $$,

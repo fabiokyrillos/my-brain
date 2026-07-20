@@ -24,9 +24,13 @@ export default async function EntryDetailPage({
   if (!isLocale(rawLocale)) notFound();
   const locale = rawLocale;
   const pt = locale === "pt-BR";
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
 
-  const review = await loadEntryReviewProjection(supabase, { entryId, locale });
+  const review = await loadEntryReviewProjection(supabase, {
+    entryId,
+    locale,
+    userId: user.id,
+  });
   if (!review) notFound();
 
   let technical: InterpretationTechnicalDetailsView | null = null;
@@ -41,6 +45,7 @@ export default async function EntryDetailPage({
 
   const {
     view,
+    timezone,
     errorMessage,
     editableCurrent,
     entityOptions,
@@ -82,6 +87,7 @@ export default async function EntryDetailPage({
           interpretationId={editableCurrent.interpretationId}
           locale={locale}
           operationKey={randomUUID()}
+          timezone={timezone}
           undoAction={undoAgentAction}
         />
       ) : (

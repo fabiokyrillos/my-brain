@@ -1,6 +1,6 @@
 begin;
 
-select plan(25);
+select plan(26);
 
 select has_column('public', 'jobs', 'locked_at', 'jobs records the lease start');
 select has_column('public', 'jobs', 'locked_by', 'jobs records the worker identity');
@@ -50,12 +50,12 @@ select results_eq(
 );
 
 select results_eq(
-  $$ select pg_get_functiondef('public.claim_attachment_job(uuid,uuid,text,integer)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.claim_attachment_job(uuid,uuid,text,integer)'::regprocedure $$,
   array[true],
   'leased claim has an explicit safe search path'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.reap_expired_jobs(integer)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.reap_expired_jobs(integer)'::regprocedure $$,
   array[true],
   'reaper has an explicit safe search path'
 );

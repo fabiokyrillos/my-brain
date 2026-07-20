@@ -11,7 +11,7 @@ select results_eq(
   'needs-attention listing is security definer'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.list_needs_attention(integer,timestamptz,uuid)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.list_needs_attention(integer,timestamptz,uuid)'::regprocedure $$,
   array[true],
   'needs-attention listing has an explicit safe search path'
 );

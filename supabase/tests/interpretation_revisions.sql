@@ -30,9 +30,9 @@ select has_column('public', 'entity_aliases', 'normalized_alias', 'aliases store
 select has_column('public', 'entity_aliases', 'valid_from', 'aliases support temporal validity start');
 
 select has_function('public', 'correct_entry_interpretation', array['uuid', 'integer', 'jsonb', 'text', 'text']);
-select has_function('public', 'begin_entry_reprocessing', array['uuid', 'text', 'integer']);
-select has_function('public', 'persist_reprocessed_entry_interpretation', array['uuid', 'text', 'jsonb', 'text', 'text', 'text', 'integer', 'integer', 'jsonb']);
-select has_function('public', 'fail_entry_reprocessing', array['uuid', 'text', 'text']);
+select has_function('public', 'begin_entry_reprocessing', array['uuid', 'text', 'integer', 'uuid']);
+select has_function('public', 'persist_reprocessed_entry_interpretation', array['uuid', 'text', 'jsonb', 'text', 'text', 'text', 'integer', 'integer', 'jsonb', 'uuid']);
+select has_function('public', 'fail_entry_reprocessing', array['uuid', 'text', 'text', 'uuid']);
 select has_function('public', 'undo_operation', array['uuid']);
 
 select results_eq(
@@ -89,28 +89,28 @@ select results_eq(
   'correction is security definer and validates the authenticated owner internally'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure $$,
   array[true],
   'correction has an explicit safe search path'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.begin_entry_reprocessing(uuid,text,integer)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.begin_entry_reprocessing(uuid,text,integer,uuid)'::regprocedure $$,
   array[true],
   'reprocessing begin has an explicit safe search path'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.persist_reprocessed_entry_interpretation(uuid,text,jsonb,text,text,text,integer,integer,jsonb)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.persist_reprocessed_entry_interpretation(uuid,text,jsonb,text,text,text,integer,integer,jsonb,uuid)'::regprocedure $$,
   array[true],
   'reprocessing completion has an explicit safe search path'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.fail_entry_reprocessing(uuid,text,text)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.fail_entry_reprocessing(uuid,text,text,uuid)'::regprocedure $$,
   array[true],
   'reprocessing failure has an explicit safe search path'
 );
 
 select results_eq(
-  $$ select pg_get_functiondef('public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer)'::regprocedure) like '%current_interpretation_id%' $$,
+  $$ select pg_get_functiondef('public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer,uuid)'::regprocedure) like '%current_interpretation_id%' $$,
   array[true],
   'compatible initial persistence advances the explicit current pointer'
 );
@@ -149,9 +149,9 @@ select results_eq(
   $$
     select bool_and(position('occurred_at = occurred_at' in pg_get_functiondef(signature)) = 0)
     from unnest(array[
-      'public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer)'::regprocedure,
+      'public.persist_entry_interpretation(uuid,jsonb,text,text,text,integer,integer,uuid)'::regprocedure,
       'public.correct_entry_interpretation(uuid,integer,jsonb,text,text)'::regprocedure,
-      'public.persist_reprocessed_entry_interpretation(uuid,text,jsonb,text,text,text,integer,integer,jsonb)'::regprocedure
+      'public.persist_reprocessed_entry_interpretation(uuid,text,jsonb,text,text,text,integer,integer,jsonb,uuid)'::regprocedure
     ]) signature
   $$,
   array[true],

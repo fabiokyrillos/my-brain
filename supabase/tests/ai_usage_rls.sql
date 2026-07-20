@@ -6,8 +6,14 @@ select has_column('public', 'agent_preferences', 'extraction_model', 'extraction
 select has_column('public', 'agent_preferences', 'review_model', 'review route exists');
 select has_table('public', 'ai_model_pricing', 'pricing catalog exists');
 select has_table('public', 'ai_usage_events', 'usage ledger exists');
-select row_security_active('public.ai_model_pricing'), 'pricing catalog RLS is active';
-select row_security_active('public.ai_usage_events'), 'usage ledger RLS is active';
+select ok(
+  (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.ai_model_pricing'::regclass),
+  'pricing catalog RLS is active and forced'
+);
+select ok(
+  (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.ai_usage_events'::regclass),
+  'usage ledger RLS is active and forced'
+);
 select policies_are('public', 'ai_model_pricing', array['ai_model_pricing_select_authenticated']);
 select policies_are('public', 'ai_usage_events', array['ai_usage_events_select_own']);
 select has_function('public', 'record_ai_usage', array['text','text','integer','integer','integer','integer','text','text','uuid','uuid']);

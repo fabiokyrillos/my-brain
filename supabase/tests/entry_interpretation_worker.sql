@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(25);
 
 -- Extension and scheduled dispatch infrastructure.
 select ok(
@@ -24,8 +24,10 @@ select has_function('public', 'persist_entry_interpretation', array['uuid', 'jso
 select has_function('public', 'begin_entry_reprocessing', array['uuid', 'text', 'int4', 'uuid']);
 select has_function('public', 'persist_reprocessed_entry_interpretation', array['uuid', 'text', 'jsonb', 'text', 'text', 'text', 'int4', 'int4', 'jsonb', 'uuid']);
 select has_function('public', 'fail_entry_reprocessing', array['uuid', 'text', 'text', 'uuid']);
-select ok(
-  not has_function('public', 'begin_entry_interpretation', array['uuid']),
+select hasnt_function(
+  'public',
+  'begin_entry_interpretation',
+  array['uuid'],
   'the original single-argument overload no longer exists'
 );
 select ok(
@@ -122,7 +124,7 @@ select ok(
 );
 select is(
   (select status from public.entries where id = '77777777-7777-4777-8777-777777777777'),
-  'completed',
+  'awaiting_review',
   'the owned entry reflects the service-persisted interpretation'
 );
 
@@ -141,7 +143,7 @@ select is(
   'reprocessing',
   'service role begins reprocessing on behalf of the owner'
 );
-select ok(
+select is(
   (public.persist_reprocessed_entry_interpretation(
     '88888888-8888-4888-8888-888888888888', 'pgtap:worker-reprocess',
     jsonb_build_object(

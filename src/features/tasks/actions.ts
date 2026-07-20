@@ -4,17 +4,74 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import {
+  candidateEditArraySchema,
+  selectedCandidateIndexesSchema,
+  serializeCandidateEdits,
+} from "./candidate-edit-contract";
 import type {
+  ConfirmTasksCode,
   ConfirmTasksState,
   UndoTasksState,
 } from "./task-candidate-form";
 
 const entryIdSchema = z.string().uuid();
 const interpretationIdSchema = z.string().uuid();
-const operationKeySchema = z.string().min(8).max(240);
+const operationKeySchema = z.string().uuid();
 const localeSchema = z.enum(["pt-BR", "en"]);
 const undoIdSchema = z.string().uuid();
+const candidateIndexFormValueSchema = z
+  .string()
+  .regex(/^(0|[1-9]\d*)$/)
+  .transform(Number)
+  .refine(Number.isSafeInteger);
+
+type Locale = z.infer<typeof localeSchema>;
+type RpcError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+type ConfirmationRpcResult = {
+  taskIds: string[];
+  undoId: string;
+  idempotent: boolean;
+};
+
+const confirmationCopy = {
+  "pt-BR": {
+    validation: "Revise as tarefas selecionadas e as edições.",
+    unauthenticated: "Sua sessão expirou. Entre novamente.",
+    stale: "A interpretação mudou. Atualize a página antes de confirmar.",
+    contended: "A interpretação está sendo alterada. Atualize a página antes de confirmar.",
+    mismatch: "Esta tentativa não corresponde mais às edições atuais. Revise e tente novamente.",
+    materialized: "Uma destas tarefas já foi criada. Atualize a página antes de confirmar.",
+    recordOnly: "Esta versão é somente registro; não há tarefas para confirmar.",
+    notFound: "Não encontramos este registro para confirmação.",
+    failed: "Não foi possível criar as tarefas agora.",
+    created: (count: number) => (
+      count === 1 ? "1 tarefa criada." : `${count} tarefas criadas.`
+    ),
+  },
+  en: {
+    validation: "Review the selected tasks and edits.",
+    unauthenticated: "Your session expired. Sign in again.",
+    stale: "The interpretation changed. Refresh the page before confirming.",
+    contended: "The interpretation is being changed. Refresh the page before confirming.",
+    mismatch: "This attempt no longer matches the current edits. Review them and try again.",
+    materialized: "One of these tasks was already created. Refresh the page before confirming.",
+    recordOnly: "This version is record-only; there are no tasks to confirm.",
+    notFound: "We could not find this record for confirmation.",
+    failed: "The tasks could not be created right now.",
+    created: (count: number) => (
+      count === 1 ? "1 task created." : `${count} tasks created.`
+    ),
+  },
+} as const;
 
 function refreshTaskSurfaces(entryId: string) {
   revalidatePath("/pt-BR/app/work");
@@ -31,69 +88,73 @@ export async function confirmEntryTasks(
   _state: ConfirmTasksState,
   formData: FormData,
 ): Promise<ConfirmTasksState> {
-  const entryId = entryIdSchema.safeParse(formData.get("entryId"));
-  const interpretationId = interpretationIdSchema.safeParse(formData.get("interpretationId"));
-  const operationKey = operationKeySchema.safeParse(formData.get("operationKey"));
-  const locale = localeSchema.safeParse(formData.get("locale") ?? "pt-BR");
-  const candidateIndexes = [...new Set(
-    formData.getAll("candidateIndex")
-      .map((value) => Number(value))
-      .filter((value) => Number.isInteger(value) && value >= 0),
-  )];
+  const localeResult = localeSchema.safeParse(formData.get("locale") ?? "pt-BR");
+  const locale = localeResult.success ? localeResult.data : "pt-BR";
+  const parsed = parseConfirmationForm(formData);
 
-  if (!entryId.success || !interpretationId.success || !operationKey.success || !locale.success || candidateIndexes.length === 0) {
-    return { status: "error", message: "Selecione pelo menos uma tarefa.", undoId: null };
+  if (!localeResult.success || !parsed.success) {
+    return confirmationFailure(
+      "validation_failed",
+      confirmationCopy[locale].validation,
+      false,
+    );
   }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return { status: "error", message: "Sua sessão expirou. Entre novamente.", undoId: null };
+    return confirmationFailure(
+      "unauthenticated",
+      confirmationCopy[locale].unauthenticated,
+      false,
+    );
   }
 
-  const { data, error } = await supabase.rpc("confirm_entry_task_candidates", {
-    p_entry_id: entryId.data,
-    p_expected_interpretation_id: interpretationId.data,
-    p_candidate_indexes: candidateIndexes,
-    p_operation_key: operationKey.data,
+  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v2", {
+    p_entry_id: parsed.data.entryId,
+    p_expected_interpretation_id: parsed.data.interpretationId,
+    p_candidate_indexes: parsed.data.candidateIndexes,
+    p_candidate_edits: parsed.data.candidateEdits,
+    p_operation_key: parsed.data.operationKey,
   });
 
   if (error) {
-    // 55P03 (lock_not_available), not 40001: raising 40001 from this RPC was
-    // found to hang until gateway timeout on the linked project, a platform
-    // behavior unrelated to this code (see the migration 028 header comment
-    // and DECISIONS.md).
-    if (error.code === "55P03") {
-      return { status: "error", message: "A interpretação mudou. Atualize a página antes de confirmar.", undoId: null };
-    }
-    if (error.code === "55000") {
-      return { status: "error", message: "Esta versão é somente registro; não há tarefas para confirmar.", undoId: null };
-    }
-    return { status: "error", message: "Não foi possível criar as tarefas.", undoId: null };
+    return mapConfirmationRpcError(error, locale);
   }
 
-  const taskIds = data && typeof data === "object" && "task_ids" in data && Array.isArray(data.task_ids)
-    ? data.task_ids
-    : [];
+  const confirmation = readConfirmationRpcResult(data);
+  if (!confirmation) {
+    return confirmationFailure(
+      "operation_failed",
+      confirmationCopy[locale].failed,
+      true,
+    );
+  }
 
-  after(() => recordProductEvent({
-    name: "task_candidates_confirmed",
-    surface: "interpretation_review",
-    locale: locale.data,
-    viewportClass: "unknown",
-    appVersion: "server",
-    idempotencyKey: createProductEventIdempotencyKey("task_candidates_confirmed", operationKey.data),
-    subject: { type: "entry", id: entryId.data },
-    properties: { candidateCount: candidateIndexes.length },
-  }).catch(() => {}));
+  if (!confirmation.idempotent) {
+    after(() => recordProductEvent({
+      name: "task_candidates_confirmed",
+      surface: "interpretation_review",
+      locale,
+      viewportClass: "unknown",
+      appVersion: "server",
+      idempotencyKey: createProductEventIdempotencyKey(
+        "task_candidates_confirmed",
+        parsed.data.operationKey,
+      ),
+      subject: { type: "entry", id: parsed.data.entryId },
+      properties: { candidateCount: parsed.data.candidateIndexes.length },
+    }).catch(() => {}));
+  }
 
-  refreshTaskSurfaces(entryId.data);
+  refreshTaskSurfaces(parsed.data.entryId);
   return {
     status: "success",
-    message: taskIds.length === 1 ? "1 tarefa criada." : `${taskIds.length} tarefas criadas.`,
-    undoId: data && typeof data === "object" && "undo_id" in data && typeof data.undo_id === "string"
-      ? data.undo_id
-      : null,
+    code: "confirmed",
+    message: confirmationCopy[locale].created(confirmation.taskIds.length),
+    undoId: confirmation.undoId,
+    replayed: confirmation.idempotent,
+    retryable: false,
   };
 }
 
@@ -102,18 +163,199 @@ export async function undoAgentAction(
   formData: FormData,
 ): Promise<UndoTasksState> {
   const undoId = undoIdSchema.safeParse(formData.get("undoId"));
-  if (!undoId.success) return { status: "error", message: "Ação inválida." };
+  const localeResult = localeSchema.safeParse(formData.get("locale") ?? "pt-BR");
+  const locale = localeResult.success ? localeResult.data : "pt-BR";
+  const pt = locale === "pt-BR";
+  if (!undoId.success || !localeResult.success) {
+    return { status: "error", message: pt ? "Ação inválida." : "Invalid action." };
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Sua sessão expirou. Entre novamente." };
+  if (!user) {
+    return {
+      status: "error",
+      message: pt ? "Sua sessão expirou. Entre novamente." : "Your session expired. Sign in again.",
+    };
+  }
 
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
-  if (error) return { status: "error", message: "Não foi possível desfazer." };
+  if (error) {
+    return {
+      status: "error",
+      message: pt ? "Não foi possível desfazer." : "Could not undo.",
+    };
+  }
 
   revalidatePath("/pt-BR/app/tasks");
   revalidatePath("/en/app/tasks");
   revalidatePath("/pt-BR/app/work");
   revalidatePath("/en/app/work");
-  return { status: "success", message: "Criação desfeita." };
+  revalidatePath("/pt-BR/app/inbox");
+  revalidatePath("/en/app/inbox");
+  return {
+    status: "success",
+    message: pt ? "Criação desfeita." : "Creation undone.",
+  };
+}
+
+function parseConfirmationForm(formData: FormData) {
+  const entryId = entryIdSchema.safeParse(formData.get("entryId"));
+  const interpretationId = interpretationIdSchema.safeParse(
+    formData.get("interpretationId"),
+  );
+  const operationKey = operationKeySchema.safeParse(formData.get("operationKey"));
+  const candidateIndexes = parseCandidateIndexes(formData.getAll("candidateIndex"));
+  const candidateEdits = parseCandidateEdits(formData.get("candidateEdits"));
+
+  if (
+    !entryId.success
+    || !interpretationId.success
+    || !operationKey.success
+    || !candidateIndexes.success
+    || !candidateEdits.success
+  ) {
+    return { success: false as const };
+  }
+
+  const selectedIndexSet = new Set(candidateIndexes.data);
+  if (candidateEdits.data.some((edit) => !selectedIndexSet.has(edit.candidateIndex))) {
+    return { success: false as const };
+  }
+
+  return {
+    success: true as const,
+    data: {
+      entryId: entryId.data,
+      interpretationId: interpretationId.data,
+      operationKey: operationKey.data,
+      candidateIndexes: candidateIndexes.data,
+      candidateEdits: JSON.parse(serializeCandidateEdits(candidateEdits.data)) as Json,
+    },
+  };
+}
+
+function parseCandidateIndexes(values: FormDataEntryValue[]) {
+  const parsedValues = values.map((value) => candidateIndexFormValueSchema.safeParse(value));
+  if (parsedValues.some((result) => !result.success)) {
+    return { success: false as const };
+  }
+
+  const parsed = selectedCandidateIndexesSchema.safeParse(
+    parsedValues.map((result) => result.data),
+  );
+  if (!parsed.success) {
+    return { success: false as const };
+  }
+
+  return {
+    success: true as const,
+    data: [...parsed.data].sort((left, right) => left - right),
+  };
+}
+
+function parseCandidateEdits(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") {
+    return { success: false as const };
+  }
+
+  try {
+    const parsedJson: unknown = JSON.parse(value);
+    const parsed = candidateEditArraySchema.safeParse(parsedJson);
+    return parsed.success
+      ? { success: true as const, data: parsed.data }
+      : { success: false as const };
+  } catch {
+    return { success: false as const };
+  }
+}
+
+function readConfirmationRpcResult(value: unknown): ConfirmationRpcResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const result = value as Record<string, unknown>;
+  if (
+    !Array.isArray(result.task_ids)
+    || !result.task_ids.every((taskId) => typeof taskId === "string")
+    || result.task_ids.length === 0
+    || typeof result.undo_id !== "string"
+    || !undoIdSchema.safeParse(result.undo_id).success
+    || typeof result.idempotent !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    taskIds: result.task_ids,
+    undoId: result.undo_id,
+    idempotent: result.idempotent,
+  };
+}
+
+function mapConfirmationRpcError(
+  error: RpcError,
+  locale: Locale,
+): ConfirmTasksState {
+  const localized = confirmationCopy[locale];
+
+  if (
+    error.code === "55P03"
+    && error.message === "Interpretation is no longer current"
+  ) {
+    return confirmationFailure("stale_interpretation", localized.stale, false);
+  }
+  if (
+    error.code === "55P03"
+    && error.message === "Interpretation changed; reload before saving"
+  ) {
+    return confirmationFailure("confirmation_contended", localized.contended, false);
+  }
+  if (
+    error.code === "P0001"
+    && error.details === "2C_IDEMPOTENCY_MISMATCH"
+  ) {
+    return confirmationFailure("idempotency_mismatch", localized.mismatch, false);
+  }
+  if (
+    error.code === "P0001"
+    && error.details === "2C_ALREADY_MATERIALIZED"
+  ) {
+    return confirmationFailure("already_materialized", localized.materialized, false);
+  }
+  if (error.code === "22023") {
+    return confirmationFailure("invalid_payload", localized.validation, false);
+  }
+  if (
+    error.code === "55000"
+    && error.message === "Interpretation is record-only"
+  ) {
+    return confirmationFailure("record_only", localized.recordOnly, false);
+  }
+  if (
+    error.code === "P0002"
+    && error.message === "Entry or interpretation not found"
+  ) {
+    return confirmationFailure("not_found", localized.notFound, false);
+  }
+  if (error.code === "42501" && error.message === "Authentication required") {
+    return confirmationFailure("unauthenticated", localized.unauthenticated, false);
+  }
+
+  return confirmationFailure("operation_failed", localized.failed, true);
+}
+
+function confirmationFailure(
+  code: Exclude<ConfirmTasksCode, "confirmed">,
+  message: string,
+  retryable: boolean,
+): ConfirmTasksState {
+  return {
+    status: "error",
+    code,
+    message,
+    undoId: null,
+    retryable,
+  };
 }

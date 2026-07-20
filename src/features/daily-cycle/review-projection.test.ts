@@ -51,6 +51,7 @@ function baseInput(overrides: Partial<EntryReviewProjectionInput> = {}): EntryRe
     correctionUndoId: null,
     unavailableCandidateIndexes: [],
     locale: "pt-BR",
+    timezone: "America/Sao_Paulo",
     lifecycle: {
       entryLifecycle: "completed",
       hasValidTaskCandidates: false,
@@ -75,6 +76,7 @@ describe("toEntryReviewProjection", () => {
       hasTechnicalDetails: true,
     });
     expect(serialized).not.toMatch(/score|polic|evidence|signal/i);
+    expect(projection.timezone).toBe("America/Sao_Paulo");
   });
 
   it("derives productState/attentionReason from the shared lifecycle mapper, not from a raw internal status", () => {
@@ -226,6 +228,42 @@ describe("loadEntryReviewProjection", () => {
     const result = await loadEntryReviewProjection(client as never, { entryId: "missing", locale: "pt-BR" });
 
     expect(result).toBeNull();
+  });
+
+  it("loads the authenticated profile timezone through the review projection boundary", async () => {
+    vi.mocked(loadInterpretationReview).mockResolvedValueOnce({
+      entry: {
+        status: "completed",
+        original_content: "Texto original",
+        occurred_at: "2026-07-18T09:00:00.000Z",
+        processing_error: null,
+      } as never,
+      current: null,
+      revisions: [],
+      extraction: null,
+      entityOptions: [],
+      tasks: [],
+      taskUndoId: null,
+      correctionUndoId: null,
+      unavailableCandidateIndexes: [],
+    });
+    const jobsStub = queryStub({ data: null, error: null });
+    const questionsStub = queryStub({ data: [], error: null });
+    const profileStub = queryStub({ data: { timezone: "America/New_York" }, error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "jobs") return jobsStub;
+      if (table === "pending_questions") return questionsStub;
+      return profileStub;
+    });
+
+    const result = await loadEntryReviewProjection(
+      { from } as never,
+      { entryId: "entry-1", locale: "en", userId: "user-1" },
+    );
+
+    expect(from).toHaveBeenCalledWith("profiles");
+    expect(profileStub.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(result?.timezone).toBe("America/New_York");
   });
 
   it("keeps productState at needs_attention when one of two current-interpretation candidates is still unconfirmed (F1 regression)", async () => {

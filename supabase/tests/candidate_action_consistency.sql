@@ -10,11 +10,11 @@ select has_function('public', 'confirm_entry_tasks', array['uuid', 'integer[]'])
 
 select results_eq(
   $$ select prosecdef from pg_proc where oid = 'public.confirm_entry_task_candidates(uuid,uuid,integer[],text)'::regprocedure $$,
-  array[false],
-  'candidate confirmation runs as invoker and relies on RLS-scoped queries'
+  array[true],
+  'candidate confirmation uses the established SECURITY DEFINER boundary with explicit owner checks'
 );
 select results_eq(
-  $$ select pg_get_functiondef('public.confirm_entry_task_candidates(uuid,uuid,integer[],text)'::regprocedure) like '%set search_path = ''''%' $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.confirm_entry_task_candidates(uuid,uuid,integer[],text)'::regprocedure $$,
   array[true],
   'candidate confirmation has an explicit safe search path'
 );
