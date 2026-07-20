@@ -23,4 +23,13 @@ describe("entry detail page architecture guardrail", () => {
     expect(source).not.toMatch(/loadInterpretationReview/);
     expect(source).not.toMatch(/entry\.status/);
   });
+
+  it("mounts the production task form with actionable candidates and projected profile timezone", () => {
+    const filePath = path.resolve(process.cwd(), "src/app/[locale]/app/inbox/[entryId]/page.tsx");
+    const source = readFileSync(filePath, "utf8");
+
+    expect(source).toMatch(/candidates=\{view\.actionableCandidates\}/);
+    expect(source).toMatch(/timezone=\{timezone\}/);
+    expect(source).not.toMatch(/candidates=\{[^}]*taskCandidates/);
+  });
 });

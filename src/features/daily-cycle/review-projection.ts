@@ -45,6 +45,7 @@ export type EntryReviewHistoryItem = {
 
 export type EntryReviewProjection = {
   view: InterpretationReviewView;
+  timezone: string;
   errorMessage: string | null;
   editableCurrent: EntryReviewEditableCurrent | null;
   entityOptions: EntityOption[];
@@ -70,6 +71,7 @@ export type EntryReviewProjectionInput = {
   unavailableCandidateIndexes: readonly number[];
   lifecycle: DailyCycleLifecycleInput;
   locale: DailyCycleLocale;
+  timezone: string;
 };
 
 const understandingFallback: Record<DailyCycleLocale, string> = {
@@ -230,6 +232,7 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
 
   return {
     view,
+    timezone: input.timezone,
     errorMessage: input.errorMessage,
     editableCurrent,
     entityOptions: input.entityOptions,
@@ -242,12 +245,20 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
 
 export async function loadEntryReviewProjection(
   supabase: SupabaseClient,
-  { entryId, locale }: { entryId: string; locale: DailyCycleLocale },
+  {
+    entryId,
+    locale,
+    userId,
+  }: {
+    entryId: string;
+    locale: DailyCycleLocale;
+    userId?: string;
+  },
 ): Promise<EntryReviewProjection | null> {
   const data = await loadInterpretationReview(supabase, entryId);
   if (!data) return null;
 
-  const [jobResult, questionsResult] = await Promise.all([
+  const [jobResult, questionsResult, profileResult] = await Promise.all([
     supabase
       .from("jobs")
       .select("status,next_attempt_at")
@@ -262,9 +273,20 @@ export async function loadEntryReviewProjection(
       .eq("entry_id", entryId)
       .eq("status", "open")
       .limit(1),
+    userId
+      ? supabase
+        .from("profiles")
+        .select("timezone")
+        .eq("user_id", userId)
+        .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
   const job = requireSupabaseData(jobResult, "load entry interpretation job") as { status: string; next_attempt_at: string | null } | null;
   const openQuestions = requireSupabaseData(questionsResult, "load entry open questions") ?? [];
+  const profile = requireSupabaseData(
+    profileResult,
+    "load entry review profile timezone",
+  ) as { timezone?: unknown } | null;
   const taskCandidateCount = data.extraction?.taskCandidates.length ?? 0;
 
   return toEntryReviewProjection({
@@ -282,6 +304,7 @@ export async function loadEntryReviewProjection(
     correctionUndoId: data.correctionUndoId,
     unavailableCandidateIndexes: data.unavailableCandidateIndexes,
     locale,
+    timezone: resolveProfileTimezone(profile?.timezone),
     lifecycle: {
       entryLifecycle: data.entry.status,
       job: job ? { status: job.status, retryAt: job.next_attempt_at } : undefined,
@@ -293,4 +316,17 @@ export async function loadEntryReviewProjection(
       now: new Date().toISOString(),
     },
   });
+}
+
+function resolveProfileTimezone(value: unknown): string {
+  if (typeof value === "string") {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: value }).format(0);
+      return value;
+    } catch {
+      // Fall through to the same default used by profile settings.
+    }
+  }
+
+  return "America/Sao_Paulo";
 }

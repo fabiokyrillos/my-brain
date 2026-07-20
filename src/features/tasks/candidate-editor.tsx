@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import {
   candidateEditArraySchema,
@@ -99,6 +99,7 @@ export type CandidateEditorProps = {
   candidate: ActionableCandidateView;
   locale: "pt-BR" | "en";
   onEditChange: (edit: CandidateEditCommand | null) => void;
+  onValidityChange?: (valid: boolean) => void;
   selected: boolean;
   timezone: string;
 };
@@ -107,6 +108,7 @@ export function CandidateEditor({
   candidate,
   locale,
   onEditChange,
+  onValidityChange,
   selected,
   timezone,
 }: CandidateEditorProps) {
@@ -134,6 +136,7 @@ export function CandidateEditor({
     timezone,
   });
   const lastEmissionRef = useRef<string | undefined>(undefined);
+  const lastValidityRef = useRef<boolean | undefined>(undefined);
   const id = useId();
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
@@ -142,6 +145,15 @@ export function CandidateEditor({
   const descriptionErrorId = `${id}-description-error`;
   const dueDateErrorId = `${id}-due-date-error`;
   const editorPanelId = `${id}-editor`;
+
+  const publishValidity = useCallback((valid: boolean) => {
+    if (lastValidityRef.current === valid) {
+      return;
+    }
+
+    lastValidityRef.current = valid;
+    onValidityChange?.(valid);
+  }, [onValidityChange]);
 
   useEffect(() => {
     const previous = synchronizationRef.current;
@@ -160,6 +172,7 @@ export function CandidateEditor({
         lastEmissionRef.current = emptyEmission;
         onEditChange(null);
       }
+      publishValidity(true);
     } else if (previous.timezone !== timezone) {
       setDueDate((currentDueDate) => {
         const previousOriginalDueDate = formatInstantForDateTimeLocal(
@@ -189,6 +202,7 @@ export function CandidateEditor({
     candidate.description,
     candidate.title,
     onEditChange,
+    publishValidity,
     originalDueAt,
     originalDueDate,
     suggestionSignature,
@@ -223,6 +237,7 @@ export function CandidateEditor({
     }
 
     try {
+      publishValidity(true);
       publishEdit(buildEdit({
         candidateIndex,
         originalDueDate,
@@ -236,6 +251,7 @@ export function CandidateEditor({
         values: nextValues,
       }));
     } catch {
+      publishValidity(false);
       publishEdit(null);
     }
   }
@@ -280,6 +296,7 @@ export function CandidateEditor({
     setDescriptionTouched(false);
     setDueDateTouched(false);
     setAnnouncement(localized.resetAnnouncement);
+    publishValidity(true);
     if (selected) {
       publishEdit(null);
     }

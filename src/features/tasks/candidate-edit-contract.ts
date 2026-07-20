@@ -25,7 +25,7 @@ const candidateEditCommandSchema = z.strictObject({
   changes: candidateChangesSchema,
 });
 
-const selectedCandidateIndexesSchema = z
+export const selectedCandidateIndexesSchema = z
   .array(candidateIndexSchema)
   .min(1)
   .max(MAX_CANDIDATE_COUNT)
