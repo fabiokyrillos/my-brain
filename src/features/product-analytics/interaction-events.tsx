@@ -33,6 +33,30 @@ function viewportClass(): "mobile" | "desktop" | "unknown" {
   return window.matchMedia?.("(max-width: 767px)").matches ? "mobile" : "desktop";
 }
 
+function sendInteraction<Name extends ProductEventName>(input: {
+  name: Name;
+  surface: ProductSurface;
+  locale: ProductEventLocale;
+  properties: ProductEventPropertiesByName[Name];
+  subject?: ProductEventSubject;
+}) {
+  const idempotencyKey = randomUuid();
+  const sessionId = getSessionId();
+  startTransition(() => {
+    void recordProductInteraction({
+      name: input.name,
+      surface: input.surface,
+      locale: input.locale,
+      viewportClass: viewportClass(),
+      appVersion: "client",
+      idempotencyKey,
+      sessionId,
+      properties: input.properties,
+      ...(input.subject ? { subject: input.subject } : {}),
+    }).catch(() => {});
+  });
+}
+
 function recordOnce<Name extends ProductEventName>(input: {
   logicalKey: string;
   name: Name;
@@ -44,22 +68,22 @@ function recordOnce<Name extends ProductEventName>(input: {
   try {
     const key = `${dedupePrefix}${input.logicalKey}`;
     if (sessionStorage.getItem(key)) return;
-    const idempotencyKey = randomUuid();
-    sessionStorage.setItem(key, idempotencyKey);
-    const sessionId = getSessionId();
-    startTransition(() => {
-      void recordProductInteraction({
-        name: input.name,
-        surface: input.surface,
-        locale: input.locale,
-        viewportClass: viewportClass(),
-        appVersion: "client",
-        idempotencyKey,
-        sessionId,
-        properties: input.properties,
-        ...(input.subject ? { subject: input.subject } : {}),
-      }).catch(() => {});
-    });
+    sessionStorage.setItem(key, "1");
+    sendInteraction(input);
+  } catch {
+    // Analytics must remain fail-open when browser storage or transport is unavailable.
+  }
+}
+
+function recordRepeatable<Name extends ProductEventName>(input: {
+  name: Name;
+  surface: ProductSurface;
+  locale: ProductEventLocale;
+  properties: ProductEventPropertiesByName[Name];
+  subject?: ProductEventSubject;
+}) {
+  try {
+    sendInteraction(input);
   } catch {
     // Analytics must remain fail-open when browser storage or transport is unavailable.
   }
@@ -199,5 +223,34 @@ export function recordNeedsAttentionItemOpened(input: {
     locale: input.locale,
     subject: { type: "entry", id: input.entryId },
     properties: { attentionReason: input.attentionReason },
+  });
+}
+
+export function recordCandidateEditStarted(input: {
+  entryId: string;
+  candidateIndex: number;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    logicalKey: `candidate-edit-started:${input.entryId}:${input.candidateIndex}`,
+    name: "candidate_edit_started",
+    surface: "interpretation_review",
+    locale: input.locale,
+    subject: { type: "entry", id: input.entryId },
+    properties: { candidateCount: 1 },
+  });
+}
+
+export function recordCandidateEditReset(input: {
+  entryId: string;
+  editedFieldCount: number;
+  locale: ProductEventLocale;
+}) {
+  recordRepeatable({
+    name: "candidate_edit_reset",
+    surface: "interpretation_review",
+    locale: input.locale,
+    subject: { type: "entry", id: input.entryId },
+    properties: { editedFieldCount: input.editedFieldCount },
   });
 }

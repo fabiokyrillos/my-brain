@@ -2,6 +2,59 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-21 — Fix a pre-existing product-events validation gap found by running pgTAP online (branch, not merged)
+
+### Fixed
+
+- Migration `202607210035` (additive, forward-fix): `private.require_product_event_integer` and `private.require_product_event_enum` (both from migration `202607170024`, untouched since Phase 2X) silently accepted a payload that omitted its required property entirely. Root cause: `jsonb -> missing_key` returns SQL `NULL`; `jsonb_typeof(NULL)` is SQL `NULL`; `NULL <> 'number'`/`NULL <> 'string'` is SQL `NULL`; and PL/pgSQL treats a `NULL` `IF` condition as false, so neither function's guard clause ever raised for a missing key, and the integer helper's follow-up regex/bounds check inherited the same `NULL` and also never raised. Found by actually executing `supabase/tests/editable_candidate_analytics_events.sql` against the linked project (see below) rather than only reasoning through the SQL — the very first "missing required property" assertion failed against real, live validation. Both functions now check `p_properties ? p_key` first and raise `22023` immediately if the key is absent. Additive, same signatures, no behavior change for any payload that already includes its required key(s) with a valid value — every event that uses either helper (all `capture_*` events, `needs_attention_viewed`/`_item_opened`, `interpretation_corrected`, `task_candidates_presented`/`_confirmed`, `processing_retry_requested`, `work_view_viewed`, `task_status_changed`, and the two events added in migration `202607210034`) is affected identically. This gap was masked in practice by the TypeScript client's exact-key contract check before any request left the browser/server, but the database — the actual trust boundary in this codebase — did not independently enforce key presence until now.
+
+### Verification
+
+- Direct before/after proof: `select private.require_product_event_integer('{}'::jsonb, 'candidateCount', 1, 1);` and the equivalent `require_product_event_enum` call returned silently (no exception) before the fix, and raised `22023` after.
+- `npx supabase db query --linked -f supabase/tests/editable_candidate_analytics_events.sql`: reported "failed 1 test of 29" before the fix; after applying `202607210035`, the same run showed no failure diagnostic (pgTAP's `finish()` only emits failure commentary; a clean pass surfaces none, consistent with the tool's single-result-set output showing the last assertion's own `ok` line instead) — all 29 assertions pass.
+- `npx supabase migration list --linked`: parity through `202607210035`. `npx supabase db lint --linked --level error`: clean.
+- `npm run test:remote:product-events`: re-passed after the fix (19 taxonomy events, 22 owner-visible rows, fixtures torn down).
+- Generated types diffed byte-identical after this migration too — no regeneration needed.
+- 594/594 application tests (unchanged), 0 lint/typecheck errors, production build unaffected by a database-only change.
+
+## 2026-07-21 — Issue #3: enable editable-candidate analytics persistence (branch, not merged)
+
+### Added
+
+- Migration `202607210034` (additive): extends `product_events.event_name`'s CHECK constraint with `candidate_edit_started`/`candidate_edit_reset` (all 17 prior names preserved); extends `private.validate_product_event_properties` with their allowlisted-property validation (`candidate_edit_started.candidateCount` fixed at exactly 1; `candidate_edit_reset.editedFieldCount` bounded 1–3, the number of editable candidate fields) and with `task_candidates_confirmed`'s now-optional `editedCandidateCount`/`editedFieldCount`; adds `private.require_task_candidates_confirmed_edit_counts`, a new cross-field bound helper enforcing `0 ≤ editedCandidateCount ≤ candidateCount` and `0 ≤ editedFieldCount ≤ editedCandidateCount × 3` (both new properties optional together — legacy `{candidateCount}`-only payloads still persist; supplying exactly one of the pair is rejected); extends `private.record_product_event`'s own event-name guard with the two new names. `SECURITY DEFINER`, `set search_path = ''`, and existing grants/revokes preserved on every replaced function; no RPC signature, table shape, or generated-type change.
+- `supabase/tests/editable_candidate_analytics_events.sql`: a focused, additive pgTAP file (29 assertions) covering both new events' valid/invalid payloads, the extended `task_candidates_confirmed` cross-field bounds (legacy-only, zero-edit, edited, and every invalid combination), unknown-property/unknown-event/cross-owner-subject rejection, RLS, and security-definer/search-path preservation. `supabase test db --linked` requires Docker locally even against a remote target (it runs `pg_prove` via a container image), unavailable on this workstation; executed instead via `npx supabase db query --linked -f supabase/tests/editable_candidate_analytics_events.sql` after temporarily installing `pgtap` into the `extensions` schema (not committed as a migration — removed again after verification, see the entry above this one for the finding it surfaced and its fix).
+- `scripts/remote-product-events-smoke.mjs`: extended the canonical 17-event matrix to 19, added a legacy-payload-only `task_candidates_confirmed` persistence check and two invalid-payload rejection checks for the new events, and added direct row-level assertions that `candidate_edit_started`, `candidate_edit_reset`, and `task_candidates_confirmed`'s new counts are actually present in `product_events` (not merely that the RPC call didn't error).
+
+### Verification
+
+- `npx supabase migration list --linked`: local/remote parity through `202607210034`. `npx supabase db lint --linked --level error`: clean.
+- `npx supabase gen types typescript --linked` diffed byte-identical (after normalizing line endings) against the committed `database.types.ts` — no regeneration needed, confirming no RPC signature or column-type change.
+- `npm run test:remote:product-events`: passed against the linked development project (19 taxonomy events, 22 owner-visible rows, disposable fixtures created and torn down) — proves real persisted rows for all three analytics changes plus a rejected invalid payload.
+- 594/594 unit/component tests (unchanged), 0 ESLint errors, 0 `tsc --noEmit` errors, production build green.
+- No RPC, task-confirmation, undo, or idempotency-flow change; `confirm_entry_task_candidates`/`confirm_entry_task_candidates_v2` untouched.
+
+## 2026-07-21 — Issue #3: editable-candidate analytics fast-follow (branch, not merged)
+
+### Added
+
+- `src/features/product-analytics/contracts.ts`: two new allowlisted events, `candidate_edit_started` (`{ candidateCount: 1 }`) and `candidate_edit_reset` (`{ editedFieldCount: number }`, bounded 0–300); `task_candidates_confirmed` extended with bounded `editedCandidateCount`/`editedFieldCount` alongside the existing `candidateCount`.
+- `src/features/product-analytics/interaction-events.tsx`: `recordCandidateEditStarted` (deduplicated once per entry/candidate per tab session, matching the existing `recordOnce` session-storage pattern) and `recordCandidateEditReset` (a new non-deduplicating `recordRepeatable` path, since a user may meaningfully repeat a reset).
+
+### Changed
+
+- `src/features/tasks/candidate-editor.tsx`: takes a new required `entryId` prop; calls `recordCandidateEditStarted` from every real field mutation (title/description/due-date change or explicit clear) — never from expand/collapse, a prop-driven rerender, or a React Strict Mode double-mount, since it is only ever invoked from `emitEdit`, which itself is only reachable from user input handlers; calls `recordCandidateEditReset` only from the explicit "Restaurar sugestão"/"Reset to suggestion" action, with `editedFieldCount` taken from the current canonical normalized edit (`normalizeCandidateEdits` output), never from raw touched-field UI state.
+- `src/features/tasks/task-candidate-form.tsx`: passes the new `entryId` prop through to `CandidateEditor`.
+- `src/features/tasks/actions.ts` (`confirmEntryTasks`): derives `editedCandidateCount`/`editedFieldCount` server-side from the same validated canonical `candidateEdits` array already sent to `confirm_entry_task_candidates_v2` (a candidate counts as edited only if its canonical `changes` object is non-empty), and includes both in the `task_candidates_confirmed` event; idempotent replay (`confirmation.idempotent`) still skips the event entirely, so replay never double-fires it.
+
+### Known gap at this commit (resolved same day — see the entry above)
+
+- At this commit, `public.product_events`'s `event_name` CHECK constraint, `private.record_product_event`'s allowlist, and `private.validate_product_event_properties`'s `task_candidates_confirmed` case (all in migration `202607170024`) did not yet recognize `candidate_edit_started`, `candidate_edit_reset`, or the two new `task_candidates_confirmed` properties, so all three analytics calls were rejected by the database's own allowlist and dropped fail-open. Closed by migration `202607210034`, documented in the changelog entry above.
+
+### Verification
+
+- 594/594 unit/component tests (up from 579), 0 ESLint errors, 0 `tsc --noEmit` errors, production build green.
+- No RPC, migration, or database change; no consumer of `confirm_entry_task_candidates`/`confirm_entry_task_candidates_v2` was touched.
+
 ## 2026-07-19 — Phase 2C Slice 2C.1: editable candidate confirmation (branch, not merged)
 
 ### Added

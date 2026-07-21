@@ -19,6 +19,8 @@ type InteractionEventsModule = {
   TrackedTechnicalDetails?: (props: { entryId: string; locale: "pt-BR" | "en"; className?: string; children: ReactNode }) => ReactNode;
   recordCaptureStarted?: (input: { attemptId: string; captureSource: "home" | "capture_page"; locale: "pt-BR" | "en" }) => void;
   recordNeedsAttentionItemOpened?: (input: { entryId: string; attentionReason: "review_interpretation"; surface: "home" | "needs_attention"; locale: "pt-BR" | "en" }) => void;
+  recordCandidateEditStarted?: (input: { entryId: string; candidateIndex: number; locale: "pt-BR" | "en" }) => void;
+  recordCandidateEditReset?: (input: { entryId: string; editedFieldCount: number; locale: "pt-BR" | "en" }) => void;
 };
 
 const eventsPath = `./${"interaction-events"}.tsx`;
@@ -107,6 +109,43 @@ describe("closed client product interactions", () => {
       properties: { attentionReason: "review_interpretation" },
     });
     expect(JSON.stringify(payload)).not.toMatch(/original|summary|title|answer|prompt|error/i);
+  });
+
+  it("records candidate edit start once per entry/candidate per session, without candidate index in properties", async () => {
+    expect(events.recordCandidateEditStarted).toBeTypeOf("function");
+    const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
+
+    events.recordCandidateEditStarted?.({ entryId, candidateIndex: 0, locale: "pt-BR" });
+    events.recordCandidateEditStarted?.({ entryId, candidateIndex: 0, locale: "pt-BR" });
+    await waitFor(() => expect(recordProductInteractionMock).toHaveBeenCalledTimes(1));
+
+    expect(recordProductInteractionMock).toHaveBeenCalledWith(expect.objectContaining({
+      name: "candidate_edit_started",
+      subject: { type: "entry", id: entryId },
+      properties: { candidateCount: 1 },
+    }));
+
+    events.recordCandidateEditStarted?.({ entryId, candidateIndex: 1, locale: "pt-BR" });
+    await waitFor(() => expect(recordProductInteractionMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("records every explicit candidate edit reset without deduplicating meaningful repeats", async () => {
+    expect(events.recordCandidateEditReset).toBeTypeOf("function");
+    const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
+
+    events.recordCandidateEditReset?.({ entryId, editedFieldCount: 2, locale: "pt-BR" });
+    events.recordCandidateEditReset?.({ entryId, editedFieldCount: 1, locale: "pt-BR" });
+    await waitFor(() => expect(recordProductInteractionMock).toHaveBeenCalledTimes(2));
+
+    expect(recordProductInteractionMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      name: "candidate_edit_reset",
+      subject: { type: "entry", id: entryId },
+      properties: { editedFieldCount: 2 },
+    }));
+    expect(recordProductInteractionMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      name: "candidate_edit_reset",
+      properties: { editedFieldCount: 1 },
+    }));
   });
 
   it("records only the outer technical disclosure when the user opens it", async () => {

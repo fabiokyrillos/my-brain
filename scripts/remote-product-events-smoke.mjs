@@ -30,6 +30,8 @@ const expectedEventNames = [
   "interpretation_corrected",
   "technical_details_opened",
   "task_candidates_presented",
+  "candidate_edit_started",
+  "candidate_edit_reset",
   "task_candidates_confirmed",
   "question_answered_basic",
   "processing_retry_requested",
@@ -90,7 +92,9 @@ function eventMatrix({ entryId, taskId, questionId }) {
     { name: "interpretation_corrected", surface: "interpretation_review", properties: { fieldCount: 2 }, ...entrySubject },
     { name: "technical_details_opened", surface: "technical_details", properties: {}, ...entrySubject },
     { name: "task_candidates_presented", surface: "interpretation_review", properties: { candidateCount: 2 }, ...entrySubject },
-    { name: "task_candidates_confirmed", surface: "interpretation_review", properties: { candidateCount: 1 }, ...entrySubject },
+    { name: "candidate_edit_started", surface: "interpretation_review", properties: { candidateCount: 1 }, ...entrySubject },
+    { name: "candidate_edit_reset", surface: "interpretation_review", properties: { editedFieldCount: 2 }, ...entrySubject },
+    { name: "task_candidates_confirmed", surface: "interpretation_review", properties: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 2 }, ...entrySubject },
     { name: "question_answered_basic", surface: "server", properties: {}, p_subject_type: "pending_question", p_subject_id: questionId },
     { name: "processing_retry_requested", surface: "interpretation_review", properties: { retrySource: "user" }, ...entrySubject },
     { name: "work_view_viewed", surface: "work", properties: { workView: "today" } },
@@ -195,6 +199,32 @@ try {
   );
   assert(distinctCapture[0]?.recorded === true && distinctCapture[0]?.event_id !== firstCapture.eventId, "Distinct interaction was incorrectly deduplicated");
 
+  const legacyConfirmedEvent = dataOrThrow(
+    await first.rpc("record_product_event", baseEvent({
+      p_event_name: "task_candidates_confirmed",
+      p_surface: "interpretation_review",
+      p_properties: { candidateCount: 1 },
+      p_session_id: sessionId,
+      p_idempotency_key: crypto.randomUUID(),
+    })),
+    "record a legacy task_candidates_confirmed payload without edit counts",
+  );
+  assert(legacyConfirmedEvent[0]?.recorded === true, "Legacy task_candidates_confirmed payload (candidateCount only) was not persisted");
+
+  const invalidEditStarted = await first.rpc("record_product_event", baseEvent({
+    p_event_name: "candidate_edit_started",
+    p_surface: "interpretation_review",
+    p_properties: { candidateCount: 2 },
+  }));
+  assert(invalidEditStarted.error?.code === "22023", "candidate_edit_started with an out-of-bound candidateCount was not denied");
+
+  const invalidEditedCounts = await first.rpc("record_product_event", baseEvent({
+    p_event_name: "task_candidates_confirmed",
+    p_surface: "interpretation_review",
+    p_properties: { candidateCount: 1, editedCandidateCount: 2, editedFieldCount: 1 },
+  }));
+  assert(invalidEditedCounts.error?.code === "22023", "task_candidates_confirmed with editedCandidateCount above candidateCount was not denied");
+
   const invalidEvent = await first.rpc("record_product_event", baseEvent({ p_event_name: "unknown_event" }));
   assert(invalidEvent.error?.code === "22023", "Unknown product event was not denied");
 
@@ -244,8 +274,24 @@ try {
     "read owner-isolated product events",
   );
   assert(
-    firstVisibleEvents.length === expectedEventNames.length + 1 && firstVisibleEvents.every((event) => event.user_id === firstUser.id),
+    firstVisibleEvents.length === expectedEventNames.length + 2 && firstVisibleEvents.every((event) => event.user_id === firstUser.id),
     "Product-events RLS leaked another user row or duplicated rows",
+  );
+  assert(
+    firstVisibleEvents.some((event) => (
+      event.event_name === "task_candidates_confirmed"
+        && event.properties?.editedCandidateCount === 1
+        && event.properties?.editedFieldCount === 2
+    )),
+    "task_candidates_confirmed's editedCandidateCount/editedFieldCount were not persisted",
+  );
+  assert(
+    firstVisibleEvents.some((event) => event.event_name === "candidate_edit_started" && event.properties?.candidateCount === 1),
+    "candidate_edit_started was not persisted",
+  );
+  assert(
+    firstVisibleEvents.some((event) => event.event_name === "candidate_edit_reset" && event.properties?.editedFieldCount === 2),
+    "candidate_edit_reset was not persisted",
   );
   assert(expectedEventNames.every((name) => firstVisibleEvents.some((event) => event.event_name === name)), "One or more canonical events were absent from the owner query");
 

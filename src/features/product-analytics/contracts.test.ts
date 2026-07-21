@@ -27,6 +27,8 @@ const eventNames = [
   "interpretation_corrected",
   "technical_details_opened",
   "task_candidates_presented",
+  "candidate_edit_started",
+  "candidate_edit_reset",
   "task_candidates_confirmed",
   "question_answered_basic",
   "processing_retry_requested",
@@ -55,7 +57,9 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
   interpretation_corrected: { fieldCount: 2 },
   technical_details_opened: {},
   task_candidates_presented: { candidateCount: 2 },
-  task_candidates_confirmed: { candidateCount: 2 },
+  candidate_edit_started: { candidateCount: 1 },
+  candidate_edit_reset: { editedFieldCount: 2 },
+  task_candidates_confirmed: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 2 },
   question_answered_basic: {},
   processing_retry_requested: { retrySource: "user" },
   work_view_viewed: { workView: "today" },
@@ -63,7 +67,7 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of seventeen product events", () => {
+  it("defines the complete closed taxonomy of nineteen product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -123,6 +127,33 @@ describe("product analytics contracts", () => {
     expect(contracts.isProductAnalyticsSerializable?.({ timestamp: new Date() })).toBe(false);
     expect(contracts.isProductAnalyticsSerializable?.({ callback: () => undefined })).toBe(false);
     expect(JSON.parse(JSON.stringify(contracts.parseProductEventPayload?.(payload)))).toMatchObject(payload);
+  });
+
+  it("bounds the editable-candidate analytics events to their allowlisted shape", () => {
+    const parse = contracts.parseProductEventPayload;
+    const valid = { ...basePayload, name: "candidate_edit_started", properties: { candidateCount: 1 } };
+
+    expect(parse?.(valid)).not.toBeNull();
+    expect(parse?.({ ...valid, properties: { candidateCount: 2 } })).toBeNull();
+    expect(parse?.({ ...valid, properties: { candidateCount: 1, candidateIndex: 0 } })).toBeNull();
+
+    const resetValid = { ...basePayload, name: "candidate_edit_reset", properties: { editedFieldCount: 0 } };
+    expect(parse?.(resetValid)).not.toBeNull();
+    expect(parse?.({ ...resetValid, properties: { editedFieldCount: -1 } })).toBeNull();
+    expect(parse?.({ ...resetValid, properties: { editedFieldCount: 301 } })).toBeNull();
+    expect(parse?.({ ...resetValid, properties: { editedFieldCount: 1, title: "leaked" } })).toBeNull();
+
+    const confirmedValid = {
+      ...basePayload,
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 3 },
+    };
+    expect(parse?.(confirmedValid)).not.toBeNull();
+    expect(parse?.({ ...confirmedValid, properties: { candidateCount: 2 } })).toBeNull();
+    expect(parse?.({
+      ...confirmedValid,
+      properties: { candidateCount: 2, editedCandidateCount: 3, editedFieldCount: 3 },
+    })).not.toBeNull();
   });
 
   it("keeps contracts independent from React, Supabase, database types, and UI modules", () => {

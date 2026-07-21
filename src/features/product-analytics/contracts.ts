@@ -11,6 +11,8 @@ export const productEventNames = [
   "interpretation_corrected",
   "technical_details_opened",
   "task_candidates_presented",
+  "candidate_edit_started",
+  "candidate_edit_reset",
   "task_candidates_confirmed",
   "question_answered_basic",
   "processing_retry_requested",
@@ -94,7 +96,13 @@ export type ProductEventPropertiesByName = {
   interpretation_corrected: { fieldCount: number };
   technical_details_opened: EmptyProductEventProperties;
   task_candidates_presented: { candidateCount: number };
-  task_candidates_confirmed: { candidateCount: number };
+  candidate_edit_started: { candidateCount: 1 };
+  candidate_edit_reset: { editedFieldCount: number };
+  task_candidates_confirmed: {
+    candidateCount: number;
+    editedCandidateCount: number;
+    editedFieldCount: number;
+  };
   question_answered_basic: EmptyProductEventProperties;
   processing_retry_requested: { retrySource: "user" | "worker" };
   work_view_viewed: { workView: "today" | "all" | "waiting" };
@@ -234,8 +242,15 @@ function arePropertiesValid<Name extends ProductEventName>(
       return hasExactKeys(value, ["fieldCount"]) && isBoundedInteger(value.fieldCount, 1, 30);
     case "task_candidates_presented":
       return hasExactKeys(value, ["candidateCount"]) && isBoundedInteger(value.candidateCount, 0, 100);
+    case "candidate_edit_started":
+      return hasExactKeys(value, ["candidateCount"]) && value.candidateCount === 1;
+    case "candidate_edit_reset":
+      return hasExactKeys(value, ["editedFieldCount"]) && isBoundedInteger(value.editedFieldCount, 0, 300);
     case "task_candidates_confirmed":
-      return hasExactKeys(value, ["candidateCount"]) && isBoundedInteger(value.candidateCount, 1, 100);
+      return hasExactKeys(value, ["candidateCount", "editedCandidateCount", "editedFieldCount"])
+        && isBoundedInteger(value.candidateCount, 1, 100)
+        && isBoundedInteger(value.editedCandidateCount, 0, 100)
+        && isBoundedInteger(value.editedFieldCount, 0, 300);
     case "processing_retry_requested":
       return hasExactKeys(value, ["retrySource"]) && isOneOf(value.retrySource, ["user", "worker"]);
     case "work_view_viewed":

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import {
+  recordCandidateEditReset,
+  recordCandidateEditStarted,
+} from "@/features/product-analytics/interaction-events";
+import {
   candidateEditArraySchema,
   normalizeCandidateEdits,
   serializeCandidateEdits,
@@ -97,6 +101,7 @@ const copy = {
 
 export type CandidateEditorProps = {
   candidate: ActionableCandidateView;
+  entryId: string;
   locale: "pt-BR" | "en";
   onEditChange: (edit: CandidateEditCommand | null) => void;
   onValidityChange?: (valid: boolean) => void;
@@ -106,6 +111,7 @@ export type CandidateEditorProps = {
 
 export function CandidateEditor({
   candidate,
+  entryId,
   locale,
   onEditChange,
   onValidityChange,
@@ -236,6 +242,8 @@ export function CandidateEditor({
       return;
     }
 
+    recordCandidateEditStarted({ candidateIndex, entryId, locale });
+
     try {
       publishValidity(true);
       publishEdit(buildEdit({
@@ -289,6 +297,7 @@ export function CandidateEditor({
   }
 
   function resetSuggestion() {
+    const editedFieldCount = canonicalEdit ? Object.keys(canonicalEdit.changes).length : 0;
     setTitle(candidate.title);
     setDescription(candidate.description ?? "");
     setDueDate(originalDueDate);
@@ -300,6 +309,7 @@ export function CandidateEditor({
     if (selected) {
       publishEdit(null);
     }
+    recordCandidateEditReset({ editedFieldCount, entryId, locale });
   }
 
   function clearDescription() {
