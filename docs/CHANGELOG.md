@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-21 — Issue #3: editable-candidate analytics fast-follow (branch, not merged)
+
+### Added
+
+- `src/features/product-analytics/contracts.ts`: two new allowlisted events, `candidate_edit_started` (`{ candidateCount: 1 }`) and `candidate_edit_reset` (`{ editedFieldCount: number }`, bounded 0–300); `task_candidates_confirmed` extended with bounded `editedCandidateCount`/`editedFieldCount` alongside the existing `candidateCount`.
+- `src/features/product-analytics/interaction-events.tsx`: `recordCandidateEditStarted` (deduplicated once per entry/candidate per tab session, matching the existing `recordOnce` session-storage pattern) and `recordCandidateEditReset` (a new non-deduplicating `recordRepeatable` path, since a user may meaningfully repeat a reset).
+
+### Changed
+
+- `src/features/tasks/candidate-editor.tsx`: takes a new required `entryId` prop; calls `recordCandidateEditStarted` from every real field mutation (title/description/due-date change or explicit clear) — never from expand/collapse, a prop-driven rerender, or a React Strict Mode double-mount, since it is only ever invoked from `emitEdit`, which itself is only reachable from user input handlers; calls `recordCandidateEditReset` only from the explicit "Restaurar sugestão"/"Reset to suggestion" action, with `editedFieldCount` taken from the current canonical normalized edit (`normalizeCandidateEdits` output), never from raw touched-field UI state.
+- `src/features/tasks/task-candidate-form.tsx`: passes the new `entryId` prop through to `CandidateEditor`.
+- `src/features/tasks/actions.ts` (`confirmEntryTasks`): derives `editedCandidateCount`/`editedFieldCount` server-side from the same validated canonical `candidateEdits` array already sent to `confirm_entry_task_candidates_v2` (a candidate counts as edited only if its canonical `changes` object is non-empty), and includes both in the `task_candidates_confirmed` event; idempotent replay (`confirmation.idempotent`) still skips the event entirely, so replay never double-fires it.
+
+### Known gap (explicit non-goal of Issue #3)
+
+- `public.product_events`'s `event_name` CHECK constraint, `private.record_product_event`'s allowlist, and `private.validate_product_event_properties`'s `task_candidates_confirmed` case (all in migration `202607170024`) do not yet recognize `candidate_edit_started`, `candidate_edit_reset`, or the two new `task_candidates_confirmed` properties. Issue #3 explicitly excluded database migrations from scope, so until a follow-up migration adds them, all three of these analytics calls are rejected by the database's own allowlist and dropped fail-open (`recordProductEvent` returns `invalid_payload`; no crash, no product-flow impact — matching the existing best-effort/fail-open contract). Tracked in `docs/TODO.md`.
+
+### Verification
+
+- 594/594 unit/component tests (up from 579), 0 ESLint errors, 0 `tsc --noEmit` errors, production build green.
+- No RPC, migration, or database change; no consumer of `confirm_entry_task_candidates`/`confirm_entry_task_candidates_v2` was touched.
+
 ## 2026-07-19 — Phase 2C Slice 2C.1: editable candidate confirmation (branch, not merged)
 
 ### Added

@@ -1,10 +1,20 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { StrictMode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import { CandidateEditor } from "./candidate-editor";
+
+const recordCandidateEditStarted = vi.hoisted(() => vi.fn());
+const recordCandidateEditReset = vi.hoisted(() => vi.fn());
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  recordCandidateEditStarted,
+  recordCandidateEditReset,
+}));
+
+const entryId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 
 const candidate: ActionableCandidateView = {
   key: "0",
@@ -17,6 +27,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof CandidateEd
   const onEditChange = vi.fn();
   const props: React.ComponentProps<typeof CandidateEditor> = {
     candidate,
+    entryId,
     locale: "pt-BR",
     onEditChange,
     selected: true,
@@ -28,6 +39,11 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof CandidateEd
 }
 
 describe("CandidateEditor", () => {
+  beforeEach(() => {
+    recordCandidateEditStarted.mockClear();
+    recordCandidateEditReset.mockClear();
+  });
+
   it("starts collapsed", () => {
     renderEditor();
 
@@ -404,6 +420,7 @@ describe("CandidateEditor", () => {
       <form onSubmit={onSubmit}>
         <CandidateEditor
           candidate={candidate}
+          entryId={entryId}
           locale="pt-BR"
           onEditChange={onEditChange}
           selected
@@ -565,5 +582,115 @@ describe("CandidateEditor", () => {
     const { container } = renderEditor({ candidate: candidateWithConfidence });
 
     expect(container.textContent).not.toMatch(/97%|0[,.]97/);
+  });
+
+  describe("editable-candidate analytics", () => {
+    it("does not record an edit-started event merely from mounting or expanding", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      expect(recordCandidateEditStarted).not.toHaveBeenCalled();
+    });
+
+    it("does not record an edit-started event from a prop-driven rerender", () => {
+      const { props, rerender } = renderEditor();
+
+      rerender(<CandidateEditor {...props} timezone="America/Sao_Paulo" />);
+      rerender(<CandidateEditor {...props} />);
+
+      expect(recordCandidateEditStarted).not.toHaveBeenCalled();
+    });
+
+    it("does not record an edit-started event from a React Strict Mode double mount", () => {
+      render(
+        <StrictMode>
+          <CandidateEditor
+            candidate={candidate}
+            entryId={entryId}
+            locale="pt-BR"
+            onEditChange={vi.fn()}
+            selected
+            timezone="America/Sao_Paulo"
+          />
+        </StrictMode>,
+      );
+
+      expect(recordCandidateEditStarted).not.toHaveBeenCalled();
+    });
+
+    it("records an edit-started event when the user actually changes a field", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.type(screen.getByRole("textbox", { name: "Título" }), " assinado");
+
+      expect(recordCandidateEditStarted).toHaveBeenCalledWith({
+        candidateIndex: 0,
+        entryId,
+        locale: "pt-BR",
+      });
+    });
+
+    it("records an edit-started event for an explicit clear action", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.click(screen.getByRole("button", { name: "Remover descrição: Enviar o relatório" }));
+
+      expect(recordCandidateEditStarted).toHaveBeenCalledWith({
+        candidateIndex: 0,
+        entryId,
+        locale: "pt-BR",
+      });
+    });
+
+    it("does not record a reset event for an explicit clear action", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.click(screen.getByRole("button", { name: "Remover descrição: Enviar o relatório" }));
+      await user.click(screen.getByRole("button", { name: "Remover prazo: Enviar o relatório" }));
+
+      expect(recordCandidateEditReset).not.toHaveBeenCalled();
+    });
+
+    it("records a reset event with the canonical edited-field count before restoring", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      fireEvent.change(screen.getByRole("textbox", { name: "Título" }), {
+        target: { value: "Enviar o relatório assinado" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "Descrição" }), {
+        target: { value: "Incluir a última revisão" },
+      });
+
+      await user.click(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" }));
+
+      expect(recordCandidateEditReset).toHaveBeenCalledWith({
+        editedFieldCount: 2,
+        entryId,
+        locale: "pt-BR",
+      });
+    });
+
+    it("records a reset event with zero edited fields when nothing changed", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.click(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" }));
+
+      expect(recordCandidateEditReset).toHaveBeenCalledWith({
+        editedFieldCount: 0,
+        entryId,
+        locale: "pt-BR",
+      });
+    });
   });
 });

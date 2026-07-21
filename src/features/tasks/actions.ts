@@ -10,6 +10,7 @@ import {
   candidateEditArraySchema,
   selectedCandidateIndexesSchema,
   serializeCandidateEdits,
+  type CandidateEditCommand,
 } from "./candidate-edit-contract";
 import type {
   ConfirmTasksCode,
@@ -143,7 +144,11 @@ export async function confirmEntryTasks(
         parsed.data.operationKey,
       ),
       subject: { type: "entry", id: parsed.data.entryId },
-      properties: { candidateCount: parsed.data.candidateIndexes.length },
+      properties: {
+        candidateCount: parsed.data.candidateIndexes.length,
+        editedCandidateCount: parsed.data.editedCandidateCount,
+        editedFieldCount: parsed.data.editedFieldCount,
+      },
     }).catch(() => {}));
   }
 
@@ -223,6 +228,8 @@ function parseConfirmationForm(formData: FormData) {
     return { success: false as const };
   }
 
+  const editCounts = computeCandidateEditCounts(candidateEdits.data);
+
   return {
     success: true as const,
     data: {
@@ -231,8 +238,27 @@ function parseConfirmationForm(formData: FormData) {
       operationKey: operationKey.data,
       candidateIndexes: candidateIndexes.data,
       candidateEdits: JSON.parse(serializeCandidateEdits(candidateEdits.data)) as Json,
+      editedCandidateCount: editCounts.editedCandidateCount,
+      editedFieldCount: editCounts.editedFieldCount,
     },
   };
+}
+
+function computeCandidateEditCounts(
+  edits: readonly CandidateEditCommand[],
+): { editedCandidateCount: number; editedFieldCount: number } {
+  let editedCandidateCount = 0;
+  let editedFieldCount = 0;
+
+  for (const edit of edits) {
+    const fieldCount = Object.keys(edit.changes).length;
+    if (fieldCount > 0) {
+      editedCandidateCount += 1;
+      editedFieldCount += fieldCount;
+    }
+  }
+
+  return { editedCandidateCount, editedFieldCount };
 }
 
 function parseCandidateIndexes(values: FormDataEntryValue[]) {

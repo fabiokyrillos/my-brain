@@ -9,8 +9,12 @@ import {
 } from "./task-candidate-form";
 
 const taskCandidatesPresented = vi.hoisted(() => vi.fn(() => null));
+const recordCandidateEditStarted = vi.hoisted(() => vi.fn());
+const recordCandidateEditReset = vi.hoisted(() => vi.fn());
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   TaskCandidatesPresented: taskCandidatesPresented,
+  recordCandidateEditStarted,
+  recordCandidateEditReset,
 }));
 
 const candidates: ActionableCandidateView[] = [

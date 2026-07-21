@@ -256,12 +256,52 @@ describe("confirmEntryTasks", () => {
     expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
       name: "task_candidates_confirmed",
       subject: { type: "entry", id: entryId },
-      properties: { candidateCount: 2 },
+      properties: { candidateCount: 2, editedCandidateCount: 0, editedFieldCount: 0 },
     }));
     expect(createProductEventIdempotencyKey).toHaveBeenCalledWith(
       "task_candidates_confirmed",
       operationKey,
     );
+  });
+
+  it("derives editedCandidateCount and editedFieldCount from the canonical edit payload, not raw indices", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: ["task-1", "task-2"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const candidateEdits = JSON.stringify([
+      { candidateIndex: 0, changes: { title: "Relatório final" } },
+      { candidateIndex: 1, changes: { description: null, dueAt: null, title: "Conversa" } },
+    ]);
+
+    await confirmEntryTasks(idleState, confirmForm({ candidateEdits }));
+
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 2, editedCandidateCount: 2, editedFieldCount: 4 },
+    }));
+  });
+
+  it("counts only candidates with a non-empty canonical changes object as edited", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: ["task-1", "task-2"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const candidateEdits = JSON.stringify([
+      { candidateIndex: 0, changes: {} },
+      { candidateIndex: 1, changes: { title: "Conversa com Maria" } },
+    ]);
+
+    await confirmEntryTasks(idleState, confirmForm({ candidateEdits }));
+
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 1 },
+    }));
   });
 
   it.each([

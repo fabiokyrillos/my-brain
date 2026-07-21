@@ -314,6 +314,7 @@ export function TaskCandidateForm({
               </label>
               <CandidateEditor
                 candidate={candidate}
+                entryId={entryId}
                 locale={locale}
                 onEditChange={(edit) => updateEdit(index, edit)}
                 onValidityChange={(valid) => updateValidity(index, valid)}
