@@ -117,7 +117,7 @@ describe("TaskCandidateForm", () => {
     await user.clear(title);
     await user.type(title, "Relatório final");
 
-    const checkbox = screen.getByRole("checkbox", { name: /Atualizar o relatório/ });
+    const checkbox = screen.getByRole("checkbox", { name: /^Atualizar o relatório/ });
     await user.click(checkbox);
     expect(within(editor).getByRole("button", { name: "Editar sugestão: Atualizar o relatório" })).toBeDisabled();
 
@@ -134,7 +134,7 @@ describe("TaskCandidateForm", () => {
     await user.type(within(firstEditor).getByLabelText("Título"), "Relatório final");
     const secondEditor = await expandEditor(user, "Conversar com Maria");
     await user.click(within(secondEditor).getByRole("button", { name: "Remover descrição: Conversar com Maria" }));
-    await user.click(screen.getByRole("checkbox", { name: /Atualizar o relatório/ }));
+    await user.click(screen.getByRole("checkbox", { name: /^Atualizar o relatório/ }));
 
     await user.click(screen.getByRole("button", { name: "Criar 1 tarefa" }));
 
@@ -227,7 +227,7 @@ describe("TaskCandidateForm", () => {
     expect(firstKey).toBe(operationKey);
     expect(retryKey).toBe(firstKey);
 
-    await user.click(screen.getByRole("checkbox", { name: /Conversar com Maria/ }));
+    await user.click(screen.getByRole("checkbox", { name: /^Conversar com Maria/ }));
     await user.click(screen.getByRole("button", { name: "Criar 1 tarefa" }));
     expect(submittedFormData(action, 2).get("operationKey")).not.toBe(firstKey);
   });

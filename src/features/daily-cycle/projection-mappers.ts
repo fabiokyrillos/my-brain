@@ -3,6 +3,7 @@ import {
   dailyCycleActions,
   dailyCycleMessageKeys,
   productStates,
+  workItemPriorities,
   type AttentionReason,
   type AvailableAction,
   type CaptureReceipt,
@@ -12,6 +13,7 @@ import {
   type ProductState,
   type WorkItemHumanState,
   type WorkItemOrigin,
+  type WorkItemPriority,
   type WorkItemView,
 } from "./contracts";
 import { resolveDailyCycleLifecycle, type DailyCycleLifecycleInput } from "./lifecycle";
@@ -57,6 +59,10 @@ export type WorkItemSource = {
   readonly title: string;
   readonly description?: string | null;
   readonly dueAt?: string | null;
+  readonly plannedAt?: string | null;
+  readonly priority?: string | null;
+  readonly intentionalNoDue: boolean;
+  readonly noDueReason?: string | null;
   readonly status: string;
   readonly createdBy: string;
   readonly availableActions: readonly ProjectionActionSource[];
@@ -185,6 +191,13 @@ function toOptionalDateTime(value: unknown): string | undefined | null {
   return isIsoDateTime(value) ? value : null;
 }
 
+function toOptionalPriority(value: unknown): WorkItemPriority | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  return typeof value === "string" && workItemPriorities.includes(value as WorkItemPriority)
+    ? (value as WorkItemPriority)
+    : null;
+}
+
 function toWorkItemHumanState(value: unknown): WorkItemHumanState | null {
   if (typeof value !== "string") return null;
   return workItemStatesByInternalStatus[value as keyof typeof workItemStatesByInternalStatus] ?? null;
@@ -282,20 +295,39 @@ export function toNeedsAttentionItemView(source: NeedsAttentionItemSource): Need
 }
 
 export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
-  if (!isRecord(source) || !isNonEmptyString(source.taskId) || !isNonEmptyString(source.title)) return null;
+  if (!isRecord(source)
+    || !isNonEmptyString(source.taskId)
+    || !isNonEmptyString(source.title)
+    || typeof source.intentionalNoDue !== "boolean") return null;
 
   const description = toOptionalText(source.description);
   const dueAt = toOptionalDateTime(source.dueAt);
+  const plannedAt = toOptionalDateTime(source.plannedAt);
+  const priority = toOptionalPriority(source.priority);
+  const noDueReason = toOptionalText(source.noDueReason);
   const humanState = toWorkItemHumanState(source.status);
   const origin = toWorkItemOrigin(source.createdBy);
   const availableActions = toAvailableActions(source.availableActions);
-  if (description === null || dueAt === null || !humanState || !origin || !availableActions) return null;
+  if (
+    description === null
+    || dueAt === null
+    || plannedAt === null
+    || priority === null
+    || noDueReason === null
+    || !humanState
+    || !origin
+    || !availableActions
+  ) return null;
 
   return Object.freeze({
     taskId: source.taskId,
     title: source.title,
     ...(description ? { description } : {}),
     ...(dueAt ? { dueAt } : {}),
+    ...(plannedAt ? { plannedAt } : {}),
+    ...(priority ? { priority } : {}),
+    intentionalNoDue: source.intentionalNoDue,
+    ...(noDueReason ? { noDueReason } : {}),
     humanState,
     origin,
     availableActions,

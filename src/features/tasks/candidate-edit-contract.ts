@@ -3,10 +3,15 @@ import { z } from "zod";
 const MAX_CANDIDATE_COUNT = 50;
 const MAX_TITLE_LENGTH = 240;
 const MAX_DESCRIPTION_LENGTH = 2_000;
+const MAX_NO_DUE_REASON_LENGTH = 2_000;
 const MAX_SERIALIZED_BYTES = 131_072;
+
+export const manualPriorityValues = ["low", "medium", "high", "urgent"] as const;
+export type ManualPriority = (typeof manualPriorityValues)[number];
 
 const candidateIndexSchema = z.number().int().nonnegative();
 const dueAtSchema = z.string().datetime({ offset: true });
+const manualPrioritySchema = z.enum(manualPriorityValues);
 
 const candidateChangesSchema = z.strictObject({
   title: z.string().trim().min(1).max(MAX_TITLE_LENGTH).optional(),
@@ -18,6 +23,16 @@ const candidateChangesSchema = z.strictObject({
     .nullable()
     .optional(),
   dueAt: dueAtSchema.nullable().optional(),
+  plannedAt: dueAtSchema.nullable().optional(),
+  manualPriority: manualPrioritySchema.nullable().optional(),
+  intentionalNoDue: z.boolean().optional(),
+  noDueReason: z
+    .string()
+    .trim()
+    .max(MAX_NO_DUE_REASON_LENGTH)
+    .transform((reason) => reason || null)
+    .nullable()
+    .optional(),
 });
 
 const candidateEditCommandSchema = z.strictObject({
@@ -58,12 +73,23 @@ const candidateEditSuggestionsSchema = z
     }
   });
 
-export type CandidateEditableField = "title" | "description" | "dueAt";
+export type CandidateEditableField =
+  | "title"
+  | "description"
+  | "dueAt"
+  | "plannedAt"
+  | "manualPriority"
+  | "intentionalNoDue"
+  | "noDueReason";
 
 export type CandidateChanges = {
   title?: string;
   description?: string | null;
   dueAt?: string | null;
+  plannedAt?: string | null;
+  manualPriority?: ManualPriority | null;
+  intentionalNoDue?: boolean;
+  noDueReason?: string | null;
 };
 
 export type CandidateEditCommand = {
@@ -154,6 +180,39 @@ export function normalizeCandidateEdits(input: {
       editedFieldCount += 1;
     }
 
+    // The AI never suggests planned date, priority, or no-due metadata; the
+    // immutable suggestion baseline for these fields is always the neutral
+    // state (null/null/false/null), so "reset" for them means "clear".
+    if (edit.changes.plannedAt !== undefined && edit.changes.plannedAt !== null) {
+      changes.plannedAt = edit.changes.plannedAt;
+      editedFieldCount += 1;
+    }
+
+    if (edit.changes.manualPriority !== undefined && edit.changes.manualPriority !== null) {
+      changes.manualPriority = edit.changes.manualPriority;
+      editedFieldCount += 1;
+    }
+
+    if (edit.changes.intentionalNoDue !== undefined && edit.changes.intentionalNoDue !== false) {
+      changes.intentionalNoDue = edit.changes.intentionalNoDue;
+      editedFieldCount += 1;
+    }
+
+    if (edit.changes.noDueReason !== undefined && edit.changes.noDueReason !== null) {
+      changes.noDueReason = edit.changes.noDueReason;
+      editedFieldCount += 1;
+    }
+
+    const effectiveDueAt = edit.changes.dueAt !== undefined ? edit.changes.dueAt : suggestion.dueAt;
+    const effectiveIntentionalNoDue = edit.changes.intentionalNoDue ?? false;
+    const effectiveNoDueReason = edit.changes.noDueReason ?? null;
+    if (effectiveIntentionalNoDue && effectiveDueAt !== null) {
+      throw new Error(`Candidate ${edit.candidateIndex} cannot have both a due date and an intentional no-due state`);
+    }
+    if (effectiveNoDueReason !== null && !effectiveIntentionalNoDue) {
+      throw new Error(`Candidate ${edit.candidateIndex} cannot have a no-due reason without an intentional no-due state`);
+    }
+
     if (Object.keys(changes).length > 0) {
       canonicalEdits.push({ candidateIndex: edit.candidateIndex, changes });
     }
@@ -181,6 +240,18 @@ export function serializeCandidateEdits(edits: readonly CandidateEditCommand[]):
       }
       if (edit.changes.dueAt !== undefined) {
         changes.dueAt = edit.changes.dueAt;
+      }
+      if (edit.changes.plannedAt !== undefined) {
+        changes.plannedAt = edit.changes.plannedAt;
+      }
+      if (edit.changes.manualPriority !== undefined) {
+        changes.manualPriority = edit.changes.manualPriority;
+      }
+      if (edit.changes.intentionalNoDue !== undefined) {
+        changes.intentionalNoDue = edit.changes.intentionalNoDue;
+      }
+      if (edit.changes.noDueReason !== undefined) {
+        changes.noDueReason = edit.changes.noDueReason;
       }
 
       return { candidateIndex: edit.candidateIndex, changes };

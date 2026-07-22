@@ -84,6 +84,7 @@ function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
     taskId: "task-1",
     title: "Preparar reunião",
     dueAt: "2026-07-19T14:00:00.000Z",
+    intentionalNoDue: false,
     humanState: "not_started",
     origin: "you",
     availableActions: [],

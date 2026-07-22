@@ -523,6 +523,14 @@ describe("CandidateEditor", () => {
     await user.tab();
     expect(screen.getByRole("button", { name: "Remover prazo: Enviar o relatório" })).toHaveFocus();
     await user.tab();
+    expect(screen.getByLabelText("Data planejada (America/Sao_Paulo)")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Remover data planejada: Enviar o relatório" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByLabelText("Prioridade")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" })).toHaveFocus();
+    await user.tab();
     expect(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" })).toHaveFocus();
   });
 
@@ -582,6 +590,138 @@ describe("CandidateEditor", () => {
     const { container } = renderEditor({ candidate: candidateWithConfidence });
 
     expect(container.textContent).not.toMatch(/97%|0[,.]97/);
+  });
+
+  describe("planning, priority, and no-due (Slice 2C.2)", () => {
+    it("starts with planned date, priority, and no-due all unset (no AI suggestion exists for them)", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data planejada (America/Sao_Paulo)")).toHaveValue("");
+      expect(screen.getByLabelText("Prioridade")).toHaveValue("");
+      expect(screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" })).not.toBeChecked();
+      expect(screen.queryByLabelText("Motivo (opcional)")).not.toBeInTheDocument();
+    });
+
+    it("emits a canonical planned-date-only edit", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      fireEvent.change(screen.getByLabelText("Data planejada (America/Sao_Paulo)"), {
+        target: { value: "2026-08-01T09:00" },
+      });
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { plannedAt: "2026-08-01T09:00:00-03:00" },
+      });
+    });
+
+    it("emits a canonical priority-only edit", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByLabelText("Prioridade"), "urgent");
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { manualPriority: "urgent" },
+      });
+    });
+
+    it("clears the planned date via its explicit clear control", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      fireEvent.change(screen.getByLabelText("Data planejada (America/Sao_Paulo)"), {
+        target: { value: "2026-08-01T09:00" },
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remover data planejada: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data planejada (America/Sao_Paulo)")).toHaveValue("");
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it("checking no-due clears and disables the due-date field and reveals a reason field", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.click(screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data limite (America/Sao_Paulo)")).toHaveValue("");
+      expect(screen.getByLabelText("Data limite (America/Sao_Paulo)")).toBeDisabled();
+      expect(screen.getByLabelText("Motivo (opcional)")).toBeVisible();
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { dueAt: null, intentionalNoDue: true },
+      });
+    });
+
+    it("emits the canonical no-due reason once provided", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      await user.click(screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" }));
+
+      await user.type(screen.getByLabelText("Motivo (opcional)"), "Someday, not now");
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { dueAt: null, intentionalNoDue: true, noDueReason: "Someday, not now" },
+      });
+    });
+
+    it("unchecking no-due re-enables the due-date field and hides/clears the reason", async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      const noDueToggle = screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" });
+      await user.click(noDueToggle);
+      await user.type(screen.getByLabelText("Motivo (opcional)"), "Someday");
+
+      await user.click(noDueToggle);
+
+      expect(screen.getByLabelText("Data limite (America/Sao_Paulo)")).not.toBeDisabled();
+      expect(screen.queryByLabelText("Motivo (opcional)")).not.toBeInTheDocument();
+    });
+
+    it("resets planned date, priority, and no-due state back to unset", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor();
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      fireEvent.change(screen.getByLabelText("Data planejada (America/Sao_Paulo)"), {
+        target: { value: "2026-08-01T09:00" },
+      });
+      await user.selectOptions(screen.getByLabelText("Prioridade"), "high");
+
+      await user.click(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data planejada (America/Sao_Paulo)")).toHaveValue("");
+      expect(screen.getByLabelText("Prioridade")).toHaveValue("");
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it("clears an existing suggested due date when no-due is checked, keeping the effective state consistent", async () => {
+      const user = userEvent.setup();
+      const candidateWithDueAt: ActionableCandidateView = {
+        ...candidate,
+        dueAt: "2026-07-21T17:30:00+00:00",
+      };
+      const { onEditChange } = renderEditor({ candidate: candidateWithDueAt });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.click(screen.getByRole("checkbox", { name: "Sem prazo definido: Enviar o relatório" }));
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { dueAt: null, intentionalNoDue: true },
+      });
+    });
   });
 
   describe("editable-candidate analytics", () => {

@@ -46,6 +46,10 @@ type TaskRow = {
   due_at: string | null;
   created_by: string;
   updated_at: string;
+  planned_at: string | null;
+  manual_priority: string | null;
+  intentional_no_due: boolean;
+  no_due_reason: string | null;
 };
 
 function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
@@ -58,6 +62,10 @@ function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
     due_at: "2026-07-18T12:00:00.000Z",
     created_by: "user",
     updated_at: "2026-07-18T12:00:00.000Z",
+    planned_at: null,
+    manual_priority: null,
+    intentional_no_due: false,
+    no_due_reason: null,
     ...overrides,
   };
 }
@@ -178,6 +186,7 @@ describe("loadWorkProjection", () => {
         taskId: "task-001",
         title: "Task 1",
         description: "Ask Marina",
+        intentionalNoDue: false,
         humanState: "waiting_on_someone",
         origin: "brain",
         availableActions: [{ id: "complete_task" }, { id: "resume_task" }],
@@ -186,9 +195,45 @@ describe("loadWorkProjection", () => {
         taskId: "task-002",
         title: "Task 2",
         dueAt: "2026-07-18T12:00:00.000Z",
+        intentionalNoDue: false,
         humanState: "completed",
         origin: "you",
         availableActions: [{ id: "reopen_task" }],
+      },
+    ]);
+  });
+
+  it("maps planned date, priority, and intentional no-due reason through WorkItemView (Slice 2C.2)", async () => {
+    const { client } = clientMock({
+      tasks: [
+        task(1, {
+          due_at: null,
+          planned_at: "2026-07-25T14:00:00.000Z",
+          manual_priority: "urgent",
+          intentional_no_due: true,
+          no_due_reason: "Someday, not now",
+        }),
+      ],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1",
+      locale: "en",
+      view: "all",
+      page: 1,
+    });
+
+    expect(page.items).toEqual([
+      {
+        taskId: "task-001",
+        title: "Task 1",
+        plannedAt: "2026-07-25T14:00:00.000Z",
+        priority: "urgent",
+        intentionalNoDue: true,
+        noDueReason: "Someday, not now",
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [{ id: "complete_task" }, { id: "wait_task" }],
       },
     ]);
   });

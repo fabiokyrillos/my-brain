@@ -395,3 +395,129 @@ describe("candidate edit contract", () => {
     expect(() => serializeCandidateEdits(edits)).toThrow(/131072|bytes|size/i);
   });
 });
+
+describe("candidate edit contract — planning, priority, and no-due (Slice 2C.2)", () => {
+  it("canonicalizes a planned-date-only edit", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { plannedAt: "2026-08-01T09:00:00-03:00" } }])).toEqual({
+      edits: [{ candidateIndex: 0, changes: { plannedAt: "2026-08-01T09:00:00-03:00" } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("canonicalizes a manual-priority-only edit", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { manualPriority: "urgent" } }])).toEqual({
+      edits: [{ candidateIndex: 0, changes: { manualPriority: "urgent" } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("rejects an unknown manual priority value", () => {
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { manualPriority: "asap" } },
+    ]).success).toBe(false);
+  });
+
+  it("accepts every allowed manual priority value", () => {
+    for (const manualPriority of ["low", "medium", "high", "urgent"] as const) {
+      expect(candidateEditArraySchema.safeParse([
+        { candidateIndex: 0, changes: { manualPriority } },
+      ]).success).toBe(true);
+    }
+  });
+
+  it("canonicalizes an intentional-no-due edit with a reason", () => {
+    expect(normalize([{
+      candidateIndex: 1,
+      changes: { intentionalNoDue: true, noDueReason: "Someday, not now" },
+    }])).toEqual({
+      edits: [{ candidateIndex: 1, changes: { intentionalNoDue: true, noDueReason: "Someday, not now" } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 2,
+    });
+  });
+
+  it("canonicalizes intentionalNoDue false away as unchanged", () => {
+    expect(normalize([{ candidateIndex: 1, changes: { intentionalNoDue: false } }])).toEqual({
+      edits: [],
+      editedCandidateCount: 0,
+      editedFieldCount: 0,
+    });
+  });
+
+  it("normalizes an empty no-due reason to explicit null", () => {
+    expect(normalize([{
+      candidateIndex: 1,
+      changes: { intentionalNoDue: true, noDueReason: "" },
+    }]).edits).toEqual([{ candidateIndex: 1, changes: { intentionalNoDue: true } }]);
+  });
+
+  it("rejects an over-long no-due reason", () => {
+    expect(() => normalize([{
+      candidateIndex: 1,
+      changes: { intentionalNoDue: true, noDueReason: "r".repeat(2_001) },
+    }])).toThrow();
+  });
+
+  it("accepts a no-due reason at the 2000-character maximum", () => {
+    const noDueReason = "r".repeat(2_000);
+    expect(normalize([{
+      candidateIndex: 1,
+      changes: { intentionalNoDue: true, noDueReason },
+    }]).edits[0]?.changes.noDueReason).toBe(noDueReason);
+  });
+
+  it("rejects intentionalNoDue true together with an effective due date (from the suggestion)", () => {
+    expect(() => normalize([{ candidateIndex: 0, changes: { intentionalNoDue: true } }])).toThrow();
+  });
+
+  it("rejects intentionalNoDue true together with an explicitly-edited due date", () => {
+    expect(() => normalize([{
+      candidateIndex: 1,
+      changes: { intentionalNoDue: true, dueAt: "2026-08-01T09:00:00-03:00" },
+    }])).toThrow();
+  });
+
+  it("accepts intentionalNoDue true when the effective due date is explicitly cleared", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: { intentionalNoDue: true, dueAt: null },
+    }]).edits).toEqual([
+      { candidateIndex: 0, changes: { dueAt: null, intentionalNoDue: true } },
+    ]);
+  });
+
+  it("rejects a no-due reason without the intentional-no-due flag", () => {
+    expect(() => normalize([{
+      candidateIndex: 1,
+      changes: { noDueReason: "Waiting on scope" },
+    }])).toThrow();
+  });
+
+  it("resets planned date, priority, and no-due state to the neutral baseline (no AI suggestion exists for them)", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: { plannedAt: null, manualPriority: null, intentionalNoDue: false, noDueReason: null },
+    }])).toEqual({ edits: [], editedCandidateCount: 0, editedFieldCount: 0 });
+  });
+
+  it("serializes plannedAt, manualPriority, intentionalNoDue, and noDueReason in canonical field order", () => {
+    const edits: CandidateEditCommand[] = [
+      {
+        candidateIndex: 0,
+        changes: {
+          noDueReason: "Someday",
+          intentionalNoDue: true,
+          manualPriority: "high",
+          plannedAt: "2026-08-01T09:00:00-03:00",
+          dueAt: null,
+        },
+      },
+    ];
+
+    expect(serializeCandidateEdits(edits)).toBe(
+      '[{"candidateIndex":0,"changes":{"dueAt":null,"plannedAt":"2026-08-01T09:00:00-03:00","manualPriority":"high","intentionalNoDue":true,"noDueReason":"Someday"}}]',
+    );
+  });
+});

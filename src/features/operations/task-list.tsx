@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Check, Clock3, Inbox, RotateCcw } from "lucide-react";
-import type { WorkItemHumanState, WorkItemView } from "@/features/daily-cycle/contracts";
+import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
 import type { Locale } from "@/lib/preferences";
 import { applyWorkItemAction } from "./actions";
 
@@ -11,6 +11,13 @@ const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   blocked: { pt: "Bloqueada", en: "Blocked" },
   deferred: { pt: "Adiada", en: "Deferred" },
   completed: { pt: "Concluída", en: "Completed" },
+};
+
+const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
+  low: { pt: "Baixa", en: "Low" },
+  medium: { pt: "Média", en: "Medium" },
+  high: { pt: "Alta", en: "High" },
+  urgent: { pt: "Urgente", en: "Urgent" },
 };
 
 const actionCopy = {
@@ -47,6 +54,16 @@ export function TaskList({
           </div>
           <div className="list-meta">
             {task.dueAt && <span>{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.dueAt))}</span>}
+            {!task.dueAt && task.intentionalNoDue && (
+              <span className="status-badge">{pt ? "Sem prazo" : "No due date"}</span>
+            )}
+            {task.plannedAt && (
+              <span>{pt ? "Planejado: " : "Planned: "}{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.plannedAt))}</span>
+            )}
+            {task.priority && (
+              <span className="status-badge">{priorityCopy[task.priority][pt ? "pt" : "en"]}</span>
+            )}
+            {task.noDueReason && <small>{task.noDueReason}</small>}
             <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
             <div className="row-actions">
               {task.availableActions.flatMap((action) => {

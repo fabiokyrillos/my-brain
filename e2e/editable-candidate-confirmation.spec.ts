@@ -197,6 +197,8 @@ test.describe("editable candidate confirmation through the production Server Act
       .click();
     await firstEditor.getByLabel("Título").fill(`${fixture.prefix} edited title`);
     await firstEditor.getByLabel("Data limite (America/New_York)").fill("2026-08-02T10:30");
+    await firstEditor.getByLabel("Data planejada (America/New_York)").fill("2026-07-30T09:00");
+    await firstEditor.getByLabel("Prioridade").selectOption("urgent");
 
     await secondEditor
       .getByRole("button", { name: `Editar sugestão: ${fixture.prefix} second candidate` })
@@ -204,6 +206,10 @@ test.describe("editable candidate confirmation through the production Server Act
     await secondEditor
       .getByRole("button", { name: `Remover descrição: ${fixture.prefix} second candidate` })
       .click();
+    await secondEditor
+      .getByRole("checkbox", { name: `Sem prazo definido: ${fixture.prefix} second candidate` })
+      .click();
+    await secondEditor.getByLabel("Motivo (opcional)").fill("Someday, not now");
 
     const submit = page.getByRole("button", { name: "Criar 2 tarefas" });
     await submit.click();
@@ -212,7 +218,7 @@ test.describe("editable candidate confirmation through the production Server Act
 
     const { data: tasks, error: tasksError } = await owner
       .from("tasks")
-      .select("candidate_index,title,description,due_at,status")
+      .select("candidate_index,title,description,due_at,status,planned_at,manual_priority,intentional_no_due,no_due_reason")
       .eq("source_entry_id", fixture.entryId)
       .order("candidate_index", { ascending: true });
     expect(tasksError).toBeNull();
@@ -221,14 +227,23 @@ test.describe("editable candidate confirmation through the production Server Act
       candidate_index: 0,
       title: `${fixture.prefix} edited title`,
       status: "inbox",
+      manual_priority: "urgent",
+      intentional_no_due: false,
+      no_due_reason: null,
     });
     expect(new Date(tasks?.[0]?.due_at ?? "").getTime()).toBe(
       new Date("2026-08-02T10:30:00-04:00").getTime(),
+    );
+    expect(new Date(tasks?.[0]?.planned_at ?? "").getTime()).toBe(
+      new Date("2026-07-30T09:00:00-04:00").getTime(),
     );
     expect(tasks?.[1]).toMatchObject({
       candidate_index: 1,
       description: null,
       status: "inbox",
+      due_at: null,
+      intentional_no_due: true,
+      no_due_reason: "Someday, not now",
     });
 
     const { data: operation, error: operationError } = await owner
@@ -237,7 +252,7 @@ test.describe("editable candidate confirmation through the production Server Act
       .eq("source_entry_id", fixture.entryId)
       .single();
     expect(operationError).toBeNull();
-    expect(operation?.operation_key).toMatch(/^confirm-v2:[0-9a-f-]{36}$/);
+    expect(operation?.operation_key).toMatch(/^confirm-v3:[0-9a-f-]{36}$/);
     expect(operation?.request_fingerprint).toMatch(/^[0-9a-f]{64}$/);
 
     const { data: interpretation, error: immutableError } = await owner
@@ -256,7 +271,7 @@ test.describe("editable candidate confirmation through the production Server Act
       .single();
     expect(auditError).toBeNull();
     expect(audit?.after_state).toMatchObject({
-      edited_fields: ["title", "description", "dueAt"],
+      edited_fields: ["title", "description", "dueAt", "plannedAt", "manualPriority", "intentionalNoDue", "noDueReason"],
       candidate_indexes: [0, 1],
     });
     expect(JSON.stringify(audit)).not.toContain("Original first description");

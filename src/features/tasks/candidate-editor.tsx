@@ -8,11 +8,13 @@ import {
 } from "@/features/product-analytics/interaction-events";
 import {
   candidateEditArraySchema,
+  manualPriorityValues,
   normalizeCandidateEdits,
   serializeCandidateEdits,
   type CandidateChanges,
   type CandidateEditCommand,
   type CandidateEditSuggestion,
+  type ManualPriority,
 } from "./candidate-edit-contract";
 import {
   formatInstantForDateTimeLocal,
@@ -23,6 +25,10 @@ type EditorValues = {
   title: string;
   description: string;
   dueDate: string;
+  plannedDate: string;
+  priority: ManualPriority | "";
+  noDue: boolean;
+  noDueReason: string;
 };
 
 type FieldError = {
@@ -37,14 +43,29 @@ const copy = {
     title: "Título",
     description: "Descrição",
     dueDate: (timezone: string) => `Data limite (${timezone})`,
+    plannedDate: (timezone: string) => `Data planejada (${timezone})`,
+    priority: "Prioridade",
+    priorityOptions: {
+      "": "Nenhuma",
+      low: "Baixa",
+      medium: "Média",
+      high: "Alta",
+      urgent: "Urgente",
+    } as Record<ManualPriority | "", string>,
+    noDue: "Sem prazo definido",
+    noDueReason: "Motivo (opcional)",
     timezone: (timezone: string) => `Horário em ${timezone}`,
     due: "Prazo",
+    planned: "Planejado",
     edited: "Editada",
     original: "Sugestão original",
     noDescription: "Sem descrição",
     noDueDate: "Sem prazo",
+    noPriority: "Sem prioridade",
     clearDescription: (title: string) => `Remover descrição: ${title}`,
     clearDueDate: (title: string) => `Remover prazo: ${title}`,
+    clearPlannedDate: (title: string) => `Remover data planejada: ${title}`,
+    noDueLabel: (title: string) => `Sem prazo definido: ${title}`,
     reset: (title: string) => `Restaurar sugestão: ${title}`,
     resetAnnouncement: "Sugestão restaurada.",
     titleRequiredError: {
@@ -59,10 +80,18 @@ const copy = {
       label: "Erro de tamanho da descrição",
       message: "A descrição deve ter no máximo 2.000 caracteres.",
     },
+    noDueReasonLengthError: {
+      label: "Erro de tamanho do motivo",
+      message: "O motivo deve ter no máximo 2.000 caracteres.",
+    },
     dueDateErrorLabel: "Erro na data limite",
     dueDateInvalid: "Informe uma data e hora válidas.",
     dueDateGap: "Esse horário não existe no fuso informado.",
     dueDateOverlap: "Esse horário é ambíguo no fuso informado.",
+    plannedDateErrorLabel: "Erro na data planejada",
+    plannedDateInvalid: "Informe uma data e hora válidas.",
+    plannedDateGap: "Esse horário não existe no fuso informado.",
+    plannedDateOverlap: "Esse horário é ambíguo no fuso informado.",
   },
   en: {
     candidate: (title: string) => `Suggestion: ${title}`,
@@ -70,14 +99,29 @@ const copy = {
     title: "Title",
     description: "Description",
     dueDate: (timezone: string) => `Due date (${timezone})`,
+    plannedDate: (timezone: string) => `Planned date (${timezone})`,
+    priority: "Priority",
+    priorityOptions: {
+      "": "None",
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      urgent: "Urgent",
+    } as Record<ManualPriority | "", string>,
+    noDue: "No due date",
+    noDueReason: "Reason (optional)",
     timezone: (timezone: string) => `Time in ${timezone}`,
     due: "Due",
+    planned: "Planned",
     edited: "Edited",
     original: "Original suggestion",
     noDescription: "No description",
     noDueDate: "No due date",
+    noPriority: "No priority",
     clearDescription: (title: string) => `Clear description: ${title}`,
     clearDueDate: (title: string) => `Clear due date: ${title}`,
+    clearPlannedDate: (title: string) => `Clear planned date: ${title}`,
+    noDueLabel: (title: string) => `No due date: ${title}`,
     reset: (title: string) => `Reset to suggestion: ${title}`,
     resetAnnouncement: "Suggestion reset.",
     titleRequiredError: {
@@ -92,10 +136,18 @@ const copy = {
       label: "Description length error",
       message: "Description must be 2,000 characters or fewer.",
     },
+    noDueReasonLengthError: {
+      label: "Reason length error",
+      message: "Reason must be 2,000 characters or fewer.",
+    },
     dueDateErrorLabel: "Due date error",
     dueDateInvalid: "Enter a valid date and time.",
     dueDateGap: "This time does not exist in the selected timezone.",
     dueDateOverlap: "This time is ambiguous in the selected timezone.",
+    plannedDateErrorLabel: "Planned date error",
+    plannedDateInvalid: "Enter a valid date and time.",
+    plannedDateGap: "This time does not exist in the selected timezone.",
+    plannedDateOverlap: "This time is ambiguous in the selected timezone.",
   },
 } as const;
 
@@ -133,9 +185,15 @@ export function CandidateEditor({
   const [title, setTitle] = useState(candidate.title);
   const [description, setDescription] = useState(candidate.description ?? "");
   const [dueDate, setDueDate] = useState(originalDueDate);
+  const [plannedDate, setPlannedDate] = useState("");
+  const [priority, setPriority] = useState<ManualPriority | "">("");
+  const [noDue, setNoDue] = useState(false);
+  const [noDueReason, setNoDueReason] = useState("");
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [plannedDateTouched, setPlannedDateTouched] = useState(false);
+  const [noDueReasonTouched, setNoDueReasonTouched] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const synchronizationRef = useRef({
     suggestionSignature,
@@ -147,9 +205,15 @@ export function CandidateEditor({
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
   const dueDateId = `${id}-due-date`;
+  const plannedDateId = `${id}-planned-date`;
+  const priorityId = `${id}-priority`;
+  const noDueId = `${id}-no-due`;
+  const noDueReasonId = `${id}-no-due-reason`;
   const titleErrorId = `${id}-title-error`;
   const descriptionErrorId = `${id}-description-error`;
   const dueDateErrorId = `${id}-due-date-error`;
+  const plannedDateErrorId = `${id}-planned-date-error`;
+  const noDueReasonErrorId = `${id}-no-due-reason-error`;
   const editorPanelId = `${id}-editor`;
 
   const publishValidity = useCallback((valid: boolean) => {
@@ -168,9 +232,15 @@ export function CandidateEditor({
       setTitle(candidate.title);
       setDescription(candidate.description ?? "");
       setDueDate(originalDueDate);
+      setPlannedDate("");
+      setPriority("");
+      setNoDue(false);
+      setNoDueReason("");
       setTitleTouched(false);
       setDescriptionTouched(false);
       setDueDateTouched(false);
+      setPlannedDateTouched(false);
+      setNoDueReasonTouched(false);
       setAnnouncement("");
       setExpanded(false);
       const emptyEmission = serializeCandidateEdits([]);
@@ -200,6 +270,21 @@ export function CandidateEditor({
           return currentDueDate;
         }
       });
+      setPlannedDate((currentPlannedDate) => {
+        if (!currentPlannedDate) {
+          return currentPlannedDate;
+        }
+
+        try {
+          const retainedInstant = localDateTimeToOffsetInstant(
+            currentPlannedDate,
+            previous.timezone,
+          );
+          return formatInstantForDateTimeLocal(retainedInstant, timezone);
+        } catch {
+          return currentPlannedDate;
+        }
+      });
       setAnnouncement("");
     }
 
@@ -215,7 +300,7 @@ export function CandidateEditor({
     timezone,
   ]);
 
-  const values = { title, description, dueDate };
+  const values = { title, description, dueDate, plannedDate, priority, noDue, noDueReason };
   const canonicalEdit = safelyBuildEdit({
     candidateIndex,
     originalDueDate,
@@ -234,6 +319,12 @@ export function CandidateEditor({
     : null;
   const dueDateError = dueDateTouched
     ? validateDueDate(dueDate, timezone, locale)
+    : null;
+  const plannedDateError = plannedDateTouched
+    ? validatePlannedDate(plannedDate, timezone, locale)
+    : null;
+  const noDueReasonError = noDueReasonTouched
+    ? validateNoDueReason(noDueReason, locale)
     : null;
   const formattedDueDate = formatDueDateForDisplay(originalDueAt, timezone, locale);
 
@@ -296,14 +387,61 @@ export function CandidateEditor({
     emitEdit(nextValues);
   }
 
+  function changePlannedDate(nextPlannedDate: string) {
+    const nextValues = { ...values, plannedDate: nextPlannedDate };
+    setPlannedDate(nextPlannedDate);
+    setPlannedDateTouched(true);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changePriority(nextPriority: ManualPriority | "") {
+    const nextValues = { ...values, priority: nextPriority };
+    setPriority(nextPriority);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changeNoDue(nextNoDue: boolean) {
+    const nextValues = {
+      ...values,
+      noDue: nextNoDue,
+      dueDate: nextNoDue ? "" : values.dueDate,
+      noDueReason: nextNoDue ? values.noDueReason : "",
+    };
+    setNoDue(nextNoDue);
+    if (nextNoDue) {
+      setDueDate("");
+      setDueDateTouched(false);
+    } else {
+      setNoDueReason("");
+      setNoDueReasonTouched(false);
+    }
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changeNoDueReason(nextNoDueReason: string) {
+    const nextValues = { ...values, noDueReason: nextNoDueReason };
+    setNoDueReason(nextNoDueReason);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
   function resetSuggestion() {
     const editedFieldCount = canonicalEdit ? Object.keys(canonicalEdit.changes).length : 0;
     setTitle(candidate.title);
     setDescription(candidate.description ?? "");
     setDueDate(originalDueDate);
+    setPlannedDate("");
+    setPriority("");
+    setNoDue(false);
+    setNoDueReason("");
     setTitleTouched(false);
     setDescriptionTouched(false);
     setDueDateTouched(false);
+    setPlannedDateTouched(false);
+    setNoDueReasonTouched(false);
     setAnnouncement(localized.resetAnnouncement);
     publishValidity(true);
     if (selected) {
@@ -324,6 +462,14 @@ export function CandidateEditor({
     const nextValues = { ...values, dueDate: "" };
     setDueDate("");
     setDueDateTouched(false);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function clearPlannedDate() {
+    const nextValues = { ...values, plannedDate: "" };
+    setPlannedDate("");
+    setPlannedDateTouched(false);
     setAnnouncement("");
     emitEdit(nextValues);
   }
@@ -449,7 +595,7 @@ export function CandidateEditor({
             <input
               aria-describedby={dueDateError ? dueDateErrorId : undefined}
               aria-invalid={dueDateError ? true : undefined}
-              disabled={!selected}
+              disabled={!selected || noDue}
               id={dueDateId}
               onBlur={() => setDueDateTouched(true)}
               onChange={(event) => changeDueDate(event.target.value)}
@@ -484,6 +630,100 @@ export function CandidateEditor({
             {locale === "pt-BR" ? "Remover prazo" : "Clear due date"}
           </button>
 
+          <label className="field-label" htmlFor={plannedDateId}>
+            <span>{localized.plannedDate(timezone)}</span>
+            <input
+              aria-describedby={plannedDateError ? plannedDateErrorId : undefined}
+              aria-invalid={plannedDateError ? true : undefined}
+              disabled={!selected}
+              id={plannedDateId}
+              onBlur={() => setPlannedDateTouched(true)}
+              onChange={(event) => changePlannedDate(event.target.value)}
+              style={{ minHeight: 44, minWidth: 44 }}
+              type="datetime-local"
+              value={plannedDate}
+            />
+          </label>
+          {plannedDateError && (
+            <p
+              aria-label={plannedDateError.label}
+              className="form-error"
+              id={plannedDateErrorId}
+              role="alert"
+            >
+              {plannedDateError.message}
+            </p>
+          )}
+          <button
+            aria-label={localized.clearPlannedDate(candidate.title)}
+            className="button-secondary"
+            disabled={!selected}
+            onClick={clearPlannedDate}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover data planejada" : "Clear planned date"}
+          </button>
+
+          <label className="field-label" htmlFor={priorityId}>
+            <span>{localized.priority}</span>
+            <select
+              disabled={!selected}
+              id={priorityId}
+              onChange={(event) => changePriority(event.target.value as ManualPriority | "")}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={priority}
+            >
+              {manualPriorityOptionValues.map((value) => (
+                <option key={value || "none"} value={value}>
+                  {localized.priorityOptions[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field-label" htmlFor={noDueId} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              aria-label={localized.noDueLabel(candidate.title)}
+              checked={noDue}
+              disabled={!selected}
+              id={noDueId}
+              onChange={(event) => changeNoDue(event.target.checked)}
+              style={{ minHeight: 44, minWidth: 44 }}
+              type="checkbox"
+            />
+            <span>{localized.noDue}</span>
+          </label>
+
+          {noDue && (
+            <>
+              <label className="field-label" htmlFor={noDueReasonId}>
+                <span>{localized.noDueReason}</span>
+                <textarea
+                  aria-describedby={noDueReasonError ? noDueReasonErrorId : undefined}
+                  aria-invalid={noDueReasonError ? true : undefined}
+                  disabled={!selected}
+                  id={noDueReasonId}
+                  onBlur={() => setNoDueReasonTouched(true)}
+                  onChange={(event) => changeNoDueReason(event.target.value)}
+                  rows={2}
+                  style={{ minHeight: 44, minWidth: 44 }}
+                  value={noDueReason}
+                />
+              </label>
+              {noDueReasonError && (
+                <p
+                  aria-label={noDueReasonError.label}
+                  className="form-error"
+                  id={noDueReasonErrorId}
+                  role="alert"
+                >
+                  {noDueReasonError.message}
+                </p>
+              )}
+            </>
+          )}
+
           <button
             aria-label={localized.reset(candidate.title)}
             className="button-secondary"
@@ -503,6 +743,8 @@ export function CandidateEditor({
     </fieldset>
   );
 }
+
+const manualPriorityOptionValues: readonly (ManualPriority | "")[] = ["", ...manualPriorityValues];
 
 function buildEdit({
   candidateIndex,
@@ -524,6 +766,22 @@ function buildEdit({
 
   if (values.dueDate !== originalDueDate) {
     changes.dueAt = localDateTimeToOffsetInstant(values.dueDate, timezone);
+  }
+
+  if (values.plannedDate !== "") {
+    changes.plannedAt = localDateTimeToOffsetInstant(values.plannedDate, timezone);
+  }
+
+  if (values.priority !== "") {
+    changes.manualPriority = values.priority;
+  }
+
+  if (values.noDue) {
+    changes.intentionalNoDue = true;
+  }
+
+  if (values.noDueReason.trim() !== "") {
+    changes.noDueReason = values.noDueReason;
   }
 
   const normalized = normalizeCandidateEdits({
@@ -570,6 +828,18 @@ function validateDescription(
   return null;
 }
 
+function validateNoDueReason(
+  value: string,
+  locale: CandidateEditorProps["locale"],
+): FieldError | null {
+  if (!candidateEditArraySchema.safeParse([
+    { candidateIndex: 0, changes: { noDueReason: value } },
+  ]).success) {
+    return copy[locale].noDueReasonLengthError;
+  }
+  return null;
+}
+
 function validateDueDate(
   value: string,
   timezone: string,
@@ -601,6 +871,41 @@ function validateDueDate(
     return {
       label: localized.dueDateErrorLabel,
       message: localized.dueDateInvalid,
+    };
+  }
+}
+
+function validatePlannedDate(
+  value: string,
+  timezone: string,
+  locale: CandidateEditorProps["locale"],
+): FieldError | null {
+  if (!value) {
+    return null;
+  }
+
+  const localized = copy[locale];
+  try {
+    localDateTimeToOffsetInstant(value, timezone);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (/ambiguous|overlap/i.test(message)) {
+      return {
+        label: localized.plannedDateErrorLabel,
+        message: localized.plannedDateOverlap,
+      };
+    }
+    if (/nonexistent|gap/i.test(message)) {
+      return {
+        label: localized.plannedDateErrorLabel,
+        message: localized.plannedDateGap,
+      };
+    }
+    return {
+      label: localized.plannedDateErrorLabel,
+      message: localized.plannedDateInvalid,
     };
   }
 }

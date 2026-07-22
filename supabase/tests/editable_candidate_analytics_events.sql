@@ -237,12 +237,12 @@ select throws_ok(
 select throws_ok(
   $$ select public.record_product_event(
     'task_candidates_confirmed', 'interpretation_review', 'pt-BR', 'desktop', '2c-test-1',
-    jsonb_build_object('candidateCount', 2, 'editedCandidateCount', 1, 'editedFieldCount', 4), null, null, null,
+    jsonb_build_object('candidateCount', 2, 'editedCandidateCount', 1, 'editedFieldCount', 8), null, null, null,
     'e0000000-0000-4000-8000-000000000010', true
   ) $$,
   '22023',
   'Invalid product event property',
-  'editedFieldCount above editedCandidateCount times three is denied'
+  'editedFieldCount above editedCandidateCount times the editable-field count (7, as of Slice 2C.2) is denied'
 );
 select throws_ok(
   $$ select public.record_product_event(
