@@ -252,7 +252,7 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     supabase.from("entry_entities").select("interpretation_id,entity_type,entity_id,mention,confidence").eq("entry_id", entryId).limit(500),
     supabase.from("tasks").select("id,title,status,due_at,candidate_index,source_interpretation_id").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
     candidateResolutionQuery,
-    supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates", "confirm_entry_task_candidates_v5"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates", "confirm_entry_task_candidates_v5", "confirm_entry_task_candidates_v6"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("undo_operations").select("id").eq("action_type", "correct_entry_interpretation").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("contexts").select("id,name").order("updated_at", { ascending: false }).limit(50),
     supabase.from("organizations").select("id,name").order("updated_at", { ascending: false }).limit(50),

@@ -11,7 +11,7 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 type TaskRow = Pick<
   Database["public"]["Tables"]["tasks"]["Row"],
   | "id" | "user_id" | "title" | "description" | "status" | "due_at" | "created_by" | "updated_at"
-  | "planned_at" | "manual_priority" | "intentional_no_due" | "no_due_reason"
+  | "planned_at" | "manual_priority" | "intentional_no_due" | "no_due_reason" | "parent_task_id"
 >;
 
 export const WORK_PAGE_SIZE = 50;
@@ -117,7 +117,7 @@ export async function loadWorkProjection(
 
   let query = supabase
     .from("tasks")
-    .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason")
+    .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason,parent_task_id")
     .eq("user_id", options.userId);
 
   if (options.view === "today") {
@@ -143,7 +143,7 @@ export async function loadWorkProjection(
   const result = await query.range(from, to);
   const rows = (requireSupabaseData(result, `load Work ${options.view} tasks`) ?? []) as TaskRow[];
   const { items: pageRows, hasNext } = paginateRows(rows, WORK_PAGE_SIZE);
-  const relationsByTaskId = await loadTaskRelations(supabase, options.userId, pageRows.map((row) => row.id));
+  const relationsByTaskId = await loadTaskRelations(supabase, options.userId, pageRows);
   const items = pageRows.flatMap((row) => {
     const relations = relationsByTaskId.get(row.id);
     const item = toWorkItemView({
@@ -162,6 +162,8 @@ export async function loadWorkProjection(
       contexts: relations?.contexts,
       people: relations?.people,
       waitingOnPeople: relations?.waitingOnPeople,
+      parent: relations?.parent,
+      dependsOn: relations?.dependsOn,
     });
     return item ? [item] : [];
   });
@@ -174,6 +176,8 @@ type TaskRelations = {
   readonly contexts: readonly { id: string; label: string }[];
   readonly people: readonly { id: string; label: string }[];
   readonly waitingOnPeople: readonly { id: string; label: string }[];
+  readonly parent?: { id: string; label: string };
+  readonly dependsOn: readonly { id: string; label: string }[];
 };
 
 // Bounded per-page hydration (never an unbounded per-user scan): only the
@@ -183,25 +187,35 @@ type TaskRelations = {
 async function loadTaskRelations(
   supabase: SupabaseClient,
   userId: string,
-  taskIds: readonly string[],
+  pageRows: readonly Pick<TaskRow, "id" | "parent_task_id">[],
 ): Promise<Map<string, TaskRelations>> {
   const relationsByTaskId = new Map<string, TaskRelations>();
+  const taskIds = pageRows.map((row) => row.id);
   if (taskIds.length === 0) return relationsByTaskId;
 
-  const [taskProjectsResult, taskContextsResult, taskPeopleResult] = await Promise.all([
+  const [taskProjectsResult, taskContextsResult, taskPeopleResult, taskDependenciesResult] = await Promise.all([
     supabase.from("task_projects").select("task_id,project_id").eq("user_id", userId).in("task_id", taskIds),
     supabase.from("task_contexts").select("task_id,context_id").eq("user_id", userId).in("task_id", taskIds),
     supabase.from("task_people").select("task_id,person_id,role").eq("user_id", userId).in("task_id", taskIds),
+    supabase.from("task_dependencies").select("task_id,depends_on_task_id").eq("user_id", userId).in("task_id", taskIds),
   ]);
   const taskProjects = (requireSupabaseData(taskProjectsResult, "load Work task project relations") ?? []) as { task_id: string; project_id: string }[];
   const taskContexts = (requireSupabaseData(taskContextsResult, "load Work task context relations") ?? []) as { task_id: string; context_id: string }[];
   const taskPeople = (requireSupabaseData(taskPeopleResult, "load Work task person relations") ?? []) as { task_id: string; person_id: string; role: string }[];
+  const taskDependencies = (requireSupabaseData(taskDependenciesResult, "load Work task dependency relations") ?? []) as { task_id: string; depends_on_task_id: string }[];
 
   const projectIds = [...new Set(taskProjects.map((row) => row.project_id))];
   const contextIds = [...new Set(taskContexts.map((row) => row.context_id))];
   const personIds = [...new Set(taskPeople.map((row) => row.person_id))];
+  const parentTaskIds = [...new Set(
+    pageRows.flatMap((row) => (row.parent_task_id ? [row.parent_task_id] : [])),
+  )];
+  const relatedTaskIds = [...new Set([
+    ...parentTaskIds,
+    ...taskDependencies.map((row) => row.depends_on_task_id),
+  ])];
 
-  const [projectsResult, contextsResult, peopleResult] = await Promise.all([
+  const [projectsResult, contextsResult, peopleResult, relatedTasksResult] = await Promise.all([
     projectIds.length
       ? supabase.from("projects").select("id,name").eq("user_id", userId).in("id", projectIds)
       : Promise.resolve({ data: [], error: null }),
@@ -210,6 +224,9 @@ async function loadTaskRelations(
       : Promise.resolve({ data: [], error: null }),
     personIds.length
       ? supabase.from("people").select("id,name").eq("user_id", userId).in("id", personIds)
+      : Promise.resolve({ data: [], error: null }),
+    relatedTaskIds.length
+      ? supabase.from("tasks").select("id,title").eq("user_id", userId).in("id", relatedTaskIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
   const projectNameById = new Map(
@@ -224,8 +241,17 @@ async function loadTaskRelations(
     (requireSupabaseData(peopleResult, "load Work related people") ?? [] as { id: string; name: string }[])
       .map((row) => [row.id, row.name] as const),
   );
+  const relatedTaskTitleById = new Map(
+    (requireSupabaseData(relatedTasksResult, "load Work related tasks") ?? [] as { id: string; title: string }[])
+      .map((row) => [row.id, row.title] as const),
+  );
+
+  const parentTaskIdByTaskId = new Map(
+    pageRows.flatMap((row) => (row.parent_task_id ? [[row.id, row.parent_task_id] as const] : [])),
+  );
 
   for (const taskId of taskIds) {
+    const parentTaskId = parentTaskIdByTaskId.get(taskId);
     relationsByTaskId.set(taskId, {
       projects: taskProjects
         .filter((row) => row.task_id === taskId && projectNameById.has(row.project_id))
@@ -239,6 +265,12 @@ async function loadTaskRelations(
       waitingOnPeople: taskPeople
         .filter((row) => row.task_id === taskId && row.role === "waiting_on" && personNameById.has(row.person_id))
         .map((row) => ({ id: row.person_id, label: personNameById.get(row.person_id)! })),
+      ...(parentTaskId && relatedTaskTitleById.has(parentTaskId)
+        ? { parent: { id: parentTaskId, label: relatedTaskTitleById.get(parentTaskId)! } }
+        : {}),
+      dependsOn: taskDependencies
+        .filter((row) => row.task_id === taskId && relatedTaskTitleById.has(row.depends_on_task_id))
+        .map((row) => ({ id: row.depends_on_task_id, label: relatedTaskTitleById.get(row.depends_on_task_id)! })),
     });
   }
 

@@ -327,3 +327,53 @@ describe("toWorkItemView owned relations (Slice 2C.3)", () => {
     expect(work).toBeNull();
   });
 });
+
+describe("toWorkItemView task graph (Slice 2C.5)", () => {
+  const baseSource = {
+    taskId: "task-1",
+    title: "Tarefa",
+    intentionalNoDue: false,
+    status: "inbox",
+    createdBy: "user",
+    availableActions: [],
+  };
+
+  it("omits parent and dependsOn when absent", () => {
+    const work = map(mappers.toWorkItemView, baseSource as WorkItemSource);
+
+    expect(work).not.toBeNull();
+    expect(work).not.toHaveProperty("parent");
+    expect(work).not.toHaveProperty("dependsOn");
+  });
+
+  it("maps a well-formed parent and dependsOn list", () => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      parent: { id: "p1", label: "Plan the launch" },
+      dependsOn: [{ id: "d1", label: "Draft outline" }],
+    } as WorkItemSource);
+
+    expect(work).toMatchObject({
+      parent: { id: "p1", label: "Plan the launch" },
+      dependsOn: [{ id: "d1", label: "Draft outline" }],
+    });
+  });
+
+  it("fails closed when parent is malformed", () => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      parent: { id: "", label: "Missing id" },
+    } as unknown as WorkItemSource);
+
+    expect(work).toBeNull();
+  });
+
+  it("fails closed when dependsOn contains a malformed entry", () => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      dependsOn: [{ id: "d1", label: "" }],
+    } as unknown as WorkItemSource);
+
+    expect(work).toBeNull();
+  });
+});

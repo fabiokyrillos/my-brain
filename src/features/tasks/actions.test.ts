@@ -493,7 +493,7 @@ describe("resolveEntryTaskCandidates", () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it("calls v5 once with one canonical mixed batch and no selection, owner, content, or task IDs", async () => {
+  it("calls v6 once with one canonical mixed batch and no selection, owner, content, or task IDs", async () => {
     const { client, rpc } = clientWithRpc({
       data: { task_ids: ["task-1"], undo_id: undoId, idempotent: false },
       error: null,
@@ -513,7 +513,7 @@ describe("resolveEntryTaskCandidates", () => {
     }));
 
     expect(rpc).toHaveBeenCalledOnce();
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v5", {
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v6", {
       p_entry_id: entryId,
       p_expected_interpretation_id: interpretationId,
       p_candidate_resolutions: [

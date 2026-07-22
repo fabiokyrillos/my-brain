@@ -90,6 +90,8 @@ const resolutionCopy = {
     mismatch: "Esta tentativa não corresponde mais às decisões atuais. Revise e tente novamente.",
     resolved: "Uma destas sugestões já foi resolvida. Atualize a página antes de continuar.",
     invalidRelation: "Um dos projetos, contextos ou pessoas selecionados não está mais disponível. Atualize a página e tente novamente.",
+    invalidGraphReference: "A tarefa-mãe ou dependência selecionada não está mais disponível. Atualize a página e tente novamente.",
+    graphCycle: "Essa combinação de tarefa-mãe/dependência criaria um ciclo. Revise as seleções.",
     recordOnly: "Esta versão é somente registro; não há sugestões para resolver.",
     notFound: "Não encontramos este registro.",
     failed: "Não foi possível resolver as sugestões agora.",
@@ -113,6 +115,8 @@ const resolutionCopy = {
     mismatch: "This attempt no longer matches the current decisions. Review them and try again.",
     resolved: "One of these suggestions was already resolved. Refresh the page before continuing.",
     invalidRelation: "One of the selected projects, contexts, or people is no longer available. Refresh the page and try again.",
+    invalidGraphReference: "The selected parent task or dependency is no longer available. Refresh the page and try again.",
+    graphCycle: "That parent/dependency combination would create a cycle. Review your selections.",
     recordOnly: "This version is record-only; there are no suggestions to resolve.",
     notFound: "We could not find this record.",
     failed: "The suggestions could not be resolved right now.",
@@ -245,7 +249,7 @@ export async function resolveEntryTaskCandidates(
     );
   }
 
-  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v5", {
+  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v6", {
     p_entry_id: parsed.data.entryId,
     p_expected_interpretation_id: parsed.data.interpretationId,
     p_candidate_resolutions: parsed.data.candidateResolutions,
@@ -565,6 +569,12 @@ function mapResolutionRpcError(
   }
   if (error.code === "22023" && error.details === "2C_INVALID_RELATION") {
     return confirmationFailure("invalid_relation", localized.invalidRelation, false);
+  }
+  if (error.code === "22023" && error.details === "2C_INVALID_GRAPH_REFERENCE") {
+    return confirmationFailure("invalid_graph_reference", localized.invalidGraphReference, false);
+  }
+  if (error.code === "22023" && error.details === "2C_GRAPH_CYCLE") {
+    return confirmationFailure("graph_cycle", localized.graphCycle, false);
   }
   if (error.code === "22023") {
     return confirmationFailure("invalid_payload", localized.validation, false);

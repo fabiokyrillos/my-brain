@@ -8,7 +8,7 @@ type Result = { data: unknown; error: unknown };
 
 function queryStub(result: Result) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order"]) {
+  for (const method of ["select", "eq", "neq", "order"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.limit = vi.fn(async () => result);
@@ -22,11 +22,12 @@ function supabaseStub(results: Record<string, Result>) {
 }
 
 describe("loadCandidateRelationOptions", () => {
-  it("maps owned projects, contexts, and people to id/label options", async () => {
+  it("maps owned projects, contexts, people, and tasks to id/label options", async () => {
     const supabase = supabaseStub({
       projects: { data: [{ id: "p1", name: "Website relaunch" }], error: null },
       contexts: { data: [{ id: "c1", name: "Work" }], error: null },
       people: { data: [{ id: "u1", name: "Alice" }], error: null },
+      tasks: { data: [{ id: "t1", title: "Draft outline" }], error: null },
     });
 
     const options = await loadCandidateRelationOptions(supabase as never, "user-1");
@@ -35,6 +36,7 @@ describe("loadCandidateRelationOptions", () => {
       projects: [{ id: "p1", label: "Website relaunch" }],
       contexts: [{ id: "c1", label: "Work" }],
       people: [{ id: "u1", label: "Alice" }],
+      tasks: [{ id: "t1", label: "Draft outline" }],
     });
   });
 
@@ -50,7 +52,7 @@ describe("loadCandidateRelationOptions", () => {
     const supabase = supabaseStub({});
     const options = await loadCandidateRelationOptions(supabase as never, "user-1");
 
-    expect(options).toEqual({ projects: [], contexts: [], people: [] });
+    expect(options).toEqual({ projects: [], contexts: [], people: [], tasks: [] });
   });
 
   it("throws when a query fails instead of silently returning partial options", async () => {

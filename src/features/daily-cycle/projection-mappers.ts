@@ -76,6 +76,8 @@ export type WorkItemSource = {
   readonly contexts?: readonly RelationSummarySource[] | null;
   readonly people?: readonly RelationSummarySource[] | null;
   readonly waitingOnPeople?: readonly RelationSummarySource[] | null;
+  readonly parent?: RelationSummarySource | null;
+  readonly dependsOn?: readonly RelationSummarySource[] | null;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -344,6 +346,10 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
   const contexts = toRelationSummaries(source.contexts);
   const people = toRelationSummaries(source.people);
   const waitingOnPeople = toRelationSummaries(source.waitingOnPeople);
+  const parent = source.parent === undefined || source.parent === null
+    ? undefined
+    : toRelationSummary(source.parent);
+  const dependsOn = toRelationSummaries(source.dependsOn);
   if (
     description === null
     || dueAt === null
@@ -357,6 +363,8 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
     || !contexts
     || !people
     || !waitingOnPeople
+    || parent === null
+    || !dependsOn
   ) return null;
 
   return Object.freeze({
@@ -375,5 +383,7 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
     contexts,
     people,
     waitingOnPeople,
+    ...(parent ? { parent } : {}),
+    ...(dependsOn.length > 0 ? { dependsOn } : {}),
   });
 }
