@@ -145,11 +145,21 @@ async function confirm(client, fixture, label, indexes, edits, operationKey = cr
   }).then((result) => ({ ...result, operationKey }));
 }
 
+async function confirmV3(client, fixture, label, indexes, edits, operationKey = crypto.randomUUID()) {
+  return client.rpc("confirm_entry_task_candidates_v3", {
+    p_entry_id: fixture.entryId,
+    p_expected_interpretation_id: fixture.interpretationId,
+    p_candidate_indexes: indexes,
+    p_candidate_edits: edits,
+    p_operation_key: operationKey,
+  }).then((result) => ({ ...result, operationKey }));
+}
+
 async function taskRows(client, taskIds) {
   return dataOrThrow(
     await client
       .from("tasks")
-      .select("id,candidate_index,title,description,due_at,status,source_interpretation_id")
+      .select("id,candidate_index,title,description,due_at,status,source_interpretation_id,planned_at,manual_priority,intentional_no_due,no_due_reason")
       .in("id", taskIds)
       .order("candidate_index", { ascending: true }),
     "read materialized task rows",
@@ -401,8 +411,72 @@ try {
     "Complete confirmation did not resolve Needs Attention",
   );
 
+  // Slice 2C.2: planning, priority, and no-due semantics (v3 RPC).
+  const planningFixture = await createFixture(owner, "v3-planning");
+  const editedPlannedAt = "2026-08-05T09:00:00-03:00";
+  const planningConfirm = dataOrThrow(
+    await confirmV3(owner, planningFixture, "v3-planning", [0], [
+      { candidateIndex: 0, changes: { plannedAt: editedPlannedAt, manualPriority: "urgent" } },
+    ]),
+    "confirm v3 planned date and priority edit",
+  );
+  const [planningTask] = await taskRows(owner, planningConfirm.task_ids);
+  assert(new Date(planningTask.planned_at).getTime() === new Date(editedPlannedAt).getTime(), "Planned-date edit was not materialized");
+  assert(planningTask.manual_priority === "urgent", "Priority edit was not materialized");
+  assert(planningTask.due_at !== null, "Planned-date edit incorrectly cleared the untouched due date");
+
+  const noDueFixture = await createFixture(owner, "v3-no-due");
+  const noDueConfirm = dataOrThrow(
+    await confirmV3(owner, noDueFixture, "v3-no-due", [1], [
+      { candidateIndex: 1, changes: { intentionalNoDue: true, noDueReason: `${fixturePrefix} someday` } },
+    ]),
+    "confirm v3 intentional no-due edit",
+  );
+  const [noDueTask] = await taskRows(owner, noDueConfirm.task_ids);
+  assert(noDueTask.intentional_no_due === true, "Intentional no-due flag was not materialized");
+  assert(noDueTask.no_due_reason === `${fixturePrefix} someday`, "No-due reason was not materialized");
+  assert(noDueTask.due_at === null, "Intentional no-due did not leave the due date null");
+
+  const conflictFixture = await createFixture(owner, "v3-conflict");
+  const conflict = await confirmV3(owner, conflictFixture, "v3-conflict", [0], [
+    { candidateIndex: 0, changes: { intentionalNoDue: true } },
+  ]);
+  assertRpcError(conflict, "22023", "Intentional no-due with an effective due date");
+
+  const raceFixture = await createFixture(owner, "v3-race");
+  const raceConfirm = dataOrThrow(
+    await confirmV3(owner, raceFixture, "v3-race", [0], []),
+    "confirm v3 race fixture",
+  );
+  const blockedV3Correction = await correct(owner, raceFixture, "blocked-v3-correction");
+  assertRpcError(blockedV3Correction, "55P03", "Correction after active v3 confirmation");
+  const undoneV3 = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: raceConfirm.undo_id }),
+    "undo v3 confirmation",
+  );
+  assert(undoneV3.undone === true, "Undo of a v3 confirmation did not report success");
+  const postUndoV3Correction = dataOrThrow(
+    await correct(owner, raceFixture, "post-undo-v3-correction"),
+    "correct after v3 undo",
+  );
+  assert(postUndoV3Correction.interpretation_id, "Correction remained blocked after v3 undo");
+
+  const legacyDefaultsFixture = await createFixture(owner, "v2-still-defaults");
+  const legacyDefaultsConfirm = dataOrThrow(
+    await confirm(owner, legacyDefaultsFixture, "v2-still-defaults", [0], []),
+    "confirm legacy v2 fixture after Slice 2C.2",
+  );
+  const [legacyDefaultsTask] = await taskRows(owner, legacyDefaultsConfirm.task_ids);
+  assert(
+    legacyDefaultsTask.manual_priority === null
+      && legacyDefaultsTask.planned_at === null
+      && legacyDefaultsTask.intentional_no_due === false
+      && legacyDefaultsTask.no_due_reason === null,
+    "A v2 confirmation no longer leaves planning/priority/no-due fields at their defaults",
+  );
+
   smokeSummary = {
-    cases: 13,
+    cases: 18,
     fixturePrefix,
     preExistingAuthUsers: before.authUserIds.length,
     preExistingTableCounts: before.tableCounts,
