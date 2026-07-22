@@ -2,6 +2,34 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-22 — Phase 2C Slice 2C.5: subtasks and dependencies (branch, not merged)
+
+### Added
+
+- Migration `202607220044` (additive): `confirm_entry_task_candidates_v6` RPC — the exact `confirm_entry_task_candidates_v5` disposition contract, extended so each confirmed candidate's edit `changes` object may also carry `parentRef` (a single graph reference or `null`) and `dependsOn` (a bounded ≤20-element array of `{target, type: blocks|requires|related}`). A graph reference is a closed discriminated union: `{type:"candidateIndex", value:int}` targeting another confirmed candidate in the same batch, or `{type:"taskId", value:uuid}` targeting an existing owned, non-cancelled task (PRD `2C-STRUCTURE-002`). Reuses the pre-existing `tasks.parent_task_id` column and `task_dependencies` table — both already carry composite `(user_id, id)` ownership foreign keys from migration `202607170016`, so cross-owner graph edges are already impossible at the database level; v6 adds RPC-level validation only for a clear closed error contract (`2C_INVALID_GRAPH_REFERENCE`) and cycle safety (`2C_GRAPH_CYCLE`). Rejects self-reference, targets that are not confirmed in the same batch, cross-owner/cancelled task targets, and duplicate dependency targets. Cycle detection is proven to only need the intra-batch `candidateIndex` subgraph (an existing task's edges can never point at a not-yet-created task), implemented with two bounded recursive CTEs. Resolves candidate references to their newly created task ids in a second pass after every insert, so forward references resolve correctly, then writes `parent_task_id`/`task_dependencies` atomically. Sorted/deduplicated graph payload participates in the replay fingerprint.
+- `src/features/tasks/relation-options.ts` now also loads a bounded (≤200) list of the user's own active tasks as `{id,label}` options for the parent/dependency pickers. `candidate-editor.tsx` gained a native parent `<select>` (grouped into this-review suggestions and existing tasks) and a `<select multiple>` dependency listbox with matching clear controls, disabled when nothing is selectable. `task-candidate-form.tsx` passes each candidate its sibling candidates so intra-batch parent/dependency references can be chosen before any task exists.
+- `work-projection.ts`/`projection-mappers.ts`/`contracts.ts`/`task-list.tsx` hydrate and display each task's parent and dependency targets via the existing bounded two-step flat-select join, with fail-closed mapping.
+- `supabase/tests/phase_2c_slice_5_task_graph.sql` (34 assertions) covers the schema/RLS/grants, self-reference/non-confirmed-target/malformed-shape rejection, cross-owner and cancelled taskId denial, direct and indirect cycle rejection, mixed-attempt atomicity, intra-batch and taskId parent/dependency materialization, fingerprint replay/mismatch sensitivity to the graph payload, the undo affected-count regression, retained dependency rows, and the analytics bound extension.
+
+### Changed
+
+- The live `resolveEntryTaskCandidates` Server Action now calls `confirm_entry_task_candidates_v6`; `v5` and every earlier RPC remain unchanged and callable. New graph-specific error codes map to stable localized results (`invalid_graph_reference`, `graph_cycle`).
+- `candidate-edit-contract.ts` extends the closed Zod command with `parentRef`/`dependsOn`, canonicalizes both (sorted, deduplicated by target), and counts them as edited fields. The analytics edited-field ceiling grows from 11 to 13 (`require_task_candidates_confirmed_edit_counts` and `candidate_edit_reset`'s own `editedFieldCount` bound), continuing the per-slice forward-patch pattern.
+- `database.types.ts` was regenerated twice from the linked schema and is byte-stable. The remote smoke now covers 29 candidate cases and includes `task_dependencies` in fatal cleanup/baseline parity.
+
+### Fixed
+
+- Migration `202607220045` replaces `undo_operation(uuid)` forward-only to avoid the same `pg_catalog.greatest(integer, integer)` lookup failure under `search_path=''` that migration `202607220042` already fixed once for Slice 2C.4 — reintroduced when migration `044`'s copy extended the v5/v6 branch. Migration `044` itself was left unedited, per this project's append-only convention.
+- Two stale analytics-bound pgTAP assertions (`phase_2c_slice_3_owned_relations.sql`, `editable_candidate_analytics_events.sql`) that hardcoded the previous ceiling of 11/12 now target the current ceiling of 13/14, the same correction earlier slices already applied when the bound last grew.
+
+### Verification
+
+- Linked migrations are aligned through `202607220045`; linked DB lint at error level is clean (only the two pre-existing unrelated `run_user_heartbeat` warnings remain at warning level); linked generated types match the committed file byte-for-byte across two consecutive runs.
+- The new 34-assertion pgTAP suite passed 34/34 online; seven earlier relevant candidate suites were re-run and passed after the two stale-bound assertions were corrected. The disposable remote smoke passed 29/29 with zero remaining users/fixtures and preserved pre-existing Auth IDs/table counts.
+- Vitest passed 85 files/714 tests (up from 693); lint, typecheck, and the production build passed. The deterministic disposition Playwright spec (now exercising the v6 live path) passed 4/4 (PT-BR/en × desktop/Pixel 7). The full real-AI serial `intelligent-capture` journey and the `online-auth`/`online-mobile-navigation` specs continue to fail from pre-existing causes unchanged from `main` (worker/OpenAI latency and auth rate-limiting) — none touch the graph confirmation path.
+- Independent review of the complete branch diff found no Critical/Important issue. The branch remains local: no push, PR, merge, or application deployment.
+- See `docs/reports/PHASE_2C_SLICE_05_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
+
 ## 2026-07-22 — Phase 2C Slice 2C.4: candidate dispositions (branch, not merged)
 
 ### Added
