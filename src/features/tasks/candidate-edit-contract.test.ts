@@ -624,3 +624,125 @@ describe("candidate edit contract — owned relations (Slice 2C.3)", () => {
     );
   });
 });
+
+describe("candidate edit contract — task graph (Slice 2C.5)", () => {
+  const taskT1 = "66666666-6666-4666-8666-666666666666";
+  const taskT2 = "77777777-7777-4777-8777-777777777777";
+
+  it("canonicalizes a parentRef edit targeting a sibling candidate", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: { parentRef: { type: "candidateIndex", value: 1 } },
+    }])).toEqual({
+      edits: [{ candidateIndex: 0, changes: { parentRef: { type: "candidateIndex", value: 1 } } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("canonicalizes a parentRef edit targeting an existing task", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: { parentRef: { type: "taskId", value: taskT1 } },
+    }])).toEqual({
+      edits: [{ candidateIndex: 0, changes: { parentRef: { type: "taskId", value: taskT1 } } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("treats a null parentRef as unchanged (no AI suggestion exists for a parent)", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { parentRef: null } }])).toEqual({
+      edits: [],
+      editedCandidateCount: 0,
+      editedFieldCount: 0,
+    });
+  });
+
+  it("canonicalizes dependsOn, sorting targets regardless of submission order", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: {
+        dependsOn: [
+          { target: { type: "taskId", value: taskT2 }, type: "blocks" },
+          { target: { type: "candidateIndex", value: 1 }, type: "requires" },
+        ],
+      },
+    }])).toEqual({
+      edits: [{
+        candidateIndex: 0,
+        changes: {
+          dependsOn: [
+            { target: { type: "candidateIndex", value: 1 }, type: "requires" },
+            { target: { type: "taskId", value: taskT2 }, type: "blocks" },
+          ],
+        },
+      }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("treats an empty dependsOn array as unchanged", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { dependsOn: [] } }])).toEqual({
+      edits: [],
+      editedCandidateCount: 0,
+      editedFieldCount: 0,
+    });
+  });
+
+  it("rejects a malformed graph reference type", () => {
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { parentRef: { type: "other", value: 1 } } },
+    ]).success).toBe(false);
+  });
+
+  it("rejects a taskId reference that is not a well-formed UUID", () => {
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { parentRef: { type: "taskId", value: "not-a-uuid" } } },
+    ]).success).toBe(false);
+  });
+
+  it("rejects duplicate dependency targets", () => {
+    expect(candidateEditArraySchema.safeParse([
+      {
+        candidateIndex: 0,
+        changes: {
+          dependsOn: [
+            { target: { type: "taskId", value: taskT1 }, type: "blocks" },
+            { target: { type: "taskId", value: taskT1 }, type: "requires" },
+          ],
+        },
+      },
+    ]).success).toBe(false);
+  });
+
+  it("rejects more than 20 dependency entries", () => {
+    const tooMany = Array.from({ length: 21 }, (_, index) => ({
+      target: { type: "candidateIndex" as const, value: index },
+      type: "blocks" as const,
+    }));
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { dependsOn: tooMany } },
+    ]).success).toBe(false);
+  });
+
+  it("serializes parentRef and dependsOn in canonical field order", () => {
+    const edits: CandidateEditCommand[] = [
+      {
+        candidateIndex: 0,
+        changes: {
+          dependsOn: [
+            { target: { type: "taskId", value: taskT2 }, type: "blocks" },
+            { target: { type: "candidateIndex", value: 1 }, type: "requires" },
+          ],
+          parentRef: { type: "taskId", value: taskT1 },
+        },
+      },
+    ];
+
+    expect(serializeCandidateEdits(edits)).toBe(
+      `[{"candidateIndex":0,"changes":{"parentRef":{"type":"taskId","value":"${taskT1}"},"dependsOn":[{"target":{"type":"candidateIndex","value":1},"type":"requires"},{"target":{"type":"taskId","value":"${taskT2}"},"type":"blocks"}]}}]`,
+    );
+  });
+});

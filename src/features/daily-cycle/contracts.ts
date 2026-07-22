@@ -220,4 +220,6 @@ export type WorkItemView = {
   readonly contexts: readonly RelationSummary[];
   readonly people: readonly RelationSummary[];
   readonly waitingOnPeople: readonly RelationSummary[];
+  readonly parent?: RelationSummary;
+  readonly dependsOn?: readonly RelationSummary[];
 };

@@ -83,6 +83,7 @@ const emptyRelationOptions: CandidateRelationOptions = Object.freeze({
   projects: [],
   contexts: [],
   people: [],
+  tasks: [],
 });
 
 const understandingFallback: Record<DailyCycleLocale, string> = {

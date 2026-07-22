@@ -844,6 +844,7 @@ describe("CandidateEditor", () => {
       projects: [{ id: projectP1, label: "Website relaunch" }, { id: projectP2, label: "Q3 planning" }],
       contexts: [{ id: contextC1, label: "Work" }],
       people: [{ id: personU1, label: "Alice" }, { id: personU2, label: "Bob" }],
+      tasks: [],
     };
 
     it("does not render disabled clear controls when no owned relations exist", () => {
@@ -913,6 +914,85 @@ describe("CandidateEditor", () => {
 
       expect(onEditChange).toHaveBeenLastCalledWith(null);
       expect(screen.getByRole("listbox", { name: "Projetos" })).toHaveDisplayValue([]);
+    });
+  });
+
+  describe("task graph (Slice 2C.5)", () => {
+    const taskT1 = "66666666-6666-4666-8666-666666666666";
+    const relationOptions = {
+      projects: [],
+      contexts: [],
+      people: [],
+      tasks: [{ id: taskT1, label: "Existing task" }],
+    };
+    const siblingCandidates = [{ index: 1, title: "Book the room" }];
+
+    it("does not render disabled graph controls when no options exist", () => {
+      renderEditor();
+
+      expect(screen.queryByRole("button", { name: "Remover tarefa-mãe: Enviar o relatório" })).not.toBeInTheDocument();
+    });
+
+    it("emits a parentRef selecting an existing task", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("combobox", { name: "Tarefa-mãe" }), [`task:${taskT1}`]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { parentRef: { type: "taskId", value: taskT1 } },
+      });
+    });
+
+    it("emits a parentRef selecting a sibling candidate from this batch", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions, siblingCandidates });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("combobox", { name: "Tarefa-mãe" }), ["candidate:1"]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { parentRef: { type: "candidateIndex", value: 1 } },
+      });
+    });
+
+    it("emits a dependsOn selection targeting an existing task", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("listbox", { name: "Depende de" }), [`task:${taskT1}`]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { dependsOn: [{ target: { type: "taskId", value: taskT1 }, type: "blocks" }] },
+      });
+    });
+
+    it("clears a parentRef selection via its dedicated clear control", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      await user.selectOptions(screen.getByRole("combobox", { name: "Tarefa-mãe" }), [`task:${taskT1}`]);
+
+      await user.click(screen.getByRole("button", { name: "Remover tarefa-mãe: Enviar o relatório" }));
+
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it("resets the graph selections when restoring the suggestion", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      await user.selectOptions(screen.getByRole("combobox", { name: "Tarefa-mãe" }), [`task:${taskT1}`]);
+
+      await user.click(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" }));
+
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+      expect(screen.getByRole("combobox", { name: "Tarefa-mãe" })).toHaveDisplayValue("Nenhuma");
     });
   });
 });

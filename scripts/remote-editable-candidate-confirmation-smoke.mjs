@@ -34,6 +34,7 @@ const countedTables = [
   "task_projects",
   "task_contexts",
   "task_people",
+  "task_dependencies",
   "entry_task_candidate_resolutions",
 ];
 
@@ -198,6 +199,23 @@ async function resolveV5(client, fixture, resolutions, edits, operationKey = cry
     p_candidate_edits: edits,
     p_operation_key: operationKey,
   }).then((result) => ({ ...result, operationKey }));
+}
+
+async function resolveV6(client, fixture, resolutions, edits, operationKey = crypto.randomUUID()) {
+  return client.rpc("confirm_entry_task_candidates_v6", {
+    p_entry_id: fixture.entryId,
+    p_expected_interpretation_id: fixture.interpretationId,
+    p_candidate_resolutions: resolutions,
+    p_candidate_edits: edits,
+    p_operation_key: operationKey,
+  }).then((result) => ({ ...result, operationKey }));
+}
+
+async function taskDependencies(client, taskId) {
+  return dataOrThrow(
+    await client.from("task_dependencies").select("depends_on_task_id,dependency_type").eq("task_id", taskId),
+    "read task_dependencies",
+  );
 }
 
 async function taskRows(client, taskIds) {
@@ -719,8 +737,89 @@ try {
   assert(v5ReconfirmedTask.status !== "cancelled", "V5 reconfirmation after undo created an inactive task");
   assert(v5ReconfirmedTask.candidate_index === 0, "V5 reconfirmation changed candidate identity");
 
+  // Slice 2C.5: subtasks and dependencies (v6 RPC).
+  const graphFixture = await createFixture(owner, "v6-parent-child", 4);
+  const graphParentChild = dataOrThrow(
+    await resolveV6(owner, graphFixture, [
+      { candidateIndex: 0, disposition: "confirmed" },
+      { candidateIndex: 1, disposition: "confirmed" },
+    ], [
+      { candidateIndex: 1, changes: { parentRef: { type: "candidateIndex", value: 0 } } },
+    ]),
+    "confirm v6 intra-batch parent/child",
+  );
+  const graphRows = await taskRows(owner, graphParentChild.task_ids);
+  const graphParentTask = graphRows.find((row) => row.candidate_index === 0);
+  const graphChildTask = graphRows.find((row) => row.candidate_index === 1);
+  const graphChildFull = dataOrThrow(
+    await owner.from("tasks").select("id,parent_task_id").eq("id", graphChildTask.id).single(),
+    "read v6 child task parent_task_id",
+  );
+  assert(graphChildFull.parent_task_id === graphParentTask.id, "V6 intra-batch parentRef did not resolve to the sibling's own task id");
+
+  const graphDependencyConfirm = dataOrThrow(
+    await resolveV6(owner, graphFixture, [{ candidateIndex: 2, disposition: "confirmed" }], [
+      {
+        candidateIndex: 2,
+        changes: {
+          dependsOn: [{ target: { type: "taskId", value: graphParentTask.id }, type: "blocks" }],
+        },
+      },
+    ]),
+    "confirm v6 taskId-typed dependency",
+  );
+  const [graphDependencyTask] = await taskRows(owner, graphDependencyConfirm.task_ids);
+  const graphDependencies = await taskDependencies(owner, graphDependencyTask.id);
+  assert(
+    graphDependencies.length === 1
+      && graphDependencies[0].depends_on_task_id === graphParentTask.id
+      && graphDependencies[0].dependency_type === "blocks",
+    "V6 taskId-typed dependency was not materialized",
+  );
+
+  const graphCycleFixture = await createFixture(owner, "v6-cycle", 2);
+  const graphCycleAttempt = await resolveV6(owner, graphCycleFixture, [
+    { candidateIndex: 0, disposition: "confirmed" },
+    { candidateIndex: 1, disposition: "confirmed" },
+  ], [
+    { candidateIndex: 0, changes: { parentRef: { type: "candidateIndex", value: 1 } } },
+    { candidateIndex: 1, changes: { parentRef: { type: "candidateIndex", value: 0 } } },
+  ]);
+  assertRpcError(graphCycleAttempt, "22023", "V6 direct parent cycle", "2C_GRAPH_CYCLE");
+  const graphCycleTaskCountResult = await owner
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("source_interpretation_id", graphCycleFixture.interpretationId);
+  if (graphCycleTaskCountResult.error) throw new Error(`count tasks after v6 cycle rejection: ${graphCycleTaskCountResult.error.message}`);
+  assert((graphCycleTaskCountResult.count ?? 0) === 0, "V6 cycle rejection was not atomic");
+
+  const otherOwnerTask = dataOrThrow(
+    await otherOwner.from("tasks").insert({
+      user_id: (await otherOwner.auth.getUser()).data.user.id,
+      title: `${fixturePrefix} other owner task`,
+    }).select("id").single(),
+    "create cross-owner task fixture",
+  );
+  const graphCrossOwnerFixture = await createFixture(owner, "v6-cross-owner", 1);
+  const graphCrossOwnerAttempt = await resolveV6(owner, graphCrossOwnerFixture, [
+    { candidateIndex: 0, disposition: "confirmed" },
+  ], [
+    { candidateIndex: 0, changes: { parentRef: { type: "taskId", value: otherOwnerTask.id } } },
+  ]);
+  assertRpcError(graphCrossOwnerAttempt, "22023", "V6 cross-owner parent reference", "2C_INVALID_GRAPH_REFERENCE");
+
+  const graphUndo = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: graphParentChild.undo_id }),
+    "undo v6 parent/child batch",
+  );
+  assert(graphUndo.undone === true, "V6 undo did not report success");
+  const graphRowsAfterUndo = await taskRows(owner, graphParentChild.task_ids);
+  assert(graphRowsAfterUndo.every((row) => row.status === "cancelled"), "V6 undo did not cancel both tasks");
+  const graphDependenciesAfterUndo = await taskDependencies(owner, graphDependencyTask.id);
+  assert(graphDependenciesAfterUndo.length === 1, "Undoing an unrelated V6 operation removed this task's own dependency row");
+
   smokeSummary = {
-    cases: 24,
+    cases: 29,
     fixturePrefix,
     preExistingAuthUsers: before.authUserIds.length,
     preExistingTableCounts: before.tableCounts,

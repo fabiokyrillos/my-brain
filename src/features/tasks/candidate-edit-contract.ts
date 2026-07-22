@@ -11,6 +11,8 @@ export type ManualPriority = (typeof manualPriorityValues)[number];
 
 const MAX_RELATION_IDS = 20;
 
+const MAX_DEPENDENCIES = 20;
+
 const candidateIndexSchema = z.number().int().nonnegative();
 const dueAtSchema = z.string().datetime({ offset: true });
 const manualPrioritySchema = z.enum(manualPriorityValues);
@@ -20,6 +22,38 @@ const relationIdArraySchema = z
   .superRefine((ids, context) => {
     if (new Set(ids).size !== ids.length) {
       context.addIssue({ code: "custom", message: "Relation IDs must be unique" });
+    }
+  });
+
+export const dependencyTypeValues = ["blocks", "requires", "related"] as const;
+export type DependencyType = (typeof dependencyTypeValues)[number];
+
+const graphReferenceSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("candidateIndex"), value: candidateIndexSchema }),
+  z.strictObject({ type: z.literal("taskId"), value: z.string().uuid() }),
+]);
+
+export type GraphReference =
+  | { type: "candidateIndex"; value: number }
+  | { type: "taskId"; value: string };
+
+const dependencyEntrySchema = z.strictObject({
+  target: graphReferenceSchema,
+  type: z.enum(dependencyTypeValues),
+});
+
+export type DependencyEntry = {
+  target: GraphReference;
+  type: DependencyType;
+};
+
+const dependsOnArraySchema = z
+  .array(dependencyEntrySchema)
+  .max(MAX_DEPENDENCIES)
+  .superRefine((entries, context) => {
+    const signatures = entries.map((entry) => JSON.stringify(entry.target));
+    if (new Set(signatures).size !== signatures.length) {
+      context.addIssue({ code: "custom", message: "Dependency targets must be unique" });
     }
   });
 
@@ -47,6 +81,8 @@ const candidateChangesSchema = z.strictObject({
   contextIds: relationIdArraySchema.optional(),
   personIds: relationIdArraySchema.optional(),
   waitingOnPersonIds: relationIdArraySchema.optional(),
+  parentRef: graphReferenceSchema.nullable().optional(),
+  dependsOn: dependsOnArraySchema.optional(),
 });
 
 const candidateEditCommandSchema = z.strictObject({
@@ -98,7 +134,9 @@ export type CandidateEditableField =
   | "projectIds"
   | "contextIds"
   | "personIds"
-  | "waitingOnPersonIds";
+  | "waitingOnPersonIds"
+  | "parentRef"
+  | "dependsOn";
 
 export type CandidateChanges = {
   title?: string;
@@ -112,7 +150,19 @@ export type CandidateChanges = {
   contextIds?: string[];
   personIds?: string[];
   waitingOnPersonIds?: string[];
+  parentRef?: GraphReference | null;
+  dependsOn?: DependencyEntry[];
 };
+
+function sortedUniqueDependencies(entries: readonly DependencyEntry[]): DependencyEntry[] {
+  const bySignature = new Map(
+    entries.map((entry) => [JSON.stringify(entry.target) + entry.type, entry] as const),
+  );
+  return [...bySignature.values()].sort((left, right) => (
+    JSON.stringify(left.target).localeCompare(JSON.stringify(right.target))
+    || left.type.localeCompare(right.type)
+  ));
+}
 
 function sortedUniqueIds(ids: readonly string[]): string[] {
   return [...new Set(ids)].sort((left, right) => left.localeCompare(right));
@@ -260,6 +310,21 @@ export function normalizeCandidateEdits(input: {
       }
     }
 
+    // The AI never suggests a parent or dependency either; the immutable
+    // baseline is always null/empty, so any non-null/non-empty value is an
+    // edit.
+    if (edit.changes.parentRef !== undefined && edit.changes.parentRef !== null) {
+      changes.parentRef = edit.changes.parentRef;
+      editedFieldCount += 1;
+    }
+    if (edit.changes.dependsOn !== undefined) {
+      const dependsOn = sortedUniqueDependencies(edit.changes.dependsOn);
+      if (dependsOn.length > 0) {
+        changes.dependsOn = dependsOn;
+        editedFieldCount += 1;
+      }
+    }
+
     const effectiveDueAt = edit.changes.dueAt !== undefined ? edit.changes.dueAt : suggestion.dueAt;
     const effectiveIntentionalNoDue = edit.changes.intentionalNoDue ?? false;
     const effectiveNoDueReason = edit.changes.noDueReason ?? null;
@@ -321,6 +386,12 @@ export function serializeCandidateEdits(edits: readonly CandidateEditCommand[]):
       }
       if (edit.changes.waitingOnPersonIds !== undefined) {
         changes.waitingOnPersonIds = sortedUniqueIds(edit.changes.waitingOnPersonIds);
+      }
+      if (edit.changes.parentRef !== undefined) {
+        changes.parentRef = edit.changes.parentRef;
+      }
+      if (edit.changes.dependsOn !== undefined) {
+        changes.dependsOn = sortedUniqueDependencies(edit.changes.dependsOn);
       }
 
       return { candidateIndex: edit.candidateIndex, changes };

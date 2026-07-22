@@ -459,13 +459,18 @@ select lives_ok(
   'editedFieldCount of 11 for a single edited candidate is now valid (7 Slice 2C.2 fields + 4 relation fields)'
 );
 
+-- The bound grew again (11 -> 13) in Slice 2C.5 (migration 202607220044,
+-- adding parentRef/dependsOn); 12 no longer exceeds it, so this assertion
+-- now targets the current actual ceiling instead, matching how this same
+-- file previously corrected a Slice 2C.2 assertion that Slice 2C.3 itself
+-- made stale.
 select throws_ok(
   $$select private.require_task_candidates_confirmed_edit_counts(
-    jsonb_build_object('candidateCount', 1, 'editedCandidateCount', 1, 'editedFieldCount', 12)
+    jsonb_build_object('candidateCount', 1, 'editedCandidateCount', 1, 'editedFieldCount', 14)
   )$$,
   '22023',
   null,
-  'editedFieldCount of 12 for a single edited candidate still exceeds the bound'
+  'editedFieldCount of 14 for a single edited candidate exceeds the current bound (raised again by Slice 2C.5)'
 );
 
 select lives_ok(
@@ -474,10 +479,10 @@ select lives_ok(
 );
 
 select throws_ok(
-  $$select private.validate_product_event_properties('candidate_edit_reset', jsonb_build_object('editedFieldCount', 12))$$,
+  $$select private.validate_product_event_properties('candidate_edit_reset', jsonb_build_object('editedFieldCount', 14))$$,
   '22023',
   null,
-  'candidate_edit_reset editedFieldCount of 12 still exceeds the bound'
+  'candidate_edit_reset editedFieldCount of 14 exceeds the current bound (raised again by Slice 2C.5)'
 );
 
 -- Cross-owner and unauthenticated denial (not trusted from any client layer) --

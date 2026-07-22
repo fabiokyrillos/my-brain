@@ -31,6 +31,8 @@ export type ConfirmTasksCode =
   | "already_materialized"
   | "invalid_payload"
   | "invalid_relation"
+  | "invalid_graph_reference"
+  | "graph_cycle"
   | "record_only"
   | "not_found"
   | "operation_failed";
@@ -394,6 +396,9 @@ export function TaskCandidateForm({
             const index = Number(candidate.key);
             const checked = selected.includes(index);
             const disposition = dispositionsByIndex.get(index) ?? "confirmed";
+            const siblingCandidates = visibleCandidates
+              .filter((sibling) => Number(sibling.key) !== index)
+              .map((sibling) => ({ index: Number(sibling.key), title: sibling.title }));
 
             return (
               <div
@@ -489,6 +494,7 @@ export function TaskCandidateForm({
                   onEditChange={(edit) => updateEdit(index, edit)}
                   onValidityChange={(valid) => updateValidity(index, valid)}
                   relationOptions={relationOptions}
+                  siblingCandidates={siblingCandidates}
                   selected={checked && disposition === "confirmed" && !pending}
                   timezone={timezone}
                 />

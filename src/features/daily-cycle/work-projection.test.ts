@@ -50,6 +50,7 @@ type TaskRow = {
   manual_priority: string | null;
   intentional_no_due: boolean;
   no_due_reason: string | null;
+  parent_task_id: string | null;
 };
 
 function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
@@ -66,6 +67,7 @@ function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
     manual_priority: null,
     intentional_no_due: false,
     no_due_reason: null,
+    parent_task_id: null,
     ...overrides,
   };
 }
@@ -273,12 +275,14 @@ describe("loadWorkProjection", () => {
       data: [{ id: "person-1", name: "Alice" }, { id: "person-2", name: "Bob" }],
       error: null,
     });
+    const taskDependenciesQuery = queryStub({ data: [], error: null });
     const tables: Record<string, ReturnType<typeof queryStub>> = {
       profiles: profileQuery,
       tasks: tasksQuery,
       task_projects: taskProjectsQuery,
       task_contexts: taskContextsQuery,
       task_people: taskPeopleQuery,
+      task_dependencies: taskDependenciesQuery,
       projects: projectsQuery,
       contexts: contextsQuery,
       people: peopleQuery,
@@ -304,6 +308,49 @@ describe("loadWorkProjection", () => {
     expect(taskProjectsQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(taskProjectsQuery.in).toHaveBeenCalledWith("task_id", ["task-001"]);
     expect(projectsQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("hydrates parent and dependency task references (Slice 2C.5)", async () => {
+    const profileQuery = queryStub({ data: { timezone: "America/Sao_Paulo" }, error: null });
+    const pageTasksQuery = queryStub({ data: [task(1, { parent_task_id: "task-parent" })], error: null });
+    const relatedTasksQuery = queryStub({
+      data: [
+        { id: "task-parent", title: "Plan the launch" },
+        { id: "task-blocker", title: "Draft outline" },
+      ],
+      error: null,
+    });
+    const emptyQuery = queryStub({ data: [], error: null });
+    const taskDependenciesQuery = queryStub({
+      data: [{ task_id: "task-001", depends_on_task_id: "task-blocker" }],
+      error: null,
+    });
+    let tasksCallCount = 0;
+    const from = vi.fn((table: string) => {
+      if (table === "profiles") return profileQuery;
+      if (table === "tasks") {
+        tasksCallCount += 1;
+        return tasksCallCount === 1 ? pageTasksQuery : relatedTasksQuery;
+      }
+      if (table === "task_dependencies") return taskDependenciesQuery;
+      return emptyQuery;
+    });
+
+    const page = await loadWorkProjection()({ from }, {
+      userId: "user-1",
+      locale: "en",
+      view: "all",
+      page: 1,
+    });
+
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        taskId: "task-001",
+        parent: { id: "task-parent", label: "Plan the launch" },
+        dependsOn: [{ id: "task-blocker", label: "Draft outline" }],
+      }),
+    ]);
+    expect(relatedTasksQuery.in).toHaveBeenCalledWith("id", expect.arrayContaining(["task-parent", "task-blocker"]));
   });
 
   it("skips relation queries entirely when the page has no tasks", async () => {

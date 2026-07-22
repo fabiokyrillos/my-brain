@@ -376,10 +376,10 @@ async function runDispositionJourney(
     .from("undo_operations")
     .select("operation_key,request_fingerprint")
     .eq("source_entry_id", fixture.entryId)
-    .eq("action_type", "confirm_entry_task_candidates_v5")
+    .eq("action_type", "confirm_entry_task_candidates_v6")
     .single();
   expect(operationError).toBeNull();
-  expect(operation?.operation_key).toMatch(/^confirm-v5:[0-9a-f-]{36}$/);
+  expect(operation?.operation_key).toMatch(/^confirm-v6:[0-9a-f-]{36}$/);
   expect(operation?.request_fingerprint).toMatch(/^[0-9a-f]{64}$/);
 
   const { data: interpretation, error: immutableError } = await owner
@@ -394,7 +394,7 @@ async function runDispositionJourney(
     .from("audit_logs")
     .select("action_type,after_state")
     .eq("source_entry_id", fixture.entryId)
-    .eq("action_type", "confirm_entry_task_candidates_v5")
+    .eq("action_type", "confirm_entry_task_candidates_v6")
     .single();
   expect(auditError).toBeNull();
   expect(audit?.after_state).toMatchObject({
@@ -454,7 +454,7 @@ async function runDispositionJourney(
   await expect(page.getByText(editedTitle, { exact: true })).toHaveCount(0);
 }
 
-test.describe("candidate dispositions through the production v5 Server Action", () => {
+test.describe("candidate dispositions through the production confirmation Server Action", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
   test.setTimeout(180_000);

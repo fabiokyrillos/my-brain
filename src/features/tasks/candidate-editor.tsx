@@ -14,6 +14,8 @@ import {
   type CandidateChanges,
   type CandidateEditCommand,
   type CandidateEditSuggestion,
+  type DependencyEntry,
+  type GraphReference,
   type ManualPriority,
 } from "./candidate-edit-contract";
 import {
@@ -34,13 +36,41 @@ type EditorValues = {
   contextIds: string[];
   personIds: string[];
   waitingOnPersonIds: string[];
+  parentRef: string;
+  dependsOn: string[];
 };
 
 const emptyRelationOptions: CandidateRelationOptions = Object.freeze({
   projects: [],
   contexts: [],
   people: [],
+  tasks: [],
 });
+
+export type SiblingCandidateOption = {
+  readonly index: number;
+  readonly title: string;
+};
+
+// Graph target select values encode the closed discriminated union as a
+// single string so a native <select>/<option> can represent it: another
+// confirmed candidate in this same batch ("candidate:<index>") or an
+// existing owned task ("task:<uuid>").
+function encodeGraphReference(ref: GraphReference): string {
+  return ref.type === "candidateIndex" ? `candidate:${ref.value}` : `task:${ref.value}`;
+}
+
+function decodeGraphReference(value: string): GraphReference | null {
+  if (value.startsWith("candidate:")) {
+    const index = Number(value.slice("candidate:".length));
+    return Number.isInteger(index) && index >= 0 ? { type: "candidateIndex", value: index } : null;
+  }
+  if (value.startsWith("task:")) {
+    const taskId = value.slice("task:".length);
+    return taskId ? { type: "taskId", value: taskId } : null;
+  }
+  return null;
+}
 
 type FieldError = {
   label: string;
@@ -77,6 +107,11 @@ const copy = {
     contexts: "Contextos",
     people: "Pessoas",
     waitingOn: "Aguardando por",
+    parentTask: "Tarefa-mãe",
+    dependsOn: "Depende de",
+    noneOption: "Nenhuma",
+    candidateGroupLabel: "Sugestões nesta revisão",
+    taskGroupLabel: "Tarefas existentes",
     noOptionsAvailable: "Nenhum registro disponível.",
     clearDescription: (title: string) => `Remover descrição: ${title}`,
     clearDueDate: (title: string) => `Remover prazo: ${title}`,
@@ -85,6 +120,8 @@ const copy = {
     clearContexts: (title: string) => `Remover contextos: ${title}`,
     clearPeople: (title: string) => `Remover pessoas: ${title}`,
     clearWaitingOn: (title: string) => `Remover pessoas aguardadas: ${title}`,
+    clearParentTask: (title: string) => `Remover tarefa-mãe: ${title}`,
+    clearDependsOn: (title: string) => `Remover dependências: ${title}`,
     noDueLabel: (title: string) => `Sem prazo definido: ${title}`,
     reset: (title: string) => `Restaurar sugestão: ${title}`,
     resetAnnouncement: "Sugestão restaurada.",
@@ -142,6 +179,11 @@ const copy = {
     contexts: "Contexts",
     people: "People",
     waitingOn: "Waiting on",
+    parentTask: "Parent task",
+    dependsOn: "Depends on",
+    noneOption: "None",
+    candidateGroupLabel: "Suggestions in this review",
+    taskGroupLabel: "Existing tasks",
     noOptionsAvailable: "No records available.",
     clearDescription: (title: string) => `Clear description: ${title}`,
     clearDueDate: (title: string) => `Clear due date: ${title}`,
@@ -150,6 +192,8 @@ const copy = {
     clearContexts: (title: string) => `Clear contexts: ${title}`,
     clearPeople: (title: string) => `Clear people: ${title}`,
     clearWaitingOn: (title: string) => `Clear waiting on: ${title}`,
+    clearParentTask: (title: string) => `Clear parent task: ${title}`,
+    clearDependsOn: (title: string) => `Clear dependencies: ${title}`,
     noDueLabel: (title: string) => `No due date: ${title}`,
     reset: (title: string) => `Reset to suggestion: ${title}`,
     resetAnnouncement: "Suggestion reset.",
@@ -187,6 +231,7 @@ export type CandidateEditorProps = {
   onEditChange: (edit: CandidateEditCommand | null) => void;
   onValidityChange?: (valid: boolean) => void;
   relationOptions?: CandidateRelationOptions;
+  siblingCandidates?: readonly SiblingCandidateOption[];
   selected: boolean;
   timezone: string;
 };
@@ -198,6 +243,7 @@ export function CandidateEditor({
   onEditChange,
   onValidityChange,
   relationOptions = emptyRelationOptions,
+  siblingCandidates = [],
   selected,
   timezone,
 }: CandidateEditorProps) {
@@ -224,6 +270,8 @@ export function CandidateEditor({
   const [contextIds, setContextIds] = useState<string[]>([]);
   const [personIds, setPersonIds] = useState<string[]>([]);
   const [waitingOnPersonIds, setWaitingOnPersonIds] = useState<string[]>([]);
+  const [parentRef, setParentRef] = useState("");
+  const [dependsOn, setDependsOn] = useState<string[]>([]);
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
@@ -248,6 +296,8 @@ export function CandidateEditor({
   const contextsId = `${id}-contexts`;
   const peopleId = `${id}-people`;
   const waitingOnId = `${id}-waiting-on`;
+  const parentTaskId = `${id}-parent-task`;
+  const dependsOnId = `${id}-depends-on`;
   const titleErrorId = `${id}-title-error`;
   const descriptionErrorId = `${id}-description-error`;
   const dueDateErrorId = `${id}-due-date-error`;
@@ -279,6 +329,8 @@ export function CandidateEditor({
       setContextIds([]);
       setPersonIds([]);
       setWaitingOnPersonIds([]);
+      setParentRef("");
+      setDependsOn([]);
       setTitleTouched(false);
       setDescriptionTouched(false);
       setDueDateTouched(false);
@@ -355,6 +407,8 @@ export function CandidateEditor({
     contextIds,
     personIds,
     waitingOnPersonIds,
+    parentRef,
+    dependsOn,
   };
   const canonicalEdit = safelyBuildEdit({
     candidateIndex,
@@ -511,6 +565,20 @@ export function CandidateEditor({
     emitEdit(nextValues);
   }
 
+  function changeParentRef(nextParentRef: string) {
+    const nextValues = { ...values, parentRef: nextParentRef };
+    setParentRef(nextParentRef);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changeDependsOn(nextDependsOn: string[]) {
+    const nextValues = { ...values, dependsOn: nextDependsOn };
+    setDependsOn(nextDependsOn);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
   function resetSuggestion() {
     const editedFieldCount = canonicalEdit ? Object.keys(canonicalEdit.changes).length : 0;
     setTitle(candidate.title);
@@ -524,6 +592,8 @@ export function CandidateEditor({
     setContextIds([]);
     setPersonIds([]);
     setWaitingOnPersonIds([]);
+    setParentRef("");
+    setDependsOn([]);
     setTitleTouched(false);
     setDescriptionTouched(false);
     setDueDateTouched(false);
@@ -576,6 +646,16 @@ export function CandidateEditor({
   function clearWaitingOnPersonIds() {
     changeWaitingOnPersonIds([]);
   }
+
+  function clearParentRef() {
+    changeParentRef("");
+  }
+
+  function clearDependsOn() {
+    changeDependsOn([]);
+  }
+
+  const graphSiblingOptions = siblingCandidates.filter((sibling) => sibling.index !== candidateIndex);
 
   return (
     <fieldset
@@ -943,6 +1023,95 @@ export function CandidateEditor({
             {locale === "pt-BR" ? "Remover pessoas aguardadas" : "Clear waiting on"}
           </button>
 
+          <label className="field-label" htmlFor={parentTaskId}>
+            <span>{localized.parentTask}</span>
+            <select
+              disabled={!selected || (graphSiblingOptions.length === 0 && relationOptions.tasks.length === 0)}
+              id={parentTaskId}
+              onChange={(event) => changeParentRef(event.target.value)}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={parentRef}
+            >
+              <option value="">{localized.noneOption}</option>
+              {graphSiblingOptions.length > 0 && (
+                <optgroup label={localized.candidateGroupLabel}>
+                  {graphSiblingOptions.map((sibling) => (
+                    <option key={`candidate-${sibling.index}`} value={encodeGraphReference({ type: "candidateIndex", value: sibling.index })}>
+                      {sibling.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {relationOptions.tasks.length > 0 && (
+                <optgroup label={localized.taskGroupLabel}>
+                  {relationOptions.tasks.map((task) => (
+                    <option key={`task-${task.id}`} value={encodeGraphReference({ type: "taskId", value: task.id })}>
+                      {task.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearParentTask(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || parentRef === ""}
+            onClick={clearParentRef}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover tarefa-mãe" : "Clear parent task"}
+          </button>
+
+          <label className="field-label" htmlFor={dependsOnId}>
+            <span>{localized.dependsOn}</span>
+            <select
+              disabled={!selected || (graphSiblingOptions.length === 0 && relationOptions.tasks.length === 0)}
+              id={dependsOnId}
+              multiple
+              onChange={(event) => changeDependsOn(selectedOptionValues(event))}
+              size={Math.min(5, Math.max(2, graphSiblingOptions.length + relationOptions.tasks.length))}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={dependsOn}
+            >
+              {graphSiblingOptions.length === 0 && relationOptions.tasks.length === 0
+                ? <option disabled value="">{localized.noOptionsAvailable}</option>
+                : (
+                  <>
+                    {graphSiblingOptions.length > 0 && (
+                      <optgroup label={localized.candidateGroupLabel}>
+                        {graphSiblingOptions.map((sibling) => (
+                          <option key={`candidate-${sibling.index}`} value={encodeGraphReference({ type: "candidateIndex", value: sibling.index })}>
+                            {sibling.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {relationOptions.tasks.length > 0 && (
+                      <optgroup label={localized.taskGroupLabel}>
+                        {relationOptions.tasks.map((task) => (
+                          <option key={`task-${task.id}`} value={encodeGraphReference({ type: "taskId", value: task.id })}>
+                            {task.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </>
+                )}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearDependsOn(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || dependsOn.length === 0}
+            onClick={clearDependsOn}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover dependências" : "Clear dependencies"}
+          </button>
+
           <button
             aria-label={localized.reset(candidate.title)}
             className="button-secondary"
@@ -1023,6 +1192,26 @@ function buildEdit({
 
   if (values.waitingOnPersonIds.length > 0) {
     changes.waitingOnPersonIds = values.waitingOnPersonIds;
+  }
+
+  if (values.parentRef !== "") {
+    const parentRef = decodeGraphReference(values.parentRef);
+    if (!parentRef) {
+      throw new Error("Invalid parent reference");
+    }
+    changes.parentRef = parentRef;
+  }
+
+  if (values.dependsOn.length > 0) {
+    const dependsOn: DependencyEntry[] = [];
+    for (const encoded of values.dependsOn) {
+      const target = decodeGraphReference(encoded);
+      if (!target) {
+        throw new Error("Invalid dependency reference");
+      }
+      dependsOn.push({ target, type: "blocks" });
+    }
+    changes.dependsOn = dependsOn;
   }
 
   const normalized = normalizeCandidateEdits({
