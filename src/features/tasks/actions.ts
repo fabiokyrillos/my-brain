@@ -245,17 +245,7 @@ export async function resolveEntryTaskCandidates(
     );
   }
 
-  const callV5 = supabase.rpc as unknown as (
-    name: "confirm_entry_task_candidates_v5",
-    args: {
-      p_entry_id: string;
-      p_expected_interpretation_id: string;
-      p_candidate_resolutions: Json;
-      p_candidate_edits: Json;
-      p_operation_key: string;
-    },
-  ) => Promise<{ data: unknown; error: RpcError | null }>;
-  const { data, error } = await callV5("confirm_entry_task_candidates_v5", {
+  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v5", {
     p_entry_id: parsed.data.entryId,
     p_expected_interpretation_id: parsed.data.interpretationId,
     p_candidate_resolutions: parsed.data.candidateResolutions,

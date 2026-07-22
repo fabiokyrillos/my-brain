@@ -69,13 +69,7 @@ export async function loadInboxProjection(
   const entryIds = paginated.items.map((entry) => entry.id);
   const interpretationIds = paginated.items.flatMap((entry) =>
     entry.current_interpretation_id ? [entry.current_interpretation_id] : []);
-  const candidateResolutionsQuery = (supabase as unknown as {
-    from(table: "entry_task_candidate_resolutions"): {
-      select(columns: string): {
-        in(column: string, values: string[]): PromiseLike<{ data: unknown; error: unknown }>;
-      };
-    };
-  }).from("entry_task_candidate_resolutions")
+  const candidateResolutionsQuery = supabase.from("entry_task_candidate_resolutions")
     .select("entry_id,interpretation_id,candidate_index,disposition")
     .in("entry_id", entryIds);
 

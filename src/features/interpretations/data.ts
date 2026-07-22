@@ -241,17 +241,7 @@ export function parseInterpretationRevision(
 }
 
 export async function loadInterpretationReview(supabase: SupabaseClient, entryId: string) {
-  const candidateResolutionQuery = (supabase as unknown as {
-    from(table: "entry_task_candidate_resolutions"): {
-      select(columns: string): {
-        eq(column: string, value: string): {
-          order(column: string, options: { ascending: boolean }): {
-            limit(count: number): PromiseLike<{ data: unknown; error: unknown }>;
-          };
-        };
-      };
-    };
-  }).from("entry_task_candidate_resolutions")
+  const candidateResolutionQuery = supabase.from("entry_task_candidate_resolutions")
     .select("interpretation_id,candidate_index,disposition,created_at")
     .eq("entry_id", entryId)
     .order("created_at", { ascending: false })
