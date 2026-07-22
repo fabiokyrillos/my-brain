@@ -28,7 +28,7 @@ type Result = { data: unknown; error: unknown };
 
 function queryStub(result: Result) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "neq", "not", "lt", "order", "range"]) {
+  for (const method of ["select", "eq", "neq", "not", "lt", "order", "range", "in"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.maybeSingle = vi.fn(async () => result);
@@ -76,7 +76,12 @@ function clientMock(options: { tasks?: TaskRow[]; timezone?: string | null } = {
     error: null,
   });
   const tasksQuery = queryStub({ data: options.tasks ?? [task(1)], error: null });
-  const from = vi.fn((table: string) => table === "profiles" ? profileQuery : tasksQuery);
+  const emptyRelationQuery = queryStub({ data: [], error: null });
+  const from = vi.fn((table: string) => {
+    if (table === "profiles") return profileQuery;
+    if (table === "tasks") return tasksQuery;
+    return emptyRelationQuery;
+  });
   return { client: { from }, from, profileQuery, tasksQuery };
 }
 
@@ -190,6 +195,10 @@ describe("loadWorkProjection", () => {
         humanState: "waiting_on_someone",
         origin: "brain",
         availableActions: [{ id: "complete_task" }, { id: "resume_task" }],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       },
       {
         taskId: "task-002",
@@ -199,6 +208,10 @@ describe("loadWorkProjection", () => {
         humanState: "completed",
         origin: "you",
         availableActions: [{ id: "reopen_task" }],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       },
     ]);
   });
@@ -234,7 +247,77 @@ describe("loadWorkProjection", () => {
         humanState: "not_started",
         origin: "you",
         availableActions: [{ id: "complete_task" }, { id: "wait_task" }],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       },
     ]);
+  });
+
+  it("hydrates owned project, context, person, and waiting-on relations (Slice 2C.3)", async () => {
+    const profileQuery = queryStub({ data: { timezone: "America/Sao_Paulo" }, error: null });
+    const tasksQuery = queryStub({ data: [task(1)], error: null });
+    const taskProjectsQuery = queryStub({ data: [{ task_id: "task-001", project_id: "project-1" }], error: null });
+    const taskContextsQuery = queryStub({ data: [{ task_id: "task-001", context_id: "context-1" }], error: null });
+    const taskPeopleQuery = queryStub({
+      data: [
+        { task_id: "task-001", person_id: "person-1", role: "involved" },
+        { task_id: "task-001", person_id: "person-2", role: "waiting_on" },
+      ],
+      error: null,
+    });
+    const projectsQuery = queryStub({ data: [{ id: "project-1", name: "Website relaunch" }], error: null });
+    const contextsQuery = queryStub({ data: [{ id: "context-1", name: "Work" }], error: null });
+    const peopleQuery = queryStub({
+      data: [{ id: "person-1", name: "Alice" }, { id: "person-2", name: "Bob" }],
+      error: null,
+    });
+    const tables: Record<string, ReturnType<typeof queryStub>> = {
+      profiles: profileQuery,
+      tasks: tasksQuery,
+      task_projects: taskProjectsQuery,
+      task_contexts: taskContextsQuery,
+      task_people: taskPeopleQuery,
+      projects: projectsQuery,
+      contexts: contextsQuery,
+      people: peopleQuery,
+    };
+    const from = vi.fn((table: string) => tables[table]);
+
+    const page = await loadWorkProjection()({ from }, {
+      userId: "user-1",
+      locale: "en",
+      view: "all",
+      page: 1,
+    });
+
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        taskId: "task-001",
+        projects: [{ id: "project-1", label: "Website relaunch" }],
+        contexts: [{ id: "context-1", label: "Work" }],
+        people: [{ id: "person-1", label: "Alice" }],
+        waitingOnPeople: [{ id: "person-2", label: "Bob" }],
+      }),
+    ]);
+    expect(taskProjectsQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(taskProjectsQuery.in).toHaveBeenCalledWith("task_id", ["task-001"]);
+    expect(projectsQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("skips relation queries entirely when the page has no tasks", async () => {
+    const { client, from } = clientMock({ tasks: [] });
+
+    await loadWorkProjection()(client, {
+      userId: "user-1",
+      locale: "en",
+      view: "all",
+      page: 1,
+    });
+
+    expect(from).not.toHaveBeenCalledWith("task_projects");
+    expect(from).not.toHaveBeenCalledWith("task_contexts");
+    expect(from).not.toHaveBeenCalledWith("task_people");
   });
 });

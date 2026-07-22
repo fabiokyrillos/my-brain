@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import {
   recordCandidateEditReset,
@@ -20,6 +20,7 @@ import {
   formatInstantForDateTimeLocal,
   localDateTimeToOffsetInstant,
 } from "./candidate-due-date";
+import type { CandidateRelationOptions } from "./relation-options";
 
 type EditorValues = {
   title: string;
@@ -29,7 +30,17 @@ type EditorValues = {
   priority: ManualPriority | "";
   noDue: boolean;
   noDueReason: string;
+  projectIds: string[];
+  contextIds: string[];
+  personIds: string[];
+  waitingOnPersonIds: string[];
 };
+
+const emptyRelationOptions: CandidateRelationOptions = Object.freeze({
+  projects: [],
+  contexts: [],
+  people: [],
+});
 
 type FieldError = {
   label: string;
@@ -62,9 +73,18 @@ const copy = {
     noDescription: "Sem descrição",
     noDueDate: "Sem prazo",
     noPriority: "Sem prioridade",
+    projects: "Projetos",
+    contexts: "Contextos",
+    people: "Pessoas",
+    waitingOn: "Aguardando por",
+    noOptionsAvailable: "Nenhum registro disponível.",
     clearDescription: (title: string) => `Remover descrição: ${title}`,
     clearDueDate: (title: string) => `Remover prazo: ${title}`,
     clearPlannedDate: (title: string) => `Remover data planejada: ${title}`,
+    clearProjects: (title: string) => `Remover projetos: ${title}`,
+    clearContexts: (title: string) => `Remover contextos: ${title}`,
+    clearPeople: (title: string) => `Remover pessoas: ${title}`,
+    clearWaitingOn: (title: string) => `Remover pessoas aguardadas: ${title}`,
     noDueLabel: (title: string) => `Sem prazo definido: ${title}`,
     reset: (title: string) => `Restaurar sugestão: ${title}`,
     resetAnnouncement: "Sugestão restaurada.",
@@ -118,9 +138,18 @@ const copy = {
     noDescription: "No description",
     noDueDate: "No due date",
     noPriority: "No priority",
+    projects: "Projects",
+    contexts: "Contexts",
+    people: "People",
+    waitingOn: "Waiting on",
+    noOptionsAvailable: "No records available.",
     clearDescription: (title: string) => `Clear description: ${title}`,
     clearDueDate: (title: string) => `Clear due date: ${title}`,
     clearPlannedDate: (title: string) => `Clear planned date: ${title}`,
+    clearProjects: (title: string) => `Clear projects: ${title}`,
+    clearContexts: (title: string) => `Clear contexts: ${title}`,
+    clearPeople: (title: string) => `Clear people: ${title}`,
+    clearWaitingOn: (title: string) => `Clear waiting on: ${title}`,
     noDueLabel: (title: string) => `No due date: ${title}`,
     reset: (title: string) => `Reset to suggestion: ${title}`,
     resetAnnouncement: "Suggestion reset.",
@@ -157,6 +186,7 @@ export type CandidateEditorProps = {
   locale: "pt-BR" | "en";
   onEditChange: (edit: CandidateEditCommand | null) => void;
   onValidityChange?: (valid: boolean) => void;
+  relationOptions?: CandidateRelationOptions;
   selected: boolean;
   timezone: string;
 };
@@ -167,6 +197,7 @@ export function CandidateEditor({
   locale,
   onEditChange,
   onValidityChange,
+  relationOptions = emptyRelationOptions,
   selected,
   timezone,
 }: CandidateEditorProps) {
@@ -189,6 +220,10 @@ export function CandidateEditor({
   const [priority, setPriority] = useState<ManualPriority | "">("");
   const [noDue, setNoDue] = useState(false);
   const [noDueReason, setNoDueReason] = useState("");
+  const [projectIds, setProjectIds] = useState<string[]>([]);
+  const [contextIds, setContextIds] = useState<string[]>([]);
+  const [personIds, setPersonIds] = useState<string[]>([]);
+  const [waitingOnPersonIds, setWaitingOnPersonIds] = useState<string[]>([]);
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
@@ -209,6 +244,10 @@ export function CandidateEditor({
   const priorityId = `${id}-priority`;
   const noDueId = `${id}-no-due`;
   const noDueReasonId = `${id}-no-due-reason`;
+  const projectsId = `${id}-projects`;
+  const contextsId = `${id}-contexts`;
+  const peopleId = `${id}-people`;
+  const waitingOnId = `${id}-waiting-on`;
   const titleErrorId = `${id}-title-error`;
   const descriptionErrorId = `${id}-description-error`;
   const dueDateErrorId = `${id}-due-date-error`;
@@ -236,6 +275,10 @@ export function CandidateEditor({
       setPriority("");
       setNoDue(false);
       setNoDueReason("");
+      setProjectIds([]);
+      setContextIds([]);
+      setPersonIds([]);
+      setWaitingOnPersonIds([]);
       setTitleTouched(false);
       setDescriptionTouched(false);
       setDueDateTouched(false);
@@ -300,7 +343,19 @@ export function CandidateEditor({
     timezone,
   ]);
 
-  const values = { title, description, dueDate, plannedDate, priority, noDue, noDueReason };
+  const values = {
+    title,
+    description,
+    dueDate,
+    plannedDate,
+    priority,
+    noDue,
+    noDueReason,
+    projectIds,
+    contextIds,
+    personIds,
+    waitingOnPersonIds,
+  };
   const canonicalEdit = safelyBuildEdit({
     candidateIndex,
     originalDueDate,
@@ -428,6 +483,34 @@ export function CandidateEditor({
     emitEdit(nextValues);
   }
 
+  function changeProjectIds(nextProjectIds: string[]) {
+    const nextValues = { ...values, projectIds: nextProjectIds };
+    setProjectIds(nextProjectIds);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changeContextIds(nextContextIds: string[]) {
+    const nextValues = { ...values, contextIds: nextContextIds };
+    setContextIds(nextContextIds);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changePersonIds(nextPersonIds: string[]) {
+    const nextValues = { ...values, personIds: nextPersonIds };
+    setPersonIds(nextPersonIds);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
+  function changeWaitingOnPersonIds(nextWaitingOnPersonIds: string[]) {
+    const nextValues = { ...values, waitingOnPersonIds: nextWaitingOnPersonIds };
+    setWaitingOnPersonIds(nextWaitingOnPersonIds);
+    setAnnouncement("");
+    emitEdit(nextValues);
+  }
+
   function resetSuggestion() {
     const editedFieldCount = canonicalEdit ? Object.keys(canonicalEdit.changes).length : 0;
     setTitle(candidate.title);
@@ -437,6 +520,10 @@ export function CandidateEditor({
     setPriority("");
     setNoDue(false);
     setNoDueReason("");
+    setProjectIds([]);
+    setContextIds([]);
+    setPersonIds([]);
+    setWaitingOnPersonIds([]);
     setTitleTouched(false);
     setDescriptionTouched(false);
     setDueDateTouched(false);
@@ -472,6 +559,22 @@ export function CandidateEditor({
     setPlannedDateTouched(false);
     setAnnouncement("");
     emitEdit(nextValues);
+  }
+
+  function clearProjectIds() {
+    changeProjectIds([]);
+  }
+
+  function clearContextIds() {
+    changeContextIds([]);
+  }
+
+  function clearPersonIds() {
+    changePersonIds([]);
+  }
+
+  function clearWaitingOnPersonIds() {
+    changeWaitingOnPersonIds([]);
   }
 
   return (
@@ -724,6 +827,122 @@ export function CandidateEditor({
             </>
           )}
 
+          <label className="field-label" htmlFor={projectsId}>
+            <span>{localized.projects}</span>
+            <select
+              disabled={!selected || relationOptions.projects.length === 0}
+              id={projectsId}
+              multiple
+              onChange={(event) => changeProjectIds(selectedOptionValues(event))}
+              size={Math.min(5, Math.max(2, relationOptions.projects.length))}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={projectIds}
+            >
+              {relationOptions.projects.length === 0
+                ? <option disabled value="">{localized.noOptionsAvailable}</option>
+                : relationOptions.projects.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearProjects(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || relationOptions.projects.length === 0}
+            onClick={clearProjectIds}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover projetos" : "Clear projects"}
+          </button>
+
+          <label className="field-label" htmlFor={contextsId}>
+            <span>{localized.contexts}</span>
+            <select
+              disabled={!selected || relationOptions.contexts.length === 0}
+              id={contextsId}
+              multiple
+              onChange={(event) => changeContextIds(selectedOptionValues(event))}
+              size={Math.min(5, Math.max(2, relationOptions.contexts.length))}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={contextIds}
+            >
+              {relationOptions.contexts.length === 0
+                ? <option disabled value="">{localized.noOptionsAvailable}</option>
+                : relationOptions.contexts.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearContexts(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || relationOptions.contexts.length === 0}
+            onClick={clearContextIds}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover contextos" : "Clear contexts"}
+          </button>
+
+          <label className="field-label" htmlFor={peopleId}>
+            <span>{localized.people}</span>
+            <select
+              disabled={!selected || relationOptions.people.length === 0}
+              id={peopleId}
+              multiple
+              onChange={(event) => changePersonIds(selectedOptionValues(event))}
+              size={Math.min(5, Math.max(2, relationOptions.people.length))}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={personIds}
+            >
+              {relationOptions.people.length === 0
+                ? <option disabled value="">{localized.noOptionsAvailable}</option>
+                : relationOptions.people.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearPeople(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || relationOptions.people.length === 0}
+            onClick={clearPersonIds}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover pessoas" : "Clear people"}
+          </button>
+
+          <label className="field-label" htmlFor={waitingOnId}>
+            <span>{localized.waitingOn}</span>
+            <select
+              disabled={!selected || relationOptions.people.length === 0}
+              id={waitingOnId}
+              multiple
+              onChange={(event) => changeWaitingOnPersonIds(selectedOptionValues(event))}
+              size={Math.min(5, Math.max(2, relationOptions.people.length))}
+              style={{ minHeight: 44, minWidth: 44 }}
+              value={waitingOnPersonIds}
+            >
+              {relationOptions.people.length === 0
+                ? <option disabled value="">{localized.noOptionsAvailable}</option>
+                : relationOptions.people.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+            </select>
+          </label>
+          <button
+            aria-label={localized.clearWaitingOn(candidate.title)}
+            className="button-secondary"
+            disabled={!selected || relationOptions.people.length === 0}
+            onClick={clearWaitingOnPersonIds}
+            style={{ minHeight: 44, minWidth: 44 }}
+            type="button"
+          >
+            {locale === "pt-BR" ? "Remover pessoas aguardadas" : "Clear waiting on"}
+          </button>
+
           <button
             aria-label={localized.reset(candidate.title)}
             className="button-secondary"
@@ -745,6 +964,10 @@ export function CandidateEditor({
 }
 
 const manualPriorityOptionValues: readonly (ManualPriority | "")[] = ["", ...manualPriorityValues];
+
+function selectedOptionValues(event: ChangeEvent<HTMLSelectElement>): string[] {
+  return Array.from(event.target.selectedOptions, (option) => option.value);
+}
 
 function buildEdit({
   candidateIndex,
@@ -782,6 +1005,22 @@ function buildEdit({
 
   if (values.noDueReason.trim() !== "") {
     changes.noDueReason = values.noDueReason;
+  }
+
+  if (values.projectIds.length > 0) {
+    changes.projectIds = values.projectIds;
+  }
+
+  if (values.contextIds.length > 0) {
+    changes.contextIds = values.contextIds;
+  }
+
+  if (values.personIds.length > 0) {
+    changes.personIds = values.personIds;
+  }
+
+  if (values.waitingOnPersonIds.length > 0) {
+    changes.waitingOnPersonIds = values.waitingOnPersonIds;
   }
 
   const normalized = normalizeCandidateEdits({

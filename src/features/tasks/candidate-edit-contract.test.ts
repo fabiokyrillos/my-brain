@@ -521,3 +521,106 @@ describe("candidate edit contract — planning, priority, and no-due (Slice 2C.2
     );
   });
 });
+
+describe("candidate edit contract — owned relations (Slice 2C.3)", () => {
+  const projectA = "11111111-1111-4111-8111-111111111111";
+  const projectB = "22222222-2222-4222-8222-222222222222";
+  const personA = "33333333-3333-4333-8333-333333333333";
+  const personB = "44444444-4444-4444-8444-444444444444";
+  const contextA = "55555555-5555-4555-8555-555555555555";
+
+  it("canonicalizes a project-only edit", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { projectIds: [projectA] } }])).toEqual({
+      edits: [{ candidateIndex: 0, changes: { projectIds: [projectA] } }],
+      editedCandidateCount: 1,
+      editedFieldCount: 1,
+    });
+  });
+
+  it("sorts relation IDs canonically regardless of submission order", () => {
+    expect(normalize([{
+      candidateIndex: 0,
+      changes: { projectIds: [projectB, projectA] },
+    }]).edits).toEqual([
+      { candidateIndex: 0, changes: { projectIds: [projectA, projectB] } },
+    ]);
+  });
+
+  it("canonicalizes context, person, and waiting-on edits together", () => {
+    expect(normalize([{
+      candidateIndex: 1,
+      changes: {
+        contextIds: [contextA],
+        personIds: [personA, personB],
+        waitingOnPersonIds: [personA],
+      },
+    }])).toEqual({
+      edits: [{
+        candidateIndex: 1,
+        changes: {
+          contextIds: [contextA],
+          personIds: [personA, personB],
+          waitingOnPersonIds: [personA],
+        },
+      }],
+      editedCandidateCount: 1,
+      editedFieldCount: 3,
+    });
+  });
+
+  it("treats an empty relation array as unchanged (no AI suggestion exists for relations)", () => {
+    expect(normalize([{ candidateIndex: 0, changes: { projectIds: [] } }])).toEqual({
+      edits: [],
+      editedCandidateCount: 0,
+      editedFieldCount: 0,
+    });
+  });
+
+  it("rejects a malformed relation ID", () => {
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { projectIds: ["not-a-uuid"] } },
+    ]).success).toBe(false);
+  });
+
+  it("rejects duplicate relation IDs within the same field", () => {
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { personIds: [personA, personA] } },
+    ]).success).toBe(false);
+  });
+
+  it("rejects more than 20 relation IDs", () => {
+    const tooMany = Array.from({ length: 21 }, (_, index) => (
+      `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`
+    ));
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { projectIds: tooMany } },
+    ]).success).toBe(false);
+  });
+
+  it("accepts exactly 20 relation IDs", () => {
+    const exactlyMax = Array.from({ length: 20 }, (_, index) => (
+      `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`
+    ));
+    expect(candidateEditArraySchema.safeParse([
+      { candidateIndex: 0, changes: { projectIds: exactlyMax } },
+    ]).success).toBe(true);
+  });
+
+  it("serializes relation fields in canonical field order, sorted and deduplicated", () => {
+    const edits: CandidateEditCommand[] = [
+      {
+        candidateIndex: 0,
+        changes: {
+          waitingOnPersonIds: [personA],
+          personIds: [personB, personA],
+          contextIds: [contextA],
+          projectIds: [projectB, projectA],
+        },
+      },
+    ];
+
+    expect(serializeCandidateEdits(edits)).toBe(
+      `[{"candidateIndex":0,"changes":{"projectIds":["${projectA}","${projectB}"],"contextIds":["${contextA}"],"personIds":["${personA}","${personB}"],"waitingOnPersonIds":["${personA}"]}}]`,
+    );
+  });
+});

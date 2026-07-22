@@ -250,10 +250,12 @@ describe("loadEntryReviewProjection", () => {
     const jobsStub = queryStub({ data: null, error: null });
     const questionsStub = queryStub({ data: [], error: null });
     const profileStub = queryStub({ data: { timezone: "America/New_York" }, error: null });
+    const relationStub = queryStub({ data: [], error: null });
     const from = vi.fn((table: string) => {
       if (table === "jobs") return jobsStub;
       if (table === "pending_questions") return questionsStub;
-      return profileStub;
+      if (table === "profiles") return profileStub;
+      return relationStub;
     });
 
     const result = await loadEntryReviewProjection(

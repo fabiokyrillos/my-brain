@@ -11,6 +11,7 @@ import {
   type InboxItemView,
   type NeedsAttentionItemView,
   type ProductState,
+  type RelationSummary,
   type WorkItemHumanState,
   type WorkItemOrigin,
   type WorkItemPriority,
@@ -54,6 +55,11 @@ export type NeedsAttentionItemSource = {
   readonly groupKey: string;
 };
 
+export type RelationSummarySource = {
+  readonly id: unknown;
+  readonly label: unknown;
+};
+
 export type WorkItemSource = {
   readonly taskId: string;
   readonly title: string;
@@ -66,6 +72,10 @@ export type WorkItemSource = {
   readonly status: string;
   readonly createdBy: string;
   readonly availableActions: readonly ProjectionActionSource[];
+  readonly projects?: readonly RelationSummarySource[] | null;
+  readonly contexts?: readonly RelationSummarySource[] | null;
+  readonly people?: readonly RelationSummarySource[] | null;
+  readonly waitingOnPeople?: readonly RelationSummarySource[] | null;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -203,6 +213,28 @@ function toWorkItemHumanState(value: unknown): WorkItemHumanState | null {
   return workItemStatesByInternalStatus[value as keyof typeof workItemStatesByInternalStatus] ?? null;
 }
 
+function toRelationSummary(source: unknown): RelationSummary | null {
+  if (!isRecord(source) || !isNonEmptyString(source.id) || !isNonEmptyString(source.label)) {
+    return null;
+  }
+
+  return Object.freeze({ id: source.id, label: source.label });
+}
+
+function toRelationSummaries(source: unknown): readonly RelationSummary[] | null {
+  if (source === undefined || source === null) return Object.freeze([]);
+  if (!Array.isArray(source)) return null;
+
+  const summaries: RelationSummary[] = [];
+  for (const item of source) {
+    const summary = toRelationSummary(item);
+    if (!summary) return null;
+    summaries.push(summary);
+  }
+
+  return Object.freeze(summaries);
+}
+
 function toWorkItemOrigin(value: unknown): WorkItemOrigin | null {
   if (value === "user") return "you";
   if (value === "agent") return "brain";
@@ -308,6 +340,10 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
   const humanState = toWorkItemHumanState(source.status);
   const origin = toWorkItemOrigin(source.createdBy);
   const availableActions = toAvailableActions(source.availableActions);
+  const projects = toRelationSummaries(source.projects);
+  const contexts = toRelationSummaries(source.contexts);
+  const people = toRelationSummaries(source.people);
+  const waitingOnPeople = toRelationSummaries(source.waitingOnPeople);
   if (
     description === null
     || dueAt === null
@@ -317,6 +353,10 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
     || !humanState
     || !origin
     || !availableActions
+    || !projects
+    || !contexts
+    || !people
+    || !waitingOnPeople
   ) return null;
 
   return Object.freeze({
@@ -331,5 +371,9 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
     humanState,
     origin,
     availableActions,
+    projects,
+    contexts,
+    people,
+    waitingOnPeople,
   });
 }

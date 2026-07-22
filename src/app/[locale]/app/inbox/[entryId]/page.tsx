@@ -53,6 +53,7 @@ export default async function EntryDetailPage({
     history,
     taskUndoId,
     correctionUndoId,
+    relationOptions,
   } = review;
 
   const canRetry = view.availableActions.some((action) => action.id === "retry_processing");
@@ -87,6 +88,7 @@ export default async function EntryDetailPage({
           interpretationId={editableCurrent.interpretationId}
           locale={locale}
           operationKey={randomUUID()}
+          relationOptions={relationOptions}
           timezone={timezone}
           undoAction={undoAgentAction}
         />

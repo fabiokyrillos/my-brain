@@ -3,6 +3,7 @@ import type { EntryExtraction } from "@/lib/ai/extraction-schema";
 import type { InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
 import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
 import type { EntityOption } from "@/features/interpretations/revision-editor";
+import { loadCandidateRelationOptions, type CandidateRelationOptions } from "@/features/tasks/relation-options";
 import { requireSupabaseData } from "@/lib/supabase/result";
 import type { createClient } from "@/lib/supabase/server";
 import type {
@@ -53,6 +54,7 @@ export type EntryReviewProjection = {
   history: EntryReviewHistoryItem[];
   taskUndoId: string | null;
   correctionUndoId: string | null;
+  relationOptions: CandidateRelationOptions;
 };
 
 export type EntryReviewProjectionInput = {
@@ -72,7 +74,14 @@ export type EntryReviewProjectionInput = {
   lifecycle: DailyCycleLifecycleInput;
   locale: DailyCycleLocale;
   timezone: string;
+  relationOptions?: CandidateRelationOptions;
 };
+
+const emptyRelationOptions: CandidateRelationOptions = Object.freeze({
+  projects: [],
+  contexts: [],
+  people: [],
+});
 
 const understandingFallback: Record<DailyCycleLocale, string> = {
   "pt-BR": "Ainda não há interpretação para este registro.",
@@ -240,6 +249,7 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
     history,
     taskUndoId: input.taskUndoId,
     correctionUndoId: input.correctionUndoId,
+    relationOptions: input.relationOptions ?? emptyRelationOptions,
   };
 }
 
@@ -258,7 +268,7 @@ export async function loadEntryReviewProjection(
   const data = await loadInterpretationReview(supabase, entryId);
   if (!data) return null;
 
-  const [jobResult, questionsResult, profileResult] = await Promise.all([
+  const [jobResult, questionsResult, profileResult, relationOptions] = await Promise.all([
     supabase
       .from("jobs")
       .select("status,next_attempt_at")
@@ -280,6 +290,7 @@ export async function loadEntryReviewProjection(
         .eq("user_id", userId)
         .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    userId ? loadCandidateRelationOptions(supabase, userId) : Promise.resolve(emptyRelationOptions),
   ]);
   const job = requireSupabaseData(jobResult, "load entry interpretation job") as { status: string; next_attempt_at: string | null } | null;
   const openQuestions = requireSupabaseData(questionsResult, "load entry open questions") ?? [];
@@ -305,6 +316,7 @@ export async function loadEntryReviewProjection(
     unavailableCandidateIndexes: data.unavailableCandidateIndexes,
     locale,
     timezone: resolveProfileTimezone(profile?.timezone),
+    relationOptions,
     lifecycle: {
       entryLifecycle: data.entry.status,
       job: job ? { status: job.status, retryAt: job.next_attempt_at } : undefined,

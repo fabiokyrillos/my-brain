@@ -131,7 +131,7 @@ describe("confirmEntryTasks", () => {
       confirmForm({ candidateIndex: ["1", "0"] }),
     );
 
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", {
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v4", {
       p_entry_id: entryId,
       p_expected_interpretation_id: interpretationId,
       p_candidate_indexes: [0, 1],
@@ -163,7 +163,7 @@ describe("confirmEntryTasks", () => {
 
     await confirmEntryTasks(idleState, confirmForm({ candidateEdits }));
 
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v4", expect.objectContaining({
       p_candidate_edits: [
         { candidateIndex: 0, changes: { title: "Relatório final", description: null } },
         { candidateIndex: 1, changes: { description: "Nova descrição", dueAt: null } },
@@ -192,7 +192,7 @@ describe("confirmEntryTasks", () => {
 
     await confirmEntryTasks(idleState, confirmForm({ candidateIndex: ["0"], candidateEdits }));
 
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v4", expect.objectContaining({
       p_candidate_edits: [
         {
           candidateIndex: 0,
@@ -371,6 +371,12 @@ describe("confirmEntryTasks", () => {
       { code: "22023", message: "Invalid task candidate index" },
       "invalid_payload",
       "Revise as tarefas selecionadas e as edições.",
+    ],
+    [
+      "invalid or cross-owner relation",
+      { code: "22023", message: "Invalid or cross-owner project relation", details: "2C_INVALID_RELATION" },
+      "invalid_relation",
+      "Um dos projetos, contextos ou pessoas selecionados não está mais disponível. Atualize a página e tente novamente.",
     ],
     [
       "record-only",

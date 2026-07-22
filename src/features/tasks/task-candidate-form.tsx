@@ -11,6 +11,7 @@ import {
   type CandidateEditSuggestion,
 } from "./candidate-edit-contract";
 import { CandidateEditor } from "./candidate-editor";
+import type { CandidateRelationOptions } from "./relation-options";
 
 export type ConfirmTasksCode =
   | "confirmed"
@@ -21,6 +22,7 @@ export type ConfirmTasksCode =
   | "idempotency_mismatch"
   | "already_materialized"
   | "invalid_payload"
+  | "invalid_relation"
   | "record_only"
   | "not_found"
   | "operation_failed";
@@ -123,6 +125,7 @@ export function TaskCandidateForm({
   interpretationId,
   locale,
   operationKey,
+  relationOptions,
   timezone,
   undoAction,
 }: {
@@ -133,6 +136,7 @@ export function TaskCandidateForm({
   interpretationId: string;
   locale: "pt-BR" | "en";
   operationKey: string;
+  relationOptions?: CandidateRelationOptions;
   timezone: string;
   undoAction?: UndoTasksAction;
 }) {
@@ -318,6 +322,7 @@ export function TaskCandidateForm({
                 locale={locale}
                 onEditChange={(edit) => updateEdit(index, edit)}
                 onValidityChange={(valid) => updateValidity(index, valid)}
+                relationOptions={relationOptions}
                 selected={checked && !pending}
                 timezone={timezone}
               />

@@ -51,6 +51,24 @@ export function TaskList({
             <strong>{task.title}</strong>
             {task.description && <p>{task.description}</p>}
             <small className="work-origin">{task.origin === "brain" ? (pt ? "Sugerida pelo Brain" : "Suggested by Brain") : (pt ? "Criada por você" : "Created by you")}</small>
+            {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0 || task.waitingOnPeople.length > 0) && (
+              <div className="work-relations">
+                {task.projects.map((project) => (
+                  <span className="status-badge" key={`project-${project.id}`}>{project.label}</span>
+                ))}
+                {task.contexts.map((context) => (
+                  <span className="status-badge" key={`context-${context.id}`}>{context.label}</span>
+                ))}
+                {task.people.map((person) => (
+                  <span className="status-badge" key={`person-${person.id}`}>{person.label}</span>
+                ))}
+                {task.waitingOnPeople.map((person) => (
+                  <span className="status-badge" key={`waiting-on-${person.id}`}>
+                    {(pt ? "Aguardando: " : "Waiting on: ") + person.label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="list-meta">
             {task.dueAt && <span>{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.dueAt))}</span>}

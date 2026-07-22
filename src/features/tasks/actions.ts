@@ -51,6 +51,7 @@ const confirmationCopy = {
     contended: "A interpretação está sendo alterada. Atualize a página antes de confirmar.",
     mismatch: "Esta tentativa não corresponde mais às edições atuais. Revise e tente novamente.",
     materialized: "Uma destas tarefas já foi criada. Atualize a página antes de confirmar.",
+    invalidRelation: "Um dos projetos, contextos ou pessoas selecionados não está mais disponível. Atualize a página e tente novamente.",
     recordOnly: "Esta versão é somente registro; não há tarefas para confirmar.",
     notFound: "Não encontramos este registro para confirmação.",
     failed: "Não foi possível criar as tarefas agora.",
@@ -65,6 +66,7 @@ const confirmationCopy = {
     contended: "The interpretation is being changed. Refresh the page before confirming.",
     mismatch: "This attempt no longer matches the current edits. Review them and try again.",
     materialized: "One of these tasks was already created. Refresh the page before confirming.",
+    invalidRelation: "One of the selected projects, contexts, or people is no longer available. Refresh the page and try again.",
     recordOnly: "This version is record-only; there are no tasks to confirm.",
     notFound: "We could not find this record for confirmation.",
     failed: "The tasks could not be created right now.",
@@ -111,7 +113,7 @@ export async function confirmEntryTasks(
     );
   }
 
-  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v3", {
+  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v4", {
     p_entry_id: parsed.data.entryId,
     p_expected_interpretation_id: parsed.data.interpretationId,
     p_candidate_indexes: parsed.data.candidateIndexes,
@@ -349,6 +351,12 @@ function mapConfirmationRpcError(
     && error.details === "2C_ALREADY_MATERIALIZED"
   ) {
     return confirmationFailure("already_materialized", localized.materialized, false);
+  }
+  if (
+    error.code === "22023"
+    && error.details === "2C_INVALID_RELATION"
+  ) {
+    return confirmationFailure("invalid_relation", localized.invalidRelation, false);
   }
   if (error.code === "22023") {
     return confirmationFailure("invalid_payload", localized.validation, false);

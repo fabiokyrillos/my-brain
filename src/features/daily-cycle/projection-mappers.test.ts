@@ -196,6 +196,10 @@ describe("daily cycle product projection mappers", () => {
       humanState: "waiting_on_someone",
       origin: "brain",
       availableActions: [{ id: "resume_task" }],
+      projects: [],
+      contexts: [],
+      people: [],
+      waitingOnPeople: [],
     });
     expect(JSON.parse(JSON.stringify(attention))).toEqual(attention);
     expect(JSON.parse(JSON.stringify(work))).toEqual(work);
@@ -259,5 +263,67 @@ describe("daily cycle product projection mappers", () => {
     expect(source).not.toMatch(/\.from\s*\(/);
     expect(source).not.toMatch(/\.rpc\s*\(/);
     expect(source).not.toMatch(/from\s*["'][^"']*\.tsx?["']/i);
+  });
+});
+
+describe("toWorkItemView owned relations (Slice 2C.3)", () => {
+  const baseSource = {
+    taskId: "task-1",
+    title: "Tarefa",
+    intentionalNoDue: false,
+    status: "inbox",
+    createdBy: "user",
+    availableActions: [],
+  };
+
+  it("defaults every relation field to an empty array when absent", () => {
+    const work = map(mappers.toWorkItemView, baseSource as WorkItemSource);
+
+    expect(work).toMatchObject({
+      projects: [],
+      contexts: [],
+      people: [],
+      waitingOnPeople: [],
+    });
+  });
+
+  it("maps well-formed relation summaries for every relation kind", () => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      projects: [{ id: "p1", label: "Website relaunch" }],
+      contexts: [{ id: "c1", label: "Work" }],
+      people: [{ id: "u1", label: "Alice" }],
+      waitingOnPeople: [{ id: "u2", label: "Bob" }],
+    } as WorkItemSource);
+
+    expect(work).toMatchObject({
+      projects: [{ id: "p1", label: "Website relaunch" }],
+      contexts: [{ id: "c1", label: "Work" }],
+      people: [{ id: "u1", label: "Alice" }],
+      waitingOnPeople: [{ id: "u2", label: "Bob" }],
+    });
+  });
+
+  it.each([
+    ["projects", { id: "", label: "Missing id" }],
+    ["contexts", { id: "c1", label: "" }],
+    ["people", "not-an-object"],
+    ["waitingOnPeople", { id: 42, label: "Wrong id type" }],
+  ])("fails closed when %s contains a malformed relation entry", (field, malformedEntry) => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      [field]: [malformedEntry],
+    } as unknown as WorkItemSource);
+
+    expect(work).toBeNull();
+  });
+
+  it("fails closed when a relation field is not an array", () => {
+    const work = map(mappers.toWorkItemView, {
+      ...baseSource,
+      projects: "not-an-array",
+    } as unknown as WorkItemSource);
+
+    expect(work).toBeNull();
   });
 });
