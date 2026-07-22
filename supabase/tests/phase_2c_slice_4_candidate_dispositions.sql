@@ -178,9 +178,8 @@ select ok(
   'PUBLIC cannot execute v5'
 );
 
-select unlike(
-  lower(pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)),
-  '%pg_catalog.greatest(%',
+select ok(
+  lower(pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) not like '%pg_catalog.greatest(%',
   'undo_operation avoids an unresolved greatest function lookup under its empty search_path'
 );
 
@@ -342,8 +341,24 @@ begin
   into candidate_rows
   from generate_series(0, p_candidate_count - 1) as candidate_slot(idx);
 
-  perform public.persist_entry_interpretation(
+  interpretation_id := gen_random_uuid();
+  insert into public.entry_interpretations (
+    id, user_id, entry_id, summary, concepts, task_candidates, confidence,
+    model, strategy_version, prompt_version, input_tokens, output_tokens,
+    raw_output, is_record_only
+  ) values (
+    interpretation_id,
+    auth.uid(),
     p_entry_id,
+    'Phase 2C.4 fixture',
+    array['task'],
+    candidate_rows,
+    0.9,
+    'gpt-test',
+    'strategy-1',
+    'prompt-1',
+    100,
+    50,
     jsonb_build_object(
       'summary', 'Phase 2C.4 fixture',
       'concepts', jsonb_build_array('task'),
@@ -352,22 +367,12 @@ begin
       'taskCandidates', candidate_rows,
       'pendingQuestions', '[]'::jsonb
     ),
-    'gpt-test', 'strategy-1', 'prompt-1', 100, 50
+    p_record_only
   );
 
-  select entry_row.current_interpretation_id
-  into interpretation_id
-  from public.entries as entry_row
-  where entry_row.id = p_entry_id
-    and entry_row.user_id = auth.uid();
-
-  update public.entry_interpretations
-  set is_record_only = p_record_only
-  where id = interpretation_id
-    and user_id = auth.uid();
-
   update public.entries
-  set status = 'completed'
+  set status = 'completed',
+      current_interpretation_id = interpretation_id
   where id = p_entry_id
     and user_id = auth.uid();
 
