@@ -49,6 +49,7 @@ function baseInput(overrides: Partial<EntryReviewProjectionInput> = {}): EntryRe
     tasks: [],
     taskUndoId: null,
     correctionUndoId: null,
+    candidateResolutionHistory: [],
     unavailableCandidateIndexes: [],
     locale: "pt-BR",
     timezone: "America/Sao_Paulo",
@@ -160,6 +161,26 @@ describe("toEntryReviewProjection", () => {
 
     expect(projection).not.toHaveProperty("taskCandidates");
     expect(JSON.stringify(projection.view.actionableCandidates)).not.toMatch(/confidence/i);
+  });
+
+  it("localizes entry-local terminal outcomes without exposing raw disposition enums", () => {
+    const projection = toEntryReviewProjection(baseInput({
+      locale: "en",
+      candidateResolutionHistory: [
+        { key: "interp-1:0", interpretationId: "interp-1", candidateIndex: 0, title: "Call Marina", disposition: "confirmed", createdAt: "2026-07-22T12:00:00.000Z" },
+        { key: "interp-1:1", interpretationId: "interp-1", candidateIndex: 1, title: "Review draft", disposition: "rejected", createdAt: "2026-07-22T12:01:00.000Z" },
+        { key: "interp-1:2", interpretationId: "interp-1", candidateIndex: 2, title: "Remember preference", disposition: "retained", createdAt: "2026-07-22T12:02:00.000Z" },
+        { key: "interp-1:3", interpretationId: "interp-1", candidateIndex: 3, title: "Ignore duplicate", disposition: "dismissed", createdAt: "2026-07-22T12:03:00.000Z" },
+      ],
+    }));
+
+    expect(projection.view.candidateOutcomes.map((outcome) => outcome.outcomeLabel)).toEqual([
+      "Task created",
+      "Suggestion rejected",
+      "Kept as record",
+      "Suggestion dismissed",
+    ]);
+    expect(JSON.stringify(projection.view.candidateOutcomes)).not.toContain('"disposition"');
   });
 
   it("only includes materialized tasks confirmed under the current interpretation", () => {

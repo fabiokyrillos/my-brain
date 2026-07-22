@@ -6,6 +6,7 @@ import {
   recordProductEvent,
 } from "@/features/product-analytics/server";
 import { createClient } from "@/lib/supabase/server";
+import * as taskActions from "./actions";
 import { confirmEntryTasks, undoAgentAction } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -51,6 +52,31 @@ function confirmForm(overrides: Partial<Record<string, string | string[]>> = {})
     candidateEdits: "[]",
     ...overrides,
   });
+}
+
+function resolutionForm(overrides: Partial<Record<string, string | string[]>> = {}) {
+  return form({
+    entryId,
+    interpretationId,
+    operationKey,
+    locale: "pt-BR",
+    candidateResolutions: JSON.stringify([
+      { candidateIndex: 0, disposition: "confirmed" },
+      { candidateIndex: 1, disposition: "rejected" },
+    ]),
+    candidateEdits: JSON.stringify([
+      { candidateIndex: 0, changes: { title: "Relatório final" } },
+    ]),
+    ...overrides,
+  });
+}
+
+async function resolveCandidates(formData: FormData) {
+  const action = (taskActions as typeof taskActions & {
+    resolveEntryTaskCandidates?: typeof confirmEntryTasks;
+  }).resolveEntryTaskCandidates;
+  expect(action).toBeTypeOf("function");
+  return action?.(idleState, formData);
 }
 
 function clientWithRpc(result: { data: unknown; error: RpcError | null }) {
@@ -444,6 +470,147 @@ describe("confirmEntryTasks", () => {
   });
 });
 
+describe("resolveEntryTaskCandidates", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects cancelled, reasons, and edits for non-confirming outcomes before RPC", async () => {
+    for (const candidateResolutions of [
+      '[{"candidateIndex":0,"disposition":"cancelled"}]',
+      '[{"candidateIndex":0,"disposition":"rejected","reason":"wrong"}]',
+    ]) {
+      const result = await resolveCandidates(resolutionForm({
+        candidateResolutions,
+        candidateEdits: "[]",
+      }));
+      expect(result).toMatchObject({ status: "error", code: "validation_failed" });
+    }
+
+    const editedRejection = await resolveCandidates(resolutionForm({
+      candidateResolutions: '[{"candidateIndex":0,"disposition":"rejected"}]',
+      candidateEdits: '[{"candidateIndex":0,"changes":{"title":"Must not pass"}}]',
+    }));
+    expect(editedRejection).toMatchObject({ status: "error", code: "validation_failed" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("calls v5 once with one canonical mixed batch and no selection, owner, content, or task IDs", async () => {
+    const { client, rpc } = clientWithRpc({
+      data: { task_ids: ["task-1"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolveCandidates(resolutionForm({
+      ownerId: "attacker",
+      taskId: "task-attacker",
+      title: "private content",
+      candidateResolutions: JSON.stringify([
+        { candidateIndex: 3, disposition: "dismissed" },
+        { candidateIndex: 0, disposition: "confirmed" },
+        { candidateIndex: 2, disposition: "retained" },
+        { candidateIndex: 1, disposition: "rejected" },
+      ]),
+    }));
+
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v5", {
+      p_entry_id: entryId,
+      p_expected_interpretation_id: interpretationId,
+      p_candidate_resolutions: [
+        { candidateIndex: 0, disposition: "confirmed" },
+        { candidateIndex: 1, disposition: "rejected" },
+        { candidateIndex: 2, disposition: "retained" },
+        { candidateIndex: 3, disposition: "dismissed" },
+      ],
+      p_candidate_edits: [
+        { candidateIndex: 0, changes: { title: "Relatório final" } },
+      ],
+      p_operation_key: operationKey,
+    });
+    expect(result).toEqual({
+      status: "success",
+      code: "resolved",
+      message: "4 sugestões resolvidas. 1 tarefa criada.",
+      undoId,
+      replayed: false,
+      retryable: false,
+    });
+    expect(after).not.toHaveBeenCalled();
+    expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("accepts a successful all-non-confirming batch with no task IDs", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: [], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolveCandidates(resolutionForm({
+      locale: "en",
+      candidateResolutions: JSON.stringify([
+        { candidateIndex: 0, disposition: "retained" },
+        { candidateIndex: 1, disposition: "dismissed" },
+      ]),
+      candidateEdits: "[]",
+    }));
+
+    expect(result).toMatchObject({
+      status: "success",
+      code: "resolved",
+      message: "2 suggestions resolved. No tasks created.",
+      undoId,
+    });
+  });
+
+  it("authenticates independently and maps database failures to sanitized stable feedback", async () => {
+    vi.mocked(createClient).mockResolvedValueOnce({
+      auth: { getUser: vi.fn(async () => ({ data: { user: null } })) },
+      rpc: vi.fn(),
+    } as never);
+
+    expect(await resolveCandidates(resolutionForm({ locale: "en" }))).toEqual({
+      status: "error",
+      code: "unauthenticated",
+      message: "Your session expired. Sign in again.",
+      undoId: null,
+      retryable: false,
+    });
+
+    const { client } = clientWithRpc({
+      data: null,
+      error: { code: "XX000", message: "raw SQL internals", details: "private payload" },
+    });
+    vi.mocked(createClient).mockResolvedValueOnce(client as never);
+
+    const failed = await resolveCandidates(resolutionForm({ locale: "en" }));
+    expect(failed).toEqual({
+      status: "error",
+      code: "operation_failed",
+      message: "The suggestions could not be resolved right now.",
+      undoId: null,
+      retryable: true,
+    });
+    expect(failed?.message).not.toMatch(/SQL|private|XX000|confirm_entry/i);
+  });
+
+  it("maps the v5 terminal-disposition marker to stable refresh guidance", async () => {
+    const { client } = clientWithRpc({
+      data: null,
+      error: { code: "P0001", message: "Candidate already has a terminal disposition", details: "2C_TERMINAL_DISPOSITION" },
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    expect(await resolveCandidates(resolutionForm())).toEqual({
+      status: "error",
+      code: "already_materialized",
+      message: "Uma destas sugestões já foi resolvida. Atualize a página antes de continuar.",
+      undoId: null,
+      retryable: false,
+    });
+  });
+});
+
 describe("undoAgentAction", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -460,5 +627,18 @@ describe("undoAgentAction", () => {
     expect(result).toEqual({ status: "success", message: "Criação desfeita." });
     expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
     expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
+  });
+
+  it("revalidates the entry detail after undoing a candidate resolution", async () => {
+    const { client } = clientWithRpc({ data: { undone: true, affected: 1 }, error: null });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await undoAgentAction(
+      { status: "idle", message: "" },
+      form({ undoId, entryId, locale: "en" }),
+    );
+
+    expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+    expect(revalidatePath).toHaveBeenCalledWith(`/en/app/inbox/${entryId}`);
   });
 });

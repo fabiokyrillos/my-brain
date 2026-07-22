@@ -1,6 +1,6 @@
 import "server-only";
 import type { EntryExtraction } from "@/lib/ai/extraction-schema";
-import type { InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
+import type { CandidateResolutionHistoryItem, InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
 import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
 import type { EntityOption } from "@/features/interpretations/revision-editor";
 import { loadCandidateRelationOptions, type CandidateRelationOptions } from "@/features/tasks/relation-options";
@@ -15,6 +15,7 @@ import type {
   HumanFieldView,
   InterpretationReviewView,
   MaterializedTaskView,
+  CandidateOutcomeView,
 } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import { resolveDailyCycleLifecycle, type DailyCycleLifecycleInput } from "./lifecycle";
@@ -70,6 +71,7 @@ export type EntryReviewProjectionInput = {
   tasks: InterpretationReviewData["tasks"];
   taskUndoId: string | null;
   correctionUndoId: string | null;
+  candidateResolutionHistory?: readonly CandidateResolutionHistoryItem[];
   unavailableCandidateIndexes: readonly number[];
   lifecycle: DailyCycleLifecycleInput;
   locale: DailyCycleLocale;
@@ -107,6 +109,21 @@ const classificationFieldLabels: Record<DailyCycleLocale, Record<string, string>
     entities: "Links classification",
   },
 };
+
+const candidateOutcomeLabels = {
+  "pt-BR": {
+    confirmed: "Tarefa criada",
+    rejected: "Sugestão rejeitada",
+    retained: "Mantida como registro",
+    dismissed: "Sugestão dispensada",
+  },
+  en: {
+    confirmed: "Task created",
+    rejected: "Suggestion rejected",
+    retained: "Kept as record",
+    dismissed: "Suggestion dismissed",
+  },
+} as const;
 
 function action(id: DailyCycleAction): AvailableAction {
   return Object.freeze({ id });
@@ -161,6 +178,12 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
         ...(task.due_at ? { dueAt: task.due_at } : {}),
       }))
     : [];
+  const candidateOutcomes: CandidateOutcomeView[] = (input.candidateResolutionHistory ?? []).map((outcome) => ({
+    key: outcome.key,
+    title: outcome.title,
+    outcomeLabel: candidateOutcomeLabels[input.locale][outcome.disposition],
+    resolvedAt: outcome.createdAt,
+  }));
 
   const humanFields: HumanFieldView[] = [];
   if (current) {
@@ -200,6 +223,7 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
     attentionItems: Object.freeze(attentionItems),
     actionableCandidates: Object.freeze(actionableCandidates),
     materializedTasks: Object.freeze(materializedTasks),
+    candidateOutcomes: Object.freeze(candidateOutcomes),
     availableActions: Object.freeze(availableActions),
     original: Object.freeze({
       content: input.originalContent,
@@ -313,6 +337,7 @@ export async function loadEntryReviewProjection(
     tasks: data.tasks,
     taskUndoId: data.taskUndoId,
     correctionUndoId: data.correctionUndoId,
+    candidateResolutionHistory: data.candidateResolutionHistory,
     unavailableCandidateIndexes: data.unavailableCandidateIndexes,
     locale,
     timezone: resolveProfileTimezone(profile?.timezone),

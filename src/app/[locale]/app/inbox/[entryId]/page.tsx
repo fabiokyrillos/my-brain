@@ -12,7 +12,7 @@ import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/tech
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
 import { getInterpretationCopy } from "@/features/interpretations/copy";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
-import { confirmEntryTasks, undoAgentAction } from "@/features/tasks/actions";
+import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 
 export default async function EntryDetailPage({
@@ -67,9 +67,12 @@ export default async function EntryDetailPage({
     : errorMessage;
 
   const materializedCount = view.materializedTasks.length;
-  const taskInitialState = materializedCount > 0 ? {
+  const taskInitialState = taskUndoId ? {
     status: "success" as const,
-    message: pt ? `${materializedCount} ${materializedCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${materializedCount} ${materializedCount === 1 ? "task created" : "tasks created"}.`,
+    code: "resolved" as const,
+    message: materializedCount > 0
+      ? (pt ? `${materializedCount} ${materializedCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${materializedCount} ${materializedCount === 1 ? "task created" : "tasks created"}.`)
+      : (pt ? "Decisões salvas." : "Decisions saved."),
     undoId: taskUndoId,
   } : undefined;
 
@@ -81,7 +84,7 @@ export default async function EntryDetailPage({
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
       ) : canConfirmCandidates || taskInitialState ? (
         <TaskCandidateForm
-          action={confirmEntryTasks}
+          action={resolveEntryTaskCandidates}
           candidates={view.actionableCandidates}
           entryId={entryId}
           initialState={taskInitialState}

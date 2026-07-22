@@ -956,9 +956,11 @@ export function CandidateEditor({
         </div>
       )}
 
-      <p aria-live="polite" role="status" style={{ margin: 0 }}>
-        {announcement}
-      </p>
+      {announcement && (
+        <p aria-live="polite" role="status" style={{ margin: 0 }}>
+          {announcement}
+        </p>
+      )}
     </fieldset>
   );
 }

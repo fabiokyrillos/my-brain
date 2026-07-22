@@ -141,6 +141,13 @@ export type MaterializedTaskView = {
   dueAt?: string;
 };
 
+export type CandidateOutcomeView = {
+  key: string;
+  title: string;
+  outcomeLabel: string;
+  resolvedAt: string;
+};
+
 export type OriginalEntryView = {
   content: string;
   occurredAt: string;
@@ -155,6 +162,7 @@ export type InterpretationReviewView = {
   attentionItems: readonly AttentionItemView[];
   actionableCandidates: readonly ActionableCandidateView[];
   materializedTasks: readonly MaterializedTaskView[];
+  candidateOutcomes: readonly CandidateOutcomeView[];
   availableActions: readonly AvailableAction[];
   original: OriginalEntryView;
   hasTechnicalDetails: boolean;
