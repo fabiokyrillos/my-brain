@@ -28,6 +28,8 @@ create table public.entry_task_candidate_resolutions (
     ),
   constraint entry_task_candidate_resolutions_identity_key
     unique (user_id, interpretation_id, candidate_index),
+  constraint entry_task_candidate_resolutions_task_key
+    unique (user_id, task_id),
   constraint entry_task_candidate_resolutions_interpretation_owner_fk
     foreign key (user_id, entry_id, interpretation_id)
     references public.entry_interpretations (user_id, entry_id, id)
@@ -52,6 +54,7 @@ create index entry_task_candidate_resolutions_undo_idx
   where undo_operation_id is not null;
 
 alter table public.entry_task_candidate_resolutions enable row level security;
+alter table public.entry_task_candidate_resolutions force row level security;
 
 create policy entry_task_candidate_resolutions_select_own
   on public.entry_task_candidate_resolutions
@@ -65,8 +68,38 @@ grant select on table public.entry_task_candidate_resolutions
   to authenticated;
 
 -- Existing active provenanced tasks are already confirmed lifecycle facts.
--- Backfill only identities PostgreSQL can prove; legacy provenance-less tasks
+-- Fail closed before writing if any active provenanced task cannot be mapped
+-- to an exact immutable candidate identity. Legacy provenance-less tasks
 -- remain covered by the compatibility branch in Needs Attention.
+do $candidate_resolution_backfill$
+begin
+  if exists (
+    select 1
+    from public.tasks as task_row
+    where task_row.status <> 'cancelled'
+      and task_row.source_interpretation_id is not null
+      and (
+        task_row.source_entry_id is null
+        or task_row.candidate_index is null
+        or task_row.candidate_index < 0
+        or not exists (
+          select 1
+          from public.entry_interpretations as interpretation_row
+          where interpretation_row.user_id = task_row.user_id
+            and interpretation_row.entry_id = task_row.source_entry_id
+            and interpretation_row.id = task_row.source_interpretation_id
+            and task_row.candidate_index < pg_catalog.jsonb_array_length(
+              interpretation_row.task_candidates
+            )
+        )
+      )
+  ) then
+    raise exception 'Invalid active candidate task provenance before disposition backfill'
+      using errcode = 'P0001', detail = '2C_INVALID_CANDIDATE_PROVENANCE';
+  end if;
+end;
+$candidate_resolution_backfill$;
+
 insert into public.entry_task_candidate_resolutions (
   user_id,
   entry_id,
@@ -107,6 +140,42 @@ where task_row.source_entry_id is not null
   and task_row.status <> 'cancelled'
 on conflict (user_id, interpretation_id, candidate_index) do nothing;
 
+do $candidate_resolution_postcondition$
+begin
+  if exists (
+    select 1
+    from public.tasks as task_row
+    where task_row.status <> 'cancelled'
+      and task_row.source_interpretation_id is not null
+      and (
+        select pg_catalog.count(*)
+        from public.entry_task_candidate_resolutions as resolution_row
+        where resolution_row.user_id = task_row.user_id
+          and resolution_row.entry_id = task_row.source_entry_id
+          and resolution_row.interpretation_id = task_row.source_interpretation_id
+          and resolution_row.candidate_index = task_row.candidate_index
+          and resolution_row.disposition = 'confirmed'
+          and resolution_row.task_id = task_row.id
+      ) <> 1
+  ) then
+    raise exception 'Candidate resolution backfill postcondition failed'
+      using errcode = 'P0001', detail = '2C_CANDIDATE_RESOLUTION_POSTCONDITION';
+  end if;
+
+  if exists (
+    select 1
+    from public.tasks as task_row
+    join public.entry_task_candidate_resolutions as resolution_row
+      on resolution_row.user_id = task_row.user_id
+     and resolution_row.task_id = task_row.id
+    where task_row.status = 'cancelled'
+  ) then
+    raise exception 'Cancelled task received a candidate resolution during backfill'
+      using errcode = 'P0001', detail = '2C_CANCELLED_TASK_RESOLUTION';
+  end if;
+end;
+$candidate_resolution_postcondition$;
+
 create or replace function public.guard_entry_task_candidate_terminal_resolution()
 returns trigger
 language plpgsql
@@ -115,12 +184,60 @@ set search_path = ''
 as $$
 declare
   resolution_interpretation_id uuid;
+  linked_resolution public.entry_task_candidate_resolutions%rowtype;
+  identity_resolution public.entry_task_candidate_resolutions%rowtype;
 begin
-  if new.status = 'cancelled'
-    or new.source_entry_id is null
-    or new.candidate_index is null
-    or new.candidate_index < 0
-  then
+  select resolution_row.*
+  into linked_resolution
+  from public.entry_task_candidate_resolutions as resolution_row
+  where resolution_row.task_id = new.id
+  limit 1;
+
+  if linked_resolution.id is not null then
+    if linked_resolution.disposition <> 'confirmed'
+      or new.user_id is distinct from linked_resolution.user_id
+      or new.source_entry_id is distinct from linked_resolution.entry_id
+      or new.candidate_index is distinct from linked_resolution.candidate_index
+      or (
+        new.source_interpretation_id is not null
+        and new.source_interpretation_id is distinct from linked_resolution.interpretation_id
+      )
+    then
+      raise exception 'Candidate task provenance conflicts with its confirmed resolution'
+        using errcode = 'P0001', detail = '2C_CANDIDATE_IDENTITY_DESYNC';
+    end if;
+
+    if tg_op = 'UPDATE' then
+      if new.user_id is distinct from old.user_id
+        or new.source_entry_id is distinct from old.source_entry_id
+        or new.source_interpretation_id is distinct from old.source_interpretation_id
+        or new.candidate_index is distinct from old.candidate_index
+      then
+        raise exception 'Candidate task provenance conflicts with its confirmed resolution'
+          using errcode = 'P0001', detail = '2C_CANDIDATE_IDENTITY_DESYNC';
+      end if;
+    end if;
+
+    return new;
+  end if;
+
+  if new.status = 'cancelled' then
+    return new;
+  end if;
+
+  if new.candidate_index is null then
+    if new.source_interpretation_id is not null then
+      raise exception 'Candidate task has invalid provenance'
+        using errcode = 'P0001', detail = '2C_INVALID_CANDIDATE_PROVENANCE';
+    end if;
+    return new;
+  end if;
+
+  if new.source_entry_id is null or new.candidate_index < 0 then
+    if new.source_interpretation_id is not null then
+      raise exception 'Candidate task has invalid provenance'
+        using errcode = 'P0001', detail = '2C_INVALID_CANDIDATE_PROVENANCE';
+    end if;
     return new;
   end if;
 
@@ -133,6 +250,10 @@ begin
       and entry_row.id = new.source_entry_id;
   end if;
   if resolution_interpretation_id is null then
+    if new.source_interpretation_id is not null then
+      raise exception 'Candidate task has invalid provenance'
+        using errcode = 'P0001', detail = '2C_INVALID_CANDIDATE_PROVENANCE';
+    end if;
     return new;
   end if;
 
@@ -146,17 +267,27 @@ begin
         interpretation_row.task_candidates
       )
   ) then
+    if new.source_interpretation_id is not null then
+      raise exception 'Candidate task has invalid provenance'
+        using errcode = 'P0001', detail = '2C_INVALID_CANDIDATE_PROVENANCE';
+    end if;
     return new;
   end if;
 
-  if exists (
-    select 1
-    from public.entry_task_candidate_resolutions as resolution_row
+  select resolution_row.*
+  into identity_resolution
+  from public.entry_task_candidate_resolutions as resolution_row
     where resolution_row.user_id = new.user_id
       and resolution_row.entry_id = new.source_entry_id
       and resolution_row.interpretation_id = resolution_interpretation_id
-      and resolution_row.candidate_index = new.candidate_index
-  ) then
+      and resolution_row.candidate_index = new.candidate_index;
+
+  if identity_resolution.id is not null
+    and (
+      identity_resolution.disposition <> 'confirmed'
+      or identity_resolution.task_id is distinct from new.id
+    )
+  then
     raise exception 'Candidate already has a terminal disposition'
       using errcode = 'P0001', detail = '2C_TERMINAL_DISPOSITION';
   end if;
@@ -173,12 +304,18 @@ set search_path = ''
 as $$
 declare
   resolution_interpretation_id uuid;
+  linked_resolution public.entry_task_candidate_resolutions%rowtype;
 begin
-  if new.status = 'cancelled'
-    or new.source_entry_id is null
-    or new.candidate_index is null
-    or new.candidate_index < 0
-  then
+  if new.status = 'cancelled' or new.candidate_index is null then
+    return new;
+  end if;
+
+  select resolution_row.*
+  into linked_resolution
+  from public.entry_task_candidate_resolutions as resolution_row
+  where resolution_row.task_id = new.id
+  limit 1;
+  if linked_resolution.id is not null then
     return new;
   end if;
 
@@ -233,17 +370,17 @@ revoke all on function public.record_entry_task_candidate_confirmation()
   from public, anon, authenticated;
 
 create trigger tasks_guard_terminal_candidate_resolution
-before insert on public.tasks
+before insert or update of status, user_id, source_entry_id, source_interpretation_id, candidate_index on public.tasks
 for each row execute function public.guard_entry_task_candidate_terminal_resolution();
 
 create trigger tasks_record_candidate_confirmation
-after insert on public.tasks
+after insert or update of status, user_id, source_entry_id, source_interpretation_id, candidate_index on public.tasks
 for each row execute function public.record_entry_task_candidate_confirmation();
 
 create or replace function public.confirm_entry_task_candidates_v5(
   p_entry_id uuid,
   p_expected_interpretation_id uuid,
-  p_resolutions jsonb,
+  p_candidate_resolutions jsonb,
   p_candidate_edits jsonb,
   p_operation_key text
 )
@@ -327,19 +464,19 @@ begin
   end if;
   internal_operation_key := 'confirm-v5:' || normalized_key;
 
-  if pg_catalog.jsonb_typeof(p_resolutions) is distinct from 'array' then
+  if pg_catalog.jsonb_typeof(p_candidate_resolutions) is distinct from 'array' then
     raise exception 'Candidate resolutions must be an array' using errcode = '22023';
   end if;
-  resolution_count := pg_catalog.jsonb_array_length(p_resolutions);
+  resolution_count := pg_catalog.jsonb_array_length(p_candidate_resolutions);
   if resolution_count not between 1 and 50
-    or pg_catalog.octet_length(p_resolutions::text) > 131072
+    or pg_catalog.octet_length(p_candidate_resolutions::text) > 131072
   then
     raise exception 'Candidate resolutions exceed the allowed bounds' using errcode = '22023';
   end if;
 
   for resolution_item in
     select item.value
-    from pg_catalog.jsonb_array_elements(p_resolutions) as item(value)
+    from pg_catalog.jsonb_array_elements(p_candidate_resolutions) as item(value)
   loop
     if pg_catalog.jsonb_typeof(resolution_item) is distinct from 'object'
       or not (resolution_item ? 'candidateIndex')
@@ -414,7 +551,7 @@ begin
     order by (item.value ->> 'candidateIndex')::integer
   )
   into canonical_resolutions
-  from pg_catalog.jsonb_array_elements(p_resolutions) as item(value);
+  from pg_catalog.jsonb_array_elements(p_candidate_resolutions) as item(value);
 
   if pg_catalog.jsonb_typeof(p_candidate_edits) is distinct from 'array' then
     raise exception 'Candidate edits must be an array' using errcode = '22023';
@@ -1318,6 +1455,7 @@ declare
   undo_version integer;
   affected integer := 0;
   resolution_affected integer := 0;
+  expected_resolution_count integer := 0;
   result_affected integer := 0;
   restored_status text;
   restored_occurred_at timestamptz;
@@ -1364,8 +1502,23 @@ begin
           pg_catalog.cardinality(operation.entity_ids) > 0
           and resolution_row.task_id = any(operation.entity_ids)
         )
-      );
+    );
     get diagnostics resolution_affected = row_count;
+
+    if operation.action_type = 'confirm_entry_task_candidates_v5' then
+      if pg_catalog.jsonb_typeof(operation.after_state -> 'resolutions') is distinct from 'array' then
+        raise exception 'Candidate resolution undo integrity check failed'
+          using errcode = 'P0001', detail = '2C_UNDO_RESOLUTION_INTEGRITY';
+      end if;
+      expected_resolution_count := pg_catalog.jsonb_array_length(
+        operation.after_state -> 'resolutions'
+      );
+      if resolution_affected <> expected_resolution_count then
+        raise exception 'Candidate resolution undo integrity check failed'
+          using errcode = 'P0001', detail = '2C_UNDO_RESOLUTION_INTEGRITY';
+      end if;
+    end if;
+
     result_affected := case
       when operation.action_type = 'confirm_entry_task_candidates_v5'
         then pg_catalog.greatest(affected, resolution_affected)

@@ -8,7 +8,7 @@
 
 begin;
 
-select plan(68);
+select plan(82);
 
 -- Exact schema, RLS, grants, and RPC boundary ---------------------------------
 
@@ -35,6 +35,15 @@ select ok(
     where table_row.oid = 'public.entry_task_candidate_resolutions'::regclass
   ), false),
   'RLS is enabled on candidate resolutions'
+);
+
+select ok(
+  coalesce((
+    select table_row.relforcerowsecurity
+    from pg_class as table_row
+    where table_row.oid = 'public.entry_task_candidate_resolutions'::regclass
+  ), false),
+  'RLS is forced on candidate resolutions'
 );
 
 select is(
@@ -93,6 +102,18 @@ select has_function(
   'confirm_entry_task_candidates_v5',
   array['uuid', 'uuid', 'jsonb', 'jsonb', 'text'],
   'the atomic mixed-disposition v5 signature exists'
+);
+
+select is(
+  (
+    select procedure.proargnames[3]
+    from pg_proc as procedure
+    where procedure.oid = to_regprocedure(
+      'public.confirm_entry_task_candidates_v5(uuid,uuid,jsonb,jsonb,text)'
+    )
+  ),
+  'p_candidate_resolutions',
+  'v5 exposes the named candidate-resolutions argument expected by the app'
 );
 
 select is(
@@ -200,6 +221,38 @@ select ok(
     false
   ),
   'v5 emits no disposition category analytics'
+);
+
+select ok(
+  coalesce((
+    select pg_get_triggerdef(trigger_row.oid) ilike '%before insert or update of%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%status%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%user_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%source_entry_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%source_interpretation_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%candidate_index%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%on public.tasks%'
+    from pg_trigger as trigger_row
+    where trigger_row.tgname = 'tasks_guard_terminal_candidate_resolution'
+      and not trigger_row.tgisinternal
+  ), false),
+  'the terminal guard covers candidate task inserts and identity/status updates'
+);
+
+select ok(
+  coalesce((
+    select pg_get_triggerdef(trigger_row.oid) ilike '%after insert or update of%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%status%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%user_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%source_entry_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%source_interpretation_id%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%candidate_index%'
+      and pg_get_triggerdef(trigger_row.oid) ilike '%on public.tasks%'
+    from pg_trigger as trigger_row
+    where trigger_row.tgname = 'tasks_record_candidate_confirmation'
+      and not trigger_row.tgisinternal
+  ), false),
+  'the confirmation recorder converges candidate task inserts and updates'
 );
 
 -- Helpers and fixtures ---------------------------------------------------------
@@ -347,7 +400,8 @@ insert into phase2c4_fixture values
   ('nonconfirm', '4c440004-0000-4000-8000-000000000004', pg_temp.phase2c4_make_entry('4c440004-0000-4000-8000-000000000004', 1)),
   ('attention', '4c440005-0000-4000-8000-000000000005', pg_temp.phase2c4_make_entry('4c440005-0000-4000-8000-000000000005', 2)),
   ('record', '4c440006-0000-4000-8000-000000000006', pg_temp.phase2c4_make_entry('4c440006-0000-4000-8000-000000000006', 1, true)),
-  ('stale', '4c440007-0000-4000-8000-000000000007', pg_temp.phase2c4_make_entry('4c440007-0000-4000-8000-000000000007', 1));
+  ('stale', '4c440007-0000-4000-8000-000000000007', pg_temp.phase2c4_make_entry('4c440007-0000-4000-8000-000000000007', 1)),
+  ('integrity', '4c440008-0000-4000-8000-000000000008', pg_temp.phase2c4_make_entry('4c440008-0000-4000-8000-000000000008', 1));
 
 select public.correct_entry_interpretation(
   '4c440007-0000-4000-8000-000000000007',
@@ -433,6 +487,47 @@ select results_eq(
 select is((select count(*)::integer from public.task_projects where task_id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid)), 1, 'confirmed still materializes owned projects');
 select is((select count(*)::integer from public.task_contexts where task_id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid)), 1, 'confirmed still materializes owned contexts');
 select is((select count(*)::integer from public.task_people where task_id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid)), 2, 'confirmed still materializes involved and waiting-on people');
+select is(
+  (
+    select count(*)::integer
+    from public.entry_task_candidate_resolutions as resolution_row
+    where resolution_row.entry_id = '4c440001-0000-4000-8000-000000000001'
+      and resolution_row.candidate_index = 0
+      and resolution_row.disposition = 'confirmed'
+      and resolution_row.task_id = (
+        select result -> 'task_ids' ->> 0
+        from phase2c4_result
+        where label = 'mixed'
+      )::uuid
+  ),
+  1,
+  'every active confirmed task points to exactly one matching confirmed resolution'
+);
+update public.tasks
+set status = 'cancelled'
+where id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid);
+update public.tasks
+set status = 'inbox'
+where id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid);
+select is(
+  (select status from public.tasks where id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid)),
+  'inbox',
+  'the same confirmed referenced task can undergo legitimate status updates and reopen'
+);
+select throws_ok(
+  format(
+    'update public.tasks set candidate_index = 1 where id = %L',
+    (select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')
+  ),
+  'P0001',
+  'Candidate task provenance conflicts with its confirmed resolution',
+  'a task referenced by a confirmed resolution cannot be reassigned to another candidate identity'
+);
+select is(
+  (select candidate_index from public.tasks where id = ((select result -> 'task_ids' ->> 0 from phase2c4_result where label = 'mixed')::uuid)),
+  0,
+  'a rejected provenance reassignment leaves the confirmed task identity unchanged'
+);
 select is((select action_type from public.undo_operations where id = ((select result ->> 'undo_id' from phase2c4_result where label = 'mixed')::uuid)), 'confirm_entry_task_candidates_v5', 'mixed outcomes share one explicit v5 undo action');
 select is((select count(*)::integer from public.undo_operations where operation_key = 'confirm-v5:pgtap:phase2c4:mixed'), 1, 'mixed outcomes create exactly one undo operation');
 select is((select count(*)::integer from public.audit_logs where action_type = 'confirm_entry_task_candidates_v5' and source_entry_id = '4c440001-0000-4000-8000-000000000001'), 1, 'mixed outcomes create one immutable audit record');
@@ -496,6 +591,25 @@ select is(
 select is((select count(*)::integer from public.entry_task_candidate_resolutions where entry_id = '4c440002-0000-4000-8000-000000000002'), 0, 'invalid mixed requests leave no resolution rows');
 select is((select count(*)::integer from public.tasks where source_entry_id = '4c440002-0000-4000-8000-000000000002'), 0, 'invalid mixed requests leave no task rows');
 select is((select count(*)::integer from public.undo_operations where source_entry_id = '4c440002-0000-4000-8000-000000000002'), 0, 'invalid mixed requests leave no undo rows');
+select throws_ok(
+  $$
+    insert into public.tasks (
+      user_id, source_entry_id, source_interpretation_id, candidate_index,
+      title, status, created_by
+    ) values (
+      '4c400001-0000-4000-8000-000000000001',
+      '4c440002-0000-4000-8000-000000000002',
+      (select interpretation_id from phase2c4_fixture where label = 'atomic'),
+      99,
+      'Invalid active candidate provenance',
+      'inbox',
+      'user'
+    )
+  $$,
+  'P0001',
+  'Candidate task has invalid provenance',
+  'future active candidate tasks fail closed on invalid interpretation candidate identity'
+);
 
 select is(
   pg_temp.phase2c4_error_state(
@@ -607,6 +721,43 @@ insert into phase2c4_result values (
     'pgtap:phase2c4:legacy-rejected'
   )
 );
+insert into public.tasks (
+  id, user_id, source_entry_id, source_interpretation_id, candidate_index,
+  title, status, created_by
+) values (
+  '4c450001-0000-4000-8000-000000000001',
+  '4c400001-0000-4000-8000-000000000001',
+  '4c440003-0000-4000-8000-000000000003',
+  (select interpretation_id from phase2c4_fixture where label = 'legacy'),
+  0,
+  'Cancelled historical task',
+  'cancelled',
+  'user'
+);
+select throws_ok(
+  $$
+    update public.tasks
+    set status = 'inbox'
+    where id = '4c450001-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'Candidate already has a terminal disposition',
+  'a cancelled historical task cannot reactivate over a non-confirming terminal resolution'
+);
+select is(
+  (select status from public.tasks where id = '4c450001-0000-4000-8000-000000000001'),
+  'cancelled',
+  'a rejected reactivation leaves the historical task cancelled'
+);
+select is(
+  (
+    select count(*)::integer
+    from public.entry_task_candidate_resolutions
+    where task_id = '4c450001-0000-4000-8000-000000000001'
+  ),
+  0,
+  'cancelled historical tasks receive no confirmed resolution'
+);
 select is(
   (
     select sqlstate
@@ -668,6 +819,37 @@ select is(
   'a non-confirming-only operation is undoable'
 );
 select is((select count(*)::integer from public.entry_task_candidate_resolutions where entry_id = '4c440004-0000-4000-8000-000000000004'), 0, 'non-confirming undo restores pending by removing only its resolution');
+
+insert into phase2c4_result values (
+  'integrity',
+  pg_temp.phase2c4_confirm_v5(
+    (select entry_id from phase2c4_fixture where label = 'integrity'),
+    (select interpretation_id from phase2c4_fixture where label = 'integrity'),
+    '[{"candidateIndex":0,"disposition":"rejected"}]'::jsonb,
+    '[]'::jsonb,
+    'pgtap:phase2c4:integrity'
+  )
+);
+delete from public.entry_task_candidate_resolutions
+where undo_operation_id = ((select result ->> 'undo_id' from phase2c4_result where label = 'integrity')::uuid);
+select throws_ok(
+  format(
+    'select public.undo_operation(%L)',
+    (select result ->> 'undo_id' from phase2c4_result where label = 'integrity')
+  ),
+  'P0001',
+  'Candidate resolution undo integrity check failed',
+  'v5 undo fails closed when the persisted resolution batch is incomplete'
+);
+select is(
+  (
+    select status
+    from public.undo_operations
+    where id = ((select result ->> 'undo_id' from phase2c4_result where label = 'integrity')::uuid)
+  ),
+  'available',
+  'a failed integrity-checked undo remains available and is not marked undone'
+);
 
 select is(
   (public.undo_operation((select result ->> 'undo_id' from phase2c4_result where label = 'mixed')::uuid))->>'undone',
