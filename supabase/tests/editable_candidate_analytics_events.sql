@@ -155,15 +155,19 @@ select throws_ok(
   'Invalid product event property',
   'candidate_edit_reset with editedFieldCount = 0 is denied'
 );
+-- The editable-field bound has grown twice since this file was written (3 ->
+-- 11 in Slice 2C.3, 11 -> 13 in Slice 2C.5); 4 no longer exceeds it, so this
+-- assertion now targets the current actual ceiling instead, the same kind of
+-- correction phase_2c_slice_3_owned_relations.sql already applied once.
 select throws_ok(
   $$ select public.record_product_event(
     'candidate_edit_reset', 'interpretation_review', 'pt-BR', 'desktop', '2c-test-1',
-    jsonb_build_object('editedFieldCount', 4), null, null, null,
+    jsonb_build_object('editedFieldCount', 14), null, null, null,
     'e0000000-0000-4000-8000-000000000009', true
   ) $$,
   '22023',
   'Invalid product event property',
-  'candidate_edit_reset with editedFieldCount above the editable-field bound is denied'
+  'candidate_edit_reset with editedFieldCount above the current editable-field bound (14, raised again by Slice 2C.5) is denied'
 );
 select throws_ok(
   $$ select public.record_product_event(
@@ -234,15 +238,17 @@ select throws_ok(
   'Invalid product event property',
   'editedCandidateCount above candidateCount is denied'
 );
+-- Same staleness class as the candidate_edit_reset fix above: the
+-- per-candidate editable-field ceiling is now 13 (Slice 2C.5), not 7.
 select throws_ok(
   $$ select public.record_product_event(
     'task_candidates_confirmed', 'interpretation_review', 'pt-BR', 'desktop', '2c-test-1',
-    jsonb_build_object('candidateCount', 2, 'editedCandidateCount', 1, 'editedFieldCount', 8), null, null, null,
+    jsonb_build_object('candidateCount', 2, 'editedCandidateCount', 1, 'editedFieldCount', 14), null, null, null,
     'e0000000-0000-4000-8000-000000000010', true
   ) $$,
   '22023',
   'Invalid product event property',
-  'editedFieldCount above editedCandidateCount times the editable-field count (7, as of Slice 2C.2) is denied'
+  'editedFieldCount above editedCandidateCount times the current editable-field count (13, raised again by Slice 2C.5) is denied'
 );
 select throws_ok(
   $$ select public.record_product_event(
