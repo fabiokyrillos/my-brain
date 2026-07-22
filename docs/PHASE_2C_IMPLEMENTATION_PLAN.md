@@ -531,6 +531,18 @@ The user can explicitly confirm, reject, retain as record, or dismiss a suggesti
 - DoD: one explicit terminal resolution per current candidate, no content duplication/category analytics, truthful daily surfaces and history, Work containing confirmed tasks only, clean fixtures/docs/report, and all earlier slice guarantees still green.
 - Stop before implementation authorization and again before Phase 2C.5.
 
+### Execution status — 2026-07-22
+
+**Complete on local branch `codex/phase-2c-slice-4`; stop gate remains in force before Phase 2C.5.**
+
+- Implemented the exact four-outcome terminal lifecycle through the narrow owner-scoped `entry_task_candidate_resolutions` ledger and atomic `confirm_entry_task_candidates_v5`; only `confirmed` materializes a task, while all outcomes remain visible in entry-local history and remove that candidate from actionable projections.
+- Preserved v2–v4 and earlier UI paths. Migrations `202607220040`–`202607220043` are additive and applied to the linked development database; the final two are forward-only corrections for undo counts and safe legacy provenance enrichment.
+- Reused the existing undo architecture to delete the exact resolution batch, cancel only tasks from the same operation, and restore candidates to pending; reconfirmation after supported undo is explicitly covered.
+- Reused only the existing aggregate `task_candidates_confirmed` event for non-idempotent batches containing at least one confirmation. No disposition category, reason, content, or identity enters analytics.
+- Executed evidence: linked pgTAP 290/290 across seven relevant suites; disposable remote smoke 24/24 with zero fixture residue and preserved pre-existing counts/Auth IDs; Playwright 4/4 (PT-BR/en × desktop/Pixel 7); Vitest 693/693; lint, typecheck, production build, migration parity, linked error-level DB lint, and byte-stable linked generated types all green.
+- Independent final review found no Critical/Important issue. Full evidence and non-blocking notes are recorded in `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
+- No push, PR, merge, application deployment, Phase 2C.5 capability, Product Audit artifact, or other adjacent scope is included.
+
 ## 8. Phase 2C.5 — Subtasks, Dependencies and Split/Merge
 
 ### User outcome

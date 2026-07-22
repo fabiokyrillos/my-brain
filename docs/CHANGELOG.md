@@ -2,6 +2,37 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-22 — Phase 2C Slice 2C.4: candidate dispositions (branch, not merged)
+
+### Added
+
+- Migration `202607220041` adds the narrow `entry_task_candidate_resolutions` provenance ledger and `confirm_entry_task_candidates_v5`. The database owns the exact terminal enum `confirmed`/`rejected`/`retained`/`dismissed`, derives ownership from `auth.uid()`, resolves a mixed batch atomically, creates tasks only for `confirmed`, and preserves all earlier RPC signatures.
+- `src/features/tasks/candidate-disposition-contract.ts` provides the closed Zod command, canonical normalization, and serialization used by the client and Server Action. The candidate editor exposes one accessible decision group per selected candidate while leaving unselected candidates pending.
+- Entry review now includes immutable, entry-local disposition history. Inbox and Needs Attention treat every terminal outcome as resolved; Work remains task-only and therefore shows only confirmed outcomes.
+- `supabase/tests/phase_2c_slice_4_candidate_dispositions.sql` covers the schema/RLS/grants, v5 ownership and replay contract, all outcomes, mixed-batch atomicity, legacy compatibility, integrity triggers, undo, reconfirmation, record-only/current-interpretation checks, and lifecycle convergence.
+
+### Changed
+
+- Migration `202607220040` replaces the existing confirmation RPC bodies and uniqueness indexes forward-only so a supported undo can preserve cancelled task history and still allow a later confirmation with a new operation key.
+- The existing undo architecture now owns v5 compensation: it removes exactly the operation's resolution rows, cancels only tasks created by that operation, validates drift before mutation, and restores pending state without inventing a parallel undo system.
+- `confirmEntryTasks` calls the generated-type-checked v5 RPC and maps disposition/ownership/relation/replay errors to stable localized results. The existing `task_candidates_confirmed` event is emitted only for a non-idempotent batch containing at least one confirmation, with aggregate counts only and fail-open behavior; no disposition category, content, reason, or identity is recorded.
+- `database.types.ts` was regenerated twice from the linked schema and is byte-stable. The remote smoke now covers 24 candidate cases and includes the resolution ledger in fatal cleanup/baseline parity; the deterministic Playwright spec covers PT-BR and English on desktop and Pixel 7.
+
+### Fixed
+
+- Migration `202607220042` replaces `undo_operation(uuid)` forward-only to avoid an invalid `pg_catalog.greatest(integer, integer)` lookup under `search_path=''` and returns the truthful larger affected count for mixed resolution batches.
+- Migration `202607220043` permits only the safe legacy provenance enrichment `NULL → already-linked interpretation`, while continuing to reject every other confirmed-task identity change.
+- Real linked pgTAP execution exposed two fixture defects: an unsupported `unlike` overload and an update against immutable interpretation rows. The canonical test now uses an equivalent `ok(... not like ...)` assertion and inserts record-only fixtures correctly.
+- Full Vitest execution exposed two stale copy assertions from the pre-disposition confirmation model; they now assert the approved “resolve suggestions” language.
+
+### Verification
+
+- Linked migrations are aligned through `202607220043`; linked DB lint at error level is clean; linked generated types match the committed file byte-for-byte.
+- Seven relevant linked pgTAP suites passed 290/290. The disposable remote smoke passed 24/24 with zero remaining users/fixtures and preserved pre-existing Auth IDs/table counts.
+- Playwright passed 4/4 (PT-BR/en × desktop/Pixel 7). Vitest passed 85 files/693 tests; lint, typecheck, and the production build passed.
+- Independent final review approved the complete branch diff with no Critical/Important finding. The branch remains local: no push, PR, merge, or application deployment.
+- See `docs/reports/PHASE_2C_SLICE_04_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
+
 ## 2026-07-22 — Phase 2C Slice 2C.3: owned relations (branch, not merged)
 
 ### Added
