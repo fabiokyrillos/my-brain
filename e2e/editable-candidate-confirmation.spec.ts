@@ -9,11 +9,15 @@ const clientOptions = { auth: { autoRefreshToken: false, persistSession: false }
 
 type DisposableFixture = {
   accessToken: string;
+  contextId: string;
   email: string;
   entryId: string;
   interpretationId: string;
   password: string;
+  personA: string;
+  personB: string;
   prefix: string;
+  projectId: string;
   userId: string;
 };
 
@@ -115,13 +119,45 @@ async function createFixture(
   expect(interpretationError).toBeNull();
   expect(typeof interpretationId).toBe("string");
 
+  const { data: project, error: projectError } = await owner
+    .from("projects")
+    .insert({ user_id: created.user.id, name: `${prefix} project` })
+    .select("id")
+    .single();
+  expect(projectError).toBeNull();
+  const { data: context, error: contextError } = await owner
+    .from("contexts")
+    .insert({ user_id: created.user.id, name: `${prefix} context` })
+    .select("id")
+    .single();
+  expect(contextError).toBeNull();
+  const { data: personA, error: personAError } = await owner
+    .from("people")
+    .insert({ user_id: created.user.id, name: `${prefix} person A` })
+    .select("id")
+    .single();
+  expect(personAError).toBeNull();
+  const { data: personB, error: personBError } = await owner
+    .from("people")
+    .insert({ user_id: created.user.id, name: `${prefix} person B` })
+    .select("id")
+    .single();
+  expect(personBError).toBeNull();
+  if (!project || !context || !personA || !personB) {
+    throw new Error("Disposable owned relation fixtures were not created.");
+  }
+
   return {
     accessToken: signedIn.session.access_token,
+    contextId: context.id as string,
     email,
     entryId: entry.id,
     interpretationId: interpretationId as string,
     password,
+    personA: personA.id as string,
+    personB: personB.id as string,
     prefix,
+    projectId: project.id as string,
     userId: created.user.id,
   };
 }
@@ -199,6 +235,8 @@ test.describe("editable candidate confirmation through the production Server Act
     await firstEditor.getByLabel("Data limite (America/New_York)").fill("2026-08-02T10:30");
     await firstEditor.getByLabel("Data planejada (America/New_York)").fill("2026-07-30T09:00");
     await firstEditor.getByLabel("Prioridade").selectOption("urgent");
+    await firstEditor.getByRole("listbox", { name: "Projetos" }).selectOption({ label: `${fixture.prefix} project` });
+    await firstEditor.getByRole("listbox", { name: "Contextos" }).selectOption({ label: `${fixture.prefix} context` });
 
     await secondEditor
       .getByRole("button", { name: `Editar sugestão: ${fixture.prefix} second candidate` })
@@ -210,6 +248,8 @@ test.describe("editable candidate confirmation through the production Server Act
       .getByRole("checkbox", { name: `Sem prazo definido: ${fixture.prefix} second candidate` })
       .click();
     await secondEditor.getByLabel("Motivo (opcional)").fill("Someday, not now");
+    await secondEditor.getByRole("listbox", { name: "Pessoas" }).selectOption({ label: `${fixture.prefix} person A` });
+    await secondEditor.getByRole("listbox", { name: "Aguardando por" }).selectOption({ label: `${fixture.prefix} person B` });
 
     const submit = page.getByRole("button", { name: "Criar 2 tarefas" });
     await submit.click();
@@ -218,7 +258,7 @@ test.describe("editable candidate confirmation through the production Server Act
 
     const { data: tasks, error: tasksError } = await owner
       .from("tasks")
-      .select("candidate_index,title,description,due_at,status,planned_at,manual_priority,intentional_no_due,no_due_reason")
+      .select("id,candidate_index,title,description,due_at,status,planned_at,manual_priority,intentional_no_due,no_due_reason")
       .eq("source_entry_id", fixture.entryId)
       .order("candidate_index", { ascending: true });
     expect(tasksError).toBeNull();
@@ -246,13 +286,39 @@ test.describe("editable candidate confirmation through the production Server Act
       no_due_reason: "Someday, not now",
     });
 
+    const firstTaskId = tasks?.[0]?.id;
+    const { data: firstTaskProjects, error: firstTaskProjectsError } = await owner
+      .from("task_projects")
+      .select("project_id")
+      .eq("task_id", firstTaskId);
+    expect(firstTaskProjectsError).toBeNull();
+    expect(firstTaskProjects).toEqual([{ project_id: fixture.projectId }]);
+    const { data: firstTaskContexts, error: firstTaskContextsError } = await owner
+      .from("task_contexts")
+      .select("context_id")
+      .eq("task_id", firstTaskId);
+    expect(firstTaskContextsError).toBeNull();
+    expect(firstTaskContexts).toEqual([{ context_id: fixture.contextId }]);
+
+    const secondTaskId = tasks?.[1]?.id;
+    const { data: secondTaskPeople, error: secondTaskPeopleError } = await owner
+      .from("task_people")
+      .select("person_id,role")
+      .eq("task_id", secondTaskId)
+      .order("role", { ascending: true });
+    expect(secondTaskPeopleError).toBeNull();
+    expect(secondTaskPeople).toEqual([
+      { person_id: fixture.personA, role: "involved" },
+      { person_id: fixture.personB, role: "waiting_on" },
+    ]);
+
     const { data: operation, error: operationError } = await owner
       .from("undo_operations")
       .select("operation_key,request_fingerprint")
       .eq("source_entry_id", fixture.entryId)
       .single();
     expect(operationError).toBeNull();
-    expect(operation?.operation_key).toMatch(/^confirm-v3:[0-9a-f-]{36}$/);
+    expect(operation?.operation_key).toMatch(/^confirm-v4:[0-9a-f-]{36}$/);
     expect(operation?.request_fingerprint).toMatch(/^[0-9a-f]{64}$/);
 
     const { data: interpretation, error: immutableError } = await owner
@@ -271,10 +337,15 @@ test.describe("editable candidate confirmation through the production Server Act
       .single();
     expect(auditError).toBeNull();
     expect(audit?.after_state).toMatchObject({
-      edited_fields: ["title", "description", "dueAt", "plannedAt", "manualPriority", "intentionalNoDue", "noDueReason"],
+      edited_fields: [
+        "title", "description", "dueAt", "plannedAt", "manualPriority", "intentionalNoDue", "noDueReason",
+        "projectIds", "contextIds", "personIds", "waitingOnPersonIds",
+      ],
       candidate_indexes: [0, 1],
     });
     expect(JSON.stringify(audit)).not.toContain("Original first description");
+    expect(JSON.stringify(audit)).not.toContain(fixture.projectId);
+    expect(JSON.stringify(audit)).not.toContain(`${fixture.prefix} project`);
 
     await expect.poll(async () => {
       const { data, error } = await owner

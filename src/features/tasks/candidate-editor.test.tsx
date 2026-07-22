@@ -833,4 +833,86 @@ describe("CandidateEditor", () => {
       });
     });
   });
+
+  describe("owned relations (Slice 2C.3)", () => {
+    const projectP1 = "11111111-1111-4111-8111-111111111111";
+    const projectP2 = "22222222-2222-4222-8222-222222222222";
+    const contextC1 = "33333333-3333-4333-8333-333333333333";
+    const personU1 = "44444444-4444-4444-8444-444444444444";
+    const personU2 = "55555555-5555-4555-8555-555555555555";
+    const relationOptions = {
+      projects: [{ id: projectP1, label: "Website relaunch" }, { id: projectP2, label: "Q3 planning" }],
+      contexts: [{ id: contextC1, label: "Work" }],
+      people: [{ id: personU1, label: "Alice" }, { id: personU2, label: "Bob" }],
+    };
+
+    it("does not render disabled clear controls when no owned relations exist", () => {
+      renderEditor();
+
+      expect(screen.queryByRole("button", { name: "Remover projetos: Enviar o relatório" })).not.toBeInTheDocument();
+    });
+
+    it("emits a project selection as a canonical edit", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("listbox", { name: "Projetos" }), [projectP2]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { projectIds: [projectP2] },
+      });
+    });
+
+    it("emits a waiting-on person separately from the general people selection", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("listbox", { name: "Pessoas" }), [personU1]);
+      await user.selectOptions(screen.getByRole("listbox", { name: "Aguardando por" }), [personU2]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { personIds: [personU1], waitingOnPersonIds: [personU2] },
+      });
+    });
+
+    it("sorts multiple selected relation IDs canonically", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.selectOptions(screen.getByRole("listbox", { name: "Projetos" }), [projectP2, projectP1]);
+
+      expect(onEditChange).toHaveBeenLastCalledWith({
+        candidateIndex: 0,
+        changes: { projectIds: [projectP1, projectP2] },
+      });
+    });
+
+    it("clears a relation selection via its dedicated clear control", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      await user.selectOptions(screen.getByRole("listbox", { name: "Contextos" }), [contextC1]);
+
+      await user.click(screen.getByRole("button", { name: "Remover contextos: Enviar o relatório" }));
+
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it("resets every relation selection when restoring the suggestion", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({ relationOptions });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+      await user.selectOptions(screen.getByRole("listbox", { name: "Projetos" }), [projectP1]);
+
+      await user.click(screen.getByRole("button", { name: "Restaurar sugestão: Enviar o relatório" }));
+
+      expect(onEditChange).toHaveBeenLastCalledWith(null);
+      expect(screen.getByRole("listbox", { name: "Projetos" })).toHaveDisplayValue([]);
+    });
+  });
 });

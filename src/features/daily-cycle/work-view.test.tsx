@@ -78,6 +78,10 @@ describe("WorkView", () => {
         humanState: "waiting_on_someone",
         origin: "brain",
         availableActions: [{ id: "complete_task" }, { id: "resume_task" }],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       }],
     });
 
@@ -104,6 +108,10 @@ describe("WorkView", () => {
         humanState: "not_started",
         origin: "you",
         availableActions: [],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       }],
     });
 
@@ -124,12 +132,59 @@ describe("WorkView", () => {
         humanState: "not_started",
         origin: "you",
         availableActions: [],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
       }],
     });
 
     expect(screen.queryByText(/Planned:/)).not.toBeInTheDocument();
     expect(screen.queryByText("No due date")).not.toBeInTheDocument();
     expect(screen.queryByText(/^(Low|Medium|High|Urgent)$/)).not.toBeInTheDocument();
+  });
+
+  it("renders owned project, context, person, and waiting-on relations (Slice 2C.3)", () => {
+    renderWork({
+      locale: "en",
+      items: [{
+        taskId: "task-1",
+        title: "Send proposal",
+        intentionalNoDue: false,
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [],
+        projects: [{ id: "project-1", label: "Website relaunch" }],
+        contexts: [{ id: "context-1", label: "Deep Work" }],
+        people: [{ id: "person-1", label: "Alice" }],
+        waitingOnPeople: [{ id: "person-2", label: "Bob" }],
+      }],
+    });
+
+    expect(screen.getByText("Website relaunch")).toBeVisible();
+    expect(screen.getByText("Deep Work")).toBeVisible();
+    expect(screen.getByText("Alice")).toBeVisible();
+    expect(screen.getByText("Waiting on: Bob")).toBeVisible();
+  });
+
+  it("renders no relation badges for a task with no owned relations", () => {
+    renderWork({
+      locale: "en",
+      items: [{
+        taskId: "task-1",
+        title: "Send proposal",
+        intentionalNoDue: false,
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
+      }],
+    });
+
+    expect(screen.queryByText(/Waiting on:/)).not.toBeInTheDocument();
   });
 
   it("explains the intentionally limited Waiting view without presenting a fake follow-up control", () => {

@@ -88,6 +88,10 @@ function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
     humanState: "not_started",
     origin: "you",
     availableActions: [],
+    projects: [],
+    contexts: [],
+    people: [],
+    waitingOnPeople: [],
     ...overrides,
   };
 }

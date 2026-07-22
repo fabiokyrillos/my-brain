@@ -191,6 +191,11 @@ export type WorkItemOrigin = (typeof workItemOrigins)[number];
 export const workItemPriorities = ["low", "medium", "high", "urgent"] as const;
 export type WorkItemPriority = (typeof workItemPriorities)[number];
 
+export type RelationSummary = {
+  readonly id: string;
+  readonly label: string;
+};
+
 export type WorkItemView = {
   readonly taskId: string;
   readonly title: string;
@@ -203,4 +208,8 @@ export type WorkItemView = {
   readonly humanState: WorkItemHumanState;
   readonly origin: WorkItemOrigin;
   readonly availableActions: readonly AvailableAction[];
+  readonly projects: readonly RelationSummary[];
+  readonly contexts: readonly RelationSummary[];
+  readonly people: readonly RelationSummary[];
+  readonly waitingOnPeople: readonly RelationSummary[];
 };

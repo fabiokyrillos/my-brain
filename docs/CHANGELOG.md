@@ -2,6 +2,39 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-22 — Phase 2C Slice 2C.3: owned relations (branch, not merged)
+
+### Added
+
+- Migration `202607220038` (additive): `confirm_entry_task_candidates_v4` RPC — the exact `confirm_entry_task_candidates_v3` contract, extended so each candidate's edit `changes` object may also carry `projectIds`/`contextIds`/`personIds`/`waitingOnPersonIds` (each a bounded, ≤20-element array of distinct owned UUIDs). Reuses the pre-existing `task_projects`/`task_contexts`/`task_people` junction tables per PRD `2C-RELATIONS-002`, not the dormant `tasks.waiting_on_person_id` scalar column; `task_people.role='involved'` covers the generic person relation, `role='waiting_on'` covers waiting-on. Validates every relation ID's `(user_id, id)` ownership across all candidates in one pass before any write, aborting the entire multi-candidate materialization atomically on any invalid/cross-owner ID (`2C_INVALID_RELATION`). Relation arrays are sorted/deduplicated before entering the replay fingerprint. Extends the correction-race guard trigger to also recognize the `confirm-v4:` operation-key namespace. Extends `private.require_task_candidates_confirmed_edit_counts`'s bound from `* 7` to `* 11` and `candidate_edit_reset`'s own `editedFieldCount` bound from `[1,3]` to `[1,11]` (a second, independently-discovered pre-existing staleness — see Fixed).
+- `src/features/tasks/relation-options.ts` (`loadCandidateRelationOptions`): new server-only projection loading the authenticated user's own projects/contexts/people, bounded to 200 rows each, ordered by name, mapped to plain `{id,label}` pairs before ever reaching a Client Component.
+- `supabase/tests/phase_2c_slice_3_owned_relations.sql`: a focused, additive pgTAP file (29 assertions) covering the v4 contract's structural relation validation, cross-owner denial per relation type, mixed valid/invalid atomic abort, full materialization across all four relation kinds with correct `task_people` roles, audit-evidence field-name-only privacy, idempotent replay sensitivity to the relation set, the guard-trigger and analytics-bound extensions, and legacy-v3 compatibility.
+
+### Changed
+
+- `src/features/tasks/candidate-edit-contract.ts`: `CandidateChanges`/`CandidateEditableField` extended with the four relation fields; `normalizeCandidateEdits` sorts/deduplicates each relation array and counts a non-empty array as an edited field (no AI baseline exists for relations, so any non-empty value is an edit).
+- `src/features/tasks/candidate-editor.tsx`: four new native `<select multiple>` listboxes (project/context/person/waiting-on) with matching clear buttons, each disabled when the user owns nothing of that kind; reset clears all four alongside the existing seven fields.
+- `src/features/tasks/task-candidate-form.tsx`, `src/features/daily-cycle/review-projection.ts`, `src/app/[locale]/app/inbox/[entryId]/page.tsx`: thread `relationOptions` from the new projection down to each `CandidateEditor`.
+- `src/features/tasks/actions.ts`: `confirmEntryTasks` now calls `confirm_entry_task_candidates_v4`; maps the new `2C_INVALID_RELATION` error to a localized `invalid_relation` result code.
+- `src/features/daily-cycle/contracts.ts`/`projection-mappers.ts`/`work-projection.ts`, `src/features/operations/task-list.tsx`: `WorkItemView` gained non-optional `projects`/`contexts`/`people`/`waitingOnPeople` (`RelationSummary[]`, always present, possibly empty); `work-projection.ts` hydrates them per page via a bounded two-step flat-select join across `task_projects`/`task_contexts`/`task_people` and `projects`/`contexts`/`people` (no Supabase embedded-resource select), matching the existing projects/people detail-page pattern; `TaskList` renders relation badges reusing the existing `status-badge` class.
+- `src/lib/supabase/database.types.ts`: regenerated for the new `confirm_entry_task_candidates_v4` signature only (diffed byte-identical to the linked schema both before and after the forward-fix).
+- `scripts/remote-editable-candidate-confirmation-smoke.mjs`: extended with 5 new cases (full relation materialization, cross-owner project denial, mixed valid/invalid atomic abort, legacy-v3 compatibility); fixed a latent bug where a second disposable test user reused the first user's email.
+- `e2e/editable-candidate-confirmation.spec.ts`: extended with owned project/context/person fixtures and real listbox selection through the browser; verifies `task_projects`/`task_contexts`/`task_people` materialization and that the audit trail never contains relation IDs or names.
+
+### Fixed
+
+- `confirm_entry_task_candidates_v4`'s cross-owner ownership check for `personIds`/`waitingOnPersonIds` used `candidate_row.value -> 'personIds' || candidate_row.value -> 'waitingOnPersonIds'`. PostgreSQL gives `->` and `||` the same precedence and associates them left-to-right, so this parsed as `(candidate_row.value -> 'personIds' || candidate_row.value) -> 'waitingOnPersonIds'` — concatenating the personIds array with the entire candidate object as one extra element, then applying `->` with a text key to the resulting array (always `NULL`). `jsonb_array_elements_text(NULL)` in a `FROM` clause yields zero rows, so the ownership check never found anything to reject; the composite foreign key `task_people_person_owner_fk` still correctly rejected the resulting insert with SQLSTATE `23503` (no cross-owner row was ever persisted), but degraded the intended `2C_INVALID_RELATION` rejection into a confusing raw FK violation. Found while writing this slice's own pgTAP coverage, not assumed from a read-through. Migration `202607220039` (forward-fix, additive) parenthesizes both operands; `038` itself was left unedited once applied, per this project's append-only migration convention.
+- `candidate_edit_reset`'s own `editedFieldCount` property bound was still `[1,3]` (set by migration `202607210034` for Phase 2C.1's 3 fields); Slice 2C.2 raised the real maximum possible reset-time edited-field count to 7 but never updated this specific bound. Fixed in the same migration `202607220038` that raises it to 11 for this slice's own fields.
+
+### Verification
+
+- 653/653 unit/component tests (up from 622), 0 ESLint errors, 0 `tsc --noEmit` errors, production build green.
+- `npx supabase migration list --linked`: parity through `202607220039`. `npx supabase db lint --linked --level warning`: clean (only the pre-existing, unrelated `run_user_heartbeat` warning).
+- `phase_2c_slice_3_owned_relations.sql` (29 assertions) executed for real online via `npx supabase db query --linked -f ...` after the forward-fix (Docker unavailable locally; `pgtap` temporarily installed into the linked project's `extensions` schema, removed afterward, not committed).
+- `remote-editable-candidate-confirmation-smoke.mjs`: 23/23 cases passed, disposable fixtures cleaned up, pre-existing table counts and Auth users preserved.
+- `editable-candidate-confirmation.spec.ts` online Playwright: 2/2 passed (desktop + Pixel 7), selecting real owned relations through the actual listbox controls.
+- `intelligent-capture.spec.ts`'s deterministic-fixture describe block: 4/4 passed. Its real-AI-capture describe block's first serial test timed out waiting for the deployed worker to organize an entry — a pre-existing external dependency on worker/OpenAI dispatch latency, confirmed unrelated to this slice (no change anywhere in `supabase/functions/` or capture/job code).
+
 ## 2026-07-21 — Phase 2C Slice 2C.2: planning, priority, and no-due semantics (branch, not merged)
 
 ### Added

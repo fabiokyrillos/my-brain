@@ -28,6 +28,12 @@ const countedTables = [
   "audit_logs",
   "pending_questions",
   "jobs",
+  "projects",
+  "contexts",
+  "people",
+  "task_projects",
+  "task_contexts",
+  "task_people",
 ];
 
 function extraction(label) {
@@ -86,8 +92,8 @@ async function environmentSnapshot() {
   };
 }
 
-async function createTestUser() {
-  const email = `${fixturePrefix}@example.test`;
+async function createTestUser(label = "owner") {
+  const email = `${fixturePrefix}-${label}@example.test`;
   const user = dataOrThrow(
     await admin.auth.admin.createUser({ email, password, email_confirm: true }),
     "create Phase 2C integration user",
@@ -155,6 +161,16 @@ async function confirmV3(client, fixture, label, indexes, edits, operationKey = 
   }).then((result) => ({ ...result, operationKey }));
 }
 
+async function confirmV4(client, fixture, label, indexes, edits, operationKey = crypto.randomUUID()) {
+  return client.rpc("confirm_entry_task_candidates_v4", {
+    p_entry_id: fixture.entryId,
+    p_expected_interpretation_id: fixture.interpretationId,
+    p_candidate_indexes: indexes,
+    p_candidate_edits: edits,
+    p_operation_key: operationKey,
+  }).then((result) => ({ ...result, operationKey }));
+}
+
 async function taskRows(client, taskIds) {
   return dataOrThrow(
     await client
@@ -164,6 +180,20 @@ async function taskRows(client, taskIds) {
       .order("candidate_index", { ascending: true }),
     "read materialized task rows",
   );
+}
+
+async function taskRelations(client, taskId) {
+  const [projects, contexts, people] = await Promise.all([
+    dataOrThrow(await client.from("task_projects").select("project_id").eq("task_id", taskId), "read task_projects"),
+    dataOrThrow(await client.from("task_contexts").select("context_id").eq("task_id", taskId), "read task_contexts"),
+    dataOrThrow(await client.from("task_people").select("person_id,role").eq("task_id", taskId), "read task_people"),
+  ]);
+  return {
+    projectIds: projects.map((row) => row.project_id).sort(),
+    contextIds: contexts.map((row) => row.context_id).sort(),
+    personIds: people.filter((row) => row.role === "involved").map((row) => row.person_id).sort(),
+    waitingOnPersonIds: people.filter((row) => row.role === "waiting_on").map((row) => row.person_id).sort(),
+  };
 }
 
 async function correct(client, fixture, label, operationKey = crypto.randomUUID()) {
@@ -475,8 +505,92 @@ try {
     "A v2 confirmation no longer leaves planning/priority/no-due fields at their defaults",
   );
 
+  // Slice 2C.3: owned relations (project, context, person, waiting-on; v4 RPC).
+  const ownedProject = dataOrThrow(
+    await owner.from("projects").insert({ user_id: user.id, name: `${fixturePrefix} project` }).select("id").single(),
+    "create owned project fixture",
+  );
+  const ownedContext = dataOrThrow(
+    await owner.from("contexts").insert({ user_id: user.id, name: `${fixturePrefix} context` }).select("id").single(),
+    "create owned context fixture",
+  );
+  const ownedPersonA = dataOrThrow(
+    await owner.from("people").insert({ user_id: user.id, name: `${fixturePrefix} person A` }).select("id").single(),
+    "create owned person A fixture",
+  );
+  const ownedPersonB = dataOrThrow(
+    await owner.from("people").insert({ user_id: user.id, name: `${fixturePrefix} person B` }).select("id").single(),
+    "create owned person B fixture",
+  );
+
+  const relationsFixture = await createFixture(owner, "v4-relations");
+  const relationsConfirm = dataOrThrow(
+    await confirmV4(owner, relationsFixture, "v4-relations", [0], [
+      {
+        candidateIndex: 0,
+        changes: {
+          projectIds: [ownedProject.id],
+          contextIds: [ownedContext.id],
+          personIds: [ownedPersonA.id],
+          waitingOnPersonIds: [ownedPersonB.id],
+        },
+      },
+    ]),
+    "confirm v4 owned relations edit",
+  );
+  const relations = await taskRelations(owner, relationsConfirm.task_ids[0]);
+  assert(JSON.stringify(relations.projectIds) === JSON.stringify([ownedProject.id]), "Project relation was not materialized");
+  assert(JSON.stringify(relations.contextIds) === JSON.stringify([ownedContext.id]), "Context relation was not materialized");
+  assert(JSON.stringify(relations.personIds) === JSON.stringify([ownedPersonA.id]), "Person relation was not materialized");
+  assert(JSON.stringify(relations.waitingOnPersonIds) === JSON.stringify([ownedPersonB.id]), "Waiting-on relation was not materialized");
+
+  const { client: otherOwner } = await createTestUser("other-owner");
+  const otherProject = dataOrThrow(
+    await otherOwner.from("projects").insert({ user_id: (await otherOwner.auth.getUser()).data.user.id, name: `${fixturePrefix} other project` }).select("id").single(),
+    "create cross-owner project fixture",
+  );
+
+  const crossOwnerFixture = await createFixture(owner, "v4-cross-owner");
+  const crossOwnerAttempt = await confirmV4(owner, crossOwnerFixture, "v4-cross-owner", [0], [
+    { candidateIndex: 0, changes: { projectIds: [otherProject.id] } },
+  ]);
+  assertRpcError(crossOwnerAttempt, "22023", "Cross-owner project relation", "2C_INVALID_RELATION");
+  const crossOwnerTaskCountResult = await owner
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("source_interpretation_id", crossOwnerFixture.interpretationId);
+  if (crossOwnerTaskCountResult.error) throw new Error(`count tasks after cross-owner rejection: ${crossOwnerTaskCountResult.error.message}`);
+  assert((crossOwnerTaskCountResult.count ?? 0) === 0, "Cross-owner attempt created a task");
+
+  const mixedFixture = await createFixture(owner, "v4-mixed-abort");
+  const mixedAttempt = await confirmV4(owner, mixedFixture, "v4-mixed-abort", [0, 1], [
+    { candidateIndex: 0, changes: { projectIds: [ownedProject.id] } },
+    { candidateIndex: 1, changes: { projectIds: [otherProject.id] } },
+  ]);
+  assertRpcError(mixedAttempt, "22023", "Mixed valid/invalid relation edit", "2C_INVALID_RELATION");
+  const mixedTaskCountResult = await owner
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("source_interpretation_id", mixedFixture.interpretationId);
+  if (mixedTaskCountResult.error) throw new Error(`count tasks after mixed valid/invalid rejection: ${mixedTaskCountResult.error.message}`);
+  assert((mixedTaskCountResult.count ?? 0) === 0, "A partially-invalid multi-candidate confirmation was not fully atomic");
+
+  const legacyV3RelationsFixture = await createFixture(owner, "v3-still-no-relations");
+  const legacyV3RelationsConfirm = dataOrThrow(
+    await confirmV3(owner, legacyV3RelationsFixture, "v3-still-no-relations", [0], []),
+    "confirm legacy v3 fixture after Slice 2C.3",
+  );
+  const legacyV3Relations = await taskRelations(owner, legacyV3RelationsConfirm.task_ids[0]);
+  assert(
+    legacyV3Relations.projectIds.length === 0
+      && legacyV3Relations.contextIds.length === 0
+      && legacyV3Relations.personIds.length === 0
+      && legacyV3Relations.waitingOnPersonIds.length === 0,
+    "A v3 confirmation unexpectedly materialized relations",
+  );
+
   smokeSummary = {
-    cases: 18,
+    cases: 23,
     fixturePrefix,
     preExistingAuthUsers: before.authUserIds.length,
     preExistingTableCounts: before.tableCounts,

@@ -2361,6 +2361,16 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_entry_task_candidates_v4: {
+        Args: {
+          p_candidate_edits: Json
+          p_candidate_indexes: number[]
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
+        Returns: Json
+      }
       confirm_entry_tasks: {
         Args: { p_candidate_indexes: number[]; p_entry_id: string }
         Returns: Json

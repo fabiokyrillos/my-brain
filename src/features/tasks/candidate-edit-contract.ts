@@ -9,9 +9,19 @@ const MAX_SERIALIZED_BYTES = 131_072;
 export const manualPriorityValues = ["low", "medium", "high", "urgent"] as const;
 export type ManualPriority = (typeof manualPriorityValues)[number];
 
+const MAX_RELATION_IDS = 20;
+
 const candidateIndexSchema = z.number().int().nonnegative();
 const dueAtSchema = z.string().datetime({ offset: true });
 const manualPrioritySchema = z.enum(manualPriorityValues);
+const relationIdArraySchema = z
+  .array(z.string().uuid())
+  .max(MAX_RELATION_IDS)
+  .superRefine((ids, context) => {
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "Relation IDs must be unique" });
+    }
+  });
 
 const candidateChangesSchema = z.strictObject({
   title: z.string().trim().min(1).max(MAX_TITLE_LENGTH).optional(),
@@ -33,6 +43,10 @@ const candidateChangesSchema = z.strictObject({
     .transform((reason) => reason || null)
     .nullable()
     .optional(),
+  projectIds: relationIdArraySchema.optional(),
+  contextIds: relationIdArraySchema.optional(),
+  personIds: relationIdArraySchema.optional(),
+  waitingOnPersonIds: relationIdArraySchema.optional(),
 });
 
 const candidateEditCommandSchema = z.strictObject({
@@ -80,7 +94,11 @@ export type CandidateEditableField =
   | "plannedAt"
   | "manualPriority"
   | "intentionalNoDue"
-  | "noDueReason";
+  | "noDueReason"
+  | "projectIds"
+  | "contextIds"
+  | "personIds"
+  | "waitingOnPersonIds";
 
 export type CandidateChanges = {
   title?: string;
@@ -90,7 +108,15 @@ export type CandidateChanges = {
   manualPriority?: ManualPriority | null;
   intentionalNoDue?: boolean;
   noDueReason?: string | null;
+  projectIds?: string[];
+  contextIds?: string[];
+  personIds?: string[];
+  waitingOnPersonIds?: string[];
 };
+
+function sortedUniqueIds(ids: readonly string[]): string[] {
+  return [...new Set(ids)].sort((left, right) => left.localeCompare(right));
+}
 
 export type CandidateEditCommand = {
   candidateIndex: number;
@@ -203,6 +229,37 @@ export function normalizeCandidateEdits(input: {
       editedFieldCount += 1;
     }
 
+    // The AI never suggests relations either; the immutable baseline is
+    // always the empty set, so any non-empty relation array is an edit.
+    if (edit.changes.projectIds !== undefined) {
+      const projectIds = sortedUniqueIds(edit.changes.projectIds);
+      if (projectIds.length > 0) {
+        changes.projectIds = projectIds;
+        editedFieldCount += 1;
+      }
+    }
+    if (edit.changes.contextIds !== undefined) {
+      const contextIds = sortedUniqueIds(edit.changes.contextIds);
+      if (contextIds.length > 0) {
+        changes.contextIds = contextIds;
+        editedFieldCount += 1;
+      }
+    }
+    if (edit.changes.personIds !== undefined) {
+      const personIds = sortedUniqueIds(edit.changes.personIds);
+      if (personIds.length > 0) {
+        changes.personIds = personIds;
+        editedFieldCount += 1;
+      }
+    }
+    if (edit.changes.waitingOnPersonIds !== undefined) {
+      const waitingOnPersonIds = sortedUniqueIds(edit.changes.waitingOnPersonIds);
+      if (waitingOnPersonIds.length > 0) {
+        changes.waitingOnPersonIds = waitingOnPersonIds;
+        editedFieldCount += 1;
+      }
+    }
+
     const effectiveDueAt = edit.changes.dueAt !== undefined ? edit.changes.dueAt : suggestion.dueAt;
     const effectiveIntentionalNoDue = edit.changes.intentionalNoDue ?? false;
     const effectiveNoDueReason = edit.changes.noDueReason ?? null;
@@ -252,6 +309,18 @@ export function serializeCandidateEdits(edits: readonly CandidateEditCommand[]):
       }
       if (edit.changes.noDueReason !== undefined) {
         changes.noDueReason = edit.changes.noDueReason;
+      }
+      if (edit.changes.projectIds !== undefined) {
+        changes.projectIds = sortedUniqueIds(edit.changes.projectIds);
+      }
+      if (edit.changes.contextIds !== undefined) {
+        changes.contextIds = sortedUniqueIds(edit.changes.contextIds);
+      }
+      if (edit.changes.personIds !== undefined) {
+        changes.personIds = sortedUniqueIds(edit.changes.personIds);
+      }
+      if (edit.changes.waitingOnPersonIds !== undefined) {
+        changes.waitingOnPersonIds = sortedUniqueIds(edit.changes.waitingOnPersonIds);
       }
 
       return { candidateIndex: edit.candidateIndex, changes };
