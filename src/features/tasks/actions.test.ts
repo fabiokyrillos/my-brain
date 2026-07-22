@@ -535,8 +535,41 @@ describe("resolveEntryTaskCandidates", () => {
       replayed: false,
       retryable: false,
     });
-    expect(after).not.toHaveBeenCalled();
     expect(recordProductEvent).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 1, editedCandidateCount: 1, editedFieldCount: 1 },
+    }));
+  });
+
+  it("records confirmed-only v5 analytics from canonical confirmation edits", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: ["task-1", "task-2"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await resolveCandidates(resolutionForm({
+      candidateResolutions: JSON.stringify([
+        { candidateIndex: 0, disposition: "confirmed" },
+        { candidateIndex: 1, disposition: "confirmed" },
+      ]),
+      candidateEdits: JSON.stringify([
+        { candidateIndex: 0, changes: {} },
+        { candidateIndex: 1, changes: { title: "Enviar proposta", description: null } },
+      ]),
+    }));
+
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 2 },
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith(
+      "task_candidates_confirmed",
+      operationKey,
+    );
   });
 
   it("accepts a successful all-non-confirming batch with no task IDs", async () => {
@@ -561,6 +594,58 @@ describe("resolveEntryTaskCandidates", () => {
       message: "2 suggestions resolved. No tasks created.",
       undoId,
     });
+    expect(after).not.toHaveBeenCalled();
+    expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not duplicate v5 confirmation analytics on an idempotent replay", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: ["task-1"], undo_id: undoId, idempotent: true },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolveCandidates(resolutionForm());
+
+    expect(result).toMatchObject({ status: "success", replayed: true });
+    expect(after).not.toHaveBeenCalled();
+    expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps v5 analytics fail-open and limits properties to aggregate confirmation counts", async () => {
+    const { client } = clientWithRpc({
+      data: { task_ids: ["task-1"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(recordProductEvent).mockRejectedValueOnce(new Error("analytics unavailable"));
+
+    const result = await resolveCandidates(resolutionForm({
+      candidateResolutions: JSON.stringify([
+        { candidateIndex: 0, disposition: "confirmed" },
+        { candidateIndex: 1, disposition: "dismissed" },
+      ]),
+      candidateEdits: JSON.stringify([
+        { candidateIndex: 0, changes: { title: "Private customer content" } },
+      ]),
+    }));
+
+    expect(result).toMatchObject({ status: "success", code: "resolved" });
+    await expect(flushAfter()).resolves.toBeUndefined();
+    const event = vi.mocked(recordProductEvent).mock.calls[0]?.[0] as {
+      name?: string;
+      properties?: Record<string, unknown>;
+    } | undefined;
+    expect(event).toEqual(expect.objectContaining({
+      name: "task_candidates_confirmed",
+      properties: { candidateCount: 1, editedCandidateCount: 1, editedFieldCount: 1 },
+    }));
+    expect(Object.keys(event?.properties ?? {}).sort()).toEqual([
+      "candidateCount",
+      "editedCandidateCount",
+      "editedFieldCount",
+    ]);
+    expect(JSON.stringify(event?.properties)).not.toMatch(/confirmed|dismissed|customer|entry-|task-|candidateIndex|title/i);
   });
 
   it("authenticates independently and maps database failures to sanitized stable feedback", async () => {
@@ -609,6 +694,31 @@ describe("resolveEntryTaskCandidates", () => {
       retryable: false,
     });
   });
+
+  it.each([
+    [
+      "pt-BR",
+      "Um dos projetos, contextos ou pessoas selecionados não está mais disponível. Atualize a página e tente novamente.",
+    ],
+    [
+      "en",
+      "One of the selected projects, contexts, or people is no longer available. Refresh the page and try again.",
+    ],
+  ])("maps v5 invalid relations to specific sanitized feedback in %s", async (locale, message) => {
+    const { client } = clientWithRpc({
+      data: null,
+      error: { code: "22023", message: "Invalid or cross-owner project relation", details: "2C_INVALID_RELATION" },
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    expect(await resolveCandidates(resolutionForm({ locale }))).toEqual({
+      status: "error",
+      code: "invalid_relation",
+      message,
+      undoId: null,
+      retryable: false,
+    });
+  });
 });
 
 describe("undoAgentAction", () => {
@@ -624,7 +734,7 @@ describe("undoAgentAction", () => {
     );
 
     expect(rpc).toHaveBeenCalledWith("undo_operation", { p_undo_id: undoId });
-    expect(result).toEqual({ status: "success", message: "Criação desfeita." });
+    expect(result).toEqual({ status: "success", message: "Alteração desfeita." });
     expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
     expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
   });
@@ -633,12 +743,13 @@ describe("undoAgentAction", () => {
     const { client } = clientWithRpc({ data: { undone: true, affected: 1 }, error: null });
     vi.mocked(createClient).mockResolvedValue(client as never);
 
-    await undoAgentAction(
+    const result = await undoAgentAction(
       { status: "idle", message: "" },
       form({ undoId, entryId, locale: "en" }),
     );
 
     expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
     expect(revalidatePath).toHaveBeenCalledWith(`/en/app/inbox/${entryId}`);
+    expect(result).toEqual({ status: "success", message: "Change undone." });
   });
 });

@@ -89,6 +89,7 @@ const resolutionCopy = {
     contended: "A interpretação está sendo alterada. Atualize a página antes de continuar.",
     mismatch: "Esta tentativa não corresponde mais às decisões atuais. Revise e tente novamente.",
     resolved: "Uma destas sugestões já foi resolvida. Atualize a página antes de continuar.",
+    invalidRelation: "Um dos projetos, contextos ou pessoas selecionados não está mais disponível. Atualize a página e tente novamente.",
     recordOnly: "Esta versão é somente registro; não há sugestões para resolver.",
     notFound: "Não encontramos este registro.",
     failed: "Não foi possível resolver as sugestões agora.",
@@ -111,6 +112,7 @@ const resolutionCopy = {
     contended: "The interpretation is being changed. Refresh the page before continuing.",
     mismatch: "This attempt no longer matches the current decisions. Review them and try again.",
     resolved: "One of these suggestions was already resolved. Refresh the page before continuing.",
+    invalidRelation: "One of the selected projects, contexts, or people is no longer available. Refresh the page and try again.",
     recordOnly: "This version is record-only; there are no suggestions to resolve.",
     notFound: "We could not find this record.",
     failed: "The suggestions could not be resolved right now.",
@@ -274,6 +276,26 @@ export async function resolveEntryTaskCandidates(
     );
   }
 
+  if (!resolution.idempotent && parsed.data.confirmedCandidateCount > 0) {
+    after(() => recordProductEvent({
+      name: "task_candidates_confirmed",
+      surface: "interpretation_review",
+      locale,
+      viewportClass: "unknown",
+      appVersion: "server",
+      idempotencyKey: createProductEventIdempotencyKey(
+        "task_candidates_confirmed",
+        parsed.data.operationKey,
+      ),
+      subject: { type: "entry", id: parsed.data.entryId },
+      properties: {
+        candidateCount: parsed.data.confirmedCandidateCount,
+        editedCandidateCount: parsed.data.editedCandidateCount,
+        editedFieldCount: parsed.data.editedFieldCount,
+      },
+    }).catch(() => {}));
+  }
+
   refreshTaskSurfaces(parsed.data.entryId);
   return {
     status: "success",
@@ -335,7 +357,7 @@ export async function undoAgentAction(
   }
   return {
     status: "success",
-    message: pt ? "Criação desfeita." : "Creation undone.",
+    message: pt ? "Alteração desfeita." : "Change undone.",
   };
 }
 
@@ -406,6 +428,7 @@ function parseResolutionForm(formData: FormData) {
       resolutions: candidateResolutions.data,
       edits: candidateEdits.data,
     });
+    const editCounts = computeCandidateEditCounts(canonical.edits);
     return {
       success: true as const,
       data: {
@@ -413,6 +436,10 @@ function parseResolutionForm(formData: FormData) {
         interpretationId: interpretationId.data,
         operationKey: operationKey.data,
         candidateResolutionCount: canonical.resolutions.length,
+        confirmedCandidateCount: canonical.resolutions.filter(
+          ({ disposition }) => disposition === "confirmed",
+        ).length,
+        ...editCounts,
         candidateResolutions: JSON.parse(
           serializeCandidateResolutions(canonical.resolutions),
         ) as Json,
@@ -545,6 +572,9 @@ function mapResolutionRpcError(
     )
   ) {
     return confirmationFailure("already_materialized", localized.resolved, false);
+  }
+  if (error.code === "22023" && error.details === "2C_INVALID_RELATION") {
+    return confirmationFailure("invalid_relation", localized.invalidRelation, false);
   }
   if (error.code === "22023") {
     return confirmationFailure("invalid_payload", localized.validation, false);
