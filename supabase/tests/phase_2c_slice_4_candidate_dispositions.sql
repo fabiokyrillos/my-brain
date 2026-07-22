@@ -8,7 +8,7 @@
 
 begin;
 
-select plan(82);
+select plan(85);
 
 -- Exact schema, RLS, grants, and RPC boundary ---------------------------------
 
@@ -176,6 +176,12 @@ select ok(
     )
   ), false),
   'PUBLIC cannot execute v5'
+);
+
+select unlike(
+  lower(pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)),
+  '%pg_catalog.greatest(%',
+  'undo_operation avoids an unresolved greatest function lookup under its empty search_path'
 );
 
 select has_function('public', 'confirm_entry_task_candidates_v4', array['uuid', 'uuid', 'integer[]', 'jsonb', 'text']);
@@ -813,10 +819,19 @@ insert into phase2c4_result values (
   )
 );
 select is((select count(*)::integer from public.tasks where source_entry_id = '4c440004-0000-4000-8000-000000000004'), 0, 'a non-confirming-only batch creates no task');
+insert into phase2c4_result values (
+  'nonconfirm-undo',
+  public.undo_operation((select result ->> 'undo_id' from phase2c4_result where label = 'nonconfirm')::uuid)
+);
 select is(
-  (public.undo_operation((select result ->> 'undo_id' from phase2c4_result where label = 'nonconfirm')::uuid))->>'undone',
+  (select result ->> 'undone' from phase2c4_result where label = 'nonconfirm-undo'),
   'true',
   'a non-confirming-only operation is undoable'
+);
+select is(
+  (select result ->> 'affected' from phase2c4_result where label = 'nonconfirm-undo'),
+  '1',
+  'non-confirming undo reports the removed resolution as affected'
 );
 select is((select count(*)::integer from public.entry_task_candidate_resolutions where entry_id = '4c440004-0000-4000-8000-000000000004'), 0, 'non-confirming undo restores pending by removing only its resolution');
 
@@ -851,10 +866,19 @@ select is(
   'a failed integrity-checked undo remains available and is not marked undone'
 );
 
+insert into phase2c4_result values (
+  'mixed-undo',
+  public.undo_operation((select result ->> 'undo_id' from phase2c4_result where label = 'mixed')::uuid)
+);
 select is(
-  (public.undo_operation((select result ->> 'undo_id' from phase2c4_result where label = 'mixed')::uuid))->>'undone',
+  (select result ->> 'undone' from phase2c4_result where label = 'mixed-undo'),
   'true',
   'one undo compensates the complete mixed operation'
+);
+select is(
+  (select result ->> 'affected' from phase2c4_result where label = 'mixed-undo'),
+  '4',
+  'mixed undo reports the larger resolution count rather than only its cancelled task count'
 );
 select is((select count(*)::integer from public.entry_task_candidate_resolutions where entry_id = '4c440001-0000-4000-8000-000000000001'), 0, 'mixed undo restores every candidate in that operation to pending');
 select is((select status from public.tasks where source_entry_id = '4c440001-0000-4000-8000-000000000001'), 'cancelled', 'mixed undo cancels only its confirmed task');
