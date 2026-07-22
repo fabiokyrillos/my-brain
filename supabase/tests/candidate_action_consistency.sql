@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(35);
 
 select has_column('public', 'entry_interpretations', 'is_record_only', 'interpretation revisions persist record-only status');
 select has_column('public', 'tasks', 'source_interpretation_id', 'tasks record which interpretation produced them');
@@ -228,6 +228,34 @@ select results_eq(
   $$,
   $$ values ('inbox'::text) $$,
   'undo of the v2 confirmation does not touch the unrelated v1 task'
+);
+
+select is(
+  (public.confirm_entry_task_candidates(
+    '33333333-3333-4333-8333-333333333333',
+    (select current_interpretation_id from public.entries where id = '33333333-3333-4333-8333-333333333333'),
+    array[0],
+    'pgtap:confirm:v2-candidate-zero-again'
+  ))->>'idempotent',
+  'false',
+  'a candidate can be confirmed again with a new operation key after undo'
+);
+select results_eq(
+  $$
+    select status, count(*)::bigint
+    from public.tasks
+    where user_id = '11111111-1111-4111-8111-111111111111'
+      and source_interpretation_id = (
+        select current_interpretation_id
+        from public.entries
+        where id = '33333333-3333-4333-8333-333333333333'
+      )
+      and candidate_index = 0
+    group by status
+    order by status
+  $$,
+  $$ values ('cancelled'::text, 1::bigint), ('inbox'::text, 1::bigint) $$,
+  'reconfirmation preserves cancelled history and creates exactly one active task'
 );
 
 -- Record-only interpretations have zero actionable candidates.
