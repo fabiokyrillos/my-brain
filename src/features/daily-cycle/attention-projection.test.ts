@@ -89,8 +89,8 @@ describe("loadAttentionProjection", () => {
     const ptPage = await loadAttentionProjection(ptClient as never, { locale: "pt-BR" });
     const enPage = await loadAttentionProjection(enClient as never, { locale: "en" });
 
-    expect(ptPage.items[0].explanation).toBe("Há tarefas sugeridas prontas para sua confirmação.");
-    expect(enPage.items[0].explanation).toBe("There are suggested tasks ready for your confirmation.");
+    expect(ptPage.items[0].explanation).toBe("Escolha o destino de cada sugestão pendente.");
+    expect(enPage.items[0].explanation).toBe("Choose what should happen to each pending suggestion.");
   });
 
   it("builds a locale-scoped primary action that links to the canonical entry review route", async () => {

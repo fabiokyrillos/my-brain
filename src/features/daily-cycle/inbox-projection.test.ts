@@ -37,6 +37,7 @@ function entry(overrides: Partial<Entry> = {}): Entry {
 }
 
 type InboxTaskRow = { source_entry_id: string; source_interpretation_id?: string | null; candidate_index?: number | null };
+type InboxResolutionRow = { entry_id: string; interpretation_id: string; candidate_index: number; disposition: string };
 
 function clientMock(options: {
   entries?: Entry[];
@@ -44,6 +45,7 @@ function clientMock(options: {
   interpretations?: Array<{ id: string; summary: string; task_candidates: unknown }>;
   openQuestions?: Array<{ entry_id: string }>;
   tasks?: InboxTaskRow[];
+  resolutions?: InboxResolutionRow[];
 } = {}) {
   const {
     entries = [entry()],
@@ -51,6 +53,7 @@ function clientMock(options: {
     interpretations = [],
     openQuestions = [],
     tasks = [],
+    resolutions = [],
   } = options;
 
   const stubs: Record<string, ReturnType<typeof queryStub>> = {
@@ -59,6 +62,7 @@ function clientMock(options: {
     entry_interpretations: queryStub({ data: interpretations, error: null }),
     pending_questions: queryStub({ data: openQuestions, error: null }),
     tasks: queryStub({ data: tasks, error: null }),
+    entry_task_candidate_resolutions: queryStub({ data: resolutions, error: null }),
   };
   const from = vi.fn((table: string) => stubs[table]);
   return { client: { from }, stubs, from };
@@ -146,6 +150,58 @@ describe("loadInboxProjection", () => {
     const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
 
     expect(page.items[0].productState).toBe("ready");
+  });
+
+  it("keeps attention when only some candidates have terminal dispositions", async () => {
+    const { client } = clientMock({
+      entries: [entry({ current_interpretation_id: "interp-1" })],
+      interpretations: [{ id: "interp-1", summary: "Plano", task_candidates: [{ title: "A" }, { title: "B" }] }],
+      resolutions: [{ entry_id: "entry-1", interpretation_id: "interp-1", candidate_index: 0, disposition: "retained" }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" });
+  });
+
+  it("clears candidate attention when all candidates have terminal dispositions", async () => {
+    const { client } = clientMock({
+      entries: [entry({ current_interpretation_id: "interp-1" })],
+      interpretations: [{ id: "interp-1", summary: "Plano", task_candidates: [{ title: "A" }, { title: "B" }] }],
+      resolutions: [
+        { entry_id: "entry-1", interpretation_id: "interp-1", candidate_index: 0, disposition: "rejected" },
+        { entry_id: "entry-1", interpretation_id: "interp-1", candidate_index: 1, disposition: "dismissed" },
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "ready" });
+  });
+
+  it("does not let an older interpretation's disposition cover the current candidate", async () => {
+    const { client } = clientMock({
+      entries: [entry({ current_interpretation_id: "interp-2" })],
+      interpretations: [{ id: "interp-2", summary: "Plano atual", task_candidates: [{ title: "A" }] }],
+      resolutions: [{ entry_id: "entry-1", interpretation_id: "interp-1", candidate_index: 0, disposition: "retained" }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" });
+  });
+
+  it("keeps an open question blocking even after all candidates are resolved", async () => {
+    const { client } = clientMock({
+      entries: [entry({ current_interpretation_id: "interp-1" })],
+      interpretations: [{ id: "interp-1", summary: "Plano", task_candidates: [{ title: "A" }] }],
+      resolutions: [{ entry_id: "entry-1", interpretation_id: "interp-1", candidate_index: 0, disposition: "retained" }],
+      openQuestions: [{ entry_id: "entry-1" }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items[0]).toMatchObject({ productState: "needs_attention", attentionReason: "answer_existing_question" });
   });
 
   it("does not let a task from an older interpretation mark the current candidate as handled", async () => {

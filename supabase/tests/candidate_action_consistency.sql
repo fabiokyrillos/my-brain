@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(36);
 
 select has_column('public', 'entry_interpretations', 'is_record_only', 'interpretation revisions persist record-only status');
 select has_column('public', 'tasks', 'source_interpretation_id', 'tasks record which interpretation produced them');
@@ -230,6 +230,34 @@ select results_eq(
   'undo of the v2 confirmation does not touch the unrelated v1 task'
 );
 
+select is(
+  (public.confirm_entry_task_candidates(
+    '33333333-3333-4333-8333-333333333333',
+    (select current_interpretation_id from public.entries where id = '33333333-3333-4333-8333-333333333333'),
+    array[0],
+    'pgtap:confirm:v2-candidate-zero-again'
+  ))->>'idempotent',
+  'false',
+  'a candidate can be confirmed again with a new operation key after undo'
+);
+select results_eq(
+  $$
+    select status, count(*)::bigint
+    from public.tasks
+    where user_id = '11111111-1111-4111-8111-111111111111'
+      and source_interpretation_id = (
+        select current_interpretation_id
+        from public.entries
+        where id = '33333333-3333-4333-8333-333333333333'
+      )
+      and candidate_index = 0
+    group by status
+    order by status
+  $$,
+  $$ values ('cancelled'::text, 1::bigint), ('inbox'::text, 1::bigint) $$,
+  'reconfirmation preserves cancelled history and creates exactly one active task'
+);
+
 -- Record-only interpretations have zero actionable candidates.
 select public.correct_entry_interpretation(
   '33333333-3333-4333-8333-333333333333',
@@ -351,6 +379,33 @@ select results_eq(
   $$ select source_interpretation_id is null from public.tasks where id = '66666666-6666-4666-8666-666666666666' $$,
   array[true],
   'a legacy-shaped task on a multi-interpretation entry is not backfilled and keeps no invented provenance'
+);
+
+select public.persist_entry_interpretation(
+  '44444444-4444-4444-8444-444444444444',
+  jsonb_build_object(
+    'summary', 'Second version fixture',
+    'concepts', jsonb_build_array('task'),
+    'occurredAt', now()::text,
+    'confidence', 0.9,
+    'taskCandidates', jsonb_build_array(jsonb_build_object('title', 'Newer candidate', 'confidence', 0.9)),
+    'pendingQuestions', '[]'::jsonb
+  ),
+  'gpt-test', 'strategy-1', 'prompt-1', 100, 50
+);
+select throws_ok(
+  $$
+    update public.tasks
+    set source_interpretation_id = (
+      select current_interpretation_id
+      from public.entries
+      where id = '44444444-4444-4444-8444-444444444444'
+    )
+    where id = '55555555-5555-4555-8555-555555555555'
+  $$,
+  'P0001',
+  'Candidate task provenance conflicts with its confirmed resolution',
+  'a linked legacy task cannot be reassigned from its enriched provenance to a newer interpretation'
 );
 
 select * from finish();

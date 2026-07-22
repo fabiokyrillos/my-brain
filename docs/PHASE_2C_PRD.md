@@ -96,7 +96,7 @@ Allow explicit project, context, person, and waiting-on choices using existing o
 
 ### Epic 2C-D — Candidate dispositions
 
-Model confirm, reject, retain as record, and dismiss/cancel-suggestion outcomes without copying the immutable candidate into a draft table.
+Model exactly four terminal outcomes for a current candidate: `confirmed`, `rejected`, `retained`, and `dismissed`. `Dismiss` and `cancel suggestion` are one persisted outcome (`dismissed`), not separate states. Non-confirming outcomes preserve the immutable candidate as historical interpretation evidence without copying it into a draft table or materializing another domain object.
 
 ### Epic 2C-E — Structure and graph materialization
 
@@ -194,9 +194,17 @@ Every requirement below is independently testable.
 ### 8.8 Later dispositions — `2C-DISPOSITION`
 
 - **2C-DISPOSITION-001:** Disposition controls are unavailable in Phase 2C.1.
-- **2C-DISPOSITION-002:** Phase 2C.4 distinguishes confirm, reject, retain-as-record, and dismiss/cancel-suggestion semantics.
+- **2C-DISPOSITION-002:** Phase 2C.4 distinguishes the terminal outcomes `confirmed`, `rejected`, `retained`, and `dismissed`; no separate `cancelled` disposition exists.
 - **2C-DISPOSITION-003:** Any persisted resolution stores only the narrow decision/provenance needed for lifecycle and does not duplicate candidate content.
 - **2C-DISPOSITION-004:** A disposition is owner-scoped, interpretation-scoped, candidate-index-scoped, auditable, and idempotent.
+- **2C-DISPOSITION-005:** `confirmed` materializes the candidate through the existing versioned confirmation transaction and remains governed by its edit, relation, replay, analytics, and undo guarantees.
+- **2C-DISPOSITION-006:** `rejected` creates no task or other domain record, records that the suggestion was wrong, irrelevant, or unsuitable, and is terminal for that candidate version.
+- **2C-DISPOSITION-007:** `retained` creates no task or other domain record; it preserves the immutable interpreted candidate only as historical entry data and is terminal for that candidate version.
+- **2C-DISPOSITION-008:** `dismissed` creates no task or other domain record, records that the user chose not to act without declaring the suggestion incorrect, and is terminal for that candidate version.
+- **2C-DISPOSITION-009:** A candidate is actionable only while it has no final disposition. An entry leaves Needs Attention only when no candidate, blocking clarification question, or other documented blocker remains unresolved.
+- **2C-DISPOSITION-010:** Slice 2C.4 permits only `pending -> confirmed|rejected|retained|dismissed`. Direct transitions between terminal dispositions are rejected; supported undo removes only the disposition's artifacts and restores the same candidate to pending.
+- **2C-DISPOSITION-011:** Refreshing or rebuilding a projection never resurfaces a disposed candidate. It may become actionable again only through supported undo, while a later interpretation may independently introduce a new candidate identity.
+- **2C-DISPOSITION-012:** Entry review/history labels every final outcome; Work displays only materialized confirmed tasks. Slice 2C.4 adds no global disposition-history page.
 
 ### 8.9 Later structure — `2C-STRUCTURE`
 
@@ -364,6 +372,8 @@ Phase 2C.1 uses the existing private product-event ledger and its server/client 
 
 No separate analytics dashboard, aggregation job, queue, or lifecycle dependency is introduced. Invalid analytics payloads are rejected by the allowlist; unavailable telemetry remains fail-open.
 
+For Phase 2C.4, disposition-category analytics are intentionally not approved. No event or property may contain a disposition category, candidate identity, candidate/entry content, rejection reason, or relation identity/name. An existing privacy-approved generic event may be reused only for aggregate counts that cannot reveal which disposition was chosen; otherwise the slice emits no new analytics event. This is a privacy boundary, not an observability gap.
+
 ## 15. Acceptance criteria
 
 ### 15.1 By epic
@@ -371,7 +381,7 @@ No separate analytics dashboard, aggregation job, queue, or lifecycle dependency
 - **Epic 2C-A:** All `2C-EDIT`, `2C-CONFIRM`, `2C-PROVENANCE`, `2C-IDEMPOTENCY`, `2C-OWNERSHIP`, `2C-UNDO`, and transverse 2C.1 requirements pass locally, in database contracts, in disposable remote smoke, and in authenticated desktop/mobile journeys.
 - **Epic 2C-B:** Planning/priority/no-due fields have explicit null/omitted/reset semantics, do not alter 2C.1 replay fingerprints, and pass Work/Needs Attention convergence.
 - **Epic 2C-C:** Every relation is an existing owned row, cross-owner input aborts atomically, and no label-based implicit relation is accepted.
-- **Epic 2C-D:** Every candidate can reach one explicit owner-scoped resolution without copying candidate content or hiding unresolved work.
+- **Epic 2C-D:** Every current candidate can move atomically from pending to exactly one owner-scoped terminal resolution (`confirmed`, `rejected`, `retained`, or `dismissed`) without copied candidate content, partial writes, hidden unresolved work, or category analytics. Non-confirming outcomes create no task/domain object; historical review remains truthful; Work contains only confirmed tasks; supported undo restores only that candidate to pending and lifecycle projections converge across refreshes.
 - **Epic 2C-E:** Graph materialization is atomic, cycle-safe, owner-safe, selected-reference-safe, isolated from earlier slices, and independently reversible.
 - **Epic 2C-F:** All daily surfaces, copy, analytics, remote gates, cleanup, reports, traceability, and permanent documentation agree on the completed behavior.
 

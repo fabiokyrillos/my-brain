@@ -37,8 +37,8 @@ const operationKey = "6118fb25-2f80-432a-aa96-0e76d924862e";
 
 const successState: ConfirmTasksState = {
   status: "success",
-  code: "confirmed",
-  message: "Tarefas criadas.",
+  code: "resolved",
+  message: "Sugestões resolvidas.",
   undoId: null,
   replayed: false,
   retryable: false,
@@ -90,7 +90,7 @@ describe("TaskCandidateForm", () => {
   it("mounts one CandidateEditor per actionable candidate in stable order with locale and profile timezone", () => {
     renderForm();
 
-    const editors = screen.getAllByRole("group");
+    const editors = screen.getAllByRole("group", { name: /^Sugestão:/ });
     expect(editors.map((editor) => editor.getAttribute("aria-disabled"))).toEqual(["false", "false"]);
     expect(editors.map((editor) => within(editor).getByText(/Sugestão:/).textContent)).toEqual([
       "Sugestão: Atualizar o relatório",
@@ -136,10 +136,13 @@ describe("TaskCandidateForm", () => {
     await user.click(within(secondEditor).getByRole("button", { name: "Remover descrição: Conversar com Maria" }));
     await user.click(screen.getByRole("checkbox", { name: /^Atualizar o relatório/ }));
 
-    await user.click(screen.getByRole("button", { name: "Criar 1 tarefa" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 1 sugestão" }));
 
     const data = submittedFormData(action);
     expect(data.getAll("candidateIndex")).toEqual(["1"]);
+    expect(data.get("candidateResolutions")).toBe(
+      '[{"candidateIndex":1,"disposition":"confirmed"}]',
+    );
     expect(data.get("candidateEdits")).toBe('[{"candidateIndex":1,"changes":{"description":null}}]');
   });
 
@@ -148,8 +151,11 @@ describe("TaskCandidateForm", () => {
     const action = actionReturning();
     renderForm({ action });
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
+    expect(submittedFormData(action).get("candidateResolutions")).toBe(
+      '[{"candidateIndex":0,"disposition":"confirmed"},{"candidateIndex":1,"disposition":"confirmed"}]',
+    );
     expect(submittedFormData(action).get("candidateEdits")).toBe("[]");
   });
 
@@ -165,7 +171,7 @@ describe("TaskCandidateForm", () => {
     await user.type(within(firstEditor).getByLabelText("Título"), "Relatório final");
     await user.click(within(firstEditor).getByRole("button", { name: "Remover prazo: Atualizar o relatório" }));
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
     expect(submittedFormData(action).get("candidateEdits")).toBe(
       '[{"candidateIndex":0,"changes":{"title":"Relatório final","dueAt":null}},{"candidateIndex":1,"changes":{"description":"Nova descrição"}}]',
@@ -182,7 +188,7 @@ describe("TaskCandidateForm", () => {
     injected.value = '{"ownerId":"attacker","candidateIndex":999}';
     container.querySelector("form")?.append(injected);
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
     expect(submittedFormData(action).getAll("candidateEdits")).toEqual(["[]"]);
   });
@@ -194,10 +200,10 @@ describe("TaskCandidateForm", () => {
     const editor = await expandEditor(user, "Atualizar o relatório");
     await user.clear(within(editor).getByLabelText("Título"));
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
     expect(action).not.toHaveBeenCalled();
-    expect(screen.getByText("Revise as edições antes de criar as tarefas.")).toHaveAttribute("role", "alert");
+    expect(screen.getByText("Revise as decisões e edições antes de continuar.")).toHaveAttribute("role", "alert");
   });
 
   it("retains edits after a recoverable action failure", async () => {
@@ -209,7 +215,7 @@ describe("TaskCandidateForm", () => {
     await user.clear(title);
     await user.type(title, "Relatório final");
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
     expect(await screen.findByText("Não foi possível criar as tarefas.")).toHaveAttribute("role", "alert");
     expect(within(editor).getByLabelText("Título")).toHaveValue("Relatório final");
@@ -220,15 +226,15 @@ describe("TaskCandidateForm", () => {
     const action = actionReturning(recoverableErrorState);
     renderForm({ action });
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
     const firstKey = submittedFormData(action, 0).get("operationKey");
     const retryKey = submittedFormData(action, 1).get("operationKey");
     expect(firstKey).toBe(operationKey);
     expect(retryKey).toBe(firstKey);
 
     await user.click(screen.getByRole("checkbox", { name: /^Conversar com Maria/ }));
-    await user.click(screen.getByRole("button", { name: "Criar 1 tarefa" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 1 sugestão" }));
     expect(submittedFormData(action, 2).get("operationKey")).not.toBe(firstKey);
   });
 
@@ -240,10 +246,10 @@ describe("TaskCandidateForm", () => {
       undoAction: vi.fn(async () => ({ status: "success" as const, message: "Criação desfeita." })),
     });
 
-    await user.click(screen.getByRole("button", { name: "Criar 2 tarefas" }));
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("2 tarefas criadas.");
-    expect(screen.getByRole("button", { name: "Desfazer criação" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Desfazer decisões" })).toBeVisible();
   });
 
   it("records when the available candidate set becomes visible", () => {
@@ -261,7 +267,7 @@ describe("TaskCandidateForm", () => {
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes).toHaveLength(2);
     expect(checkboxes.every((checkbox) => (checkbox as HTMLInputElement).checked)).toBe(true);
-    expect(screen.getByRole("button", { name: "Criar 2 tarefas" })).toHaveAttribute("type", "submit");
+    expect(screen.getByRole("button", { name: "Resolver 2 sugestões" })).toHaveAttribute("type", "submit");
   });
 
   it("submits each candidate's own key rather than its position in an already-filtered list", () => {
@@ -282,15 +288,15 @@ describe("TaskCandidateForm", () => {
     });
 
     expect(screen.getByRole("status")).toHaveTextContent("2 tarefas criadas.");
-    expect(screen.getByRole("button", { name: "Desfazer criação" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Desfazer decisões" })).toBeInTheDocument();
   });
 
   it("shows an explicit empty state instead of an unusable form when no candidate is available", () => {
     renderForm({ candidates: [] });
 
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Criar/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Nenhuma sugestão pendente para confirmar.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Resolver/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Nenhuma sugestão pendente.")).toBeInTheDocument();
   });
 
   it("never renders a raw AI extraction confidence score", () => {
@@ -298,5 +304,70 @@ describe("TaskCandidateForm", () => {
 
     expect(container.querySelector(".confidence-pill")).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\d+%/);
+  });
+
+  it("offers four concise localized decisions for every selected candidate with confirmed as default", () => {
+    renderForm({ locale: "en" });
+
+    const decision = screen.getByRole("group", {
+      name: "Decision for: Atualizar o relatório",
+    });
+    const radios = within(decision).getAllByRole("radio") as HTMLInputElement[];
+    expect(radios).toHaveLength(4);
+    expect(within(decision).getByRole("radio", { name: "Create task" })).toBeChecked();
+    expect(within(decision).getByRole("radio", { name: "Reject suggestion" })).not.toBeChecked();
+    expect(within(decision).getByRole("radio", { name: "Keep as record" })).not.toBeChecked();
+    expect(within(decision).getByRole("radio", { name: "Dismiss suggestion" })).not.toBeChecked();
+    expect(within(decision).getByText("Keeps it only in this entry's history.")).toBeVisible();
+    expect(decision.textContent).not.toMatch(/confirmed|rejected|retained|dismissed|cancelled/i);
+  });
+
+  it("submits one mixed canonical batch and omits edits for a non-confirming decision", async () => {
+    const user = userEvent.setup();
+    const action = actionReturning();
+    renderForm({ action });
+    const firstEditor = await expandEditor(user, "Atualizar o relatório");
+    await user.clear(within(firstEditor).getByLabelText("Título"));
+    await user.type(within(firstEditor).getByLabelText("Título"), "Relatório final");
+    const secondEditor = await expandEditor(user, "Conversar com Maria");
+    await user.click(within(secondEditor).getByRole("button", { name: "Remover descrição: Conversar com Maria" }));
+
+    const secondDecision = screen.getByRole("group", { name: "Decisão para: Conversar com Maria" });
+    await user.click(within(secondDecision).getByRole("radio", { name: "Rejeitar sugestão" }));
+    expect(within(secondEditor).getByRole("button", { name: "Editar sugestão: Conversar com Maria" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
+
+    const data = submittedFormData(action);
+    expect(data.get("candidateResolutions")).toBe(
+      '[{"candidateIndex":0,"disposition":"confirmed"},{"candidateIndex":1,"disposition":"rejected"}]',
+    );
+    expect(data.get("candidateEdits")).toBe(
+      '[{"candidateIndex":0,"changes":{"title":"Relatório final"}}]',
+    );
+    expect(action).toHaveBeenCalledOnce();
+  });
+
+  it("keeps an unselected pending candidate after partial success and reconciles removed state", async () => {
+    const user = userEvent.setup();
+    const action = actionReturning({
+      ...successState,
+      message: "1 sugestão resolvida. Nenhuma tarefa criada.",
+      undoId: "undo-id",
+    });
+    const rendered = renderForm({ action });
+
+    await user.click(screen.getByRole("checkbox", { name: /^Conversar com Maria/ }));
+    await user.click(screen.getAllByRole("radio", { name: "Rejeitar sugestão" })[0]);
+    await user.click(screen.getByRole("button", { name: "Resolver 1 sugestão" }));
+
+    rendered.rerender(<TaskCandidateForm {...rendered.props} candidates={[candidates[1]]} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "1 sugestão resolvida. Nenhuma tarefa criada.",
+    );
+    expect(screen.queryByText("Atualizar o relatório")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Conversar com Maria")[0]).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: /^Conversar com Maria/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "Criar tarefa" })).toBeChecked();
   });
 });

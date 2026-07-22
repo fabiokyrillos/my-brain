@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
-import type { AttentionItemView, AttentionReason, InterpretationReviewView, OriginalEntryView } from "./contracts";
+import type { AttentionItemView, AttentionReason, CandidateOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 
 const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "resolve_consistency"];
@@ -111,6 +111,37 @@ export function OriginalRecord({
   );
 }
 
+export function CandidateOutcomeHistory({
+  outcomes,
+  locale,
+}: {
+  outcomes: readonly CandidateOutcomeView[];
+  locale: DailyCycleLocale;
+}) {
+  if (outcomes.length === 0) return null;
+  const pt = locale === "pt-BR";
+  return (
+    <section className="candidate-outcome-history" aria-labelledby="candidate-outcome-history-title">
+      <div className="section-heading">
+        <span aria-hidden="true">✓</span>
+        <div>
+          <h2 id="candidate-outcome-history-title">{pt ? "Decisões anteriores" : "Previous decisions"}</h2>
+          <p>{pt ? "O histórico deste registro permanece visível." : "This record's history remains visible."}</p>
+        </div>
+      </div>
+      <ul>
+        {outcomes.map((outcome) => (
+          <li key={outcome.key}>
+            <strong>{outcome.title}</strong>
+            <span>{outcome.outcomeLabel}</span>
+            <time dateTime={outcome.resolvedAt}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(outcome.resolvedAt))}</time>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export type EntryReviewSlots = {
   attentionAction?: ReactNode;
   attentionDetail?: string | null;
@@ -139,6 +170,7 @@ export function EntryReview({
         {slots.attentionAction}
       </ReviewAttention>
       <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
+      <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} />
       <OriginalRecord original={view.original} locale={locale} defaultOpen={originalDefaultOpen} />
       {slots.technicalDetails}
     </div>

@@ -34,9 +34,10 @@ const countedTables = [
   "task_projects",
   "task_contexts",
   "task_people",
+  "entry_task_candidate_resolutions",
 ];
 
-function extraction(label) {
+function extraction(label, candidateCount = 2) {
   return {
     summary: `Phase 2C integration smoke: ${label}`,
     concepts: ["task"],
@@ -61,7 +62,25 @@ function extraction(label) {
         confidence: 0.8,
         explicit: true,
       },
-    ],
+      {
+        title: `${fixturePrefix} candidate two`,
+        description: "Original description two",
+        dueAt: null,
+        waitingOn: null,
+        parentIndex: null,
+        confidence: 0.75,
+        explicit: true,
+      },
+      {
+        title: `${fixturePrefix} candidate three`,
+        description: "Original description three",
+        dueAt: null,
+        waitingOn: null,
+        parentIndex: null,
+        confidence: 0.7,
+        explicit: true,
+      },
+    ].slice(0, candidateCount),
     pendingQuestions: [],
   };
 }
@@ -113,7 +132,7 @@ async function createTestUser(label = "owner") {
   return { client, user };
 }
 
-async function createFixture(client, label) {
+async function createFixture(client, label, candidateCount = 2) {
   const captured = dataOrThrow(
     await client.rpc("capture_entry_async", {
       p_original_content: `Phase 2C integration smoke: ${fixturePrefix}:${label}`,
@@ -128,7 +147,7 @@ async function createFixture(client, label) {
   const interpretationId = dataOrThrow(
     await client.rpc("persist_entry_interpretation", {
       p_entry_id: captured.entry_id,
-      p_extraction: extraction(label),
+      p_extraction: extraction(label, candidateCount),
       p_model: "gpt-test",
       p_strategy_version: "phase-2c-integration-smoke",
       p_prompt_version: "phase-2c-integration-smoke",
@@ -166,6 +185,16 @@ async function confirmV4(client, fixture, label, indexes, edits, operationKey = 
     p_entry_id: fixture.entryId,
     p_expected_interpretation_id: fixture.interpretationId,
     p_candidate_indexes: indexes,
+    p_candidate_edits: edits,
+    p_operation_key: operationKey,
+  }).then((result) => ({ ...result, operationKey }));
+}
+
+async function resolveV5(client, fixture, resolutions, edits, operationKey = crypto.randomUUID()) {
+  return client.rpc("confirm_entry_task_candidates_v5", {
+    p_entry_id: fixture.entryId,
+    p_expected_interpretation_id: fixture.interpretationId,
+    p_candidate_resolutions: resolutions,
     p_candidate_edits: edits,
     p_operation_key: operationKey,
   }).then((result) => ({ ...result, operationKey }));
@@ -589,8 +618,109 @@ try {
     "A v3 confirmation unexpectedly materialized relations",
   );
 
+  // Slice 2C.4: one atomic mixed batch records all terminal dispositions,
+  // materializes only confirmations, and remains fully undoable/reconfirmable.
+  const v5BaseFixture = await createFixture(owner, "v5-mixed-dispositions", 4);
+  await settleInterpretEntryJob(user.id, v5BaseFixture.entryId, "v5-mixed-dispositions");
+  const v5Current = dataOrThrow(
+    await correct(owner, v5BaseFixture, "v5-mixed-dispositions"),
+    "move v5 disposition fixture to completed",
+  );
+  const v5Fixture = {
+    entryId: v5BaseFixture.entryId,
+    interpretationId: v5Current.interpretation_id,
+  };
+  const v5Resolutions = [
+    { candidateIndex: 0, disposition: "confirmed" },
+    { candidateIndex: 1, disposition: "rejected" },
+    { candidateIndex: 2, disposition: "retained" },
+    { candidateIndex: 3, disposition: "dismissed" },
+  ];
+  const v5Edits = [{
+    candidateIndex: 0,
+    changes: { title: `${fixturePrefix} v5 confirmed task` },
+  }];
+  const v5OperationKey = crypto.randomUUID();
+  const v5Resolution = dataOrThrow(
+    await resolveV5(owner, v5Fixture, v5Resolutions, v5Edits, v5OperationKey),
+    "resolve v5 mixed disposition batch",
+  );
+  assert(v5Resolution.idempotent === false, "First v5 mixed batch was reported as a replay");
+  assert(v5Resolution.task_ids.length === 1, "V5 mixed batch did not create exactly one task");
+  const [v5Task] = await taskRows(owner, v5Resolution.task_ids);
+  assert(v5Task.candidate_index === 0, "V5 created a task for a non-confirmed disposition");
+  assert(v5Task.title === `${fixturePrefix} v5 confirmed task`, "V5 confirmed edit was not materialized");
+  const v5Rows = dataOrThrow(
+    await owner
+      .from("entry_task_candidate_resolutions")
+      .select("candidate_index,disposition,task_id,undo_operation_id")
+      .eq("entry_id", v5Fixture.entryId)
+      .eq("interpretation_id", v5Fixture.interpretationId)
+      .order("candidate_index", { ascending: true }),
+    "read v5 candidate disposition rows",
+  );
+  assert(v5Rows.length === 4, "V5 mixed batch did not persist four disposition rows");
+  assert(
+    JSON.stringify(v5Rows.map(({ candidate_index, disposition }) => ({ candidate_index, disposition })))
+      === JSON.stringify([
+        { candidate_index: 0, disposition: "confirmed" },
+        { candidate_index: 1, disposition: "rejected" },
+        { candidate_index: 2, disposition: "retained" },
+        { candidate_index: 3, disposition: "dismissed" },
+      ]),
+    "V5 disposition rows did not preserve the canonical mixed outcomes",
+  );
+  assert(v5Rows[0].task_id === v5Task.id, "Confirmed disposition did not reference its task");
+  assert(v5Rows.slice(1).every((row) => row.task_id === null), "Non-confirmed disposition referenced a task");
+  assert(v5Rows.every((row) => row.undo_operation_id === v5Resolution.undo_id), "V5 disposition rows did not share the batch undo operation");
+
+  const v5Replay = dataOrThrow(
+    await resolveV5(owner, v5Fixture, v5Resolutions, v5Edits, v5OperationKey),
+    "replay v5 mixed disposition batch",
+  );
+  assert(v5Replay.idempotent === true, "Same-key v5 replay was not idempotent");
+  assert(JSON.stringify(v5Replay.task_ids) === JSON.stringify(v5Resolution.task_ids), "V5 replay returned different task ids");
+  const v5TerminalRetry = await resolveV5(owner, v5Fixture, v5Resolutions, v5Edits);
+  assertRpcError(v5TerminalRetry, "P0001", "V5 terminal disposition retry", "2C_TERMINAL_DISPOSITION");
+  const afterV5Resolution = await attentionProjection();
+  assert(
+    !afterV5Resolution.some((row) => row.entry_id === v5Fixture.entryId),
+    "Fully resolved v5 fixture remained actionable in Needs Attention",
+  );
+
+  const v5Undo = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: v5Resolution.undo_id }),
+    "undo v5 mixed disposition batch",
+  );
+  assert(v5Undo.undone === true, "V5 undo did not report success");
+  const [v5UndoneTask] = await taskRows(owner, v5Resolution.task_ids);
+  assert(v5UndoneTask.status === "cancelled", "V5 undo did not cancel the confirmed task");
+  const v5RowsAfterUndo = dataOrThrow(
+    await owner
+      .from("entry_task_candidate_resolutions")
+      .select("id")
+      .eq("entry_id", v5Fixture.entryId)
+      .eq("interpretation_id", v5Fixture.interpretationId),
+    "read v5 dispositions after undo",
+  );
+  assert(v5RowsAfterUndo.length === 0, "V5 undo did not remove terminal disposition rows");
+  const afterV5Undo = await attentionProjection();
+  assert(
+    afterV5Undo.some((row) => row.entry_id === v5Fixture.entryId && row.reason === "confirm_existing_candidates"),
+    "V5 undo did not restore candidates to pending Needs Attention",
+  );
+
+  const v5Reconfirmation = dataOrThrow(
+    await resolveV5(owner, v5Fixture, [{ candidateIndex: 0, disposition: "confirmed" }], []),
+    "reconfirm v5 candidate after undo",
+  );
+  assert(v5Reconfirmation.task_ids.length === 1, "V5 reconfirmation after undo did not create one task");
+  const [v5ReconfirmedTask] = await taskRows(owner, v5Reconfirmation.task_ids);
+  assert(v5ReconfirmedTask.status !== "cancelled", "V5 reconfirmation after undo created an inactive task");
+  assert(v5ReconfirmedTask.candidate_index === 0, "V5 reconfirmation changed candidate identity");
+
   smokeSummary = {
-    cases: 23,
+    cases: 24,
     fixturePrefix,
     preExistingAuthUsers: before.authUserIds.length,
     preExistingTableCounts: before.tableCounts,

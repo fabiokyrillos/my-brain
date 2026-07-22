@@ -31,5 +31,7 @@ describe("entry detail page architecture guardrail", () => {
     expect(source).toMatch(/candidates=\{view\.actionableCandidates\}/);
     expect(source).toMatch(/timezone=\{timezone\}/);
     expect(source).not.toMatch(/candidates=\{[^}]*taskCandidates/);
+    expect(source).toMatch(/action=\{resolveEntryTaskCandidates\}/);
+    expect(source).not.toMatch(/action=\{confirmEntryTasks\}/);
   });
 });

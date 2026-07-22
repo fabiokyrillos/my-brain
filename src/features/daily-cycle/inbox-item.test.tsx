@@ -42,6 +42,6 @@ describe("InboxItemRow", () => {
     render(<InboxItemRow item={item({ productState: "needs_attention", attentionReason: "confirm_existing_candidates" })} locale="en" />);
 
     expect(screen.getByText("Needs your attention")).toBeInTheDocument();
-    expect(screen.getByText("Confirm the tasks")).toBeInTheDocument();
+    expect(screen.getByText("Resolve the suggestions")).toBeInTheDocument();
   });
 });

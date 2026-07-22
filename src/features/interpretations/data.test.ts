@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates, parseInterpretationRevision, selectCurrentInterpretation } from "./data";
+import {
+  computeUnavailableCandidateIndexes,
+  hasUnconfirmedTaskCandidates,
+  parseInterpretationRevision,
+  projectCandidateResolutionHistory,
+  selectCurrentInterpretation,
+} from "./data";
 
 vi.mock("server-only", () => ({}));
 
@@ -95,6 +101,66 @@ describe("computeUnavailableCandidateIndexes", () => {
       { candidate_index: 2, source_interpretation_id: "interpretation-2" },
       { candidate_index: 2, source_interpretation_id: "interpretation-2" },
     ])).toEqual([2]);
+  });
+
+  it("unions active task provenance with every terminal disposition for the current interpretation", () => {
+    expect(computeUnavailableCandidateIndexes("interpretation-2", [
+      { candidate_index: 0, source_interpretation_id: "interpretation-2" },
+    ], [
+      { interpretation_id: "interpretation-2", candidate_index: 1, disposition: "retained" },
+      { interpretation_id: "interpretation-2", candidate_index: 2, disposition: "dismissed" },
+      { interpretation_id: "interpretation-2", candidate_index: 3, disposition: "rejected" },
+    ])).toEqual([0, 1, 2, 3]);
+  });
+
+  it("keeps the same candidate index actionable in a later interpretation", () => {
+    expect(computeUnavailableCandidateIndexes("interpretation-2", [], [
+      { interpretation_id: "interpretation-1", candidate_index: 0, disposition: "rejected" },
+    ])).toEqual([]);
+  });
+
+  it("restores a candidate to pending when undo removed its resolution row", () => {
+    expect(computeUnavailableCandidateIndexes("interpretation-2", [], [])).toEqual([]);
+  });
+});
+
+describe("projectCandidateResolutionHistory", () => {
+  it("joins provenance-only resolution rows to immutable interpretation candidate snapshots", () => {
+    expect(projectCandidateResolutionHistory([
+      {
+        id: "interpretation-1",
+        task_candidates: [{
+          title: "Enviar contrato original",
+          description: null,
+          dueAt: null,
+          waitingOn: null,
+          parentIndex: null,
+          confidence: 0.9,
+          explicit: true,
+        }],
+      },
+    ], [{
+      interpretation_id: "interpretation-1",
+      candidate_index: 0,
+      disposition: "retained",
+      created_at: "2026-07-22T12:00:00.000Z",
+    }])).toEqual([{
+      key: "interpretation-1:0",
+      interpretationId: "interpretation-1",
+      candidateIndex: 0,
+      title: "Enviar contrato original",
+      disposition: "retained",
+      createdAt: "2026-07-22T12:00:00.000Z",
+    }]);
+  });
+
+  it("drops malformed dispositions and rows whose immutable candidate snapshot is unavailable", () => {
+    expect(projectCandidateResolutionHistory([
+      { id: "interpretation-1", task_candidates: [] },
+    ], [
+      { interpretation_id: "interpretation-1", candidate_index: 0, disposition: "cancelled", created_at: "2026-07-22T12:00:00.000Z" },
+      { interpretation_id: "missing", candidate_index: 0, disposition: "rejected", created_at: "2026-07-22T12:01:00.000Z" },
+    ])).toEqual([]);
   });
 });
 

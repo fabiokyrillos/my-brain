@@ -69,19 +69,29 @@ export async function loadInboxProjection(
   const entryIds = paginated.items.map((entry) => entry.id);
   const interpretationIds = paginated.items.flatMap((entry) =>
     entry.current_interpretation_id ? [entry.current_interpretation_id] : []);
+  const candidateResolutionsQuery = supabase.from("entry_task_candidate_resolutions")
+    .select("entry_id,interpretation_id,candidate_index,disposition")
+    .in("entry_id", entryIds);
 
-  const [jobsResult, interpretationsResult, questionsResult, tasksResult] = await Promise.all([
+  const [jobsResult, interpretationsResult, questionsResult, tasksResult, candidateResolutionsResult] = await Promise.all([
     supabase.from("jobs").select("status,next_attempt_at,payload").eq("type", "interpret_entry").in("payload->>entry_id", entryIds).order("created_at", { ascending: false }),
     interpretationIds.length
       ? supabase.from("entry_interpretations").select("id,summary,task_candidates").in("id", interpretationIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("pending_questions").select("entry_id").eq("status", "open").in("entry_id", entryIds),
     supabase.from("tasks").select("source_entry_id,source_interpretation_id,candidate_index").neq("status", "cancelled").in("source_entry_id", entryIds),
+    candidateResolutionsQuery,
   ]);
   const jobs = requireSupabaseData(jobsResult, "load inbox interpretation jobs") ?? [];
   const interpretations = requireSupabaseData(interpretationsResult, "load inbox current interpretations") ?? [];
   const openQuestions = requireSupabaseData(questionsResult, "load inbox open questions") ?? [];
   const materializedTasks = requireSupabaseData(tasksResult, "load inbox materialized tasks") ?? [];
+  const candidateResolutions = (requireSupabaseData(candidateResolutionsResult as never, "load inbox candidate resolutions") ?? []) as Array<{
+    entry_id: string;
+    interpretation_id: string;
+    candidate_index: number;
+    disposition: string;
+  }>;
 
   const latestJobByEntryId = new Map<string, { status: string; next_attempt_at: string | null }>();
   for (const job of jobs) {
@@ -95,6 +105,12 @@ export async function loadInboxProjection(
     const tasksForEntry = tasksByEntryId.get(task.source_entry_id);
     if (tasksForEntry) tasksForEntry.push(task);
     else tasksByEntryId.set(task.source_entry_id, [task]);
+  }
+  const candidateResolutionsByEntryId = new Map<string, typeof candidateResolutions>();
+  for (const resolution of candidateResolutions) {
+    const resolutionsForEntry = candidateResolutionsByEntryId.get(resolution.entry_id);
+    if (resolutionsForEntry) resolutionsForEntry.push(resolution);
+    else candidateResolutionsByEntryId.set(resolution.entry_id, [resolution]);
   }
   const now = new Date().toISOString();
 
@@ -113,6 +129,7 @@ export async function loadInboxProjection(
     const unavailableCandidateIndexes = computeUnavailableCandidateIndexes(
       entry.current_interpretation_id,
       tasksByEntryId.get(entry.id) ?? [],
+      candidateResolutionsByEntryId.get(entry.id) ?? [],
     );
 
     const source: InboxItemSource = {

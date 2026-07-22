@@ -496,34 +496,52 @@ The user can intentionally relate a candidate to owned project, context, person,
 
 ### User outcome
 
-The user can explicitly confirm, reject, retain as record, or dismiss/cancel a suggestion so unresolved work is truthful across Needs Attention and review.
+The user can explicitly confirm, reject, retain as record, or dismiss a suggestion so unresolved work is truthful across Needs Attention and review. `Dismiss` is persisted as `dismissed`; there is no separate `cancelled` state.
 
 ### Included/excluded/dependencies
 
-- Include candidate-scoped resolution decisions and their lifecycle projection.
-- Exclude subtasks, dependencies, split, and merge.
+- Include exactly four terminal candidate outcomes: `confirmed`, `rejected`, `retained`, and `dismissed`; candidate-scoped historical display; atomic lifecycle projection; and bounded undo through the existing undo architecture.
+- `confirmed` keeps using the existing versioned confirmation path and materializes a task with all prior edit/relation guarantees. `rejected`, `retained`, and `dismissed` create no task or other domain object and persist decision/provenance only.
+- A candidate is unresolved only until one terminal disposition exists. An entry leaves Needs Attention only when no candidate, blocking clarification question, or other documented blocker remains unresolved.
+- Permit only `pending -> confirmed|rejected|retained|dismissed`. Direct terminal-to-terminal transitions, indefinite history editing, and automatic resurfacing are excluded.
+- Exclude subtasks, dependencies, split, merge, mandatory reasons, category analytics, temporary snoozing, retained-to-task conversion, new memory/note entities, a global disposition-history page, broad Review redesign, Phase 2C.5, and Product Audit recommendations.
 - Depend on current-interpretation provenance and earlier materialization contracts.
 
 ### Likely files and contract work
 
-- First prove whether existing task/audit/undo rows can represent non-materializing decisions. If lifecycle needs a persisted non-task resolution, add one narrow owner/interpretation/candidate resolution table containing decision/provenance only and no copied title/description/due date.
-- Add migration/RPC, generated types, disposition contract/control, review/Needs Attention/Inbox projections, actions, analytics allowlist, pgTAP, remote smoke, E2E, and `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
+- Prove whether existing task/audit/undo rows can represent non-materializing decisions. If lifecycle needs persisted non-task resolution, add one narrow owner/entry/interpretation/candidate-index resolution table containing only the closed disposition enum, operation provenance, and timestamps — never copied title, description, due date, labels, or candidate text.
+- Preserve deployed confirmation RPCs. Add a new versioned confirmation RPC only if persisting `confirmed` cannot be composed safely with the current version, and add a separate closed non-confirming disposition RPC only when that keeps confirmation from being reimplemented or weakened.
+- Add generated types, disposition contract/control, review/Needs Attention/Inbox projections, actions, bounded audit/undo evidence, pgTAP, remote smoke, E2E, and `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
 - Never introduce a candidate draft or duplicate candidate content.
 
 ### Boundaries, security, idempotency, and analytics
 
-- Decision enum and transitions are closed and database-owned.
-- Current interpretation, owner, candidate existence, conflicting materialization, idempotency, and undo/compensation are validated atomically.
-- Analytics records decision category only if privacy review approves it; no candidate content.
+- Decision enum and transitions are closed and database-owned. Identity is the owned current interpretation plus candidate index, never label or candidate text.
+- Ownership derives only from `auth.uid()`. Current interpretation, owner, candidate existence, record-only state, conflicting materialization/disposition, canonical replay fingerprint, and undo/compensation are validated atomically for the complete multi-candidate request.
+- Additive migrations and versioned RPCs preserve prior signatures. Every new `SECURITY DEFINER` function uses `set search_path = ''`, revokes `public`/`anon`, grants only `authenticated`, and keeps RLS/composite ownership boundaries intact.
+- Category analytics are not approved. Emit no disposition category, candidate/entry content or identity, rejection reason, or relation identity/name. Reuse an existing generic event only if it records privacy-safe aggregate counts without revealing the chosen disposition; otherwise add no event. Recheck every candidate/edit-count ceiling touched by the slice.
 
 ### Verification, deployment, rollback, documentation, and DoD
 
-- Local: lifecycle mapping, copy, controls, action results, projection convergence.
-- Database/remote: each disposition, invalid transition, stale/current, record-only, cross-owner, replay/mismatch, race with confirmation/correction, undo if supported.
-- Playwright: all decisions across PT-BR/English desktop/mobile, keyboard/focus/live regions, Needs Attention removal/reappearance rules.
+- Local: RED/GREEN coverage for the closed disposition contract, lifecycle mapping, concise localized copy/supporting text, accessible controls, action results, historical display, and projection convergence.
+- Database/remote: all four dispositions; mixed multi-candidate atomicity; invalid/direct terminal transitions; stale/current interpretation; record-only behavior; cross-owner/anonymous denial; same-payload replay and mismatch; races with confirmation/correction; bounded undo restoring pending without touching unrelated artifacts; and cleanup/pre-existing-data checks.
+- Playwright: deterministic authenticated journeys across PT-BR/English desktop and Pixel 7 mobile, keyboard/focus/live regions, historical outcome labels, Work-only-for-confirmed behavior, persistence after refresh, and exact Needs Attention removal/reappearance rules.
 - Additive deployment; old projections ignore new rows safely; UI rollback does not delete resolution history.
-- DoD: one explicit resolution per current candidate, no content duplication, truthful daily surfaces, clean fixtures/docs/report.
+- Rollback preserves every earlier RPC/UI path. Non-confirming undo removes only its disposition state; confirmed undo preserves the already-documented task cancellation semantics. If the existing undo system cannot support non-confirming dispositions without a new cross-cutting architecture, stop before creating a separate undo system and document the exact incompatibility.
+- DoD: one explicit terminal resolution per current candidate, no content duplication/category analytics, truthful daily surfaces and history, Work containing confirmed tasks only, clean fixtures/docs/report, and all earlier slice guarantees still green.
 - Stop before implementation authorization and again before Phase 2C.5.
+
+### Execution status — 2026-07-22
+
+**Complete on local branch `codex/phase-2c-slice-4`; stop gate remains in force before Phase 2C.5.**
+
+- Implemented the exact four-outcome terminal lifecycle through the narrow owner-scoped `entry_task_candidate_resolutions` ledger and atomic `confirm_entry_task_candidates_v5`; only `confirmed` materializes a task, while all outcomes remain visible in entry-local history and remove that candidate from actionable projections.
+- Preserved v2–v4 and earlier UI paths. Migrations `202607220040`–`202607220043` are additive and applied to the linked development database; the final two are forward-only corrections for undo counts and safe legacy provenance enrichment.
+- Reused the existing undo architecture to delete the exact resolution batch, cancel only tasks from the same operation, and restore candidates to pending; reconfirmation after supported undo is explicitly covered.
+- Reused only the existing aggregate `task_candidates_confirmed` event for non-idempotent batches containing at least one confirmation. No disposition category, reason, content, or identity enters analytics.
+- Executed evidence: linked pgTAP 290/290 across seven relevant suites; disposable remote smoke 24/24 with zero fixture residue and preserved pre-existing counts/Auth IDs; Playwright 4/4 (PT-BR/en × desktop/Pixel 7); Vitest 693/693; lint, typecheck, production build, migration parity, linked error-level DB lint, and byte-stable linked generated types all green.
+- Independent final review found no Critical/Important issue. Full evidence and non-blocking notes are recorded in `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
+- No push, PR, merge, application deployment, Phase 2C.5 capability, Product Audit artifact, or other adjacent scope is included.
 
 ## 8. Phase 2C.5 — Subtasks, Dependencies and Split/Merge
 

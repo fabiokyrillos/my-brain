@@ -57,4 +57,15 @@ describe("daily cycle copy", () => {
       action_failed: expect.any(String),
     });
   });
+
+  it("frames candidate attention as resolving suggestions, not confirming every task", () => {
+    expect(copy.dailyCycleCopy?.["pt-BR"]?.attentionReasons.confirm_existing_candidates).toEqual({
+      title: "Decida sobre as sugestões",
+      description: "Escolha o destino de cada sugestão pendente.",
+    });
+    expect(copy.dailyCycleCopy?.en?.attentionReasons.confirm_existing_candidates).toEqual({
+      title: "Resolve the suggestions",
+      description: "Choose what should happen to each pending suggestion.",
+    });
+  });
 });

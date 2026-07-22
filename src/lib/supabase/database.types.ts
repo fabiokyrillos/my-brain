@@ -988,6 +988,64 @@ export type Database = {
           },
         ]
       }
+      entry_task_candidate_resolutions: {
+        Row: {
+          candidate_index: number
+          created_at: string
+          disposition: string
+          entry_id: string
+          id: string
+          interpretation_id: string
+          task_id: string | null
+          undo_operation_id: string | null
+          user_id: string
+        }
+        Insert: {
+          candidate_index: number
+          created_at?: string
+          disposition: string
+          entry_id: string
+          id?: string
+          interpretation_id: string
+          task_id?: string | null
+          undo_operation_id?: string | null
+          user_id: string
+        }
+        Update: {
+          candidate_index?: number
+          created_at?: string
+          disposition?: string
+          entry_id?: string
+          id?: string
+          interpretation_id?: string
+          task_id?: string | null
+          undo_operation_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entry_task_candidate_resolutions_interpretation_owner_fk"
+            columns: ["user_id", "entry_id", "interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "entry_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_task_candidate_resolutions_task_owner_fk"
+            columns: ["user_id", "task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_task_candidate_resolutions_undo_owner_fk"
+            columns: ["user_id", "undo_operation_id"]
+            isOneToOne: false
+            referencedRelation: "undo_operations"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       heartbeat_runs: {
         Row: {
           analyzed_items: number
@@ -2365,6 +2423,16 @@ export type Database = {
         Args: {
           p_candidate_edits: Json
           p_candidate_indexes: number[]
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
+        Returns: Json
+      }
+      confirm_entry_task_candidates_v5: {
+        Args: {
+          p_candidate_edits: Json
+          p_candidate_resolutions: Json
           p_entry_id: string
           p_expected_interpretation_id: string
           p_operation_key: string

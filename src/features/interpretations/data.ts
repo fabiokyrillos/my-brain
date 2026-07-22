@@ -1,9 +1,13 @@
 import "server-only";
 import { z } from "zod";
-import { conceptSchema, entryExtractionSchema, pendingQuestionSchema } from "@/lib/ai/extraction-schema";
+import { conceptSchema, entryExtractionSchema, pendingQuestionSchema, taskCandidateSchema } from "@/lib/ai/extraction-schema";
 import type { Database } from "@/lib/supabase/database.types";
 import type { createClient } from "@/lib/supabase/server";
 import { requireSupabaseData } from "@/lib/supabase/result";
+import {
+  candidateDispositionValues,
+  type CandidateDisposition,
+} from "@/features/tasks/candidate-disposition-contract";
 import type { EntityOption } from "./revision-editor";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -57,6 +61,24 @@ type InterpretationSource = Pick<
   "id" | "version" | "summary" | "concepts" | "extracted_dates" | "element_classifications" | "element_confidence" | "element_policy" | "resolution_evidence" | "pending_questions" | "origin" | "model" | "confidence" | "correction_reason" | "created_at" | "parent_interpretation_id" | "is_record_only"
 > & Partial<Pick<InterpretationRow, "raw_output">>;
 
+export type CandidateResolutionRow = {
+  interpretation_id: string;
+  candidate_index: number;
+  disposition: string;
+  created_at?: string;
+};
+
+export type CandidateResolutionHistoryItem = {
+  key: string;
+  interpretationId: string;
+  candidateIndex: number;
+  title: string;
+  disposition: CandidateDisposition;
+  createdAt: string;
+};
+
+const candidateDispositionSchema = z.enum(candidateDispositionValues);
+
 /**
  * A candidate's own index carries no proof of which interpretation produced
  * it (COH-001/COH-011). A task is only safely re-confirmable for the
@@ -69,6 +91,7 @@ type InterpretationSource = Pick<
 export function computeUnavailableCandidateIndexes(
   currentInterpretationId: string | null,
   tasks: ReadonlyArray<{ candidate_index: number | null; source_interpretation_id: string | null }>,
+  resolutions: ReadonlyArray<Pick<CandidateResolutionRow, "interpretation_id" | "candidate_index" | "disposition">> = [],
 ): number[] {
   if (!currentInterpretationId) return [];
   const indexes = new Set<number>();
@@ -78,7 +101,36 @@ export function computeUnavailableCandidateIndexes(
       indexes.add(task.candidate_index);
     }
   }
+  for (const resolution of resolutions) {
+    if (resolution.interpretation_id !== currentInterpretationId) continue;
+    if (!candidateDispositionSchema.safeParse(resolution.disposition).success) continue;
+    indexes.add(resolution.candidate_index);
+  }
   return [...indexes].sort((left, right) => left - right);
+}
+
+export function projectCandidateResolutionHistory(
+  interpretations: ReadonlyArray<{ id: string; task_candidates: unknown }>,
+  resolutions: ReadonlyArray<CandidateResolutionRow>,
+): CandidateResolutionHistoryItem[] {
+  const candidatesByInterpretation = new Map(interpretations.flatMap((interpretation) => {
+    const candidates = taskCandidateSchema.array().safeParse(interpretation.task_candidates);
+    return candidates.success ? [[interpretation.id, candidates.data] as const] : [];
+  }));
+
+  return resolutions.flatMap((resolution) => {
+    const disposition = candidateDispositionSchema.safeParse(resolution.disposition);
+    const candidate = candidatesByInterpretation.get(resolution.interpretation_id)?.[resolution.candidate_index];
+    if (!disposition.success || !candidate || !resolution.created_at) return [];
+    return [{
+      key: `${resolution.interpretation_id}:${resolution.candidate_index}`,
+      interpretationId: resolution.interpretation_id,
+      candidateIndex: resolution.candidate_index,
+      title: candidate.title,
+      disposition: disposition.data,
+      createdAt: resolution.created_at,
+    }];
+  }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 /**
@@ -189,12 +241,18 @@ export function parseInterpretationRevision(
 }
 
 export async function loadInterpretationReview(supabase: SupabaseClient, entryId: string) {
-  const [entryResult, interpretationsResult, linksResult, taskResult, taskUndoResult, correctionUndoResult, contextsResult, organizationsResult, projectsResult, peopleResult] = await Promise.all([
+  const candidateResolutionQuery = supabase.from("entry_task_candidate_resolutions")
+    .select("interpretation_id,candidate_index,disposition,created_at")
+    .eq("entry_id", entryId)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  const [entryResult, interpretationsResult, linksResult, taskResult, candidateResolutionsResult, taskUndoResult, correctionUndoResult, contextsResult, organizationsResult, projectsResult, peopleResult] = await Promise.all([
     supabase.from("entries").select("*").eq("id", entryId).maybeSingle(),
     supabase.from("entry_interpretations").select("*").eq("entry_id", entryId).order("version", { ascending: false }).limit(50),
     supabase.from("entry_entities").select("interpretation_id,entity_type,entity_id,mention,confidence").eq("entry_id", entryId).limit(500),
     supabase.from("tasks").select("id,title,status,due_at,candidate_index,source_interpretation_id").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
-    supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    candidateResolutionQuery,
+    supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates", "confirm_entry_task_candidates_v5"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("undo_operations").select("id").eq("action_type", "correct_entry_interpretation").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("contexts").select("id,name").order("updated_at", { ascending: false }).limit(50),
     supabase.from("organizations").select("id,name").order("updated_at", { ascending: false }).limit(50),
@@ -205,6 +263,7 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
   const interpretationRows = (requireSupabaseData(interpretationsResult, "load interpretation history") ?? []) as InterpretationRow[];
   const links = (requireSupabaseData(linksResult, "load interpretation entity links") ?? []) as EntryEntityRow[];
   const tasks = requireSupabaseData(taskResult, "load entry tasks") ?? [];
+  const candidateResolutions = (requireSupabaseData(candidateResolutionsResult as never, "load candidate resolutions") ?? []) as CandidateResolutionRow[];
   const taskUndo = requireSupabaseData(taskUndoResult, "load entry task undo");
   const correctionUndo = requireSupabaseData(correctionUndoResult, "load interpretation correction undo");
   const groups: Array<[EntityOption["entityType"], Array<{ id: string; name: string }>]> = [
@@ -221,6 +280,7 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
   const revisions = interpretationRows.map((row) => parseInterpretationRevision(row, links, names, entry.occurred_at));
   const current = currentRow ? revisions.find((revision) => revision.id === currentRow.id) ?? null : null;
   const extraction = currentRow ? entryExtractionSchema.safeParse(currentRow.raw_output) : null;
+  const candidateResolutionHistory = projectCandidateResolutionHistory(interpretationRows, candidateResolutions);
   return {
     entry,
     current,
@@ -230,7 +290,8 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     tasks,
     taskUndoId: taskUndo?.id ?? null,
     correctionUndoId: correctionUndo?.id ?? null,
-    unavailableCandidateIndexes: computeUnavailableCandidateIndexes(current?.id ?? null, tasks),
+    ...(candidateResolutionHistory.length > 0 ? { candidateResolutionHistory } : {}),
+    unavailableCandidateIndexes: computeUnavailableCandidateIndexes(current?.id ?? null, tasks, candidateResolutions),
   };
 }
 
