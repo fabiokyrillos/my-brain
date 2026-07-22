@@ -52,6 +52,10 @@ type WorkItemSource = {
   title: string;
   description?: string | null;
   dueAt?: string | null;
+  plannedAt?: string | null;
+  priority?: string | null;
+  intentionalNoDue: boolean;
+  noDueReason?: string | null;
   status: string;
   createdBy: string;
   availableActions: readonly ActionSource[];
@@ -164,6 +168,7 @@ describe("daily cycle product projection mappers", () => {
       title: "Enviar proposta",
       description: "Versão final",
       dueAt: "2026-07-18T12:00:00.000Z",
+      intentionalNoDue: false,
       status: "waiting",
       createdBy: "agent",
       availableActions: [{ id: "resume_task" }],
@@ -187,6 +192,7 @@ describe("daily cycle product projection mappers", () => {
       title: "Enviar proposta",
       description: "Versão final",
       dueAt: "2026-07-18T12:00:00.000Z",
+      intentionalNoDue: false,
       humanState: "waiting_on_someone",
       origin: "brain",
       availableActions: [{ id: "resume_task" }],
@@ -240,7 +246,7 @@ describe("daily cycle product projection mappers", () => {
       status: "cancelled",
       createdBy: "agent",
       availableActions: [],
-    })).toBeNull();
+    } as unknown as WorkItemSource)).toBeNull();
   });
 
   it("keeps projection mappers free of React, Supabase, database types, and data access", () => {

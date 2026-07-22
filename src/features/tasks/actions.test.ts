@@ -131,7 +131,7 @@ describe("confirmEntryTasks", () => {
       confirmForm({ candidateIndex: ["1", "0"] }),
     );
 
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v2", {
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", {
       p_entry_id: entryId,
       p_expected_interpretation_id: interpretationId,
       p_candidate_indexes: [0, 1],
@@ -163,10 +163,47 @@ describe("confirmEntryTasks", () => {
 
     await confirmEntryTasks(idleState, confirmForm({ candidateEdits }));
 
-    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v2", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", expect.objectContaining({
       p_candidate_edits: [
         { candidateIndex: 0, changes: { title: "Relatório final", description: null } },
         { candidateIndex: 1, changes: { description: "Nova descrição", dueAt: null } },
+      ],
+    }));
+  });
+
+  it("forwards planned date, priority, and no-due edits to the v3 RPC", async () => {
+    const { client, rpc } = clientWithRpc({
+      data: { task_ids: ["task-1"], undo_id: undoId, idempotent: false },
+      error: null,
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const candidateEdits = JSON.stringify([
+      {
+        candidateIndex: 0,
+        changes: {
+          plannedAt: "2026-08-01T09:00:00-03:00",
+          manualPriority: "urgent",
+          intentionalNoDue: true,
+          noDueReason: "Someday",
+          dueAt: null,
+        },
+      },
+    ]);
+
+    await confirmEntryTasks(idleState, confirmForm({ candidateIndex: ["0"], candidateEdits }));
+
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_task_candidates_v3", expect.objectContaining({
+      p_candidate_edits: [
+        {
+          candidateIndex: 0,
+          changes: {
+            dueAt: null,
+            plannedAt: "2026-08-01T09:00:00-03:00",
+            manualPriority: "urgent",
+            intentionalNoDue: true,
+            noDueReason: "Someday",
+          },
+        },
       ],
     }));
   });

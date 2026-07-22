@@ -188,11 +188,18 @@ export type WorkItemHumanState = (typeof workItemHumanStates)[number];
 export const workItemOrigins = ["you", "brain"] as const;
 export type WorkItemOrigin = (typeof workItemOrigins)[number];
 
+export const workItemPriorities = ["low", "medium", "high", "urgent"] as const;
+export type WorkItemPriority = (typeof workItemPriorities)[number];
+
 export type WorkItemView = {
   readonly taskId: string;
   readonly title: string;
   readonly description?: string;
   readonly dueAt?: string;
+  readonly plannedAt?: string;
+  readonly priority?: WorkItemPriority;
+  readonly intentionalNoDue: boolean;
+  readonly noDueReason?: string;
   readonly humanState: WorkItemHumanState;
   readonly origin: WorkItemOrigin;
   readonly availableActions: readonly AvailableAction[];

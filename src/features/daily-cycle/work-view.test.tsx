@@ -74,6 +74,7 @@ describe("WorkView", () => {
         taskId: "task-1",
         title: "Send proposal",
         dueAt: "2026-07-19T01:00:00.000Z",
+        intentionalNoDue: false,
         humanState: "waiting_on_someone",
         origin: "brain",
         availableActions: [{ id: "complete_task" }, { id: "resume_task" }],
@@ -87,6 +88,48 @@ describe("WorkView", () => {
     expect(screen.getByRole("button", { name: "Complete" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Resume" })).toBeVisible();
     expect((document.querySelector('input[name="operationKey"]') as HTMLInputElement).value).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it("renders planned date, priority, and an intentional no-due indicator (Slice 2C.2)", () => {
+    renderWork({
+      locale: "en",
+      timezone: "America/New_York",
+      items: [{
+        taskId: "task-1",
+        title: "Send proposal",
+        plannedAt: "2026-07-25T14:00:00.000Z",
+        priority: "urgent",
+        intentionalNoDue: true,
+        noDueReason: "Someday, not now",
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [],
+      }],
+    });
+
+    expect(screen.getByText(/Planned:/)).toBeVisible();
+    expect(screen.getByText("Urgent")).toBeVisible();
+    expect(screen.getByText("No due date")).toBeVisible();
+    expect(screen.getByText("Someday, not now")).toBeVisible();
+  });
+
+  it("omits planning/priority/no-due indicators for a task that never set them", () => {
+    renderWork({
+      locale: "en",
+      items: [{
+        taskId: "task-1",
+        title: "Send proposal",
+        dueAt: "2026-07-19T01:00:00.000Z",
+        intentionalNoDue: false,
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [],
+      }],
+    });
+
+    expect(screen.queryByText(/Planned:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No due date")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^(Low|Medium|High|Urgent)$/)).not.toBeInTheDocument();
   });
 
   it("explains the intentionally limited Waiting view without presenting a fake follow-up control", () => {

@@ -10,7 +10,8 @@ import { toWorkItemView, type ProjectionActionSource } from "./projection-mapper
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 type TaskRow = Pick<
   Database["public"]["Tables"]["tasks"]["Row"],
-  "id" | "user_id" | "title" | "description" | "status" | "due_at" | "created_by" | "updated_at"
+  | "id" | "user_id" | "title" | "description" | "status" | "due_at" | "created_by" | "updated_at"
+  | "planned_at" | "manual_priority" | "intentional_no_due" | "no_due_reason"
 >;
 
 export const WORK_PAGE_SIZE = 50;
@@ -116,7 +117,7 @@ export async function loadWorkProjection(
 
   let query = supabase
     .from("tasks")
-    .select("id,user_id,title,description,status,due_at,created_by,updated_at")
+    .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason")
     .eq("user_id", options.userId);
 
   if (options.view === "today") {
@@ -148,6 +149,10 @@ export async function loadWorkProjection(
       title: row.title,
       description: row.description,
       dueAt: row.due_at,
+      plannedAt: row.planned_at,
+      priority: row.manual_priority,
+      intentionalNoDue: row.intentional_no_due,
+      noDueReason: row.no_due_reason,
       status: row.status,
       createdBy: row.created_by,
       availableActions: availableActions(row.status),

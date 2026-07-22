@@ -111,7 +111,7 @@ export async function confirmEntryTasks(
     );
   }
 
-  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v2", {
+  const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v3", {
     p_entry_id: parsed.data.entryId,
     p_expected_interpretation_id: parsed.data.interpretationId,
     p_candidate_indexes: parsed.data.candidateIndexes,
