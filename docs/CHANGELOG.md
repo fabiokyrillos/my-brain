@@ -2,7 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
-## 2026-07-22 — Phase 2C Slice 2C.5: subtasks and dependencies (branch, not merged)
+## 2026-07-22 — Phase 2C Slice 2C.6: product convergence and closeout (branch, not merged)
+
+Closeout slice — no migration, no RPC, and no product/UI source change. Slices 2C.1–2C.5 are merged to `main` (2C.5 via PR #9, base `b5c8edb`).
+
+### Added
+
+- `scripts/generate-phase-2c-traceability.mjs` (`npm run docs:phase-2c:traceability`) parses `docs/PHASE_2C_PRD.md` and emits `docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md` — 83 rows mapping all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates to owning slice(s) and durable evidence. Fails closed if the PRD inventory or any per-family count drifts, and never marks the two non-green requirements (`2C-STRUCTURE-004` deferred split/merge, `2C-UNDO-004` `undo_operation` residual risk) as complete.
+- `scripts/verify-phase-2c-cleanup.mjs` (`npm run test:remote:2c:cleanup`) — fail-closed residual-data check across Auth users, 13 owner-scoped tables (including the Phase 2C `task_projects`/`task_contexts`/`task_people`/`task_dependencies`/`entry_task_candidate_resolutions` tables), and `user-files` storage.
+- `test:remote:2c` aggregate (`remote-supabase-smoke.mjs --phase-2c`): a deterministic, fail-fast sequence of editable-candidate confirmation (v2–v6), candidate-analytics product events, and residual-data cleanup, plus the focused `test:remote:2c:confirmation` alias.
+- `docs/reports/PHASE_2C_SLICE_06_REPORT.md` and `docs/PHASE_2C_REPORT.md` (phase-level closeout).
+
+### Changed
+
+- Convergence audit of the four daily surfaces (Home, Caixa/Inbox, entry review, canonical Work) plus the candidate form: the Slice 2X.16 projection-boundary guardrails and 714/714 unit tests are green; no raw row, raw enum/confidence, duplicate lifecycle rule, unbounded read, or content analytic was found. **No product source needed to change.**
+
+### Fixed
+
+- `scripts/remote-daily-cycle-smoke.mjs` concurrency-race assertion was stale relative to the Slice 2C.4 disposition contract: it expected two *different*-operation-key confirmations racing on the same candidate to both succeed with the same task id. Under the shipped contract (`2C-IDEMPOTENCY-005`, `2C-DISPOSITION-010`) the entry lock serializes them, one materializes the task plus its terminal `confirmed` disposition, and the loser is rejected with a terminal-disposition conflict (`P0001`). The smoke now asserts exactly one winner, one `P0001` conflict, and still exactly one task — a stronger, contract-accurate check (remote-evidence drift only; no product behavior changed).
+
+## 2026-07-22 — Phase 2C Slice 2C.5: subtasks and dependencies (merged to `main` via PR #9)
 
 ### Added
 
