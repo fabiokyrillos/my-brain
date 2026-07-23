@@ -236,7 +236,7 @@ describe("toEntryReviewProjection", () => {
 
 function queryStub(result: { data: unknown; error: unknown }) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "neq", "order", "limit", "maybeSingle"]) stub[method] = vi.fn(() => stub);
+  for (const method of ["select", "eq", "neq", "or", "order", "limit", "maybeSingle"]) stub[method] = vi.fn(() => stub);
   stub.then = (onFulfilled: (value: typeof result) => unknown) => Promise.resolve(result).then(onFulfilled);
   return stub;
 }

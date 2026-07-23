@@ -1,4 +1,5 @@
 import "server-only";
+import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates } from "@/features/interpretations/data";
 import { pageRange, paginateRows } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
@@ -78,7 +79,7 @@ export async function loadInboxProjection(
     interpretationIds.length
       ? supabase.from("entry_interpretations").select("id,summary,task_candidates").in("id", interpretationIds)
       : Promise.resolve({ data: [], error: null }),
-    supabase.from("pending_questions").select("entry_id").eq("status", "open").in("entry_id", entryIds),
+    supabase.from("pending_questions").select("entry_id").or(actionablePendingQuestionFilter()).in("entry_id", entryIds),
     supabase.from("tasks").select("source_entry_id,source_interpretation_id,candidate_index").neq("status", "cancelled").in("source_entry_id", entryIds),
     candidateResolutionsQuery,
   ]);

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
-import { answerPendingQuestion, undoQuestionResolution } from "./actions";
+import { answerPendingQuestion, resolvePendingQuestion, undoQuestionResolution } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
@@ -24,6 +24,8 @@ const idleState = {
   status: "idle" as const,
   code: null,
   message: "",
+  resolution: null,
+  snoozedUntil: null,
   undoId: null,
   replayed: false,
   retryable: false,
@@ -39,6 +41,20 @@ function form(overrides: Record<string, string> = {}) {
   return data;
 }
 
+function dispositionForm(kind: string, overrides: Record<string, string> = {}) {
+  const data = new FormData();
+  data.set("locale", "pt-BR");
+  data.set("questionId", questionId);
+  data.set("kind", kind);
+  data.set("operationKey", operationKey);
+  for (const [key, value] of Object.entries(overrides)) data.set(key, value);
+  return data;
+}
+
+function futureInstant(offsetMs = 86_400_000): string {
+  return new Date(Date.now() + offsetMs).toISOString();
+}
+
 type RpcOutcome = { data: unknown; error: unknown };
 
 function resolutionClient(outcome: RpcOutcome, user: { id: string } | null = { id: "user-1" }) {
@@ -48,9 +64,15 @@ function resolutionClient(outcome: RpcOutcome, user: { id: string } | null = { i
   };
 }
 
-function successOutcome(idempotent = false): RpcOutcome {
+function successOutcome(idempotent = false, resolution = "answered", snoozedUntil?: string): RpcOutcome {
   return {
-    data: { question_id: questionId, resolution: "answered", undo_id: undoId, idempotent },
+    data: {
+      question_id: questionId,
+      resolution,
+      undo_id: undoId,
+      idempotent,
+      ...(snoozedUntil ? { snoozed_until: snoozedUntil } : {}),
+    },
     error: null,
   };
 }
@@ -62,7 +84,7 @@ async function flushAfter() {
 describe("answerPendingQuestion", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("resolves through resolve_pending_question_v1 with the closed payload and operation key", async () => {
+  it("resolves through resolve_pending_question_v2 with the closed payload and operation key", async () => {
     const client = resolutionClient(successOutcome());
     vi.mocked(createClient).mockResolvedValue(client as never);
 
@@ -70,9 +92,10 @@ describe("answerPendingQuestion", () => {
 
     expect(result.status).toBe("success");
     expect(result.code).toBe("resolution_succeeded");
+    expect(result.resolution).toBe("answered");
     expect(result.undoId).toBe(undoId);
     expect(result.replayed).toBe(false);
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v1", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
       p_question_id: questionId,
       p_resolution: { kind: "answer", answer: "Sexta às 14h" },
       p_operation_key: operationKey,
@@ -169,7 +192,7 @@ describe("answerPendingQuestion", () => {
     const result = await answerPendingQuestion(idleState, form({ locale: "en" }));
 
     expect(result.code).toBe("stale_interpretation");
-    expect(result.message).toBe("This question's interpretation changed. Refresh the page before answering.");
+    expect(result.message).toBe("This question's interpretation changed. Refresh the page before resolving.");
   });
 
   it("treats an unreadable result shape as retryable", async () => {
@@ -185,14 +208,145 @@ describe("answerPendingQuestion", () => {
   });
 });
 
+describe("resolvePendingQuestion dispositions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("defers through the closed deferral payload and surfaces the canonical instant", async () => {
+    const snoozedUntil = futureInstant();
+    const client = resolutionClient(successOutcome(false, "deferred", snoozedUntil));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(
+      idleState,
+      dispositionForm("deferred", { snoozedUntil }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.resolution).toBe("deferred");
+    expect(result.snoozedUntil).toBe(snoozedUntil);
+    expect(result.message).toBe("Pergunta adiada.");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+      p_question_id: questionId,
+      p_resolution: { kind: "deferred", snoozedUntil },
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("rejects a past or malformed deferral before any database call with the deferral copy", async () => {
+    const client = resolutionClient(successOutcome(false, "deferred"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const past = await resolvePendingQuestion(
+      idleState,
+      dispositionForm("deferred", { snoozedUntil: "2020-01-01T00:00:00Z" }),
+    );
+    expect(past.code).toBe("validation_error");
+    expect(past.message).toBe("Escolha uma data futura, em até um ano, para adiar.");
+
+    const malformed = await resolvePendingQuestion(
+      idleState,
+      dispositionForm("deferred", { snoozedUntil: "amanhã" }),
+    );
+    expect(malformed.code).toBe("validation_error");
+
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("dismisses with a payload carrying only the discriminant", async () => {
+    const client = resolutionClient(successOutcome(false, "dismissed"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(idleState, dispositionForm("dismissed"));
+
+    expect(result.resolution).toBe("dismissed");
+    expect(result.message).toBe("Pergunta descartada.");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+      p_question_id: questionId,
+      p_resolution: { kind: "dismissed" },
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("marks not relevant distinctly", async () => {
+    const client = resolutionClient(successOutcome(false, "not_relevant"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(idleState, dispositionForm("not_relevant"));
+
+    expect(result.resolution).toBe("not_relevant");
+    expect(result.message).toBe("Pergunta marcada como não relevante.");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+      p_question_id: questionId,
+      p_resolution: { kind: "not_relevant" },
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("rejects an unknown kind before any database call", async () => {
+    const client = resolutionClient(successOutcome());
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(idleState, dispositionForm("reinterpret"));
+
+    expect(result.status).toBe("error");
+    expect(result.code).toBe("validation_error");
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("emits question_resolved with only the bounded kind for a disposition", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(false, "dismissed")) as never,
+    );
+
+    const result = await resolvePendingQuestion(idleState, dispositionForm("dismissed"));
+
+    expect(result.status).toBe("success");
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "question_resolved",
+      subject: { type: "pending_question", id: questionId },
+      properties: { kind: "dismissed" },
+    }));
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("question_resolved", operationKey);
+  });
+
+  it("never puts the deferral instant, question, or free text into the event payload", async () => {
+    const snoozedUntil = futureInstant();
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(false, "deferred", snoozedUntil)) as never,
+    );
+
+    await resolvePendingQuestion(idleState, dispositionForm("deferred", { snoozedUntil }));
+    await flushAfter();
+
+    const eventPayload = vi.mocked(recordProductEvent).mock.calls[0][0];
+    expect(eventPayload).toMatchObject({ name: "question_resolved", properties: { kind: "deferred" } });
+    expect(JSON.stringify(eventPayload)).not.toContain(snoozedUntil);
+  });
+
+  it("suppresses the disposition event on an idempotent replay", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(true, "not_relevant")) as never,
+    );
+
+    const result = await resolvePendingQuestion(idleState, dispositionForm("not_relevant"));
+
+    expect(result.replayed).toBe(true);
+    expect(result.message).toBe("Esta resolução já estava registrada.");
+    await flushAfter();
+    expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+});
+
 describe("undoQuestionResolution", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  function undoForm(locale = "pt-BR") {
+  function undoForm(locale = "pt-BR", resolution?: string) {
     const data = new FormData();
     data.set("locale", locale);
     data.set("questionId", questionId);
     data.set("undoId", undoId);
+    if (resolution) data.set("resolution", resolution);
     return data;
   }
 
@@ -203,7 +357,18 @@ describe("undoQuestionResolution", () => {
     const result = await undoQuestionResolution({ status: "idle", message: "" }, undoForm());
 
     expect(result.status).toBe("success");
+    expect(result.message).toBe("Resposta desfeita. A pergunta voltou para a fila.");
     expect(client.rpc).toHaveBeenCalledWith("undo_operation", { p_undo_id: undoId });
+  });
+
+  it("localizes the undo confirmation for a non-answer resolution", async () => {
+    const client = resolutionClient({ data: { undone: true, affected: 1, idempotent: false }, error: null });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await undoQuestionResolution({ status: "idle", message: "" }, undoForm("pt-BR", "deferred"));
+
+    expect(result.status).toBe("success");
+    expect(result.message).toBe("Resolução desfeita. A pergunta voltou para a fila.");
   });
 
   it("maps undo failures without leaking raw error text", async () => {

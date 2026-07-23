@@ -163,38 +163,55 @@ export async function createReminder(
   return { status: "success", message: "Lembrete criado." };
 }
 
-// Phase 2D Slice 2D.1 — answering flows through the versioned, audited,
-// undoable resolve_pending_question_v1 transition instead of a plain owner
-// UPDATE. Database outcomes map to stable localized codes; raw SQL text is
-// never surfaced.
+// Phase 2D — question resolution flows through the versioned, audited,
+// undoable resolve_pending_question_vN family instead of a plain owner
+// UPDATE (Slice 2D.1). Slice 2D.2 cuts the consumer over to
+// resolve_pending_question_v2, which adds the deferred / dismissed /
+// not_relevant dispositions to the same closed discriminated contract.
+// Database outcomes map to stable localized codes; raw SQL text is never
+// surfaced.
 const questionOperationKeySchema = z.string().trim().min(8).max(240);
+
+const questionResolutionKindSchema = z.enum(["answer", "deferred", "dismissed", "not_relevant"]);
 
 const questionResolutionCopy = {
   "pt-BR": {
     validation: "Escreva uma resposta com até 4000 caracteres.",
+    deferValidation: "Escolha uma data futura, em até um ano, para adiar.",
+    invalid: "Ação inválida.",
     session: "Sua sessão expirou. Entre novamente.",
-    stale: "A interpretação desta pergunta mudou. Atualize a página antes de responder.",
+    stale: "A interpretação desta pergunta mudou. Atualize a página antes de resolver.",
     notOpen: "Esta pergunta não está mais aberta.",
-    mismatch: "Esta tentativa não corresponde mais à resposta atual. Revise e tente novamente.",
-    failed: "Não foi possível responder agora. Tente novamente.",
+    mismatch: "Esta tentativa não corresponde mais à resolução atual. Revise e tente novamente.",
+    failed: "Não foi possível concluir agora. Tente novamente.",
     answered: "Resposta registrada.",
-    replayed: "Esta resposta já estava registrada.",
+    deferred: "Pergunta adiada.",
+    dismissed: "Pergunta descartada.",
+    notRelevant: "Pergunta marcada como não relevante.",
+    replayed: "Esta resolução já estava registrada.",
     undoInvalid: "Ação inválida.",
     undoFailed: "Não foi possível desfazer.",
-    undone: "Resposta desfeita. A pergunta voltou para a fila.",
+    undoneAnswer: "Resposta desfeita. A pergunta voltou para a fila.",
+    undoneResolution: "Resolução desfeita. A pergunta voltou para a fila.",
   },
   en: {
     validation: "Write an answer with up to 4000 characters.",
+    deferValidation: "Pick a future date, within one year, to defer.",
+    invalid: "Invalid action.",
     session: "Your session expired. Sign in again.",
-    stale: "This question's interpretation changed. Refresh the page before answering.",
+    stale: "This question's interpretation changed. Refresh the page before resolving.",
     notOpen: "This question is no longer open.",
-    mismatch: "This attempt no longer matches the current answer. Review it and try again.",
-    failed: "Could not answer right now. Try again.",
+    mismatch: "This attempt no longer matches the current resolution. Review it and try again.",
+    failed: "Could not complete right now. Try again.",
     answered: "Answer recorded.",
-    replayed: "This answer was already recorded.",
+    deferred: "Question deferred.",
+    dismissed: "Question dismissed.",
+    notRelevant: "Question marked as not relevant.",
+    replayed: "This resolution was already recorded.",
     undoInvalid: "Invalid action.",
     undoFailed: "Could not undo.",
-    undone: "Answer undone. The question returned to the queue.",
+    undoneAnswer: "Answer undone. The question returned to the queue.",
+    undoneResolution: "Resolution undone. The question returned to the queue.",
   },
 } as const;
 
@@ -205,12 +222,22 @@ function questionResolutionFailure(
   message: string,
   retryable: boolean,
 ): QuestionResolutionState {
-  return { status: "error", code, message, undoId: null, replayed: false, retryable };
+  return {
+    status: "error",
+    code,
+    message,
+    resolution: null,
+    snoozedUntil: null,
+    undoId: null,
+    replayed: false,
+    retryable,
+  };
 }
 
 function mapQuestionResolutionError(
   error: QuestionRpcError,
   copy: (typeof questionResolutionCopy)["pt-BR" | "en"],
+  validationMessage: string,
 ): QuestionResolutionState {
   if (error.code === "42501" && error.message === "Authentication required") {
     return questionResolutionFailure("session_expired", copy.session, false);
@@ -225,23 +252,32 @@ function mapQuestionResolutionError(
     return questionResolutionFailure("idempotency_mismatch", copy.mismatch, false);
   }
   if (error.code === "22023") {
-    return questionResolutionFailure("validation_error", copy.validation, false);
+    return questionResolutionFailure("validation_error", validationMessage, false);
   }
   return questionResolutionFailure("retryable_failure", copy.failed, true);
 }
 
+const questionResolutionOutcomeSchema = z.enum(["answered", "deferred", "dismissed", "not_relevant"]);
+
 function readQuestionResolutionResult(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const result = value as Record<string, unknown>;
+  const resolution = questionResolutionOutcomeSchema.safeParse(result.resolution);
   if (
-    result.resolution !== "answered"
+    !resolution.success
     || typeof result.undo_id !== "string"
     || !z.string().uuid().safeParse(result.undo_id).success
     || typeof result.idempotent !== "boolean"
+    || (result.snoozed_until !== undefined && typeof result.snoozed_until !== "string")
   ) {
     return null;
   }
-  return { undoId: result.undo_id, idempotent: result.idempotent };
+  return {
+    resolution: resolution.data,
+    undoId: result.undo_id,
+    idempotent: result.idempotent,
+    snoozedUntil: typeof result.snoozed_until === "string" ? result.snoozed_until : null,
+  };
 }
 
 // The answer action intentionally performs NO revalidation: any revalidatePath
@@ -258,7 +294,7 @@ function refreshQuestionSurfaces() {
   }
 }
 
-export async function answerPendingQuestion(
+export async function resolvePendingQuestion(
   _state: QuestionResolutionState,
   formData: FormData,
 ): Promise<QuestionResolutionState> {
@@ -266,19 +302,33 @@ export async function answerPendingQuestion(
   const locale = localeResult.success ? localeResult.data : "pt-BR";
   const copy = questionResolutionCopy[locale];
 
+  const kindResult = questionResolutionKindSchema.safeParse(formData.get("kind"));
+  if (!kindResult.success) {
+    return questionResolutionFailure("validation_error", copy.invalid, false);
+  }
+  const kind = kindResult.data;
+  const validationMessage = kind === "answer"
+    ? copy.validation
+    : kind === "deferred"
+      ? copy.deferValidation
+      : copy.invalid;
+
   const operationKey = questionOperationKeySchema.safeParse(formData.get("operationKey"));
   let command: QuestionResolutionCommand | null = null;
   try {
-    command = normalizeQuestionResolutionCommand({
-      questionId: formData.get("questionId"),
-      kind: "answer",
-      answer: formData.get("answer"),
-    });
+    const questionId = formData.get("questionId");
+    command = normalizeQuestionResolutionCommand(
+      kind === "answer"
+        ? { questionId, kind, answer: formData.get("answer") }
+        : kind === "deferred"
+          ? { questionId, kind, snoozedUntil: formData.get("snoozedUntil") }
+          : { questionId, kind },
+    );
   } catch {
     command = null;
   }
   if (!localeResult.success || !operationKey.success || !command) {
-    return questionResolutionFailure("validation_error", copy.validation, false);
+    return questionResolutionFailure("validation_error", validationMessage, false);
   }
 
   const supabase = await createClient();
@@ -287,12 +337,12 @@ export async function answerPendingQuestion(
   } = await supabase.auth.getUser();
   if (!user) return questionResolutionFailure("session_expired", copy.session, false);
 
-  const { data, error } = await supabase.rpc("resolve_pending_question_v1", {
+  const { data, error } = await supabase.rpc("resolve_pending_question_v2", {
     p_question_id: command.questionId,
     p_resolution: JSON.parse(serializeQuestionResolution(command)) as Json,
     p_operation_key: operationKey.data,
   });
-  if (error) return mapQuestionResolutionError(error, copy);
+  if (error) return mapQuestionResolutionError(error, copy, validationMessage);
 
   const result = readQuestionResolutionResult(data);
   if (!result) return questionResolutionFailure("retryable_failure", copy.failed, true);
@@ -300,26 +350,62 @@ export async function answerPendingQuestion(
   if (!result.idempotent) {
     const eventQuestionId = command.questionId;
     const eventOperationKey = operationKey.data;
-    after(() => recordProductEvent({
-      name: "question_answered_basic",
-      surface: "server",
-      locale,
-      viewportClass: "unknown",
-      appVersion: "server",
-      idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
-      subject: { type: "pending_question", id: eventQuestionId },
-      properties: {},
-    }).catch(() => {}));
+    const eventResolution = result.resolution;
+    after(() => recordProductEvent(
+      eventResolution === "answered"
+        ? {
+          name: "question_answered_basic",
+          surface: "server",
+          locale,
+          viewportClass: "unknown",
+          appVersion: "server",
+          idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
+          subject: { type: "pending_question", id: eventQuestionId },
+          properties: {},
+        }
+        : {
+          name: "question_resolved",
+          surface: "server",
+          locale,
+          viewportClass: "unknown",
+          appVersion: "server",
+          idempotencyKey: createProductEventIdempotencyKey("question_resolved", eventOperationKey),
+          subject: { type: "pending_question", id: eventQuestionId },
+          properties: { kind: eventResolution },
+        },
+    ).catch(() => {}));
   }
+
+  const successMessage = result.idempotent
+    ? copy.replayed
+    : result.resolution === "answered"
+      ? copy.answered
+      : result.resolution === "deferred"
+        ? copy.deferred
+        : result.resolution === "dismissed"
+          ? copy.dismissed
+          : copy.notRelevant;
 
   return {
     status: "success",
     code: "resolution_succeeded",
-    message: result.idempotent ? copy.replayed : copy.answered,
+    message: successMessage,
+    resolution: result.resolution,
+    snoozedUntil: result.snoozedUntil,
     undoId: result.undoId,
     replayed: result.idempotent,
     retryable: false,
   };
+}
+
+// Retained export from Slice 2D.1: the answer flow is the same discriminated
+// resolution contract with kind fixed to "answer".
+export async function answerPendingQuestion(
+  state: QuestionResolutionState,
+  formData: FormData,
+): Promise<QuestionResolutionState> {
+  formData.set("kind", "answer");
+  return resolvePendingQuestion(state, formData);
 }
 
 export async function undoQuestionResolution(
@@ -333,6 +419,10 @@ export async function undoQuestionResolution(
   if (!localeResult.success || !undoId.success) {
     return { status: "error", message: copy.undoInvalid };
   }
+  // The undone resolution's kind only localizes the confirmation copy; it
+  // never drives authorization or state (the database validates the stored
+  // operation itself).
+  const undoneKind = questionResolutionOutcomeSchema.safeParse(formData.get("resolution"));
 
   const supabase = await createClient();
   const {
@@ -344,7 +434,12 @@ export async function undoQuestionResolution(
   if (error) return { status: "error", message: copy.undoFailed };
 
   refreshQuestionSurfaces();
-  return { status: "success", message: copy.undone };
+  return {
+    status: "success",
+    message: !undoneKind.success || undoneKind.data === "answered"
+      ? copy.undoneAnswer
+      : copy.undoneResolution,
+  };
 }
 
 export async function markNotification(formData: FormData) {

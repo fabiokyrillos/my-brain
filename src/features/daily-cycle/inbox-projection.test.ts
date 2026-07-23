@@ -7,7 +7,7 @@ type Result = { data: unknown; error: unknown };
 
 function queryStub(result: Result) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "neq", "in", "order", "range"]) {
+  for (const method of ["select", "eq", "neq", "in", "or", "order", "range"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.then = (onFulfilled: (value: Result) => unknown, onRejected?: (reason: unknown) => unknown) =>

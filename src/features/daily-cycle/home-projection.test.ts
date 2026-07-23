@@ -7,7 +7,7 @@ type Result = { data: unknown; error: unknown; count?: number | null };
 
 function queryStub(result: Result) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order", "limit"]) {
+  for (const method of ["select", "eq", "or", "order", "limit"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.then = (onFulfilled: (value: Result) => unknown, onRejected?: (reason: unknown) => unknown) =>
@@ -28,7 +28,11 @@ describe("loadHomeSupplementalProjection", () => {
     expect(waitingStub.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(waitingStub.eq).toHaveBeenCalledWith("status", "waiting");
     expect(questionsStub.eq).toHaveBeenCalledWith("user_id", "user-1");
-    expect(questionsStub.eq).toHaveBeenCalledWith("status", "open");
+    // Read-time snooze reactivation (Slice 2D.2): open, or snoozed past its
+    // deadline, is the single actionable-question predicate.
+    expect(questionsStub.or).toHaveBeenCalledWith(
+      expect.stringContaining("status.eq.open,and(status.eq.snoozed,snoozed_until.lte."),
+    );
     expect(questionsStub.order).toHaveBeenCalledWith("created_at", { ascending: false });
     expect(questionsStub.limit).toHaveBeenCalledWith(1);
     expect(result).toEqual({ waitingCount: 3, openQuestionPreview: "Isso é um retrabalho ou uma tarefa nova?" });

@@ -15,6 +15,7 @@ export const productEventNames = [
   "candidate_edit_reset",
   "task_candidates_confirmed",
   "question_answered_basic",
+  "question_resolved",
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
@@ -104,6 +105,7 @@ export type ProductEventPropertiesByName = {
     editedFieldCount: number;
   };
   question_answered_basic: EmptyProductEventProperties;
+  question_resolved: { kind: "deferred" | "dismissed" | "not_relevant" };
   processing_retry_requested: { retrySource: "user" | "worker" };
   work_view_viewed: { workView: "today" | "all" | "waiting" };
   task_status_changed: { fromStatus: ProductTaskStatus; toStatus: ProductTaskStatus };
@@ -238,6 +240,9 @@ function arePropertiesValid<Name extends ProductEventName>(
     case "technical_details_opened":
     case "question_answered_basic":
       return hasExactKeys(value, []);
+    case "question_resolved":
+      return hasExactKeys(value, ["kind"])
+        && isOneOf(value.kind, ["deferred", "dismissed", "not_relevant"]);
     case "interpretation_corrected":
       return hasExactKeys(value, ["fieldCount"]) && isBoundedInteger(value.fieldCount, 1, 30);
     case "task_candidates_presented":

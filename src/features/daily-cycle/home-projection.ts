@@ -1,4 +1,5 @@
 import "server-only";
+import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { createClient } from "@/lib/supabase/server";
 
@@ -31,7 +32,7 @@ export async function loadHomeSupplementalProjection(
       .from("pending_questions")
       .select("question")
       .eq("user_id", userId)
-      .eq("status", "open")
+      .or(actionablePendingQuestionFilter())
       .order("created_at", { ascending: false })
       .limit(1),
   ]);

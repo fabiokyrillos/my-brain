@@ -1,4 +1,5 @@
 import "server-only";
+import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import type { EntryExtraction } from "@/lib/ai/extraction-schema";
 import type { CandidateResolutionHistoryItem, InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
 import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
@@ -306,7 +307,7 @@ export async function loadEntryReviewProjection(
       .from("pending_questions")
       .select("id")
       .eq("entry_id", entryId)
-      .eq("status", "open")
+      .or(actionablePendingQuestionFilter())
       .limit(1),
     userId
       ? supabase
@@ -356,7 +357,7 @@ export async function loadEntryReviewProjection(
   });
 }
 
-function resolveProfileTimezone(value: unknown): string {
+export function resolveProfileTimezone(value: unknown): string {
   if (typeof value === "string") {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: value }).format(0);
