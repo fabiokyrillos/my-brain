@@ -288,8 +288,19 @@ try {
       p_operation_key: `remote-daily-cycle:race-b:${suffix}`,
     }),
   ]);
-  const raceValues = raceResults.map((result, index) => dataOrThrow(result, `confirmation race branch ${index}`));
-  assert(raceValues[0].task_ids[0] === raceValues[1].task_ids[0], "A concurrent confirmation race produced two different tasks for the same candidate");
+  // Under the Slice 2C.4 disposition contract, two *different* operation keys targeting
+  // the same candidate cannot both succeed (2C-IDEMPOTENCY-005, 2C-DISPOSITION-010): the
+  // entry lock serializes them, one materializes the task plus its terminal `confirmed`
+  // disposition, and the loser is rejected with a terminal-disposition conflict. Neither
+  // branch may create a second task.
+  const raceWinners = raceResults.filter((result) => !result.error);
+  const raceConflicts = raceResults.filter((result) => result.error);
+  assert(raceWinners.length === 1, "A concurrent confirmation race did not yield exactly one winner");
+  assert(raceWinners[0].data.task_ids?.length === 1, "The winning confirmation did not materialize exactly one task");
+  assert(
+    raceConflicts.length === 1 && raceConflicts[0].error.code === "P0001",
+    "A concurrent confirmation race did not reject the loser with a terminal-disposition conflict",
+  );
   const raceTasks = dataOrThrow(
     await owner.from("tasks").select("id").eq("source_interpretation_id", raceInterpretationId).eq("candidate_index", 0),
     "list tasks created by the confirmation race",
