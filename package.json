@@ -19,6 +19,7 @@
     "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
     "test:remote:daily-cycle": "node scripts/remote-daily-cycle-smoke.mjs",
     "test:remote:2c:confirmation": "node scripts/remote-editable-candidate-confirmation-smoke.mjs",
+  "test:remote:2d:resolution": "node scripts/remote-question-resolution-smoke.mjs",
     "test:remote:2c:cleanup": "node scripts/verify-phase-2c-cleanup.mjs",
     "test:remote:2c": "node scripts/remote-supabase-smoke.mjs --phase-2c",
     "test:remote:2x": "node scripts/remote-supabase-smoke.mjs --phase-2x",

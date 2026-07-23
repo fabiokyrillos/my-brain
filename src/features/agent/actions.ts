@@ -15,7 +15,18 @@ import { defaultAgentPreferences } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordAIUsage } from "@/lib/ai/usage";
-import type { AgentFormState } from "./forms";
+import type { Json } from "@/lib/supabase/database.types";
+import {
+  normalizeQuestionResolutionCommand,
+  serializeQuestionResolution,
+  type QuestionResolutionCommand,
+} from "./question-resolution-contract";
+import type {
+  AgentFormState,
+  QuestionResolutionCode,
+  QuestionResolutionState,
+  QuestionUndoState,
+} from "./forms";
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 
@@ -152,49 +163,188 @@ export async function createReminder(
   return { status: "success", message: "Lembrete criado." };
 }
 
+// Phase 2D Slice 2D.1 — answering flows through the versioned, audited,
+// undoable resolve_pending_question_v1 transition instead of a plain owner
+// UPDATE. Database outcomes map to stable localized codes; raw SQL text is
+// never surfaced.
+const questionOperationKeySchema = z.string().trim().min(8).max(240);
+
+const questionResolutionCopy = {
+  "pt-BR": {
+    validation: "Escreva uma resposta com até 4000 caracteres.",
+    session: "Sua sessão expirou. Entre novamente.",
+    stale: "A interpretação desta pergunta mudou. Atualize a página antes de responder.",
+    notOpen: "Esta pergunta não está mais aberta.",
+    mismatch: "Esta tentativa não corresponde mais à resposta atual. Revise e tente novamente.",
+    failed: "Não foi possível responder agora. Tente novamente.",
+    answered: "Resposta registrada.",
+    replayed: "Esta resposta já estava registrada.",
+    undoInvalid: "Ação inválida.",
+    undoFailed: "Não foi possível desfazer.",
+    undone: "Resposta desfeita. A pergunta voltou para a fila.",
+  },
+  en: {
+    validation: "Write an answer with up to 4000 characters.",
+    session: "Your session expired. Sign in again.",
+    stale: "This question's interpretation changed. Refresh the page before answering.",
+    notOpen: "This question is no longer open.",
+    mismatch: "This attempt no longer matches the current answer. Review it and try again.",
+    failed: "Could not answer right now. Try again.",
+    answered: "Answer recorded.",
+    replayed: "This answer was already recorded.",
+    undoInvalid: "Invalid action.",
+    undoFailed: "Could not undo.",
+    undone: "Answer undone. The question returned to the queue.",
+  },
+} as const;
+
+type QuestionRpcError = { code?: string; message?: string; details?: string };
+
+function questionResolutionFailure(
+  code: Exclude<QuestionResolutionCode, "resolution_succeeded">,
+  message: string,
+  retryable: boolean,
+): QuestionResolutionState {
+  return { status: "error", code, message, undoId: null, replayed: false, retryable };
+}
+
+function mapQuestionResolutionError(
+  error: QuestionRpcError,
+  copy: (typeof questionResolutionCopy)["pt-BR" | "en"],
+): QuestionResolutionState {
+  if (error.code === "42501" && error.message === "Authentication required") {
+    return questionResolutionFailure("session_expired", copy.session, false);
+  }
+  if (error.code === "55P03") {
+    return questionResolutionFailure("stale_interpretation", copy.stale, false);
+  }
+  if (error.code === "55000" || error.code === "P0002") {
+    return questionResolutionFailure("not_open", copy.notOpen, false);
+  }
+  if (error.code === "P0001" && error.details === "2D_IDEMPOTENCY_MISMATCH") {
+    return questionResolutionFailure("idempotency_mismatch", copy.mismatch, false);
+  }
+  if (error.code === "22023") {
+    return questionResolutionFailure("validation_error", copy.validation, false);
+  }
+  return questionResolutionFailure("retryable_failure", copy.failed, true);
+}
+
+function readQuestionResolutionResult(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = value as Record<string, unknown>;
+  if (
+    result.resolution !== "answered"
+    || typeof result.undo_id !== "string"
+    || !z.string().uuid().safeParse(result.undo_id).success
+    || typeof result.idempotent !== "boolean"
+  ) {
+    return null;
+  }
+  return { undoId: result.undo_id, idempotent: result.idempotent };
+}
+
+// The answer action intentionally performs NO revalidation: any revalidatePath
+// re-renders the current route in the same action response, which would drop
+// the just-answered card from the open-questions list and unmount its undo
+// control. Every question surface is dynamic (rendered per request), so the
+// next navigation reflects the resolved queue anyway. Undo revalidates
+// everything, returning the restored question to every surface immediately.
+function refreshQuestionSurfaces() {
+  for (const locale of ["pt-BR", "en"] as const) {
+    revalidatePath(`/${locale}/app/questions`);
+    revalidatePath(`/${locale}/app`);
+    revalidatePath(`/${locale}/app/inbox`);
+  }
+}
+
 export async function answerPendingQuestion(
-  _state: AgentFormState,
+  _state: QuestionResolutionState,
   formData: FormData,
-): Promise<AgentFormState> {
-  const parsed = z
-    .object({
-      locale: localeSchema,
-      questionId: z.string().uuid(),
-      answer: z.string().trim().min(1).max(4000),
-    })
-    .safeParse(Object.fromEntries(formData));
-  if (!parsed.success)
-    return { status: "error", message: "Escreva uma resposta." };
+): Promise<QuestionResolutionState> {
+  const localeResult = localeSchema.safeParse(formData.get("locale"));
+  const locale = localeResult.success ? localeResult.data : "pt-BR";
+  const copy = questionResolutionCopy[locale];
+
+  const operationKey = questionOperationKeySchema.safeParse(formData.get("operationKey"));
+  let command: QuestionResolutionCommand | null = null;
+  try {
+    command = normalizeQuestionResolutionCommand({
+      questionId: formData.get("questionId"),
+      kind: "answer",
+      answer: formData.get("answer"),
+    });
+  } catch {
+    command = null;
+  }
+  if (!localeResult.success || !operationKey.success || !command) {
+    return questionResolutionFailure("validation_error", copy.validation, false);
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Sua sessão expirou." };
-  const { data: answeredQuestion, error } = await supabase
-    .from("pending_questions")
-    .update({
-      status: "answered",
-      answer: parsed.data.answer,
-      answered_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.questionId)
-    .eq("user_id", user.id)
-    .eq("status", "open")
-    .select("id")
-    .maybeSingle();
-  if (error || !answeredQuestion) return { status: "error", message: "Não foi possível responder." };
-  after(() => recordProductEvent({
-    name: "question_answered_basic",
-    surface: "server",
-    locale: parsed.data.locale,
-    viewportClass: "unknown",
-    appVersion: "server",
-    idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", parsed.data.questionId),
-    subject: { type: "pending_question", id: parsed.data.questionId },
-    properties: {},
-  }).catch(() => {}));
-  revalidatePath(`/${parsed.data.locale}/app/questions`);
-  return { status: "success", message: "Resposta registrada." };
+  if (!user) return questionResolutionFailure("session_expired", copy.session, false);
+
+  const { data, error } = await supabase.rpc("resolve_pending_question_v1", {
+    p_question_id: command.questionId,
+    p_resolution: JSON.parse(serializeQuestionResolution(command)) as Json,
+    p_operation_key: operationKey.data,
+  });
+  if (error) return mapQuestionResolutionError(error, copy);
+
+  const result = readQuestionResolutionResult(data);
+  if (!result) return questionResolutionFailure("retryable_failure", copy.failed, true);
+
+  if (!result.idempotent) {
+    const eventQuestionId = command.questionId;
+    const eventOperationKey = operationKey.data;
+    after(() => recordProductEvent({
+      name: "question_answered_basic",
+      surface: "server",
+      locale,
+      viewportClass: "unknown",
+      appVersion: "server",
+      idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
+      subject: { type: "pending_question", id: eventQuestionId },
+      properties: {},
+    }).catch(() => {}));
+  }
+
+  return {
+    status: "success",
+    code: "resolution_succeeded",
+    message: result.idempotent ? copy.replayed : copy.answered,
+    undoId: result.undoId,
+    replayed: result.idempotent,
+    retryable: false,
+  };
+}
+
+export async function undoQuestionResolution(
+  _state: QuestionUndoState,
+  formData: FormData,
+): Promise<QuestionUndoState> {
+  const localeResult = localeSchema.safeParse(formData.get("locale"));
+  const locale = localeResult.success ? localeResult.data : "pt-BR";
+  const copy = questionResolutionCopy[locale];
+  const undoId = z.string().uuid().safeParse(formData.get("undoId"));
+  if (!localeResult.success || !undoId.success) {
+    return { status: "error", message: copy.undoInvalid };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: copy.session };
+
+  const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
+  if (error) return { status: "error", message: copy.undoFailed };
+
+  refreshQuestionSurfaces();
+  return { status: "success", message: copy.undone };
 }
 
 export async function markNotification(formData: FormData) {

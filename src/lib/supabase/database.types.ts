@@ -2653,6 +2653,14 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_pending_question_v1: {
+        Args: {
+          p_operation_key: string
+          p_question_id: string
+          p_resolution: Json
+        }
+        Returns: Json
+      }
       run_all_heartbeats: { Args: never; Returns: number }
       run_user_heartbeat: { Args: { p_user_id: string }; Returns: Json }
       save_profile_settings: {
