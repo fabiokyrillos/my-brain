@@ -648,7 +648,116 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     });
     await staleCard.getByRole("textbox", { name: "Resposta" }).fill("Resposta tardia");
     await staleCard.getByRole("button", { name: "Responder" }).click();
-    await expect(staleCard.getByRole("alert")).toHaveText("A interpretação desta pergunta mudou. Atualize a página antes de responder.");
+    await expect(staleCard.getByRole("alert")).toHaveText("A interpretação desta pergunta mudou. Atualize a página antes de resolver.");
+  });
+
+  // Phase 2D Slice 2D.2 — question dispositions.
+  test("defers, dismisses, and marks a pending question not relevant as audited, undoable transitions", async ({}, testInfo) => {
+    const seedQuestion = async (label: string) => {
+      const marker = crypto.randomUUID().slice(0, 8);
+      const entryId = await insertBareEntry(user!.accessToken, user!.userId, `Pergunta e2e ${label} ${marker}.`);
+      await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+      await restRpc(user!.accessToken, "persist_entry_interpretation", {
+        p_entry_id: entryId,
+        p_extraction: {
+          language: "pt-BR",
+          occurredAt: new Date().toISOString(),
+          isRetroactive: false,
+          summary: `Registro para ${label}.`,
+          concepts: ["pending_question"],
+          contexts: [], organizations: [], projects: [], people: [],
+          taskCandidates: [],
+          pendingQuestions: [{ question: `Qual é o prazo? (${marker})`, reason: "Nenhum prazo foi mencionado.", confidence: 0.5 }],
+          confidence: 0.6,
+        },
+        p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+        p_input_tokens: 0, p_output_tokens: 0,
+      });
+      return marker;
+    };
+
+    const dismissMarker = await seedQuestion("descarte");
+    const notRelevantMarker = await seedQuestion("nao-relevante");
+    const deferMarker = await seedQuestion("adiamento");
+
+    await page.goto("/pt-BR/app/questions");
+
+    // Dismiss: terminal, audited, undoable.
+    const dismissCard = page.locator(".question-card", { hasText: `(${dismissMarker})` });
+    await expect(dismissCard).toBeVisible();
+    const dismissButton = dismissCard.getByRole("button", { name: "Descartar" });
+    if (testInfo.project.name === "mobile") {
+      const box = await dismissButton.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+    await dismissButton.click();
+    await expect(dismissCard.getByRole("status")).toHaveText("Pergunta descartada.");
+    const undoDismiss = dismissCard.getByRole("button", { name: "Desfazer descarte" });
+    await expect(undoDismiss).toBeVisible();
+    await undoDismiss.click();
+    await expect(dismissCard.getByRole("status")).toHaveText("Resolução desfeita. A pergunta voltou para a fila.");
+    await expect(dismissCard.getByRole("button", { name: "Descartar" })).toBeVisible();
+
+    // Not relevant: distinct terminal outcome.
+    const notRelevantCard = page.locator(".question-card", { hasText: `(${notRelevantMarker})` });
+    await notRelevantCard.getByRole("button", { name: "Não é relevante" }).click();
+    await expect(notRelevantCard.getByRole("status")).toHaveText("Pergunta marcada como não relevante.");
+    await expect(notRelevantCard.getByRole("button", { name: "Desfazer marcação" })).toBeVisible();
+
+    // Defer: pick a future time and confirm; the question leaves the queue.
+    const deferCard = page.locator(".question-card", { hasText: `(${deferMarker})` });
+    await deferCard.getByRole("button", { name: "Adiar" }).click();
+    const deferInput = deferCard.getByLabel("Adiar até");
+    await expect(deferInput).toBeVisible();
+    if (testInfo.project.name === "mobile") {
+      const box = await deferInput.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+    const future = new Date(Date.now() + 3 * 86_400_000);
+    const wall = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}T09:00`;
+    await deferInput.fill(wall);
+    await deferCard.getByRole("button", { name: "Confirmar adiamento" }).click();
+    await expect(deferCard.getByRole("status")).toContainText("Pergunta adiada até");
+    await deferCard.getByRole("button", { name: "Desfazer adiamento" }).click();
+    await expect(deferCard.getByRole("status")).toHaveText("Resolução desfeita. A pergunta voltou para a fila.");
+
+    // The content-free disposition outcome events land fail-open.
+    await expect.poll(async () => {
+      const names = await loadProductEventNames(user!.userId, user!.accessToken);
+      return names.filter((name) => name === "question_resolved").length;
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
+  });
+
+  test("dismisses a pending question with the English disposition copy", async () => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `English e2e disposition question ${marker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "en",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Entry with a question to dispose of.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `What is the deadline? (${marker})`, reason: "No deadline was mentioned.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/en/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+    await card.getByRole("button", { name: "Not relevant" }).click();
+    await expect(card.getByRole("status")).toHaveText("Question marked as not relevant.");
+    const undoButton = card.getByRole("button", { name: "Undo mark" });
+    await expect(undoButton).toBeVisible();
+    await undoButton.click();
+    await expect(card.getByRole("status")).toHaveText("Resolution undone. The question returned to the queue.");
   });
 
   test("answers a pending question with the English resolution copy", async () => {

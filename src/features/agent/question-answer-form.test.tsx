@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -16,6 +16,8 @@ function successState(overrides: Partial<QuestionResolutionState> = {}): Questio
     status: "success",
     code: "resolution_succeeded",
     message: "Resposta registrada.",
+    resolution: "answered",
+    snoozedUntil: null,
     undoId,
     replayed: false,
     retryable: false,
@@ -28,7 +30,16 @@ function failureState(
   message: string,
   retryable = false,
 ): QuestionResolutionState {
-  return { status: "error", code, message, undoId: null, replayed: false, retryable };
+  return {
+    status: "error",
+    code,
+    message,
+    resolution: null,
+    snoozedUntil: null,
+    undoId: null,
+    replayed: false,
+    retryable,
+  };
 }
 
 const noopUndo: QuestionUndoAction = vi.fn(async () => ({ status: "idle" as const, message: "" }));
@@ -156,5 +167,161 @@ describe("QuestionAnswerForm", () => {
     );
     expect(screen.getByRole("textbox", { name: "Answer" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Answer" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Defer" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Not relevant" })).toBeEnabled();
+  });
+
+  // Phase 2D Slice 2D.2 — dispositions.
+  it("dismisses through the resolution contract and shows the dismissal undo control", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () =>
+      successState({ resolution: "dismissed", message: "Pergunta descartada." }),
+    );
+    const view = render(
+      <QuestionAnswerForm action={actionMock} undoAction={noopUndo} locale="pt-BR" questionId={questionId} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+
+    await waitFor(() => expect(actionMock).toHaveBeenCalledOnce());
+    const formData = actionMock.mock.calls[0]?.[1];
+    expect(formData.get("kind")).toBe("dismissed");
+    expect(formData.get("questionId")).toBe(questionId);
+    expect(String(formData.get("operationKey")).length).toBeGreaterThanOrEqual(8);
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Pergunta descartada.");
+    expect(view.container.querySelector('[data-state="dismissed"]')).not.toBeNull();
+    const undoButton = screen.getByRole("button", { name: "Desfazer descarte" });
+    expect(undoButton).toBeVisible();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("marks not relevant distinctly and passes the resolution kind to the undo action", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () =>
+      successState({ resolution: "not_relevant", message: "Pergunta marcada como não relevante." }),
+    );
+    const undoMock = vi.fn<QuestionUndoAction>(async () => ({
+      status: "success" as const,
+      message: "Resolução desfeita. A pergunta voltou para a fila.",
+    }));
+    const view = render(
+      <QuestionAnswerForm action={actionMock} undoAction={undoMock} locale="pt-BR" questionId={questionId} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Não é relevante" }));
+    await waitFor(() => expect(actionMock).toHaveBeenCalledOnce());
+    expect(actionMock.mock.calls[0]?.[1].get("kind")).toBe("not_relevant");
+    expect(view.container.querySelector('[data-state="not_relevant"]')).not.toBeNull();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Desfazer marcação" }));
+    await waitFor(() => expect(undoMock).toHaveBeenCalledOnce());
+    const undoData = undoMock.mock.calls[0]?.[1];
+    expect(undoData.get("resolution")).toBe("not_relevant");
+    expect(undoData.get("undoId")).toBe(undoId);
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Resolução desfeita. A pergunta voltou para a fila.");
+    expect(screen.getByRole("textbox", { name: "Resposta" })).toBeVisible();
+  });
+
+  it("defers through the defer panel, converting the wall time in the profile timezone", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () =>
+      successState({
+        resolution: "deferred",
+        message: "Pergunta adiada.",
+        snoozedUntil: "2030-07-24T15:30:00.000Z",
+      }),
+    );
+    const view = render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="pt-BR"
+        questionId={questionId}
+        timezone="America/Sao_Paulo"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Adiar" }));
+    const deferInput = screen.getByLabelText("Adiar até");
+    expect(deferInput).toHaveValue();
+    // São Paulo is UTC-03: 12:30 wall time is 15:30Z.
+    fireEvent.change(deferInput, { target: { value: "2030-07-24T12:30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar adiamento" }));
+
+    await waitFor(() => expect(actionMock).toHaveBeenCalledOnce());
+    const formData = actionMock.mock.calls[0]?.[1];
+    expect(formData.get("kind")).toBe("deferred");
+    expect(formData.get("snoozedUntil")).toBe("2030-07-24T12:30:00-03:00");
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Pergunta adiada até");
+    expect(status).toHaveTextContent("24/07/2030");
+    expect(status).toHaveTextContent("12:30");
+    expect(view.container.querySelector('[data-state="deferred"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Desfazer adiamento" })).toBeVisible();
+  });
+
+  it("shows a field-associated local error for an unconvertible deferral value without dispatching", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="pt-BR"
+        questionId={questionId}
+        timezone="America/New_York"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Adiar" }));
+    const deferInput = screen.getByLabelText("Adiar até");
+    // 02:30 on 2030-03-10 does not exist in America/New_York (DST gap), so
+    // the wall-time conversion fails locally before any dispatch.
+    fireEvent.change(deferInput, { target: { value: "2030-03-10T02:30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar adiamento" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Escolha uma data e hora futuras válidas.");
+    expect(deferInput).toHaveAttribute("aria-invalid", "true");
+    expect(deferInput).toHaveAttribute("aria-describedby", alert.id);
+    await waitFor(() => expect(deferInput).toHaveFocus());
+    expect(actionMock).not.toHaveBeenCalled();
+  });
+
+  it("closes the defer panel without submitting when cancelled", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm action={actionMock} undoAction={noopUndo} locale="pt-BR" questionId={questionId} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Adiar" }));
+    expect(screen.getByLabelText("Adiar até")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByLabelText("Adiar até")).toBeNull();
+    expect(actionMock).not.toHaveBeenCalled();
+  });
+
+  it("rotates the operation key when the resolution kind changes", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () =>
+      failureState("retryable_failure", "Não foi possível concluir agora. Tente novamente.", true),
+    );
+    render(
+      <QuestionAnswerForm action={actionMock} undoAction={noopUndo} locale="pt-BR" questionId={questionId} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    await waitFor(() => expect(actionMock).toHaveBeenCalledTimes(2));
+    const firstKey = String(actionMock.mock.calls[0]?.[1].get("operationKey"));
+    const retryKey = String(actionMock.mock.calls[1]?.[1].get("operationKey"));
+    expect(retryKey).toBe(firstKey);
+
+    await userEvent.click(screen.getByRole("button", { name: "Não é relevante" }));
+    await waitFor(() => expect(actionMock).toHaveBeenCalledTimes(3));
+    const rotatedKey = String(actionMock.mock.calls[2]?.[1].get("operationKey"));
+    expect(rotatedKey).not.toBe(firstKey);
   });
 });

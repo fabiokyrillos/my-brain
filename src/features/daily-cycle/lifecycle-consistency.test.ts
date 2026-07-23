@@ -19,7 +19,7 @@ const { loadEntryReviewProjection } = await import("./review-projection");
 
 function queryStub(result: { data: unknown; error: unknown }) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "neq", "in", "order", "range", "limit", "maybeSingle"]) {
+  for (const method of ["select", "eq", "neq", "in", "or", "order", "range", "limit", "maybeSingle"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.then = (onFulfilled: (value: typeof result) => unknown) => Promise.resolve(result).then(onFulfilled);
