@@ -28,6 +28,35 @@ if (process.argv.includes("--phase-2x")) {
   process.exit(0);
 }
 
+if (process.argv.includes("--phase-2c")) {
+  // Deterministic, disposable-fixture suites only. The daily-cycle smoke is intentionally
+  // excluded from this fail-fast aggregate: its needs-attention section claims an
+  // `interpret_entry` job, which races the unattended per-minute pg_cron drain on the
+  // shared queue and is therefore not deterministic under back-to-back aggregate timing.
+  // It remains available standalone (`npm run test:remote:daily-cycle`) and inside the
+  // Phase 2X aggregate. The 2C disposition/convergence contract is covered deterministically
+  // by the confirmation smoke's v5 disposition, partial-confirmation, and undo cases.
+  const suites = [
+    ["test:remote:2c:confirmation", "Phase 2C editable candidate confirmation (v2–v6)"],
+    ["test:remote:product-events", "Phase 2C candidate analytics product events"],
+    ["test:remote:2c:cleanup", "Phase 2C residual-data cleanup"],
+  ];
+
+  for (const [script, label] of suites) {
+    console.log(`\n[remote:2c] ${label} (${script})`);
+    const command = process.platform === "win32" ? process.env.ComSpec : "npm";
+    const args = process.platform === "win32"
+      ? ["/d", "/s", "/c", `npm run ${script}`]
+      : ["run", script];
+    const result = spawnSync(command, args, { stdio: "inherit" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
+
+  console.log("\nPhase 2C aggregate remote gate passed: editable candidate confirmation (v2–v6), candidate analytics product events, and residual-data cleanup.");
+  process.exit(0);
+}
+
 function assert(condition, label) {
   if (!condition) throw new Error(label);
 }
