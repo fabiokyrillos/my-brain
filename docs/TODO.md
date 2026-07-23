@@ -13,7 +13,7 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
 - [x] Complete Phase 2B immutable interpretation revisions and the trust/entity-resolution foundation.
 - [x] Complete Phase 2X — Product Convergence according to the approved architecture review, PRD, and implementation plan; official Slices 2X.1–2X.18 are complete.
 - [x] Complete Phase 2C editable candidate tasks and transactional materialization according to `PHASE_2C_PRD.md` and `PHASE_2C_IMPLEMENTATION_PLAN.md` (Slices 2C.1–2C.6; split/merge sub-epic deferred as GitHub issue #8). See `docs/PHASE_2C_REPORT.md`.
-- [ ] Complete Phase 2D conversational pending questions.
+- [ ] Complete Phase 2D conversational pending questions. Design approved (2026-07-23): `docs/PHASE_2D_PRD.md`, `docs/PHASE_2D_IMPLEMENTATION_PLAN.md` (six ordered slices 2D.1–2D.6), and ADR-033 (`Accepted`), with deterministic suggested answers (no AI schema change by default) and a single long-lived `resolve_pending_question_vN` RPC family. No branch, code, or migration started; Slice 2D.1 begins only after separate authorization.
 - [ ] Complete Phase 2E natural-language updates to existing tasks.
 - [ ] Complete Phase 2F retroactive history, mobile/localization/accessibility finish, full gates, and closeout.
 
