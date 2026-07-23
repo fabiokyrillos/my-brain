@@ -540,6 +540,150 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     }
   });
 
+  test("answers a pending question as an audited, undoable, stale-safe transition", async ({}, testInfo) => {
+    // Fixture: an interpretation-backed open question (bare entry, no job, so
+    // production automation never races this test).
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `Pergunta e2e de resolução ${marker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Registro com pergunta para responder.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `Qual é o prazo final? (${marker})`, reason: "Nenhum prazo foi mencionado.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/pt-BR/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+    const input = card.getByRole("textbox", { name: "Resposta" });
+    const answerButton = card.getByRole("button", { name: "Responder" });
+    if (testInfo.project.name === "mobile") {
+      const inputBox = await input.boundingBox();
+      const buttonBox = await answerButton.boundingBox();
+      expect(inputBox?.height).toBeGreaterThanOrEqual(44);
+      expect(buttonBox?.height).toBeGreaterThanOrEqual(44);
+    }
+
+    // Answer, observe the audited success state and the undo control.
+    await input.fill("  Sexta-feira às 14h  ");
+    await answerButton.click();
+    await expect(card.getByRole("status")).toHaveText("Resposta registrada.");
+    const undoButton = card.getByRole("button", { name: "Desfazer resposta" });
+    await expect(undoButton).toBeVisible();
+    if (testInfo.project.name === "mobile") {
+      const undoBox = await undoButton.boundingBox();
+      expect(undoBox?.height).toBeGreaterThanOrEqual(44);
+    }
+
+    // Undo restores the editable open state.
+    await undoButton.click();
+    await expect(card.getByRole("status")).toHaveText("Resposta desfeita. A pergunta voltou para a fila.");
+    await expect(card.getByRole("textbox", { name: "Resposta" })).toBeVisible();
+
+    // Re-answer through the keyboard; the restored question resolves again.
+    const restoredInput = card.getByRole("textbox", { name: "Resposta" });
+    await restoredInput.fill("Resposta definitiva");
+    await restoredInput.press("Enter");
+    await expect(card.getByRole("status")).toHaveText("Resposta registrada.");
+    await expect(card.getByRole("button", { name: "Desfazer resposta" })).toBeVisible();
+
+    // The content-free outcome event lands fail-open.
+    await expect.poll(async () => {
+      const names = await loadProductEventNames(user!.userId, user!.accessToken);
+      return names.filter((name) => name === "question_answered_basic").length;
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
+
+    // Stale safety: a second question whose interpretation is superseded
+    // rejects the answer with the stale conflict copy and no state change.
+    const staleMarker = crypto.randomUUID().slice(0, 8);
+    const staleEntryId = await insertBareEntry(user!.accessToken, user!.userId, `Pergunta e2e obsoleta ${staleMarker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: staleEntryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: staleEntryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Registro com pergunta que ficará obsoleta.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `Qual é o contexto? (${staleMarker})`, reason: "Contexto ausente.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+    await page.goto("/pt-BR/app/questions");
+    const staleCard = page.locator(".question-card", { hasText: `(${staleMarker})` });
+    await expect(staleCard).toBeVisible();
+    const staleOperationKey = crypto.randomUUID();
+    await restRpc(user!.accessToken, "begin_entry_reprocessing", { p_entry_id: staleEntryId, p_operation_key: staleOperationKey, p_lease_seconds: 180 });
+    await restRpc(user!.accessToken, "persist_reprocessed_entry_interpretation", {
+      p_entry_id: staleEntryId,
+      p_operation_key: staleOperationKey,
+      p_extraction: {
+        language: "pt-BR", occurredAt: new Date().toISOString(), isRetroactive: false,
+        summary: "Registro reprocessado sem pendências.",
+        concepts: ["raw_record"], contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [], pendingQuestions: [], confidence: 0.9,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+      p_element_trust: {
+        summary: trustDecision("apply_and_flag"), concepts: trustDecision("apply_and_flag"), occurredAt: trustDecision("apply_and_flag"),
+        extractedDates: trustDecision("apply_and_flag"), entities: trustDecision("apply_and_flag"),
+      },
+    });
+    await staleCard.getByRole("textbox", { name: "Resposta" }).fill("Resposta tardia");
+    await staleCard.getByRole("button", { name: "Responder" }).click();
+    await expect(staleCard.getByRole("alert")).toHaveText("A interpretação desta pergunta mudou. Atualize a página antes de responder.");
+  });
+
+  test("answers a pending question with the English resolution copy", async () => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `English e2e resolution question ${marker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "en",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Entry with a question to answer.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `What is the deadline? (${marker})`, reason: "No deadline was mentioned.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/en/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+    await card.getByRole("textbox", { name: "Answer" }).fill("Friday at 2pm");
+    await card.getByRole("button", { name: "Answer" }).click();
+    await expect(card.getByRole("status")).toHaveText("Answer recorded.");
+    const undoButton = card.getByRole("button", { name: "Undo answer" });
+    await expect(undoButton).toBeVisible();
+    await undoButton.click();
+    await expect(card.getByRole("status")).toHaveText("Answer undone. The question returned to the queue.");
+  });
+
   test("offers retry after a recoverable processing failure and recovers on retry", async ({}, testInfo) => {
     const entryId = await insertBareEntry(user!.accessToken, user!.userId, "Anotação simples para verificar recuperação de falha.");
     await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
