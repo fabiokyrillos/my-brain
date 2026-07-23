@@ -1,14 +1,25 @@
-// Phase 2D Slice 2D.1 — authenticated remote smoke for the versioned
-// pending-question answer transition (resolve_pending_question_v1).
+// Phase 2D — authenticated remote smoke for the versioned pending-question
+// resolution family (resolve_pending_question_v1 + _v2).
 //
-// Proves, against the linked development project with disposable fixtures:
-// owner success with canonical trimming, deterministic replay, idempotency
-// mismatch, non-open rejection, stale-interpretation rejection, concurrent
-// single-winner behavior, cross-owner/missing indistinguishability,
-// anonymous denial, atomic audit + undo evidence, exact-prior-state undo
-// with idempotent repetition, post-undo resolvability, legacy answer-path
-// compatibility, and immutable interpretation evidence. Cleanup is
-// fail-closed: any leftover fixture fails the smoke.
+// Slice 2D.1 section proves, against the linked development project with
+// disposable fixtures: owner success with canonical trimming, deterministic
+// replay, idempotency mismatch, non-open rejection, stale-interpretation
+// rejection, concurrent single-winner behavior, cross-owner/missing
+// indistinguishability, anonymous denial, atomic audit + undo evidence,
+// exact-prior-state undo with idempotent repetition, post-undo
+// resolvability, legacy answer-path compatibility, and immutable
+// interpretation evidence.
+//
+// Slice 2D.2 section proves the disposition contract on the same guarantees:
+// closed-shape rejection for the deferred/dismissed/not_relevant kinds,
+// deferral-instant validation, deferral with deterministic replay/mismatch,
+// still-snoozed rejection, deterministic snooze reactivation (Needs
+// Attention queue convergence + RPC-time resolvability), guarded undo that
+// can never clobber a newer resolution, terminal dismissal and distinct
+// not_relevant history, stale rejection, v1/v2 operation-key namespace
+// isolation, and the content-free question_resolved event allowlist.
+//
+// Cleanup is fail-closed: any leftover fixture fails the smoke.
 
 import { createClient } from "@supabase/supabase-js";
 import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
@@ -493,8 +504,494 @@ try {
   );
   assert(legacyUpdate?.status === "answered", "Legacy owner-scoped answer path is no longer callable");
 
+  // ===========================================================================
+  // Phase 2D Slice 2D.2 — dispositions through resolve_pending_question_v2.
+  // ===========================================================================
+  const resolveV2 = (client, questionId, resolution, operationKey = crypto.randomUUID()) =>
+    client.rpc("resolve_pending_question_v2", {
+      p_question_id: questionId,
+      p_resolution: resolution,
+      p_operation_key: operationKey,
+    }).then((result) => ({ ...result, operationKey }));
+  const canonicalFutureInstant = (offsetMs) => new Date(Date.now() + offsetMs).toISOString();
+  const listQueue = async (client) => dataOrThrow(
+    await client.rpc("list_needs_attention", { p_limit: 100 }),
+    "list needs attention",
+  );
+
+  // --- Closed-shape rejection (v2) -------------------------------------------
+  const deferFixture = await createQuestionFixture(owner, ownerUser.id, "defer");
+  const deferInterpretationBefore = dataOrThrow(
+    await owner
+      .from("entry_interpretations")
+      .select("pending_questions")
+      .eq("id", deferFixture.interpretationId)
+      .single(),
+    "snapshot defer immutable interpretation questions",
+  );
+  assertRpcError(
+    await resolveV2(owner, deferFixture.questionId, { kind: "reinterpret" }, `${fixturePrefix}-v2-invalid-kind`),
+    "22023",
+    "v2 unknown resolution kind",
+  );
+  assertRpcError(
+    await resolveV2(owner, deferFixture.questionId, { kind: "deferred" }, `${fixturePrefix}-v2-invalid-missing`),
+    "22023",
+    "v2 deferral without instant",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: canonicalFutureInstant(3_600_000), answer: "extra" },
+      `${fixturePrefix}-v2-invalid-extra`,
+    ),
+    "22023",
+    "v2 deferral with foreign key",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: "2020-01-01T00:00:00Z" },
+      `${fixturePrefix}-v2-invalid-past`,
+    ),
+    "22023",
+    "v2 past deferral instant",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: "2027-01-01 10:00:00" },
+      `${fixturePrefix}-v2-invalid-naive`,
+    ),
+    "22023",
+    "v2 naive offset-less instant",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: canonicalFutureInstant(400 * 86_400_000) },
+      `${fixturePrefix}-v2-invalid-beyond`,
+    ),
+    "22023",
+    "v2 deferral beyond the bounded window",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "dismissed", answer: "conteúdo" },
+      `${fixturePrefix}-v2-invalid-terminal-content`,
+    ),
+    "22023",
+    "v2 terminal disposition carrying content",
+  );
+  assertRpcError(
+    await resolveV2(owner, deferFixture.questionId, { kind: "dismissed" }, "short"),
+    "22023",
+    "v2 malformed operation key",
+  );
+  const v2InvalidEvidence = await admin
+    .from("undo_operations")
+    .select("id", { count: "exact", head: true })
+    .like("operation_key", `resolve-v2:${fixturePrefix}-v2-invalid-%`);
+  if (v2InvalidEvidence.error) throw v2InvalidEvidence.error;
+  assert((v2InvalidEvidence.count ?? 0) === 0, "Rejected v2 payloads left reserved evidence behind");
+
+  // --- Ownership and anonymity (v2) ------------------------------------------
+  const v2CrossOwner = await resolveV2(
+    otherOwner,
+    deferFixture.questionId,
+    { kind: "dismissed" },
+    `${fixturePrefix}-v2-cross-owner`,
+  );
+  assertRpcError(v2CrossOwner, "P0002", "v2 cross-owner disposition");
+  const v2Missing = await resolveV2(
+    owner,
+    crypto.randomUUID(),
+    { kind: "dismissed" },
+    `${fixturePrefix}-v2-missing`,
+  );
+  assertRpcError(v2Missing, "P0002", "v2 missing question disposition");
+  assert(
+    v2CrossOwner.error.message === v2Missing.error.message,
+    "v2 cross-owner denial is distinguishable from a missing question",
+  );
+  const v2Anonymous = await anonymous.rpc("resolve_pending_question_v2", {
+    p_question_id: deferFixture.questionId,
+    p_resolution: { kind: "dismissed" },
+    p_operation_key: `${fixturePrefix}-v2-anonymous`,
+  });
+  assert(v2Anonymous.error, "Anonymous v2 disposition did not fail");
+
+  // --- Needs Attention baseline: open question keeps its completed entry -----
+  const completedEntry = await admin
+    .from("entries")
+    .update({ status: "completed" })
+    .eq("id", deferFixture.entryId)
+    .eq("user_id", ownerUser.id)
+    .select("id,status")
+    .single();
+  if (completedEntry.error) throw completedEntry.error;
+  const queueBaseline = await listQueue(owner);
+  const baselineItem = queueBaseline.find((item) => item.entry_id === deferFixture.entryId);
+  assert(
+    baselineItem?.reason === "answer_existing_question"
+      && baselineItem?.open_question_id === deferFixture.questionId,
+    "Open question did not keep its completed entry in the Needs Attention queue",
+  );
+
+  // --- Defer: success, replay, mismatch ---------------------------------------
+  const deferInstant = canonicalFutureInstant(30 * 60_000);
+  const deferred = dataOrThrow(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: deferInstant },
+      `${fixturePrefix}-v2-defer`,
+    ),
+    "owner deferral",
+  );
+  assert(deferred.resolution === "deferred", "Deferral did not report the deferred resolution");
+  assert(deferred.snoozed_until === deferInstant, "Deferral did not echo the canonical UTC instant");
+  assert(deferred.idempotent === false, "First deferral reported a replay");
+  const deferredRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("id,status,answer,answered_at,snoozed_until")
+      .eq("id", deferFixture.questionId)
+      .single(),
+    "read deferred question row",
+  );
+  assert(deferredRow.status === "snoozed", "Question row did not move to snoozed");
+  assert(
+    new Date(deferredRow.snoozed_until).toISOString() === deferInstant,
+    "Stored snoozed_until is not the validated instant",
+  );
+  const deferAudit = dataOrThrow(
+    await admin
+      .from("audit_logs")
+      .select("after_state,before_state")
+      .eq("action_type", "resolve_pending_question_v2")
+      .eq("entity_id", deferFixture.questionId),
+    "read deferral audit rows",
+  );
+  assert(deferAudit.length === 1, `Expected exactly one deferral audit row, saw ${deferAudit.length}`);
+  assert(
+    deferAudit[0].after_state?.resolution === "deferred"
+      && deferAudit[0].after_state?.snoozed_until === deferInstant
+      && deferAudit[0].before_state?.status === "open",
+    "Deferral audit evidence drifted",
+  );
+  const deferReplay = dataOrThrow(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: deferInstant },
+      `${fixturePrefix}-v2-defer`,
+    ),
+    "replay deferral",
+  );
+  assert(
+    deferReplay.idempotent === true
+      && deferReplay.undo_id === deferred.undo_id
+      && deferReplay.snoozed_until === deferInstant,
+    "Deferral replay drifted",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "deferred", snoozedUntil: canonicalFutureInstant(2 * 3_600_000) },
+      `${fixturePrefix}-v2-defer`,
+    ),
+    "P0001",
+    "deferral idempotency mismatch",
+    "2D_IDEMPOTENCY_MISMATCH",
+  );
+
+  // --- Still-snoozed questions are not resolvable and leave the queue ---------
+  assertRpcError(
+    await resolveV2(owner, deferFixture.questionId, { kind: "dismissed" }, `${fixturePrefix}-v2-early`),
+    "55000",
+    "still-snoozed rejection",
+  );
+  const queueWhileSnoozed = await listQueue(owner);
+  assert(
+    !queueWhileSnoozed.some((item) => item.entry_id === deferFixture.entryId),
+    "A deferred question did not leave the Needs Attention queue",
+  );
+
+  // --- Deterministic reactivation ---------------------------------------------
+  const elapsed = await admin
+    .from("pending_questions")
+    .update({ snoozed_until: new Date(Date.now() - 3_600_000).toISOString() })
+    .eq("id", deferFixture.questionId)
+    .eq("user_id", ownerUser.id)
+    .select("id")
+    .single();
+  if (elapsed.error) throw elapsed.error;
+  const queueReactivated = await listQueue(owner);
+  const reactivatedItem = queueReactivated.find((item) => item.entry_id === deferFixture.entryId);
+  assert(
+    reactivatedItem?.reason === "answer_existing_question"
+      && reactivatedItem?.open_question_id === deferFixture.questionId,
+    "A snoozed question past its deadline did not return to the Needs Attention queue",
+  );
+  const reactivatedAnswer = dataOrThrow(
+    await resolveV2(
+      owner,
+      deferFixture.questionId,
+      { kind: "answer", answer: "  Resposta reativada  " },
+      `${fixturePrefix}-v2-reactivated-answer`,
+    ),
+    "answer reactivated question",
+  );
+  assert(reactivatedAnswer.resolution === "answered", "Reactivated question was not answerable");
+  const reactivatedRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status,answer,snoozed_until")
+      .eq("id", deferFixture.questionId)
+      .single(),
+    "read reactivated question row",
+  );
+  assert(
+    reactivatedRow.status === "answered"
+      && reactivatedRow.answer === "Resposta reativada"
+      && reactivatedRow.snoozed_until === null,
+    "Reactivated resolution did not settle answered with a cleared snooze deadline",
+  );
+  const reactivatedAudit = dataOrThrow(
+    await admin
+      .from("audit_logs")
+      .select("before_state")
+      .eq("action_type", "resolve_pending_question_v2")
+      .eq("entity_id", deferFixture.questionId)
+      .filter("after_state->>resolution", "eq", "answered"),
+    "read reactivated audit row",
+  );
+  assert(
+    reactivatedAudit.length === 1 && reactivatedAudit[0].before_state?.status === "snoozed",
+    "The audit evidence does not record the automatic snoozed-to-open reactivation",
+  );
+
+  // --- Guarded undo: a superseded deferral cannot clobber the newer answer ----
+  const supersededUndo = await owner.rpc("undo_operation", { p_undo_id: deferred.undo_id });
+  assert(
+    supersededUndo.error?.details === "2D_UNDO_RESTORE_INTEGRITY",
+    "Undoing the superseded deferral did not fail with the integrity guard",
+  );
+  const guardedRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status,answer")
+      .eq("id", deferFixture.questionId)
+      .single(),
+    "read guarded question row",
+  );
+  assert(
+    guardedRow.status === "answered" && guardedRow.answer === "Resposta reativada",
+    "The guarded undo touched the newer answer",
+  );
+  const reactivatedUndo = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: reactivatedAnswer.undo_id }),
+    "undo reactivated answer",
+  );
+  assert(reactivatedUndo.undone === true && reactivatedUndo.affected === 1, "Reactivated answer undo drifted");
+  const restoredDeferRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status,answer,answered_at,snoozed_until")
+      .eq("id", deferFixture.questionId)
+      .single(),
+    "read restored defer question row",
+  );
+  assert(
+    restoredDeferRow.status === "open"
+      && restoredDeferRow.answer === null
+      && restoredDeferRow.answered_at === null
+      && restoredDeferRow.snoozed_until === null,
+    "The undone v2 answer did not restore the exact open state",
+  );
+
+  // --- Dismiss: terminal semantics, replay, undo, redismissal -----------------
+  const dismissFixture = await createQuestionFixture(owner, ownerUser.id, "dismiss");
+  const dismissed = dataOrThrow(
+    await resolveV2(owner, dismissFixture.questionId, { kind: "dismissed" }, `${fixturePrefix}-success`),
+    "owner dismissal",
+  );
+  assert(dismissed.resolution === "dismissed", "Dismissal did not report the dismissed resolution");
+  assert(dismissed.idempotent === false, "The v1-consumed raw key replayed under the v2 namespace");
+  const namespaceEvidence = dataOrThrow(
+    await admin
+      .from("undo_operations")
+      .select("operation_key,action_type")
+      .in("operation_key", [`resolve-v1:${fixturePrefix}-success`, `resolve-v2:${fixturePrefix}-success`]),
+    "read namespace evidence",
+  );
+  assert(
+    namespaceEvidence.length === 2,
+    "The v1 and v2 namespaces do not hold independent reservations for the same raw key",
+  );
+  const dismissedRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status,answer")
+      .eq("id", dismissFixture.questionId)
+      .single(),
+    "read dismissed question row",
+  );
+  assert(dismissedRow.status === "dismissed" && dismissedRow.answer === null, "Dismissal row state drifted");
+  assertRpcError(
+    await resolveV2(owner, dismissFixture.questionId, { kind: "not_relevant" }, `${fixturePrefix}-v2-terminal`),
+    "55000",
+    "terminal-to-terminal rejection",
+  );
+  assertRpcError(
+    await resolveV2(
+      owner,
+      dismissFixture.questionId,
+      { kind: "answer", answer: "tarde demais" },
+      `${fixturePrefix}-v2-terminal-answer`,
+    ),
+    "55000",
+    "terminal answer rejection",
+  );
+  const dismissReplay = dataOrThrow(
+    await resolveV2(owner, dismissFixture.questionId, { kind: "dismissed" }, `${fixturePrefix}-success`),
+    "replay dismissal",
+  );
+  assert(dismissReplay.idempotent === true && dismissReplay.undo_id === dismissed.undo_id, "Dismissal replay drifted");
+  const dismissUndo = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: dismissed.undo_id }),
+    "undo dismissal",
+  );
+  assert(dismissUndo.affected === 1, "Dismissal undo drifted");
+  const restoredDismissRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status")
+      .eq("id", dismissFixture.questionId)
+      .single(),
+    "read restored dismiss question row",
+  );
+  assert(restoredDismissRow.status === "open", "The undone dismissal did not restore the open state");
+
+  // --- Not relevant: distinct truthful history over the dismissed status ------
+  const notRelevant = dataOrThrow(
+    await resolveV2(owner, dismissFixture.questionId, { kind: "not_relevant" }, `${fixturePrefix}-v2-not-relevant`),
+    "owner not-relevant resolution",
+  );
+  assert(notRelevant.resolution === "not_relevant", "not_relevant did not report its distinct resolution kind");
+  const notRelevantRow = dataOrThrow(
+    await owner
+      .from("pending_questions")
+      .select("status")
+      .eq("id", dismissFixture.questionId)
+      .single(),
+    "read not-relevant question row",
+  );
+  assert(notRelevantRow.status === "dismissed", "not_relevant did not reuse the dismissed status");
+  const notRelevantEvidence = dataOrThrow(
+    await admin
+      .from("undo_operations")
+      .select("after_state")
+      .eq("operation_key", `resolve-v2:${fixturePrefix}-v2-not-relevant`),
+    "read not-relevant undo evidence",
+  );
+  assert(
+    notRelevantEvidence.length === 1 && notRelevantEvidence[0].after_state?.resolution === "not_relevant",
+    "The evidence does not label the not-relevant outcome distinctly",
+  );
+  const notRelevantUndo = dataOrThrow(
+    await owner.rpc("undo_operation", { p_undo_id: notRelevant.undo_id }),
+    "undo not-relevant resolution",
+  );
+  assert(notRelevantUndo.affected === 1, "not-relevant undo drifted");
+
+  // --- Stale deferral ----------------------------------------------------------
+  assertRpcError(
+    await resolveV2(
+      owner,
+      staleFixture.questionId,
+      { kind: "deferred", snoozedUntil: canonicalFutureInstant(86_400_000) },
+      `${fixturePrefix}-v2-stale`,
+    ),
+    "55P03",
+    "stale deferral rejection",
+  );
+  const staleV2Evidence = await admin
+    .from("undo_operations")
+    .select("id", { count: "exact", head: true })
+    .eq("operation_key", `resolve-v2:${fixturePrefix}-v2-stale`);
+  if (staleV2Evidence.error) throw staleV2Evidence.error;
+  assert((staleV2Evidence.count ?? 0) === 0, "Stale v2 rejection left reserved evidence behind");
+
+  // --- question_resolved allowlist: bounded kind only, content-free ------------
+  const resolvedEvent = dataOrThrow(
+    await owner.rpc("record_product_event", {
+      p_event_name: "question_resolved",
+      p_surface: "server",
+      p_locale: "pt-BR",
+      p_viewport_class: "unknown",
+      p_app_version: "smoke",
+      p_properties: { kind: "deferred" },
+      p_subject_type: "pending_question",
+      p_subject_id: dismissFixture.questionId,
+      p_idempotency_key: crypto.randomUUID(),
+      p_is_synthetic: true,
+    }),
+    "record question_resolved with a bounded kind",
+  );
+  assert(resolvedEvent?.[0]?.recorded === true, "question_resolved with a bounded kind was not recorded");
+  const contentEvent = await owner.rpc("record_product_event", {
+    p_event_name: "question_resolved",
+    p_surface: "server",
+    p_locale: "pt-BR",
+    p_viewport_class: "unknown",
+    p_app_version: "smoke",
+    p_properties: { kind: "dismissed", question: "free text" },
+    p_subject_type: "pending_question",
+    p_subject_id: dismissFixture.questionId,
+    p_idempotency_key: crypto.randomUUID(),
+    p_is_synthetic: true,
+  });
+  assert(contentEvent.error?.code === "22023", "question_resolved accepted a content property");
+  const badKindEvent = await owner.rpc("record_product_event", {
+    p_event_name: "question_resolved",
+    p_surface: "server",
+    p_locale: "pt-BR",
+    p_viewport_class: "unknown",
+    p_app_version: "smoke",
+    p_properties: { kind: "answered" },
+    p_subject_type: "pending_question",
+    p_subject_id: dismissFixture.questionId,
+    p_idempotency_key: crypto.randomUUID(),
+    p_is_synthetic: true,
+  });
+  assert(badKindEvent.error?.code === "22023", "question_resolved accepted a kind outside the bounded enum");
+
+  // --- Immutable interpretation evidence after the disposition cycle ----------
+  const deferInterpretationAfter = dataOrThrow(
+    await owner
+      .from("entry_interpretations")
+      .select("pending_questions")
+      .eq("id", deferFixture.interpretationId)
+      .single(),
+    "re-read defer immutable interpretation questions",
+  );
+  assert(
+    JSON.stringify(deferInterpretationAfter.pending_questions)
+      === JSON.stringify(deferInterpretationBefore.pending_questions),
+    "Immutable interpretation pending_questions changed during the disposition cycle",
+  );
+
   smokeSummary = {
-    cases: 14,
+    cases: 28,
     fixturePrefix,
     preExistingAuthUsers: before.authUserIds.length,
     preExistingTableCounts: before.tableCounts,
