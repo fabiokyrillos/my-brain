@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-24 — Phase 2D Slice 2D.5: conversational surfacing (Chat + queue) and cooldown (branch, not merged)
+
+### Added
+
+- `src/features/agent/question-surfacing.ts` — pure, LLM-free `decideQuestionSurfacing`: the deterministic proactive-nudge decision the PRD's `2D-COOLDOWN` requirements demand. Mirrors the heartbeat discipline (`run_user_heartbeat`): quiet hours in the user's own timezone (reusing `isWithinQuietHours` verbatim), a per-local-day `max_followups_per_day` cap, a rolling 24h cooldown, and an `important_reminder_override` bypass that only an *important* item may use. Gates evaluate in a stable order (quiet hours → cap → cooldown). 18 unit tests cover every branch, timezone correctness, the empty quiet window, cap 0, cooldown boundaries, an unparseable timestamp, and every override interaction.
+- `src/features/agent/question-surfacing-data.ts` (`server-only`) — derives the decision inputs from owner-scoped data and **reuses the heartbeat's existing `notifications` ledger read-only** as the shared nudge budget (delivered-today count + last-nudge cooldown anchor), so no new cron, channel, or persisted surfacing state is introduced — surfacing stays pull-based per ADR-033 decision 5. Fails **closed** (no nudge) on any read error. 7 unit tests.
+- `src/features/agent/conversational-questions.tsx` (`server-only`) — a reusable `<section>` (role `region`) panel that renders open actionable questions as interactive, untrusted-data elements resolvable through the **unchanged** `resolvePendingQuestion` / `undoQuestionResolution` contract and the existing `QuestionAnswerForm` (answer, defer, dismiss, not-relevant, 2D.3 suggestions/previews, 2D.4 confirm-to-reinterpret). Two modes: **proactive** (Chat — shown with attention only when the surfacing module allows, otherwise collapsed to one quiet reachable link so nothing is ever permanently hidden) and **pull** (the "Precisa de você" queue — always shown; the decision only sets header emphasis). Fully failure-isolated: a read error degrades to "no panel" instead of crashing the host page. Every projected string is React-escaped owner content and is never injected into the chat prompt.
+- `ConversationalQuestionsViewed` (`src/features/product-analytics/interaction-events.tsx`) — content-free "surfaced" observation reusing the existing allowlisted `needs_attention_viewed` event with the allowlisted `questions` surface and a bounded item count only. No new event name, surface, or migration.
+- E2E: a new authenticated journey in `e2e/intelligent-capture.spec.ts` resolving the same pending question from Chat and the Needs-you queue through the identical contract, asserting cross-surface convergence with `/questions`, ≥44 px targets, and no mobile overflow (desktop + Pixel 7 verified against the linked project).
+
+### Changed
+
+- `src/app/[locale]/app/chat/page.tsx` mounts the proactive panel above the chat form; `src/app/[locale]/app/inbox/page.tsx` (`?view=needs-you`) mounts the pull panel above the entry-centric needs-attention list. `src/app/agent.css` gains the panel styles (reusing the existing `question-card`/`question-answer` chrome).
+
+### Notes
+
+- **No migration.** No table, column, RPC, constraint, or product-event name/surface changed; generated types are unchanged; local/remote parity is preserved through `202607230051`. The resolution, reinterpretation, undo, and analytics contracts of 2D.1–2D.4 are reused byte-for-byte. Verified: ESLint clean, TypeScript clean, Vitest 902/902, production build green, linked DB lint (`--level error`) clean, authenticated Playwright desktop + Pixel 7 green (new journey + regressions). Branch `codex/phase-2d-slice-5`, base `218e56e` — not pushed, no PR, not deployed. See `docs/reports/PHASE_2D_SLICE_05_REPORT.md`.
+
 ## 2026-07-24 — Phase 2D Slice 2D.4: confirmed consequence / reinterpretation (branch, not merged)
 
 ### Added

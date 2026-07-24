@@ -1118,4 +1118,66 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     await waitForRecovered(page, href);
     await expect(page.locator(".entry-status-could_not_organize")).toHaveCount(0);
   });
+
+  test("resolves the same pending question from Chat and the Needs-you queue through the identical contract", async ({}, testInfo) => {
+    // Slice 2D.5: one interpretation-backed open question must render as an
+    // interactive element on the conversational surfaces and resolve through
+    // the same audited/undoable contract the /questions page uses.
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `Pergunta conversacional e2e ${marker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Registro com pergunta para responder em conversa.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `Onde vai acontecer? (${marker})`, reason: "Local não informado.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    // The pull surface always shows the question; the panel is a labeled region
+    // with the interactive resolution form built from untrusted question text.
+    await page.goto("/pt-BR/app/inbox?view=needs-you");
+    const queuePanel = page.getByRole("region", { name: "Perguntas pendentes" });
+    await expect(queuePanel).toBeVisible();
+    const queueCard = queuePanel.locator(".question-card", { hasText: `(${marker})` });
+    await expect(queueCard).toBeVisible();
+    if (testInfo.project.name === "mobile") {
+      expect((await page.locator("body").boundingBox())?.width ?? 0).toBeLessThanOrEqual(page.viewportSize()!.width);
+    }
+
+    // The Chat surface renders the same question as an interactive element and
+    // resolves it inline. Answering here uses the identical Server Action.
+    await page.goto("/pt-BR/app/chat");
+    const chatPanel = page.getByRole("region", { name: "Perguntas para responder agora" });
+    await expect(chatPanel).toBeVisible();
+    const chatCard = chatPanel.locator(".question-card", { hasText: `(${marker})` });
+    await expect(chatCard).toBeVisible();
+    const input = chatCard.getByRole("textbox", { name: "Resposta" });
+    const answerButton = chatCard.getByRole("button", { name: "Responder", exact: true });
+    if (testInfo.project.name === "mobile") {
+      expect((await input.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect((await answerButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    await input.fill("No escritório central");
+    await answerButton.click();
+    await expect(chatCard.getByRole("status")).toHaveText("Resposta registrada.");
+    const undoButton = chatCard.getByRole("button", { name: "Desfazer resposta" });
+    await expect(undoButton).toBeVisible();
+
+    // Convergence: after resolving from Chat, the queue and the /questions page
+    // agree the question is no longer actionable.
+    await page.goto("/pt-BR/app/questions");
+    await expect(page.locator(".question-card", { hasText: `(${marker})` })).toHaveCount(0);
+    await page.goto("/pt-BR/app/inbox?view=needs-you");
+    await expect(page.locator(".question-card", { hasText: `(${marker})` })).toHaveCount(0);
+  });
 });
