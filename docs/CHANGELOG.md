@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-24 — Phase 2D Slice 2D.6: convergence and closeout (branch)
+
+### Added
+
+- `scripts/generate-phase-2d-traceability.mjs` (`npm run docs:phase-2d:traceability`) — parses the PRD's 58 `2D-<FAMILY>-NNN` functional/non-functional requirement IDs (15 families), 6 per-epic acceptance criteria (§19.1), and 5 global gates (§19.2), maps each to its owning slice(s) and durable evidence, and **fails closed** if the inventory or any per-family count drifts. Verified: a deliberately injected extra requirement makes it exit non-zero (59 ≠ 58), and the PRD restores byte-identical.
+- `docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md` — 69 generated rows (58 requirements + 6 epics + 5 gates). No requirement is represented as non-green: the deterministic suggested-answer path fully satisfies `2D-SUGGEST-002`/`2D-OPERATIONS-003` (the AI extraction-schema field they name is an explicitly deferred, separately-authorized fallback that was not needed), and the `2C-UNDO-004` hard gate behind `2D-ACTION-006`/`2D-UNDO-003` is resolved by migration `202607230050`.
+- `scripts/verify-phase-2d-cleanup.mjs` (`npm run test:remote:2d:cleanup`) — fail-closed residual-data check across Auth users (Phase 2D fixture prefixes `phase-2d-resolution-`/`-preview-`/`-reinterpret-` plus adjacent smoke prefixes), 14 owner-scoped tables (adding `entry_interpretations` to the Phase 2C set — `pending_questions` was already scanned — since reinterpretation appends an immutable interpretation revision), and remote-smoke storage objects.
+- `test:remote:2d` aggregate (`remote-supabase-smoke.mjs --phase-2d`) — a deterministic, fail-fast sequence: question-resolution (v1/v2 answer + dispositions), suggested-answer/preview, reinterpretation (v3), content-free resolution analytics, and residual-data cleanup. The daily-cycle smoke is intentionally excluded (its needs-attention section claims an `interpret_entry` job that races the unattended `pg_cron` drain) and remains runnable standalone and inside `test:remote:2x`.
+- `docs/reports/PHASE_2D_SLICE_06_REPORT.md` (this slice's acceptance report) and `docs/PHASE_2D_REPORT.md` (phase-level closeout handoff).
+
+### Changed
+
+- `docs/SECURITY.md` — reconciled to record that the `undo_operation` `40001`→`55P03` fix shipped in migration `202607230050` (Slice 2D.4, `2C-UNDO-004` resolved) and to document the Phase 2C/2D versioned resolution/confirmation security controls; the stale pre-production `undo_operation 40001` residual item is closed.
+- `docs/DECISIONS.md` — ADR-034 records the closeout decisions (evidence-based convergence with no product source change; legacy answer path preserved per PRD §21.7; deterministic fail-fast aggregate; documentation reconciliation).
+- `docs/STATE.md`, `docs/TODO.md` — reconciled to mark Phase 2D complete through Slice 2D.6 and Phase 2E as the next authorized scope.
+
+### Notes
+
+- **No migration, RPC, or product/UI source change.** The convergence audit confirmed every actionable-question reader already shares `actionablePendingQuestionFilter` (mirrored in SQL by `list_needs_attention`) and the single `resolvePendingQuestion`/`undoQuestionResolution` contract, so no drift required a product fix. The closeout scripts are node-only with no runtime coupling. Local/remote parity is preserved through `202607230051`; generated types are unchanged. Branch `codex/phase-2d-slice-6`, base `62883af` (Slice 2D.5 merge / PR #15). See `docs/reports/PHASE_2D_SLICE_06_REPORT.md` and ADR-034.
+
 ## 2026-07-24 — Phase 2D Slice 2D.5: conversational surfacing (Chat + queue) and cooldown (branch, not merged)
 
 ### Added
