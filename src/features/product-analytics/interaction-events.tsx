@@ -126,6 +126,24 @@ export function NeedsAttentionViewed({ surface, itemCount, locale }: {
   })} />;
 }
 
+// Phase 2D Slice 2D.5 — the conversational pending-question panel became
+// visible on a pull/proactive surface (Chat or the "Precisa de você" queue).
+// Content-free: reuses the existing `needs_attention_viewed` event with the
+// allowlisted `questions` surface and carries only a bounded item count —
+// never any question or answer text. Session-deduplicated and fail-open.
+export function ConversationalQuestionsViewed({ itemCount, locale }: {
+  itemCount: number;
+  locale: ProductEventLocale;
+}) {
+  return <VisibilityEvent onVisible={() => recordOnce({
+    logicalKey: `conversational-questions-viewed:${itemCount}`,
+    name: "needs_attention_viewed",
+    surface: "questions",
+    locale,
+    properties: { itemCount },
+  })} />;
+}
+
 export function InterpretationReviewViewed({ entryId, locale }: {
   entryId: string;
   locale: ProductEventLocale;

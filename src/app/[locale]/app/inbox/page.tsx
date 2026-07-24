@@ -1,6 +1,7 @@
 import { Inbox } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ConversationalQuestions } from "@/features/agent/conversational-questions";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
@@ -35,7 +36,7 @@ export default async function InboxPage({
   const pt = locale === "pt-BR";
   const resolvedSearchParams = await searchParams;
   const view = resolvedSearchParams.view === "needs-you" ? "needs-you" : "all";
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
 
   if (view === "needs-you") {
     const projection = await loadAttentionProjection(supabase, { locale });
@@ -50,6 +51,7 @@ export default async function InboxPage({
           </div>
         </header>
         <InboxViewTabs locale={locale} active="needs-you" />
+        <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="pull" limit={5} />
         {projection.items.length ? (
           <NeedsAttentionList
             initialItems={projection.items}
