@@ -9,6 +9,39 @@ import { z } from "zod";
 // family, bumped to `resolve_pending_question_v2`).
 export const QUESTION_ANSWER_MAX_LENGTH = 4000;
 
+// Phase 2D Slice 2D.3 — suggestion provenance.
+//
+// Provenance is deliberately NOT part of `p_resolution`: the closed database
+// write shape (and therefore `resolve_pending_question_v1`/`_v2`) is unchanged,
+// and no new RPC version is introduced — ADR-033 reserves `_v3` for Slice
+// 2D.4's consequence. The browser may submit only a bounded suggestion *id*;
+// the server re-derives the deterministic options for that question and
+// records the resulting bounded `origin` enum on the persisted-outcome
+// analytics event. A client can never assert its own attribution.
+export const questionAnswerOrigins = ["typed", "suggested"] as const;
+export type QuestionAnswerOrigin = (typeof questionAnswerOrigins)[number];
+
+export const QUESTION_SUGGESTION_ID_MAX_LENGTH = 64;
+
+// A suggestion id is `<kind>:<slug>` — lowercase letters/underscore, then a
+// lowercase alphanumeric-hyphen slug. Nothing else is accepted.
+const suggestionIdSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(QUESTION_SUGGESTION_ID_MAX_LENGTH)
+  .regex(/^[a-z_]+:[a-z0-9-]+$/);
+
+/**
+ * Parses an untrusted submitted suggestion id. An absent, malformed, or
+ * oversized id yields `null`, which the caller records as a typed answer — a
+ * UI hint never blocks or fails a resolution.
+ */
+export function parseSubmittedSuggestionId(input: unknown): string | null {
+  const parsed = suggestionIdSchema.safeParse(input);
+  return parsed.success ? parsed.data : null;
+}
+
 // Bounded deferral window: a snooze must land strictly in the future and
 // within one year (366 days covers leap years); an unbounded far-future defer
 // would be an untruthful dismissal. Mirrored by the database contract.

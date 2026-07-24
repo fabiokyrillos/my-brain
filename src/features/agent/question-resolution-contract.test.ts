@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   QUESTION_ANSWER_MAX_LENGTH,
   QUESTION_DEFER_MAX_DAYS,
+  QUESTION_SUGGESTION_ID_MAX_LENGTH,
   normalizeQuestionResolutionCommand,
+  parseSubmittedSuggestionId,
+  questionAnswerOrigins,
   questionResolutionCommandSchema,
   serializeQuestionResolution,
 } from "./question-resolution-contract";
@@ -238,6 +241,72 @@ describe("questionResolutionCommandSchema", () => {
     expect(
       questionResolutionCommandSchema.safeParse({ questionId, answer: "ok" }).success,
     ).toBe(false);
+  });
+});
+
+// Phase 2D Slice 2D.3 — suggestion provenance never widens the write shape.
+describe("suggestion provenance", () => {
+  it("exposes exactly the bounded typed/suggested origin enum", () => {
+    expect(questionAnswerOrigins).toEqual(["typed", "suggested"]);
+  });
+
+  it("rejects a suggestion id as a resolution-command key", () => {
+    expect(
+      questionResolutionCommandSchema.safeParse({
+        questionId,
+        kind: "answer",
+        answer: "Ana Prado",
+        suggestionId: "person:ana-prado",
+      }).success,
+    ).toBe(false);
+    expect(
+      questionResolutionCommandSchema.safeParse({
+        questionId,
+        kind: "answer",
+        answer: "Ana Prado",
+        origin: "suggested",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps the serialized database payload byte-identical when a suggestion was used", () => {
+    const command = normalizeQuestionResolutionCommand({
+      questionId,
+      kind: "answer",
+      answer: "Ana Prado",
+    });
+    expect(JSON.parse(serializeQuestionResolution(command))).toEqual({
+      kind: "answer",
+      answer: "Ana Prado",
+    });
+    expect(serializeQuestionResolution(command)).not.toContain("origin");
+    expect(serializeQuestionResolution(command)).not.toContain("suggestion");
+  });
+
+  it("accepts a well-formed suggestion id", () => {
+    expect(parseSubmittedSuggestionId("person:ana-prado")).toBe("person:ana-prado");
+    expect(parseSubmittedSuggestionId("yes_no:yes")).toBe("yes_no:yes");
+    expect(parseSubmittedSuggestionId("  project:aurora  ")).toBe("project:aurora");
+  });
+
+  it("downgrades an absent, malformed, or oversized suggestion id to null", () => {
+    for (const input of [
+      undefined,
+      null,
+      "",
+      "   ",
+      42,
+      { id: "person:ana" },
+      "person",
+      "person:",
+      ":ana",
+      "Person:Ana",
+      "person:ana prado",
+      "person:<script>",
+      `person:${"a".repeat(QUESTION_SUGGESTION_ID_MAX_LENGTH)}`,
+    ]) {
+      expect(parseSubmittedSuggestionId(input)).toBeNull();
+    }
   });
 });
 

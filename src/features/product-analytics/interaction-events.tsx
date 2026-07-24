@@ -196,6 +196,37 @@ export function TrackedTechnicalDetails({ entryId, locale, className, children }
   );
 }
 
+// Phase 2D Slice 2D.3 — the owner opened a read-only source or predicted-effect
+// disclosure for a pending question. Opening a panel performs no domain write;
+// this observation is property-free, session-deduplicated per question (both
+// panels share one logical key), and fail-open.
+export function TrackedQuestionPreview({ questionId, locale, className, children }: {
+  questionId: string;
+  locale: ProductEventLocale;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      className={className}
+      onToggle={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (!event.currentTarget.open) return;
+        recordOnce({
+          logicalKey: `question-effect-previewed:${questionId}`,
+          name: "question_effect_previewed",
+          surface: "questions",
+          locale,
+          subject: { type: "pending_question", id: questionId },
+          properties: {},
+        });
+      }}
+    >
+      {children}
+    </details>
+  );
+}
+
 export function recordCaptureStarted(input: {
   attemptId: string;
   captureSource: CaptureSource;

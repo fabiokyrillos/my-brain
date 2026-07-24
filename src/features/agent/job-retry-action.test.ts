@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import * as agentActions from "./actions";
 import type { AgentFormState } from "./forms";
 
+vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));

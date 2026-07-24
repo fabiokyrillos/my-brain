@@ -3,6 +3,8 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { answerPendingQuestion, resolvePendingQuestion, undoQuestionResolution } from "./actions";
+import { loadQuestionSuggestions } from "./question-preview-projection";
+import type { QuestionSuggestion } from "./question-suggestions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
@@ -15,6 +17,7 @@ vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
 vi.mock("@/lib/preferences", () => ({ defaultAgentPreferences: {} }));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn() }));
+vi.mock("./question-preview-projection", () => ({ loadQuestionSuggestions: vi.fn(async () => []) }));
 
 const questionId = "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6";
 const undoId = "9b8ff364-1adf-4f7a-8d40-4fbcbcfc1131";
@@ -113,7 +116,7 @@ describe("answerPendingQuestion", () => {
     expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
       name: "question_answered_basic",
       subject: { type: "pending_question", id: questionId },
-      properties: {},
+      properties: { origin: "typed" },
     }));
     expect(JSON.stringify(vi.mocked(recordProductEvent).mock.calls[0][0])).not.toContain("Resposta privada");
     expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("question_answered_basic", operationKey);
@@ -205,6 +208,139 @@ describe("answerPendingQuestion", () => {
     expect(result.status).toBe("error");
     expect(result.code).toBe("retryable_failure");
     expect(result.retryable).toBe(true);
+  });
+});
+
+// Phase 2D Slice 2D.3 — suggestion provenance is authenticated server-side and
+// never widens the closed database write shape.
+describe("suggestion-originated answers", () => {
+  const presented: QuestionSuggestion[] = [
+    { id: "person:ana-prado", value: "Ana Prado", label: "Ana Prado", kind: "person" },
+    { id: "person:bruno-lima", value: "Bruno Lima", label: "Bruno Lima", kind: "person" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadQuestionSuggestions).mockResolvedValue(presented);
+  });
+
+  it("records `suggested` when the submitted id was presented and matches the answer", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    const result = await answerPendingQuestion(
+      idleState,
+      form({ answer: "Ana Prado", suggestionId: "person:ana-prado" }),
+    );
+
+    expect(result.status).toBe("success");
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "question_answered_basic",
+      properties: { origin: "suggested" },
+    }));
+  });
+
+  it("re-derives the options server-side rather than trusting the browser", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    await answerPendingQuestion(idleState, form({ answer: "Ana Prado", suggestionId: "person:ana-prado" }));
+
+    expect(loadQuestionSuggestions).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+      questionId,
+      "pt-BR",
+    );
+  });
+
+  it("keeps the closed database payload byte-identical for a suggestion-originated answer", async () => {
+    const client = resolutionClient(successOutcome());
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await answerPendingQuestion(idleState, form({ answer: "Ana Prado", suggestionId: "person:ana-prado" }));
+
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+      p_question_id: questionId,
+      p_resolution: { kind: "answer", answer: "Ana Prado" },
+      p_operation_key: operationKey,
+    });
+    expect(JSON.stringify(client.rpc.mock.calls[0])).not.toContain("person:ana-prado");
+  });
+
+  it("downgrades a forged suggestion id to a typed answer without failing the resolution", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    const result = await answerPendingQuestion(
+      idleState,
+      form({ answer: "Carla Souza", suggestionId: "person:carla-souza" }),
+    );
+
+    expect(result.status).toBe("success");
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      properties: { origin: "typed" },
+    }));
+  });
+
+  it("downgrades a presented id whose value no longer matches the submitted answer", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    const result = await answerPendingQuestion(
+      idleState,
+      form({ answer: "Ana Prado e o Bruno", suggestionId: "person:ana-prado" }),
+    );
+
+    expect(result.status).toBe("success");
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      properties: { origin: "typed" },
+    }));
+  });
+
+  it("ignores a malformed suggestion id without re-deriving options", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    const result = await answerPendingQuestion(
+      idleState,
+      form({ answer: "Ana Prado", suggestionId: "<script>alert(1)</script>" }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(loadQuestionSuggestions).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      properties: { origin: "typed" },
+    }));
+  });
+
+  it("never re-derives options for a non-answer disposition", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(false, "dismissed")) as never,
+    );
+
+    await resolvePendingQuestion(idleState, dispositionForm("dismissed", { suggestionId: "person:ana-prado" }));
+
+    expect(loadQuestionSuggestions).not.toHaveBeenCalled();
+    await flushAfter();
+    expect(recordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: "question_resolved",
+      properties: { kind: "dismissed" },
+    }));
+  });
+
+  it("emits no analytics at all when the resolution itself did not persist", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient({ data: null, error: { code: "55P03" } }) as never,
+    );
+
+    const result = await answerPendingQuestion(
+      idleState,
+      form({ answer: "Ana Prado", suggestionId: "person:ana-prado" }),
+    );
+
+    expect(result.code).toBe("stale_interpretation");
+    await flushAfter();
+    expect(recordProductEvent).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { BellPlus, CalendarClock, CircleOff, EyeOff, FileUp, LoaderCircle, Sparkles, Undo2 } from "lucide-react";
 import { formatInstantForDateTimeLocal, localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-date";
+import type { QuestionSuggestion } from "./question-suggestions";
 
 export type AgentFormState = { status: "idle" | "success" | "error"; message: string };
 export type AgentFormAction = (state: AgentFormState, formData: FormData) => Promise<AgentFormState>;
@@ -76,6 +77,9 @@ const questionResolutionCopy = {
     deferLabel: "Adiar até",
     deferConfirm: "Confirmar adiamento",
     deferCancel: "Cancelar",
+    suggestionsLabel: "Respostas sugeridas",
+    suggestionsHint: "Sugestões vindas deste registro. Escolher uma preenche o campo — nada é enviado até você responder.",
+    suggestionSelected: "Sugestão escolhida. Você ainda pode editar a resposta.",
     deferInvalid: "Escolha uma data e hora futuras válidas.",
     deferring: "Adiando…",
     deferredUntil: (formatted: string) => `Pergunta adiada até ${formatted}.`,
@@ -100,6 +104,9 @@ const questionResolutionCopy = {
     deferLabel: "Defer until",
     deferConfirm: "Confirm deferral",
     deferCancel: "Cancel",
+    suggestionsLabel: "Suggested answers",
+    suggestionsHint: "Suggestions drawn from this record. Picking one fills the field — nothing is sent until you answer.",
+    suggestionSelected: "Suggestion picked. You can still edit the answer.",
     deferInvalid: "Pick a valid future date and time.",
     deferring: "Deferring…",
     deferredUntil: (formatted: string) => `Question deferred until ${formatted}.`,
@@ -132,12 +139,13 @@ function instantToDeferLocalValue(instantMs: number, timezone: string): string {
 
 type QuestionResolutionKind = "answer" | "deferred" | "dismissed" | "not_relevant";
 
-export function QuestionAnswerForm({ action, undoAction, locale, questionId, timezone = "America/Sao_Paulo" }: {
+export function QuestionAnswerForm({ action, undoAction, locale, questionId, timezone = "America/Sao_Paulo", suggestions = [] }: {
   action: QuestionResolutionAction;
   undoAction: QuestionUndoAction;
   locale: "pt-BR" | "en";
   questionId: string;
   timezone?: string;
+  suggestions?: readonly QuestionSuggestion[];
 }) {
   const [state, formAction, pending] = useActionState(action, idleQuestionResolutionState);
   const [undoState, undoFormAction, undoPending] = useActionState(undoAction, idleQuestionUndoState);
@@ -152,6 +160,12 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
   // Controlled so a failed submission keeps the typed answer editable —
   // React resets uncontrolled fields after every form action.
   const [answer, setAnswer] = useState("");
+  // Slice 2D.3 — which presented suggestion the current answer came from. It
+  // is a UI hint only: the server re-derives the deterministic options and
+  // authenticates the attribution, so this can never forge provenance. It is
+  // cleared deterministically the moment the answer stops matching the chip.
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
+  const selectedSuggestion = suggestions.find((option) => option.id === selectedSuggestionId) ?? null;
   const [lastKind, setLastKind] = useState<QuestionResolutionKind>("answer");
   const [deferOpen, setDeferOpen] = useState(false);
   const [deferValue, setDeferValue] = useState("");
@@ -207,6 +221,23 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     dispatchResolution(formData, "not_relevant", "not_relevant");
   };
 
+  // Picking a suggestion only fills the editable field and moves focus there.
+  // It never submits, never resolves, and never writes analytics.
+  const selectSuggestion = (suggestion: QuestionSuggestion) => {
+    setAnswer(suggestion.value);
+    setSelectedSuggestionId(suggestion.id);
+    inputRef.current?.focus();
+  };
+
+  const changeAnswer = (value: string) => {
+    setAnswer(value);
+    // Deterministic invalidation, matching the server's canonical comparison:
+    // an answer edited away from the chip is a typed answer again.
+    if (selectedSuggestion && value.trim() !== selectedSuggestion.value) {
+      setSelectedSuggestionId(null);
+    }
+  };
+
   const openDefer = () => {
     const now = Date.now();
     setDeferMin(instantToDeferLocalValue(now + 60_000, timezone));
@@ -234,6 +265,7 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     operationKeyRef.current = crypto.randomUUID();
     lastSubmittedSignatureRef.current = null;
     setAnswer("");
+    setSelectedSuggestionId(null);
     setDeferOpen(false);
     setDeferValue("");
     undoFormAction(formData);
@@ -252,6 +284,8 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
   const resolution: QuestionResolutionOutcome = state.resolution ?? "answered";
   const errorId = `question-answer-error-${questionId}`;
   const deferErrorId = `question-defer-error-${questionId}`;
+  const suggestionsLabelId = `question-suggestions-label-${questionId}`;
+  const suggestionsHintId = `question-suggestions-hint-${questionId}`;
   const isFieldError = state.status === "error" && state.code === "validation_error" && lastKind === "answer";
   const isDeferFieldError = deferLocalError
     || (state.status === "error" && state.code === "validation_error" && lastKind === "deferred");
@@ -283,18 +317,42 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     <div className="question-answer" data-state={visibleState}>
       {resolved ? null : (
         <>
+          {suggestions.length ? (
+            <div className="question-suggestions" role="group" aria-labelledby={suggestionsLabelId} aria-describedby={suggestionsHintId}>
+              <p id={suggestionsLabelId} className="question-suggestions-label">{copy.suggestionsLabel}</p>
+              <p id={suggestionsHintId} className="question-suggestions-hint">{copy.suggestionsHint}</p>
+              <div className="question-suggestion-options">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    className="question-suggestion"
+                    aria-pressed={selectedSuggestionId === suggestion.id}
+                    onClick={() => selectSuggestion(suggestion)}
+                    disabled={pending}
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <form action={submitAnswer} className="question-answer-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="questionId" value={questionId} />
+            {selectedSuggestion ? (
+              <input type="hidden" name="suggestionId" value={selectedSuggestion.id} />
+            ) : null}
             <input
               ref={inputRef}
               name="answer"
               required
               maxLength={4000}
               value={answer}
-              onChange={(event) => setAnswer(event.target.value)}
+              onChange={(event) => changeAnswer(event.target.value)}
               aria-label={copy.answerLabel}
               placeholder={copy.placeholder}
+              data-suggested={selectedSuggestion ? "true" : undefined}
               aria-invalid={isFieldError || undefined}
               aria-describedby={isFieldError ? errorId : undefined}
             />
@@ -361,7 +419,9 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
           ) : null}
         </>
       )}
-      <p aria-live="polite" className="sr-only">{pending ? submittingLabel : ""}</p>
+      <p aria-live="polite" className="sr-only">
+        {pending ? submittingLabel : selectedSuggestion ? copy.suggestionSelected : ""}
+      </p>
       {state.status === "idle" || (state.status === "success" && undone) ? null : (
         <p
           ref={feedbackRef}
