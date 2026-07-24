@@ -61,7 +61,7 @@ export type QuestionSuggestionContext = {
 function fold(question: string): string {
   return question
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
