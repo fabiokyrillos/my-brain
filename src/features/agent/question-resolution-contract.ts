@@ -66,10 +66,25 @@ const snoozedUntilSchema = z
   })
   .transform((value) => new Date(value).toISOString());
 
+// Phase 2D Slice 2D.4 — the closed permitted-consequence enum.
+//
+// This is the ONLY consequence vocabulary the product accepts (PRD
+// 2D-ACTION-002 / ADR-033 decision 3). It is not an action object, not a
+// free-form payload, and not extensible from the client: an unknown value is
+// rejected here, again in the Server Action, and again by
+// `resolve_pending_question_v3`. A consequence is carried only by the
+// `answer` kind — a deferral, dismissal, or not-relevant marking supplies no
+// new information for the interpreter to use, so attaching a consequence to
+// one is rejected as an unknown key.
+export const questionConsequences = ["none", "reinterpret"] as const;
+export type QuestionConsequence = (typeof questionConsequences)[number];
+
 const answerResolutionCommandSchema = z.strictObject({
   questionId: z.string().uuid(),
   kind: z.literal("answer"),
   answer: z.string().trim().min(1).max(QUESTION_ANSWER_MAX_LENGTH),
+  // Absent means `none`: answering never applies a consequence implicitly.
+  consequence: z.enum(questionConsequences).default("none"),
 });
 
 const deferredResolutionCommandSchema = z.strictObject({
@@ -105,16 +120,22 @@ export function normalizeQuestionResolutionCommand(input: unknown): QuestionReso
   return questionResolutionCommandSchema.parse(input);
 }
 
-// Serializes the closed `p_resolution` JSON for `resolve_pending_question_v2`
-// (and, for the answer kind, the still-compatible `_v1` shape). The payload
-// carries exactly the discriminant and its content — the question id travels
-// as the RPC's own `p_question_id` argument, never inside the resolution
-// payload.
+// Serializes the closed `p_resolution` JSON for `resolve_pending_question_v3`.
+// The payload carries exactly the discriminant and its content — the question
+// id travels as the RPC's own `p_question_id` argument, never inside the
+// resolution payload. The normalized consequence is always emitted for the
+// answer kind so the canonical replay fingerprint is unambiguous; the
+// database canonicalizes an absent consequence to the same `none`, so both
+// spellings replay identically.
 export function serializeQuestionResolution(command: QuestionResolutionCommand): string {
   const parsed = questionResolutionCommandSchema.parse(command);
   switch (parsed.kind) {
     case "answer":
-      return JSON.stringify({ kind: parsed.kind, answer: parsed.answer });
+      return JSON.stringify({
+        kind: parsed.kind,
+        answer: parsed.answer,
+        consequence: parsed.consequence,
+      });
     case "deferred":
       return JSON.stringify({ kind: parsed.kind, snoozedUntil: parsed.snoozedUntil });
     case "dismissed":

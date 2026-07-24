@@ -29,6 +29,8 @@ const idleState = {
   message: "",
   resolution: null,
   snoozedUntil: null,
+  consequence: null,
+  consequenceStatus: null,
   undoId: null,
   replayed: false,
   retryable: false,
@@ -67,11 +69,18 @@ function resolutionClient(outcome: RpcOutcome, user: { id: string } | null = { i
   };
 }
 
-function successOutcome(idempotent = false, resolution = "answered", snoozedUntil?: string): RpcOutcome {
+function successOutcome(
+  idempotent = false,
+  resolution = "answered",
+  snoozedUntil?: string,
+  consequence: "none" | "reinterpret" = "none",
+): RpcOutcome {
   return {
     data: {
       question_id: questionId,
       resolution,
+      consequence,
+      consequence_status: consequence === "reinterpret" ? "reinterpretation_queued" : "none",
       undo_id: undoId,
       idempotent,
       ...(snoozedUntil ? { snoozed_until: snoozedUntil } : {}),
@@ -87,7 +96,7 @@ async function flushAfter() {
 describe("answerPendingQuestion", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("resolves through resolve_pending_question_v2 with the closed payload and operation key", async () => {
+  it("resolves through resolve_pending_question_v3 with the closed payload and operation key", async () => {
     const client = resolutionClient(successOutcome());
     vi.mocked(createClient).mockResolvedValue(client as never);
 
@@ -98,9 +107,9 @@ describe("answerPendingQuestion", () => {
     expect(result.resolution).toBe("answered");
     expect(result.undoId).toBe(undoId);
     expect(result.replayed).toBe(false);
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
       p_question_id: questionId,
-      p_resolution: { kind: "answer", answer: "Sexta às 14h" },
+      p_resolution: { kind: "answer", answer: "Sexta às 14h", consequence: "none" },
       p_operation_key: operationKey,
     });
   });
@@ -259,9 +268,9 @@ describe("suggestion-originated answers", () => {
 
     await answerPendingQuestion(idleState, form({ answer: "Ana Prado", suggestionId: "person:ana-prado" }));
 
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
       p_question_id: questionId,
-      p_resolution: { kind: "answer", answer: "Ana Prado" },
+      p_resolution: { kind: "answer", answer: "Ana Prado", consequence: "none" },
       p_operation_key: operationKey,
     });
     expect(JSON.stringify(client.rpc.mock.calls[0])).not.toContain("person:ana-prado");
@@ -361,7 +370,7 @@ describe("resolvePendingQuestion dispositions", () => {
     expect(result.resolution).toBe("deferred");
     expect(result.snoozedUntil).toBe(snoozedUntil);
     expect(result.message).toBe("Pergunta adiada.");
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
       p_question_id: questionId,
       p_resolution: { kind: "deferred", snoozedUntil },
       p_operation_key: operationKey,
@@ -396,7 +405,7 @@ describe("resolvePendingQuestion dispositions", () => {
 
     expect(result.resolution).toBe("dismissed");
     expect(result.message).toBe("Pergunta descartada.");
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
       p_question_id: questionId,
       p_resolution: { kind: "dismissed" },
       p_operation_key: operationKey,
@@ -411,7 +420,7 @@ describe("resolvePendingQuestion dispositions", () => {
 
     expect(result.resolution).toBe("not_relevant");
     expect(result.message).toBe("Pergunta marcada como não relevante.");
-    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v2", {
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
       p_question_id: questionId,
       p_resolution: { kind: "not_relevant" },
       p_operation_key: operationKey,
@@ -471,6 +480,162 @@ describe("resolvePendingQuestion dispositions", () => {
     expect(result.message).toBe("Esta resolução já estava registrada.");
     await flushAfter();
     expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 2D Slice 2D.4 — the confirmed consequence.
+describe("resolvePendingQuestion confirmed consequence", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function answerForm(overrides = {}) {
+    return form({ kind: "answer", ...overrides });
+  }
+
+  it("never asks for a consequence when the form did not submit one", async () => {
+    const client = resolutionClient(successOutcome());
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(idleState, answerForm());
+
+    expect(result.consequence).toBe("none");
+    expect(result.consequenceStatus).toBe("none");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
+      p_question_id: questionId,
+      p_resolution: expect.objectContaining({ consequence: "none" }),
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("forwards an explicitly confirmed reinterpretation and reports the truthful result", async () => {
+    const client = resolutionClient(successOutcome(false, "answered", undefined, "reinterpret"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(
+      idleState,
+      answerForm({ answer: "Sexta às 14h", consequence: "reinterpret" }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.consequence).toBe("reinterpret");
+    expect(result.consequenceStatus).toBe("reinterpretation_queued");
+    expect(result.message).toBe("Resposta registrada. A reinterpretação deste registro foi enfileirada.");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
+      p_question_id: questionId,
+      p_resolution: { kind: "answer", answer: "Sexta às 14h", consequence: "reinterpret" },
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("rejects a consequence outside the closed enum before any database call", async () => {
+    const client = resolutionClient(successOutcome());
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    for (const consequence of ["reprocess", "REINTERPRET", "create_task", ""]) {
+      const result = await resolvePendingQuestion(idleState, answerForm({ consequence }));
+      expect(result.status).toBe("error");
+      expect(result.code).toBe("validation_error");
+    }
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a consequence smuggled onto a non-answer disposition", async () => {
+    const client = resolutionClient(successOutcome(false, "dismissed"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await resolvePendingQuestion(
+      idleState,
+      dispositionForm("dismissed", { consequence: "reinterpret" }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(client.rpc).toHaveBeenCalledWith("resolve_pending_question_v3", {
+      p_question_id: questionId,
+      p_resolution: { kind: "dismissed" },
+      p_operation_key: operationKey,
+    });
+  });
+
+  it("emits the property-free reinterpretation event only when the consequence applied", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(false, "answered", undefined, "reinterpret")) as never,
+    );
+
+    await resolvePendingQuestion(idleState, answerForm({ consequence: "reinterpret" }));
+    await flushAfter();
+
+    const names = vi.mocked(recordProductEvent).mock.calls.map(([payload]) => (payload as { name: string }).name);
+    expect(names).toContain("question_answered_basic");
+    expect(names).toContain("question_reinterpret_applied");
+    const applied = vi.mocked(recordProductEvent).mock.calls
+      .map(([payload]) => payload as { name: string })
+      .find((payload) => payload.name === "question_reinterpret_applied");
+    expect(applied).toMatchObject({
+      properties: {},
+      subject: { type: "pending_question", id: questionId },
+      surface: "server",
+    });
+    expect(JSON.stringify(applied)).not.toContain("Resposta privada");
+    expect(createProductEventIdempotencyKey).toHaveBeenCalledWith("question_reinterpret_applied", operationKey);
+  });
+
+  it("never emits the reinterpretation event for an answer without a consequence", async () => {
+    vi.mocked(createClient).mockResolvedValue(resolutionClient(successOutcome()) as never);
+
+    await resolvePendingQuestion(idleState, answerForm());
+    await flushAfter();
+
+    const names = vi.mocked(recordProductEvent).mock.calls.map(([payload]) => (payload as { name: string }).name);
+    expect(names).not.toContain("question_reinterpret_applied");
+  });
+
+  it("suppresses the reinterpretation event on an idempotent replay", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient(successOutcome(true, "answered", undefined, "reinterpret")) as never,
+    );
+
+    const result = await resolvePendingQuestion(idleState, answerForm({ consequence: "reinterpret" }));
+    await flushAfter();
+
+    expect(result.replayed).toBe(true);
+    expect(recordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("maps an unavailable consequence to a distinct retryable code without leaking raw text", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient({
+        data: null,
+        error: {
+          code: "P0001",
+          message: "Reinterpretation is not available for this record",
+          details: "2D_CONSEQUENCE_UNAVAILABLE",
+        },
+      }) as never,
+    );
+
+    const result = await resolvePendingQuestion(idleState, answerForm({ consequence: "reinterpret" }));
+
+    expect(result.status).toBe("error");
+    expect(result.code).toBe("consequence_unavailable");
+    expect(result.retryable).toBe(true);
+    expect(result.message).toBe(
+      "Este registro já está sendo reinterpretado. Nada foi alterado — tente novamente depois.",
+    );
+    expect(result.consequence).toBeNull();
+    expect(result.consequenceStatus).toBeNull();
+  });
+
+  it("rejects a result missing the consequence contract instead of assuming none", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      resolutionClient({
+        data: { question_id: questionId, resolution: "answered", undo_id: undoId, idempotent: false },
+        error: null,
+      }) as never,
+    );
+
+    const result = await resolvePendingQuestion(idleState, answerForm());
+
+    expect(result.status).toBe("error");
+    expect(result.code).toBe("retryable_failure");
   });
 });
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { BellPlus, CalendarClock, CircleOff, EyeOff, FileUp, LoaderCircle, Sparkles, Undo2 } from "lucide-react";
+import { BellPlus, CalendarClock, CircleOff, EyeOff, FileUp, LoaderCircle, RefreshCcw, Sparkles, Undo2 } from "lucide-react";
 import { formatInstantForDateTimeLocal, localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-date";
+import type { QuestionConsequence } from "./question-resolution-contract";
 import type { QuestionSuggestion } from "./question-suggestions";
 
 export type AgentFormState = { status: "idle" | "success" | "error"; message: string };
@@ -28,10 +29,15 @@ export type QuestionResolutionCode =
   | "stale_interpretation"
   | "not_open"
   | "idempotency_mismatch"
+  | "consequence_unavailable"
   | "retryable_failure"
   | "resolution_succeeded";
 
 export type QuestionResolutionOutcome = "answered" | "deferred" | "dismissed" | "not_relevant";
+
+// Phase 2D Slice 2D.4 — the truthful, bounded outcome of the confirmed
+// consequence. `none` means nothing beyond the resolution was applied.
+export type QuestionConsequenceStatus = "none" | "reinterpretation_queued";
 
 export type QuestionResolutionState = {
   status: "idle" | "success" | "error";
@@ -39,6 +45,8 @@ export type QuestionResolutionState = {
   message: string;
   resolution: QuestionResolutionOutcome | null;
   snoozedUntil: string | null;
+  consequence: QuestionConsequence | null;
+  consequenceStatus: QuestionConsequenceStatus | null;
   undoId: string | null;
   replayed: boolean;
   retryable: boolean;
@@ -61,6 +69,8 @@ const idleQuestionResolutionState: QuestionResolutionState = {
   message: "",
   resolution: null,
   snoozedUntil: null,
+  consequence: null,
+  consequenceStatus: null,
   undoId: null,
   replayed: false,
   retryable: false,
@@ -80,6 +90,15 @@ const questionResolutionCopy = {
     suggestionsLabel: "Respostas sugeridas",
     suggestionsHint: "Sugestões vindas deste registro. Escolher uma preenche o campo — nada é enviado até você responder.",
     suggestionSelected: "Sugestão escolhida. Você ainda pode editar a resposta.",
+    consequenceOpen: "Responder e reinterpretar",
+    consequenceLabel: "Aplicar consequência: reinterpretar o registro",
+    consequenceDescription:
+      "Sua resposta será registrada e este registro entrará na fila para ser reinterpretado, gerando uma nova revisão da interpretação. Nenhuma interpretação anterior é apagada ou alterada.",
+    consequenceNotice: "Nada foi aplicado ainda. Isto só acontece se você confirmar.",
+    consequenceConfirm: "Confirmar e reinterpretar",
+    consequenceSkip: "Pular consequência",
+    consequenceApplying: "Registrando e enfileirando…",
+    consequenceUndoHint: "Desfazer também cancela a reinterpretação enfileirada, se ela ainda não tiver começado.",
     deferInvalid: "Escolha uma data e hora futuras válidas.",
     deferring: "Adiando…",
     deferredUntil: (formatted: string) => `Pergunta adiada até ${formatted}.`,
@@ -107,6 +126,15 @@ const questionResolutionCopy = {
     suggestionsLabel: "Suggested answers",
     suggestionsHint: "Suggestions drawn from this record. Picking one fills the field — nothing is sent until you answer.",
     suggestionSelected: "Suggestion picked. You can still edit the answer.",
+    consequenceOpen: "Answer and re-interpret",
+    consequenceLabel: "Apply consequence: re-interpret this record",
+    consequenceDescription:
+      "Your answer will be recorded and this record will be queued for re-interpretation, producing a new interpretation revision. No earlier interpretation is deleted or changed.",
+    consequenceNotice: "Nothing has been applied yet. This only happens if you confirm.",
+    consequenceConfirm: "Confirm and re-interpret",
+    consequenceSkip: "Skip consequence",
+    consequenceApplying: "Recording and queueing…",
+    consequenceUndoHint: "Undoing also cancels the queued re-interpretation, if it has not started yet.",
     deferInvalid: "Pick a valid future date and time.",
     deferring: "Deferring…",
     deferredUntil: (formatted: string) => `Question deferred until ${formatted}.`,
@@ -139,13 +167,18 @@ function instantToDeferLocalValue(instantMs: number, timezone: string): string {
 
 type QuestionResolutionKind = "answer" | "deferred" | "dismissed" | "not_relevant";
 
-export function QuestionAnswerForm({ action, undoAction, locale, questionId, timezone = "America/Sao_Paulo", suggestions = [] }: {
+export function QuestionAnswerForm({ action, undoAction, locale, questionId, timezone = "America/Sao_Paulo", suggestions = [], canReinterpret = false }: {
   action: QuestionResolutionAction;
   undoAction: QuestionUndoAction;
   locale: "pt-BR" | "en";
   questionId: string;
   timezone?: string;
   suggestions?: readonly QuestionSuggestion[];
+  // Slice 2D.4 — offered only when the read-only effect preview says a
+  // reinterpretation is genuinely possible (the question's interpretation is
+  // still the entry's current one). When the preview is unavailable the
+  // control is simply absent, so the flow degrades to the plain answer.
+  canReinterpret?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, idleQuestionResolutionState);
   const [undoState, undoFormAction, undoPending] = useActionState(undoAction, idleQuestionUndoState);
@@ -167,6 +200,13 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const selectedSuggestion = suggestions.find((option) => option.id === selectedSuggestionId) ?? null;
   const [lastKind, setLastKind] = useState<QuestionResolutionKind>("answer");
+  // Slice 2D.4 — the confirmed consequence. `consequenceOpen` only reveals a
+  // read-only description plus an explicit confirmation control; it performs
+  // no mutation, no enqueue, and no resolution. Only pressing the
+  // confirmation button submits, and it submits `consequence=reinterpret`.
+  const [consequenceOpen, setConsequenceOpen] = useState(false);
+  const [lastConsequence, setLastConsequence] = useState<QuestionConsequence>("none");
+  const consequenceConfirmRef = useRef<HTMLButtonElement>(null);
   const [deferOpen, setDeferOpen] = useState(false);
   const [deferValue, setDeferValue] = useState("");
   const [deferMin, setDeferMin] = useState("");
@@ -193,10 +233,23 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
 
   const submitAnswer = (formData: FormData) => {
     const submitted = String(formData.get("answer") ?? "").trim();
-    dispatchResolution(formData, "answer", `answer|${submitted}`);
+    setLastConsequence("none");
+    dispatchResolution(formData, "answer", `answer|none|${submitted}`);
+  };
+
+  // The only path that ever asks for a consequence. It is reachable only from
+  // the confirmation panel's confirm button, and the operation-key signature
+  // includes the consequence so an answer-only attempt and an
+  // answer-plus-reinterpret attempt can never be conflated on replay.
+  const submitAnswerWithReinterpretation = (formData: FormData) => {
+    const submitted = String(formData.get("answer") ?? "").trim();
+    formData.set("consequence", "reinterpret");
+    setLastConsequence("reinterpret");
+    dispatchResolution(formData, "answer", `answer|reinterpret|${submitted}`);
   };
 
   const submitDefer = (formData: FormData) => {
+    setLastConsequence("none");
     const localValue = String(formData.get("snoozedUntilLocal") ?? "");
     let instant: string | null = null;
     try {
@@ -214,10 +267,12 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
   };
 
   const submitDismiss = (formData: FormData) => {
+    setLastConsequence("none");
     dispatchResolution(formData, "dismissed", "dismissed");
   };
 
   const submitNotRelevant = (formData: FormData) => {
+    setLastConsequence("none");
     dispatchResolution(formData, "not_relevant", "not_relevant");
   };
 
@@ -236,6 +291,23 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     if (selectedSuggestion && value.trim() !== selectedSuggestion.value) {
       setSelectedSuggestionId(null);
     }
+  };
+
+  // Opening the panel is a pure disclosure: it reads nothing, writes nothing,
+  // and enqueues nothing. Focus lands on the confirmation control so the
+  // keyboard path matches the pointer path.
+  const openConsequence = () => {
+    setConsequenceOpen(true);
+    setDeferOpen(false);
+  };
+
+  useEffect(() => {
+    if (consequenceOpen) consequenceConfirmRef.current?.focus();
+  }, [consequenceOpen]);
+
+  const skipConsequence = () => {
+    setConsequenceOpen(false);
+    inputRef.current?.focus();
   };
 
   const openDefer = () => {
@@ -266,6 +338,8 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     lastSubmittedSignatureRef.current = null;
     setAnswer("");
     setSelectedSuggestionId(null);
+    setConsequenceOpen(false);
+    setLastConsequence("none");
     setDeferOpen(false);
     setDeferValue("");
     undoFormAction(formData);
@@ -286,6 +360,9 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
   const deferErrorId = `question-defer-error-${questionId}`;
   const suggestionsLabelId = `question-suggestions-label-${questionId}`;
   const suggestionsHintId = `question-suggestions-hint-${questionId}`;
+  const consequenceLabelId = `question-consequence-label-${questionId}`;
+  const consequenceDescriptionId = `question-consequence-description-${questionId}`;
+  const trimmedAnswer = answer.trim();
   const isFieldError = state.status === "error" && state.code === "validation_error" && lastKind === "answer";
   const isDeferFieldError = deferLocalError
     || (state.status === "error" && state.code === "validation_error" && lastKind === "deferred");
@@ -297,7 +374,7 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
         ? state.code ?? "error"
         : "editing";
   const submittingLabel = lastKind === "answer"
-    ? copy.submitting
+    ? lastConsequence === "reinterpret" ? copy.consequenceApplying : copy.submitting
     : lastKind === "deferred"
       ? copy.deferring
       : lastKind === "dismissed"
@@ -314,7 +391,7 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
     : state.message;
 
   return (
-    <div className="question-answer" data-state={visibleState}>
+    <div className="question-answer" data-state={visibleState} data-consequence={resolved ? state.consequenceStatus ?? "none" : undefined}>
       {resolved ? null : (
         <>
           {suggestions.length ? (
@@ -357,9 +434,44 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
               aria-describedby={isFieldError ? errorId : undefined}
             />
             <button type="submit" disabled={pending}>
-              {pending && lastKind === "answer" ? <LoaderCircle className="spin" size={16} /> : null} {pending && lastKind === "answer" ? copy.submitting : copy.submit}
+              {pending && lastKind === "answer" && lastConsequence === "none" ? <LoaderCircle className="spin" size={16} /> : null} {pending && lastKind === "answer" && lastConsequence === "none" ? copy.submitting : copy.submit}
             </button>
           </form>
+          {canReinterpret ? (
+            <div className="question-consequence" data-open={consequenceOpen}>
+              {consequenceOpen ? null : (
+                <button type="button" onClick={openConsequence} disabled={pending}>
+                  <RefreshCcw size={16} /> {copy.consequenceOpen}
+                </button>
+              )}
+              {consequenceOpen ? (
+                <form
+                  action={submitAnswerWithReinterpretation}
+                  className="question-consequence-form"
+                  aria-labelledby={consequenceLabelId}
+                  aria-describedby={consequenceDescriptionId}
+                >
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="questionId" value={questionId} />
+                  <input type="hidden" name="answer" value={answer} />
+                  {selectedSuggestion ? (
+                    <input type="hidden" name="suggestionId" value={selectedSuggestion.id} />
+                  ) : null}
+                  <p id={consequenceLabelId} className="question-consequence-label">{copy.consequenceLabel}</p>
+                  <p id={consequenceDescriptionId} className="question-consequence-description">{copy.consequenceDescription}</p>
+                  <p className="question-consequence-notice">{copy.consequenceNotice}</p>
+                  <div className="question-consequence-actions">
+                    <button ref={consequenceConfirmRef} type="submit" disabled={pending || trimmedAnswer.length === 0}>
+                      {pending && lastConsequence === "reinterpret" ? <LoaderCircle className="spin" size={16} /> : <RefreshCcw size={16} />} {pending && lastConsequence === "reinterpret" ? copy.consequenceApplying : copy.consequenceConfirm}
+                    </button>
+                    <button type="button" onClick={skipConsequence} disabled={pending}>
+                      {copy.consequenceSkip}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
           <div className="question-dispositions">
             {deferOpen ? null : (
               <button type="button" onClick={openDefer} disabled={pending}>
@@ -433,6 +545,9 @@ export function QuestionAnswerForm({ action, undoAction, locale, questionId, tim
           {successMessage}
         </p>
       )}
+      {resolved && state.consequenceStatus === "reinterpretation_queued" ? (
+        <p className="question-consequence-undo-hint">{copy.consequenceUndoHint}</p>
+      ) : null}
       {resolved && state.undoId ? (
         <form action={undoSubmit} className="question-undo-form">
           <input type="hidden" name="locale" value={locale} />

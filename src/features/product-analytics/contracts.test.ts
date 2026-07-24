@@ -33,6 +33,7 @@ const eventNames = [
   "question_answered_basic",
   "question_resolved",
   "question_effect_previewed",
+  "question_reinterpret_applied",
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
@@ -65,13 +66,14 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
   question_answered_basic: { origin: "suggested" },
   question_resolved: { kind: "deferred" },
   question_effect_previewed: {},
+  question_reinterpret_applied: {},
   processing_retry_requested: { retrySource: "user" },
   work_view_viewed: { workView: "today" },
   task_status_changed: { fromStatus: "inbox", toStatus: "in_progress" },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of twenty-one product events", () => {
+  it("defines the complete closed taxonomy of twenty-two product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -104,6 +106,15 @@ describe("product analytics contracts", () => {
     expect(parse?.({ ...base, properties: {} })).not.toBeNull();
     expect(parse?.({ ...base, properties: { kind: "reinterpret" } })).toBeNull();
     expect(parse?.({ ...base, properties: { question: "Quem?" } })).toBeNull();
+  });
+
+  // Slice 2D.4: the reinterpretation event is boolean-by-existence.
+  it("keeps the reinterpretation-applied event strictly property-free", () => {
+    const parse = contracts.parseProductEventPayload;
+    const base = { ...basePayload, surface: "server", name: "question_reinterpret_applied" };
+    expect(parse?.({ ...base, properties: {} })).not.toBeNull();
+    expect(parse?.({ ...base, properties: { consequence: "reinterpret" } })).toBeNull();
+    expect(parse?.({ ...base, properties: { answer: "Sexta" } })).toBeNull();
   });
 
   it("keeps every event on the explicit v1 contract while appVersion remains the stored experience version", () => {
