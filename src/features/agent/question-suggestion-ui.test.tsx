@@ -41,6 +41,8 @@ function successState(overrides: Partial<QuestionResolutionState> = {}): Questio
     message: "Resposta registrada.",
     resolution: "answered",
     snoozedUntil: null,
+    consequence: "none",
+    consequenceStatus: "none",
     undoId,
     replayed: false,
     retryable: false,

@@ -23,10 +23,12 @@ import {
   parseSubmittedSuggestionId,
   serializeQuestionResolution,
   type QuestionAnswerOrigin,
+  type QuestionConsequence,
   type QuestionResolutionCommand,
 } from "./question-resolution-contract";
 import type {
   AgentFormState,
+  QuestionConsequenceStatus,
   QuestionResolutionCode,
   QuestionResolutionState,
   QuestionUndoState,
@@ -187,8 +189,10 @@ const questionResolutionCopy = {
     stale: "A interpretação desta pergunta mudou. Atualize a página antes de resolver.",
     notOpen: "Esta pergunta não está mais aberta.",
     mismatch: "Esta tentativa não corresponde mais à resolução atual. Revise e tente novamente.",
+    consequenceUnavailable: "Este registro já está sendo reinterpretado. Nada foi alterado — tente novamente depois.",
     failed: "Não foi possível concluir agora. Tente novamente.",
     answered: "Resposta registrada.",
+    answeredWithReinterpretation: "Resposta registrada. A reinterpretação deste registro foi enfileirada.",
     deferred: "Pergunta adiada.",
     dismissed: "Pergunta descartada.",
     notRelevant: "Pergunta marcada como não relevante.",
@@ -206,8 +210,10 @@ const questionResolutionCopy = {
     stale: "This question's interpretation changed. Refresh the page before resolving.",
     notOpen: "This question is no longer open.",
     mismatch: "This attempt no longer matches the current resolution. Review it and try again.",
+    consequenceUnavailable: "This record is already being re-interpreted. Nothing changed — try again later.",
     failed: "Could not complete right now. Try again.",
     answered: "Answer recorded.",
+    answeredWithReinterpretation: "Answer recorded. Re-interpretation of this record is queued.",
     deferred: "Question deferred.",
     dismissed: "Question dismissed.",
     notRelevant: "Question marked as not relevant.",
@@ -232,6 +238,8 @@ function questionResolutionFailure(
     message,
     resolution: null,
     snoozedUntil: null,
+    consequence: null,
+    consequenceStatus: null,
     undoId: null,
     replayed: false,
     retryable,
@@ -255,6 +263,12 @@ function mapQuestionResolutionError(
   if (error.code === "P0001" && error.details === "2D_IDEMPOTENCY_MISMATCH") {
     return questionResolutionFailure("idempotency_mismatch", copy.mismatch, false);
   }
+  // Slice 2D.4 — the confirmed consequence could not be applied truthfully
+  // (reprocessing already queued/running for this entry). The whole
+  // resolution rolled back, so nothing was answered and nothing was queued.
+  if (error.code === "P0001" && error.details === "2D_CONSEQUENCE_UNAVAILABLE") {
+    return questionResolutionFailure("consequence_unavailable", copy.consequenceUnavailable, true);
+  }
   if (error.code === "22023") {
     return questionResolutionFailure("validation_error", validationMessage, false);
   }
@@ -262,13 +276,19 @@ function mapQuestionResolutionError(
 }
 
 const questionResolutionOutcomeSchema = z.enum(["answered", "deferred", "dismissed", "not_relevant"]);
+const questionConsequenceSchema = z.enum(["none", "reinterpret"]);
+const questionConsequenceStatusSchema = z.enum(["none", "reinterpretation_queued"]);
 
 function readQuestionResolutionResult(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const result = value as Record<string, unknown>;
   const resolution = questionResolutionOutcomeSchema.safeParse(result.resolution);
+  const consequence = questionConsequenceSchema.safeParse(result.consequence);
+  const consequenceStatus = questionConsequenceStatusSchema.safeParse(result.consequence_status);
   if (
     !resolution.success
+    || !consequence.success
+    || !consequenceStatus.success
     || typeof result.undo_id !== "string"
     || !z.string().uuid().safeParse(result.undo_id).success
     || typeof result.idempotent !== "boolean"
@@ -278,6 +298,8 @@ function readQuestionResolutionResult(value: unknown) {
   }
   return {
     resolution: resolution.data,
+    consequence: consequence.data,
+    consequenceStatus: consequenceStatus.data,
     undoId: result.undo_id,
     idempotent: result.idempotent,
     snoozedUntil: typeof result.snoozed_until === "string" ? result.snoozed_until : null,
@@ -321,9 +343,21 @@ export async function resolvePendingQuestion(
   let command: QuestionResolutionCommand | null = null;
   try {
     const questionId = formData.get("questionId");
+    // Slice 2D.4 — the consequence is validated here against the same closed
+    // enum the database enforces. An absent field means `none`: answering
+    // never applies a consequence implicitly. An unknown value is a
+    // validation error, never a silent downgrade, so a tampered request can
+    // never resolve the question under a consequence the user did not
+    // confirm.
+    const submittedConsequence = formData.get("consequence");
     command = normalizeQuestionResolutionCommand(
       kind === "answer"
-        ? { questionId, kind, answer: formData.get("answer") }
+        ? {
+          questionId,
+          kind,
+          answer: formData.get("answer"),
+          ...(submittedConsequence === null ? {} : { consequence: submittedConsequence }),
+        }
         : kind === "deferred"
           ? { questionId, kind, snoozedUntil: formData.get("snoozedUntil") }
           : { questionId, kind },
@@ -358,7 +392,11 @@ export async function resolvePendingQuestion(
     }
   }
 
-  const { data, error } = await supabase.rpc("resolve_pending_question_v2", {
+  // Slice 2D.4 cuts the consumer over to resolve_pending_question_v3, the
+  // third version of the same long-lived family. `_v1` and `_v2` stay
+  // byte-identical and callable, so reverting this application commit alone
+  // is a complete rollback.
+  const { data, error } = await supabase.rpc("resolve_pending_question_v3", {
     p_question_id: command.questionId,
     p_resolution: JSON.parse(serializeQuestionResolution(command)) as Json,
     p_operation_key: operationKey.data,
@@ -373,35 +411,58 @@ export async function resolvePendingQuestion(
     const eventOperationKey = operationKey.data;
     const eventResolution = result.resolution;
     const eventOrigin = answerOrigin;
-    after(() => recordProductEvent(
-      eventResolution === "answered"
-        ? {
-          name: "question_answered_basic",
+    const consequenceApplied = result.consequenceStatus === "reinterpretation_queued";
+    after(async () => {
+      const observations: Promise<unknown>[] = [recordProductEvent(
+        eventResolution === "answered"
+          ? {
+            name: "question_answered_basic",
+            surface: "server",
+            locale,
+            viewportClass: "unknown",
+            appVersion: "server",
+            idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
+            subject: { type: "pending_question", id: eventQuestionId },
+            properties: { origin: eventOrigin },
+          }
+          : {
+            name: "question_resolved",
+            surface: "server",
+            locale,
+            viewportClass: "unknown",
+            appVersion: "server",
+            idempotencyKey: createProductEventIdempotencyKey("question_resolved", eventOperationKey),
+            subject: { type: "pending_question", id: eventQuestionId },
+            properties: { kind: eventResolution },
+          },
+      ).catch(() => {})];
+      // Boolean-by-existence: the event carries no properties at all, so it
+      // records only *that* a resolution applied the bounded reinterpretation
+      // consequence — never the question, answer, interpretation, entry, or
+      // job. Emitted only after the RPC persisted, and only for a genuinely
+      // new (non-replayed) operation, keyed by the operation key.
+      if (consequenceApplied) {
+        observations.push(recordProductEvent({
+          name: "question_reinterpret_applied",
           surface: "server",
           locale,
           viewportClass: "unknown",
           appVersion: "server",
-          idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
+          idempotencyKey: createProductEventIdempotencyKey("question_reinterpret_applied", eventOperationKey),
           subject: { type: "pending_question", id: eventQuestionId },
-          properties: { origin: eventOrigin },
-        }
-        : {
-          name: "question_resolved",
-          surface: "server",
-          locale,
-          viewportClass: "unknown",
-          appVersion: "server",
-          idempotencyKey: createProductEventIdempotencyKey("question_resolved", eventOperationKey),
-          subject: { type: "pending_question", id: eventQuestionId },
-          properties: { kind: eventResolution },
-        },
-    ).catch(() => {}));
+          properties: {},
+        }).catch(() => {}));
+      }
+      await Promise.allSettled(observations);
+    });
   }
 
   const successMessage = result.idempotent
     ? copy.replayed
     : result.resolution === "answered"
-      ? copy.answered
+      ? result.consequenceStatus === "reinterpretation_queued"
+        ? copy.answeredWithReinterpretation
+        : copy.answered
       : result.resolution === "deferred"
         ? copy.deferred
         : result.resolution === "dismissed"
@@ -414,6 +475,8 @@ export async function resolvePendingQuestion(
     message: successMessage,
     resolution: result.resolution,
     snoozedUntil: result.snoozedUntil,
+    consequence: result.consequence satisfies QuestionConsequence,
+    consequenceStatus: result.consequenceStatus satisfies QuestionConsequenceStatus,
     undoId: result.undoId,
     replayed: result.idempotent,
     retryable: false,

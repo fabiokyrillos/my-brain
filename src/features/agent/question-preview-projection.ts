@@ -58,27 +58,27 @@ export type QuestionPreview = {
 const effectCopy = {
   "pt-BR": {
     reinterpret: {
-      title: "Se uma reinterpretação for confirmada mais tarde",
+      title: "Se você confirmar a reinterpretação",
       description:
-        "Este registro poderia ser reinterpretado usando a sua resposta. Essa confirmação ainda não existe: responder agora apenas registra a resposta.",
+        "Este registro será reinterpretado usando a sua resposta, gerando uma nova revisão da interpretação. As interpretações anteriores continuam preservadas no histórico. Responder sem confirmar apenas registra a resposta.",
     },
     none: {
       title: "Nada mudaria",
       description:
-        "A interpretação desta pergunta não é mais a atual, então nenhuma consequência poderia ser aplicada.",
+        "A interpretação desta pergunta não é mais a atual, então nenhuma consequência pode ser aplicada.",
     },
     notice: "Nada foi aplicado ainda. Esta é apenas uma previsão.",
   },
   en: {
     reinterpret: {
-      title: "If a reinterpretation is confirmed later",
+      title: "If you confirm the reinterpretation",
       description:
-        "This record could be re-interpreted using your answer. That confirmation does not exist yet: answering now only records the answer.",
+        "This record will be re-interpreted using your answer, producing a new interpretation revision. Earlier interpretations stay preserved in history. Answering without confirming only records the answer.",
     },
     none: {
       title: "Nothing would change",
       description:
-        "This question's interpretation is no longer the current one, so no consequence could be applied.",
+        "This question's interpretation is no longer the current one, so no consequence can be applied.",
     },
     notice: "Nothing has been applied yet. This is only a prediction.",
   },

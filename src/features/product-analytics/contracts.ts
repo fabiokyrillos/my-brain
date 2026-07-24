@@ -17,6 +17,7 @@ export const productEventNames = [
   "question_answered_basic",
   "question_resolved",
   "question_effect_previewed",
+  "question_reinterpret_applied",
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
@@ -112,6 +113,10 @@ export type ProductEventPropertiesByName = {
   question_answered_basic: { origin: "typed" | "suggested" };
   question_resolved: { kind: "deferred" | "dismissed" | "not_relevant" };
   question_effect_previewed: EmptyProductEventProperties;
+  // Slice 2D.4 — boolean-by-existence: emitted only when an answer applied
+  // the bounded reinterpretation consequence. It carries no properties, so it
+  // reveals nothing beyond that a reinterpretation was confirmed.
+  question_reinterpret_applied: EmptyProductEventProperties;
   processing_retry_requested: { retrySource: "user" | "worker" };
   work_view_viewed: { workView: "today" | "all" | "waiting" };
   task_status_changed: { fromStatus: ProductTaskStatus; toStatus: ProductTaskStatus };
@@ -245,6 +250,7 @@ function arePropertiesValid<Name extends ProductEventName>(
     case "interpretation_review_viewed":
     case "technical_details_opened":
     case "question_effect_previewed":
+    case "question_reinterpret_applied":
       return hasExactKeys(value, []);
     case "question_answered_basic":
       return hasExactKeys(value, ["origin"]) && isOneOf(value.origin, ["typed", "suggested"]);

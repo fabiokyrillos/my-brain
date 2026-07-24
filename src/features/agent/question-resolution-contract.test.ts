@@ -6,6 +6,7 @@ import {
   normalizeQuestionResolutionCommand,
   parseSubmittedSuggestionId,
   questionAnswerOrigins,
+  questionConsequences,
   questionResolutionCommandSchema,
   serializeQuestionResolution,
 } from "./question-resolution-contract";
@@ -219,7 +220,7 @@ describe("questionResolutionCommandSchema", () => {
         questionId,
         kind: "answer",
         answer: "ok",
-        consequence: "reinterpret",
+        reinterpret: true,
       }).success,
     ).toBe(false);
   });
@@ -269,7 +270,7 @@ describe("suggestion provenance", () => {
     ).toBe(false);
   });
 
-  it("keeps the serialized database payload byte-identical when a suggestion was used", () => {
+  it("keeps the serialized database payload free of provenance when a suggestion was used", () => {
     const command = normalizeQuestionResolutionCommand({
       questionId,
       kind: "answer",
@@ -278,6 +279,7 @@ describe("suggestion provenance", () => {
     expect(JSON.parse(serializeQuestionResolution(command))).toEqual({
       kind: "answer",
       answer: "Ana Prado",
+      consequence: "none",
     });
     expect(serializeQuestionResolution(command)).not.toContain("origin");
     expect(serializeQuestionResolution(command)).not.toContain("suggestion");
@@ -310,6 +312,113 @@ describe("suggestion provenance", () => {
   });
 });
 
+// Phase 2D Slice 2D.4 — the closed permitted-consequence enum.
+describe("permitted consequence", () => {
+  it("exposes exactly the approved closed enum", () => {
+    expect(questionConsequences).toEqual(["none", "reinterpret"]);
+  });
+
+  it("defaults an answer without a consequence to none", () => {
+    const command = normalizeQuestionResolutionCommand({
+      questionId,
+      kind: "answer",
+      answer: "Sexta-feira",
+    });
+    expect(command.kind).toBe("answer");
+    if (command.kind === "answer") expect(command.consequence).toBe("none");
+  });
+
+  it("accepts each approved consequence value on the answer kind", () => {
+    for (const consequence of questionConsequences) {
+      const command = normalizeQuestionResolutionCommand({
+        questionId,
+        kind: "answer",
+        answer: "Sexta-feira",
+        consequence,
+      });
+      if (command.kind === "answer") expect(command.consequence).toBe(consequence);
+    }
+  });
+
+  it("rejects any consequence outside the closed enum", () => {
+    for (const consequence of [
+      "reprocess",
+      "REINTERPRET",
+      "create_task",
+      "",
+      null,
+      1,
+      true,
+      { kind: "reinterpret" },
+      ["reinterpret"],
+    ]) {
+      expect(
+        questionResolutionCommandSchema.safeParse({
+          questionId,
+          kind: "answer",
+          answer: "Sexta-feira",
+          consequence,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects a consequence on every non-answer resolution kind", () => {
+    expect(
+      questionResolutionCommandSchema.safeParse({
+        questionId,
+        kind: "deferred",
+        snoozedUntil: futureInstant(),
+        consequence: "reinterpret",
+      }).success,
+    ).toBe(false);
+    expect(
+      questionResolutionCommandSchema.safeParse({
+        questionId,
+        kind: "dismissed",
+        consequence: "reinterpret",
+      }).success,
+    ).toBe(false);
+    expect(
+      questionResolutionCommandSchema.safeParse({
+        questionId,
+        kind: "not_relevant",
+        consequence: "none",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("serializes the consequence explicitly so replay is unambiguous", () => {
+    const command = normalizeQuestionResolutionCommand({
+      questionId,
+      kind: "answer",
+      answer: "Sexta-feira",
+      consequence: "reinterpret",
+    });
+    const payload = JSON.parse(serializeQuestionResolution(command)) as Record<string, unknown>;
+    expect(payload).toEqual({
+      kind: "answer",
+      answer: "Sexta-feira",
+      consequence: "reinterpret",
+    });
+    expect(Object.keys(payload).sort()).toEqual(["answer", "consequence", "kind"]);
+  });
+
+  it("never leaks a consequence into a non-answer serialized payload", () => {
+    for (const command of [
+      normalizeQuestionResolutionCommand({ questionId, kind: "dismissed" }),
+      normalizeQuestionResolutionCommand({ questionId, kind: "not_relevant" }),
+      normalizeQuestionResolutionCommand({
+        questionId,
+        kind: "deferred",
+        snoozedUntil: futureInstant(),
+      }),
+    ]) {
+      expect(serializeQuestionResolution(command)).not.toContain("consequence");
+    }
+  });
+});
+
 describe("normalizeQuestionResolutionCommand", () => {
   it("throws on invalid input instead of returning a partial command", () => {
     expect(() =>
@@ -319,15 +428,15 @@ describe("normalizeQuestionResolutionCommand", () => {
 });
 
 describe("serializeQuestionResolution", () => {
-  it("serializes the closed resolution payload with exactly kind and answer", () => {
+  it("serializes the closed resolution payload with exactly kind, answer, and consequence", () => {
     const command = normalizeQuestionResolutionCommand({
       questionId,
       kind: "answer",
       answer: " Sexta-feira ",
     });
     const payload = JSON.parse(serializeQuestionResolution(command)) as Record<string, unknown>;
-    expect(payload).toEqual({ kind: "answer", answer: "Sexta-feira" });
-    expect(Object.keys(payload).sort()).toEqual(["answer", "kind"]);
+    expect(payload).toEqual({ kind: "answer", answer: "Sexta-feira", consequence: "none" });
+    expect(Object.keys(payload).sort()).toEqual(["answer", "consequence", "kind"]);
   });
 
   it("never includes the question id or any extra key in the resolution payload", () => {

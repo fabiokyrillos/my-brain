@@ -18,6 +18,8 @@ function successState(overrides: Partial<QuestionResolutionState> = {}): Questio
     message: "Resposta registrada.",
     resolution: "answered",
     snoozedUntil: null,
+    consequence: "none",
+    consequenceStatus: "none",
     undoId,
     replayed: false,
     retryable: false,
@@ -36,6 +38,8 @@ function failureState(
     message,
     resolution: null,
     snoozedUntil: null,
+    consequence: null,
+    consequenceStatus: null,
     undoId: null,
     replayed: false,
     retryable,
@@ -323,5 +327,104 @@ describe("QuestionAnswerForm", () => {
     await waitFor(() => expect(actionMock).toHaveBeenCalledTimes(3));
     const rotatedKey = String(actionMock.mock.calls[2]?.[1].get("operationKey"));
     expect(rotatedKey).not.toBe(firstKey);
+  });
+
+  // Phase 2D Slice 2D.4 — confirmed consequence / reinterpretation.
+  it("never offers the reinterpretation control unless it is possible", () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm action={actionMock} undoAction={noopUndo} locale="pt-BR" questionId={questionId} />,
+    );
+    expect(screen.queryByRole("button", { name: "Responder e reinterpretar" })).toBeNull();
+  });
+
+  it("mutates nothing when the consequence panel is opened", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="pt-BR"
+        questionId={questionId}
+        canReinterpret
+      />,
+    );
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Resposta" }), "Sexta às 14h");
+    await userEvent.click(screen.getByRole("button", { name: "Responder e reinterpretar" }));
+
+    // The disclosure states plainly that nothing has happened yet, and no
+    // action was dispatched by opening it.
+    expect(screen.getByText("Nada foi aplicado ainda. Isto só acontece se você confirmar.")).toBeVisible();
+    expect(actionMock).not.toHaveBeenCalled();
+  });
+
+  it("submits the reinterpret consequence only on explicit confirmation", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () =>
+      successState({ consequence: "reinterpret", consequenceStatus: "reinterpretation_queued", message: "Resposta registrada. A reinterpretação deste registro foi enfileirada." }),
+    );
+    render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="pt-BR"
+        questionId={questionId}
+        canReinterpret
+      />,
+    );
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Resposta" }), "Sexta às 14h");
+    await userEvent.click(screen.getByRole("button", { name: "Responder e reinterpretar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar e reinterpretar" }));
+
+    await waitFor(() => expect(actionMock).toHaveBeenCalledOnce());
+    const formData = actionMock.mock.calls[0]?.[1];
+    expect(formData.get("kind")).toBe("answer");
+    expect(formData.get("consequence")).toBe("reinterpret");
+    expect(formData.get("answer")).toBe("Sexta às 14h");
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("A reinterpretação deste registro foi enfileirada.");
+    expect(screen.getByText("Desfazer também cancela a reinterpretação enfileirada, se ela ainda não tiver começado.")).toBeVisible();
+  });
+
+  it("skipping the consequence returns to the plain answer without a consequence", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="pt-BR"
+        questionId={questionId}
+        canReinterpret
+      />,
+    );
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Resposta" }), "Sexta às 14h");
+    await userEvent.click(screen.getByRole("button", { name: "Responder e reinterpretar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pular consequência" }));
+    await userEvent.click(screen.getByRole("button", { name: "Responder" }));
+
+    await waitFor(() => expect(actionMock).toHaveBeenCalledOnce());
+    const formData = actionMock.mock.calls[0]?.[1];
+    expect(formData.get("consequence")).toBeNull();
+  });
+
+  it("renders the English consequence copy", async () => {
+    const actionMock = vi.fn<QuestionResolutionAction>(async () => successState());
+    render(
+      <QuestionAnswerForm
+        action={actionMock}
+        undoAction={noopUndo}
+        locale="en"
+        questionId={questionId}
+        canReinterpret
+      />,
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: "Answer" }), "Friday at 2pm");
+    await userEvent.click(screen.getByRole("button", { name: "Answer and re-interpret" }));
+    expect(screen.getByText("Nothing has been applied yet. This only happens if you confirm.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Confirm and re-interpret" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Skip consequence" })).toBeEnabled();
   });
 });

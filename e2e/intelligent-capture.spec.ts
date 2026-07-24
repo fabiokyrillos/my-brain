@@ -112,6 +112,15 @@ async function loadProductEventNames(userId: string, accessToken: string) {
   return ((await response.json()) as Array<{ event_name: string }>).map((event) => event.event_name);
 }
 
+// Owner-scoped REST select for the current authenticated user (RLS applies).
+async function restSelect(accessToken: string, query: string): Promise<Array<Record<string, unknown>>> {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+  });
+  expect(response.ok).toBe(true);
+  return (await response.json()) as Array<Record<string, unknown>>;
+}
+
 test.describe("converged daily journey — capture, review, and confirmation", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
@@ -567,7 +576,7 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     const card = page.locator(".question-card", { hasText: `(${marker})` });
     await expect(card).toBeVisible();
     const input = card.getByRole("textbox", { name: "Resposta" });
-    const answerButton = card.getByRole("button", { name: "Responder" });
+    const answerButton = card.getByRole("button", { name: "Responder", exact: true });
     if (testInfo.project.name === "mobile") {
       const inputBox = await input.boundingBox();
       const buttonBox = await answerButton.boundingBox();
@@ -647,8 +656,86 @@ test.describe("converged daily journey — basic question, recoverable retry, an
       },
     });
     await staleCard.getByRole("textbox", { name: "Resposta" }).fill("Resposta tardia");
-    await staleCard.getByRole("button", { name: "Responder" }).click();
+    await staleCard.getByRole("button", { name: "Responder", exact: true }).click();
     await expect(staleCard.getByRole("alert")).toHaveText("A interpretação desta pergunta mudou. Atualize a página antes de resolver.");
+  });
+
+  // Phase 2D Slice 2D.4 — confirmed consequence / reinterpretation.
+  test("answers and re-interprets only on explicit confirmation, and undoes the consequence", async ({}, testInfo) => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    // A completed entry with an open question whose interpretation is current,
+    // so the read-only effect preview offers the reinterpretation.
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `Pergunta e2e com consequência ${marker}.`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: "Registro que pode ser reinterpretado.",
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{ question: `Qual é o prazo final? (${marker})`, reason: "Nenhum prazo foi mencionado.", confidence: 0.5 }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/pt-BR/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+
+    // Opening the consequence panel mutates nothing and states so plainly.
+    const openButton = card.getByRole("button", { name: "Responder e reinterpretar" });
+    await expect(openButton).toBeVisible();
+    await card.getByRole("textbox", { name: "Resposta" }).fill("O prazo é 30 de julho");
+    await openButton.click();
+    await expect(card.getByText("Nada foi aplicado ainda. Isto só acontece se você confirmar.")).toBeVisible();
+
+    const confirmButton = card.getByRole("button", { name: "Confirmar e reinterpretar" });
+    if (testInfo.project.name === "mobile") {
+      const box = await confirmButton.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(await card.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    }
+
+    // Skipping returns to the plain answer with no consequence applied.
+    await card.getByRole("button", { name: "Pular consequência" }).click();
+    await expect(confirmButton).toBeHidden();
+    // Re-open and confirm the reinterpretation.
+    await openButton.click();
+    await confirmButton.click();
+    await expect(card.getByRole("status")).toHaveText("Resposta registrada. A reinterpretação deste registro foi enfileirada.");
+    await expect(card.getByText("Desfazer também cancela a reinterpretação enfileirada, se ela ainda não tiver começado.")).toBeVisible();
+
+    // The reprocess job was enqueued through the existing owner-scoped path.
+    await expect.poll(async () => {
+      const jobs = await restSelect(
+        user!.accessToken,
+        `jobs?type=eq.interpret_entry&payload->>entry_id=eq.${entryId}&payload->>mode=eq.reprocess&select=id,status`,
+      );
+      return jobs.length;
+    }, { timeout: 30_000 }).toBe(1);
+
+    // The content-free reinterpretation event lands fail-open.
+    await expect.poll(async () => {
+      const names = await loadProductEventNames(user!.userId, user!.accessToken);
+      return names.filter((name) => name === "question_reinterpret_applied").length;
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+
+    // Undo restores the open question and cancels the un-claimed reprocess job.
+    await card.getByRole("button", { name: "Desfazer resposta" }).click();
+    await expect(card.getByRole("status")).toHaveText("Resposta desfeita. A pergunta voltou para a fila.");
+    await expect.poll(async () => {
+      const jobs = await restSelect(
+        user!.accessToken,
+        `jobs?type=eq.interpret_entry&payload->>entry_id=eq.${entryId}&payload->>mode=eq.reprocess&select=id`,
+      );
+      return jobs.length;
+    }, { timeout: 30_000 }).toBe(0);
   });
 
   // Phase 2D Slice 2D.2 — question dispositions.
@@ -830,7 +917,7 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     // Submitting an unchanged suggestion resolves exactly like a typed answer.
     await reloaded.getByRole("group", { name: "Respostas sugeridas" })
       .getByRole("button", { name: "Ana Prado" }).click();
-    await reloaded.getByRole("button", { name: "Responder" }).click();
+    await reloaded.getByRole("button", { name: "Responder", exact: true }).click();
     await expect(reloaded.getByRole("status")).toHaveText("Resposta registrada.");
     await expect(reloaded.getByRole("button", { name: "Desfazer resposta" })).toBeVisible();
 
@@ -916,7 +1003,7 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     await expect(card.getByRole("group", { name: "Respostas sugeridas" })).toHaveCount(0);
     // The ordinary free-text flow is untouched.
     await card.getByRole("textbox", { name: "Resposta" }).fill("Cerca de R$ 2.000");
-    await card.getByRole("button", { name: "Responder" }).click();
+    await card.getByRole("button", { name: "Responder", exact: true }).click();
     await expect(card.getByRole("status")).toHaveText("Resposta registrada.");
   });
 
@@ -977,7 +1064,7 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     const card = page.locator(".question-card", { hasText: `(${marker})` });
     await expect(card).toBeVisible();
     await card.getByRole("textbox", { name: "Answer" }).fill("Friday at 2pm");
-    await card.getByRole("button", { name: "Answer" }).click();
+    await card.getByRole("button", { name: "Answer", exact: true }).click();
     await expect(card.getByRole("status")).toHaveText("Answer recorded.");
     const undoButton = card.getByRole("button", { name: "Undo answer" });
     await expect(undoButton).toBeVisible();
