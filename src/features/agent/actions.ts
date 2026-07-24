@@ -16,9 +16,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordAIUsage } from "@/lib/ai/usage";
 import type { Json } from "@/lib/supabase/database.types";
+import { loadQuestionSuggestions } from "./question-preview-projection";
+import { findPresentedSuggestion } from "./question-suggestions";
 import {
   normalizeQuestionResolutionCommand,
+  parseSubmittedSuggestionId,
   serializeQuestionResolution,
+  type QuestionAnswerOrigin,
   type QuestionResolutionCommand,
 } from "./question-resolution-contract";
 import type {
@@ -337,6 +341,23 @@ export async function resolvePendingQuestion(
   } = await supabase.auth.getUser();
   if (!user) return questionResolutionFailure("session_expired", copy.session, false);
 
+  // Slice 2D.3 — server-owned suggestion provenance. The browser submits only
+  // a bounded suggestion id; the deterministic options are regenerated here
+  // from owner-scoped data and the id must both have been presented for this
+  // question and carry exactly the submitted answer. Anything else (forged id,
+  // stale id, answer edited away from the chip) is recorded as `typed`. This
+  // read performs no mutation and never changes the resolution itself.
+  let answerOrigin: QuestionAnswerOrigin = "typed";
+  if (command.kind === "answer") {
+    const submittedSuggestionId = parseSubmittedSuggestionId(formData.get("suggestionId"));
+    if (submittedSuggestionId) {
+      const presented = await loadQuestionSuggestions(supabase, user.id, command.questionId, locale);
+      if (findPresentedSuggestion(presented, submittedSuggestionId, command.answer)) {
+        answerOrigin = "suggested";
+      }
+    }
+  }
+
   const { data, error } = await supabase.rpc("resolve_pending_question_v2", {
     p_question_id: command.questionId,
     p_resolution: JSON.parse(serializeQuestionResolution(command)) as Json,
@@ -351,6 +372,7 @@ export async function resolvePendingQuestion(
     const eventQuestionId = command.questionId;
     const eventOperationKey = operationKey.data;
     const eventResolution = result.resolution;
+    const eventOrigin = answerOrigin;
     after(() => recordProductEvent(
       eventResolution === "answered"
         ? {
@@ -361,7 +383,7 @@ export async function resolvePendingQuestion(
           appVersion: "server",
           idempotencyKey: createProductEventIdempotencyKey("question_answered_basic", eventOperationKey),
           subject: { type: "pending_question", id: eventQuestionId },
-          properties: {},
+          properties: { origin: eventOrigin },
         }
         : {
           name: "question_resolved",

@@ -32,6 +32,7 @@ const eventNames = [
   "task_candidates_confirmed",
   "question_answered_basic",
   "question_resolved",
+  "question_effect_previewed",
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
@@ -61,15 +62,16 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
   candidate_edit_started: { candidateCount: 1 },
   candidate_edit_reset: { editedFieldCount: 2 },
   task_candidates_confirmed: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 2 },
-  question_answered_basic: {},
+  question_answered_basic: { origin: "suggested" },
   question_resolved: { kind: "deferred" },
+  question_effect_previewed: {},
   processing_retry_requested: { retrySource: "user" },
   work_view_viewed: { workView: "today" },
   task_status_changed: { fromStatus: "inbox", toStatus: "in_progress" },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of nineteen product events", () => {
+  it("defines the complete closed taxonomy of twenty-one product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -79,8 +81,29 @@ describe("product analytics contracts", () => {
       "interpretation_review",
       "technical_details",
       "work",
+      "questions",
       "server",
     ]);
+  });
+
+  // Slice 2D.3: suggestion provenance is a bounded enum, never content.
+  it("accepts only the bounded typed/suggested answer origin", () => {
+    const parse = contracts.parseProductEventPayload;
+    const base = { ...basePayload, name: "question_answered_basic" };
+    expect(parse?.({ ...base, properties: { origin: "typed" } })).not.toBeNull();
+    expect(parse?.({ ...base, properties: { origin: "suggested" } })).not.toBeNull();
+    expect(parse?.({ ...base, properties: {} })).toBeNull();
+    expect(parse?.({ ...base, properties: { origin: "person:ana-prado" } })).toBeNull();
+    expect(parse?.({ ...base, properties: { origin: "suggested", suggestionId: "person:ana" } })).toBeNull();
+    expect(parse?.({ ...base, properties: { origin: "suggested", answer: "Ana Prado" } })).toBeNull();
+  });
+
+  it("keeps the effect-preview event strictly property-free", () => {
+    const parse = contracts.parseProductEventPayload;
+    const base = { ...basePayload, surface: "questions", name: "question_effect_previewed" };
+    expect(parse?.({ ...base, properties: {} })).not.toBeNull();
+    expect(parse?.({ ...base, properties: { kind: "reinterpret" } })).toBeNull();
+    expect(parse?.({ ...base, properties: { question: "Quem?" } })).toBeNull();
   });
 
   it("keeps every event on the explicit v1 contract while appVersion remains the stored experience version", () => {

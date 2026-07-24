@@ -728,6 +728,198 @@ test.describe("converged daily journey — basic question, recoverable retry, an
     }, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
   });
 
+  // Phase 2D Slice 2D.3 — deterministic suggestions and read-only previews.
+  test("offers deterministic suggestions and read-only source/effect previews without mutating anything", async ({}, testInfo) => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(
+      user!.accessToken,
+      user!.userId,
+      `Fechamos o escopo do Aurora com a Ana Prado e o Bruno Lima. (${marker})`,
+    );
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: `Escopo do Aurora fechado. (${marker})`,
+        concepts: ["pending_question"],
+        contexts: [], organizations: [],
+        projects: [{ name: "Aurora", confidence: 0.9, evidence: "escopo do Aurora", inferred: false }],
+        people: [
+          { name: "Ana Prado", confidence: 0.9, evidence: "com a Ana Prado", inferred: false },
+          { name: "Bruno Lima", confidence: 0.8, evidence: "e o Bruno Lima", inferred: false },
+        ],
+        taskCandidates: [],
+        pendingQuestions: [{
+          question: `Quem ficou responsável pela entrega? (${marker})`,
+          reason: "O registro não diz quem assume a entrega.",
+          confidence: 0.5,
+        }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/pt-BR/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+
+    // Bounded, deterministic, owner-derived options — never a fabricated set.
+    const suggestions = card.getByRole("group", { name: "Respostas sugeridas" });
+    await expect(suggestions).toBeVisible();
+    const anaChip = suggestions.getByRole("button", { name: "Ana Prado" });
+    const brunoChip = suggestions.getByRole("button", { name: "Bruno Lima" });
+    await expect(anaChip).toBeVisible();
+    await expect(brunoChip).toBeVisible();
+    await expect(suggestions.getByRole("button")).toHaveCount(2);
+    if (testInfo.project.name === "mobile") {
+      const box = await anaChip.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+
+    // Keyboard operable; selecting fills the still-editable field and never submits.
+    const answerField = card.getByRole("textbox", { name: "Resposta" });
+    await anaChip.focus();
+    await page.keyboard.press("Enter");
+    await expect(answerField).toHaveValue("Ana Prado");
+    await expect(answerField).toBeFocused();
+    await expect(anaChip).toHaveAttribute("aria-pressed", "true");
+    await expect(brunoChip).toHaveAttribute("aria-pressed", "false");
+    await expect(card.getByRole("status")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Desfazer resposta" })).toHaveCount(0);
+
+    // Editing away from the chip clears the selected provenance deterministically.
+    await answerField.fill("Ana Prado e o Bruno");
+    await expect(anaChip).toHaveAttribute("aria-pressed", "false");
+    // Picking another suggestion replaces it.
+    await brunoChip.click();
+    await expect(answerField).toHaveValue("Bruno Lima");
+    await expect(brunoChip).toHaveAttribute("aria-pressed", "true");
+    await expect(anaChip).toHaveAttribute("aria-pressed", "false");
+
+    // Read-only disclosures: opening them changes nothing and says so.
+    const sourcePanel = card.locator("details.question-preview").first();
+    const effectPanel = card.locator("details.question-preview").nth(1);
+    await expect(sourcePanel).not.toHaveAttribute("open", "");
+    await sourcePanel.getByText("Por que esta pergunta existe").click();
+    await expect(sourcePanel.getByText("O registro não diz quem assume a entrega.")).toBeVisible();
+    await expect(sourcePanel.getByText("Interpretação atual")).toBeVisible();
+    await expect(sourcePanel.getByText(`Fechamos o escopo do Aurora com a Ana Prado e o Bruno Lima. (${marker})`)).toBeVisible();
+    await effectPanel.getByText("O que mudaria se você responder").click();
+    await expect(effectPanel.getByText("Nada foi aplicado ainda. Esta é apenas uma previsão.")).toBeVisible();
+
+    // No horizontal overflow at either viewport.
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    // Opening panels and picking chips resolved nothing: the queue still lists it.
+    await page.reload();
+    await expect(page.locator(".question-card", { hasText: `(${marker})` })).toBeVisible();
+
+    // The disposition controls remain fully available alongside suggestions.
+    const reloaded = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(reloaded.getByRole("button", { name: "Adiar" })).toBeVisible();
+    await expect(reloaded.getByRole("button", { name: "Descartar" })).toBeVisible();
+    await expect(reloaded.getByRole("button", { name: "Não é relevante" })).toBeVisible();
+
+    // Submitting an unchanged suggestion resolves exactly like a typed answer.
+    await reloaded.getByRole("group", { name: "Respostas sugeridas" })
+      .getByRole("button", { name: "Ana Prado" }).click();
+    await reloaded.getByRole("button", { name: "Responder" }).click();
+    await expect(reloaded.getByRole("status")).toHaveText("Resposta registrada.");
+    await expect(reloaded.getByRole("button", { name: "Desfazer resposta" })).toBeVisible();
+
+    // The content-free preview and answer events land fail-open.
+    await expect.poll(async () => {
+      const names = await loadProductEventNames(user!.userId, user!.accessToken);
+      return names.filter((name) => name === "question_effect_previewed").length;
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  });
+
+  test("renders the English suggestion and preview chrome", async () => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(
+      user!.accessToken,
+      user!.userId,
+      `We closed the Aurora scope with Ana Prado. (${marker})`,
+    );
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "en",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: `Aurora scope closed. (${marker})`,
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [],
+        people: [{ name: "Ana Prado", confidence: 0.9, evidence: "with Ana Prado", inferred: false }],
+        taskCandidates: [],
+        pendingQuestions: [{
+          question: `Who owns the delivery? (${marker})`,
+          reason: "The record does not say who owns it.",
+          confidence: 0.5,
+        }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/en/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+    const suggestions = card.getByRole("group", { name: "Suggested answers" });
+    await expect(suggestions).toBeVisible();
+    await suggestions.getByRole("button", { name: "Ana Prado" }).click();
+    await expect(card.getByRole("textbox", { name: "Answer" })).toHaveValue("Ana Prado");
+
+    const effectPanel = card.locator("details.question-preview").nth(1);
+    await effectPanel.getByText("What would change if you answer").click();
+    await expect(effectPanel.getByText("Nothing has been applied yet. This is only a prediction.")).toBeVisible();
+    await expect(card.locator("details.question-preview").first().getByText("Why this question exists")).toBeVisible();
+  });
+
+  test("shows no suggestion chips when no truthful deterministic answer exists", async () => {
+    const marker = crypto.randomUUID().slice(0, 8);
+    const entryId = await insertBareEntry(user!.accessToken, user!.userId, `Registro sem contexto sugerível. (${marker})`);
+    await restRpc(user!.accessToken, "begin_entry_interpretation", { p_entry_id: entryId });
+    await restRpc(user!.accessToken, "persist_entry_interpretation", {
+      p_entry_id: entryId,
+      p_extraction: {
+        language: "pt-BR",
+        occurredAt: new Date().toISOString(),
+        isRetroactive: false,
+        summary: `Registro sem pistas. (${marker})`,
+        concepts: ["pending_question"],
+        contexts: [], organizations: [], projects: [], people: [],
+        taskCandidates: [],
+        pendingQuestions: [{
+          question: `Quanto isso vai custar? (${marker})`,
+          reason: "Nenhum valor foi mencionado.",
+          confidence: 0.5,
+        }],
+        confidence: 0.6,
+      },
+      p_model: "e2e-fixture", p_strategy_version: "e2e", p_prompt_version: "e2e",
+      p_input_tokens: 0, p_output_tokens: 0,
+    });
+
+    await page.goto("/pt-BR/app/questions");
+    const card = page.locator(".question-card", { hasText: `(${marker})` });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole("group", { name: "Respostas sugeridas" })).toHaveCount(0);
+    // The ordinary free-text flow is untouched.
+    await card.getByRole("textbox", { name: "Resposta" }).fill("Cerca de R$ 2.000");
+    await card.getByRole("button", { name: "Responder" }).click();
+    await expect(card.getByRole("status")).toHaveText("Resposta registrada.");
+  });
+
   test("dismisses a pending question with the English disposition copy", async () => {
     const marker = crypto.randomUUID().slice(0, 8);
     const entryId = await insertBareEntry(user!.accessToken, user!.userId, `English e2e disposition question ${marker}.`);

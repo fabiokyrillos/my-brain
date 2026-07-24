@@ -6,6 +6,7 @@ import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { retryProcessingJob } from "./actions";
 
+vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));

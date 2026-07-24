@@ -16,6 +16,7 @@ export const productEventNames = [
   "task_candidates_confirmed",
   "question_answered_basic",
   "question_resolved",
+  "question_effect_previewed",
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
@@ -36,6 +37,7 @@ export const productSurfaces = [
   "interpretation_review",
   "technical_details",
   "work",
+  "questions",
   "server",
 ] as const;
 
@@ -104,8 +106,12 @@ export type ProductEventPropertiesByName = {
     editedCandidateCount: number;
     editedFieldCount: number;
   };
-  question_answered_basic: EmptyProductEventProperties;
+  // Slice 2D.3 provenance: a bounded two-value enum recording *that* the
+  // answer came from a presented deterministic suggestion. It never carries
+  // the suggestion's id, value, label, or any question/answer text.
+  question_answered_basic: { origin: "typed" | "suggested" };
   question_resolved: { kind: "deferred" | "dismissed" | "not_relevant" };
+  question_effect_previewed: EmptyProductEventProperties;
   processing_retry_requested: { retrySource: "user" | "worker" };
   work_view_viewed: { workView: "today" | "all" | "waiting" };
   task_status_changed: { fromStatus: ProductTaskStatus; toStatus: ProductTaskStatus };
@@ -238,8 +244,10 @@ function arePropertiesValid<Name extends ProductEventName>(
         ]);
     case "interpretation_review_viewed":
     case "technical_details_opened":
-    case "question_answered_basic":
+    case "question_effect_previewed":
       return hasExactKeys(value, []);
+    case "question_answered_basic":
+      return hasExactKeys(value, ["origin"]) && isOneOf(value.origin, ["typed", "suggested"]);
     case "question_resolved":
       return hasExactKeys(value, ["kind"])
         && isOneOf(value.kind, ["deferred", "dismissed", "not_relevant"]);
