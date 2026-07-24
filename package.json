@@ -22,12 +22,15 @@
   "test:remote:2d:resolution": "node scripts/remote-question-resolution-smoke.mjs",
     "test:remote:2d:preview": "node scripts/remote-question-preview-smoke.mjs",
     "test:remote:2d:reinterpretation": "node scripts/remote-question-reinterpretation-smoke.mjs",
+    "test:remote:2d:cleanup": "node scripts/verify-phase-2d-cleanup.mjs",
+    "test:remote:2d": "node scripts/remote-supabase-smoke.mjs --phase-2d",
     "test:remote:2c:cleanup": "node scripts/verify-phase-2c-cleanup.mjs",
     "test:remote:2c": "node scripts/remote-supabase-smoke.mjs --phase-2c",
     "test:remote:2x": "node scripts/remote-supabase-smoke.mjs --phase-2x",
     "test:remote:2x:cleanup": "node scripts/verify-phase-2x-cleanup.mjs",
     "docs:phase-2x:traceability": "node scripts/generate-phase-2x-traceability.mjs",
     "docs:phase-2c:traceability": "node scripts/generate-phase-2c-traceability.mjs",
+    "docs:phase-2d:traceability": "node scripts/generate-phase-2d-traceability.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {

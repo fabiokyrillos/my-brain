@@ -57,6 +57,38 @@ if (process.argv.includes("--phase-2c")) {
   process.exit(0);
 }
 
+if (process.argv.includes("--phase-2d")) {
+  // Deterministic, disposable-fixture suites only. The daily-cycle smoke is intentionally
+  // excluded from this fail-fast aggregate for the same reason it is excluded from the
+  // Phase 2C aggregate: its needs-attention section claims an `interpret_entry` job, which
+  // races the unattended per-minute pg_cron drain on the shared queue and is therefore not
+  // deterministic under back-to-back aggregate timing. The Phase 2D question-resolution,
+  // question-preview, and question-reinterpretation smokes create their own disposable
+  // entries/interpretations/questions and never claim the shared queue, so they are
+  // deterministic; the product-events smoke re-verifies the content-free analytics contract.
+  const suites = [
+    ["test:remote:2d:resolution", "Phase 2D question resolution (v1/v2 answer + dispositions)"],
+    ["test:remote:2d:preview", "Phase 2D suggested answers and source/effect preview"],
+    ["test:remote:2d:reinterpretation", "Phase 2D reinterpretation consequence (v3)"],
+    ["test:remote:product-events", "Phase 2D content-free resolution analytics"],
+    ["test:remote:2d:cleanup", "Phase 2D residual-data cleanup"],
+  ];
+
+  for (const [script, label] of suites) {
+    console.log(`\n[remote:2d] ${label} (${script})`);
+    const command = process.platform === "win32" ? process.env.ComSpec : "npm";
+    const args = process.platform === "win32"
+      ? ["/d", "/s", "/c", `npm run ${script}`]
+      : ["run", script];
+    const result = spawnSync(command, args, { stdio: "inherit" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
+
+  console.log("\nPhase 2D aggregate remote gate passed: question resolution (v1/v2), suggested-answer/preview, reinterpretation (v3), content-free resolution analytics, and residual-data cleanup.");
+  process.exit(0);
+}
+
 function assert(condition, label) {
   if (!condition) throw new Error(label);
 }
