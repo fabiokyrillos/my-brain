@@ -449,15 +449,33 @@ try {
   );
   assert(drainedEntry.current_interpretation_id, "The unattended dispatch drain did not persist a current interpretation");
 
-  const drainedJob = dataOrThrow(
-    await first
-      .from("jobs")
-      .select("id,status,attempts")
-      .eq("idempotency_key", `entry-capture:${drainCaptureKey}`)
-      .single(),
-    "read dispatch-drain fixture job",
+  // The entry going terminal does not imply the job is finished:
+  // processEntryJob persists the interpretation, then makes an OpenAI embedding
+  // round-trip, and only then calls complete_job (entry.ts — persist, embed,
+  // complete, in that order). Reading the job synchronously here asserted a
+  // later fact from an earlier trigger, and failed whenever the embedding call
+  // outlasted the slack left in this loop's 1s poll interval. Every other
+  // asynchronous assertion in this script already waits; this one now does too.
+  const drainedJob = await waitFor(
+    async () => {
+      const row = dataOrThrow(
+        await first
+          .from("jobs")
+          .select("id,status,attempts")
+          .eq("idempotency_key", `entry-capture:${drainCaptureKey}`)
+          .single(),
+        "read dispatch-drain fixture job",
+      );
+      if (row.status === "failed") {
+        throw new Error("The unattended dispatch drain failed its fixture job");
+      }
+      return row.status === "completed" ? row : null;
+    },
+    "dispatch-drain job completion",
+    60_000,
+    500,
   );
-  assert(drainedJob.status === "completed" && drainedJob.attempts >= 1, "The unattended dispatch drain did not persist job completion");
+  assert(drainedJob.attempts >= 1, "The unattended dispatch drain did not record an attempt");
 
   const drainedEvents = dataOrThrow(
     await first
