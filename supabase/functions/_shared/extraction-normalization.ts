@@ -27,7 +27,7 @@ const BARE_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const LOCAL_DATETIME =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
-type WallTime = {
+export type WallTime = {
   year: number;
   month: number;
   day: number;
@@ -140,7 +140,7 @@ function formatOffset(minutes: number): string {
  * non-calendar date (`2026-02-30`) without either being special-cased —
  * inventing an instant for those would move a deadline silently.
  */
-function resolveLocal(wall: WallTime, timeZone: string): string | null {
+export function resolveLocal(wall: WallTime, timeZone: string): string | null {
   const asUtc = asIfUtc(wall);
   if (Number.isNaN(asUtc.getTime())) return null;
 
