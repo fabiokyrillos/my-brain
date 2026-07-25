@@ -20,6 +20,12 @@ create extension if not exists pgtap with schema extensions;
 -- Belt and braces: do not depend on the local image's default role search_path
 -- for `extensions` to be visible. Database-level scope so the fresh sessions
 -- pg_prove opens inherit it.
+--
+-- This does not weaken CI as a detector of unqualified-lookup bugs in product
+-- code, which was the reason to check: `config.toml` already puts `extensions`
+-- on the Data API's own search_path (`[api] extra_search_path`), so an API
+-- session always had it, and every product function pins `search_path = ''`
+-- explicitly — asserted per RPC by the pgTAP suite.
 do $$
 begin
   execute format(

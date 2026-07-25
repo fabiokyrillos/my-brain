@@ -436,12 +436,25 @@ select is(
   'the reinterpreted question is resolvable again after undo'
 );
 
+-- Corrected with the first real execution of this suite (pre-2E CI gate). The
+-- assertion previously used a fresh operation key ('phase2d4-plain-2') against
+-- a question the test had already answered above, so resolve_pending_question_v3
+-- refused it as no longer open, the helper returned its error object, and
+-- `consequence` came back NULL -- it could never have passed. The plan(34)
+-- mismatch had been masking that per-test result.
+--
+-- The section header states the contract being proven, and replaying the SAME
+-- key is what actually proves it: an omitted consequence must canonicalize to
+-- 'none' and hash IDENTICALLY to an explicit 'none', so the recorded
+-- request_fingerprint still matches. If canonicalization were broken the RPC
+-- would raise 2D_IDEMPOTENCY_MISMATCH and this would be NULL again. The answer
+-- text must match the original call for the same reason.
 select is(
   (select pg_temp.phase2d4_resolve(refs.plain_question_id,
-    jsonb_build_object('kind', 'answer', 'answer', 'Nova resposta'),
-    'phase2d4-plain-2') ->> 'consequence' from phase2d4_refs as refs),
+    jsonb_build_object('kind', 'answer', 'answer', 'Sexta'),
+    'phase2d4-plain') ->> 'consequence' from phase2d4_refs as refs),
   'none',
-  'an answer omitting the consequence key resolves with consequence none'
+  'an answer omitting the consequence key canonicalizes to none and hashes identically'
 );
 
 select * from finish();

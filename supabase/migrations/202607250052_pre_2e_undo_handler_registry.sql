@@ -563,7 +563,7 @@ revoke all on function private.undo_correct_entry_interpretation(uuid, uuid) fro
 -- ---------------------------------------------------------------------------
 -- Registration
 -- ---------------------------------------------------------------------------
--- Exactly the seven action_type values any shipped RPC can record. The
+-- Exactly the eight action_type values any shipped RPC can record. The
 -- unversioned candidate key is what confirm_entry_task_candidates_v2/_v3/_v4
 -- record as well, which is why they need no separate row.
 
@@ -680,8 +680,11 @@ begin
   into handler_result
   using current_user_id, operation.id;
 
+  -- A registered handler that returns NULL is a handler bug, not an
+  -- unregistered operation. Distinct message so it cannot be misdiagnosed.
   if handler_result is null then
-    raise exception 'Unsupported undo operation';
+    raise exception 'Undo handler returned no result'
+      using errcode = 'P0001', detail = 'UNDO_HANDLER_NO_RESULT';
   end if;
 
   return handler_result;
