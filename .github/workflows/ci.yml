@@ -43,12 +43,38 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.9.4
+
+      # Every Deno command is scoped to a function's own deno.json. Without
+      # --config, Deno discovers the repository root's package.json, adopts the
+      # entire Next.js dependency tree as its own manifest, and then fails
+      # because it expects a populated node_modules/ it has no reason to need.
+      # --node-modules-dir=none resolves npm: specifiers from Deno's global
+      # cache and writes no node_modules/ next to a function — `auto` does write
+      # one, which would end up inside the deployed bundle. --no-lock keeps
+      # package-lock.json the single source of dependency truth here;
+      # `npm:@supabase/supabase-js@2` then resolves the same way the deployed
+      # function resolves it, which is the fidelity this gate wants.
       - name: Type-check the deployed function entrypoints
-        run: deno check supabase/functions/process-jobs/index.ts supabase/functions/heartbeat/index.ts
+        run: |
+          deno check --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock \
+            supabase/functions/process-jobs/index.ts
+          deno check --config supabase/functions/heartbeat/deno.json --node-modules-dir=none --no-lock \
+            supabase/functions/heartbeat/index.ts
+
       - name: Run the worker test suite
         # No --allow-* flags on purpose: the suite must stay network-free and
         # must never reach a real OpenAI or Supabase endpoint.
-        run: deno test supabase/functions/
+        #
+        # Paths are enumerated from the directory listing rather than passing
+        # `supabase/functions/` once: a scoped --config narrows Deno's own test
+        # discovery to that config's directory, which would silently drop the
+        # _shared suites. Globbing every function directory means a new one is
+        # covered automatically instead of being missed.
+        run: |
+          set -euo pipefail
+          DIRS=$(ls -d supabase/functions/*/)
+          echo "Discovering tests in: $DIRS"
+          deno test --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock $DIRS
 
   # The database is this product's trust boundary and its largest body of
   # logic. Nothing verified it automatically before this job: pgTAP had never
