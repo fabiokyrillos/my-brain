@@ -5,28 +5,63 @@ import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { createClient } from "@/lib/supabase/server";
+import { locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { CreateRecordState } from "./inline-create-form";
 
 const createSchema = z.object({
   kind: z.enum(["task", "project", "person", "memory"]),
-  locale: z.enum(["pt-BR", "en"]),
+  locale: z.enum(locales),
   name: z.string().trim().min(1).max(240),
 });
+
+type CreateRecordCopy = {
+  invalidName: string;
+  nameTooLong: string;
+  sessionExpired: string;
+  duplicateName: string;
+  createFailed: string;
+  created: string;
+};
+
+// Canonical localization mechanism (ADR-036). Every message below used to be
+// Portuguese-only and reached English users verbatim.
+const createRecordCopy = {
+  "pt-BR": {
+    invalidName: "Revise o nome.",
+    nameTooLong: "Use no máximo 160 caracteres.",
+    sessionExpired: "Sua sessão expirou.",
+    duplicateName: "Esse nome já existe.",
+    createFailed: "Não foi possível adicionar.",
+    created: "Adicionado.",
+  },
+  en: {
+    invalidName: "Review the name.",
+    nameTooLong: "Use at most 160 characters.",
+    sessionExpired: "Your session expired.",
+    duplicateName: "That name already exists.",
+    createFailed: "We could not add this.",
+    created: "Added.",
+  },
+} satisfies Record<Locale, CreateRecordCopy>;
 
 export async function createRecord(
   _state: CreateRecordState,
   formData: FormData,
 ): Promise<CreateRecordState> {
+  // Resolved first and independently so the validation failure below is
+  // localized too — it happens before the input schema succeeds.
+  const copy = createRecordCopy[resolveLocale(formData.get("locale"))];
+
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { status: "error", message: "Revise o nome." };
+  if (!parsed.success) return { status: "error", message: copy.invalidName };
   if (parsed.data.kind !== "task" && parsed.data.kind !== "memory" && parsed.data.name.length > 160) {
-    return { status: "error", message: "Use no máximo 160 caracteres." };
+    return { status: "error", message: copy.nameTooLong };
   }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  if (!user) return { status: "error", message: copy.sessionExpired };
 
   let error: { message: string } | null = null;
   if (parsed.data.kind === "task") {
@@ -68,7 +103,7 @@ export async function createRecord(
 
   if (error) {
     const duplicate = error.message.includes("duplicate") || error.message.includes("unique");
-    return { status: "error", message: duplicate ? "Esse nome já existe." : "Não foi possível adicionar." };
+    return { status: "error", message: duplicate ? copy.duplicateName : copy.createFailed };
   }
 
   const route = parsed.data.kind === "task" ? "tasks" : parsed.data.kind === "project" ? "projects" : parsed.data.kind === "person" ? "people" : "memories";
@@ -78,7 +113,7 @@ export async function createRecord(
     revalidatePath("/pt-BR/app/work");
     revalidatePath("/en/app/work");
   }
-  return { status: "success", message: "Adicionado." };
+  return { status: "success", message: copy.created };
 }
 
 const statusSchema = z.object({

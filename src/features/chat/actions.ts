@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
-import { defaultAgentPreferences } from "@/lib/preferences";
+import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
@@ -12,9 +12,44 @@ import type { ChatState } from "./chat-form";
 
 const chatInputSchema = z.object({
   question: z.string().trim().min(1).max(12000),
-  locale: z.enum(["pt-BR", "en"]),
+  locale: z.enum(locales),
   conversationId: z.union([z.string().uuid(), z.literal("")]).optional(),
 });
+
+type ChatCopy = {
+  invalidQuestion: string;
+  sessionExpired: string;
+  conversationUnavailable: string;
+  conversationNotFound: string;
+  conversationNotStarted: string;
+  questionNotSaved: string;
+  answerUnavailable: string;
+};
+
+// Canonical localization mechanism (ADR-036): one typed copy record per
+// feature, `satisfies Record<Locale, …>` so a missing key or a missing locale
+// is a compile error. Before this, every message below was Portuguese-only and
+// reached English users verbatim.
+const chatCopy = {
+  "pt-BR": {
+    invalidQuestion: "Escreva uma pergunta válida.",
+    sessionExpired: "Sua sessão expirou.",
+    conversationUnavailable: "Não foi possível abrir a conversa.",
+    conversationNotFound: "Conversa não encontrada.",
+    conversationNotStarted: "Não foi possível iniciar a conversa.",
+    questionNotSaved: "Não foi possível salvar sua pergunta.",
+    answerUnavailable: "O Brain não conseguiu responder agora. Sua pergunta ficou salva.",
+  },
+  en: {
+    invalidQuestion: "Write a valid question.",
+    sessionExpired: "Your session expired.",
+    conversationUnavailable: "We could not open this conversation.",
+    conversationNotFound: "Conversation not found.",
+    conversationNotStarted: "We could not start the conversation.",
+    questionNotSaved: "We could not save your question.",
+    answerUnavailable: "The Brain could not answer right now. Your question was saved.",
+  },
+} satisfies Record<Locale, ChatCopy>;
 
 type KnowledgeRow = {
   source_type: "entry" | "memory";
@@ -25,25 +60,29 @@ type KnowledgeRow = {
 };
 
 export async function sendChatMessage(_state: ChatState, formData: FormData): Promise<ChatState> {
+  // Resolve the locale first and independently: the validation failure below
+  // has to be localized too, and it happens before the input schema succeeds.
+  const copy = chatCopy[resolveLocale(formData.get("locale"))];
+
   const parsed = chatInputSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { status: "error", message: "Escreva uma pergunta válida." };
+  if (!parsed.success) return { status: "error", message: copy.invalidQuestion };
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Sua sessão expirou." };
+  if (!user) return { status: "error", message: copy.sessionExpired };
   let conversationId = parsed.data.conversationId || undefined;
 
   if (conversationId) {
     const { data: ownedConversation, error: conversationError } = await supabase.from("conversations").select("id").eq("id", conversationId).maybeSingle();
-    if (conversationError) return { status: "error", message: "Não foi possível abrir a conversa." };
-    if (!ownedConversation) return { status: "error", message: "Conversa não encontrada." };
+    if (conversationError) return { status: "error", message: copy.conversationUnavailable };
+    if (!ownedConversation) return { status: "error", message: copy.conversationNotFound };
   } else {
     const { data: conversation, error } = await supabase.from("conversations").insert({
       user_id: user.id,
       title: parsed.data.question.slice(0, 100),
       locale: parsed.data.locale,
     }).select("id").single();
-    if (error || !conversation) return { status: "error", message: "Não foi possível iniciar a conversa." };
+    if (error || !conversation) return { status: "error", message: copy.conversationNotStarted };
     conversationId = conversation.id;
   }
 
@@ -53,7 +92,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     role: "user",
     content: parsed.data.question,
   });
-  if (userMessageError) return { status: "error", message: "Não foi possível salvar sua pergunta." };
+  if (userMessageError) return { status: "error", message: copy.questionNotSaved };
 
   try {
     const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
@@ -104,9 +143,16 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       sourceType: "conversation",
       sourceId: conversationId,
     });
-    const citations = answer.citedSourceIds.map((id) => {
-      const source = sources.find((item) => item.id === id)!;
-      return { id, type: source.type, sourceId: id.split(":")[1], excerpt: source.content.slice(0, 220) };
+    // The provider strips fabricated ids deterministically, but that invariant
+    // crosses the AIProvider portability seam and is not encoded in ChatResult.
+    // A non-null assertion here turned any weakening of that filter into a
+    // TypeError mid-conversation; dropping an unmatched id keeps the hydration
+    // total instead, preserving order and shape.
+    const citations = answer.citedSourceIds.flatMap((id) => {
+      const source = sources.find((item) => item.id === id);
+      const sourceId = id.split(":")[1];
+      if (!source || !sourceId) return [];
+      return [{ id, type: source.type, sourceId, excerpt: source.content.slice(0, 220) }];
     });
 
     const { error: answerError } = await supabase.from("conversation_messages").insert({
@@ -137,7 +183,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     requireSupabaseSuccess(auditInsert, "record chat audit");
   } catch (error) {
     console.error("Grounded chat failed", error instanceof Error ? error.message : "unknown error");
-    return { status: "error", message: "O Brain não conseguiu responder agora. Sua pergunta ficou salva." };
+    return { status: "error", message: copy.answerUnavailable };
   }
 
   revalidatePath(`/${parsed.data.locale}/app/chat/${conversationId}`);
