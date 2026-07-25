@@ -65,6 +65,17 @@ function row(overrides: Partial<TaskCandidateRow> & { taskId: string }): TaskCan
     plannedAt: null,
     manualPriority: null,
     createdAt: "2026-07-01T00:00:00.000Z",
+    description: null,
+    completedAt: null,
+    cancelledAt: null,
+    intentionalNoDue: false,
+    noDueReason: null,
+    updatedAt: "2026-07-01T00:00:00.000Z",
+    projectIds: [],
+    contextIds: [],
+    personIds: [],
+    personRoles: [],
+    observedBefore: NOW,
     projectNames: [],
     contextNames: [],
     personNames: [],
@@ -212,7 +223,13 @@ describe("overflow (2E-MATCH-004)", () => {
     expect(result.oneStep).toBe(false);
   });
 
-  it("overflow outranks unmatched, because the winner may be the row that was cut", () => {
+  it("does not report ambiguity it cannot render, but still reports the truncation", () => {
+    // A truncated set with nothing above the floor used to return
+    // `ambiguous_overflow` with an empty candidate list — "there are too many,
+    // narrow this down" pointing at nothing, which 2E-DISAMBIG-001 cannot
+    // render. The truthful outcome is `unmatched`, which routes to 2E.6's
+    // clarification, with `overflowed` still true so the surface can say there
+    // was more than it could look at.
     const rows = [
       row({ taskId: "t1", effectiveLimit: 1 }),
       row({ taskId: "t2", effectiveLimit: 1 }),
@@ -221,7 +238,20 @@ describe("overflow (2E-MATCH-004)", () => {
     const result = rank(rows, command({ action: "complete_task" }));
 
     expect(result.qualifyingCount).toBe(0);
-    expect(result.outcome).toBe("ambiguous_overflow");
+    expect(result.outcome).toBe("unmatched");
+    expect(result.overflowed).toBe(true);
+  });
+
+  it("never returns ambiguous_overflow with nothing to disambiguate", () => {
+    for (const qualifying of [0, 1, 2]) {
+      const rows = Array.from({ length: qualifying + 2 }, (_, index) =>
+        index < qualifying
+          ? exactRow(`t${index}`, { effectiveLimit: 1 })
+          : row({ taskId: `t${index}`, effectiveLimit: 1 }));
+      const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
+      if (result.outcome !== "ambiguous_overflow") continue;
+      expect(result.candidates.length).toBeGreaterThan(0);
+    }
   });
 
   it("reads the limit from the data, not from the constant this process asked for", () => {

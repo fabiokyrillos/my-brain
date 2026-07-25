@@ -47,6 +47,17 @@ function row(overrides: Partial<TaskCandidateRow> & { taskId: string }): TaskCan
     plannedAt: null,
     manualPriority: null,
     createdAt: "2026-07-01T00:00:00.000Z",
+    description: null,
+    completedAt: null,
+    cancelledAt: null,
+    intentionalNoDue: false,
+    noDueReason: null,
+    updatedAt: "2026-07-01T00:00:00.000Z",
+    projectIds: [],
+    contextIds: [],
+    personIds: [],
+    personRoles: [],
+    observedBefore: NOW,
     projectNames: [],
     contextNames: [],
     personNames: [],
@@ -221,7 +232,7 @@ describe("match-quality baseline (2E-MATCH-018)", () => {
     // Pinned, not merely reported: a weight change that quietly turns an
     // ambiguity into a one-step apply has to come here and say so.
     expect(measured).toEqual({
-      policyVersion: "2026-07-25.1",
+      policyVersion: "2026-07-25.2",
       scenarios: 14,
       oneStep: 0.429,
       matchedNeedsDeliberateness: 0.071,

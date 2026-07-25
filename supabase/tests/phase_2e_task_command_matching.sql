@@ -13,7 +13,7 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(29);
+select plan(32);
 
 -- Contract: signature, security, grants ------------------------------------
 
@@ -55,12 +55,30 @@ select is(
   'and still pins an empty search_path'
 );
 
-select ok(
-  (select count(*) > 0 from pg_indexes
-   where schemaname = 'public'
-     and tablename = 'tasks'
-     and indexname = 'tasks_user_normalized_title_idx'),
-  'the authoritative normalizer is index-expressible, and indexed (2E-MATCH-007)'
+-- The signature, pinned against the catalog ---------------------------------
+--
+-- `src/lib/supabase/database.types.ts` was hand-written for this function,
+-- because `supabase gen types typescript` cannot run on a workstation without
+-- Docker and refuses to run in this job without an access token it has no
+-- business holding. 2E-OPERATIONS-002 still wants parity proven by content
+-- comparison, so it is proven three ways: the migration declares the signature,
+-- `database-types-parity.test.ts` checks the generated types against that
+-- declaration, and this assertion checks both against what Postgres actually
+-- built. `proargnames` is the input parameters in declaration order followed by
+-- the RETURNS TABLE columns in declaration order.
+
+select is(
+  (select proargnames from pg_proc where oid =
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
+  array['p_eligible_statuses', 'p_title_query', 'p_project_hint', 'p_context_hint', 'p_person_hint', 'p_observed_before', 'p_limit', 'task_id', 'owner_id', 'title', 'description', 'status', 'due_at', 'planned_at', 'manual_priority', 'completed_at', 'cancelled_at', 'intentional_no_due', 'no_due_reason', 'created_at', 'updated_at', 'project_ids', 'project_names', 'context_ids', 'context_names', 'person_ids', 'person_names', 'person_roles', 'project_hint_matched', 'context_hint_matched', 'person_hint_matched', 'last_audited_at', 'observed_before', 'prefilter_tier', 'token_overlap', 'query_token_count', 'effective_limit'],
+  'the catalog signature is the one the migration declares and the generated types describe'
+);
+
+select is(
+  (select pronargdefaults from pg_proc where oid =
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
+  6::smallint,
+  'every argument except the eligible-status array carries a default'
 );
 
 -- 2E-MATCH-008: the authoritative normalizer, pinned -----------------------
@@ -143,10 +161,19 @@ select is(
 -- 2E-MATCH-003: ordered before truncation -----------------------------------
 
 select is(
-  (select task_id from public.list_task_command_candidates(
-     array['todo'], U&'Relat\00F3rio final', null, null, null, now(), 25) limit 1),
-  '41000001-1111-4111-8111-111111111111'::uuid,
-  'the exact normalized title sorts ahead of a token match'
+  (select prefilter_tier from public.list_task_command_candidates(
+     array['todo'], U&'Relat F3rio final', null, null, null, now(), 25)
+   where task_id = '41000001-1111-4111-8111-111111111111'),
+  0,
+  'the exact normalized title is tier 0, which is what sorts it ahead of the rest'
+);
+
+select is(
+  (select prefilter_tier from public.list_task_command_candidates(
+     array['todo'], U&'Relat F3rio final', null, null, null, now(), 25)
+   where task_id = '41000002-1111-4111-8111-111111111111'),
+  2,
+  'and a token-only match is tier 2, so truncation can never prefer it'
 );
 
 -- 2E-MATCH-002: eligibility is the action''s, not the table''s ---------------
@@ -188,6 +215,18 @@ select is(
      array['todo'], null, 'Acme', null, null, now(), 25)),
   '41000006-1111-4111-8111-111111111111'::uuid,
   'a project hint reaches a task no lexical signal connects to the command'
+);
+
+-- Relations travel with their ids -------------------------------------------
+--
+-- 2E-PREVIEW-005 must detect "assigning a relation the task already holds", and
+-- comparing names in TypeScript would mean re-normalizing them there.
+
+select is(
+  (select project_ids from public.list_task_command_candidates(
+     array['todo'], null, 'Acme', null, null, now(), 25)),
+  array['41000009-1111-4111-8111-111111111111'::uuid],
+  'a candidate carries the ids of its relations, not only their names'
 );
 
 -- The counts the TypeScript scorer is not allowed to re-derive ---------------

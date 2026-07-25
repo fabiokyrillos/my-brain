@@ -15,6 +15,8 @@
 
 import { z } from "zod";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 import { eligibleStatusesFor, type TaskCandidateRow } from "./matching";
 import { TASK_MATCH_LIMITS } from "./match-policy";
 import type { ValidatedTaskCommand } from "./schema";
@@ -26,10 +28,13 @@ import type { ValidatedTaskCommand } from "./schema";
  * the real client, a test passes a recorded double, and neither has to know
  * about the other.
  */
+type CandidateArgs =
+  Database["public"]["Functions"]["list_task_command_candidates"]["Args"];
+
 export type TaskCandidateQueryClient = {
   rpc(
     fn: "list_task_command_candidates",
-    args: Record<string, unknown>,
+    args: CandidateArgs,
   ): PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>;
 };
 
@@ -58,24 +63,47 @@ const rowSchema = z
     task_id: z.string().uuid(),
     owner_id: z.string().uuid(),
     title: z.string(),
+    description: z.string().nullable(),
     status: z.string(),
     due_at: z.string().nullable(),
     planned_at: z.string().nullable(),
     manual_priority: z.string().nullable(),
+    completed_at: z.string().nullable(),
+    cancelled_at: z.string().nullable(),
+    intentional_no_due: z.boolean(),
+    no_due_reason: z.string().nullable(),
     created_at: z.string(),
+    updated_at: z.string(),
+    project_ids: z.array(z.string()),
     project_names: z.array(z.string()),
+    context_ids: z.array(z.string()),
     context_names: z.array(z.string()),
+    person_ids: z.array(z.string()),
     person_names: z.array(z.string()),
+    person_roles: z.array(z.string()),
     project_hint_matched: z.boolean(),
     context_hint_matched: z.boolean(),
     person_hint_matched: z.boolean(),
     last_audited_at: z.string().nullable(),
+    observed_before: z.string(),
     prefilter_tier: z.number().int().min(0).max(3),
     token_overlap: z.number().int().min(0),
     query_token_count: z.number().int().min(0),
     effective_limit: z.number().int().min(1),
   })
-  .strict();
+  .strict()
+  // Position n of the three person arrays describes one `task_people` row. SQL
+  // builds them under one shared ORDER BY so they cannot drift, but the
+  // preview reads them pairwise and a silent misalignment would attribute a
+  // role to the wrong person.
+  .refine(
+    (row) =>
+      row.person_ids.length === row.person_names.length
+      && row.person_ids.length === row.person_roles.length
+      && row.project_ids.length === row.project_names.length
+      && row.context_ids.length === row.context_names.length,
+    { message: "relation id, name and role arrays are not aligned" },
+  );
 
 const rowsSchema = z.array(rowSchema);
 
@@ -84,18 +112,29 @@ function toCandidateRow(row: z.infer<typeof rowSchema>): TaskCandidateRow {
     taskId: row.task_id,
     ownerId: row.owner_id,
     title: row.title,
+    description: row.description,
     status: row.status,
     dueAt: row.due_at,
     plannedAt: row.planned_at,
     manualPriority: row.manual_priority,
+    completedAt: row.completed_at,
+    cancelledAt: row.cancelled_at,
+    intentionalNoDue: row.intentional_no_due,
+    noDueReason: row.no_due_reason,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    projectIds: row.project_ids,
     projectNames: row.project_names,
+    contextIds: row.context_ids,
     contextNames: row.context_names,
+    personIds: row.person_ids,
     personNames: row.person_names,
+    personRoles: row.person_roles,
     projectHintMatched: row.project_hint_matched,
     contextHintMatched: row.context_hint_matched,
     personHintMatched: row.person_hint_matched,
     lastAuditedAt: row.last_audited_at,
+    observedBefore: row.observed_before,
     prefilterTier: row.prefilter_tier,
     tokenOverlap: row.token_overlap,
     queryTokenCount: row.query_token_count,
@@ -144,10 +183,14 @@ export async function loadTaskCandidates(
     // sends `cancelled`, and `reopen_task` the only one that sends `completed`
     // alone — 2E-MATCH-002 is this argument and nothing else.
     p_eligible_statuses: [...eligibleStatusesFor(command.action)],
-    p_title_query: titleQueryOf(command) || null,
-    p_project_hint: command.targetHints.project ?? null,
-    p_context_hint: command.targetHints.context ?? null,
-    p_person_hint: command.targetHints.person ?? null,
+    // `undefined`, not `null`: the generated argument type says these are
+    // optional strings, and JSON.stringify drops an undefined value, so the key
+    // is omitted and the function's own `default null` applies. Sending `null`
+    // would mean the same thing to Postgres and a type error here.
+    p_title_query: titleQueryOf(command) || undefined,
+    p_project_hint: command.targetHints.project ?? undefined,
+    p_context_hint: command.targetHints.context ?? undefined,
+    p_person_hint: command.targetHints.person ?? undefined,
     p_observed_before: observedBefore,
     p_limit: input.limit ?? TASK_MATCH_LIMITS.candidates,
   });
@@ -161,8 +204,13 @@ export async function loadTaskCandidates(
 
   const parsed = rowsSchema.safeParse(result.data ?? []);
   if (!parsed.success) {
+    // The offending path travels with the error. A bare "unexpected row shape"
+    // against a thirty-column projection tells whoever is paged nothing, and
+    // the most likely cause is a migration that landed ahead of this code.
+    const issue = parsed.error.issues[0];
+    const path = (issue?.path ?? []).join(".");
     throw new TaskCandidateQueryError(
-      "list_task_command_candidates returned an unexpected row shape",
+      `list_task_command_candidates returned an unexpected row shape at ${path || "<root>"}`,
       "invalid_row_shape",
     );
   }

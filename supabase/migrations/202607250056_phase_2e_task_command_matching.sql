@@ -24,28 +24,54 @@
 --                 the divergence characterized by 2E-MATCH-008 cannot reach a
 --                 candidacy decision.
 --
--- Deliberately `security invoker`, which is a departure from the
--- `list_needs_attention` read-projection precedent. 2E-MATCH-001 requires
--- ownership to be enforced three times *independently*: by the function's own
--- predicate, by forced RLS, and again in the ranking input. Under
--- `security definer` the second of those is not independent — the definer owns
--- the tables — so the claim would be decorative. This function reads nothing
--- the caller cannot already select for itself, so it gives up nothing by
--- running as the caller, and RLS becomes a real second wall.
-
--- The index that makes 2E-MATCH-007's "index-expressible" claim concrete.
+-- `security definer`, following the `list_needs_attention` read-projection
+-- precedent, after `security invoker` was written and rejected.
 --
--- Truthfully: the current candidate query's dominant access path is
--- `tasks_user_status_due_idx`, because qualification is a disjunction over
--- lexical *and* relation signals and the planner cannot drive that from one
--- expression index. This index backs the exact-normalized-title probe, and is
--- the path the query moves onto as the eligible population grows past what a
--- scan of one user's tasks answers cheaply. It is created here rather than
--- later because it is the property 2E-MATCH-007 chose the SQL normalizer *for*,
--- and because an expression index over an `immutable strict` function is
--- additive and reversible.
-create index if not exists tasks_user_normalized_title_idx
-  on public.tasks (user_id, public.normalize_entity_alias(title));
+-- Invoker is what 2E-MATCH-001's "and by RLS" clause literally wants, and it
+-- cannot be had: `202607170020:314` revokes EXECUTE on
+-- `public.normalize_entity_alias` from `public, anon, authenticated`, and that
+-- function carries a non-null `proconfig`, so the planner may not inline it and
+-- the ACL check reaches the caller. Every lexical decision below would raise
+-- `42501` for the only role that will ever call this. Migration `202607170022`
+-- exists solely to work around the same revoke, and resolved it the same way:
+-- by making the consumer `security definer`.
+--
+-- Granting `authenticated` EXECUTE would also work — the function is a pure
+-- text transform that reads nothing — but 2E-OWNERSHIP-003 and PRD §14 say no
+-- grant is widened by this phase, and quietly reversing a deliberate hardening
+-- decision from another slice is not this slice's call to make.
+--
+-- What that costs, stated plainly rather than papered over: inside this
+-- function ownership rests on the `auth.uid()` predicate below, not on RLS,
+-- because the definer owns these tables. RLS still forces the boundary on every
+-- other path to them. So the three layers 2E-MATCH-001 asks for are the
+-- predicate here, the owner filter in `rankTaskCandidates`, and the raise in
+-- `loadTaskCandidates` — and, more usefully than any of them, cross-owner
+-- denial is *proven* through this function by
+-- `supabase/tests/phase_2e_task_command_matching.sql` rather than argued from
+-- role attributes.
+--
+-- No index is created here. An expression index on
+-- `(user_id, normalize_entity_alias(title))` was written and removed: the
+-- candidate query below qualifies on a disjunction of lexical *and* relation
+-- signals, so `normalize_entity_alias(title)` never appears in a sargable
+-- position and no plan can use it — while index maintenance evaluates the
+-- expression as the *writing* role, which would have raised `42501` on
+-- `createRecord`'s direct client insert (`src/features/operations/actions.ts:68`)
+-- and broken task creation outright. 2E-MATCH-007 designates this normalizer
+-- authoritative because it *is* index-expressible; it does not oblige a slice
+-- with nothing to index to add one. `tasks_user_status_due_idx` is the access
+-- path this query actually uses.
+--
+-- The projection is wider than ranking needs, deliberately. `create or replace`
+-- cannot add, rename or retype a `RETURNS TABLE` column — Postgres raises
+-- `42P13` — so every column Slices 2E.3 and 2E.4 will need had to be decided
+-- here or bought with a `_v2` in the very next slice, which is the versioned-RPC
+-- sprawl ADR-037 exists to contain. So the whole observed pre-state of every
+-- field the §11.2 taxonomy can change travels with the candidate: 2E-PREVIEW-002
+-- can render before/after without re-reading the task, and 2E-UPDATE-003 can
+-- gate on a pre-state observed at the *same* instant that produced the match
+-- rather than at a later one. Any column change after this still needs a `_v2`.
 
 create or replace function public.list_task_command_candidates(
   p_eligible_statuses text[],
@@ -60,18 +86,29 @@ returns table (
   task_id uuid,
   owner_id uuid,
   title text,
+  description text,
   status text,
   due_at timestamptz,
   planned_at timestamptz,
   manual_priority text,
+  completed_at timestamptz,
+  cancelled_at timestamptz,
+  intentional_no_due boolean,
+  no_due_reason text,
   created_at timestamptz,
+  updated_at timestamptz,
+  project_ids uuid[],
   project_names text[],
+  context_ids uuid[],
   context_names text[],
+  person_ids uuid[],
   person_names text[],
+  person_roles text[],
   project_hint_matched boolean,
   context_hint_matched boolean,
   person_hint_matched boolean,
   last_audited_at timestamptz,
+  observed_before timestamptz,
   prefilter_tier integer,
   token_overlap integer,
   query_token_count integer,
@@ -79,7 +116,7 @@ returns table (
 )
 language sql
 stable
-security invoker
+security definer
 set search_path = ''
 as $$
   with caller as (
@@ -94,7 +131,9 @@ as $$
       -- instant this command was resolved against" — which also makes the
       -- signal a pure function of the clock the caller injected, as
       -- 2E-MATCH-017 requires. `now()` is only the fallback for direct SQL and
-      -- pgTAP; the application always passes its injected instant.
+      -- pgTAP; the application always passes its injected instant, and the
+      -- instant actually used is echoed back so the pre-state a later slice
+      -- gates on is one this function vouched for.
       coalesce(p_observed_before, now()) as observed_before
   ),
   statuses as (
@@ -104,6 +143,11 @@ as $$
     -- closed: an element outside the eight `tasks_status_check` literals is
     -- dropped rather than widening candidacy, and an empty or wholly invalid
     -- array yields no candidates at all.
+    --
+    -- This list is the third copy of those literals (the CHECK and
+    -- `TASK_STATUSES` are the others) and it fails *silently*, so
+    -- `status-vocabulary-parity.test.ts` reads this file and reds if it ever
+    -- stops matching the taxonomy.
     select array(
       select distinct s
       from unnest(coalesce(p_eligible_statuses, '{}'::text[])) as s
@@ -117,15 +161,22 @@ as $$
     -- `normalize_entity_alias` is `strict`, so a null argument returns null;
     -- the coalesce around the argument keeps every hint a string.
     --
+    -- Bounded here and not only in TypeScript. The 2E-COMMAND-005 caps live in
+    -- the command schema, but PostgREST exposes this function directly to any
+    -- authenticated caller, and an unbounded hint turns the token lateral below
+    -- into an unbounded number of `LIKE` comparisons per candidate. The lengths
+    -- match the columns each hint is compared against: `tasks.title` is capped
+    -- at 240, `projects.name` and `people.name` at 160, `contexts.name` at 120.
+    --
     -- Normalization also closes a LIKE-metacharacter hole for free: the
     -- function's own `[^a-z0-9]+` replacement means no `%`, `_` or backslash
     -- can survive into the containment tests below, so the model-supplied hint
     -- cannot widen its own pattern.
     select
-      public.normalize_entity_alias(coalesce(p_title_query, '')) as q,
-      public.normalize_entity_alias(coalesce(p_project_hint, '')) as project_q,
-      public.normalize_entity_alias(coalesce(p_context_hint, '')) as context_q,
-      public.normalize_entity_alias(coalesce(p_person_hint, '')) as person_q
+      public.normalize_entity_alias(left(coalesce(p_title_query, ''), 240)) as q,
+      public.normalize_entity_alias(left(coalesce(p_project_hint, ''), 160)) as project_q,
+      public.normalize_entity_alias(left(coalesce(p_context_hint, ''), 120)) as context_q,
+      public.normalize_entity_alias(left(coalesce(p_person_hint, ''), 160)) as person_q
   ),
   hint_query as (
     select
@@ -133,10 +184,16 @@ as $$
       h.project_q,
       h.context_q,
       h.person_q,
+      -- Ordered before it is bounded, for the same reason the candidate query
+      -- is: an arbitrary sixteen of a caller's tokens would make scoring depend
+      -- on something no fixture can pin. Sixteen is above MAX_TITLE_WORDS (12),
+      -- so a well-formed command never reaches it.
       array(
         select distinct tok
         from unnest(string_to_array(h.q, ' ')) as tok
         where tok <> ''
+        order by tok
+        limit 16
       ) as tokens
     from hints h
   ),
@@ -145,11 +202,17 @@ as $$
       t.id,
       t.user_id,
       t.title,
+      t.description,
       t.status,
       t.due_at,
       t.planned_at,
       t.manual_priority,
+      t.completed_at,
+      t.cancelled_at,
+      t.intentional_no_due,
+      t.no_due_reason,
       t.created_at,
+      t.updated_at,
       public.normalize_entity_alias(t.title) as nt,
       -- A relation hint qualifies a candidate as well as scoring it. Without
       -- that, "mark the Acme task as done" could never reach a task titled
@@ -262,42 +325,70 @@ as $$
     r.id,
     r.user_id,
     r.title,
+    r.description,
     r.status,
     r.due_at,
     r.planned_at,
     r.manual_priority,
+    r.completed_at,
+    r.cancelled_at,
+    r.intentional_no_due,
+    r.no_due_reason,
     r.created_at,
+    r.updated_at,
+    coalesce(pn.ids, '{}'::uuid[]),
     coalesce(pn.names, '{}'::text[]),
+    coalesce(cn.ids, '{}'::uuid[]),
     coalesce(cn.names, '{}'::text[]),
+    coalesce(sn.ids, '{}'::uuid[]),
     coalesce(sn.names, '{}'::text[]),
+    coalesce(sn.roles, '{}'::text[]),
     r.project_hit,
     r.context_hit,
     r.person_hit,
     al.last_audited_at,
+    b.observed_before,
     r.tier,
     r.overlap,
     r.query_tokens,
     b.lim
   from ranked r
   cross join bounds b
-  -- Names and recency are resolved *after* truncation, over at most `lim + 1`
-  -- rows. They inform scoring and the disambiguation evidence of 2E-DISAMBIG-001;
-  -- neither decides candidacy, so neither is worth paying for across the whole
-  -- eligible population.
+  -- Relations and recency are resolved *after* truncation, over at most
+  -- `lim + 1` rows. Neither decides candidacy, so neither is worth paying for
+  -- across the whole eligible population.
+  --
+  -- Ids travel with the names, and every array in a group shares one ORDER BY,
+  -- so position `n` of `person_ids`, `person_names` and `person_roles` describes
+  -- one row. 2E-PREVIEW-005 has to detect "assigning a relation the task
+  -- already has", and comparing names in TypeScript would mean re-normalizing
+  -- them there — exactly what 2E-MATCH-007 forbids. The role travels for the
+  -- same reason: `assign_person` and `set_waiting_on` write different roles, and
+  -- a name alone cannot tell them apart.
   left join lateral (
-    select array_agg(p.name order by p.name, p.id) as names
+    select
+      array_agg(p.id order by p.name, p.id) as ids,
+      array_agg(p.name order by p.name, p.id) as names
     from public.task_projects tp
     join public.projects p on p.id = tp.project_id and p.user_id = tp.user_id
     where tp.task_id = r.id and tp.user_id = r.user_id
   ) pn on true
   left join lateral (
-    select array_agg(c.name order by c.name, c.id) as names
+    select
+      array_agg(c.id order by c.name, c.id) as ids,
+      array_agg(c.name order by c.name, c.id) as names
     from public.task_contexts tc
     join public.contexts c on c.id = tc.context_id and c.user_id = tc.user_id
     where tc.task_id = r.id and tc.user_id = r.user_id
   ) cn on true
   left join lateral (
-    select array_agg(distinct pe.name order by pe.name) as names
+    -- No DISTINCT here, unlike a name-only projection: `task_people` is keyed
+    -- (task_id, person_id, role), so one person legitimately appears twice
+    -- under two roles and collapsing them would lose the role that matters.
+    select
+      array_agg(pe.id order by pe.name, pe.id, tpe.role) as ids,
+      array_agg(pe.name order by pe.name, pe.id, tpe.role) as names,
+      array_agg(tpe.role order by pe.name, pe.id, tpe.role) as roles
     from public.task_people tpe
     join public.people pe on pe.id = tpe.person_id and pe.user_id = tpe.user_id
     where tpe.task_id = r.id and tpe.user_id = r.user_id
@@ -313,7 +404,8 @@ as $$
     --
     -- `tasks.updated_at` is deliberately not the source: it records mutation
     -- time, ties exactly in the canonical two-identical-titles ambiguity case,
-    -- and is bumped by Phase 2E's own writes.
+    -- and is bumped by Phase 2E's own writes. It is projected above for
+    -- staleness detection (2E-PREVIEW-006), which is a different question.
     select max(a.created_at) as last_audited_at
     from public.audit_logs a
     where a.user_id = r.user_id
@@ -332,7 +424,7 @@ as $$
 $$;
 
 comment on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) is
-  'Phase 2E deterministic task candidate generation (PRD 2E-MATCH-001..007). Read-only, owner-scoped, ordered before truncation, returns one row beyond p_limit so overflow is detectable.';
+  'Phase 2E deterministic task candidate generation (PRD 2E-MATCH-001..007). Read-only, owner-scoped, ordered before truncation, returns one row beyond p_limit so overflow is detectable, and projects the full observed pre-state so a preview never has to re-read the task.';
 
 grant execute on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) to authenticated;
 revoke all on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) from public, anon;

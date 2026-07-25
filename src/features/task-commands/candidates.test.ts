@@ -49,9 +49,20 @@ function sqlRow(overrides: Record<string, unknown> = {}) {
     planned_at: null,
     manual_priority: null,
     created_at: "2026-07-01T00:00:00.000Z",
+    description: null,
+    completed_at: null,
+    cancelled_at: null,
+    intentional_no_due: false,
+    no_due_reason: null,
+    updated_at: "2026-07-01T00:00:00.000Z",
+    project_ids: ["55555555-5555-4555-8555-555555555555"],
     project_names: ["Acme"],
+    context_ids: [],
     context_names: [],
+    person_ids: [],
     person_names: [],
+    person_roles: [],
+    observed_before: NOW,
     project_hint_matched: true,
     context_hint_matched: false,
     person_hint_matched: false,
@@ -114,10 +125,13 @@ describe("candidate query arguments", () => {
       now: NOW,
     });
 
-    expect(calls[0].args.p_title_query).toBeNull();
-    expect(calls[0].args.p_project_hint).toBeNull();
-    expect(calls[0].args.p_context_hint).toBeNull();
-    expect(calls[0].args.p_person_hint).toBeNull();
+    // Omitted, not nulled: the generated argument type says these are optional
+    // strings, JSON.stringify drops an undefined value, and the function's own
+    // `default null` then applies.
+    expect(calls[0].args.p_title_query).toBeUndefined();
+    expect(calls[0].args.p_project_hint).toBeUndefined();
+    expect(calls[0].args.p_context_hint).toBeUndefined();
+    expect(calls[0].args.p_person_hint).toBeUndefined();
   });
 
   it("passes the injected instant, so the recency window is never the server's clock", async () => {
@@ -179,9 +193,20 @@ describe("what comes back", () => {
         plannedAt: null,
         manualPriority: null,
         createdAt: "2026-07-01T00:00:00.000Z",
+        description: null,
+        completedAt: null,
+        cancelledAt: null,
+        intentionalNoDue: false,
+        noDueReason: null,
+        updatedAt: "2026-07-01T00:00:00.000Z",
+        projectIds: ["55555555-5555-4555-8555-555555555555"],
         projectNames: ["Acme"],
+        contextIds: [],
         contextNames: [],
+        personIds: [],
         personNames: [],
+        personRoles: [],
+        observedBefore: NOW,
         projectHintMatched: true,
         contextHintMatched: false,
         personHintMatched: false,
@@ -238,7 +263,7 @@ describe("what comes back", () => {
   });
 
   it("raises on a column the row contract does not declare", async () => {
-    const { client } = recordingClient({ data: [sqlRow({ description: "leaked" })], error: null });
+    const { client } = recordingClient({ data: [sqlRow({ dynamic_priority: 3 })], error: null });
 
     await expect(
       loadTaskCandidates({

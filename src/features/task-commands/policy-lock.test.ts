@@ -82,8 +82,8 @@ describe("policy digest", () => {
       TASK_MATCH_SCORE_BANDS,
     ];
     expect({ version: TASK_MATCH_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.1",
-      digest: "fe664034053a19f1",
+      version: "2026-07-25.2",
+      digest: "2354d889a2db7e15",
     });
   });
 
@@ -107,20 +107,18 @@ describe("policy digest", () => {
     // and it is the one that would silently pick "whichever you last touched".
     expect(TASK_MATCH_WEIGHTS.recency).toBeLessThan(TASK_MATCH_THRESHOLDS.minMargin);
 
-    // Signals the user *did* express are allowed to break that tie, and naming
-    // a project or a person is calibrated to do exactly that: it is how a user
-    // distinguishes two tasks called "Send invoice", and a hint that cannot
-    // change the outcome is decoration.
-    expect(TASK_MATCH_WEIGHTS.referencedProject)
-      .toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.minMargin);
-    expect(TASK_MATCH_WEIGHTS.referencedPerson)
-      .toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.minMargin);
-
-    // The coarser hints are deliberately below it. A shared context ("Work"),
-    // a status the model inferred from free text, or a due date in the same
-    // 24 hours identifies a *kind* of task, not a task.
+    // *No* single non-lexical signal may reach the margin. This started as
+    // "only recency", with project and person calibrated at exactly 0.12 so a
+    // named relation could break a tie — and a review proved that let one
+    // relation hint carry a pair straight from ambiguous to a one-step apply,
+    // landing on the task that already held the relation the command was about
+    // to add. Identification is what the margin measures, and a hint that also
+    // names the patch is not identification.
     for (const weight of [
+      TASK_MATCH_WEIGHTS.recency,
+      TASK_MATCH_WEIGHTS.referencedProject,
       TASK_MATCH_WEIGHTS.referencedContext,
+      TASK_MATCH_WEIGHTS.referencedPerson,
       TASK_MATCH_WEIGHTS.statusMatch,
       TASK_MATCH_WEIGHTS.temporalProximity,
     ]) {

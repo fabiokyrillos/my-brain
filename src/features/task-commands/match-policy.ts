@@ -20,7 +20,7 @@
  * command-contract version on every proposal, and collapsing them would force a
  * prompt change to invalidate the attribution of every past match.
  */
-export const TASK_MATCH_POLICY_VERSION = "2026-07-25.1";
+export const TASK_MATCH_POLICY_VERSION = "2026-07-25.2";
 
 /**
  * How much each deterministic signal contributes (2E-MATCH-005).
@@ -31,12 +31,15 @@ export const TASK_MATCH_POLICY_VERSION = "2026-07-25.1";
  * strong signal past the threshold that two independent ones are meant to
  * clear.
  *
- * The calibration that matters, and the reason `recency` is the smallest
- * number here: the canonical ambiguity case of PRD §12.2 is two tasks with the
- * same title, and recency must never be able to resolve it on its own. At
- * 0.06 it cannot — the largest gap it can open is below `minMargin`, so two
- * otherwise-identical candidates stay ambiguous however recently one was
- * touched.
+ * The calibration that matters: **no single non-lexical signal may reach
+ * `minMargin`**, so none of them can resolve the canonical ambiguity case of
+ * PRD §12.2 — two tasks with the same title — on its own. `referencedProject`
+ * and `referencedPerson` were 0.12, exactly `minMargin`, and a review proved
+ * that let one relation hint carry a pair from ambiguous straight to a one-step
+ * apply. Worse, for `assign_project` and `set_waiting_on` the hint names the
+ * relation the command is about to *add*, so the boost landed on the task that
+ * already had it. They are now 0.1, and `scoreRow` additionally refuses to
+ * score the relation the requested action writes.
  */
 export const TASK_MATCH_WEIGHTS = {
   /** The normalized title equals the normalized hint. */
@@ -45,9 +48,9 @@ export const TASK_MATCH_WEIGHTS = {
   titlePhrase: 0.4,
   /** Scaled by the fraction of the hint's tokens the title carries. */
   tokenOverlap: 0.22,
-  referencedProject: 0.12,
+  referencedProject: 0.1,
   referencedContext: 0.1,
-  referencedPerson: 0.12,
+  referencedPerson: 0.1,
   /** The task holds the status the hint named. */
   statusMatch: 0.08,
   /** The task's due (or planned) instant sits near the hint's temporal phrase. */
@@ -91,6 +94,35 @@ export const TASK_MATCH_LIMITS = {
   temporalExactHours: 24,
   /** ...and this close scores half of it. */
   temporalNearHours: 72,
+  /**
+   * Decimal places every published score and margin is rounded to.
+   *
+   * Declared here rather than inlined in `roundScore` so it is inside the
+   * digest: a review demonstrated that changing it to two left every pinned
+   * score in the suite unchanged, which made a real precision change invisible.
+   */
+  scoreDecimals: 3,
+} as const;
+
+/**
+ * The tier vocabulary `list_task_command_candidates` assigns and `scoreRow`
+ * decodes.
+ *
+ * A cross-language contract carried by bare integers is the same defect class
+ * as the normalizer divergence of 2E-MATCH-008, in a place the PRD did not
+ * anticipate: inserting a tier in the SQL `case` would silently re-score every
+ * match. Declaring it here puts it inside the policy digest, and
+ * `status-vocabulary-parity.test.ts` holds the migration to it.
+ */
+export const TASK_MATCH_PREFILTER_TIERS = {
+  /** The normalized title equals the normalized hint. */
+  exactTitle: 0,
+  /** The whole normalized hint appears in the title as complete words. */
+  titlePhrase: 1,
+  /** Some lexical or relational connection exists. */
+  connected: 2,
+  /** None does. Only reachable when the command carried no hint at all. */
+  unconnected: 3,
 } as const;
 
 /**
@@ -109,7 +141,12 @@ export const TASK_MATCH_EVIDENCE = [
   "referenced_context",
   "referenced_person",
   "status_match",
+  /** The due or planned instant is within `temporalExactHours` of the hint. */
   "temporal_proximity",
+  /** ...or within `temporalNearHours`, which scores half. A review noted the
+   * single label could not tell the user which band fired, and 2E-DISAMBIG-001
+   * renders exactly this to distinguish competing candidates. */
+  "temporal_proximity_near",
   "recent_activity",
 ] as const;
 
@@ -127,21 +164,18 @@ export const TASK_MATCH_SCORE_BANDS = ["none", "low", "medium", "high"] as const
 
 export type TaskMatchScoreBand = (typeof TASK_MATCH_SCORE_BANDS)[number];
 
-export function scoreBand(score: number): TaskMatchScoreBand {
-  if (!Number.isFinite(score) || score <= 0) return "none";
-  if (score < TASK_MATCH_THRESHOLDS.minCandidateScore) return "low";
-  if (score < TASK_MATCH_THRESHOLDS.topScore) return "medium";
-  return "high";
-}
+/**
+ * The mapping from a score to a band deliberately does not live here yet.
+ *
+ * 2E-ANALYTICS-002 requires the *vocabulary* to be settled before it reaches a
+ * CHECK constraint, and it is. The functions that assign a band were written
+ * and removed: they had no caller, no test, and no emitting code until Slice
+ * 2E.7, and Slice 2E.1's review had already removed one consumer-less export
+ * for the same reason. They arrive with the analytics payload that needs them.
+ */
 
-export function marginBand(margin: number): TaskMatchScoreBand {
-  if (!Number.isFinite(margin) || margin <= 0) return "none";
-  if (margin < TASK_MATCH_THRESHOLDS.minMargin) return "low";
-  if (margin < TASK_MATCH_THRESHOLDS.minMargin * 2) return "medium";
-  return "high";
-}
-
-/** Three decimals, matching `calculateCandidateMargin`'s own rounding. */
+/** Rounded to `TASK_MATCH_LIMITS.scoreDecimals`, matching `calculateCandidateMargin`. */
 export function roundScore(value: number): number {
-  return Math.round(value * 1_000) / 1_000;
+  const factor = 10 ** TASK_MATCH_LIMITS.scoreDecimals;
+  return Math.round(value * factor) / factor;
 }

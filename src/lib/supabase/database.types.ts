@@ -2537,25 +2537,36 @@ export type Database = {
           p_title_query?: string
         }
         Returns: {
+          cancelled_at: string
+          completed_at: string
           context_hint_matched: boolean
+          context_ids: string[]
           context_names: string[]
           created_at: string
+          description: string
           due_at: string
           effective_limit: number
+          intentional_no_due: boolean
           last_audited_at: string
           manual_priority: string
+          no_due_reason: string
+          observed_before: string
           owner_id: string
           person_hint_matched: boolean
+          person_ids: string[]
           person_names: string[]
+          person_roles: string[]
           planned_at: string
           prefilter_tier: number
           project_hint_matched: boolean
+          project_ids: string[]
           project_names: string[]
           query_token_count: number
           status: string
           task_id: string
           title: string
           token_overlap: number
+          updated_at: string
         }[]
       }
       match_internal_knowledge: {
