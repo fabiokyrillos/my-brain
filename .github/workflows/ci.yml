@@ -101,7 +101,10 @@ jobs:
         # are not exercised by any gate below, so they are excluded to keep the
         # job inside its timeout. `db`, `kong`, `rest`, `meta` and Auth stay up
         # because the journey step needs a real API and a real Auth service.
-        run: supabase start -x studio,imgproxy,inbucket,vector,analytics,edge-runtime,functions
+        # `inbucket`, `analytics` and `functions` appear in `supabase start
+        # --help` but the CLI rejects them at runtime ("not valid to exclude"),
+        # so only the names it actually accepts are listed.
+        run: supabase start -x studio,imgproxy,vector,edge-runtime
 
       - name: Apply the whole migration chain to an empty database
         # Proves every migration still applies from zero, in order — the check
@@ -113,12 +116,19 @@ jobs:
         run: supabase test db --local supabase/tests
 
       - name: Lint the database
-        # `--level warning` prints everything; `--fail-on error` gates. Two
+        # `--level warning` prints everything; `--fail-on error` gates. The two
         # long-standing 42804 warnings in run_user_heartbeat are recorded in
         # docs/SECURITY.md and are not part of this initiative — error level is
         # what catches the defect class this gate exists for (the
         # `pg_catalog.greatest` lookup that 202607220042/045 had to fix twice).
-        run: supabase db lint --local --level warning --fail-on error
+        #
+        # Scoped to the product's own schemas. Without --schema the linter also
+        # walks `extensions`, where supabase/seed.sql installed pgTAP: its 30
+        # internal plpgsql_check findings (7 of them error level) would fail a
+        # gate that exists to check code this project owns. `private` is
+        # included deliberately — the undo handlers and the AI bounds validator
+        # live there.
+        run: supabase db lint --local --schema public,private --level warning --fail-on error
 
       - name: Export the local Supabase credentials
         # NEXT_PUBLIC_* are inlined at build time, so this must precede build.
