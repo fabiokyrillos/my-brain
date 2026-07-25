@@ -10,6 +10,14 @@ import {
   touchesReminders,
   type TaskCommandAction,
 } from "./taxonomy";
+import {
+  TASK_MATCH_EVIDENCE,
+  TASK_MATCH_LIMITS,
+  TASK_MATCH_POLICY_VERSION,
+  TASK_MATCH_SCORE_BANDS,
+  TASK_MATCH_THRESHOLDS,
+  TASK_MATCH_WEIGHTS,
+} from "./match-policy";
 import { TEMPORAL_LEXICON, TEMPORAL_LEXICON_VERSION } from "./temporal";
 import { resolvePriorityTerm, resolveStatusTerm } from "./vocabulary";
 
@@ -59,6 +67,70 @@ describe("policy digest", () => {
       version: "2026-07-25.1",
       digest: "a5b7f3be24a9abe1",
     });
+  });
+
+  it("pins every matching weight, threshold, limit and band to the match policy version", () => {
+    // 2E-MATCH-016. The match policy carries its own version rather than
+    // sharing the command contract's: §10.4 stamps `match_policy_version` on
+    // every match decision, and a prompt change must not invalidate the
+    // attribution of every match already recorded.
+    const canonical = [
+      TASK_MATCH_WEIGHTS,
+      TASK_MATCH_THRESHOLDS,
+      TASK_MATCH_LIMITS,
+      TASK_MATCH_EVIDENCE,
+      TASK_MATCH_SCORE_BANDS,
+    ];
+    expect({ version: TASK_MATCH_POLICY_VERSION, digest: digest(canonical) }).toEqual({
+      version: "2026-07-25.1",
+      digest: "fe664034053a19f1",
+    });
+  });
+
+  it("keeps the calibration that makes the ambiguity rule mean anything", () => {
+    // These are not arbitrary numbers, and a future tuner deserves to be told
+    // which relationships the design depends on rather than discovering them
+    // by shipping a wrong match.
+
+    // A single exact-title hit must clear the threshold on its own, or PRD
+    // §12.1's headline flow becomes a disambiguation list of one.
+    expect(TASK_MATCH_WEIGHTS.exactTitle).toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.topScore);
+
+    // A phrase hit must clear it only *with* its token overlap, so a bare
+    // fragment cannot carry a command by itself.
+    expect(TASK_MATCH_WEIGHTS.titlePhrase).toBeLessThan(TASK_MATCH_THRESHOLDS.topScore);
+    expect(TASK_MATCH_WEIGHTS.titlePhrase + TASK_MATCH_WEIGHTS.tokenOverlap)
+      .toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.topScore);
+
+    // A signal the user did not express may never resolve the canonical
+    // two-identical-titles case of PRD §12.2. Recency is the only such signal,
+    // and it is the one that would silently pick "whichever you last touched".
+    expect(TASK_MATCH_WEIGHTS.recency).toBeLessThan(TASK_MATCH_THRESHOLDS.minMargin);
+
+    // Signals the user *did* express are allowed to break that tie, and naming
+    // a project or a person is calibrated to do exactly that: it is how a user
+    // distinguishes two tasks called "Send invoice", and a hint that cannot
+    // change the outcome is decoration.
+    expect(TASK_MATCH_WEIGHTS.referencedProject)
+      .toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.minMargin);
+    expect(TASK_MATCH_WEIGHTS.referencedPerson)
+      .toBeGreaterThanOrEqual(TASK_MATCH_THRESHOLDS.minMargin);
+
+    // The coarser hints are deliberately below it. A shared context ("Work"),
+    // a status the model inferred from free text, or a due date in the same
+    // 24 hours identifies a *kind* of task, not a task.
+    for (const weight of [
+      TASK_MATCH_WEIGHTS.referencedContext,
+      TASK_MATCH_WEIGHTS.statusMatch,
+      TASK_MATCH_WEIGHTS.temporalProximity,
+    ]) {
+      expect(weight).toBeLessThan(TASK_MATCH_THRESHOLDS.minMargin);
+    }
+
+    // The floor must sit below every single-signal contribution, or a candidate
+    // the query deliberately qualified would be dropped before it is ranked.
+    expect(TASK_MATCH_THRESHOLDS.minCandidateScore)
+      .toBeLessThanOrEqual(TASK_MATCH_WEIGHTS.referencedContext);
   });
 });
 
