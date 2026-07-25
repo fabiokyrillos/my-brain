@@ -2,6 +2,12 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceData, requireServiceSuccess } from "../_shared/result.ts";
 import { rankEntityCandidates, type EntityCandidate, type EntityType } from "../_shared/entity-resolution.ts";
 import { buildExtractionElementTrust } from "../_shared/trust-builders.ts";
+import {
+  describeExtractionIssues,
+  validateExtraction,
+  type EntityCandidateValue,
+  type ExtractionValue,
+} from "../_shared/extraction-validation.ts";
 import { recordEntryProcessingEvent, toProcessingOutcome } from "./product-events.ts";
 
 // Mirrors src/lib/ai/openai-provider.ts EXTRACTION_STRATEGY_VERSION /
@@ -149,21 +155,13 @@ function buildCandidates(input: {
   }));
 }
 
-type ExtractionMention = { name: string; confidence: number; evidence: string; inferred: boolean };
-type Extraction = {
-  language: string;
-  occurredAt: string;
-  isRetroactive: boolean;
-  summary: string;
-  concepts: string[];
-  contexts: ExtractionMention[];
-  organizations: ExtractionMention[];
-  projects: ExtractionMention[];
-  people: ExtractionMention[];
-  taskCandidates: unknown[];
-  pendingQuestions: unknown[];
-  confidence: number;
-};
+// The extraction shape is owned by ../_shared/extraction-validation.ts, which
+// mirrors src/lib/ai/extraction-schema.ts and is held to it by
+// src/lib/ai/extraction-parity.test.ts. The local structural type this file
+// used to declare left taskCandidates/pendingQuestions as `unknown[]` — the two
+// riskiest arrays were not even typed.
+type ExtractionMention = EntityCandidateValue;
+type Extraction = ExtractionValue;
 
 function resolveExtractionEntities(input: {
   extraction: Extraction;
@@ -285,7 +283,28 @@ async function extractEntry(input: {
   });
   if (usageError) console.error("AI usage recording failed", { operation: "capture_extraction", model: responseModel, code: usageError.code });
 
-  const extraction = JSON.parse(outputText(responseJson)) as Extraction;
+  // Model output is untrusted data. Before this validation the worker asserted
+  // the shape with a bare cast, so out-of-range or over-length output was
+  // persisted verbatim into entry_interpretations/task_candidates and only
+  // surfaced later — as an unmapped failure at task materialization, or as a
+  // silently null interpretation in the UI when the read-side Zod parse failed.
+  let parsedExtraction: unknown;
+  try {
+    parsedExtraction = JSON.parse(outputText(responseJson));
+  } catch {
+    // A SyntaxError message embeds an excerpt of the offending input, and this
+    // message reaches jobs.error, so it must never be propagated.
+    throw new Error("Entry extraction returned output that is not valid JSON");
+  }
+
+  const validated = validateExtraction(parsedExtraction);
+  if (!validated.ok) {
+    // Field paths and codes only — never the offending value.
+    throw new Error(
+      `Entry extraction output failed validation (${describeExtractionIssues(validated.issues)})`,
+    );
+  }
+  const extraction: Extraction = validated.value;
 
   const history = new Map<string, number>();
   historyRows.forEach((row: { entity_type: string; entity_id: string }) => {
@@ -327,6 +346,12 @@ async function persistEmbedding(input: {
     body: JSON.stringify({ model: input.embeddingModel, input: embeddingContent, encoding_format: "float" }),
   });
   if (!response.ok) throw new Error(`OpenAI embedding failed with ${response.status}`);
+  // /v1/embeddings has no `id` in its body, unlike /v1/responses, so the
+  // provider request id has to come from the header. Without it
+  // ai_usage_events_request_id_idx cannot deduplicate, and a job retry
+  // double-records the embedding cost in the ledger a future spend cap would
+  // depend on.
+  const providerRequestId = response.headers.get("x-request-id");
   const json = await response.json();
   const embedding = json.data?.[0]?.embedding;
   if (!embedding) throw new Error("OpenAI returned no embedding");
@@ -339,7 +364,7 @@ async function persistEmbedding(input: {
     p_cached_input_tokens: 0,
     p_output_tokens: 0,
     p_reasoning_tokens: 0,
-    p_provider_request_id: null,
+    p_provider_request_id: providerRequestId,
     p_source_type: "entry",
     p_source_id: input.entryId,
     p_user_id: input.userId,
