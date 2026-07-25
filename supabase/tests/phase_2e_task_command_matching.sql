@@ -13,7 +13,7 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(32);
+select plan(34);
 
 -- Contract: signature, security, grants ------------------------------------
 
@@ -35,15 +35,23 @@ select ok(
   'anon may not (2E-OWNERSHIP-003)'
 );
 
--- 2E-MATCH-001 requires ownership enforced three times *independently*. Under
--- SECURITY DEFINER the RLS layer is not independent of the predicate layer,
--- because the definer owns the tables. This assertion is what keeps the
--- three-layer claim honest.
+-- `security definer`, and pinned as such.
+--
+-- `security invoker` was written first, because 2E-MATCH-001 literally wants
+-- RLS as an independent second wall. It cannot run: `202607170020:314` revokes
+-- EXECUTE on `normalize_entity_alias` from `authenticated`, and its non-null
+-- `proconfig` stops the planner inlining it, so every lexical decision in the
+-- function would raise 42501 for the only role that calls it.
+--
+-- The consequence is that inside this function the `auth.uid()` predicate is
+-- the whole wall. That is why the cross-owner cases below assert *absence* in
+-- both directions, and why the null-caller case exists at all: under definer
+-- they are the proof rather than a second opinion.
 select is(
   (select prosecdef from pg_proc where oid =
     'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
-  false,
-  'the candidate query runs as the caller, so forced RLS is a real second wall'
+  true,
+  'the candidate query is SECURITY DEFINER, because normalize_entity_alias is not executable by authenticated'
 );
 
 -- Compared as text for the reason `phase_2e_task_command_ai_usage.sql` records:
@@ -90,7 +98,7 @@ select is(
 
 select is(public.normalize_entity_alias(U&'Relat\00F3rio Final'), U&'relatorio final', 'corpus: western-european accents fold');
 select is(public.normalize_entity_alias(U&'se\00F1or'), U&'senor', 'corpus: NFC n-tilde folds to n');
-select is(public.normalize_entity_alias(U&'sen\0303or'), U&'sen or', 'corpus: the NFD spelling of the same word does not — it splits');
+select is(public.normalize_entity_alias(U&'sen\0303or'), U&'sen or', 'corpus: the NFD spelling of the same word does not - it splits');
 select is(public.normalize_entity_alias(U&'\0178'), U&'', 'corpus: U+0178 is absent from the translate map and normalizes away entirely');
 select is(public.normalize_entity_alias(U&'\0142\00F3d\017A'), U&'od', 'corpus: diacritics outside Latin-1 are dropped, not folded');
 select is(public.normalize_entity_alias(U&'caf\00E9'), U&'cafe', 'corpus: NFC e-acute folds to e');
@@ -162,7 +170,7 @@ select is(
 
 select is(
   (select prefilter_tier from public.list_task_command_candidates(
-     array['todo'], U&'Relat F3rio final', null, null, null, now(), 25)
+     array['todo'], U&'Relat\00F3rio final', null, null, null, now(), 25)
    where task_id = '41000001-1111-4111-8111-111111111111'),
   0,
   'the exact normalized title is tier 0, which is what sorts it ahead of the rest'
@@ -170,7 +178,7 @@ select is(
 
 select is(
   (select prefilter_tier from public.list_task_command_candidates(
-     array['todo'], U&'Relat F3rio final', null, null, null, now(), 25)
+     array['todo'], U&'Relat\00F3rio final', null, null, null, now(), 25)
    where task_id = '41000002-1111-4111-8111-111111111111'),
   2,
   'and a token-only match is tier 2, so truncation can never prefer it'
@@ -263,6 +271,42 @@ select is(
   now(),
   'and move the instant forward and the newer row is visible'
 );
+
+-- The other direction, and no direction at all -------------------------------
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"42222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', null, null, null, now(), 25)),
+  1,
+  'the second owner sees exactly its own matching task and none of the first owner''s'
+);
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+set local role authenticated;
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', null, null, null, now(), 25)),
+  0,
+  'and a caller with no identity gets nothing, rather than everything'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"41111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
 
 -- Fail closed ---------------------------------------------------------------
 

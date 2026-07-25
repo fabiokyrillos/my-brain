@@ -217,11 +217,13 @@ export async function loadTaskCandidates(
 
   const rows = parsed.data.map(toCandidateRow);
 
-  // 2E-MATCH-001 and 2E-OWNERSHIP-001. The RPC predicates on `auth.uid()` and
-  // runs as the caller so forced RLS applies too; a foreign row reaching here
-  // would mean both failed, which is a failure to raise rather than to filter.
-  // `rankTaskCandidates` filters as well — that layer protects a future caller
-  // that did not come through this function.
+  // 2E-MATCH-001 and 2E-OWNERSHIP-001. The RPC is `security definer` — it has
+  // to be, because `normalize_entity_alias` is not executable by
+  // `authenticated` — so RLS is *not* a second wall inside it and its
+  // `auth.uid()` predicate is the whole control. That is exactly why a foreign
+  // row reaching here is raised rather than filtered: quietly dropping it would
+  // hide the failure of the only control there is. `rankTaskCandidates` filters
+  // as well, for a future caller that did not come through this function.
   if (rows.some((row) => row.ownerId !== ownerId)) {
     throw new TaskCandidateQueryError(
       "list_task_command_candidates returned a row owned by another user",
