@@ -8,6 +8,7 @@ import {
   type EntityCandidateValue,
   type ExtractionValue,
 } from "../_shared/extraction-validation.ts";
+import { normalizeExtractionInstants } from "../_shared/extraction-normalization.ts";
 import { recordEntryProcessingEvent, toProcessingOutcome } from "./product-events.ts";
 
 // Mirrors src/lib/ai/openai-provider.ts EXTRACTION_STRATEGY_VERSION /
@@ -18,7 +19,7 @@ import { recordEntryProcessingEvent, toProcessingOutcome } from "./product-event
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
 const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-const EXTRACTION_PROMPT_VERSION = "2026-07-16.1";
+const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -30,6 +31,7 @@ Security and truth rules:
 - Implicit work goes into taskCandidates for user confirmation. Set explicit=true only for direct commands such as "crie uma tarefa" or "me lembre".
 - When no date is stated, occurredAt equals currentTime. Resolve relative dates in the supplied IANA timezone.
 - dueAt is null when no defensible deadline exists. Do not silently invent one.
+- occurredAt and dueAt are full ISO-8601 timestamps with a timezone designator, never a bare date: 2026-07-31T23:59:59-03:00, not 2026-07-31. A deadline stated as a day means the end of that day in the supplied IANA timezone.
 - If ambiguity changes the meaning or action, add one short pending question.
 - Use concise natural-language summaries in the requested locale.
 - Evidence must be a short phrase grounded in the entry.
@@ -224,6 +226,10 @@ async function extractEntry(input: {
   const model = preferences?.extraction_model ?? "gpt-5.6-luna";
   const embeddingModel = preferences?.embedding_model ?? "text-embedding-3-small";
   const currentTime = new Date().toISOString();
+  // One resolution shared by the prompt and by instant normalization: the model
+  // is asked to answer in this zone, so an under-specified answer is widened in
+  // the same zone.
+  const timezone = profile?.timezone ?? DEFAULT_TIMEZONE;
   const knownContext = formatKnownContext([
     ["Contexts", contexts],
     ["Organizations", organizations],
@@ -247,7 +253,7 @@ async function extractEntry(input: {
           role: "user",
           content: [
             `Locale: ${input.locale}`,
-            `IANA timezone: ${profile?.timezone ?? DEFAULT_TIMEZONE}`,
+            `IANA timezone: ${timezone}`,
             `Current time: ${currentTime}`,
             knownContext ? `Known user context:\n${knownContext}` : "Known user context: none",
             `Entry data:\n<entry>${input.content}</entry>`,
@@ -297,7 +303,14 @@ async function extractEntry(input: {
     throw new Error("Entry extraction returned output that is not valid JSON");
   }
 
-  const validated = validateExtraction(parsedExtraction);
+  // The provider schema types occurredAt/dueAt as bare strings and Structured
+  // Outputs does not enforce `format`, so the model may answer a deadline with
+  // a bare local date. That is unambiguous given the timezone the prompt was
+  // given, and rejecting it would strand the entry permanently — the same
+  // prompt reproduces the same output, so retrying cannot fix it.
+  const normalizedExtraction = normalizeExtractionInstants(parsedExtraction, timezone);
+
+  const validated = validateExtraction(normalizedExtraction);
   if (!validated.ok) {
     // Field paths and codes only — never the offending value.
     throw new Error(

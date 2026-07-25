@@ -80,7 +80,19 @@ describe("Deno worker copies stay identical to their Node source", () => {
     // helper rather than a copy of it, and `extraction-validation.ts` is
     // Deno-owned — its Node counterpart is the Zod schema, held in parity by
     // src/lib/ai/extraction-parity.test.ts instead.
-    const denoOnly = ["result.ts", "extraction-validation.ts", "extraction-validation.test.ts"];
+    // `extraction-normalization.ts` is likewise Deno-owned and has no Node
+    // counterpart to drift from: only the worker calls the provider in
+    // production (`AIProvider.extractEntry` has no caller), so widening
+    // under-specified provider output belongs to the worker alone. Copying it
+    // into Node would create the second implementation this guard exists to
+    // prevent.
+    const denoOnly = [
+      "result.ts",
+      "extraction-validation.ts",
+      "extraction-validation.test.ts",
+      "extraction-normalization.ts",
+      "extraction-normalization.test.ts",
+    ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 
     expect(readdirSync(sharedDirectory).sort()).toEqual(expected);

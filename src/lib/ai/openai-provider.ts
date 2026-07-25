@@ -9,7 +9,7 @@ import type { ChatInput, ChatResult, EmbeddingResult, ExtractionInput, Extractio
 import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details";
 
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-export const EXTRACTION_PROMPT_VERSION = "2026-07-16.1";
+export const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
 
 /** Explicit ceiling per provider call. See the constructor for why. */
 export const NODE_OPENAI_TIMEOUT_MS = 120_000;
@@ -24,6 +24,7 @@ Security and truth rules:
 - Implicit work goes into taskCandidates for user confirmation. Set explicit=true only for direct commands such as "crie uma tarefa" or "me lembre".
 - When no date is stated, occurredAt equals currentTime. Resolve relative dates in the supplied IANA timezone.
 - dueAt is null when no defensible deadline exists. Do not silently invent one.
+- occurredAt and dueAt are full ISO-8601 timestamps with a timezone designator, never a bare date: 2026-07-31T23:59:59-03:00, not 2026-07-31. A deadline stated as a day means the end of that day in the supplied IANA timezone.
 - If ambiguity changes the meaning or action, add one short pending question.
 - Use concise natural-language summaries in the requested locale.
 - Evidence must be a short phrase grounded in the entry.
