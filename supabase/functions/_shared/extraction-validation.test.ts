@@ -164,6 +164,124 @@ Deno.test("pending question text is bounded on both fields", () => {
   );
 });
 
+// Regression lock for the forEach -> indexed-loop conversion. Inside a
+// `forEach` callback `return` means "skip this element"; inside a `for` loop it
+// means "exit the function". A missed conversion would silently stop validating
+// the rest of an array after the first bad element — invisible in a
+// single-element fixture, so every collection is checked with a bad element
+// FOLLOWED by a second bad element, and both must be reported.
+Deno.test("a bad element never stops the loop: entity candidates", () => {
+  const base = validExtraction();
+  const issues = issuesOf({
+    ...base,
+    people: [
+      { name: "", confidence: 0.9, evidence: "trecho", inferred: false },
+      { name: "Ana", confidence: 5, evidence: "trecho", inferred: false },
+    ],
+  });
+  assertEquals(issues, [
+    { path: "people.0.name", code: "too_short" },
+    { path: "people.1.confidence", code: "out_of_range" },
+  ]);
+});
+
+Deno.test("a bad element never stops the loop: task candidates", () => {
+  const base = validExtraction();
+  const candidate = (base.taskCandidates as Record<string, unknown>[])[0];
+  const issues = issuesOf({
+    ...base,
+    taskCandidates: [
+      { ...candidate, title: "" },
+      { ...candidate, dueAt: "amanha" },
+    ],
+  });
+  assertEquals(issues, [
+    { path: "taskCandidates.0.title", code: "too_short" },
+    { path: "taskCandidates.1.dueAt", code: "expected_iso_instant" },
+  ]);
+});
+
+Deno.test("a bad element never stops the loop: pending questions", () => {
+  const base = validExtraction();
+  const issues = issuesOf({
+    ...base,
+    pendingQuestions: [
+      { question: "", reason: "Motivo", confidence: 0.2 },
+      { question: "Por que?", reason: "", confidence: 0.2 },
+    ],
+  });
+  assertEquals(issues, [
+    { path: "pendingQuestions.0.question", code: "too_short" },
+    { path: "pendingQuestions.1.reason", code: "too_short" },
+  ]);
+});
+
+Deno.test("a bad element never stops the loop: concepts", () => {
+  assertEquals(issuesOf({ ...validExtraction(), concepts: ["nope", "task", "also_nope"] }), [
+    { path: "concepts.0", code: "expected_enum" },
+    { path: "concepts.2", code: "expected_enum" },
+  ]);
+});
+
+Deno.test("a valid element after an invalid one is still collected", () => {
+  // Proves the loop continues rather than returning: element 1 is well formed,
+  // so the only issue reported must be element 0's.
+  const base = validExtraction();
+  const candidate = (base.taskCandidates as Record<string, unknown>[])[0];
+  assertEquals(
+    issuesOf({ ...base, taskCandidates: [{ ...candidate, title: "" }, candidate] }),
+    [{ path: "taskCandidates.0.title", code: "too_short" }],
+  );
+});
+
+Deno.test("an array hole is refused rather than skipped", () => {
+  // `Array.prototype.forEach` skips holes entirely, which silently accepted a
+  // sparse array as a shorter valid one and defeated the non-empty concepts
+  // rule. Indexed loops see the hole as undefined, matching the Zod schema.
+  const holed: unknown[] = ["task", "reminder"];
+  delete holed[1];
+  assertEquals(holed.length, 2);
+  assertEquals(1 in holed, false);
+  assertEquals(issuesOf({ ...validExtraction(), concepts: holed }), [
+    { path: "concepts.1", code: "expected_enum" },
+  ]);
+
+  const onlyHole: unknown[] = [undefined];
+  delete onlyHole[0];
+  assertEquals(issuesOf({ ...validExtraction(), concepts: onlyHole }), [
+    { path: "concepts.0", code: "expected_enum" },
+  ]);
+});
+
+Deno.test("the timezone offset is bounded to what PostgreSQL can store", () => {
+  const base = validExtraction();
+  const candidate = (base.taskCandidates as Record<string, unknown>[])[0];
+
+  assert(validateExtraction({ ...base, occurredAt: "2026-07-24T15:04:05+15:59" }).ok);
+  assert(validateExtraction({ ...base, occurredAt: "2026-07-24T15:04:05-15:59" }).ok);
+
+  for (const occurredAt of ["2026-07-24T15:04:05+16:00", "2026-07-24T15:04:05-16:00", "2026-07-24T15:04:05+23:59"]) {
+    assertEquals(issuesOf({ ...base, occurredAt }), [
+      { path: "occurredAt", code: "expected_iso_instant" },
+    ]);
+  }
+
+  assertEquals(
+    issuesOf({ ...base, taskCandidates: [{ ...candidate, dueAt: "2026-07-31T12:00:00+18:00" }] }),
+    [{ path: "taskCandidates.0.dueAt", code: "expected_iso_instant" }],
+  );
+});
+
+Deno.test("two-digit years are calendar-validated without Date's 1900 offset", () => {
+  const base = validExtraction();
+  for (const occurredAt of ["0050-07-24T15:04:05Z", "0099-07-24T15:04:05Z", "0000-02-29T15:04:05Z", "0004-02-29T15:04:05Z"]) {
+    assert(validateExtraction({ ...base, occurredAt }).ok, `${occurredAt} must be accepted`);
+  }
+  for (const occurredAt of ["0100-02-29T15:04:05Z", "2100-02-29T15:04:05Z", "2026-02-29T15:04:05Z"]) {
+    assertFalse(validateExtraction({ ...base, occurredAt }).ok, `${occurredAt} must be refused`);
+  }
+});
+
 Deno.test("every issue reports a path and a code and never the offending value", () => {
   const secret = "conteudo-confidencial-do-usuario";
   const issues = issuesOf({ ...validExtraction(), summary: secret.repeat(200), confidence: 9 });

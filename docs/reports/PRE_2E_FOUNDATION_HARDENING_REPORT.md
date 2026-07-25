@@ -26,7 +26,7 @@ Only findings this initiative addressed are listed. Everything else is deferred 
 | **H6** | i18n fragmented; `next-intl` unused; Portuguese-only errors in English flows | **ACCEPTED** | Canonical mechanism, dependency removed, 30 strings fixed (ADR-036) | `docs/ENGINEERING_STANDARDS.md`; `src/features/chat/actions.test.ts` |
 | **H7** | Error boundary claims recording while recording nothing | **ACCEPTED WITH MODIFICATIONS** | Boundary made truthful; **error sink deferred** | `src/app/[locale]/app/error.tsx` |
 | **H9** | Chat grounding pipeline entirely untested, incl. its citation invariant | **ACCEPTED WITH MODIFICATIONS** | Assertion removed + first chat tests; `answerFromKnowledge` **deferred** | `src/features/chat/actions.ts`, `actions.test.ts` |
-| **H10** | The only production extraction path has zero executed tests | **ACCEPTED** | Deno CI job; 20 tests execute; both entrypoints type-check | `.github/workflows/ci.yml` `worker` job |
+| **H10** | The only production extraction path has zero executed tests | **ACCEPTED** | Deno CI job; 28 tests execute; both entrypoints type-check | `.github/workflows/ci.yml` `worker` job |
 | **M9** | Model routing half-dead | **ACCEPTED WITH MODIFICATIONS** | Dead surface deleted; consolidation **deferred** (needs a Deno mirror) | `src/lib/ai/model-routing.ts` |
 | **M15** | Hand-synchronized Deno copies have no parity guard | **ACCEPTED** | Source-parity locks for all three pairs | `src/features/interpretations/deno-parity.test.ts` |
 | **L3** | `retryProcessingJob` consumer-less two phases on | **ACCEPTED** | Removed, with its test | `src/features/agent/actions.ts` |
@@ -80,7 +80,7 @@ Four review claims did not survive verification unchanged.
 
 **Independent review corrections.** Two: `playwright.config.ts` was not CI-shaped (`reuseExistingServer: true` unconditional, dev server rather than the production build, no `webServer.timeout`) — fixed; and the `supabase status -o env` key name is not guaranteed across CLI versions — the export step now accepts `ANON_KEY` or `PUBLISHABLE_KEY` and fails loudly with a named reason if neither is present.
 
-**Acceptance.** Accepted. The `worker` job was executed locally (Deno 2.9.4 installed for the purpose): 20 tests pass, both entrypoints type-check clean. The `database` job's first real execution is on the pull request, because Docker is unavailable on this workstation — named as evidence debt in §3, not claimed as local verification.
+**Acceptance.** Accepted. The `worker` job was executed locally (Deno 2.9.4 installed for the purpose): 28 tests pass, both entrypoints type-check clean. The `database` job's first real execution is on the pull request, because Docker is unavailable on this workstation — named as evidence debt in §3, not claimed as local verification.
 
 ### B — Split `undo_operation` (H2)
 
@@ -160,7 +160,7 @@ Verified and **not** implemented, with reasons in §5: coverage thresholds (not 
 | `npm test` (Vitest) | **PASS** — 1020 tests, 94 files | Baseline was 902/93. Net +118 after 3 new files and 2 deletions |
 | `npm run build` | **PASS** | Also green in CI |
 | `deno check` (both deployed entrypoints) | **PASS** | First static gate this code has ever had. Run with the exact CI flags |
-| `deno test` over every function directory | **PASS** — 20 tests | Deno 2.9.4; the pre-existing `dispatch.test.ts` header admitting it had never executed is now false |
+| `deno test` over every function directory | **PASS** — 28 tests | Deno 2.9.4; the pre-existing `dispatch.test.ts` header admitting it had never executed is now false |
 | Offline Playwright | **PASS** — 6 passed, 66 skipped | The 66 are credential-gated online journeys that skip cleanly (review M12) |
 | **Migration reset from zero** | **PASS — executed in CI** | `supabase db reset` applied all 54 migrations to an empty database. Nothing had ever checked this. This is the single most important result on the branch, and it could not be produced locally |
 | **Full pgTAP suite** | **PASS — executed in CI** | `Files=24, Tests=821`. The first execution of this suite as a suite in any environment. It found exactly one failure — a pre-existing test defect, fixed (§3.1) |
@@ -222,7 +222,7 @@ Reproduced verbatim in the pull request description and in the branch's commit m
 - `npm run typecheck` → `tsc --noEmit`, exit 0, no output.
 - `npm test` → `Test Files 94 passed (94) / Tests 1020 passed (1020)`.
 - `deno check --config supabase/functions/<fn>/deno.json --node-modules-dir=none --no-lock <entrypoint>` → exit 0 for both.
-- `deno test --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock $(ls -d supabase/functions/*/)` → `ok | 20 passed | 0 failed`.
+- `deno test --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock $(ls -d supabase/functions/*/)` → `ok | 28 passed | 0 failed`.
 - pgTAP static plan verification → `files with delta != 0: 0 / 24`, `total planned: 822 total counted: 822`.
 - pgTAP in CI → `Files=24, Tests=821` on the run before the final assertion was added; all green.
 
