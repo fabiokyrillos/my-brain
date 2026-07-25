@@ -10,6 +10,15 @@ import { z } from "zod";
 // Mirrored by `isIsoInstant` in
 // supabase/functions/_shared/extraction-validation.ts and held to it by
 // src/lib/ai/extraction-parity.test.ts.
+//
+// This refinement is deliberately NOT visible to the model. `zodTextFormat`
+// converts this schema for OpenAI Structured Outputs and silently drops
+// `.refine()` — the emitted `pattern` is Zod's own datetime regex, which still
+// allows up to ±23:59 (verified, and the conversion does not throw). So the
+// provider may still return an unstorable offset; what changed is that the
+// worker validator now refuses it before any write instead of the database
+// refusing it after one. Enforcement lives in the two validators, not in the
+// response schema — do not read the generated JSON Schema as the guarantee.
 const OFFSET_SUFFIX = /(?:Z|([+-])(\d{2}):(\d{2}))$/;
 const MAX_OFFSET_MINUTES = 15 * 60 + 59;
 
