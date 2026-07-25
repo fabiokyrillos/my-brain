@@ -15,7 +15,10 @@
 
 begin;
 
-select plan(34);
+-- Plan corrected from 34 to the 37 assertions this file actually runs. The
+-- suite had never executed anywhere (Docker was unavailable on the only
+-- workstation), so the drift was invisible until the pre-2E CI gate ran it.
+select plan(37);
 
 -- Structural guards ----------------------------------------------------------
 
