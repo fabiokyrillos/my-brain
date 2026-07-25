@@ -122,6 +122,35 @@ jobs:
         # Also runs supabase/seed.sql, which installs pgTAP for the next step.
         run: supabase db reset
 
+      - name: Prove the generated types still describe the schema
+        # PRD 2E-OPERATIONS-002: "generated types are regenerated whenever
+        # exposed schema changes, and parity is proven by content comparison,
+        # not asserted."
+        #
+        # Nothing checked this before. A migration could add, rename or drop an
+        # RPC and leave `database.types.ts` describing a schema that no longer
+        # exists, and every TypeScript gate would stay green — the checked-in
+        # file is the only thing `tsc` ever sees. The CLI version is pinned
+        # above, so the generator's output is deterministic across runs.
+        run: |
+          set -euo pipefail
+          supabase gen types typescript --local > /tmp/database.types.generated.ts
+          if ! diff -u src/lib/supabase/database.types.ts /tmp/database.types.generated.ts; then
+            echo "::error::src/lib/supabase/database.types.ts no longer matches the schema. Regenerate it." >&2
+            exit 1
+          fi
+
+      - name: Publish the freshly generated types when parity fails
+        # Docker is unavailable on the maintainer's workstation, so this job is
+        # the only place the generator can run. Without the artifact a parity
+        # failure would report a diff nobody can act on.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types-generated
+          path: /tmp/database.types.generated.ts
+          if-no-files-found: ignore
+
       - name: Run the pgTAP suite
         run: supabase test db --local supabase/tests
 

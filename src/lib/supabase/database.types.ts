@@ -2526,6 +2526,38 @@ export type Database = {
           reason: string
         }[]
       }
+      list_task_command_candidates: {
+        Args: {
+          p_context_hint?: string
+          p_eligible_statuses: string[]
+          p_limit?: number
+          p_observed_before?: string
+          p_person_hint?: string
+          p_project_hint?: string
+          p_title_query?: string
+        }
+        Returns: {
+          context_hint_matched: boolean
+          context_names: string[]
+          created_at: string
+          due_at: string
+          effective_limit: number
+          last_audited_at: string
+          manual_priority: string
+          owner_id: string
+          person_hint_matched: boolean
+          person_names: string[]
+          planned_at: string
+          prefilter_tier: number
+          project_hint_matched: boolean
+          project_names: string[]
+          query_token_count: number
+          status: string
+          task_id: string
+          title: string
+          token_overlap: number
+        }[]
+      }
       match_internal_knowledge: {
         Args: { p_match_count?: number; p_query_embedding: string }
         Returns: {
