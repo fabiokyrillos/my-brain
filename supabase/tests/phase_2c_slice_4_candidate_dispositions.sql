@@ -178,9 +178,13 @@ select ok(
   'PUBLIC cannot execute v5'
 );
 
+-- Recurrence guard for the defect 202607220042 fixed and 202607220044
+-- re-introduced. Since 202607250052 the affected-count arithmetic lives in
+-- private.undo_confirm_entry_tasks, so the guard covers the router plus every
+-- registered handler.
 select ok(
-  lower(pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) not like '%pg_catalog.greatest(%',
-  'undo_operation avoids an unresolved greatest function lookup under its empty search_path'
+  lower(private.undo_operation_definition_bundle()) not like '%pg_catalog.greatest(%',
+  'undo compensation avoids an unresolved greatest function lookup under its empty search_path'
 );
 
 select has_function('public', 'confirm_entry_task_candidates_v4', array['uuid', 'uuid', 'integer[]', 'jsonb', 'text']);

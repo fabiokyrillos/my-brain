@@ -114,8 +114,11 @@ select results_eq(
   array[true],
   'compatible initial persistence advances the explicit current pointer'
 );
+-- Since 202607250052 the compensation body lives in
+-- private.undo_correct_entry_interpretation, so the guard inspects the router
+-- plus every registered handler rather than the router alone.
 select results_eq(
-  $$ select pg_get_functiondef('public.undo_operation(uuid)'::regprocedure) like '%correct_entry_interpretation%' $$,
+  $$ select private.undo_operation_definition_bundle() like '%correct_entry_interpretation%' $$,
   array[true],
   'undo supports append-only interpretation compensation'
 );

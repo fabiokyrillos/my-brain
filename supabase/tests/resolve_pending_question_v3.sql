@@ -100,14 +100,17 @@ select ok(
 
 -- 2C-UNDO-004 forward fix: undo_operation must no longer raise 40001 ----------
 
+-- Since 202607250052 the compensation bodies live in private handlers, so the
+-- guard inspects the router plus every registered handler. Asserting on
+-- undo_operation alone would now pass vacuously.
 select ok(
-  position('errcode = ''40001''' in pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) = 0,
-  'undo_operation no longer contains the gateway-hanging SQLSTATE 40001'
+  position('errcode = ''40001''' in private.undo_operation_definition_bundle()) = 0,
+  'undo compensation no longer contains the gateway-hanging SQLSTATE 40001'
 );
 
 select ok(
-  position('55P03' in pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) > 0,
-  'undo_operation signals the interpretation-revision conflict with 55P03'
+  position('55P03' in private.undo_operation_definition_bundle()) > 0,
+  'undo compensation signals the interpretation-revision conflict with 55P03'
 );
 
 -- Product-event allowlist ----------------------------------------------------
