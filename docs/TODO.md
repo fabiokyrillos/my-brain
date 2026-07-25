@@ -166,7 +166,36 @@ Continue with the reconciled slices. Do not restart the architecture.
 - [ ] Remove or adopt unused UI dependencies after verifying the intended design system.
 - [ ] Strengthen CSP without `unsafe-eval`, add HSTS at the deployment layer, and document the final header policy.
 - [ ] Add upload content validation, file-size/type enforcement, and malware scanning strategy.
-- [ ] Add CI jobs for Playwright, database reset/lint/pgTAP, dependency audit, and meaningful coverage gates.
+- [x] ~~Add CI jobs for Playwright, database reset/lint/pgTAP~~ — done 2026-07-25 (pre-2E hardening, ADR-038): the `verify` workflow gained the `worker` job (`deno check` + `deno test`) and the `database` job (`supabase db reset` from zero, the full pgTAP suite, `db lint`, and `e2e/foundation.spec.ts` on the production build, desktop + Pixel 7). Dependency audit and coverage gates remain open below.
+- [ ] Add a dependency-audit CI job.
+- [ ] Add per-directory coverage thresholds where coverage is already high, and run `test:coverage` in CI. Thresholds must be measured, never guessed. (Architecture-review L10.)
+
+## Pre-Phase-2E hardening — deferred follow-ups
+
+Recorded by the consolidated hardening initiative (2026-07-25) as explicitly **not** implemented, with the reason. Full disposition in `docs/reports/PRE_2E_FOUNDATION_HARDENING_REPORT.md`; source findings in `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md`.
+
+- [ ] **C1 — rate limiting and per-user AI spend caps** behind open self-service signup. The only Critical finding in the review, and the one item that blocks *public production* rather than Phase 2E. Interim mitigation: invite-gate signup, which drops it to High. Needs per-user rolling-window limits on chat/capture, a daily budget checked against `get_ai_cost_summary`, and `max_output_tokens` per operation.
+- [ ] **H7 — an error sink.** The authenticated error boundary no longer claims the problem was recorded and now surfaces `error.digest` with a structured `console.error`, but there is still no Sentry-equivalent and no `instrumentation.ts`/`onRequestError`. Deliberately out of scope: a real observability platform is its own decision, not a hardening quick win.
+- [ ] **H8 / M21 — a cron dead-man's switch with a cost threshold.** Three `pg_cron` jobs are the operational backbone and every failure mode is silent.
+- [ ] **M6 — retention purges.** The 180-day `product_events` limit is a table comment with no purge job; completed jobs and delivered notifications are never pruned either. Required before the first pilot.
+- [ ] **M19 / M20 — deploy runbook and a verified backup/restore posture** for the Next.js app layer.
+- [ ] **H4 — a runtime-neutral shared artifact for prompt text and version constants.** The extraction *schema* now has enforced parity (`src/lib/ai/extraction-parity.test.ts`) and the three hand-copied `_shared` modules have source-parity locks (`src/features/interpretations/deno-parity.test.ts`), but the system prompt and the two version constants are still duplicated by hand between `openai-provider.ts` and `process-jobs/entry.ts`. Fold into Phase 2E as it adds prompts.
+- [ ] **H9 (partial) / M14 / M16 — remaining unit-test gaps.** `chat/actions.ts` now has tests for citation hydration and localized failures; `answerFromKnowledge` itself, the four untested `agent` actions (`createReminder`, `markNotification`, `uploadAttachment`, `generateReview`) and the auth boundary (`proxy.ts`, `auth/actions.ts`) remain uncovered.
+- [ ] **M1 / M2 / M3 / M4 — structural work:** extract the pure shared layer out of `daily-cycle` (a hub slice with bidirectional imports to five slices), rename or consolidate the three task-domain slices, split the `agent` grab-bag, and adopt the projection-module rule for every new or touched page. All explicitly Phase-2E-or-later, folded into touched code.
+- [ ] **M5 — product-event allowlist as a catalog table** instead of three duplicated places re-pasted per event addition. Do it when Phase 2E adds its first new event.
+- [ ] **M7 / M8 — behavioural heartbeat tests and a cross-language lifecycle-precedence fixture.** `run_all_heartbeats` is still "tested" by `pg_get_functiondef LIKE` assertions, and `match_internal_knowledge` still has no pgTAP ownership test.
+- [ ] **M9 / M10 — model routing and catalog.** `resolveAIRoutes` was deleted as dead rather than consolidated: five call sites still re-implement `preferences?.X ?? "<hardcoded>"`, and a single helper needs a Deno mirror to be truthful. Pricing still matches the provider model string exactly, so a rename silently flips cost events to `unpriced`.
+- [ ] **M11 — review generation** still injects tasks as fake `memory` chat sources with fabricated similarity, computes period boundaries in server-local time, and prompts only in Portuguese.
+- [ ] **M12 / M13 — the deterministic authenticated e2e tier and a six-route smoke** (memories, notifications, history, people, projects, reminders). CI now runs the unauthenticated foundation journey; the authenticated ones remain online-gated.
+- [ ] **M17 — structured logging with correlation ids on the Next.js side.** The Deno worker already demonstrates the right shape.
+- [ ] **M18 — one `product_events` reader.** 17 instrumented events, zero readers.
+- [ ] **M22 / M25 — chat streaming and `loading.tsx` skeletons.** No `loading.tsx` exists anywhere; chat is a blocking nine-step serial action.
+- [ ] **M23 — the pgvector decision.** `match_internal_knowledge`'s `UNION ALL` + computed-alias ordering defeats the HNSW indexes; `DATABASE.md` and `STATE.md` were corrected to say so. Decide explicitly: keep the exact scan and drop the indexes, or restructure to per-table `ORDER BY embedding <=> $q LIMIT k`.
+- [ ] **M24 / L12 / L13 — query and index work:** the entry-review page loads the interpretation dataset twice serially; Home fetches a full 51-row inbox page to render four items; `entries (user_id, created_at desc)` is missing for inbox ordering. `undo_operations` JSONB containment lookups are better fixed by switching `interpretations/data.ts` to the existing `source_entry_id` index than by adding a GIN index — but that needs a backfill first, because the legacy `confirm_entry_tasks` path never populated `source_entry_id`, and without the backfill the undo button would silently disappear for old rows.
+- [ ] **L11 — raw exception text on the Jobs page.** The worst leak is closed at the source (a `JSON.parse` `SyntaxError` message embeds an excerpt of the model output and reached `jobs.error`; the worker no longer propagates it), but `jobs.error` is still rendered verbatim and still *replaces* the localized attempts line.
+- [ ] **L1 / L4 / L5 / O2 — contract-module naming convergence, a full `STATE.md` restructure, `DATABASE.md`'s remaining gaps, and formatter adoption.** `STATE.md` gained a current-truth section and three factual corrections in this pass; the full restructure is separate.
+- [ ] **L2 — timezone validation implemented twice** with divergent acceptance rules (`review-projection.ts` vs `work-projection.ts`); hoist one helper into `src/lib`.
+- [ ] **O1 — document the per-minute drain's throughput ceiling** (~3–10 interpretations/min under `DISPATCH_BUDGET_MS`) next to the constants, and expose oldest-pending-age as the operator signal.
 
 ## Known bugs and risks
 
@@ -178,7 +207,7 @@ Continue with the reconciled slices. Do not restart the architecture.
 
 ## External dependencies
 
-- [ ] Start Docker Desktop and execute the committed pgTAP suite through the Supabase CLI.
+- [x] ~~Start Docker Desktop and execute the committed pgTAP suite through the Supabase CLI.~~ — superseded 2026-07-25: the suite now runs in CI on `ubuntu-latest`, where Docker is free, so it no longer depends on this workstation. Docker remains unavailable locally, which is why the `database` job's first real execution is on the pull request rather than locally; recorded as evidence debt, not claimed as local verification. Deno **is** now available locally (2.9.4) and the `worker` job was executed here.
 - [x] Linked Supabase CLI credentials can run authenticated Playwright and disposable remote smoke without persisted secrets.
 - [x] Verified OpenAI and Supabase Edge Function secrets through a disposable real worker call.
 - [ ] Custom SMTP credentials, a provider-routable catch-all `ONLINE_AUTH_TEST_EMAIL_DOMAIN`, and verified real-inbox delivery before production launch.

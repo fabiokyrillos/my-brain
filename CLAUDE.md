@@ -46,10 +46,10 @@ Local setup requires Node 22+, a linked Supabase project, and `.env.local` (copy
 ### Layout
 
 - `src/app/[locale]/...` — Next.js App Router routes, split into `app/*` (authenticated product: capture, inbox, today, tasks, waiting, projects, people, reminders, reviews, chat, memories, files, notifications, history, jobs, questions, costs, settings) and `auth/*` (login, register, recover, reset, callback). Locale is `pt-BR` or `en`.
-- `src/features/<domain>/` — vertical slices (agent, auth, capture, chat, daily-cycle, interpretations, operations, product-analytics, profile, pwa, shell, tasks). Each feature colocates its Server Actions (`actions.ts`), Zod schemas (`schema.ts`), components, and same-directory `*.test.ts(x)` files.
+- `src/features/<domain>/` — vertical slices (agent, auth, capture, chat, daily-cycle, interpretations, operations, product-analytics, profile, pwa, reviews, shell, tasks). Each feature colocates its Server Actions (`actions.ts`), Zod schemas (`schema.ts`), components, and same-directory `*.test.ts(x)` files.
 - `src/lib/` — cross-cutting infrastructure: `ai/` (provider abstraction, extraction/chat schemas, model routing, cost calculation), `agent/` (heartbeat), `auth/` (`require-user`), `supabase/` (client/server factories, generated `database.types.ts`, `result.ts` error-wrapping helpers), plus `env.ts`, `pagination.ts`, `preferences.ts`.
 - `src/proxy.ts` — the Next.js 16 replacement for `middleware.ts`. Handles Supabase session refresh and locale/auth route redirects.
-- `src/i18n/messages.ts` — next-intl message catalog (pt-BR/en).
+- `src/i18n/messages.ts` — a hand-rolled typed message record (pt-BR/en) read through `getMessages(locale)`, consumed by three `src/features/shell/` files. It is **not** a next-intl catalog, and next-intl is not a dependency (ADR-036 removed it — it had zero imports). The canonical mechanism for new copy is a typed feature `copy.ts` module in the `src/features/daily-cycle/copy.ts` shape; see `docs/ENGINEERING_STANDARDS.md`.
 - `supabase/migrations/` — append-only SQL migrations (source of DB truth); `supabase/functions/` — Edge Functions (`heartbeat`, `process-jobs`); `supabase/tests/` — pgTAP tests.
 - `docs/` — living documentation; treat as authoritative context, not background reading. Key files: `STATE.md` (current phase/status, source-of-truth order), `TODO.md` (backlog), `DECISIONS.md` (append-only ADRs), `CHANGELOG.md`, `ENGINEERING_STANDARDS.md` (mandatory engineering contract), `ARCHITECTURE.md`, `DATABASE.md`, `AI_AGENT.md`, `SECURITY.md`.
 
