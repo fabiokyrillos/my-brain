@@ -95,6 +95,16 @@ describe("single declaration of the command contract", () => {
     expect(contract).toContain("z.enum(TASK_COMMAND_MODEL_UNSUPPORTED_REASONS)");
   });
 
+  it("declares the prompt's distinctive content once, not merely its name", () => {
+    // The name-based counts above are evaded by `taskCommandSystemPromptV2`.
+    // A value-based check is what makes a second copy of the prompt visible,
+    // the way the taxonomy check greps for the verbs themselves.
+    const carriers = productionFiles.filter((file) =>
+      readFileSync(file, "utf8").includes("You never see a task"),
+    );
+    expect(carriers.map(relative)).toEqual(["src/lib/ai/task-command-schema.ts"]);
+  });
+
   it("ships no competing command contract in the Deno runtime", () => {
     const denoFiles = sourceFiles("supabase/functions").filter(
       (file) => !/\.test\.ts$/.test(file),
@@ -127,22 +137,49 @@ describe("provider wiring", () => {
 
   it("bounds the call before making it", () => {
     const method = provider.slice(provider.indexOf("async parseTaskCommand"));
-    const guard = method.indexOf("command_text_too_long");
-    const request = method.indexOf("this.client.responses.parse");
+    const guard = method.indexOf("classifyCommandText");
+    const request = method.indexOf("this.client.responses.create");
     expect(guard).toBeGreaterThan(-1);
     expect(request).toBeGreaterThan(-1);
-    // An oversized input is refused before it is billed.
+    // An out-of-bounds input is refused before it is billed.
     expect(guard).toBeLessThan(request);
     expect(method).toContain("max_output_tokens: TASK_COMMAND_MAX_OUTPUT_TOKENS");
   });
 
-  it("validates the structured output before returning it", () => {
-    const method = provider.slice(provider.indexOf("async parseTaskCommand"));
-    const request = method.indexOf("this.client.responses.parse");
+  it("parses the response itself rather than letting the SDK throw the schema error", () => {
+    // `responses.parse` runs the schema eagerly inside the awaited promise, so
+    // schema-violating output arrives as a ZodError indistinguishable from a
+    // transport failure — misclassified as `provider_unavailable`, and with the
+    // response (and its usage) already lost.
+    // Bounded to this method: `answerFromKnowledge` legitimately still uses
+    // `responses.parse`, where a throw carries no ledger consequence.
+    const method = provider.slice(
+      provider.indexOf("async parseTaskCommand"),
+      provider.indexOf("async embedText"),
+    );
+    expect(method).not.toContain("this.client.responses.parse");
+    const request = method.indexOf("this.client.responses.create");
     const validation = method.indexOf("taskCommandProposalSchema.safeParse", request);
     const returned = method.indexOf("proposal: parsed.data", request);
     expect(validation).toBeGreaterThan(request);
     expect(returned).toBeGreaterThan(validation);
+  });
+
+  it("keeps the billed usage on every failure after a paid response", () => {
+    // 2E-PROVENANCE-002 and the worker's own rule in usage-order.test.ts.
+    const method = provider.slice(
+      provider.indexOf("async parseTaskCommand"),
+      provider.indexOf("async embedText"),
+    );
+    const usage = method.indexOf("normalizeResponseUsage(response)");
+    const request = method.indexOf("this.client.responses.create");
+    expect(usage).toBeGreaterThan(request);
+    for (const code of ["no_structured_output", "invalid_model_output"]) {
+      const site = method.indexOf(code, usage);
+      expect(site, code).toBeGreaterThan(-1);
+      // Each post-response throw hands the caller what it was billed.
+      expect(method.slice(site, site + 40), code).toContain("billed");
+    }
   });
 
   it("throws only classified, content-free errors", () => {
@@ -153,11 +190,13 @@ describe("provider wiring", () => {
     const throws = method.match(/throw [^;]+/g) ?? [];
     expect(throws.length).toBeGreaterThan(0);
     for (const statement of throws) {
-      expect(statement).toMatch(/throw new TaskCommandProviderError\("[a-z_]+"\)/);
+      expect(statement).toMatch(/throw new TaskCommandProviderError\((?:"[a-z_]+"|bound)(?:, billed)?\)/);
     }
     // A bare rethrow would carry the SDK's message, which quotes the request
     // body — the user's own command text.
     expect(method).not.toMatch(/catch \(\w+\)[\s\S]{0,80}throw \w+;/);
+    // Nor may it be logged: `APIError.message` quotes that same body (§16.5).
+    expect(method).not.toMatch(/console\./);
   });
 
   it("sends nothing but the fenced command text and the locale", () => {

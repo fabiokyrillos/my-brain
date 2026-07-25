@@ -16,7 +16,6 @@ import type { TemporalContext } from "./temporal";
 const CONTEXT: TemporalContext = {
   now: "2026-07-25T13:00:00Z",
   timeZone: "America/Sao_Paulo",
-  locale: "en",
 };
 const KEY = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
 
@@ -128,10 +127,75 @@ describe("allowed target values", () => {
     }
   });
 
-  it("refuses a priority outside the manual_priority CHECK values", () => {
-    expect(validate(command({ action: "set_priority", patch: { priority: "critical" } }))).toMatchObject({
+  it("refuses a word that names no priority this product has", () => {
+    expect(validate(command({ action: "set_priority", patch: { priority: "extremely spicy" } }))).toMatchObject({
+      status: "invalid",
+      reason: "unrecognized_value",
+      field: "priority",
+    });
+  });
+
+  it("distinguishes an unknown value from one this action may not reach", () => {
+    // 2E-COMMAND-017 reserves `value_not_allowed_for_action` for a value that
+    // is legal for the column but not for the requested action. Telling a user
+    // that "cancelled" belongs to a different action is true; telling them the
+    // same about a word that names no status at all is not.
+    expect(validate(command({ action: "set_status", patch: { status: "cancelled" } })).status)
+      .toBe("unsupported");
+    expect(validate(command({ action: "set_status", patch: { status: "borogove" } })).status)
+      .toBe("invalid");
+  });
+});
+
+describe("bilingual target values", () => {
+  // PRD Goal 1: the user's own words, in pt-BR or English. The model is told to
+  // copy what the user wrote, and this product's first language is Portuguese.
+  it("accepts Portuguese status words and canonicalizes them", () => {
+    for (const [term, canonical] of [
+      ["bloqueada", "blocked"],
+      ["em andamento", "in_progress"],
+      ["aguardando", "waiting"],
+      ["adiado", "deferred"],
+      ["a fazer", "todo"],
+    ] as const) {
+      const result = validate(command({ action: "set_status", patch: { status: term } }));
+      expect(result.status, term).toBe("ok");
+      if (result.status === "ok") expect(result.command.patch.status).toBe(canonical);
+    }
+  });
+
+  it("accepts Portuguese priority words and canonicalizes them", () => {
+    for (const [term, canonical] of [
+      ["alta", "high"],
+      ["baixa", "low"],
+      ["media", "medium"],
+      ["urgente", "urgent"],
+      ["crítica", "urgent"],
+    ] as const) {
+      const result = validate(command({ action: "set_priority", patch: { priority: term } }));
+      expect(result.status, term).toBe("ok");
+      if (result.status === "ok") expect(result.command.patch.priority).toBe(canonical);
+    }
+  });
+
+  it("refuses a Portuguese word for a state this action may not reach", () => {
+    expect(validate(command({ action: "set_status", patch: { status: "cancelada" } }))).toMatchObject({
       status: "unsupported",
       reason: "value_not_allowed_for_action",
+    });
+  });
+
+  it("canonicalizes a status hint instead of destroying the command over it", () => {
+    const result = validate(command({ targetHints: { titleWords: ["relatorio"], status: "bloqueada" } }));
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") expect(result.command.targetHints.status).toBe("blocked");
+  });
+
+  it("refuses a hint word that names no status", () => {
+    expect(validate(command({ targetHints: { titleWords: ["x"], status: "borogove" } }))).toMatchObject({
+      status: "invalid",
+      reason: "unrecognized_value",
+      field: "status",
     });
   });
 });
@@ -180,7 +244,7 @@ describe("temporal resolution", () => {
   it("resolves a Portuguese phrase in a Portuguese session", () => {
     const result = validate(
       command({ action: "reschedule_due", patch: { dueAt: "sexta-feira" } }),
-      { ...CONTEXT, locale: "pt-BR" },
+      CONTEXT,
     );
     expect(result).toMatchObject({ status: "ok" });
     if (result.status === "ok") expect(result.command.patch.dueAt).toBe("2026-07-31T23:59:59-03:00");
@@ -217,11 +281,26 @@ describe("temporal resolution", () => {
   });
 });
 
-describe("multi-target refusal", () => {
-  it("refuses a command whose hints name more than one target", () => {
-    expect(validate(command({ targetHints: { titleWords: ["invoice"], multipleTargets: true } }))).toMatchObject({
-      status: "invalid",
-    });
+describe("multi-target", () => {
+  // Deliberately NOT claiming the validator enforces 2E-COMMAND-007's
+  // `multiple_targets`. It cannot: the closed shape has no multi-target signal
+  // to read, so the model reports it (see task-command-schema.test.ts) and the
+  // deterministic backstop is the matcher's ambiguity rule in Slice 2E.2. The
+  // test this replaces asserted only that `.strict()` rejects an unknown key —
+  // a duplicate of "rejects an unknown target hint" wearing a name that claimed
+  // a guarantee the layer does not provide.
+  it("carries exactly one target's worth of hints, with no field for a second", () => {
+    const hintFields = ["titleWords", "project", "person", "context", "status", "temporalPhrase"];
+    const result = validate(command({ targetHints: { titleWords: ["invoice"] } }));
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      for (const key of Object.keys(result.command.targetHints)) {
+        expect(hintFields).toContain(key);
+      }
+    }
+    // A second target cannot be expressed by adding a field.
+    expect(validate(command({ targetHints: { titleWords: ["a"], secondTarget: "b" } })).status)
+      .toBe("invalid");
   });
 });
 
@@ -261,6 +340,18 @@ describe("total hint size", () => {
   // comparison.
   const long = (length: number) => "a".repeat(length);
 
+  it("rejects a single hint beyond its own cap", () => {
+    // The per-field half of 2E-COMMAND-005. Every total-cap case below uses a
+    // hint of exactly MAX_HINT_LENGTH, so the field cap itself was untested.
+    expect(validate(command({ targetHints: { project: long(MAX_HINT_LENGTH + 1) } }))).toMatchObject({
+      status: "invalid",
+      reason: "value_too_long",
+      field: "project",
+    });
+    expect(validate(command({ targetHints: { titleWords: [long(MAX_HINT_LENGTH + 1)] } })).status)
+      .toBe("invalid");
+  });
+
   it("accepts hints within the total serialized cap", () => {
     const words = Array.from({ length: MAX_TITLE_WORDS }, () => long(40));
     expect(validate(command({ targetHints: { titleWords: words } }))).toMatchObject({ status: "ok" });
@@ -290,10 +381,25 @@ describe("total hint size", () => {
   });
 
   it("measures the cap on the canonical form, so key order cannot change the verdict", () => {
-    const hints = { project: long(MAX_HINT_LENGTH), titleWords: [long(MAX_HINT_LENGTH)], person: long(MAX_HINT_LENGTH) };
-    const reordered = { person: hints.person, titleWords: hints.titleWords, project: hints.project };
-    expect(validate(command({ targetHints: hints })).status)
-      .toBe(validate(command({ targetHints: reordered })).status);
+    // Both orderings must reach the *same, named* verdict. Asserting only that
+    // they agree is satisfied by any implementation, including one with no cap
+    // at all — which a review proved by disabling the cap and watching this
+    // pass.
+    const hints = {
+      project: long(MAX_HINT_LENGTH), person: long(MAX_HINT_LENGTH),
+      context: long(MAX_HINT_LENGTH), temporalPhrase: long(MAX_HINT_LENGTH),
+      titleWords: [long(MAX_HINT_LENGTH), long(MAX_HINT_LENGTH)],
+    };
+    const reordered = {
+      titleWords: hints.titleWords, temporalPhrase: hints.temporalPhrase,
+      context: hints.context, person: hints.person, project: hints.project,
+    };
+    for (const payload of [hints, reordered]) {
+      expect(validate(command({ targetHints: payload }))).toMatchObject({
+        status: "invalid",
+        reason: "target_hints_too_large",
+      });
+    }
   });
 });
 
@@ -307,16 +413,27 @@ describe("temporal fail-closed paths reachable from a command", () => {
     // Samoa skipped 2011-12-30 entirely when it crossed the date line. The
     // phrase is well-formed and the zone is real; the wall time simply never
     // happened, and `resolveLocal` refuses rather than sliding to a neighbour.
-    const apia = { ...CONTEXT, timeZone: "Pacific/Apia" };
+    // The clock sits beside the date so the ±730-day explicit-date bound is not
+    // what does the refusing.
+    const apia = { now: "2011-12-20T12:00:00Z", timeZone: "Pacific/Apia" };
     expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-30" } }), apia))
       .toMatchObject({ status: "needs_clarification", field: "dueAt" });
   });
 
   it("resolves the surrounding days in that same zone, so the refusal is specific", () => {
-    const apia = { ...CONTEXT, timeZone: "Pacific/Apia" };
+    const apia = { now: "2011-12-20T12:00:00Z", timeZone: "Pacific/Apia" };
     expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-29" } }), apia))
       .toMatchObject({ status: "ok" });
     expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-31" } }), apia))
       .toMatchObject({ status: "ok" });
+  });
+
+  it("refuses an explicit date far outside the bounded window", () => {
+    // `tasks.due_at` is an unbounded timestamptz, so a transcription typo would
+    // otherwise persist in silence.
+    for (const far of ["9999-12-31", "5000-06-15", "1900-01-01"]) {
+      expect(validate(command({ action: "reschedule_due", patch: { dueAt: far } })).status, far)
+        .toBe("needs_clarification");
+    }
   });
 });

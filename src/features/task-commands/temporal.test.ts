@@ -14,8 +14,10 @@ const SP = "America/Sao_Paulo";
 // A Saturday, 10:00 local (13:00Z, since Sao Paulo is UTC-03:00 year-round).
 const SATURDAY = "2026-07-25T13:00:00Z";
 
-function resolve(phrase: string, locale: "pt-BR" | "en" = "en", now = SATURDAY, timeZone = SP) {
-  return resolveTemporalPhrase(phrase, { now, timeZone, locale });
+// No locale argument: the resolver searches both lexicons unconditionally, so
+// a Portuguese phrase resolves identically in an English session.
+function resolve(phrase: string, now = SATURDAY, timeZone = SP) {
+  return resolveTemporalPhrase(phrase, { now, timeZone });
 }
 
 describe("lexicon versioning", () => {
@@ -48,28 +50,28 @@ describe("deadline semantics", () => {
 
 describe("Portuguese lexicon", () => {
   it("resolves amanhã", () => {
-    expect(resolve("amanhã", "pt-BR")).toMatchObject({ instant: "2026-07-26T23:59:59-03:00" });
+    expect(resolve("amanhã")).toMatchObject({ instant: "2026-07-26T23:59:59-03:00" });
   });
 
   it("resolves an unaccented amanha, because users do not always type the accent", () => {
-    expect(resolve("amanha", "pt-BR")).toMatchObject({ instant: "2026-07-26T23:59:59-03:00" });
+    expect(resolve("amanha")).toMatchObject({ instant: "2026-07-26T23:59:59-03:00" });
   });
 
   it("resolves semana que vem and próxima semana to the same instant", () => {
-    const a = resolve("semana que vem", "pt-BR");
-    const b = resolve("próxima semana", "pt-BR");
+    const a = resolve("semana que vem");
+    const b = resolve("próxima semana");
     expect(a.status).toBe("resolved");
     // The echoed phrase differs by construction; the resolution must not.
     expect(a).toMatchObject({ instant: (b as { instant: string }).instant });
   });
 
   it("resolves amanhã de manhã to a morning time", () => {
-    expect(resolve("amanhã de manhã", "pt-BR")).toMatchObject({ instant: "2026-07-26T09:00:00-03:00" });
+    expect(resolve("amanhã de manhã")).toMatchObject({ instant: "2026-07-26T09:00:00-03:00" });
   });
 
   it("resolves a Portuguese weekday with or without the -feira suffix", () => {
-    const withSuffix = resolve("sexta-feira", "pt-BR");
-    const without = resolve("sexta", "pt-BR");
+    const withSuffix = resolve("sexta-feira");
+    const without = resolve("sexta");
     expect(withSuffix.status).toBe("resolved");
     expect(withSuffix).toMatchObject({ instant: (without as { instant: string }).instant });
   });
@@ -89,8 +91,8 @@ describe("weekday resolution and the declared week convention", () => {
     // From Wednesday 2026-07-22, "friday" is this week's Friday (the 24th)
     // while "next friday" is the Friday of the following week (the 31st).
     const wednesday = "2026-07-22T13:00:00Z";
-    expect(resolve("friday", "en", wednesday)).toMatchObject({ instant: "2026-07-24T23:59:59-03:00" });
-    expect(resolve("next friday", "en", wednesday)).toMatchObject({ instant: "2026-07-31T23:59:59-03:00" });
+    expect(resolve("friday", wednesday)).toMatchObject({ instant: "2026-07-24T23:59:59-03:00" });
+    expect(resolve("next friday", wednesday)).toMatchObject({ instant: "2026-07-31T23:59:59-03:00" });
   });
 
   it("collapses next <weekday> onto the next occurrence when that already falls in the following week", () => {
@@ -112,7 +114,7 @@ describe("relative offsets", () => {
   });
 
   it("resolves em N dias", () => {
-    expect(resolve("em 3 dias", "pt-BR")).toMatchObject({ instant: "2026-07-28T23:59:59-03:00" });
+    expect(resolve("em 3 dias")).toMatchObject({ instant: "2026-07-28T23:59:59-03:00" });
   });
 
   it("resolves in N weeks", () => {
@@ -130,7 +132,7 @@ describe("month and week boundaries", () => {
   });
 
   it("resolves fim do mês identically", () => {
-    expect(resolve("fim do mês", "pt-BR")).toMatchObject({ instant: "2026-07-31T23:59:59-03:00" });
+    expect(resolve("fim do mês")).toMatchObject({ instant: "2026-07-31T23:59:59-03:00" });
   });
 
   it("resolves end of the week to the Sunday that closes the current week", () => {
@@ -143,8 +145,22 @@ describe("explicit dates", () => {
     expect(resolve("2026-09-01")).toMatchObject({ instant: "2026-09-01T23:59:59-03:00" });
   });
 
-  it("passes an already-complete instant through untouched", () => {
-    expect(resolve("2026-09-01T08:30:00-03:00")).toMatchObject({ instant: "2026-09-01T08:30:00-03:00" });
+  it("refuses a complete instant rather than trusting the caller's own precision", () => {
+    // 2E-COMMAND-016: the instant is never model-supplied. The passthrough this
+    // replaces returned the string before `resolveLocal` ever saw it, so a
+    // shape-valid but impossible timestamp was reported `resolved`.
+    expect(resolve("2026-09-01T08:30:00-03:00").status).toBe("unsupported");
+  });
+
+  it("refuses an impossible instant that the old shape check would have accepted", () => {
+    for (const impossible of [
+      "2026-13-45T99:99:99Z",
+      "2026-02-30T12:00:00Z",
+      "2026-09-01T25:61:61Z",
+      "9999-12-31T23:59:59+14:00",
+    ]) {
+      expect(resolve(impossible).status, impossible).toBe("unsupported");
+    }
   });
 
   it("refuses a non-calendar date instead of rolling it over", () => {
@@ -154,15 +170,15 @@ describe("explicit dates", () => {
 
 describe("timezone correctness", () => {
   it("resolves in the caller's timezone, not the server's", () => {
-    expect(resolve("tomorrow", "en", SATURDAY, "Asia/Tokyo")).toMatchObject({
+    expect(resolve("tomorrow", SATURDAY, "Asia/Tokyo")).toMatchObject({
       instant: "2026-07-26T23:59:59+09:00",
     });
   });
 
   it("computes the offset for the target date, so a DST zone stays correct", () => {
     // New York is UTC-04:00 in July and UTC-05:00 in January.
-    const july = resolve("tomorrow", "en", "2026-07-15T12:00:00Z", "America/New_York");
-    const january = resolve("tomorrow", "en", "2026-01-15T12:00:00Z", "America/New_York");
+    const july = resolve("tomorrow", "2026-07-15T12:00:00Z", "America/New_York");
+    const january = resolve("tomorrow", "2026-01-15T12:00:00Z", "America/New_York");
     expect(july).toMatchObject({ instant: "2026-07-16T23:59:59-04:00" });
     expect(january).toMatchObject({ instant: "2026-01-16T23:59:59-05:00" });
   });
@@ -170,13 +186,13 @@ describe("timezone correctness", () => {
   it("uses the caller's local day, so a phrase near midnight does not slip a day", () => {
     // 2026-07-26T02:00:00Z is still 2026-07-25 23:00 in Sao Paulo, so "tomorrow"
     // is the 26th locally, not the 27th.
-    expect(resolve("tomorrow", "en", "2026-07-26T02:00:00Z")).toMatchObject({
+    expect(resolve("tomorrow", "2026-07-26T02:00:00Z")).toMatchObject({
       instant: "2026-07-26T23:59:59-03:00",
     });
   });
 
   it("refuses an unknown timezone rather than falling back to UTC", () => {
-    expect(resolve("tomorrow", "en", SATURDAY, "Not/AZone").status).toBe("unsupported");
+    expect(resolve("tomorrow", SATURDAY, "Not/AZone").status).toBe("unsupported");
   });
 });
 
@@ -209,7 +225,7 @@ describe("fail-closed behaviour", () => {
     // Accepting cross-locale input is fine; inventing meaning is not. Both
     // lexicons are searched, so this resolves — the assertion pins that it is a
     // deliberate, tested behaviour rather than an accident.
-    expect(resolve("amanhã", "en")).toMatchObject({ status: "resolved" });
+    expect(resolve("amanhã")).toMatchObject({ status: "resolved" });
   });
 });
 
@@ -221,8 +237,8 @@ describe("determinism", () => {
   });
 
   it("depends only on the injected clock, never on the ambient one", () => {
-    const early = resolve("tomorrow", "en", "2026-07-25T00:00:01Z");
-    const late = resolve("tomorrow", "en", "2026-07-25T13:00:00Z");
+    const early = resolve("tomorrow", "2026-07-25T00:00:01Z");
+    const late = resolve("tomorrow", "2026-07-25T13:00:00Z");
     // 00:00:01Z on the 25th is still 21:00 on the 24th in Sao Paulo, so the
     // caller's "tomorrow" is the 25th there and the 26th later that day.
     expect(early).toMatchObject({ instant: "2026-07-25T23:59:59-03:00" });

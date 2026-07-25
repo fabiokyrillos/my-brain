@@ -5,6 +5,7 @@ import {
   TASK_COMMAND_POLICY_VERSION,
   actionPolicy,
   isTaskCommandAction,
+  touchesReminders,
   NON_TERMINAL_STATUSES,
   TASK_STATUSES,
 } from "./taxonomy";
@@ -206,7 +207,7 @@ describe("reminder consequences", () => {
   it("marks every transition that invalidates or revives a reminder", () => {
     // PRD §11.3. Getting this wrong leaves a reminder firing for a cancelled
     // task, or hands back a restored task that can never remind.
-    const touching = TASK_COMMAND_ACTIONS.filter((action) => actionPolicy(action).touchesReminders);
+    const touching = TASK_COMMAND_ACTIONS.filter((action) => touchesReminders(action));
     expect(touching.sort()).toEqual(
       ["cancel_task", "clear_due", "complete_task", "reopen_task", "reschedule_due", "restore_task"].sort(),
     );

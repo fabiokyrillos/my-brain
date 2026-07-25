@@ -6,12 +6,12 @@ import { chatAnswerSchema } from "./chat-schema";
 import { entryExtractionSchema } from "./extraction-schema";
 import type { AIProvider } from "./provider";
 import {
-  MAX_COMMAND_TEXT_LENGTH,
   TASK_COMMAND_MAX_OUTPUT_TOKENS,
   TASK_COMMAND_PROMPT_VERSION,
   TASK_COMMAND_STRATEGY_VERSION,
   TaskCommandProviderError,
   buildTaskCommandUserMessage,
+  classifyCommandText,
   taskCommandProposalSchema,
   taskCommandSystemPrompt,
 } from "./task-command-schema";
@@ -116,14 +116,19 @@ export class OpenAIProvider implements AIProvider {
    */
   async parseTaskCommand(input: TaskCommandParseInput): Promise<TaskCommandParseResult> {
     const commandText = input.commandText.trim();
-    if (commandText === "" || commandText.length > MAX_COMMAND_TEXT_LENGTH) {
-      // Refused before the request, so an oversized input is never billed.
-      throw new TaskCommandProviderError("command_text_too_long");
-    }
+    // Refused before the request, so an out-of-bounds input is never billed.
+    const bound = classifyCommandText(commandText);
+    if (bound !== null) throw new TaskCommandProviderError(bound);
 
     let response;
     try {
-      response = await this.client.responses.parse({
+      // `responses.create`, not `responses.parse`. `parse` runs the schema
+      // eagerly *inside* the awaited promise, so schema-violating output throws
+      // a ZodError indistinguishable here from a transport failure — it would
+      // be reported as `provider_unavailable`, inviting a retry of a
+      // deterministic model defect, and the response (with its usage) would be
+      // gone. Parsing below instead keeps both the classification and the bill.
+      response = await this.client.responses.create({
         model: this.model,
         reasoning: { effort: "low" },
         // The proposal is a classification plus a handful of short strings.
@@ -142,23 +147,38 @@ export class OpenAIProvider implements AIProvider {
       throw new TaskCommandProviderError("provider_unavailable");
     }
 
-    // Also the truncation path: a response cut off at the token ceiling parses
-    // to nothing rather than to half a command.
-    if (!response.output_parsed) {
-      throw new TaskCommandProviderError("no_structured_output");
+    // Past this point the call is billed, so every failure carries what it
+    // cost. The worker's rule, pinned by `usage-order.test.ts`: rejecting
+    // invalid output must not skip the cost already incurred.
+    const usage = normalizeResponseUsage(response);
+    const model = response.model ?? this.model;
+    const billed = { usage: usage as unknown as Record<string, unknown>, model };
+
+    // Empty when the response was truncated at the token ceiling, and when the
+    // model returned a refusal instead of content.
+    const outputText = response.output_text;
+    if (typeof outputText !== "string" || outputText.trim() === "") {
+      throw new TaskCommandProviderError("no_structured_output", billed);
     }
 
-    const parsed = taskCommandProposalSchema.safeParse(response.output_parsed);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(outputText);
+    } catch {
+      throw new TaskCommandProviderError("invalid_model_output", billed);
+    }
+
+    const parsed = taskCommandProposalSchema.safeParse(raw);
     if (!parsed.success) {
       // Zod's issues quote the offending values, which are model echoes of the
       // user's own words. The code travels; the detail does not.
-      throw new TaskCommandProviderError("invalid_model_output");
+      throw new TaskCommandProviderError("invalid_model_output", billed);
     }
 
     return {
-      ...normalizeResponseUsage(response),
+      ...usage,
       proposal: parsed.data,
-      model: response.model ?? this.model,
+      model,
       promptVersion: TASK_COMMAND_PROMPT_VERSION,
       strategyVersion: TASK_COMMAND_STRATEGY_VERSION,
     };

@@ -80,12 +80,13 @@ describe("Deno worker copies stay identical to their Node source", () => {
     // helper rather than a copy of it, and `extraction-validation.ts` is
     // Deno-owned — its Node counterpart is the Zod schema, held in parity by
     // src/lib/ai/extraction-parity.test.ts instead.
-    // `extraction-normalization.ts` is likewise Deno-owned and has no Node
-    // counterpart to drift from: only the worker calls the provider in
-    // production (`AIProvider.extractEntry` has no caller), so widening
-    // under-specified provider output belongs to the worker alone. Copying it
-    // into Node would create the second implementation this guard exists to
-    // prevent.
+    // `extraction-normalization.ts` has no Node *counterpart* to drift from
+    // either — but since Phase 2E it is no longer Deno-only: the command
+    // temporal resolver (`src/features/task-commands/temporal.ts`) imports
+    // `resolveLocal` from it directly, which is the outcome this guard wants
+    // (one proven implementation, reused) rather than the copy it forbids. It
+    // is therefore a genuinely shared module, and the test below keeps it
+    // importable from Node.
     const denoOnly = [
       "result.ts",
       "extraction-validation.ts",
@@ -96,5 +97,17 @@ describe("Deno worker copies stay identical to their Node source", () => {
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 
     expect(readdirSync(sharedDirectory).sort()).toEqual(expected);
+  });
+
+  it("keeps the shared normalization module importable from Node", () => {
+    // Phase 2E's temporal resolver imports `resolveLocal` from here, so a
+    // worker-side change reaching for a Deno global, an https: import or a
+    // .ts-suffixed specifier would break `next build`. Neither existing gate
+    // would catch it: `vitest.config.ts` includes only `src/**`, and the CI
+    // worker job runs `deno check`, which is happy with all three.
+    const source = readFileSync(path.join(sharedDirectory, "extraction-normalization.ts"), "utf8");
+    expect(source).not.toMatch(/\bDeno\./);
+    expect(source).not.toMatch(/from\s+["']https:/);
+    expect(source).not.toMatch(/from\s+["'][^"']+\.ts["']/);
   });
 });

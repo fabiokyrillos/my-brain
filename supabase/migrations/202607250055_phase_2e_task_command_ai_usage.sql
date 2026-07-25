@@ -37,6 +37,40 @@ alter table public.ai_usage_events
     'advanced_reasoning','background','task_command'
   ));
 
+-- `drop constraint if exists` is fail-open, and this is the one statement in
+-- the change whose failure would be silent. The constraint was created inline
+-- in `202607160015:58-61`, so its name is PostgreSQL's generated
+-- `<table>_<column>_check`; if that assumption were ever wrong the DROP would
+-- no-op, the ADD would succeed under a free name, the old seven-value
+-- constraint would survive, and every `task_command` insert would fail at
+-- runtime — where `src/lib/ai/usage.ts` swallows the error into a console line.
+-- CI proves the chain from an empty database; this proves the swap on whatever
+-- database the migration is actually applied to. Same fail-closed shape as
+-- `202607250054:58`.
+do $$
+declare
+  operation_checks integer;
+begin
+  select count(*) into operation_checks
+  from pg_constraint
+  where conrelid = 'public.ai_usage_events'::regclass
+    and contype = 'c'
+    and pg_get_constraintdef(oid) like '%operation%';
+
+  if operation_checks <> 1 then
+    raise exception 'expected exactly one operation CHECK on ai_usage_events, found %', operation_checks;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'ai_usage_events_operation_check'
+      and conrelid = 'public.ai_usage_events'::regclass
+      and pg_get_constraintdef(oid) like '%task_command%'
+  ) then
+    raise exception 'the ai_usage_events operation CHECK was not widened to task_command';
+  end if;
+end $$;
+
 create or replace function public.record_ai_usage(
   p_operation text,
   p_model text,

@@ -109,6 +109,19 @@ Filling a proposal:
 
 Return outcome "proposal" with a non-null action, or outcome "unsupported" with a non-null unsupportedReason. Never both, never neither.`;
 
+/**
+ * Strips the fence's own delimiters out of the fenced value.
+ *
+ * The ceiling here is low — the only text in the prompt is the user's own
+ * sentence, so closing the fence is self-injection with no cross-tenant
+ * surface, and the taxonomy still bounds what any answer can be. But §12.7
+ * names the fence as *the* boundary, so the boundary should not be forgeable by
+ * typing the delimiter.
+ */
+function fence(value: string): string {
+  return value.replace(/<\/?command>/gi, " ");
+}
+
 /** The user turn. The only untrusted value in it is `commandText`, fenced. */
 export function buildTaskCommandUserMessage(input: {
   commandText: string;
@@ -116,7 +129,7 @@ export function buildTaskCommandUserMessage(input: {
 }): string {
   return [
     `Locale: ${input.locale}`,
-    `Command text:\n<command>${input.commandText}</command>`,
+    `Command text:\n<command>${fence(input.commandText)}</command>`,
   ].join("\n\n");
 }
 
@@ -129,27 +142,65 @@ export function buildTaskCommandUserMessage(input: {
  * downstream redaction can undo.
  */
 export const TASK_COMMAND_PROVIDER_ERROR_CODES = [
+  /** Nothing to parse. Distinct from too-long: the copy differs entirely. */
+  "empty_command_text",
   /** Refused before the call, so an oversized input is never billed. */
   "command_text_too_long",
   /** Transport, auth, rate limit, timeout — anything below the response. */
   "provider_unavailable",
-  /** The call succeeded but returned no parsed structured output. */
+  /** The call returned no output text: truncated at the ceiling, or a refusal. */
   "no_structured_output",
-  /** Structured output that does not satisfy the schema. */
+  /** Output that is not JSON, or JSON that does not satisfy the schema. */
   "invalid_model_output",
 ] as const;
 
 export type TaskCommandProviderErrorCode = (typeof TASK_COMMAND_PROVIDER_ERROR_CODES)[number];
 
+/**
+ * The bound check, extracted so it is testable.
+ *
+ * `openai-provider.ts` begins `import "server-only"` and therefore cannot be
+ * imported by a test at all, so anything decided inside it can only be asserted
+ * by regex over source. That is how an empty command came to be reported as
+ * `command_text_too_long` — structurally correct, and the exact opposite of
+ * what the user would be told.
+ */
+export function classifyCommandText(commandText: string): TaskCommandProviderErrorCode | null {
+  const trimmed = commandText.trim();
+  if (trimmed === "") return "empty_command_text";
+  if (trimmed.length > MAX_COMMAND_TEXT_LENGTH) return "command_text_too_long";
+  return null;
+}
+
+/**
+ * Token counts and a provider request id. Content-free by construction — the
+ * shape `normalizeResponseUsage` already produces — so carrying it on a failure
+ * leaks nothing while letting the caller still record what it was billed.
+ */
+export type TaskCommandFailureUsage = {
+  readonly usage: Record<string, unknown>;
+  readonly model: string;
+};
+
 export class TaskCommandProviderError extends Error {
   readonly code: TaskCommandProviderErrorCode;
+  /**
+   * Present exactly when the failure happened *after* a billed response.
+   *
+   * The worker's own rule, pinned by `usage-order.test.ts`: "rejecting invalid
+   * output must not skip the cost that was already incurred". Without this the
+   * caller has nothing to write to the ledger and a truncated response becomes
+   * unbilled-but-paid-for.
+   */
+  readonly billed?: TaskCommandFailureUsage;
 
-  constructor(code: TaskCommandProviderErrorCode) {
+  constructor(code: TaskCommandProviderErrorCode, billed?: TaskCommandFailureUsage) {
     // The code is the whole message: there is nothing else this error is
-    // allowed to carry.
+    // allowed to carry in text.
     super(code);
     this.name = "TaskCommandProviderError";
     this.code = code;
+    this.billed = billed;
   }
 }
 

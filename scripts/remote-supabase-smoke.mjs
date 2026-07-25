@@ -180,6 +180,41 @@ try {
     p_user_id: firstUser.id,
   }), "record own AI usage");
 
+  // Phase 2E, migration 202607250055. CI proves the widened operation CHECK
+  // against a chain applied from an empty database; only this reaches the
+  // linked project, where the constraint already existed and was swapped in
+  // place. Without it the swap has no verification path at all, because
+  // `src/lib/ai/usage.ts` swallows a ledger failure into a console line.
+  const commandUsageRequest = `smoke-command-${suffix}`;
+  dataOrThrow(await first.rpc("record_ai_usage", {
+    p_operation: "task_command",
+    p_model: "gpt-5.6-luna",
+    p_input_tokens: 900,
+    p_cached_input_tokens: 0,
+    p_output_tokens: 120,
+    p_reasoning_tokens: 0,
+    p_provider_request_id: commandUsageRequest,
+    // Parse time has no persisted subject: no task is selected yet, by
+    // construction. `'task'` stays refused until Phase 2F (PRD §22).
+    p_source_type: null,
+    p_source_id: null,
+    p_user_id: firstUser.id,
+  }), "record command-parsing AI usage");
+
+  const commandSource = await first.rpc("record_ai_usage", {
+    p_operation: "task_command",
+    p_model: "gpt-5.6-luna",
+    p_input_tokens: 1,
+    p_cached_input_tokens: 0,
+    p_output_tokens: 1,
+    p_reasoning_tokens: 0,
+    p_provider_request_id: `smoke-command-source-${suffix}`,
+    p_source_type: "task",
+    p_source_id: null,
+    p_user_id: firstUser.id,
+  });
+  assert(commandSource.error?.code === "22023", "Source type 'task' was not refused");
+
   const crossUsage = await first.rpc("record_ai_usage", {
     p_operation: "chat",
     p_model: "gpt-5.6-terra",
