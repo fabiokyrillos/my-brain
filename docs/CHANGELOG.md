@@ -2,6 +2,37 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-07-25 - Phase 2E Slice 2E.1: bounded task command contract (branch `codex/phase-2e-natural-language-task-updates`)
+
+The first slice of Phase 2E - Natural-Language Task Updates. **Contract only: no task search, no matching, no mutation, no RPC, no UI, no Server Action, no product event, and no user-visible behaviour change.** `AIProvider.parseTaskCommand` has no production caller yet; its first consumer is Slice 2E.7. Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-A. See ADR-039 and `docs/reports/PHASE_2E_SLICE_01_REPORT.md`.
+
+### Added
+
+- **`src/features/task-commands/taxonomy.ts`** - PRD SS11.2 as executable data: fifteen actions, each declaring eligible source statuses, allowed target values, the patch field those values govern, required/allowed patch fields, changed fields, destructiveness, one-step eligibility, confirmation requirement and undo strategy. The *allowed target values* column is load-bearing: without it `set_status` carrying `cancelled` is a non-destructive, one-step, unconfirmed route to the transition `cancel_task` exists to guard.
+- **`src/features/task-commands/temporal.ts`** - a declared, enumerable bilingual lexicon whose entries state their own resolution rules, resolved against an explicitly injected instant and IANA timezone and converted by the already-proven `resolveLocal` (the first Node consumer of `supabase/functions/_shared/extraction-normalization.ts`, reused rather than copied). Fails closed on a non-existent wall time, a non-calendar date, an unknown zone, an out-of-window explicit date, an ambiguous "this <weekday>", a bare time-of-day already past, and any phrase outside the lexicon.
+- **`src/features/task-commands/vocabulary.ts`** - the declared closed bilingual table mapping a user's pt-BR or English status/priority word onto the database literal.
+- **`src/features/task-commands/schema.ts`** - the closed command contract: strict shape, per-action patch contracts, per-action value bounds, a total serialized hint cap over and above each field's own, and a declared closed validation-reason vocabulary (Zod's own issue codes are mapped onto it rather than passed through, so the vocabulary is not library-owned and version-dependent).
+- **`src/lib/ai/task-command-schema.ts`** - the prompt, the Structured Outputs response schema, both version constants, the bounded-input classifier and the closed content-free provider-error vocabulary, in one module with no `server-only` import so the fencing and the no-task-row promise are asserted against the real values rather than by regex over source.
+- **`AIProvider.parseTaskCommand`** and its `OpenAIProvider` implementation - bounded input and output, explicit timeout and retries, strict post-response validation, and a failure that still carries the usage it was billed.
+- **Migration `202607250055`** - the `task_command` operation literal added to the `ai_usage_events` CHECK *and* the `record_ai_usage` guard in one change, with a fail-closed `DO` block asserting the constraint swap took effect. `source_type` deliberately unchanged: at parse time no task is selected, so a null source is truthful and `'task'` stays a Phase 2F decision (PRD SS22). Generated types unaffected - `operation` is `text`, so CHECK literals never reach `database.types.ts`.
+- **`supabase/tests/phase_2e_task_command_ai_usage.sql`** - asserts the widened CHECK and the rewritten RPC guard independently, that all seven prior operations survived both, and that the `create or replace` kept `SECURITY DEFINER` and its empty `search_path`.
+- **`src/features/task-commands/policy-lock.test.ts`** - PRD SS11.2 transcribed row for row, plus digests pinning the taxonomy, vocabulary, lexicon and prompt to their declared versions, so SS10.4's "enforced by test" is actually enforced.
+- The `task_command` cost-dashboard label, and a `task_command` round-trip in `scripts/remote-supabase-smoke.mjs` - the only gate that reaches the linked project, where the constraint already existed and was swapped in place.
+
+### Changed
+
+- `supabase/functions/_shared/extraction-normalization.ts` is no longer Deno-only: it is imported from the Node runtime for the first time. `deno-parity.test.ts`'s rationale is corrected accordingly and gains a guard keeping the module Node-importable, which neither existing gate would catch (`vitest.config.ts` includes only `src/**`; `deno check` accepts Deno globals and `.ts` specifiers).
+
+### Fixed
+
+All found by independent review, all proven by executing the code, all introduced within this slice and never released:
+
+- **`lastDayOfMonth` returned 1 February in every non-leap year.** The base date was built in the year 2000 - a leap year - so `Date.UTC(2000, 2, 0)` is 29 February, and setting a non-leap target year rolled forward to 1 March, leaving day 1. "Fim do mes" produced a deadline up to 27 days in the past, reported as `resolved`; "mes que vem" landed two days into the current month. No test covered February, a leap year, or "next month".
+- **A model-supplied instant was trusted verbatim.** The fast path returned the caller's string before `resolveLocal` ever saw it, so `2026-13-45T99:99:99Z` and `2026-02-30T12:00:00Z` were both `resolved`, on their way to a `timestamptz` column - the exact failure class the module exists to prevent, against a model the Gate 1 cutover had already measured ignoring this instruction. A complete instant is now a clarification (2E-COMMAND-016).
+- `parseTaskCommand` used `responses.parse`, which runs the schema inside the awaited promise: schema-violating output arrived as a `ZodError` indistinguishable from a transport failure, was classified `provider_unavailable` (inviting a retry of a deterministic model defect), and took the response's usage with it. It now parses the response itself, so classification is precise and every post-response failure carries what it was billed - the rule `usage-order.test.ts` already pins for the worker.
+- An empty command was reported as `command_text_too_long`, decided inside a `server-only` module no test could reach.
+- Portuguese status and priority words were refused, and refused with `value_not_allowed_for_action` - which claims the value belongs to another action rather than that it was not understood.
+
 ## 2026-07-25 — Pre-Phase-2E foundation hardening (branch `codex/pre-2e-foundation-hardening`)
 
 One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md`, between Phase 2D and Phase 2E. **No Phase 2E product functionality.** Full finding-by-finding disposition — accepted, modified, deferred, rejected — in `docs/reports/PRE_2E_FOUNDATION_HARDENING_REPORT.md`. ADR-035 (undo handler architecture), ADR-036 (canonical localization), ADR-037 (RPC retirement policy), ADR-038 (CI database/worker verification).

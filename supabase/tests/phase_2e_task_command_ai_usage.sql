@@ -73,7 +73,8 @@ select results_eq(
 select is(
   (select array_to_string(proconfig, ',') from pg_proc
    where oid = 'public.record_ai_usage(text,text,integer,integer,integer,integer,text,text,uuid,uuid)'::regprocedure),
-  'search_path=',
+  -- Postgres stores the empty value quoted: `search_path=""`.
+  'search_path=""',
   'record_ai_usage still pins an empty search_path'
 );
 

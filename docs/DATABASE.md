@@ -87,6 +87,15 @@ O gate final confirmou migrations locais/remotas sincronizadas até `20260718003
 - **Ordem de deploy:** o worker primeiro, a migration depois. Invertido, um worker em voo com o código antigo gastaria as tentativas em um `P0001` que não consegue corrigir.
 - Rollback: `drop trigger entry_interpretations_ai_bounds on public.entry_interpretations;`.
 
+## Vocabulário de `ai_usage_events.operation`
+
+Oito literais, fixados em dois lugares que precisam concordar: o CHECK da tabela (`202607160015:58-61`, reescrito por `202607250055`) e a lista de guarda dentro de `record_ai_usage` (`202607170018:55`, reescrita pela mesma migration). São `capture_extraction`, `semantic_search`, `chat`, `review`, `file_analysis`, `advanced_reasoning`, `background` e — desde a Fase 2E, Slice 2E.1 — `task_command`.
+
+- **Por que um literal novo, e não um emprestado.** Registrar a análise de comando como `chat` ou `background` tornaria o gasto da Fase 2E inatribuível no painel de custos. O ledger é append-only e o rótulo é permanente, então tomar emprestado é uma mentira que não dá para desfazer.
+- **Ampliar exige as duas pontas na mesma migration.** CHECK e guarda discordando é uma falha que só aparece em produção: a guarda recusa antes de a tabela ver o valor, ou a tabela recusa um valor que a guarda aprovou. `supabase/tests/phase_2e_task_command_ai_usage.sql` exercita as duas de forma independente, e confirma que os sete literais anteriores sobreviveram a ambas as reescritas.
+- **`create or replace`, não uma nova versão `_vN`.** A política abaixo vale para famílias de RPC de *mutação* versionadas. `record_ai_usage` não é uma: ampliar o conjunto de valores aceitos não quebra chamador algum nem muda a semântica de nenhuma escrita (DATABASE.md §1), então não há geração nova a criar nem inventário ADR-037 a estender. O que a reescrita *pode* perder silenciosamente é a postura de segurança, então o pgTAP afirma `prosecdef` e `search_path` explicitamente depois dela.
+- **`source_type` continua com cinco valores** (`entry`, `memory`, `conversation`, `summary`, `attachment`). Na hora da análise nenhuma tarefa foi selecionada — por construção — então `null` é a classificação verdadeira. `'task'` é decisão da Fase 2F, junto com os embeddings de tarefa (PRD da Fase 2E §22), e continua recusado com `22023`.
+
 ## Política de aposentadoria de versões de RPC
 
 Vale para toda família de RPC de mutação versionada (`*_vN`). Ver ADR-037; primeira aplicação na migration `202607250054`.
