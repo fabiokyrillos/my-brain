@@ -106,16 +106,35 @@ const CONCEPT_SET: ReadonlySet<string> = new Set(EXTRACTION_CONCEPTS);
 const LANGUAGE_SET: ReadonlySet<string> = new Set(EXTRACTION_LANGUAGES);
 
 // ISO 8601 instant with a required timezone designator. Seconds and fractional
-// seconds are optional, matching the source-of-truth schema's accepted shape.
-const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+// seconds are optional, and the case of `T`/`Z` is significant — all three match
+// the source-of-truth schema's accepted grammar, which
+// src/lib/ai/extraction-parity.test.ts pins empirically.
+const ISO_INSTANT =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+
+/** PostgreSQL's maximum `timestamptz` UTC offset, in minutes (±15:59). */
+const MAX_OFFSET_MINUTES = 15 * 60 + 59;
 
 function isPlainObject(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null && !Array.isArray(input);
 }
 
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31;
+}
+
 /**
- * Calendar-real ISO instant. The regex alone would accept 2026-02-30, so the
- * date parts are re-derived from a UTC Date and compared.
+ * Calendar-real ISO instant with an in-range timezone designator.
+ *
+ * The day is validated arithmetically rather than through `Date`: `Date.UTC`
+ * maps years 0–99 to 1900+year, which would reject `0050-07-24T…` that the
+ * source-of-truth schema accepts. The proleptic-Gregorian leap rule also makes
+ * year 0 a leap year, matching it.
  */
 export function isIsoInstant(input: unknown): input is string {
   if (typeof input !== "string") return false;
@@ -130,16 +149,38 @@ export function isIsoInstant(input: unknown): input is string {
   const second = match[6] === undefined ? 0 : Number(match[6]);
 
   if (month < 1 || month > 12) return false;
-  if (day < 1 || day > 31) return false;
+  if (day < 1 || day > daysInMonth(year, month)) return false;
   if (hour > 23 || minute > 59 || second > 59) return false;
 
-  const asUtc = new Date(Date.UTC(year, month - 1, day));
-  return (
-    asUtc.getUTCFullYear() === year &&
-    asUtc.getUTCMonth() === month - 1 &&
-    asUtc.getUTCDate() === day
-  );
+  // Offset present (match[7] is the sign only when it is not `Z`).
+  if (match[7] !== undefined) {
+    const offsetHour = Number(match[8]);
+    const offsetMinute = Number(match[9]);
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+    // Every instant here is destined for a `timestamptz` column, and PostgreSQL
+    // only accepts a UTC offset up to ±15:59 — beyond that the cast raises
+    // 22009. Accepting a wider offset would mean persisting an instant the
+    // database refuses, failing late and burning the job's retry budget on an
+    // error it cannot fix. Mirrors `isStorableInstant` in
+    // src/lib/ai/extraction-schema.ts.
+    if (offsetHour * 60 + offsetMinute > MAX_OFFSET_MINUTES) return false;
+  }
+
+  return true;
 }
+
+/**
+ * Non-negative integer within the safe range, mirroring `z.number().int()`,
+ * which rejects 2^53 and above rather than accepting any integral float.
+ */
+function isNonNegativeSafeInteger(input: unknown): input is number {
+  return typeof input === "number" && Number.isSafeInteger(input) && input >= 0;
+}
+
+// NOTE ON ELEMENT LOOPS: every loop below indexes explicitly rather than using
+// `Array.prototype.forEach`, which skips array holes entirely. A hole reads as
+// `undefined` for the source-of-truth schema, which rejects it, so a `forEach`
+// here silently accepted sparse input the Zod schema refused.
 
 type Collector = { issues: ExtractionIssue[] };
 
@@ -231,19 +272,20 @@ function readEntityCandidates(
   if (items === null) return [];
 
   const values: EntityCandidateValue[] = [];
-  items.forEach((item, index) => {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
     const itemPath = `${path}.${index}`;
     if (!isPlainObject(item)) {
       fail(collector, itemPath, "expected_object");
-      return;
+      continue;
     }
     const name = readString(collector, item.name, `${itemPath}.name`, 1, 160);
     const confidence = readNumber(collector, item.confidence, `${itemPath}.confidence`, 0, 1);
     const evidence = readString(collector, item.evidence, `${itemPath}.evidence`, 1, 500);
     const inferred = readBoolean(collector, item.inferred, `${itemPath}.inferred`);
-    if (name === null || confidence === null || evidence === null || inferred === null) return;
+    if (name === null || confidence === null || evidence === null || inferred === null) continue;
     values.push({ name, confidence, evidence, inferred });
-  });
+  }
   return values;
 }
 
@@ -256,11 +298,12 @@ function readTaskCandidates(
   if (items === null) return [];
 
   const values: TaskCandidateValue[] = [];
-  items.forEach((item, index) => {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
     const itemPath = `${path}.${index}`;
     if (!isPlainObject(item)) {
       fail(collector, itemPath, "expected_object");
-      return;
+      continue;
     }
 
     const title = readString(collector, item.title, `${itemPath}.title`, 1, 240);
@@ -288,7 +331,7 @@ function readTaskCandidates(
     let parentIndex: number | null | undefined;
     if (item.parentIndex === null) {
       parentIndex = null;
-    } else if (typeof item.parentIndex === "number" && Number.isInteger(item.parentIndex) && item.parentIndex >= 0) {
+    } else if (isNonNegativeSafeInteger(item.parentIndex)) {
       parentIndex = item.parentIndex;
     } else {
       fail(collector, `${itemPath}.parentIndex`, "expected_non_negative_integer");
@@ -304,11 +347,11 @@ function readTaskCandidates(
       dueAt === undefined ||
       parentIndex === undefined
     ) {
-      return;
+      continue;
     }
 
     values.push({ title, description, dueAt, waitingOn, parentIndex, confidence, explicit });
-  });
+  }
   return values;
 }
 
@@ -321,18 +364,19 @@ function readPendingQuestions(
   if (items === null) return [];
 
   const values: PendingQuestionValue[] = [];
-  items.forEach((item, index) => {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
     const itemPath = `${path}.${index}`;
     if (!isPlainObject(item)) {
       fail(collector, itemPath, "expected_object");
-      return;
+      continue;
     }
     const question = readString(collector, item.question, `${itemPath}.question`, 1, 500);
     const reason = readString(collector, item.reason, `${itemPath}.reason`, 1, 500);
     const confidence = readNumber(collector, item.confidence, `${itemPath}.confidence`, 0, 1);
-    if (question === null || reason === null || confidence === null) return;
+    if (question === null || reason === null || confidence === null) continue;
     values.push({ question, reason, confidence });
-  });
+  }
   return values;
 }
 
@@ -365,13 +409,14 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
   const rawConcepts = readArray(collector, input.concepts, "concepts", 1);
   const concepts: ExtractionConcept[] = [];
   if (rawConcepts !== null) {
-    rawConcepts.forEach((concept, index) => {
+    for (let index = 0; index < rawConcepts.length; index += 1) {
+      const concept = rawConcepts[index];
       if (typeof concept === "string" && CONCEPT_SET.has(concept)) {
         concepts.push(concept as ExtractionConcept);
-        return;
+        continue;
       }
       fail(collector, `concepts.${index}`, "expected_enum");
-    });
+    }
   }
 
   const contexts = readEntityCandidates(collector, input.contexts, "contexts");

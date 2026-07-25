@@ -9,6 +9,10 @@ const auditedVisibleSurfaces = [
   "src/app/[locale]/app/settings/page.tsx",
   "src/app/[locale]/app/reviews/page.tsx",
   "src/i18n/messages.ts",
+  // The authenticated error boundary claimed "the problem was recorded" while
+  // discarding the error prop entirely. There is still no error sink, so that
+  // promise must not come back: it belongs under this audit, not in a comment.
+  "src/app/[locale]/app/error.tsx",
 ];
 
 describe("operational copy", () => {
@@ -27,6 +31,8 @@ describe("operational copy", () => {
       /autonomy level/i,
       /privacidade padrão/i,
       /default privacy/i,
+      /problema foi registrado/i,
+      /problem was recorded/i,
     ]) {
       expect(source).not.toMatch(forbidden);
     }

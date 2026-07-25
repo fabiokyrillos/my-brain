@@ -12,7 +12,7 @@
 
 begin;
 
-select plan(20);
+select plan(21);
 
 -- Structural guards ----------------------------------------------------------
 
@@ -222,6 +222,23 @@ select is(
   ),
   'P0001:AI_INTERPRETATION_CANDIDATE_CONFIDENCE_BOUNDS',
   'an out-of-range candidate confidence is refused'
+);
+
+-- PostgreSQL caps a timestamptz UTC offset at ±15:59, so this is the boundary
+-- the worker validator must mirror — and it is the one place where "the database
+-- is at least as permissive as the worker" could have been violated. An offset
+-- Zod's grammar allows (up to ±23:59) but PostgreSQL refuses would have been
+-- accepted by the worker and then rejected here, burning the job's retry budget.
+-- Both sides now stop at ±15:59; this assertion pins the database half.
+select is(
+  pg_temp.ai_bounds_persist(
+    'ab100002-0000-4000-8000-000000000002',
+    jsonb_build_object('taskCandidates', jsonb_build_array(
+      jsonb_build_object('title', 'Candidate', 'dueAt', '2026-07-31T12:00:00+18:00', 'confidence', 0.5)
+    ))
+  ),
+  'P0001:AI_INTERPRETATION_CANDIDATE_DUE_AT',
+  'a dueAt offset PostgreSQL cannot store is refused, and the worker refuses it first'
 );
 
 select is(

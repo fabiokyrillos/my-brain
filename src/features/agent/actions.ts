@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
-import { defaultAgentPreferences, resolveLocale } from "@/lib/preferences";
+import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordAIUsage } from "@/lib/ai/usage";
@@ -30,10 +30,31 @@ import type {
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 
-// Canonical localization mechanism (ADR-036): locale-keyed typed copy records,
-// matching this file's existing `jobRetryMessages`. Reminder creation and
-// attachment upload previously returned Portuguese-only results to English
-// users even though both had already resolved the locale.
+// Canonical localization mechanism (ADR-036): an explicit key type plus
+// `satisfies Record<Locale, …>`, so a missing key or a missing locale is a
+// compile error even for a key nothing reads yet. Reminder creation and
+// attachment upload previously returned Portuguese-only results to English users
+// even though both had already resolved the locale.
+type ReminderCopy = {
+  invalid: string;
+  invalidDate: string;
+  session: string;
+  failed: string;
+  created: string;
+};
+
+type UploadCopy = {
+  selectFile: string;
+  tooLarge: string;
+  unsupported: string;
+  session: string;
+  uploadFailed: string;
+  registerFailed: string;
+  notQueued: string;
+  queued: string;
+  analyzed: string;
+};
+
 const reminderCopy = {
   "pt-BR": {
     invalid: "Revise o lembrete.",
@@ -49,7 +70,7 @@ const reminderCopy = {
     failed: "We could not create it.",
     created: "Reminder created.",
   },
-} as const;
+} satisfies Record<Locale, ReminderCopy>;
 
 const uploadCopy = {
   "pt-BR": {
@@ -74,7 +95,7 @@ const uploadCopy = {
     queued: "Private file uploaded and queued for another attempt.",
     analyzed: "Private file uploaded and analyzed.",
   },
-} as const;
+} satisfies Record<Locale, UploadCopy>;
 
 export async function createReminder(
   _state: AgentFormState,

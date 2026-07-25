@@ -60,6 +60,19 @@ function withRoot(patch: Record<string, unknown>) {
   return { ...baseExtraction(), ...patch };
 }
 
+/**
+ * A genuinely sparse array — holes, not explicit `undefined` entries. `delete`
+ * is what creates one; an array literal with an elision is normalized away by
+ * some tooling, and `[undefined]` is a different value.
+ */
+function sparse(values: unknown[]): unknown[] {
+  const result = [...values];
+  for (let index = 0; index < result.length; index += 1) {
+    if (result[index] === undefined) delete result[index];
+  }
+  return result;
+}
+
 function withTaskCandidate(patch: Record<string, unknown>) {
   const base = baseExtraction();
   const candidates = base.taskCandidates as Record<string, unknown>[];
@@ -201,11 +214,68 @@ const corpus: { name: string; input: unknown }[] = [
   // Unknown keys are stripped, not rejected, by the source of truth.
   { name: "unknown root key", input: withRoot({ unexpected: "extra" }) },
   { name: "unknown candidate key", input: withTaskCandidate({ unexpected: "extra" }) },
+
+  // The four divergence classes an independent review of this branch found
+  // after the first corpus passed. Each was a real gap where the worker
+  // validator and the Zod schema disagreed; none of them can regress silently
+  // now. See docs/reports/PRE_2E_FOUNDATION_HARDENING_REPORT.md.
+
+  // 1. Timezone offset range. `[+-]\d{2}:\d{2}` alone accepts nonsense offsets.
+  // PostgreSQL caps a timestamptz offset at ±15:59, so the storable bound — not
+  // Zod's ±23:59 grammar — is what both implementations must agree on. Without
+  // this, an offset of +16:00 would pass the worker and then be refused by
+  // 202607250053's `::timestamptz` cast, stranding the entry in `failed`.
+  { name: "offset at the storable bound", input: withRoot({ occurredAt: "2026-07-24T15:04:05+15:59" }) },
+  { name: "offset one minute past the storable bound", input: withRoot({ occurredAt: "2026-07-24T15:04:05+16:00" }) },
+  { name: "negative offset past the storable bound", input: withRoot({ occurredAt: "2026-07-24T15:04:05-16:00" }) },
+  { name: "offset within Zod's grammar but unstorable", input: withRoot({ occurredAt: "2026-07-24T15:04:05+23:59" }) },
+  { name: "candidate dueAt offset unstorable", input: withTaskCandidate({ dueAt: "2026-07-31T12:00:00+18:00" }) },
+  { name: "offset hour 24", input: withRoot({ occurredAt: "2026-07-24T15:04:05+24:00" }) },
+  { name: "offset minute 60", input: withRoot({ occurredAt: "2026-07-24T15:04:05+23:60" }) },
+  { name: "offset wildly out of range", input: withRoot({ occurredAt: "2026-07-24T15:04:05+99:99" }) },
+  { name: "negative zero offset", input: withRoot({ occurredAt: "2026-07-24T15:04:05-00:00" }) },
+  { name: "offset without a colon", input: withRoot({ occurredAt: "2026-07-24T15:04:05+0000" }) },
+  { name: "offset hours only", input: withRoot({ occurredAt: "2026-07-24T15:04:05+05" }) },
+  { name: "candidate dueAt offset out of range", input: withTaskCandidate({ dueAt: "2026-07-31T12:00:00+99:99" }) },
+
+  // 2. Two-digit years. `Date.UTC` maps 0..99 to 1900+year, so a round-trip
+  // check through Date rejected years the schema accepts.
+  { name: "year 0050", input: withRoot({ occurredAt: "0050-07-24T15:04:05Z" }) },
+  { name: "year 0099", input: withRoot({ occurredAt: "0099-07-24T15:04:05Z" }) },
+  { name: "year 0000 is a leap year", input: withRoot({ occurredAt: "0000-02-29T15:04:05Z" }) },
+  { name: "year 0004 is a leap year", input: withRoot({ occurredAt: "0004-02-29T15:04:05Z" }) },
+  { name: "year 0100 is not a leap year", input: withRoot({ occurredAt: "0100-02-29T15:04:05Z" }) },
+  { name: "year 2000 is a leap year", input: withRoot({ occurredAt: "2000-02-29T15:04:05Z" }) },
+  { name: "year 2100 is not a leap year", input: withRoot({ occurredAt: "2100-02-29T15:04:05Z" }) },
+  { name: "five-digit year", input: withRoot({ occurredAt: "12026-07-24T15:04:05Z" }) },
+  { name: "signed year", input: withRoot({ occurredAt: "+2026-07-24T15:04:05Z" }) },
+  { name: "month zero", input: withRoot({ occurredAt: "2026-00-10T15:04:05Z" }) },
+  { name: "day zero", input: withRoot({ occurredAt: "2026-07-00T15:04:05Z" }) },
+  { name: "day 32", input: withRoot({ occurredAt: "2026-07-32T15:04:05Z" }) },
+  { name: "seconds 60", input: withRoot({ occurredAt: "2026-07-24T15:04:60Z" }) },
+  { name: "lowercase separators", input: withRoot({ occurredAt: "2026-07-24t15:04:05z" }) },
+
+  // 3. `.int()` rejects anything outside the safe-integer range, where
+  // `Number.isInteger` accepts integral floats of any magnitude.
+  { name: "parentIndex at the safe-integer bound", input: withTaskCandidate({ parentIndex: Number.MAX_SAFE_INTEGER }) },
+  { name: "parentIndex beyond the safe-integer bound", input: withTaskCandidate({ parentIndex: 2 ** 53 }) },
+  { name: "parentIndex 1e21", input: withTaskCandidate({ parentIndex: 1e21 }) },
+  { name: "parentIndex 1e300", input: withTaskCandidate({ parentIndex: 1e300 }) },
+  { name: "parentIndex Infinity", input: withTaskCandidate({ parentIndex: Number.POSITIVE_INFINITY }) },
+  { name: "parentIndex negative zero", input: withTaskCandidate({ parentIndex: -0 }) },
+
+  // 4. Array holes. `Array.prototype.forEach` skips them entirely; the schema
+  // sees `undefined` and rejects.
+  { name: "sparse concepts array", input: withRoot({ concepts: sparse(["task", undefined, "reminder"]) }) },
+  { name: "sparse people array", input: withRoot({ people: sparse([{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false }, undefined]) }) },
+  { name: "sparse taskCandidates array", input: withRoot({ taskCandidates: sparse([undefined]) }) },
+  { name: "sparse pendingQuestions array", input: withRoot({ pendingQuestions: sparse([undefined]) }) },
+  { name: "explicit undefined concept", input: withRoot({ concepts: ["task", undefined] }) },
 ];
 
 describe("extraction validator parity with the Zod source of truth", () => {
   it("covers a meaningful corpus", () => {
-    expect(corpus.length).toBeGreaterThanOrEqual(70);
+    expect(corpus.length).toBeGreaterThanOrEqual(110);
     expect(new Set(corpus.map((entry) => entry.name)).size).toBe(corpus.length);
   });
 

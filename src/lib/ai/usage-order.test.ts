@@ -42,6 +42,9 @@ describe("AI usage ledger ordering", () => {
     expect(embeddingCall).toBeGreaterThan(-1);
     expect(requestIdRead).toBeGreaterThan(embeddingCall);
     expect(requestIdRead).toBeLessThan(usageRecord);
-    expect(worker.indexOf("p_provider_request_id: null")).toBe(-1);
+    // Scoped to the embedding block rather than the whole file: another RPC may
+    // legitimately pass a literal null for an unrelated parameter later.
+    const embeddingBlock = worker.slice(embeddingCall, worker.indexOf("entry_embeddings", embeddingCall));
+    expect(embeddingBlock).not.toContain("p_provider_request_id: null");
   });
 });

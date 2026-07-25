@@ -27,9 +27,16 @@ const nodeDirectory = path.resolve(process.cwd(), "src/features/interpretations"
 function algorithm(code: string) {
   return code
     .replace(/\r\n/g, "\n")
-    // Every top-level import statement, single- or multi-line.
-    .replace(/^import\s[\s\S]*?;\s*$/gm, "")
-    // Comments carry provenance notes that differ by design.
+    // Only the leading comment/import prologue is stripped, and an import must
+    // be terminated by its own `from "…"` clause. A greedy `^import[\s\S]*?;`
+    // over the whole file would swallow the statement after a semicolon-less
+    // import, and would cut through a template literal containing a line that
+    // starts with `import` — both silently comparing less while still passing.
+    .replace(
+      /^(?:\s*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/|import\s[\s\S]*?from\s+["'][^"']+["'];?|import\s+["'][^"']+["'];?)\s*)+/,
+      "",
+    )
+    // Remaining comments carry provenance notes that differ by design.
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/[^\n]*$/gm, "")
     .split("\n")

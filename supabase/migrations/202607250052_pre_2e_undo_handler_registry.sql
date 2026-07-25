@@ -607,16 +607,26 @@ as $$
     E'\n',
     pg_catalog.pg_get_functiondef('public.undo_operation(uuid)'::pg_catalog.regprocedure),
     (
+      -- to_regprocedure, not a ::regprocedure cast: the cast RAISES 42883 on a
+      -- name it cannot resolve, which would make this helper throw for its four
+      -- pgTAP callers instead of them failing cleanly on a missing handler. The
+      -- registry-completeness assertions are what report that.
       select pg_catalog.string_agg(
-        pg_catalog.pg_get_functiondef(
-          ('private.' || pg_catalog.quote_ident(handlers.handler_function) || '(uuid, uuid)')::pg_catalog.regprocedure
-        ),
+        pg_catalog.pg_get_functiondef(resolved.oid),
         E'\n'
-        order by handlers.handler_function
+        order by resolved.handler_function
       )
       from (
-        select distinct handler_function from private.undo_operation_handlers
-      ) as handlers
+        select
+          handler_function,
+          to_regprocedure(
+            'private.' || pg_catalog.quote_ident(handler_function) || '(uuid, uuid)'
+          ) as oid
+        from (
+          select distinct handler_function from private.undo_operation_handlers
+        ) as handlers
+      ) as resolved
+      where resolved.oid is not null
     )
   );
 $$;
