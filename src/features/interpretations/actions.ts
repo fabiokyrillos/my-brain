@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
+import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import type { RevisionActionState } from "./revision-editor";
 import { parseCorrectionFormData } from "./form-parser";
@@ -31,7 +32,16 @@ export async function correctInterpretation(
   const parsed = parseCorrectionFormData(formData);
   const locale = localeSchema.safeParse(formData.get("locale"));
   if (!parsed.success || !locale.success) {
-    return { status: "error", message: "Revise os campos da correção." };
+    // The strict locale parse may itself have failed, so fall back to the
+    // resolved locale instead of hardcoding Portuguese for English users.
+    return {
+      status: "error",
+      message: localized(
+        resolveLocale(formData.get("locale")),
+        "Revise os campos da correção.",
+        "Review the correction fields.",
+      ),
+    };
   }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -91,7 +101,10 @@ export async function undoInterpretationCorrection(
   const undoId = uuidSchema.safeParse(formData.get("undoId"));
   const locale = localeSchema.safeParse(formData.get("locale"));
   if (!entryId.success || !undoId.success || !locale.success) {
-    return { status: "error", message: "Ação inválida." };
+    return {
+      status: "error",
+      message: localized(resolveLocale(formData.get("locale")), "Ação inválida.", "Invalid action."),
+    };
   }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -110,7 +123,10 @@ export async function reprocessEntry(
   const operationKey = uuidSchema.safeParse(formData.get("operationKey"));
   const locale = localeSchema.safeParse(formData.get("locale"));
   if (!entryId.success || !operationKey.success || !locale.success) {
-    return { status: "error", message: "Ação inválida." };
+    return {
+      status: "error",
+      message: localized(resolveLocale(formData.get("locale")), "Ação inválida.", "Invalid action."),
+    };
   }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

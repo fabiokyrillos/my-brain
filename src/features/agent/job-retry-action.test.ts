@@ -8,7 +8,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
-vi.mock("@/lib/preferences", () => ({ defaultAgentPreferences: {} }));
+vi.mock("@/lib/preferences", () => ({
+  defaultAgentPreferences: {},
+  resolveLocale: (value: unknown) => (value === "en" ? "en" : "pt-BR"),
+}));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn() }));
 vi.mock("@/features/product-analytics/server", () => ({
   createProductEventIdempotencyKey: vi.fn(() => "44444444-4444-5444-8444-444444444444"),

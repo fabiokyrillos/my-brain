@@ -7,6 +7,7 @@ import { resolveDailyCycleLifecycle } from "@/features/daily-cycle/lifecycle";
 import { toCaptureReceipt } from "@/features/daily-cycle/projection-mappers";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
+import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { captureEntrySchema } from "./schema";
 import type { CaptureState } from "./quick-capture-form";
@@ -18,6 +19,11 @@ const captureRequestSchema = z.object({
 
 const sessionExpiredMessage = { "pt-BR": "Sua sessão expirou. Entre novamente.", en: "Your session expired. Sign in again." } as const;
 const actionFailedMessage = { "pt-BR": "Não foi possível concluir esta ação agora.", en: "This action could not be completed right now." } as const;
+// `capture/schema.ts` writes its Zod messages in Portuguese only, so surfacing
+// `issues[0].message` verbatim leaked Portuguese into the English product. The
+// localized message is the fallback AND the ceiling: a raw validator message is
+// never shown (ADR-036).
+const invalidEntryMessage = { "pt-BR": "Revise a entrada.", en: "Review the entry." } as const;
 
 type CaptureAsyncRow = { entry_id: string; status: string; replayed: boolean };
 
@@ -40,7 +46,7 @@ export async function captureEntry(
     return {
       status: "error",
       code: "validation_failed",
-      message: parsedEntry.error?.issues[0]?.message ?? "Revise a entrada.",
+      message: invalidEntryMessage[resolveLocale(formData.get("locale"))],
     };
   }
   const { content, locale, source } = parsedEntry.data;

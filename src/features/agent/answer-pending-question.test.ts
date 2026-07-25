@@ -15,7 +15,10 @@ vi.mock("@/features/product-analytics/server", () => ({
 }));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
-vi.mock("@/lib/preferences", () => ({ defaultAgentPreferences: {} }));
+vi.mock("@/lib/preferences", () => ({
+  defaultAgentPreferences: {},
+  resolveLocale: (value: unknown) => (value === "en" ? "en" : "pt-BR"),
+}));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn() }));
 vi.mock("./question-preview-projection", () => ({ loadQuestionSuggestions: vi.fn(async () => []) }));
 

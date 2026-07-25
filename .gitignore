@@ -42,3 +42,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# deno
+# The Edge Function gate runs with --no-lock: package-lock.json stays the single
+# source of dependency truth, and `npm:@supabase/supabase-js@2` resolves in CI
+# the same way the deployed function resolves it. A stray lock from a local
+# `deno test` must not dirty the tree.
+deno.lock
+supabase/functions/**/deno.lock
+# `--node-modules-dir=auto` would materialize one of these inside a function
+# directory, where `supabase functions deploy` would bundle it. CI uses `none`.
+supabase/functions/**/node_modules

@@ -15,7 +15,10 @@
 
 begin;
 
-select plan(34);
+-- Plan corrected from 34 to the 37 assertions this file actually runs. The
+-- suite had never executed anywhere (Docker was unavailable on the only
+-- workstation), so the drift was invisible until the pre-2E CI gate ran it.
+select plan(37);
 
 -- Structural guards ----------------------------------------------------------
 
@@ -97,14 +100,17 @@ select ok(
 
 -- 2C-UNDO-004 forward fix: undo_operation must no longer raise 40001 ----------
 
+-- Since 202607250052 the compensation bodies live in private handlers, so the
+-- guard inspects the router plus every registered handler. Asserting on
+-- undo_operation alone would now pass vacuously.
 select ok(
-  position('errcode = ''40001''' in pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) = 0,
-  'undo_operation no longer contains the gateway-hanging SQLSTATE 40001'
+  position('errcode = ''40001''' in private.undo_operation_definition_bundle()) = 0,
+  'undo compensation no longer contains the gateway-hanging SQLSTATE 40001'
 );
 
 select ok(
-  position('55P03' in pg_get_functiondef('public.undo_operation(uuid)'::regprocedure)) > 0,
-  'undo_operation signals the interpretation-revision conflict with 55P03'
+  position('55P03' in private.undo_operation_definition_bundle()) > 0,
+  'undo compensation signals the interpretation-revision conflict with 55P03'
 );
 
 -- Product-event allowlist ----------------------------------------------------
@@ -430,12 +436,25 @@ select is(
   'the reinterpreted question is resolvable again after undo'
 );
 
+-- Corrected with the first real execution of this suite (pre-2E CI gate). The
+-- assertion previously used a fresh operation key ('phase2d4-plain-2') against
+-- a question the test had already answered above, so resolve_pending_question_v3
+-- refused it as no longer open, the helper returned its error object, and
+-- `consequence` came back NULL -- it could never have passed. The plan(34)
+-- mismatch had been masking that per-test result.
+--
+-- The section header states the contract being proven, and replaying the SAME
+-- key is what actually proves it: an omitted consequence must canonicalize to
+-- 'none' and hash IDENTICALLY to an explicit 'none', so the recorded
+-- request_fingerprint still matches. If canonicalization were broken the RPC
+-- would raise 2D_IDEMPOTENCY_MISMATCH and this would be NULL again. The answer
+-- text must match the original call for the same reason.
 select is(
   (select pg_temp.phase2d4_resolve(refs.plain_question_id,
-    jsonb_build_object('kind', 'answer', 'answer', 'Nova resposta'),
-    'phase2d4-plain-2') ->> 'consequence' from phase2d4_refs as refs),
+    jsonb_build_object('kind', 'answer', 'answer', 'Sexta'),
+    'phase2d4-plain') ->> 'consequence' from phase2d4_refs as refs),
   'none',
-  'an answer omitting the consequence key resolves with consequence none'
+  'an answer omitting the consequence key canonicalizes to none and hashes identically'
 );
 
 select * from finish();

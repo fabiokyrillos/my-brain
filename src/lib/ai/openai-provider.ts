@@ -11,6 +11,9 @@ import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
 export const EXTRACTION_PROMPT_VERSION = "2026-07-16.1";
 
+/** Explicit ceiling per provider call. See the constructor for why. */
+export const NODE_OPENAI_TIMEOUT_MS = 120_000;
+
 const systemPrompt = `You extract personal knowledge and possible actions from one user entry.
 
 Security and truth rules:
@@ -36,7 +39,12 @@ export class OpenAIProvider implements AIProvider {
   constructor(options?: { apiKey?: string; model?: string; embeddingModel?: string }) {
     const apiKey = options?.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-    this.client = new OpenAI({ apiKey });
+    // The SDK defaults to a 10-minute timeout with 2 retries, so a stalled
+    // provider could hold a blocking Server Action (chat, review generation,
+    // memory embedding) for up to ~30 minutes. The Deno worker already bounds
+    // its own calls with AbortSignal.timeout(120_000); this is the Node
+    // equivalent, kept longer because review generation is the slowest call.
+    this.client = new OpenAI({ apiKey, timeout: NODE_OPENAI_TIMEOUT_MS, maxRetries: 2 });
     this.model = options?.model ?? process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-5.6-luna";
     this.embeddingModel = options?.embeddingModel ?? process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
   }

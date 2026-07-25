@@ -53,13 +53,12 @@ export const TEXT_MODEL_LABELS: Record<TextModelId, string> = {
   "gpt-5-mini": "GPT-5 mini",
 };
 
-export function resolveAIRoutes(
-  profile: AIRoutingProfile,
-  overrides: Partial<AIRoutes> = {},
-): AIRoutes {
-  const preset = profile === "custom" ? MODEL_PROFILES.quality : MODEL_PROFILES[profile];
-  return { ...preset, ...overrides };
-}
+// `resolveAIRoutes` was removed in the pre-2E hardening pass: it had no
+// production caller. The five real call sites each resolve their own model with
+// `preferences?.<operation>_model ?? "<default>"`, and consolidating them
+// behind one helper needs a Deno-side mirror for the worker to use the same
+// rule — that belongs to the AI-layer work Phase 2E folds in, not to a
+// hardening pass keeping a consumer-less abstraction alive.
 
 export function isTextModelId(value: unknown): value is TextModelId {
   return typeof value === "string" && TEXT_MODEL_IDS.includes(value as TextModelId);

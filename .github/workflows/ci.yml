@@ -3,9 +3,19 @@ on:
   pull_request:
   push:
     branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # The pre-existing application gate. Every Vitest suite mocks Supabase, so
+  # this job proves the Node layer only — the `worker` and `database` jobs
+  # below cover what it cannot reach.
   app:
+    name: application (lint, types, unit, build)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       NEXT_PUBLIC_SUPABASE_ANON_KEY: local-anon-key-with-enough-length
@@ -20,3 +30,163 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # supabase/functions/** is invisible to both other gates: eslint.config.mjs
+  # ignores it and vitest.config.ts only includes src/**. This job is the only
+  # static or behavioural check the production worker gets.
+  worker:
+    name: edge worker (deno types, deno tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.4
+
+      # Every Deno command is scoped to a function's own deno.json. Without
+      # --config, Deno discovers the repository root's package.json, adopts the
+      # entire Next.js dependency tree as its own manifest, and then fails
+      # because it expects a populated node_modules/ it has no reason to need.
+      # --node-modules-dir=none resolves npm: specifiers from Deno's global
+      # cache and writes no node_modules/ next to a function — `auto` does write
+      # one, which would end up inside the deployed bundle.
+      #
+      # --no-lock is a deliberate trade-off, not hermeticity: Deno never reads
+      # package-lock.json, so `npm:@supabase/supabase-js@2` floats within major
+      # 2 here. That is exactly how the DEPLOYED function resolves it, so this
+      # gate sees what production sees — a 2.x that breaks the worker reds this
+      # job before it reaches a deploy. The cost is that a provider release can
+      # red the job with no repository change. A committed Deno lockfile is not
+      # the alternative: it would have to live beside a function's deno.json,
+      # where `supabase functions deploy` would bundle it.
+      - name: Type-check the deployed function entrypoints
+        run: |
+          deno check --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock \
+            supabase/functions/process-jobs/index.ts
+          deno check --config supabase/functions/heartbeat/deno.json --node-modules-dir=none --no-lock \
+            supabase/functions/heartbeat/index.ts
+
+      - name: Run the worker test suite
+        # No --allow-* flags on purpose: the suite must stay network-free and
+        # must never reach a real OpenAI or Supabase endpoint.
+        #
+        # Paths are enumerated from the directory listing rather than passing
+        # `supabase/functions/` once: a scoped --config narrows Deno's own test
+        # discovery to that config's directory, which would silently drop the
+        # _shared suites. Globbing every function directory means a new one is
+        # covered automatically instead of being missed.
+        run: |
+          set -euo pipefail
+          DIRS=$(ls -d supabase/functions/*/)
+          echo "Discovering tests in: $DIRS"
+          deno test --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock $DIRS
+
+  # The database is this product's trust boundary and its largest body of
+  # logic. Nothing verified it automatically before this job: pgTAP had never
+  # run as a suite in any environment, and no check proved the migration chain
+  # still applies to an empty database.
+  database:
+    name: database and journey (migrations, pgTAP, db lint, foundation e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.106.0
+
+      - name: Start the local Supabase stack
+        # Studio, image proxy, mail catcher, log pipeline and the edge runtime
+        # are not exercised by any gate below, so they are excluded to keep the
+        # job inside its timeout. `db`, `kong`, `rest`, `meta` and Auth stay up
+        # because the journey step needs a real API and a real Auth service.
+        # `inbucket`, `analytics` and `functions` appear in `supabase start
+        # --help` but the CLI rejects them at runtime ("not valid to exclude"),
+        # so only the names it actually accepts are listed. `vector` is left
+        # running on purpose even though no gate reads logs: `[analytics]` is
+        # enabled in config.toml and cannot be excluded, and it consumes the
+        # vector pipeline — a few seconds of start-up is cheaper than a
+        # half-configured log path.
+        run: supabase start -x studio,imgproxy,edge-runtime
+
+      - name: Apply the whole migration chain to an empty database
+        # Proves every migration still applies from zero, in order — the check
+        # `supabase db push` against an already-migrated project cannot make.
+        # Also runs supabase/seed.sql, which installs pgTAP for the next step.
+        run: supabase db reset
+
+      - name: Run the pgTAP suite
+        run: supabase test db --local supabase/tests
+
+      - name: Lint the database
+        # `--level warning` prints everything; `--fail-on error` gates. The two
+        # long-standing 42804 warnings in run_user_heartbeat are recorded in
+        # docs/SECURITY.md and are not part of this initiative — error level is
+        # what catches the defect class this gate exists for (the
+        # `pg_catalog.greatest` lookup that 202607220042/045 had to fix twice).
+        #
+        # Scoped to the product's own schemas. Without --schema the linter also
+        # walks `extensions`, where supabase/seed.sql installed pgTAP: its 30
+        # internal plpgsql_check findings (7 of them error level) would fail a
+        # gate that exists to check code this project owns. `private` is
+        # included deliberately — the undo handlers and the AI bounds validator
+        # live there.
+        run: supabase db lint --local --schema public,private --level warning --fail-on error
+
+      - name: Export the local Supabase credentials
+        # NEXT_PUBLIC_* are inlined at build time, so this must precede build.
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          if [ -z "${API_URL:-}" ]; then
+            echo "supabase status did not report API_URL" >&2
+            exit 1
+          fi
+          BROWSER_KEY="${ANON_KEY:-${PUBLISHABLE_KEY:-}}"
+          if [ -z "$BROWSER_KEY" ]; then
+            echo "supabase status did not report ANON_KEY or PUBLISHABLE_KEY" >&2
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$BROWSER_KEY" >> "$GITHUB_ENV"
+
+      - name: Build the application under test
+        run: npm run build
+
+      - name: Install the browser
+        # Both Playwright projects (Desktop Chrome, Pixel 7) are Chromium.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the deterministic foundation journey
+        # foundation.spec.ts needs no OpenAI key and no seeded user: it proves
+        # the proxy's auth boundary, the locale redirects and the accessible
+        # auth forms. The remaining specs are credential-gated against the
+        # linked project and skip themselves; remote smokes stay manual.
+        run: npx playwright test e2e/foundation.spec.ts --project=desktop --project=mobile
+
+      - name: Collect the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Collect the Supabase container logs
+        if: failure()
+        # `|| true` because the default shell is `bash -e -o pipefail`: with no
+        # matching container `grep` exits 1 and would red this step on top of the
+        # real failure it is trying to explain.
+        run: docker ps -a --format '{{.Names}}' | grep -i supabase | xargs -r -I{} sh -c 'echo "===== {} ====="; docker logs --tail 200 {} 2>&1' || true
+
+      - name: Stop the local Supabase stack
+        if: always()
+        run: supabase stop --no-backup
