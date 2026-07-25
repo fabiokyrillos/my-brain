@@ -62,6 +62,59 @@ export const TASK_COMMAND_ACTIONS = [
 export type TaskCommandAction = (typeof TASK_COMMAND_ACTIONS)[number];
 
 /**
+ * The reasons the model may report instead of a proposal.
+ *
+ * PRD 2E-COMMAND-007 requires each refusal to carry *its own* code rather than
+ * a shared "unsupported": "push the two invoice tasks to next week" and "remind
+ * me every Monday" are refused for different reasons, and a user told only
+ * "unsupported" learns nothing about which part of the sentence to change.
+ *
+ * The schema already makes several of these unrepresentable as a proposal —
+ * there is exactly one `action` field and no way to name two targets — so the
+ * model's only way to describe them is to classify, which is the point.
+ */
+export const TASK_COMMAND_MODEL_UNSUPPORTED_REASONS = [
+  /** The verb is not one of the fifteen. */
+  "unsupported_action",
+  /** Two or more distinct actions in one sentence. */
+  "multiple_actions",
+  /** More than one task addressed; Phase 2E targets exactly one (PRD §5). */
+  "multiple_targets",
+  /** Gmail, Calendar, Slack, WhatsApp, push — none exist (PRD §5). */
+  "integration_requested",
+  /** Recurrence has no model in this domain; Phase 2F (PRD 2E-NOMATCH-009). */
+  "recurrence_requested",
+  /** Retroactive placement or review invalidation; Phase 2F. */
+  "retroactive_requested",
+  /** The text asks for something that is not an operation on a task at all. */
+  "not_a_task_command",
+] as const;
+
+export type TaskCommandModelUnsupportedReason =
+  (typeof TASK_COMMAND_MODEL_UNSUPPORTED_REASONS)[number];
+
+/**
+ * The complete closed vocabulary, adding the one reason only the deterministic
+ * validator can produce: a value that is legal for the column but not for the
+ * requested action (PRD 2E-COMMAND-017).
+ */
+export const TASK_COMMAND_UNSUPPORTED_REASONS = [
+  ...TASK_COMMAND_MODEL_UNSUPPORTED_REASONS,
+  "value_not_allowed_for_action",
+] as const;
+
+export type TaskCommandUnsupportedReason = (typeof TASK_COMMAND_UNSUPPORTED_REASONS)[number];
+
+export function isTaskCommandModelUnsupportedReason(
+  value: unknown,
+): value is TaskCommandModelUnsupportedReason {
+  return (
+    typeof value === "string" &&
+    (TASK_COMMAND_MODEL_UNSUPPORTED_REASONS as readonly string[]).includes(value)
+  );
+}
+
+/**
  * Bumped whenever any weight, threshold, eligibility rule or allowed value in
  * this module or in the matching policy changes, so a recorded decision stays
  * attributable to the rules that produced it (PRD §10.4).

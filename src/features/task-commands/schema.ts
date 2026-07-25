@@ -8,6 +8,7 @@ import {
   isTaskCommandAction,
   type TaskCommandAction,
   type TaskCommandPatchField,
+  type TaskCommandUnsupportedReason,
 } from "./taxonomy";
 import { resolveTemporalPhrase, type TemporalContext } from "./temporal";
 
@@ -31,6 +32,19 @@ export const MAX_TITLE_WORDS = 12;
 export const MAX_HINT_LENGTH = 160;
 export const MAX_TITLE_LENGTH = 240;
 export const MAX_NOTE_LENGTH = 2000;
+
+/**
+ * The cap on all hints together, over and above each field's own cap
+ * (2E-COMMAND-005).
+ *
+ * Per-field caps alone are not a bound: twelve title words plus five other
+ * hints at 160 characters each is over 2.7 KB of attacker-chosen text flowing
+ * into the matcher's normalization and into every candidate comparison. The
+ * total is what the downstream cost actually scales with, so the total is what
+ * is capped. Measured on the canonical JSON, so reordering keys cannot change
+ * whether a payload fits.
+ */
+export const MAX_TARGET_HINTS_SERIALIZED = 800;
 
 const boundedHint = z.string().trim().min(1).max(MAX_HINT_LENGTH);
 
@@ -92,7 +106,7 @@ export type ValidatedTaskCommand = {
 export type TaskCommandValidation =
   | { status: "ok"; command: ValidatedTaskCommand }
   | { status: "invalid"; reason: string; field?: string }
-  | { status: "unsupported"; reason: string; field?: string }
+  | { status: "unsupported"; reason: TaskCommandUnsupportedReason; field?: string }
   | { status: "needs_clarification"; reason: string; field: string };
 
 /** The fields whose value is a temporal phrase rather than a literal. */
@@ -144,6 +158,11 @@ export function validateTaskCommand(
     };
   }
 
+  const targetHints = canonicalize(parsed.data.targetHints);
+  if (JSON.stringify(targetHints).length > MAX_TARGET_HINTS_SERIALIZED) {
+    return { status: "invalid", reason: "target_hints_too_large", field: "targetHints" };
+  }
+
   const policy = actionPolicy(action);
   const patch: Record<string, unknown> = { ...parsed.data.patch };
 
@@ -183,7 +202,7 @@ export function validateTaskCommand(
     status: "ok",
     command: canonicalize({
       action,
-      targetHints: canonicalize(parsed.data.targetHints),
+      targetHints,
       patch: canonicalize(patch) as TaskCommandPatch,
       operationKey: parsed.data.operationKey,
       schemaVersion: TASK_COMMAND_SCHEMA_VERSION,

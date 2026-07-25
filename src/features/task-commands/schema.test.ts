@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_TITLE_WORDS, TASK_COMMAND_SCHEMA_VERSION, validateTaskCommand } from "./schema";
+import {
+  MAX_HINT_LENGTH,
+  MAX_TITLE_WORDS,
+  TASK_COMMAND_SCHEMA_VERSION,
+  validateTaskCommand,
+} from "./schema";
 import type { TemporalContext } from "./temporal";
 
 // PRD §13.1. The model's proposal is untrusted structured data: this module is
@@ -246,5 +251,72 @@ describe("untrusted content is never interpreted", () => {
     const result = validate(command({ targetHints: { titleWords: ["ignore"], project: "'; drop table tasks; --" } }));
     expect(result).toMatchObject({ status: "ok" });
     if (result.status === "ok") expect(result.command.targetHints.project).toBe("'; drop table tasks; --");
+  });
+});
+
+describe("total hint size", () => {
+  // 2E-COMMAND-005. Per-field caps are not a bound on the whole: twelve title
+  // words plus five hints at 160 characters each is over 2.7 KB of
+  // attacker-chosen text flowing into normalization and into every candidate
+  // comparison.
+  const long = (length: number) => "a".repeat(length);
+
+  it("accepts hints within the total serialized cap", () => {
+    const words = Array.from({ length: MAX_TITLE_WORDS }, () => long(40));
+    expect(validate(command({ targetHints: { titleWords: words } }))).toMatchObject({ status: "ok" });
+  });
+
+  it("rejects hints that pass every field cap but blow the total", () => {
+    const words = Array.from({ length: MAX_TITLE_WORDS }, () => long(MAX_HINT_LENGTH));
+    const result = validate(command({ targetHints: { titleWords: words } }));
+    expect(result).toMatchObject({
+      status: "invalid",
+      reason: "target_hints_too_large",
+      field: "targetHints",
+    });
+  });
+
+  it("rejects an oversized total spread across different hint fields", () => {
+    const result = validate(command({
+      targetHints: {
+        titleWords: [long(MAX_HINT_LENGTH), long(MAX_HINT_LENGTH)],
+        project: long(MAX_HINT_LENGTH),
+        person: long(MAX_HINT_LENGTH),
+        context: long(MAX_HINT_LENGTH),
+        temporalPhrase: long(MAX_HINT_LENGTH),
+      },
+    }));
+    expect(result).toMatchObject({ status: "invalid", reason: "target_hints_too_large" });
+  });
+
+  it("measures the cap on the canonical form, so key order cannot change the verdict", () => {
+    const hints = { project: long(MAX_HINT_LENGTH), titleWords: [long(MAX_HINT_LENGTH)], person: long(MAX_HINT_LENGTH) };
+    const reordered = { person: hints.person, titleWords: hints.titleWords, project: hints.project };
+    expect(validate(command({ targetHints: hints })).status)
+      .toBe(validate(command({ targetHints: reordered })).status);
+  });
+});
+
+describe("temporal fail-closed paths reachable from a command", () => {
+  it("asks for clarification on a date the calendar does not contain", () => {
+    expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2026-02-30" } })))
+      .toMatchObject({ status: "needs_clarification", reason: "unresolved_temporal_phrase", field: "dueAt" });
+  });
+
+  it("asks for clarification on a local day that never existed in the caller's zone", () => {
+    // Samoa skipped 2011-12-30 entirely when it crossed the date line. The
+    // phrase is well-formed and the zone is real; the wall time simply never
+    // happened, and `resolveLocal` refuses rather than sliding to a neighbour.
+    const apia = { ...CONTEXT, timeZone: "Pacific/Apia" };
+    expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-30" } }), apia))
+      .toMatchObject({ status: "needs_clarification", field: "dueAt" });
+  });
+
+  it("resolves the surrounding days in that same zone, so the refusal is specific", () => {
+    const apia = { ...CONTEXT, timeZone: "Pacific/Apia" };
+    expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-29" } }), apia))
+      .toMatchObject({ status: "ok" });
+    expect(validate(command({ action: "reschedule_due", patch: { dueAt: "2011-12-31" } }), apia))
+      .toMatchObject({ status: "ok" });
   });
 });

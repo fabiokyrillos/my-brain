@@ -8,7 +8,11 @@ export type AIOperation =
   | "review"
   | "file_analysis"
   | "advanced_reasoning"
-  | "background";
+  | "background"
+  // Phase 2E command parsing. Added to the table CHECK and to the
+  // `record_ai_usage` guard by migration 202607250055 — recording it as `chat`
+  // would have made the phase's spend unattributable.
+  | "task_command";
 
 export type AIUsageEvent = {
   operation: AIOperation;

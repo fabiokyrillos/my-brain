@@ -5,7 +5,25 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { chatAnswerSchema } from "./chat-schema";
 import { entryExtractionSchema } from "./extraction-schema";
 import type { AIProvider } from "./provider";
-import type { ChatInput, ChatResult, EmbeddingResult, ExtractionInput, ExtractionResult } from "./types";
+import {
+  MAX_COMMAND_TEXT_LENGTH,
+  TASK_COMMAND_MAX_OUTPUT_TOKENS,
+  TASK_COMMAND_PROMPT_VERSION,
+  TASK_COMMAND_STRATEGY_VERSION,
+  TaskCommandProviderError,
+  buildTaskCommandUserMessage,
+  taskCommandProposalSchema,
+  taskCommandSystemPrompt,
+} from "./task-command-schema";
+import type {
+  ChatInput,
+  ChatResult,
+  EmbeddingResult,
+  ExtractionInput,
+  ExtractionResult,
+  TaskCommandParseInput,
+  TaskCommandParseResult,
+} from "./types";
 import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details";
 
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
@@ -79,6 +97,70 @@ export class OpenAIProvider implements AIProvider {
       extraction: entryExtractionSchema.parse(response.output_parsed),
       model: response.model ?? this.model,
       rawOutput: response.output_parsed,
+    };
+  }
+
+  /**
+   * PRD 2E-COMMAND-009/013, §6.1.
+   *
+   * Transport only. It builds the fenced prompt, bounds the call, validates the
+   * response against the schema, and returns the proposal with its provenance —
+   * it does not decide anything. The caller records the usage this returns to
+   * `ai_usage_events` before persisting anything derived from the proposal
+   * (2E-PROVENANCE-002); the two cannot be inverted here, because the ledger
+   * write needs a Supabase client and this module deliberately has none.
+   *
+   * Every throw is a `TaskCommandProviderError` carrying a code and nothing
+   * else. An escaping SDK error would quote the request body — the user's raw
+   * command text — into whatever logs it.
+   */
+  async parseTaskCommand(input: TaskCommandParseInput): Promise<TaskCommandParseResult> {
+    const commandText = input.commandText.trim();
+    if (commandText === "" || commandText.length > MAX_COMMAND_TEXT_LENGTH) {
+      // Refused before the request, so an oversized input is never billed.
+      throw new TaskCommandProviderError("command_text_too_long");
+    }
+
+    let response;
+    try {
+      response = await this.client.responses.parse({
+        model: this.model,
+        reasoning: { effort: "low" },
+        // The proposal is a classification plus a handful of short strings.
+        // A model that starts writing prose gets truncated rather than billed.
+        max_output_tokens: TASK_COMMAND_MAX_OUTPUT_TOKENS,
+        input: [
+          { role: "system", content: taskCommandSystemPrompt },
+          {
+            role: "user",
+            content: buildTaskCommandUserMessage({ commandText, locale: input.locale }),
+          },
+        ],
+        text: { format: zodTextFormat(taskCommandProposalSchema, "task_command") },
+      });
+    } catch {
+      throw new TaskCommandProviderError("provider_unavailable");
+    }
+
+    // Also the truncation path: a response cut off at the token ceiling parses
+    // to nothing rather than to half a command.
+    if (!response.output_parsed) {
+      throw new TaskCommandProviderError("no_structured_output");
+    }
+
+    const parsed = taskCommandProposalSchema.safeParse(response.output_parsed);
+    if (!parsed.success) {
+      // Zod's issues quote the offending values, which are model echoes of the
+      // user's own words. The code travels; the detail does not.
+      throw new TaskCommandProviderError("invalid_model_output");
+    }
+
+    return {
+      ...normalizeResponseUsage(response),
+      proposal: parsed.data,
+      model: response.model ?? this.model,
+      promptVersion: TASK_COMMAND_PROMPT_VERSION,
+      strategyVersion: TASK_COMMAND_STRATEGY_VERSION,
     };
   }
 
