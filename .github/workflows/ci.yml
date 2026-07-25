@@ -132,9 +132,22 @@ jobs:
         # exists, and every TypeScript gate would stay green — the checked-in
         # file is the only thing `tsc` ever sees. The CLI version is pinned
         # above, so the generator's output is deterministic across runs.
+        #
+        # Driven by `--db-url` rather than `--local`: the `--local` form still
+        # resolves the linked project and fails with "Access token not
+        # provided", which is not a credential this job has or should have.
         run: |
           set -euo pipefail
-          supabase gen types typescript --local > /tmp/database.types.generated.ts
+          eval "$(supabase status -o env)"
+          if [ -z "${DB_URL:-}" ]; then
+            echo "supabase status did not report DB_URL" >&2
+            exit 1
+          fi
+          supabase gen types typescript --db-url "$DB_URL" > /tmp/database.types.generated.ts
+          if [ ! -s /tmp/database.types.generated.ts ]; then
+            echo "::error::type generation produced nothing" >&2
+            exit 1
+          fi
           if ! diff -u src/lib/supabase/database.types.ts /tmp/database.types.generated.ts; then
             echo "::error::src/lib/supabase/database.types.ts no longer matches the schema. Regenerate it." >&2
             exit 1
