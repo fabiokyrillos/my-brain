@@ -1,6 +1,6 @@
 # Phase 2E — Execution Progress
 
-**Status: IN PROGRESS — Slice 2E.3 accepted; Slice 2E.4 next.**
+**Status: IN PROGRESS — Slice 2E.4 implemented and CI-green; acceptance pending one owed review round.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -8,26 +8,33 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 
 | Field | Value |
 |---|---|
-| Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote) |
-| Branch HEAD | `4f9aff8` |
+| Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, in sync) |
+| Branch HEAD | `aba6d6b` |
 | Phase base | `2e2acfd` |
 | Working tree | clean |
 | Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | **all three jobs green** on `4f9aff8` (run `30203421883`): `application`, `edge worker`, `database and journey`. The pgTAP suite reports `Files=27, Tests=927, Result: PASS` |
+| CI | **all three jobs green** on `aba6d6b` (run `30215531422`): `application`, `edge worker`, `database and journey`. The pgTAP suite reports `Files=28, Tests=1043, Result: PASS` |
 | Merged / tagged / released | nothing |
 
-**Drift corrected on entry to this session:** the previous record named `56111ac` as branch HEAD and cited CI run `30182925282`. Both were stale by two docs-only commits; CI was green on the true HEAD (`52f8db6`, run `30183090238`). No regression, and Slices 2E.1/2E.2 remain accepted.
+**Drift corrected on entry to this session** (both docs-only, neither a regression):
+
+1. This file named branch HEAD `4f9aff8` and CI run `30203421883`. Both were stale by two docs-only commits — the true HEAD on entry was `ccf481a`, with a *newer* green run `30204125375`. Same drift class the previous session recorded: this file is written before the docs commits that follow it.
+2. Open item 8 said `PHASE_2E_SLICE_03_REPORT.md` "is not yet written". It existed, committed in `0b23ad1`, and closes that item at its own §13.8.
+
+Slices 2E.1–2E.3 remain accepted.
 
 ## Deployment state
 
 | Artifact | State |
 |---|---|
-| Remote migration parity | `202607250054` — unchanged since the pre-2E cutover, verified this session |
-| `202607250055`, `202607250056`, `202607250057` | **local only.** The whole chain applies from zero in CI; none is applied to the linked project |
-| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged and verified; Slices 2E.1–2E.3 touch no worker code |
-| Generated types | hand-written (ADR-041), parity proven three ways. No claim of regeneration is made anywhere |
+| Remote migration parity | `202607250054` — unchanged since the pre-2E cutover, verified this session with `npx supabase migration list --linked` |
+| `202607250055`–`202607260058` | **local only.** The whole chain applies from an empty database in CI; none is applied to the linked project |
+| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged. Slices 2E.1–2E.4 touch no worker code |
+| Generated types | hand-written (ADR-041). `apply_task_command` parity is proven **three ways** — migration text, content comparison, and `pg_proc` from the real catalog. No claim of regeneration is made anywhere |
 
-**The `202607250056` amendment window is now CLOSED by exhaustion, not by policy.** Slice 2E.2 deliberately left it open so its first consumer could prove the projection sufficient. Slice 2E.3 was that consumer, found it insufficient twice, and amended in place both times. Any further change to its result columns or arguments costs a `_v2` (`42P13` — and adding an argument creates an overload rather than replacing).
+**`202607250056`'s amendment window is CLOSED by exhaustion.** Any change to its result columns or argument list costs a `_v2` (`42P13`).
+
+**`202607260058` has no such constraint.** It returns a scalar `jsonb`, so `create or replace` can change its body freely; only an argument-list change would cost a new signature. This is what lets Slice 2E.5 enable `cancel_task`/`restore_task` on the same function.
 
 ## Slice status
 
@@ -36,85 +43,92 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | 2E.1 — Bounded task command contract | 2E-A | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_01_REPORT.md` |
 | 2E.2 — Deterministic matching and margins | 2E-B | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_02_REPORT.md` |
 | 2E.3 — Disambiguation and read-only preview | 2E-C | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_03_REPORT.md` |
-| 2E.4 — Reversible non-destructive updates | 2E-D | not started |
+| 2E.4 — Reversible non-destructive updates | 2E-D | **IMPLEMENTED, CI-GREEN — ACCEPTANCE PENDING.** `PHASE_2E_SLICE_04_REPORT.md` |
 | 2E.5 — Destructive actions and confirmation | 2E-E | not started |
 | 2E.6 — No-match activity creation | 2E-F | not started |
 | 2E.7 — Conversational and task-surface integration | 2E-G | not started |
 | 2E.8 — Convergence and closeout | 2E-H | not started |
 
-## Slice 2E.3 — what shipped
+## Slice 2E.4 — what shipped
+
+The first RPC in this codebase that mutates an existing task.
 
 | Artifact | Responsibility |
 |---|---|
-| `202607250056` (amended in place, twice) | +3 `default null` relation-ref arguments; +8 result columns: `project/context/person_ref_id`, `project/context/person_ref_name`, `scheduled_reminder_count`, `next_reminder_at` |
-| `202607250057` (new) | `public.task_command_fingerprint` — `immutable`, `strict`, **not** `security definer`, `jsonb_build_object` as the canonicalizer |
-| `preview.ts` | `buildTaskCommandPreview` — pure, `willMutate: false` as a literal type, relation- and instant-aware `no_change`, linked effects from observed state, five dispositions |
-| `disambiguation.ts` | `buildTaskDisambiguation` — ranked order preserved, distinguishing evidence marked, `confirm_one` never a list of one |
-| `outcomes.ts` | 2E-UX-001's twelve outcomes, declared for the first time, as an iterable `as const` |
-| `copy.ts` | pt-BR/en, every record keyed by a declared union, no locale fallback |
-| `fingerprint.ts` | payload assembly + the RPC call. **Hashes nothing** |
-| `taxonomy.ts` | `targetStatus` (PRD §11.2's `status→completed` arrow, previously only prose), `TASK_COMMAND_UNDO_WINDOW_HOURS` |
+| `202607260058` (new, 1895 lines) | `public.apply_task_command`; the re-pasted `public.audit_task_change`; `private.undo_apply_task_command_fields`; `private.undo_apply_task_command_relation`; two registry rows; grants; five post-deploy fail-closed DO blocks |
+| `supabase/tests/phase_2e_task_command_apply.sql` | `plan(116)` |
+| `supabase/tests/rpc_version_retirement.sql` | the new RPC in the `prosecdef`/`search_path` array; `plan(24)` unchanged |
+| `errors.ts` | the closed `2E_*` vocabulary as iterable `as const`, outcome/retryable/SQLSTATE as data |
+| `apply.ts` | the RPC wrapper: injected client, shared operation-key normalization, validated discriminated union, `(code, details)` mapper |
+| `copy.ts` / `copy.test.ts` | the eighth section and eighth `VOCABULARIES` row — **closes Slice 2E.3 open item 3** |
+| `agent/actions.ts` | the two `2E_UNDO_*` codes mapped through the shared router |
+| `database.types.ts` / `database-types-parity.test.ts` | hand-written entry; parity generalized to a scalar return |
 
-`TASK_COMMAND_POLICY_VERSION` → `2026-07-25.2` (the `targetStatus` addition moves the digest). `TASK_MATCH_POLICY_VERSION` stays `2026-07-25.3` — no weight, threshold or limit changed, and the pinned 2E-MATCH-018 baseline rates did not move.
+**Thirteen of fifteen actions enabled.** `cancel_task` and `restore_task` refused with `2E_ACTION_NOT_ENABLED` — Slice 2E.5's.
 
-### The two projection gaps, and why neither was fixable in TypeScript
+**Still no UI, route, Server Action, product event or model call.** Nothing calls the RPC; its consumer is Slice 2E.7.
 
-1. **Relation reference resolution.** `patch.projectRef`/`contextRef`/`personRef` are the user's own words; the pre-state carries relation *ids*. Comparing them needs the authoritative normalizer, and `normalizer-divergence.test.ts` enumerates this directory and forbids `normalizeEntityName(`, `.localeCompare(` and `Intl.Collator(` in every non-test module — including ones not yet written. Resolution therefore happens in SQL, through `public.resolve_owned_entity_exact`, which the rest of the product already uses (ADR-021: no second copy of entity resolution). It is exact-or-nothing: null means no owned entity of that name *or* more than one, and the preview says so truthfully rather than guessing.
-2. **Reminder state.** `reminders` was the only member of the taxonomy's `changedFields` with no observed state. `due_at is not null` is not a proxy: `create_due_task_reminder` is `after insert` only.
+## Decisions accepted in Slice 2E.4 — not re-litigable
 
-**Resolved ids, not booleans.** A boolean cannot separate "you have no project called Acme" from "Acme exists but is not linked", Slice 2E.4's `remove_added_relation` undo needs the id (2E-UPDATE-015), and binding the id stops a rename between preview and apply silently retargeting the assignment.
+- **ADR-044 — the RPC is unversioned** (`public.apply_task_command`). ADR-037 §1 warrants a version only when a closed input shape changes incompatibly; there is no predecessor. The contract version lives in the hashed `TASK_COMMAND_POLICY_VERSION` and the `'taskcmd-v1:'` operation-key prefix. It is nonetheless added to `rpc_version_retirement.sql`'s posture array, which is hardcoded and would otherwise never notice a new definer function.
+- **ADR-045 — `no_change` returns before the reservation**, computed against the *claimed* pre-state, so 2E-UPDATE-009's "no undo row" is literally true. An unlocked ownership probe runs first, so a non-owned and a nonexistent task both yield `P0002 'Task not found'`. Post-lock, an empty delta is an invariant violation (`2E_TRANSITION_INTEGRITY`), not a `no_change`.
+- **ADR-046 — the audit actor is a transaction-local `app.audit_actor`**, read with `missing_ok`, written with `is_local => true`, defaulting to `'user'`, normalizing an out-of-vocabulary value rather than raising. **The apply path sets `'user'`; the undo handlers set `'system'`.** The INSERT branch of `audit_task_change` is untouched. No `update of` column list was added to the trigger.
+- **Undo restores reminders by close-and-insert**, per §11.3's "forced, not chosen" — not by un-cancelling the recorded ids, even though that would be safe under the current heartbeat predicate. The recorded `remind_at` is restored verbatim even if now past.
+- **`before_state` carries the authoritative locked pre-state; `after_state` carries what undo acts on plus its integrity counts** and is the sole source of the replay return. Both are patched by the mandatory post-write UPDATE, because the row is not locked when the reservation is inserted.
+- **`entity_type` is `'task'`** on both the undo row and the audit row.
+- **Two `action_type` values, one RPC**: `'apply_task_command'` for the nine column actions, `'apply_task_command_relation'` for the four relation actions, so the registry routes to the right handler without a branch inside one.
+- **`reminders` grants are not narrowed** (PRD §5 defers write-path consolidation; §14 forbids only widening). **No product event is emitted** — 2E-ANALYTICS-005 wants the surface value added with the first emitting code, and there is no surface until 2E.7.
+- **`ai_usage_events.source_type` stays unwidened.** `'task'` is Phase 2F.
+- **WITHDRAWN on evidence: the terminal timestamps are written unconditionally**, mirroring `persistTaskStatus` (`src/features/operations/actions.ts:148-152`), which PRD §11.2 requires by name. An earlier decision to gate them per action was refuted: `changedFields` is a **disclosure list, not a write manifest**, as `updated_at` proves by being written on every UPDATE and named in no action's list. The mirror is pinned by a fixture on the one input that distinguishes the two implementations.
+- Everything Slice 2E.3 declared non-re-litigable still holds: fingerprint is replay identity and token binding only; `observedBefore` is hashed as verbatim client text; only the command policy version is hashed; a matching fingerprint is not confirmation evidence; reminder state is absent from the fingerprint's pre-state; `202607250056` is closed.
 
-### Verified facts about reminders that contradict the PRD
+## The three defects Slice 2E.4 found, and where
 
-**Nothing in this repository has ever cancelled a reminder.** The only writers of `public.reminders` are the `after insert` trigger (`202607160007:195-209`) and the heartbeat's two mark-sent updates (`202607160013:33`, `202607170016:552-560`). `authenticated` also retains full `insert/update/delete` on the table. So:
+Worth carrying forward, because two are one family.
 
-- §11.3's premise that `reopen_task` "re-creates the reminder the INSERT-only trigger cannot" is **false for rows written before Phase 2E** — such a task may still hold a live `scheduled` row. The preview renders observed state and discloses close-and-insert for it.
-- `snoozed` is **not** a gap: every heartbeat path selects `status = 'scheduled'` and no other, so a snoozed reminder can never fire. §11.3's wording is complete.
+1. **Critical — `pg_catalog.coalesce(...)` at eleven sites.** COALESCE is a SQL special form with no `pg_proc` entry, like GREATEST/LEAST, so it cannot be schema-qualified under `search_path = ''`. Two sites sat in `audit_task_change`, so the first `public.tasks` UPDATE would have broken `persistTaskStatus`, `undo_confirm_entry_tasks` and two existing pgTAP suites. Found independently by both reviewers; the corpus settles it — 387 bare `coalesce(` and zero qualified. **The post-deploy guard now greps for `pg_catalog.coalesce(` and `pg_catalog.nullif(` too.** `overlay`/`substring`/`position`/`trim`/`extract` are deliberately excluded: they have real catalog entries.
+2. **`42601 syntax error at end of input` — the migration would not apply at all.** plpgsql reads an `if` condition by scanning for the first `then` at paren-depth zero, so a bare `case … when … then … end` there ends the condition at the `case`'s own `then`. **Found by CI, not by any local gate.** One site, fixed by parenthesizing.
+3. **Three reminder-integrity guards were tautological** — comparing a value against the write that produced it, so a declared member of a closed vocabulary could never be raised. Replaced with a postcondition read back from `public.reminders`, which guards the reachable cause: `authenticated` still holds INSERT/UPDATE there.
 
-### Review, and the corrections it forced
-
-Three delegated implementation tracks plus one adversarial reviewer. The reviewer returned **NOT READY** on two Criticals, both reproduced by execution, both in modules written earlier in the same slice:
-
-1. **The preview could never name the entity it would add.** `relationAfter` looked the resolved id up in the arrays of relations the task *already holds*, so the name resolved only in the `no_change` case and the real addition rendered `"+1"` — a raw literal bypassing the copy module. The already-held case appended anyway and rendered "Acme, Acme" beside copy saying nothing would change. Fixed by projecting the stored name (the second `202607250056` amendment).
-2. **The reminder rule required a full hour of lead** (`due - 1h > now`, strictly), misreading `greatest(now(), due_at - interval '1 hour')`. "Move it to 5pm" typed at 4:30pm disclosed "no reminders are affected" while the mechanism would have created one. §11.3's condition is only that the due date is in the future.
-
-Also fixed: `reopen_task`/`restore_task` promising a duplicate live reminder; `completed_at`/`cancelled_at` reporting `changed: false` while rendering a change; the stale/refused shells reading candidate content before ownership was established; two different instants acting as "now"; a fabricated empty-string `observedBefore` that would have produced a *valid* digest over an instant that never happened.
-
-**One finding was rejected, with reasoning recorded.** The reviewer called it a defect that `no_change` suppresses reminder disclosure. 2E-UPDATE-009 is explicit that `no_change` writes no task update, no audit row and no undo row — so nothing happens to those reminders, and disclosing a cancellation would be the invented effect. The underlying inconsistency (a null due date beside a live reminder) is real, predates this phase, and is in `TODO.md`.
-
-The reviewer also named the assertions that let both Criticals hide: the relation delta's `after.text` was only swept for non-emptiness, which `"+1"` satisfies, and the reminder rule was pinned only at "already past" and "+2h". Both are now pinned on both sides.
+One review finding was **refuted with verified reasoning** (the terminal timestamps, above).
 
 ## Local gates on HEAD
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **1875 passed / 113 files** · focused `src/features/task-commands` **786 passed / 15 files** · `build` clean.
+`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2007 passed / 115 files** · focused `src/features/task-commands` **915 passed / 17 files** · `build` clean.
 
-pgTAP cannot run locally — Docker is unavailable here, so `supabase db reset`, `supabase test db` and `supabase db lint --local` never execute on this workstation. It ran **in CI**: `phase_2e_task_command_matching.sql` at `plan(73)` and `phase_2e_task_command_fingerprint.sql` at `plan(19)`, inside a suite total of `Files=27, Tests=927, Result: PASS`. That is `883 + 25 + 19` against Slice 2E.2's baseline, so every assertion this slice added executed rather than being skipped.
+pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and `supabase db lint --local` never execute on this workstation. It ran **in CI**: `Files=28, Tests=1043, Result: PASS`. That is `927 + 116` against Slice 2E.3's baseline and `27 + 1` files, with `phase_2e_task_command_apply.sql ... ok` in the log — so every assertion this slice added executed rather than being skipped. **The arithmetic is the evidence, not the pass.**
 
-## Open items owed by Slice 2E.3
+## Open items owed by Slice 2E.4
 
-1. ~~Final CI confirmation on `4f9aff8`.~~ **CLOSED.** All three jobs green (run `30203421883`); the twice-amended migration applies from an empty database and every new pgTAP assertion executed.
-2. **Epic 2E-C's "surfaces are keyboard operable and localized" clause is deliberately NOT met.** No Phase 2E UI, route or Server Action exists; 2E.4/2E.5/2E.6 each change the surface's shape; and with no mutation there is no async action, so 2E-A11Y-002/003 cannot be tested. Components are deferred to **Slice 2E.7**, which must own 2E-A11Y-001/002/003 in the traceability matrix. Shipping them now would repeat the consumer-less `retryProcessingJob` pattern the pre-2E hardening removed.
-3. **2E-I18N-003's literal subject does not exist yet.** The requirement names "every declared `2E_*` detail code"; those arrive with Slice 2E.4's RPC. The *mechanism* is built and tested against seven declared vocabularies, but nothing will notice when the codes land without copy unless a row is added to `copy.test.ts`'s `VOCABULARIES` table. **Slice 2E.4 owns that.**
-4. **`2E-OPERATIONS-003` focused remote smoke — still owed, still blocked on deployment**, inherited from Slice 2E.2 and now covering this slice too. Nothing calls the RPCs and they do not exist in the linked project.
-5. **A pre-existing flaky test reds CI intermittently.** `src/features/tasks/task-candidate-form.test.tsx` → "keeps one idempotency key for a same-payload retry…" failed in run `30184955865` with `Unable to find an accessible element with the role "button" and name "Resolver 2 sugestões"`. It passes 3/3 locally, this slice never touched the file, and its most recent commit (`a2c263d`, Slice 2E.2) was itself a fix for the same async-read flake class. PRD §20 names flaky gates as a risk that erodes evidence — recorded in `TODO.md`.
-6. **`fingerprint.ts` has no production caller.** By design: its consumers are Slices 2E.4/2E.5. Behaviour is proven through an injected client double.
-7. **Alias-driven relation resolution is unproven in pgTAP.** `resolve_owned_entity_exact` also unions `entity_aliases` within a validity window; the new assertions cover the base-table path only. If Slice 2E.4 relies on alias resolution, it must add fixtures.
-8. **`PHASE_2E_SLICE_03_REPORT.md` is not yet written**, and `STATE.md` / `CHANGELOG.md` / `TODO.md` / `DECISIONS.md` are not yet updated for this slice.
+1. **A second whole-artifact adversarial round did not run — THIS IS THE BLOCKING ITEM.** Five lenses (SQL execution, concurrency/replay, undo truthfulness, ownership/security, test adequacy) with per-finding refutation were launched and **all five failed on a session limit before producing any finding**. No result is claimed. The round that *did* run covered the migration only — not the pgTAP suite, not the TypeScript surface. Slice 2E.3 is the reason to insist: both of its Criticals lived in code written earlier in the same slice and were invisible to the author.
+2. **No mutation round ran for this slice.** Slice 2E.2's 36-mutation discipline was not repeated.
+3. **2E-OPERATIONS-003's focused remote smoke — owed, blocked on deployment, and NOT dismissible this time.** Epic 2E-D's acceptance criteria explicitly name "a disposable remote smoke and authenticated desktop/mobile journeys", unlike Epics 2E-B and 2E-C. It must additionally prove: a real two-session concurrency race (2E-UPDATE-008's loser path, unprovable inside one pgTAP transaction); replay across two separate PostgREST requests; that the fingerprint TypeScript computes equals the one the RPC derives, over the wire, for all thirteen actions; and cross-owner denial with two real owners.
+4. **Authenticated desktop/mobile Playwright journeys** — same clause, blocked on the same dependency and on there being no surface (ADR-043).
+5. **2E-UNDO-005's task-scoped undo listing is not built.** The operations are *recorded* task-scoped (`entity_type = 'task'`, `entity_ids = array[task_id]`), which is what a listing needs; the listing itself is a surface concern. Owed by Slice 2E.7.
+6. **`apply.ts` and `errors.ts` have no production caller.** By design; Slice 2E.7.
+7. **The pre-existing flaky test** `src/features/tasks/task-candidate-form.test.tsx` still reds CI intermittently. It passed in both runs of this slice. Recorded in `docs/TODO.md` under PRD §20.
+8. **Alias-driven relation resolution remains unproven in pgTAP** — but this slice does **not** depend on it: the RPC receives already-resolved ids and re-verifies ownership against the base tables, so `entity_aliases` is off the apply path.
 
-## Next: Slice 2E.4 — Reversible non-destructive updates (Epic 2E-D)
+## Next: the continuation point, precisely
 
-Read `docs/PHASE_2E_PRD.md` §13.5 (`2E-UPDATE-001..018`), §13.8, §13.9, §13.10, §13.11 and §11.3, then `preview.ts`, `fingerprint.ts`, `202607250057`, and `confirm_entry_task_candidates_v6` as the undo/replay precedent.
+**Close open item 1 first.** Re-run the five-lens adversarial round over the whole Slice 2E.4 artifact set with per-finding refutation, plus a mutation round. The workflow script is preserved and can be replayed:
 
-Inherited rules that are **not** re-litigable, because Slice 2E.3 already committed to them:
+```
+Workflow({scriptPath: "<session>/workflows/scripts/slice-2e4-adversarial-wf_00f2a7fa-c90.js"})
+```
 
-- **The fingerprint is replay identity and token binding — never a staleness gate.** Staleness (2E-UPDATE-003) must be a separate, typed, column-by-column `is distinct from` comparison of the `for update`-locked row against the supplied pre-state. Conflating them forces the RPC to re-render the locked row's timestamps as text byte-identically to what PostgREST emitted, which is unwinnable. This is also the existing `resolve_pending_question` pattern.
-- **Hash the client-supplied `observedBefore` string verbatim.** Never re-render it from the locked row: the preview captured one string, and the apply must hash that same string.
-- **Only `TASK_COMMAND_POLICY_VERSION` is hashed**, not the match policy version. Irreversible once fingerprints are stored.
-- **A matching fingerprint is not confirmation evidence.** `task_command_fingerprint` is granted to `authenticated` and all its inputs are client-held, so it is client-derivable. 2E-DESTRUCTIVE-002's server-issued single-use token is a separate mechanism (Slice 2E.5).
-- **Reminder state is deliberately absent from the fingerprint's pre-state.** The heartbeat flips `scheduled → sent` hourly with no user act; gating a write on it would manufacture a stale refusal on a cron tick.
-- **`no_change` writes nothing** — no task update, no audit row, no undo row (2E-UPDATE-009) — and the preview is where it is detected and terminal.
-- **`operation_key` namespacing:** `'taskcmd-v1:' || key` keeps 36+12 = 48 inside the 8..260 bound at `202607170020:82`.
-- Slice 2E.4 owes the `audit_task_change` actor derivation and its extension to `title`/`description` (2E-UPDATE-010, closing 2E-MATCH-006's declared blind spot).
+Its prompt already carries the settled-decision list and the do-not-re-report list, including that D17 is withdrawn. Fix whatever survives refutation, re-run CI, then move Slice 2E.4 to ACCEPTED in this file and in the slice report's §11.
+
+**Then Slice 2E.5 — Destructive actions and confirmation (Epic 2E-E).** Read PRD §13.6, §11.2's `cancel_task`/`restore_task` rows, §11.3, §12.3, §19.1 (Epic 2E-E), then `202607260058`.
+
+What 2E.5 inherits:
+
+- **Both actions are already refused with a declared, mapped, localized, pgTAP-asserted code.** Enabling them means removing that guard and adding the token gate — not a new function. `create or replace` on `apply_task_command` is the mechanism.
+- **A matching fingerprint is not confirmation evidence.** The token must be server-issued, single-use, and bound to fingerprint, owner and operation key.
+- **`cancelled_at` is never written by Slice 2E.4.** The shared status UPDATE writes it, but no enabled action can reach `cancelled` — `set_status` is bounded to the six non-terminal values as data, asserted in pgTAP.
+- **`app.audit_actor` is already the mechanism 2E-DESTRUCTIVE-007 needs**: apply sets `'user'`, undo sets `'system'`. Do not add a second one.
+- **2E-DESTRUCTIVE-008's creation-undo collision is not implemented in either ordering.** One declared code must close undo, `restore_task`, and the recovery affordance.
+- **The handler already exists.** `undo_apply_task_command_fields` is registered under `action_type = 'apply_task_command'`; both actions are `restore_fields` and both touch reminders, which it already restores by close-and-insert.
 
 Useful commands:
 
@@ -122,15 +136,14 @@ Useful commands:
 npx vitest run src/features/task-commands           # focused
 npm run lint; npm run typecheck; npm test; npm run build
 deno check supabase/functions/process-jobs/index.ts supabase/functions/heartbeat/index.ts
-deno test supabase/functions/
 npx supabase migration list --linked                # parity
-npx supabase functions list                         # deployed worker versions
 gh pr checks 18                                     # the database gate
 ```
 
 ## Environment constraints that shape the workflow
 
-- **Docker is unavailable.** Every SQL claim is proven only by draft PR #18's `database` job (~5 min/run): full migration reset from zero, the whole pgTAP suite, `db lint`, and the foundation journey on desktop and Pixel 7. Budget for the round trip; never report a local pgTAP run.
-- `supabase gen types typescript` cannot run here either (ADR-041). Types are hand-written and parity is proven by content comparison plus `pg_proc`.
+- **Docker is unavailable.** Every SQL claim is proven only by draft PR #18's `database` job (~4 min/run): full migration reset from zero, the whole pgTAP suite, `db lint` over `public,private`, and the foundation journey on desktop and Pixel 7. **Slice 2E.4 is the proof this matters** — CI caught a defect that stopped the migration applying, which no local gate could see. Budget for the round trip; never report a local pgTAP run.
+- `supabase gen types typescript` cannot run here either (ADR-041).
 - Remote smokes and authenticated online journeys stay manual.
 - Edit SQL with a text editor, never a script: a scripted edit once injected NUL bytes and silently voided an entire pgTAP file while TypeScript stayed green.
+- **Subagent work can fail on session limits mid-round.** When it does, say so and carry the round forward as an open item rather than reporting an empty result as a clean one.
