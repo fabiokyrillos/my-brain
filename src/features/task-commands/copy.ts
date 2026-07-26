@@ -28,6 +28,7 @@
 
 import type { Locale } from "@/lib/preferences";
 
+import type { TaskCommandApplyFailure } from "./errors";
 import type { TaskMatchEvidence } from "./match-policy";
 import type {
   TaskCommandOutcome,
@@ -56,6 +57,32 @@ export type TaskCommandCopy = {
   outcomes: Record<TaskCommandOutcome, OutcomeCopy>;
   dispositions: Record<TaskCommandPreviewDisposition, OutcomeCopy>;
   refusals: Record<TaskCommandPreviewRefusal, OutcomeCopy>;
+  /**
+   * Why an apply did not happen, keyed by `errors.ts`'s declared vocabulary
+   * (2E-I18N-003, 2E-UPDATE-017).
+   *
+   * This closes Slice 2E.3's third open item and is the literal subject of
+   * 2E-I18N-003: "Every declared `2E_*` detail code maps to localized copy in
+   * both locales, asserted exhaustively against the declared code list rather
+   * than against a hand-written key list."
+   *
+   * One sentence rather than an `OutcomeCopy` pair, on purpose: the title is
+   * already supplied by `outcomes[result.outcome]`, and the fourteen failures
+   * collapse onto three outcomes (2E-UX-001 declares no more), so a per-failure
+   * title would either repeat the outcome's or contradict it. What the failure
+   * adds is the *reason*, which is exactly one sentence long.
+   *
+   * The keys are not 1:1 with the outcomes and never will be — `2E_INVALID_RELATION`
+   * and `2E_ACTION_NOT_ENABLED` both present as `refused`, the same collapse the
+   * 2C vocabulary makes when three `2C_*` details share one code. The database
+   * vocabulary and the UI vocabulary answer different questions.
+   *
+   * None of these names a task, a title or an id. A failure sentence is rendered
+   * on a surface that may have been reached without ownership ever being
+   * established — `task_not_found` is precisely that case — and 2E-OWNERSHIP-002
+   * requires another owner's task to be indistinguishable from a nonexistent one.
+   */
+  failures: Record<TaskCommandApplyFailure, string>;
   actions: Record<TaskCommandAction, string>;
   fields: Record<TaskChangedField, string>;
   evidence: Record<TaskMatchEvidence, string>;
@@ -160,6 +187,28 @@ const ptBR: TaskCommandCopy = {
       description:
         "Não encontrei exatamente um item seu com esse nome — ou ele não existe, ou você tem mais de um com o mesmo nome.",
     },
+  },
+  failures: {
+    "2E_IDEMPOTENCY_MISMATCH":
+      "Esta tentativa reaproveita a identificação de outro pedido. Veja a previsão atualizada e tente de novo.",
+    "2E_ACTION_NOT_ENABLED": "Esta ação ainda não está disponível.",
+    "2E_INELIGIBLE_STATUS": "O status atual da tarefa não permite esta ação.",
+    "2E_TRANSITION_INTEGRITY":
+      "Outra alteração chegou a esta tarefa primeiro, então nada foi alterado. Tente novamente.",
+    "2E_REMINDER_INTEGRITY":
+      "Os lembretes desta tarefa mudaram durante a alteração, então nada foi alterado. Tente novamente.",
+    "2E_INVALID_RELATION": "O item que você citou não é seu ou não existe.",
+    "2E_DUE_CONSISTENCY":
+      "Esta tarefa está marcada como sem prazo por decisão, então o prazo não pode ser definido deste jeito.",
+    "2E_UNDO_RESTORE_INTEGRITY":
+      "A tarefa mudou depois desta operação, então desfazer descartaria essa alteração mais recente.",
+    "2E_UNDO_REMINDER_INTEGRITY":
+      "Não foi possível recriar os lembretes desta operação, então nada foi desfeito.",
+    unauthenticated: "Sua sessão expirou. Entre novamente.",
+    task_not_found: "Não encontramos esta tarefa.",
+    stale_pre_state: "A tarefa mudou desde a previsão, então nada foi aplicado.",
+    invalid_payload: "Este pedido chegou fora do formato esperado. Refaça a previsão e tente de novo.",
+    undeclared_failure: "Não foi possível aplicar agora. Nada foi alterado — tente novamente.",
   },
   actions: {
     complete_task: "concluir a tarefa",
@@ -298,6 +347,28 @@ const en: TaskCommandCopy = {
       description:
         "I did not find exactly one of your items with that name — either it does not exist, or you have more than one with the same name.",
     },
+  },
+  failures: {
+    "2E_IDEMPOTENCY_MISMATCH":
+      "This attempt reuses another request's identifier. Check the fresh preview and try again.",
+    "2E_ACTION_NOT_ENABLED": "This action is not available yet.",
+    "2E_INELIGIBLE_STATUS": "The task's current status does not allow this action.",
+    "2E_TRANSITION_INTEGRITY":
+      "Another change reached this task first, so nothing was changed. Try again.",
+    "2E_REMINDER_INTEGRITY":
+      "This task's reminders changed while it was being updated, so nothing was changed. Try again.",
+    "2E_INVALID_RELATION": "The item you named is not yours, or does not exist.",
+    "2E_DUE_CONSISTENCY":
+      "This task is marked as intentionally undated, so a due date cannot be set this way.",
+    "2E_UNDO_RESTORE_INTEGRITY":
+      "The task changed after this operation, so undoing it would discard that newer change.",
+    "2E_UNDO_REMINDER_INTEGRITY":
+      "This operation's reminders could not be re-created, so nothing was undone.",
+    unauthenticated: "Your session expired. Sign in again.",
+    task_not_found: "We could not find this task.",
+    stale_pre_state: "The task changed since the preview, so nothing was applied.",
+    invalid_payload: "This request did not arrive in the expected shape. Build a fresh preview and try again.",
+    undeclared_failure: "Could not apply right now. Nothing was changed — try again.",
   },
   actions: {
     complete_task: "complete the task",

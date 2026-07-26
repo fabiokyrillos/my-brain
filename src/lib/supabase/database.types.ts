@@ -2342,6 +2342,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_task_command: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: Json
+      }
       begin_entry_interpretation: {
         Args: { p_entry_id: string; p_service_user_id?: string }
         Returns: Json

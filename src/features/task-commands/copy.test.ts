@@ -9,6 +9,7 @@ import {
   taskCommandCopy,
   type TaskCommandCopy,
 } from "./copy";
+import { TASK_COMMAND_APPLY_FAILURES, TASK_COMMAND_ERROR_DETAILS } from "./errors";
 import { TASK_MATCH_EVIDENCE } from "./match-policy";
 import {
   TASK_COMMAND_OUTCOMES,
@@ -39,7 +40,7 @@ import { locales, type Locale } from "@/lib/preferences";
 
 const COPY_SOURCE = "src/features/task-commands/copy.ts";
 
-/** The seven vocabularies whose keys are declared elsewhere, as data. */
+/** The eight vocabularies whose keys are declared elsewhere, as data. */
 const VOCABULARIES: readonly {
   readonly section: keyof TaskCommandCopy;
   readonly declared: readonly string[];
@@ -47,6 +48,10 @@ const VOCABULARIES: readonly {
   { section: "outcomes", declared: TASK_COMMAND_OUTCOMES },
   { section: "dispositions", declared: TASK_COMMAND_PREVIEW_DISPOSITIONS },
   { section: "refusals", declared: TASK_COMMAND_PREVIEW_REFUSALS },
+  // Slice 2E.4. The row 2E-I18N-003 is literally about: the mutation RPC's
+  // closed failure vocabulary, which until this slice had no localized copy at
+  // all because no code raised it yet.
+  { section: "failures", declared: TASK_COMMAND_APPLY_FAILURES },
   { section: "actions", declared: TASK_COMMAND_ACTIONS },
   { section: "fields", declared: TASK_CHANGED_FIELDS },
   { section: "evidence", declared: TASK_MATCH_EVIDENCE },
@@ -215,5 +220,49 @@ describe("the preview dispositions and the outcome vocabulary (2E-UX-001)", () =
     expect(TASK_COMMAND_PREVIEW_REFUSALS.length).toBeGreaterThan(0);
     const declaredOutcomes: readonly string[] = TASK_COMMAND_OUTCOMES;
     expect(declaredOutcomes).toContain("refused");
+  });
+});
+
+describe("every declared 2E_* detail code has copy in both locales (2E-I18N-003)", () => {
+  // The `failures` row of VOCABULARIES already proves the section is keyed
+  // *exactly* by `TASK_COMMAND_APPLY_FAILURES`. This states the narrower
+  // requirement separately, because that row would still pass if the nine
+  // database tokens were removed from the declared list along with their copy —
+  // and 2E-UPDATE-017 is about those nine specifically.
+  it.each(locales)("%s localizes all nine database tokens", (locale) => {
+    const copy = getTaskCommandCopy(locale);
+    for (const detail of TASK_COMMAND_ERROR_DETAILS) {
+      expect(Object.keys(copy.failures), `${locale} is missing ${detail}`).toContain(detail);
+    }
+    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(9);
+  });
+
+  it("covers the failures that carry no token as well", () => {
+    // A vocabulary limited to the `2E_*` tokens would leave `55P03`, `42501`,
+    // `P0002` and the bare-`22023` family with no sentence at all — the four the
+    // RPC signals with a SQLSTATE alone, plus this process's own fallback.
+    const declared: readonly string[] = TASK_COMMAND_APPLY_FAILURES;
+    const tokens: readonly string[] = TASK_COMMAND_ERROR_DETAILS;
+    expect(declared.filter((failure) => !tokens.includes(failure))).toEqual([
+      "unauthenticated",
+      "task_not_found",
+      "stale_pre_state",
+      "invalid_payload",
+      "undeclared_failure",
+    ]);
+  });
+
+  it("names no task and no identifier in any failure sentence", () => {
+    // 2E-OWNERSHIP-002: a failure is rendered on a surface that may have been
+    // reached without ownership ever being established, so a sentence that
+    // interpolated a title would disclose the existence of a row the caller may
+    // not own. Structural, because the type is `Record<..., string>` and a
+    // template function would compile just as well.
+    for (const locale of locales) {
+      for (const [failure, sentence] of Object.entries(getTaskCommandCopy(locale).failures)) {
+        expect(typeof sentence, `${locale} ${failure}`).toBe("string");
+        expect(sentence, `${locale} ${failure} interpolates a value`).not.toMatch(/\$\{|%s|\{\{/);
+      }
+    }
   });
 });
