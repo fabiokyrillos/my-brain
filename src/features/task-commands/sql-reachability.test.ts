@@ -108,6 +108,96 @@ describe("the rules match the SQL that produces the rows", () => {
   it("the limit is clamped to the range the rules assume", () => {
     expect(migration).toContain("least(greatest(coalesce(p_limit, 25), 1), 100) as lim");
   });
+
+  it("the patch's references are resolved by the shared resolver, not a second copy", () => {
+    // ADR-021 records entity-resolution duplication as a source of silent
+    // divergence, and `normalizer-divergence.test.ts` already forbids a second
+    // normalizer in TypeScript. This is the SQL-side half: a hand-rolled
+    // `select id from public.projects where normalize_entity_alias(name) = ...`
+    // would pass every other assertion in this file while dropping the alias
+    // window and the exactly-one rule that make a null reference *mean*
+    // something.
+    expect(migration).toContain("public.resolve_owned_entity_exact(");
+    expect(migration).toContain("cl.id, 'project', left(coalesce(p_project_ref, ''), 160)");
+    expect(migration).toContain("cl.id, 'context', left(coalesce(p_context_ref, ''), 120)");
+    expect(migration).toContain("cl.id, 'person', left(coalesce(p_person_ref, ''), 160)");
+  });
+
+  it("the references are resolved once per query, before anything is scanned", () => {
+    // The three `*_ref_id` values are query-scalars, and `candidates.ts` raises
+    // `unreachable_row_shape` on a set whose rows disagree about one. That claim
+    // is only true while the resolution happens in its own CTE ahead of
+    // `scanned` — moving it into a lateral would make it per-row, and the
+    // TypeScript defence would then reject legal result sets.
+    const refs = migration.indexOf("\n  refs as (");
+    const scanned = migration.indexOf("\n  scanned as (");
+    expect(refs).toBeGreaterThan(-1);
+    expect(scanned).toBeGreaterThan(-1);
+    expect(refs).toBeLessThan(scanned);
+  });
+
+  it("the references never reach the scanning or ranking path", () => {
+    // 2E-MATCH-005 in its sharpest form: the relation a command is *adding* must
+    // not qualify or boost the task that already holds it — the defect
+    // `writesRelation` exists to prevent, which a review proved had reached a
+    // one-step apply. Keeping the arguments out of the whole region that selects
+    // candidates, tiers them and orders them is what makes that structural
+    // rather than a promise. The region is bounded by the CTE that first touches
+    // `public.tasks` and by the final projection.
+    const scanned = migration.indexOf("\n  scanned as (");
+    const projection = migration.indexOf("\n  select\n    r.id,");
+    expect(scanned).toBeGreaterThan(-1);
+    expect(projection).toBeGreaterThan(scanned);
+
+    const candidacy = migration.slice(scanned, projection);
+    expect(candidacy).toContain("tiered as (");
+    expect(candidacy).toContain("ranked as (");
+    for (const argument of ["p_project_ref", "p_context_ref", "p_person_ref"]) {
+      expect(candidacy).not.toContain(argument);
+    }
+  });
+
+  it("only scheduled reminders are counted, because only they can fire", () => {
+    // Every heartbeat path selects `scheduled` and no other status, so a
+    // `snoozed` row is inert, a `sent` one has already fired, and a `cancelled`
+    // one is already where the transition would put it. Counting any of them
+    // would make the preview disclose an effect that cannot happen.
+    expect(migration).toMatch(
+      /from public\.reminders rem\s*\n\s*where rem\.task_id = r\.id\s*\n\s*and rem\.user_id = r\.user_id\s*\n\s*and rem\.status = 'scheduled'/,
+    );
+    expect(migration).toContain("count(*)::integer as scheduled_count");
+    expect(migration).toContain("min(rem.remind_at) as next_remind_at");
+  });
+
+  it("none of the preview columns appears in either ordering key", () => {
+    // 2E-MATCH-003 is "ordered totally and deterministically *before* it
+    // truncates", and the migration repeats the same key after the joins so the
+    // truncated set and the returned set agree. Both are checked, because a
+    // preview column reaching either would make which candidates survive depend
+    // on the patch's own references, or on reminder state the heartbeat mutates
+    // hourly with no user act — a set of matches that changed on a cron tick.
+    //
+    // Matched on `order by` at the start of a line, which is the multi-line
+    // ranking key; the single-line `order by tok` and the `array_agg(... order
+    // by ...)` aggregates are ordering rows within a value, not candidates
+    // against each other.
+    const keys = [...migration.matchAll(/\n\s*order by\n([\s\S]*?)(?=\n\s*limit|;)/g)]
+      .map((match) => match[1]);
+    expect(keys).toHaveLength(2);
+
+    for (const key of keys) {
+      expect(key).toContain("tier,");
+      for (const column of [
+        "project_ref_id",
+        "context_ref_id",
+        "person_ref_id",
+        "scheduled_reminder_count",
+        "next_reminder_at",
+      ]) {
+        expect(key).not.toContain(column);
+      }
+    }
+  });
 });
 
 describe("triples SQL can emit are accepted", () => {

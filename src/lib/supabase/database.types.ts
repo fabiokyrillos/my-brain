@@ -2529,11 +2529,14 @@ export type Database = {
       list_task_command_candidates: {
         Args: {
           p_context_hint?: string
+          p_context_ref?: string
           p_eligible_statuses: string[]
           p_limit?: number
           p_observed_before?: string
           p_person_hint?: string
+          p_person_ref?: string
           p_project_hint?: string
+          p_project_ref?: string
           p_title_query?: string
         }
         Returns: {
@@ -2542,6 +2545,7 @@ export type Database = {
           context_hint_matched: boolean
           context_ids: string[]
           context_names: string[]
+          context_ref_id: string
           created_at: string
           description: string
           due_at: string
@@ -2549,19 +2553,23 @@ export type Database = {
           intentional_no_due: boolean
           last_audited_at: string
           manual_priority: string
+          next_reminder_at: string
           no_due_reason: string
           observed_before: string
           owner_id: string
           person_hint_matched: boolean
           person_ids: string[]
           person_names: string[]
+          person_ref_id: string
           person_roles: string[]
           planned_at: string
           prefilter_tier: number
           project_hint_matched: boolean
           project_ids: string[]
           project_names: string[]
+          project_ref_id: string
           query_token_count: number
+          scheduled_reminder_count: number
           status: string
           task_id: string
           title: string
@@ -2725,6 +2733,18 @@ export type Database = {
       save_profile_settings: {
         Args: { p_preferences: Json; p_profile: Json }
         Returns: undefined
+      }
+      task_command_fingerprint: {
+        Args: {
+          p_observed_before: string
+          p_operation_key: string
+          p_owner_id: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: string
       }
       undo_operation: { Args: { p_undo_id: string }; Returns: Json }
       validate_element_trust: {

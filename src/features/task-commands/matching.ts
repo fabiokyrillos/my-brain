@@ -102,6 +102,55 @@ export type TaskCandidateRow = TaskPreState & {
   readonly tokenOverlap: number;
   readonly queryTokenCount: number;
   readonly effectiveLimit: number;
+  /**
+   * The patch's `projectRef`, `contextRef` and `personRef` resolved to an owned
+   * entity id — or null, meaning no owned entity carries that name at
+   * `observedBefore`, *or* more than one does.
+   *
+   * `public.resolve_owned_entity_exact` collapses those two failures
+   * deliberately, and the preview does not pretend to tell them apart: both mean
+   * it cannot name the thing the user asked for, and both produce the same
+   * truthful copy.
+   *
+   * Outside `TaskPreState` on purpose. These describe what the command wants to
+   * *assign*, not what the task currently holds — the pre-state is already
+   * carrying the latter as `projectIds`/`contextIds`/`personIds`. 2E-PREVIEW-005
+   * has to tell "the task already holds this relation" from "this relation will
+   * be added", and comparing a resolved id against those arrays is the only way
+   * to answer it without re-normalizing a name in TypeScript, which is exactly
+   * the divergence 2E-MATCH-008 characterizes and `normalizer-divergence.test.ts`
+   * forbids structurally in this directory.
+   *
+   * Outside `scoreRow` on the same evidence that produced `writesRelation`: a
+   * review proved that letting the relation an action is *adding* boost the task
+   * that already holds it reached a one-step apply on the wrong task. Feeding the
+   * resolved id back into scoring would rebuild that defect from the other side.
+   */
+  readonly projectRefId: string | null;
+  readonly contextRefId: string | null;
+  readonly personRefId: string | null;
+  /**
+   * The task's live reminders — how many are `scheduled`, and when the next one
+   * fires (null when none is).
+   *
+   * `scheduled` is the whole live population: every heartbeat path selects that
+   * status and no other, so a `snoozed`, `sent` or `cancelled` row can never
+   * fire. 2E-PREVIEW-003 asks for the linked effect, and `dueAt !== null` is not
+   * a substitute for observing it — `create_due_task_reminder` is `after insert
+   * on public.tasks`, so a due date set by any later update has no reminder at
+   * all, and `authenticated` may delete reminders directly. A preview promising
+   * to cancel a reminder that does not exist is not disclosing an effect, it is
+   * inventing one.
+   *
+   * Kept out of `TaskPreState`, and that exclusion is load-bearing rather than
+   * tidiness. The pre-state is what 2E-PREVIEW-004's fingerprint hashes and what
+   * 2E-UPDATE-003's gate compares, while the heartbeat flips `scheduled` to
+   * `sent` hourly with no user act — so a fingerprint over reminder state would
+   * manufacture a stale-preview refusal on a cron tick, one the user could
+   * neither predict nor avoid by acting faster.
+   */
+  readonly scheduledReminderCount: number;
+  readonly nextReminderAt: string | null;
 };
 
 export type RankedTaskCandidate = {
@@ -578,6 +627,18 @@ const SQL_MAX_QUERY_TOKENS = 16;
 const SQL_MAX_EFFECTIVE_LIMIT = 100;
 
 /**
+ * Stands in for an unresolved `*_ref_id` in the cross-row agreement check below.
+ *
+ * The check keys on value identity, and the three reference columns are the only
+ * query-scalars that are nullable. Dropping the nulls instead would make a set of
+ * one resolved and one unresolved row *agree* — which is precisely the
+ * disagreement worth catching — so they are folded to a value that cannot be
+ * mistaken for one `resolve_owned_entity_exact` returns, since that function
+ * returns a uuid or nothing.
+ */
+const UNRESOLVED_REF = "<unresolved>";
+
+/**
  * The part of a candidate row whose values SQL derives rather than reads.
  *
  * `TaskCandidateRow` satisfies this structurally; naming the subset keeps the
@@ -593,6 +654,24 @@ export type TaskCandidateShape = {
   readonly personHintMatched: boolean;
   readonly effectiveLimit: number;
   readonly observedBefore: string;
+};
+
+/**
+ * The patch's resolved relation references, as a shape the set-level check can
+ * read without them entering `TaskCandidateShape`.
+ *
+ * They are query-scalars like `effectiveLimit` and `observedBefore`, so the
+ * *set* constrains them — but they are not per-row derivations, so no rule in
+ * `describeUnreachableRow` may consult them and they are kept out of the type
+ * that names its inputs. Optional, and deliberately so: `TaskCandidateRow`
+ * satisfies this with all three present, while a caller holding only the derived
+ * columns has no values to disagree about and should not be required to invent
+ * them.
+ */
+export type TaskCandidateRefScalars = {
+  readonly projectRefId?: string | null;
+  readonly contextRefId?: string | null;
+  readonly personRefId?: string | null;
 };
 
 function describeUnreachableRow(row: TaskCandidateShape): string | null {
@@ -683,27 +762,41 @@ function describeUnreachableRow(row: TaskCandidateShape): string | null {
  * filters already refuse to act on a row it cannot justify.
  */
 export function describeUnreachableCandidates(
-  rows: readonly TaskCandidateShape[],
+  rows: readonly (TaskCandidateShape & TaskCandidateRefScalars)[],
 ): string | null {
   for (const [index, row] of rows.entries()) {
     const reason = describeUnreachableRow(row);
     if (reason !== null) return `row ${index}: ${reason}`;
   }
-  // Three values are computed once per query and cross-joined onto every row —
-  // `cardinality(q.tokens)`, `b.lim` and `b.observed_before` — so a result set
-  // carrying two of any of them is a broken contract rather than an unusual
-  // query. All three are checked, because a review found the defence applied to
-  // one and not the other two, and `observed_before` is the one that will guard
-  // a write in Slice 2E.4.
+  // Six values are computed once per query and cross-joined onto every row —
+  // `cardinality(q.tokens)`, `b.lim`, `b.observed_before` and the three
+  // `rf.*_ref_id` the `refs` CTE resolves — so a result set carrying two of any
+  // of them is a broken contract rather than an unusual query. All six are
+  // checked, because a review found the defence applied to one and not the
+  // others, and `observed_before` is the one that will guard a write in Slice
+  // 2E.4.
   const disagreement = (label: string, values: readonly (string | number)[]): string | null => {
     const distinct = [...new Set(values)];
     if (distinct.length <= 1) return null;
     return `${label} differs across one result set (${distinct.slice(0, 4).map(String).sort().join(", ")}), and SQL computes it once per query`;
   };
 
+  // The reference columns are the only nullable members of that set, and the
+  // helper above keys on value identity. Folding null to `UNRESOLVED_REF` rather
+  // than filtering it out is what keeps "one row resolved Acme, the other
+  // resolved nothing" a disagreement — the case that matters most, because Slice
+  // 2E.4 binds the resolved *id* rather than the user's words, so two ids in one
+  // set means the preview and the apply could name different projects.
+  const references = (
+    pick: (row: TaskCandidateRefScalars) => string | null | undefined,
+  ): readonly string[] => rows.map((row) => pick(row) ?? UNRESOLVED_REF);
+
   return (
     disagreement("query token count", rows.map((row) => row.queryTokenCount))
     ?? disagreement("effective limit", rows.map((row) => row.effectiveLimit))
     ?? disagreement("observation instant", rows.map((row) => row.observedBefore))
+    ?? disagreement("resolved project reference", references((row) => row.projectRefId))
+    ?? disagreement("resolved context reference", references((row) => row.contextRefId))
+    ?? disagreement("resolved person reference", references((row) => row.personRefId))
   );
 }

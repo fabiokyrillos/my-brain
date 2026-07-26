@@ -73,10 +73,17 @@ function parseMigration() {
   );
   if (!match) throw new Error(`${MIGRATION} no longer declares ${FUNCTION} in the expected shape`);
 
+  // Comments are stripped before the block is split, not after. Slice 2E.3's
+  // amendment put explanatory prose *inside* both the parameter list and the
+  // RETURNS TABLE, and prose contains commas — so splitting first tore a
+  // sentence into fragments that no longer looked like comments, and this file
+  // stopped parsing the migration at all rather than disagreeing with it. A
+  // parity check that throws on a legal declaration proves nothing about parity.
   const parse = (block: string): Declared[] =>
     block
+      .replace(/--.*$/gm, "")
       .split(",")
-      .map((line) => line.replace(/--.*$/gm, "").trim())
+      .map((line) => line.trim())
       .filter((line) => line.length > 0)
       .map((line) => {
         const parts = line.match(/^(\w+)\s+([a-z0-9]+(?:\[\])?)(\s+default\s+.+)?$/i);

@@ -19,6 +19,13 @@ function command(input: {
   project?: string;
   context?: string;
   person?: string;
+  /**
+   * The patch, which the taxonomy gates per action — `assign_project` requires
+   * `projectRef` and forbids the other two, so a command carrying all three
+   * cannot be built and the reference arguments have to be proven one action at
+   * a time.
+   */
+  patch?: Record<string, unknown>;
 }): ValidatedTaskCommand {
   const targetHints: Record<string, unknown> = {};
   if (input.titleWords) targetHints.titleWords = input.titleWords;
@@ -30,7 +37,7 @@ function command(input: {
     {
       action: input.action,
       targetHints,
-      patch: {},
+      patch: input.patch ?? {},
       operationKey: "aaaaaaaa-1111-4111-8111-111111111111",
     },
     { now: NOW, timeZone: "America/Sao_Paulo" },
@@ -71,6 +78,11 @@ function sqlRow(overrides: Record<string, unknown> = {}) {
     token_overlap: 1,
     query_token_count: 1,
     effective_limit: 25,
+    project_ref_id: null,
+    context_ref_id: null,
+    person_ref_id: null,
+    scheduled_reminder_count: 0,
+    next_reminder_at: null,
     ...overrides,
   };
 }
@@ -159,6 +171,84 @@ describe("candidate query arguments", () => {
     expect(calls[0].args.p_context_hint).toBe("Deep Work");
     expect(calls[0].args.p_person_hint).toBe("Ana Paula");
     expect(calls[0].args.p_title_query).toBe("report");
+  });
+
+  it.each([
+    ["assign_project", "projectRef", "p_project_ref"],
+    ["assign_context", "contextRef", "p_context_ref"],
+    ["assign_person", "personRef", "p_person_ref"],
+  ] as const)(
+    "sends %s's patch reference to %s's own argument",
+    async (action, patchField, argument) => {
+      // One action at a time, because the taxonomy allows each of them exactly
+      // one reference field. The three arguments are asserted *together* — the
+      // one that carries a value and the two that must not — so a swap is
+      // caught. A swap is not cosmetic here: SQL resolves each reference against
+      // a different table, and a person reference arriving as `p_project_ref`
+      // would resolve to nothing and make the preview report that the project
+      // the user named does not exist.
+      const { calls, client } = recordingClient({ data: [], error: null });
+
+      await loadTaskCandidates({
+        client,
+        command: command({
+          action,
+          titleWords: ["report"],
+          patch: { [patchField]: "Acme Holdings" },
+        }),
+        ownerId: OWNER,
+        now: NOW,
+      });
+
+      const args = calls[0].args;
+      expect(args[argument]).toBe("Acme Holdings");
+      for (const other of ["p_project_ref", "p_context_ref", "p_person_ref"]) {
+        if (other !== argument) expect(args[other]).toBeUndefined();
+      }
+    },
+  );
+
+  it("keeps the patch's references distinct from the target hints of the same name", async () => {
+    // "add the invoice task to Acme" carries a title hint of "invoice" and a
+    // project *ref* of "Acme": the hint says which task the user meant, the
+    // reference says what to assign to it. Feeding one into the other's argument
+    // would make the task already in Acme outrank the one the user named, which
+    // is the defect `writesRelation` exists to prevent on the scoring side.
+    const { calls, client } = recordingClient({ data: [], error: null });
+
+    await loadTaskCandidates({
+      client,
+      command: command({
+        action: "assign_project",
+        titleWords: ["invoice"],
+        project: "Billing",
+        patch: { projectRef: "Acme" },
+      }),
+      ownerId: OWNER,
+      now: NOW,
+    });
+
+    expect(calls[0].args.p_project_hint).toBe("Billing");
+    expect(calls[0].args.p_project_ref).toBe("Acme");
+  });
+
+  it("omits every patch reference when the command carries none", async () => {
+    // Omitted, not nulled, for the same reason the hints are: the generated
+    // argument type says these are optional strings, JSON.stringify drops an
+    // undefined value, and the function's own `default null` then applies.
+    const { calls, client } = recordingClient({ data: [], error: null });
+
+    await loadTaskCandidates({
+      client,
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      ownerId: OWNER,
+      now: NOW,
+    });
+
+    expect(calls[0].args).not.toHaveProperty("p_project_ref", null);
+    expect(calls[0].args.p_project_ref).toBeUndefined();
+    expect(calls[0].args.p_context_ref).toBeUndefined();
+    expect(calls[0].args.p_person_ref).toBeUndefined();
   });
 
   it("passes the injected instant, so the recency window is never the server's clock", async () => {
@@ -282,8 +372,68 @@ describe("what comes back", () => {
         tokenOverlap: 1,
         queryTokenCount: 1,
         effectiveLimit: 25,
+        projectRefId: null,
+        contextRefId: null,
+        personRefId: null,
+        scheduledReminderCount: 0,
+        nextReminderAt: null,
       },
     ]);
+  });
+
+  it("carries the resolved references and the reminder state through to the row", async () => {
+    // The preview half of the projection, and the only place the five columns
+    // Slice 2E.3 added are proven to arrive with values rather than as the nulls
+    // the base fixture uses. Each is mapped from a differently-named SQL column,
+    // so a transposition here would silently show one relation's id under
+    // another's label.
+    const { client } = recordingClient({
+      data: [
+        sqlRow({
+          project_ref_id: "66666666-6666-4666-8666-666666666666",
+          context_ref_id: "77777777-7777-4777-8777-777777777777",
+          person_ref_id: "88888888-8888-4888-8888-888888888888",
+          scheduled_reminder_count: 2,
+          next_reminder_at: "2026-07-26T09:00:00.000Z",
+        }),
+      ],
+      error: null,
+    });
+
+    const rows = await loadTaskCandidates({
+      client,
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      ownerId: OWNER,
+      now: NOW,
+    });
+
+    expect(rows[0]).toMatchObject({
+      projectRefId: "66666666-6666-4666-8666-666666666666",
+      contextRefId: "77777777-7777-4777-8777-777777777777",
+      personRefId: "88888888-8888-4888-8888-888888888888",
+      scheduledReminderCount: 2,
+      nextReminderAt: "2026-07-26T09:00:00.000Z",
+    });
+  });
+
+  it("raises on a reminder column renamed to something plausible", async () => {
+    // `.strict()` over the five new columns, asserted against a near-miss rather
+    // than an obviously foreign key: a projection that started returning
+    // `reminder_count` would leave `scheduled_reminder_count` missing *and* add
+    // an undeclared key, and a schema that merely ignored unknown keys would
+    // render "no reminders" for a task that has two.
+    const row: Record<string, unknown> = { ...sqlRow(), reminder_count: 2 };
+    delete row.scheduled_reminder_count;
+    const { client } = recordingClient({ data: [row], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_row_shape" });
   });
 
   it("treats a null payload as an empty candidate set", async () => {
@@ -375,6 +525,20 @@ describe("what comes back", () => {
     ["a null observation instant", { observed_before: null }],
     ["a null intentional_no_due", { intentional_no_due: null }],
     ["person arrays that are not aligned", { person_ids: ["a"], person_names: [], person_roles: [] }],
+    // The reference columns are nullable but not free-form. A name arriving
+    // where an id was declared is a projection that stopped resolving, and
+    // binding a relation to it would assign the wrong thing — or, once Slice
+    // 2E.4 stores it as `remove_added_relation`'s target, undo the wrong thing.
+    ["a project reference that is not a uuid", { project_ref_id: "Acme" }],
+    ["a context reference that is not a uuid", { context_ref_id: "deep-work" }],
+    ["a person reference that is not a uuid", { person_ref_id: "11111111-1111-4111-8111" }],
+    // Non-null and non-negative: SQL coalesces the count to 0, so both a null
+    // and a negative mean the projection changed. Either would be read as "no
+    // reminders" by a preview that trusted the number.
+    ["a null scheduled reminder count", { scheduled_reminder_count: null }],
+    ["a negative scheduled reminder count", { scheduled_reminder_count: -1 }],
+    ["a fractional scheduled reminder count", { scheduled_reminder_count: 1.5 }],
+    ["a non-string next reminder instant", { next_reminder_at: 1_764_000_000 }],
   ];
 
   it.each(invalidRows)("refuses %s at the schema", async (_label, overrides) => {
@@ -394,6 +558,12 @@ describe("what comes back", () => {
     "task_id", "owner_id", "title", "status", "observed_before",
     "prefilter_tier", "token_overlap", "query_token_count", "effective_limit",
     "intentional_no_due", "created_at", "updated_at", "project_ids", "person_roles",
+    // Nullable is not optional. A dropped reference column would arrive as
+    // undefined and read as "resolved to nothing", which is the one answer a
+    // preview must not give when the truth is "the projection stopped telling
+    // us".
+    "project_ref_id", "context_ref_id", "person_ref_id",
+    "scheduled_reminder_count", "next_reminder_at",
   ] as const;
 
   it.each(requiredKeys)("refuses a row missing %s", async (key) => {
@@ -411,7 +581,7 @@ describe("what comes back", () => {
     ).rejects.toMatchObject({ code: "invalid_row_shape" });
   });
 
-  it("names the field that was wrong, so a paged human is not reading a thirty-column diff", async () => {
+  it("names the field that was wrong, so a paged human is not reading a thirty-five-column diff", async () => {
     const { client } = recordingClient({ data: [sqlRow({ prefilter_tier: 9 })], error: null });
 
     await expect(
@@ -476,6 +646,13 @@ describe("what comes back", () => {
   it.each([
     ["the observation instant", { observed_before: "2026-07-25T11:00:00.000Z" }],
     ["the effective limit", { effective_limit: 7 }],
+    // The `refs` CTE resolves each reference once and cross-joins it, so these
+    // are query-scalars exactly as the two above are. Two ids in one set would
+    // mean the preview and the Slice 2E.4 apply — which binds the resolved id
+    // rather than the user's words — could name different projects.
+    ["the resolved project reference", { project_ref_id: "66666666-6666-4666-8666-666666666666" }],
+    ["the resolved context reference", { context_ref_id: "77777777-7777-4777-8777-777777777777" }],
+    ["the resolved person reference", { person_ref_id: "88888888-8888-4888-8888-888888888888" }],
   ])("refuses a set whose rows disagree about %s", async (_label, overrides) => {
     // `b.observed_before` and `b.lim` are single-row cross joins, exactly like
     // `cardinality(q.tokens)`. The observation instant is the one that matters
@@ -524,6 +701,34 @@ describe("what comes back", () => {
         now: NOW,
       }),
     ).rejects.toMatchObject({ code: "unreachable_row_shape" });
+  });
+
+  it("accepts a set whose rows disagree about their reminders, which are per-row", async () => {
+    // The mirror of the tests above, and the reason they are worth having. The
+    // reminder lateral runs once per candidate, so two rows reporting different
+    // counts is the ordinary case — folding these into the query-scalar
+    // agreement check would refuse every result set containing one task with a
+    // reminder and one without.
+    const { client } = recordingClient({
+      data: [
+        sqlRow({ scheduled_reminder_count: 0, next_reminder_at: null }),
+        sqlRow({
+          task_id: "44444444-4444-4444-8444-444444444444",
+          scheduled_reminder_count: 3,
+          next_reminder_at: "2026-07-26T09:00:00.000Z",
+        }),
+      ],
+      error: null,
+    });
+
+    const rows = await loadTaskCandidates({
+      client,
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      ownerId: OWNER,
+      now: NOW,
+    });
+
+    expect(rows.map((row) => row.scheduledReminderCount)).toEqual([0, 3]);
   });
 
   it("raises, never filters, when a row belongs to another owner", async () => {

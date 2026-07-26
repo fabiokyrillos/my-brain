@@ -13,14 +13,14 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(48);
+select plan(66);
 
 -- Contract: signature, security, grants ------------------------------------
 
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure,
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure,
     'execute'
   ),
   'authenticated may generate its own task candidates'
@@ -29,7 +29,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure,
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure,
     'execute'
   ),
   'anon may not (2E-OWNERSHIP-003)'
@@ -49,7 +49,7 @@ select ok(
 -- they are the proof rather than a second opinion.
 select is(
   (select prosecdef from pg_proc where oid =
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
   true,
   'the candidate query is SECURITY DEFINER, because normalize_entity_alias is not executable by authenticated'
 );
@@ -58,7 +58,7 @@ select is(
 -- `proconfig` is text[] and Postgres stores the empty value quoted.
 select is(
   (select array_to_string(proconfig, ',') from pg_proc where oid =
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
   'search_path=""',
   'and still pins an empty search_path'
 );
@@ -77,16 +77,16 @@ select is(
 
 select is(
   (select proargnames from pg_proc where oid =
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
-  array['p_eligible_statuses', 'p_title_query', 'p_project_hint', 'p_context_hint', 'p_person_hint', 'p_observed_before', 'p_limit', 'task_id', 'owner_id', 'title', 'description', 'status', 'due_at', 'planned_at', 'manual_priority', 'completed_at', 'cancelled_at', 'intentional_no_due', 'no_due_reason', 'created_at', 'updated_at', 'project_ids', 'project_names', 'context_ids', 'context_names', 'person_ids', 'person_names', 'person_roles', 'project_hint_matched', 'context_hint_matched', 'person_hint_matched', 'last_audited_at', 'observed_before', 'prefilter_tier', 'token_overlap', 'query_token_count', 'effective_limit'],
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
+  array['p_eligible_statuses', 'p_title_query', 'p_project_hint', 'p_context_hint', 'p_person_hint', 'p_observed_before', 'p_limit', 'p_project_ref', 'p_context_ref', 'p_person_ref', 'task_id', 'owner_id', 'title', 'description', 'status', 'due_at', 'planned_at', 'manual_priority', 'completed_at', 'cancelled_at', 'intentional_no_due', 'no_due_reason', 'created_at', 'updated_at', 'project_ids', 'project_names', 'context_ids', 'context_names', 'person_ids', 'person_names', 'person_roles', 'project_hint_matched', 'context_hint_matched', 'person_hint_matched', 'last_audited_at', 'observed_before', 'prefilter_tier', 'token_overlap', 'query_token_count', 'effective_limit', 'project_ref_id', 'context_ref_id', 'person_ref_id', 'scheduled_reminder_count', 'next_reminder_at'],
   'the catalog signature is the one the migration declares and the generated types describe'
 );
 
 select is(
   (select pronargdefaults from pg_proc where oid =
-    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer)'::regprocedure),
-  6::smallint,
-  'every argument except the eligible-status array carries a default'
+    'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
+  9::smallint,
+  'every argument except the eligible-status array carries a default: nine of them, after Slice 2E.3 appended the three relation references'
 );
 
 -- 2E-MATCH-008: the authoritative normalizer, pinned -----------------------
@@ -133,6 +133,57 @@ insert into public.tasks (id, user_id, title, status, created_at) values
 
 insert into public.task_projects (task_id, project_id, user_id) values
   ('41000006-1111-4111-8111-111111111111', '41000009-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111');
+
+-- Slice 2E.3 fixtures ---------------------------------------------------------
+--
+-- Everything below exists for the three relation references and the reminder
+-- projection, and every row of it is chosen so that no assertion above changes
+-- value. No new task is created, so the eligible population stays the four
+-- `todo` rows the wholly-metacharacter case pins at 4. No new project, context
+-- or person is linked to a task that an assertion above already inspects,
+-- except one person on task 41000006 under a role no assertion above reads -
+-- and a relation hint reaches a candidate only through `task_projects`,
+-- `task_contexts` or `task_people`, never through a reference.
+
+insert into public.projects (id, user_id, name) values
+  -- Equality, not containment. A reference of 'Globex' must not resolve here,
+  -- while `project_hint` would have matched it as a complete word.
+  ('4100000a-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Globex Industries'),
+  -- Written as an escape for the reason the corpus above is: the whole point of
+  -- the assertion is that the accented spelling is what is stored, and an
+  -- editor re-encoding it would silently make the test tautological.
+  ('4100000b-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', U&'Or\00E7amento Anual'),
+  -- Two owned projects that normalize to one name. `projects_user_name_idx` is
+  -- on `(user_id, lower(name))`, and these two differ under `lower` while
+  -- collapsing under `normalize_entity_alias` — which is exactly the ambiguity
+  -- `resolve_owned_entity_exact` refuses to guess at.
+  ('4100000c-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Duplicado'),
+  ('4100000d-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', U&'Duplic\00E1do'),
+  -- Owned only by the second user. The first user naming it must resolve
+  -- nothing, rather than reaching across the owner boundary.
+  ('4200000a-2222-4222-8222-222222222222', '42222222-2222-4222-8222-222222222222', 'Initech');
+
+insert into public.contexts (id, user_id, name) values
+  ('41000019-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Casa');
+
+insert into public.people (id, user_id, name) values
+  ('41000029-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Bruno Silva');
+
+-- The person *is* on a task, under a role. A reference is the patch's, not the
+-- task's, so it must resolve identically for a candidate that already holds
+-- this person and for one that holds nobody at all.
+insert into public.task_people (task_id, person_id, user_id, role) values
+  ('41000006-1111-4111-8111-111111111111', '41000029-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'waiting_on');
+
+-- Reminders on one task and none on another. The `sent` and `cancelled` rows
+-- are deliberately *earlier* than both scheduled ones, so a projection that
+-- forgot the status filter would report a different count **and** a different
+-- next instant — a filter regression cannot pass by coincidence.
+insert into public.reminders (id, user_id, task_id, title, remind_at, status) values
+  ('41000031-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', '41000003-1111-4111-8111-111111111111', 'Comprar leite', now() + interval '2 hours', 'scheduled'),
+  ('41000032-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', '41000003-1111-4111-8111-111111111111', 'Comprar leite de novo', now() + interval '5 hours', 'scheduled'),
+  ('41000033-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', '41000003-1111-4111-8111-111111111111', 'Ja disparado', now() - interval '1 hour', 'sent'),
+  ('41000034-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', '41000003-1111-4111-8111-111111111111', 'Ja cancelado', now() + interval '30 minutes', 'cancelled');
 
 -- One historical state change, older than the rows `tasks_audit_changes` just
 -- wrote for every insert above.
@@ -484,6 +535,214 @@ select is(
   (select array_agg(task_id) from public.list_task_command_candidates(
      array['todo'], 'relatorio' || chr(92), null, null, null, now(), 25)),
   'and the order is identical across executions of the same escaped hint'
+);
+
+-- 2E-PREVIEW-003: the reminders a transition would actually touch -------------
+--
+-- `due_at is not null` is not a substitute for this, because
+-- `create_due_task_reminder` fires only `after insert on public.tasks` — a due
+-- date set by any later UPDATE leaves no reminder — and `authenticated` may
+-- delete reminders directly. A preview that promises to cancel a reminder that
+-- does not exist is inventing an effect, not disclosing one.
+--
+-- `comprar leite` is an exact normalized title, and no other eligible task
+-- shares a token with it, so the call below returns exactly one row and the
+-- scalar subqueries are total.
+
+select is(
+  (select scheduled_reminder_count from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25)),
+  2,
+  'only scheduled reminders are counted: the sent and the cancelled row are inert and are not disclosed'
+);
+
+select is(
+  (select next_reminder_at from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25)),
+  now() + interval '2 hours',
+  'and the next instant is the earliest scheduled one, never the earlier sent or cancelled row'
+);
+
+-- The zero case, asserted before the null case on purpose: a `where task_id`
+-- filter that matched nothing would make the null assertion below pass
+-- vacuously, and this one - over the same call and the same filter - is what
+-- proves the row is there to have a null.
+select is(
+  (select scheduled_reminder_count from public.list_task_command_candidates(
+     array['todo'], 'enviar fatura', null, null, null, now(), 25)
+   where task_id = '41000006-1111-4111-8111-111111111111'),
+  0,
+  'a task with no reminder at all reports zero rather than null'
+);
+
+select is(
+  (select next_reminder_at from public.list_task_command_candidates(
+     array['todo'], 'enviar fatura', null, null, null, now(), 25)
+   where task_id = '41000006-1111-4111-8111-111111111111'),
+  null::timestamptz,
+  'and its next instant is null, so a preview cannot promise to cancel a reminder that does not exist'
+);
+
+-- The patch's relation references (2E-PREVIEW-005) ---------------------------
+--
+-- These are what the command wants to *assign*, resolved through
+-- `resolve_owned_entity_exact` so that 2E-PREVIEW-005 can compare ids rather
+-- than re-normalizing names in TypeScript — the divergence 2E-MATCH-008
+-- characterizes and `normalizer-divergence.test.ts` forbids structurally.
+--
+-- Every call below uses the single-row `comprar leite` hint, so a scalar
+-- subquery is total, and the cases that expect null are written as counts
+-- instead: a scalar subquery over zero rows is also null, which would make the
+-- interesting assertions pass for the wrong reason.
+
+select is(
+  (select project_ref_id from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'ORCAMENTO ANUAL', null, null)),
+  '4100000b-1111-4111-8111-111111111111'::uuid,
+  'a reference resolves through the authoritative normalizer, so an unaccented uppercase reference finds the accented stored name'
+);
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Globex', null, null)
+   where project_ref_id is null),
+  1,
+  'a reference is equality and never containment: Globex does not resolve to the project named Globex Industries'
+);
+
+select is(
+  (select project_ref_id from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'globex industries', null, null)),
+  '4100000a-1111-4111-8111-111111111111'::uuid,
+  'and the whole name does resolve, so the null above is exactness rather than a missing project'
+);
+
+select is(
+  (select project_ref_id from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Acme', null, null)),
+  '41000009-1111-4111-8111-111111111111'::uuid,
+  'a reference resolves to the caller''s own project, never to the identically-named one the second owner has'
+);
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Initech', null, null)
+   where project_ref_id is null),
+  1,
+  'and a project only the second owner has resolves to nothing for the first'
+);
+
+-- `resolve_owned_entity_exact` is exact-or-nothing by construction: it counts
+-- `distinct id` across the owned union and returns a row only when the count is
+-- one (`202607170020:374-379`). Null therefore means "no owned entity of that
+-- name, *or* more than one", and the preview says so truthfully rather than
+-- picking the lower uuid.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Duplicado', null, null)
+   where project_ref_id is null),
+  1,
+  'two owned projects that normalize to one name resolve to nothing rather than to whichever sorts first'
+);
+
+select is(
+  (select context_ref_id from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     null, 'casa', null)),
+  '41000019-1111-4111-8111-111111111111'::uuid,
+  'a context reference resolves on the same terms, against the 120-character column'
+);
+
+select is(
+  (select person_ref_id from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     null, null, 'BRUNO SILVA')),
+  '41000029-1111-4111-8111-111111111111'::uuid,
+  'a person reference resolves for a candidate that holds no person at all'
+);
+
+select is(
+  (select person_ref_id from public.list_task_command_candidates(
+     array['todo'], 'enviar fatura', null, null, null, now(), 25,
+     null, null, 'Bruno Silva')
+   where task_id = '41000006-1111-4111-8111-111111111111'),
+  '41000029-1111-4111-8111-111111111111'::uuid,
+  'and identically for the candidate that already holds that person as waiting_on: the reference is the patch''s, not the task''s'
+);
+
+-- Query-scalar, like `observed_before` and `effective_limit`. A result set
+-- whose rows disagree is a broken contract, and `candidates.ts` refuses it on
+-- exactly that ground - so the count is pinned to four rather than compared
+-- against zero disagreements, which zero rows would also satisfy.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25,
+     'orcamento anual', 'Casa', 'Bruno Silva')
+   where project_ref_id = '4100000b-1111-4111-8111-111111111111'::uuid
+     and context_ref_id = '41000019-1111-4111-8111-111111111111'::uuid
+     and person_ref_id = '41000029-1111-4111-8111-111111111111'::uuid),
+  4,
+  'the three references are query-scalar: every one of the caller''s four candidates carries the same resolved ids'
+);
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25)
+   where project_ref_id is null and context_ref_id is null and person_ref_id is null),
+  4,
+  'and an omitted reference is null on every row rather than an accidental resolution'
+);
+
+-- 2E-MATCH-003 under the amendment: the references changed nothing -----------
+--
+-- This is the assertion the whole amendment rests on. `writesRelation` exists
+-- in `matching.ts` because the relation a command is *adding* must never boost
+-- the task that already holds it, and a review proved that defect reached a
+-- one-step apply. So the references must reach neither candidacy nor ordering:
+-- the same call with and without them returns the same rows in the same order.
+--
+-- The hinted call is the probe that matters. Its project reference is 'Acme',
+-- which is precisely the relation task 41000006 already holds, and 'Bruno
+-- Silva' is the person task 41000006 already holds as waiting_on - so a leak
+-- into the tier or into the hit-count tiebreak would move that row.
+
+select is(
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', 'Acme', null, null, now(), 25)),
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', 'Acme', null, null, now(), 25,
+     'Acme', 'Casa', 'Bruno Silva')),
+  'supplying the three references changes neither the row set nor the row order of a hinted call'
+);
+
+-- Pinned against a literal, not only against the other call: two aggregations
+-- compared to each other are both satisfied by null, so the invariance above
+-- would survive the function regressing to returning nothing.
+select is(
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', 'Acme', null, null, now(), 25,
+     'Acme', 'Casa', 'Bruno Silva')),
+  array[
+    '41000002-1111-4111-8111-111111111111'::uuid,
+    '41000001-1111-4111-8111-111111111111'::uuid,
+    '41000006-1111-4111-8111-111111111111'::uuid
+  ],
+  'and the order it is invariant under is the declared one: both tier-1 title matches, newest first, then the project-hint-only tier 2'
+);
+
+select is(
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25)),
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25,
+     'Acme', 'Casa', 'Bruno Silva')),
+  'and the hintless call, where every eligible task is a candidate, is invariant under them too'
 );
 
 select * from finish();

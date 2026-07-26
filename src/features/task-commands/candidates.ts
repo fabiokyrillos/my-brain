@@ -95,6 +95,21 @@ const rowSchema = z
     token_overlap: z.number().int().min(0),
     query_token_count: z.number().int().min(0),
     effective_limit: z.number().int().min(1),
+    // Query-scalars like `observed_before` and `effective_limit`: resolved once
+    // by the `refs` CTE and cross-joined onto every row. Nullable on purpose —
+    // null is "no owned entity of that name, or more than one", which
+    // `resolve_owned_entity_exact` collapses — but a *non-uuid* string is not
+    // that, it is a column the RPC stopped returning as an id, and a preview
+    // that bound a relation to it would name the wrong thing.
+    project_ref_id: z.string().uuid().nullable(),
+    context_ref_id: z.string().uuid().nullable(),
+    person_ref_id: z.string().uuid().nullable(),
+    // Per-row, and non-null: SQL coalesces the count to 0, so a null here means
+    // the projection changed. Parsed as a non-negative integer for the same
+    // reason the other counts are — an undefined arriving where a count is
+    // expected would render "no reminders" rather than failing.
+    scheduled_reminder_count: z.number().int().min(0),
+    next_reminder_at: z.string().nullable(),
   })
   .strict()
   // Position n of the three person arrays describes one `task_people` row. SQL
@@ -144,6 +159,11 @@ function toCandidateRow(row: z.infer<typeof rowSchema>): TaskCandidateRow {
     tokenOverlap: row.token_overlap,
     queryTokenCount: row.query_token_count,
     effectiveLimit: row.effective_limit,
+    projectRefId: row.project_ref_id,
+    contextRefId: row.context_ref_id,
+    personRefId: row.person_ref_id,
+    scheduledReminderCount: row.scheduled_reminder_count,
+    nextReminderAt: row.next_reminder_at,
   };
 }
 
@@ -213,6 +233,23 @@ export async function loadTaskCandidates(
     p_person_hint: command.targetHints.person ?? undefined,
     p_observed_before: observedBefore,
     p_limit: input.limit ?? TASK_MATCH_LIMITS.candidates,
+    // The *patch's* references, not the target hints above. The hints say which
+    // task the user meant; these say what the command wants to assign to it, and
+    // conflating them would make "add the invoice task to Acme" rank the task
+    // already in Acme above the one the user named.
+    //
+    // They are sent so SQL can resolve each to an owned entity id under the
+    // authoritative normalizer (2E-MATCH-007). Resolving them here would mean
+    // `normalizeEntityName`, whose divergence 2E-MATCH-008 characterizes — a
+    // preview could report "will add Acme" where the Slice 2E.4 RPC then
+    // computes `no_change`.
+    //
+    // `undefined` rather than `null`, exactly as the hints are and for the same
+    // reason: the key is dropped by JSON.stringify and the function's own
+    // `default null` applies.
+    p_project_ref: command.patch.projectRef ?? undefined,
+    p_context_ref: command.patch.contextRef ?? undefined,
+    p_person_ref: command.patch.personRef ?? undefined,
   });
 
   if (result.error) {
@@ -225,7 +262,7 @@ export async function loadTaskCandidates(
   const parsed = rowsSchema.safeParse(result.data ?? []);
   if (!parsed.success) {
     // The offending path travels with the error. A bare "unexpected row shape"
-    // against a thirty-column projection tells whoever is paged nothing, and
+    // against a thirty-five-column projection tells whoever is paged nothing, and
     // the most likely cause is a migration that landed ahead of this code.
     const issue = parsed.error.issues[0];
     const path = (issue?.path ?? []).join(".");

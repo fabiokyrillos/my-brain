@@ -74,6 +74,15 @@ function row(overrides: Partial<TaskCandidateRow> & { taskId: string }): TaskCan
     tokenOverlap: 0,
     queryTokenCount: 0,
     effectiveLimit: TASK_MATCH_LIMITS.candidates,
+    // Preview data the scorer never reads, defaulted to "nothing resolved, no
+    // reminders". 2E-MATCH-018's rates are pinned below, so this has to be a
+    // widening of the row shape and not of the corpus: if setting any of these
+    // could move a rate, the purity 2E-MATCH-017 promises would already be gone.
+    projectRefId: null,
+    contextRefId: null,
+    personRefId: null,
+    scheduledReminderCount: 0,
+    nextReminderAt: null,
     ...overrides,
   };
 }

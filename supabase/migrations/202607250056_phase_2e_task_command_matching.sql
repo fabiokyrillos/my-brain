@@ -72,6 +72,49 @@
 -- can render before/after without re-reading the task, and 2E-UPDATE-003 can
 -- gate on a pre-state observed at the *same* instant that produced the match
 -- rather than at a later one. Any column change after this still needs a `_v2`.
+--
+-- Slice 2E.3 amended this function in place — the amendment window Slice 2E.2's
+-- report §10 kept open, because `202607250056` had only ever been applied to
+-- ephemeral CI databases and never to the linked project. Building the preview
+-- proved the pre-state alone insufficient in exactly two places, and both are
+-- unfixable in TypeScript:
+--
+--   1. Relation references. `patch.projectRef`/`contextRef`/`personRef` are the
+--      user's own words, and the pre-state carries relation *ids*. Deciding
+--      "the task already holds this relation" (2E-PREVIEW-005) therefore needs
+--      the reference resolved to an id, under the authoritative normalizer.
+--      Doing it in TypeScript would mean `normalizeEntityName`, whose
+--      divergence from this normalizer 2E-MATCH-008 characterizes — a preview
+--      could report "will add Acme" where the Slice 2E.4 RPC then computes
+--      `no_change`. `normalizer-divergence.test.ts` forbids it structurally in
+--      this directory for that reason. So the three refs resolve here, through
+--      `public.resolve_owned_entity_exact` — the resolver the rest of the
+--      product already uses, rather than a second copy of entity resolution
+--      (ADR-021). It is exact-or-nothing: null means no owned entity of that
+--      name, *or* more than one, and the preview says so truthfully rather than
+--      guessing. Slice 2E.4 inherits the id its `remove_added_relation` undo
+--      needs (2E-UPDATE-015), and binding the id rather than the words stops a
+--      rename between preview and apply silently retargeting the assignment.
+--
+--   2. Reminders. `reminders` is a member of the taxonomy's `changedFields` and
+--      was the only member with no observed state, so a preview rendering
+--      before/after over that list had a hole on six of the fifteen actions.
+--      `due_at is not null` is not a substitute: `create_due_task_reminder` is
+--      `after insert on public.tasks` (`202607160007:209`), so a due date set by
+--      any later UPDATE has no reminder at all, and `authenticated` may delete
+--      reminders directly. 2E-PREVIEW-003 asks for the linked effect, and a
+--      preview that promises to cancel a reminder that does not exist is not
+--      disclosing an effect, it is inventing one.
+--
+-- Both additions are deliberately *outside* the ranking path: they are computed
+-- after truncation, appear in neither `order by`, and reach neither
+-- `TaskPreState` nor `TaskCandidateShape` in TypeScript. The refs especially
+-- must not qualify a candidate — `writesRelation` in `matching.ts` exists
+-- because the relation a command is *adding* must never boost the task that
+-- already holds it, and a review proved that defect reached a one-step apply.
+-- Reminder state is likewise kept out of the fingerprint's pre-state: the
+-- heartbeat flips `scheduled` to `sent` hourly with no user act, and gating a
+-- write on it would manufacture a stale-preview refusal on a cron tick.
 
 create or replace function public.list_task_command_candidates(
   p_eligible_statuses text[],
@@ -80,7 +123,21 @@ create or replace function public.list_task_command_candidates(
   p_context_hint text default null,
   p_person_hint text default null,
   p_observed_before timestamptz default null,
-  p_limit integer default 25
+  p_limit integer default 25,
+  -- Appended, and every one defaulted. Position matters: `proargnames` is
+  -- pinned as an ordered array by the pgTAP contract, and `pronargdefaults`
+  -- encodes that `p_eligible_statuses` is the only required argument. Adding a
+  -- non-defaulted argument, or inserting one mid-list, breaks both.
+  --
+  -- These are the *patch's* references — what the command wants to assign — and
+  -- are unrelated to `p_project_hint`/`p_context_hint`/`p_person_hint`, which
+  -- describe which task the user meant. "add the invoice task to Acme" carries
+  -- a title hint of "invoice" and a project *ref* of "Acme", and conflating the
+  -- two would make the task that is already in Acme outrank the one the user
+  -- named.
+  p_project_ref text default null,
+  p_context_ref text default null,
+  p_person_ref text default null
 )
 returns table (
   task_id uuid,
@@ -112,7 +169,25 @@ returns table (
   prefilter_tier integer,
   token_overlap integer,
   query_token_count integer,
-  effective_limit integer
+  effective_limit integer,
+  -- Query-scalar, like `observed_before` and `effective_limit`: resolved once
+  -- and cross-joined onto every row, so a result set whose rows disagree is a
+  -- broken contract rather than an unusual query, and `candidates.ts` refuses it
+  -- on exactly that ground.
+  --
+  -- Null means "no owned entity of that name at `observed_before`, or more than
+  -- one" — the two failures `resolve_owned_entity_exact` deliberately collapses.
+  -- The preview does not pretend to tell them apart: both mean it cannot name
+  -- the thing the user asked for, and both produce the same truthful copy.
+  project_ref_id uuid,
+  context_ref_id uuid,
+  person_ref_id uuid,
+  -- Per-row, unlike the three above: reminders belong to the candidate.
+  -- `scheduled` only — the heartbeat selects no other status, so a `snoozed`,
+  -- `sent` or `cancelled` row can never fire and cancelling it would be a
+  -- disclosed effect that does not exist.
+  scheduled_reminder_count integer,
+  next_reminder_at timestamptz
 )
 language sql
 stable
@@ -135,6 +210,44 @@ as $$
       -- instant actually used is echoed back so the pre-state a later slice
       -- gates on is one this function vouched for.
       coalesce(p_observed_before, now()) as observed_before
+  ),
+  refs as (
+    -- The patch's relation references, resolved once per query.
+    --
+    -- `resolve_owned_entity_exact` is the resolver the rest of the product uses
+    -- (`202607170020:322`): owner-scoped, normalized through the same
+    -- authoritative function every lexical decision below uses, alias-aware
+    -- within the alias's validity window, and returning a row only when exactly
+    -- one owned entity matches. Reusing it rather than restating its query is
+    -- the point — ADR-021 records entity-resolution duplication as a source of
+    -- silent divergence, and this would have been the second copy.
+    --
+    -- Equality on the normalized name, never the hint predicate's
+    -- equality-or-word-containment: the hints are asking "which task did you
+    -- mean", where a partial match is evidence, while these are asking "is this
+    -- exactly the project you named", where a partial match is wrong. A ref of
+    -- "Acme" must not report that a task linked to "Acme Corp" already holds it.
+    --
+    -- Bounded like every hint, and for the same reason: PostgREST exposes this
+    -- function directly, and the lengths match the columns each is resolved
+    -- against — `projects.name` and `people.name` 160, `contexts.name` 120.
+    -- `resolve_owned_entity_exact` returns null for the empty string, so an
+    -- absent reference costs one null comparison and nothing else.
+    --
+    -- Resolved at `observed_before`, not at `now()`, so the alias window is the
+    -- same instant the pre-state was read at.
+    select
+      public.resolve_owned_entity_exact(
+        cl.id, 'project', left(coalesce(p_project_ref, ''), 160), b.observed_before
+      ) as project_ref_id,
+      public.resolve_owned_entity_exact(
+        cl.id, 'context', left(coalesce(p_context_ref, ''), 120), b.observed_before
+      ) as context_ref_id,
+      public.resolve_owned_entity_exact(
+        cl.id, 'person', left(coalesce(p_person_ref, ''), 160), b.observed_before
+      ) as person_ref_id
+    from caller cl
+    cross join bounds b
   ),
   statuses as (
     -- Eligibility is owned by the TypeScript taxonomy (PRD §11.2 as data), so
@@ -361,9 +474,15 @@ as $$
     r.tier,
     r.overlap,
     r.query_tokens,
-    b.lim
+    b.lim,
+    rf.project_ref_id,
+    rf.context_ref_id,
+    rf.person_ref_id,
+    coalesce(rm.scheduled_count, 0),
+    rm.next_remind_at
   from ranked r
   cross join bounds b
+  cross join refs rf
   -- Relations and recency are resolved *after* truncation, over at most
   -- `lim + 1` rows. Neither decides candidacy, so neither is worth paying for
   -- across the whole eligible population.
@@ -423,6 +542,28 @@ as $$
       and a.entity_id = r.id
       and a.created_at < b.observed_before
   ) al on true
+  -- 2E-PREVIEW-003. `status = 'scheduled'` is the whole live population: every
+  -- heartbeat path selects that status and no other (`202607160007:274`,
+  -- `202607160013:31`, `202607170016:510`), so a `snoozed` row is inert, a
+  -- `sent` one has already fired and §11.3 leaves it alone, and a `cancelled`
+  -- one is already where the transition would put it.
+  --
+  -- No `remind_at` predicate. A reminder whose instant has passed but which the
+  -- heartbeat has not yet marked `sent` is still scheduled, and would still
+  -- notify on the next hourly tick; filtering it out would under-report the
+  -- effect on precisely the rows most likely to fire next.
+  --
+  -- `reminders_user_due_idx (user_id, status, remind_at)` is the access path,
+  -- and like the relation laterals this runs over at most `lim + 1` rows.
+  left join lateral (
+    select
+      count(*)::integer as scheduled_count,
+      min(rem.remind_at) as next_remind_at
+    from public.reminders rem
+    where rem.task_id = r.id
+      and rem.user_id = r.user_id
+      and rem.status = 'scheduled'
+  ) rm on true
   -- Repeated because a CTE's ordering is not guaranteed to survive the joins
   -- above. Identical keys, so the truncated set and the returned set agree.
   order by
@@ -433,8 +574,8 @@ as $$
     r.id;
 $$;
 
-comment on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) is
-  'Phase 2E deterministic task candidate generation (PRD 2E-MATCH-001..007). Read-only, owner-scoped, ordered before truncation, returns one row beyond p_limit so overflow is detectable, and projects the full observed pre-state so a preview never has to re-read the task.';
+comment on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text) is
+  'Phase 2E deterministic task candidate generation (PRD 2E-MATCH-001..007). Read-only, owner-scoped, ordered before truncation, returns one row beyond p_limit so overflow is detectable, and projects the full observed pre-state, the patch''s resolved relation references and the task''s scheduled reminders so a preview never has to re-read the task.';
 
-grant execute on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) to authenticated;
-revoke all on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer) from public, anon;
+grant execute on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text) to authenticated;
+revoke all on function public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text) from public, anon;
