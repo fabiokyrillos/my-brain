@@ -12,7 +12,7 @@
 | Phase base | `2e2acfd` (Pre-Phase-2E Foundation Hardening, PR #17) |
 | Slice base | `79a3021` (Slice 2E.1 accepted) |
 | HEAD at acceptance | `958d50e` |
-| Commits | `b143b42`, `5de68eb`, `d7b4eb3`, `a2c263d`, `c32a5bd` (five-review correction pass), `120e4a1`, `6177f81` (progress record), `958d50e` (mutation hardening + docs) |
+| Commits | `b143b42`, `5de68eb`, `d7b4eb3`, `a2c263d`, `c32a5bd` (correction pass over four reviews), `120e4a1` (the fifth review's Critical), `6177f81` (progress record), `958d50e` (mutation hardening), plus the acceptance-review corrections |
 | Migration | `202607250056_phase_2e_task_command_matching.sql` — **local only, not applied to the linked project** |
 | Remote migration parity | `202607250054`, unchanged since the pre-2E cutover |
 | Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged; this slice touches no worker code |
@@ -38,8 +38,8 @@ What this slice deliberately is not, per Epic 2E-B's own acceptance criteria ("n
 | Artifact | Responsibility |
 |---|---|
 | `supabase/migrations/202607250056_phase_2e_task_command_matching.sql` | `public.list_task_command_candidates` — owner-scoped, filtered on the action's declared eligible statuses, ordered totally and deterministically **before** truncating, returning one row beyond the limit so truncation is detectable, projecting the full observed pre-state of every field §11.2 can change |
-| `supabase/tests/phase_2e_task_command_matching.sql` | **40 pgTAP assertions**, executed against a from-zero database in CI |
-| `src/features/task-commands/match-policy.ts` | Every weight, threshold, limit, tier and band, at `TASK_MATCH_POLICY_VERSION = 2026-07-25.2`, pinned by digest |
+| `supabase/tests/phase_2e_task_command_matching.sql` | **48 pgTAP assertions**, executed against a from-zero database in CI |
+| `src/features/task-commands/match-policy.ts` | Every weight, threshold, limit, tier and band, at `TASK_MATCH_POLICY_VERSION = 2026-07-25.3`, pinned by digest |
 | `src/features/task-commands/matching.ts` | The pure scorer, comparator, outcome classifier, and the SQL-reachability invariant |
 | `src/features/task-commands/candidates.ts` | The injectable data-access layer: argument assembly, row validation, reachability check, cross-owner raise |
 | `src/lib/supabase/database.types.ts` | The RPC's hand-written type entry (ADR-041) |
@@ -77,7 +77,7 @@ Outcome order is load-bearing: overflow outranks confidence (a truncated set can
 
 ## 5. The measured 2E-MATCH-018 baseline, with its scope
 
-From the committed 14-scenario corpus in `match-baseline.test.ts`, at policy version `2026-07-25.2`:
+From the committed 14-scenario corpus in `match-baseline.test.ts`, at policy version `2026-07-25.3`:
 
 | Rate | Value |
 |---|---|
@@ -100,7 +100,7 @@ Full posture in `docs/SECURITY.md` and ADR-040. In summary:
 - **`set search_path = ''`**, pinned against `pg_proc.proconfig`.
 - **Inside the function, the `auth.uid()` predicate is the only ownership control**, because the definer owns the tables. Stated, not papered over. RLS still forces the boundary on every other path.
 - **Cross-owner denial is indistinguishable from no result** — the other owner's identically-titled task is absent, not outranked — proven symmetrically, plus a null-caller case.
-- **Up to 26 owned tasks' `title` and `description`** travel in the projection (25 + the probe row). Deliberate: `42P13` means a `RETURNS TABLE` shape cannot be widened later without a `_v2`.
+- **The projection carries `title` and `description`.** The application asks for 26 rows (`TASK_MATCH_LIMITS.candidates` 25 plus the 2E-MATCH-004 probe), but the *server* bound is what governs a direct PostgREST caller, and it is `least(greatest(coalesce(p_limit,25),1),100)` then `limit lim + 1` — **101 rows**. An earlier draft of this section said "up to 26", which is the application default rather than the exposed bound; the same passage reasons about direct PostgREST exposure for the hint lengths, and the row cap deserved the same treatment. All of it is the caller's own data. The width is deliberate: `42P13` means a `RETURNS TABLE` shape cannot be widened later without a `_v2`.
 - **No content reaches analytics or a model.** This slice emits no product event and makes no model call; `TASK_MATCH_EVIDENCE` names the signal that fired, never the value.
 - **Residual, named:** if the ownership predicate regresses, nothing else inside the function stops a cross-owner read. That is why the pgTAP cross-owner assertions are symmetric and run from zero on every push.
 
@@ -130,21 +130,49 @@ Also fixed from Important findings: the projection widened to carry the full pre
 
 ### The sixth review: mutation testing
 
-A mutation run over 41 real mutations arrived after the correction pass and found the suite **green under fifteen changes that alter what the matcher decides**. Every one is now killed; each was applied, confirmed to fail the focused suite, and reverted.
+A mutation run (whose author reported it covered 41 mutations) arrived after the correction pass and found the suite **green under fifteen changes that alter what the matcher decides**. Every one is now killed; each was applied, confirmed to fail the focused suite, and reverted.
 
-| Mutation | Why it mattered | What kills it now |
+| # | Mutation | Why it mattered |
 |---|---|---|
-| `overflowed` `>` → `>=` | every full page reports a truncation, which 2E-MATCH-004 turns into a refusal to one-step apply | fixtures at exactly the declared limit and one above |
-| `topScore <` → `<=` | 2E-MATCH-011 says "at or above"; a confident match becomes ambiguous | a fixture scoring exactly 0.55 |
-| `margin <` → `<=` | the clearest separation the policy expresses becomes a disambiguation list | a fixture with margin exactly 0.12 |
-| delete `TASK_MATCH_LIMITS.ranked` | the presentation cap disappears | seven qualifying candidates, five presented |
-| `temporalExactHours <=` → `<` | a task due exactly a day out stops being "on that day" | fixtures at exactly 24h and 72h |
-| title tie-break → `localeCompare` | ordering resolves against the host's ICU data | `"B"` vs `"a"`, plus a structural guard forbidding `.localeCompare(` |
-| four `rowSchema` refinements removed, incl. `prefilter_tier: z.any()` | malformed rows score as "no signal" | 17 invalid values and 14 missing keys, table-driven, asserting the **specific** error code |
-| reachability check removed | impossible triples are scored rather than caught | `unreachable_row_shape` behavioural tests |
-| a pgTAP corpus assertion commented out | the SQL-side proof silently shrinks | assertion count must equal `CORPUS.length`, anchored on the whole `select is(...)` form |
+| 1 | `overflowed` `>` → `>=` | every full page reports a truncation, which 2E-MATCH-004 turns into a refusal to one-step apply |
+| 2 | `topScore <` → `<=` | 2E-MATCH-011 says "at or above"; a confident match becomes ambiguous |
+| 3 | `margin <` → `<=` | the clearest separation the policy expresses becomes a disambiguation list |
+| 4 | delete `TASK_MATCH_LIMITS.ranked` | the presentation cap disappears |
+| 5 | `temporalExactHours <=` → `<` | a task due exactly a day out stops being "on that day" |
+| 6 | `temporalNearHours <=` → `<` | the near band loses its own edge |
+| 7 | title tie-break → `localeCompare` | ordering resolves against the host's ICU data |
+| 8 | `token_overlap` loses `.min(0)` | a negative count scores as a fraction |
+| 9 | `prefilter_tier` → `z.any()` | the weakest possible schema passes the test written to defend it |
+| 10 | `prefilter_tier` loses `.min(0).max(3)` | a tier outside the vocabulary decodes as "no title signal" |
+| 11 | `effective_limit` loses `.min(1)` | a zero limit makes every set look truncated |
+| 12 | `owner_id` loses `.uuid()` | a malformed owner reaches the cross-owner comparison |
+| 13 | reachability check removed | impossible triples are scored rather than caught |
+| 14 | a pgTAP corpus assertion commented out | the SQL-side proof silently shrinks |
+| 15 | a pgTAP corpus expected value changed | single-sided drift between the two corpora |
+
+Fixtures 1–7 are in `matching.test.ts`, 8–13 in `candidates.test.ts` (table-driven over 17 invalid values and 14 missing keys, asserting the **specific** error code so a removed refinement cannot pass on the strength of a different layer), and 14–15 are killed by the anchored `select is(...)` form plus the requirement that the executed assertion count equal `CORPUS.length`.
 
 Two findings from that review are **accepted as scope, not defects**: the baseline's hand-written triples (now proven reachable, §5) and the fact that co-drift in the normalizer corpus — changing both files to a value the real function does not return — is caught by the pgTAP run rather than by the cross-file test. pgTAP is the authoritative runtime proof and it executes from zero on every push.
+
+### The acceptance review: three Criticals, and one live defect
+
+Three further reviewers ran at acceptance. They confirmed the fifteen above are genuinely killed, confirmed the reachability rules against the SQL in both directions (including the dangerous direction — a row the rules *reject* that SQL can produce, which would be a production raise — and found none), confirmed the owner predicate airtight through every lateral, and verified the injection expected-counts by hand. They also found the following, all now fixed.
+
+**Critical — the correction pass's own fixes were untested.** Four of the five Criticals fixed earlier in this slice could be deleted with the suite still green:
+
+1. **The `writesRelation` guards** (three call sites plus the helper). Removing the person guard made `set_waiting_on` with a person hint score 0.60 instead of 0.50 on a task that already held that person — `matched`, `oneStep`, an unconfirmed `waiting_on` write on the wrong task. That is verbatim the defect the guard was added to fix.
+2. **The future-audit clamp and the ISO designator precondition.** Removing the clamp turned a `now + 14d` audit timestamp into a margin of exactly `minMargin` — a garbage clock manufacturing a one-step apply, again verbatim the original defect.
+3. **The outcome branch order.** Hoisting the confirmation branch above the ambiguity branch survived, because no fixture ever exercised a destructive action with *two* candidates. Two identical `cancel_task` candidates would have produced a single confirm control for an arbitrary one of them.
+
+**Important — a live defect, not a coverage gap.** The status hint was tautological for `reopen_task` and `restore_task`. `describesDestination` only suppresses a hint equal to `patch.status`, which only `set_status` can carry — but `isEligibleStatus` already guarantees every candidate holds an eligible status, and those two actions have single-element eligible sets. So the hint fired on every candidate, separated none, and only inflated the score against the threshold. Proven by execution: "reopen the completed report task" reached `matched` + one-step at 0.60 where "reopen the report task" was `ambiguous` at 0.52. **Fixed** — the hint is now skipped when the action's eligible set cannot distinguish candidates — and `TASK_MATCH_POLICY_VERSION` moved to `2026-07-25.3`, because the scorer's behaviour changed without any number in the policy module changing, and §10.4 exists so a recorded decision is attributable to the rules that produced it.
+
+**Important — cross-row defences applied inconsistently.** `observedBefore` was read from `rows[0]` on trust — the value that will guard 2E-UPDATE-003's TOCTOU check and feed 2E-PREVIEW-004's fingerprint — even when that row is dropped moments later as cross-owner. Two reviewers found this independently. It is now the *earliest* observation across the set, and `describeUnreachableCandidates` refuses a set whose rows disagree on `observed_before` or `effective_limit`, not only on `query_token_count`.
+
+**Important — the data-access layer accepted a zone-less instant** that `rankTaskCandidates` refuses as a 2E-MATCH-017 violation. `Date.parse("2026-07-26T00:30")` resolves in the host's zone, so `p_observed_before` — and the recency window and audit cut-off derived from it — were machine-dependent. That the ranker threw afterwards was no defence: the query had already run. `ISO_INSTANT` is now exported from `matching.ts` and applied in `candidates.ts` **before** the RPC call, rather than copied.
+
+**Minor, also fixed:** the `localeCompare` structural guard was defeatable by moving the comparator to a new module, and now enumerates the feature directory instead of a hard-coded list; the normalizer count assertion's comment claimed a guarantee it does not deliver (it catches SQL-side extras and deletions, *not* co-drift) and now says so; `scoreDecimals` was documented as governing the margin, which `trust-policy.ts` actually rounds with a hard-coded `1_000` outside the policy digest — the seam is now named; `p_eligible_statuses` was the one argument with no server-side bound and is now sliced before the `distinct`; the second cross-owner direction asserted only a count and now asserts absence like the first; the relation laterals had no same-name-different-owner fixture and now do; the limit clamp was exercised only at 1 and is now proven at 0, 101 and null; and one metacharacter assertion compared two counts against each other, which zero would have satisfied, and is now pinned.
+
+All of these were re-verified by mutation: **21 further mutations applied, 21 killed.**
 
 ## 9. Verification
 
@@ -152,15 +180,15 @@ Two findings from that review are **accepted as scope, not defects**: the baseli
 |---|---|
 | `npm run lint` | 0 errors, 0 warnings |
 | `npm run typecheck` | 0 errors |
-| `npm test` | **1427 passed / 109 files** |
-| `npx vitest run src/features/task-commands` | **338 passed / 11 files** |
+| `npm test` | **1462 passed / 109 files** |
+| `npx vitest run src/features/task-commands` | **373 passed / 11 files** |
 | `npm run build` | clean |
 | `deno check` (both entrypoints) | clean |
 | `deno test supabase/functions/` | 46 passed |
-| Mutation verification | 15 applied, **15 killed**, all reverted |
+| Mutation verification | 36 applied across three rounds, **36 killed**, all reverted |
 | CI `application` | pass |
 | CI `edge worker` | pass |
-| CI `database and journey` | pass — migrations from zero, 40 pgTAP assertions, `db lint`, foundation e2e on desktop and Pixel 7 |
+| CI `database and journey` | pass — migrations from zero, 48 pgTAP assertions, `db lint`, foundation e2e on desktop and Pixel 7 |
 
 Docker is unavailable on this workstation, so `supabase db reset`, `supabase test db` and `supabase db lint --local` **cannot run locally**. Draft PR #18's `database` job is the only execution path for them, and it is the evidence cited above — not a local run reported as one.
 
@@ -200,7 +228,8 @@ This is classified as a **non-blocking deployment dependency** for the slice ver
 - **Epic 2E-B's acceptance criteria (PRD §19.1) do not name a remote smoke.** They require every `2E-MATCH` requirement to pass; ranking deterministic, owner-scoped, ordered before truncation, overflow-aware and explainable; thresholds and margins in one versioned module; adversarial fixtures covering identical titles, near-equal candidates, cross-owner rows, ineligible statuses, overflowing sets and injection strings; a measured baseline; and no mutation. All of those are met.
 - The contrast is deliberate and visible in the PRD's own text: **Epic 2E-D explicitly requires "a disposable remote smoke and authenticated desktop/mobile journeys"**, and Epic 2E-B does not.
 - `2E-OPERATIONS-003` is an **Epic 2E-H** convergence requirement, and PRD §19.3 lists "every focused remote smoke" as a **phase-level** Definition of Done item, not a per-slice acceptance gate.
-- Slice 2E.1 set the same precedent within this phase for the same reason.
+
+The requirement's own text is per-slice ("Each slice has a focused disposable remote smoke"), and that is not disputed here — what is argued is only that Epic 2E-B's acceptance does not gate on it. **Slice 2E.1 is a related but weaker precedent, not the same one**, and an earlier draft of this section overstated it: 2E.1 recorded "none is owed yet" because it added no owner-scoped surface to smoke, and it still added executable `task_command` assertions to `scripts/remote-supabase-smoke.mjs` against a literal that already existed remotely. This slice's smoke is *owed* and blocked, and no executable assertions exist for it — `scripts/` contains no reference to `list_task_command_candidates`. What follows is therefore a specification, not deferred code.
 
 **What the smoke must prove when it runs** — recorded here so Slice 2E.8 inherits a specification rather than a reminder: disposable and owner-isolated with two owners; cross-owner non-disclosure (the other owner's identically-titled task **absent**, not outranked); `limit + 1` overflow detection; deterministic ordering across repeated executions; injection-pattern hints (`%`, `_`, embedded and trailing backslash) neither widening results nor raising `22025`; and complete fixture cleanup. Every one of these is already proven by pgTAP against a from-zero database; the smoke's distinct value is proving them against the **real project's** RLS, roles, and PostgREST exposure.
 
@@ -223,7 +252,7 @@ This is classified as a **non-blocking deployment dependency** for the slice ver
 | 2E-MATCH-015 (no fallback to "first result") | Met — a floor, not a preference |
 | 2E-MATCH-016 (one policy module) | Met — pinned by digest |
 | 2E-MATCH-017 (pure) | Met — instant and timezone injected; a designator-less instant is refused |
-| 2E-MATCH-018 (measured baseline) | Met, with the §5 scope stated |
+| 2E-MATCH-018 (measured baseline) | Met, with the §5 scope stated. Rates unchanged at `2026-07-25.3`: no corpus scenario carries a status hint |
 | 2E-OWNERSHIP-003 (no grant widened) | Met — and the tempting violation was explicitly rejected |
 | 2E-OPERATIONS-001 (additive, resets from zero) | Met — proven by the CI `database` job |
 | 2E-OPERATIONS-002 (generated-type parity) | **Met by a substituted mechanism.** Not regenerated; proven three ways. ADR-041 |

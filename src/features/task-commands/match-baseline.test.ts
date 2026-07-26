@@ -247,7 +247,7 @@ describe("match-quality baseline (2E-MATCH-018)", () => {
     // Pinned, not merely reported: a weight change that quietly turns an
     // ambiguity into a one-step apply has to come here and say so.
     expect(measured).toEqual({
-      policyVersion: "2026-07-25.2",
+      policyVersion: "2026-07-25.3",
       scenarios: 14,
       oneStep: 0.429,
       matchedNeedsDeliberateness: 0.071,

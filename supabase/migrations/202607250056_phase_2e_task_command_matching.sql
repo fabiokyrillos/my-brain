@@ -148,9 +148,19 @@ as $$
     -- `TASK_STATUSES` are the others) and it fails *silently*, so
     -- `status-vocabulary-parity.test.ts` reads this file and reds if it ever
     -- stops matching the taxonomy.
+    -- Bounded like every other argument, and for the same reason the hints are
+    -- (see below): PostgREST exposes this function directly, and this was the
+    -- one input a caller could make arbitrarily large. The bound is on the
+    -- *input* rather than the output, because `distinct` over a million-element
+    -- array does the work whatever the result size.
+    --
+    -- 32 against a vocabulary of 8: a legitimate caller sends at most the eight
+    -- literals, so the slice cannot drop a value the membership filter would
+    -- have kept, and the margin leaves room for duplicates without inventing a
+    -- reason for a well-formed command to fail.
     select array(
       select distinct s
-      from unnest(coalesce(p_eligible_statuses, '{}'::text[])) as s
+      from unnest((coalesce(p_eligible_statuses, '{}'::text[]))[1:32]) as s
       where s in (
         'inbox', 'todo', 'in_progress', 'waiting', 'blocked', 'deferred',
         'completed', 'cancelled'

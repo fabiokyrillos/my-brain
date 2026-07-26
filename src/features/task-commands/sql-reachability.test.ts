@@ -43,6 +43,7 @@ function shape(overrides: Partial<TaskCandidateShape> = {}): TaskCandidateShape 
     contextHintMatched: false,
     personHintMatched: false,
     effectiveLimit: TASK_MATCH_LIMITS.candidates,
+    observedBefore: "2026-07-25T12:00:00.000Z",
     ...overrides,
   };
 }
@@ -66,10 +67,30 @@ describe("the rules match the SQL that produces the rows", () => {
 
   it("tier 3 is returned only when every hint was empty", () => {
     expect(migration).toContain("else 3");
-    expect(migration).toContain(
-      "(q.q = '' and q.project_q = '' and q.context_q = '' and q.person_q = '')",
+    // Anchored as the *whole* predicate, not as two independent substrings.
+    // The tier-3 rule below is the one whose violation is a production raise,
+    // and it depends on this WHERE having exactly these two branches: a third
+    // OR-branch would leave two `toContain` assertions green while making
+    // tier-3 rows returnable alongside a hint.
+    expect(migration).toMatch(
+      /where\s*\n\s*\(q\.q = '' and q\.project_q = '' and q\.context_q = '' and q\.person_q = ''\)\s*\n\s*or tr\.tier <= 2\s*\n/,
     );
-    expect(migration).toContain("or tr.tier <= 2");
+  });
+
+  it("eligible statuses are bounded before they are scanned", () => {
+    // The bound is on the input array, not the result: `distinct` over a
+    // million elements does the work whatever the output size.
+    expect(migration).toContain("unnest((coalesce(p_eligible_statuses, '{}'::text[]))[1:32])");
+  });
+
+  it("every hint is truncated to the column it is compared against", () => {
+    // Pinned by nothing before this. These lengths are what stop an unbounded
+    // model-supplied hint turning the token lateral into an unbounded number of
+    // LIKE comparisons per candidate.
+    expect(migration).toContain("left(coalesce(p_title_query, ''), 240)");
+    expect(migration).toContain("left(coalesce(p_project_hint, ''), 160)");
+    expect(migration).toContain("left(coalesce(p_context_hint, ''), 120)");
+    expect(migration).toContain("left(coalesce(p_person_hint, ''), 160)");
   });
 
   it("overlap counts a subset of the hint's own token array", () => {

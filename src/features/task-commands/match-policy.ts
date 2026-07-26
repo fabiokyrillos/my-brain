@@ -13,14 +13,21 @@
  */
 
 /**
- * Bumped whenever any number in this module changes.
+ * Bumped whenever any number in this module changes, **or whenever the scorer's
+ * behaviour changes without one**.
+ *
+ * The second clause was added at `.3`, when a review found the status hint
+ * firing on every candidate of a single-eligible-status action — a scoring
+ * change that moved no number here. §10.4 exists so a recorded decision is
+ * attributable to the rules that produced it, and two different scoring
+ * behaviours sharing one version defeats exactly that.
  *
  * Distinct from `TASK_COMMAND_POLICY_VERSION` in `taxonomy.ts` on purpose:
  * §10.4 records a `match_policy_version` on every match decision and the
  * command-contract version on every proposal, and collapsing them would force a
  * prompt change to invalidate the attribution of every past match.
  */
-export const TASK_MATCH_POLICY_VERSION = "2026-07-25.2";
+export const TASK_MATCH_POLICY_VERSION = "2026-07-25.3";
 
 /**
  * How much each deterministic signal contributes (2E-MATCH-005).
@@ -95,11 +102,20 @@ export const TASK_MATCH_LIMITS = {
   /** ...and this close scores half of it. */
   temporalNearHours: 72,
   /**
-   * Decimal places every published score and margin is rounded to.
+   * Decimal places every published **score** is rounded to.
    *
    * Declared here rather than inlined in `roundScore` so it is inside the
    * digest: a review demonstrated that changing it to two left every pinned
    * score in the suite unchanged, which made a real precision change invisible.
+   *
+   * It does **not** govern the margin, and the earlier wording claiming "score
+   * and margin" was wrong. `calculateCandidateMargin` lives in
+   * `../interpretations/trust-policy` and hard-codes `1_000` — three places —
+   * outside this digest. The two agree today at 3, and nothing enforces that:
+   * changing this constant moves the digest while leaving margin precision
+   * where it was, and `minMargin` is compared against that unfollowed value.
+   * Unifying them means touching a shared interpretation-layer helper, which is
+   * not this slice's call to make; naming the seam is.
    */
   scoreDecimals: 3,
 } as const;

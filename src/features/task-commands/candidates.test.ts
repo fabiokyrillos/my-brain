@@ -197,6 +197,46 @@ describe("candidate query arguments", () => {
       }),
     ).rejects.toThrow(TaskCandidateQueryError);
   });
+
+  it.each([
+    "2026-07-25T12:00",
+    "2026-07-25T12:00:00",
+    "2026-07-25T12:00:00.000",
+    "2026-07-25",
+  ])("refuses %s, which Date.parse would read in the host's zone", async (instant) => {
+    // `rankTaskCandidates` already refuses these as a 2E-MATCH-017 violation,
+    // and this layer accepted them — so the query ran against a host-dependent
+    // instant before anything threw, making `p_observed_before`, the recency
+    // window and the audit cut-off depend on the machine. A caller using
+    // `loadTaskCandidates` alone got no error at all.
+    const { calls, client } = recordingClient({ data: [], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: instant,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_clock" });
+    // ...and it refused *before* querying, not after.
+    expect(calls).toHaveLength(0);
+  });
+
+  it("accepts the designator forms that are unambiguous", async () => {
+    const { client } = recordingClient({ data: [], error: null });
+
+    for (const instant of ["2026-07-25T12:00:00.000Z", "2026-07-25T12:00Z", "2026-07-25T09:00-03:00"]) {
+      await expect(
+        loadTaskCandidates({
+          client,
+          command: command({ action: "complete_task", titleWords: ["report"] }),
+          ownerId: OWNER,
+          now: instant,
+        }),
+      ).resolves.toEqual([]);
+    }
+  });
 });
 
 describe("what comes back", () => {
@@ -422,6 +462,33 @@ describe("what comes back", () => {
 
   it.each(unreachableRows)("refuses %s", async (_label, overrides) => {
     const { client } = recordingClient({ data: [sqlRow(overrides)], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "unreachable_row_shape" });
+  });
+
+  it.each([
+    ["the observation instant", { observed_before: "2026-07-25T11:00:00.000Z" }],
+    ["the effective limit", { effective_limit: 7 }],
+  ])("refuses a set whose rows disagree about %s", async (_label, overrides) => {
+    // `b.observed_before` and `b.lim` are single-row cross joins, exactly like
+    // `cardinality(q.tokens)`. The observation instant is the one that matters
+    // most: it is what 2E-UPDATE-003's TOCTOU gate will compare against, and a
+    // set carrying two of them means one of the pre-states was never observed
+    // at the instant the write would claim.
+    const { client } = recordingClient({
+      data: [
+        sqlRow(),
+        sqlRow({ task_id: "44444444-4444-4444-8444-444444444444", ...overrides }),
+      ],
+      error: null,
+    });
 
     await expect(
       loadTaskCandidates({

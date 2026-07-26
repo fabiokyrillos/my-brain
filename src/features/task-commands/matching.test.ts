@@ -8,6 +8,7 @@ import {
   TASK_MATCH_WEIGHTS,
 } from "./match-policy";
 import {
+  TaskMatchInputError,
   describeUnreachableCandidates,
   eligibleStatusesFor,
   rankTaskCandidates,
@@ -420,6 +421,237 @@ describe("thresholds are inclusive at the boundary (2E-MATCH-011/015)", () => {
   });
 });
 
+/**
+ * The correction pass fixed four review Criticals and covered none of them by
+ * test. A mutation run then proved every one of those fixes could be deleted
+ * with the suite still green. These are the fixtures that make the fixes real.
+ */
+describe("the guards the correction pass added (regression)", () => {
+  it("refuses to score the relation the requested action is about to write", () => {
+    // Critical #4. `assign_project` with a project hint of "Acme" scored the
+    // task *already* in Acme above the one the user meant. For `set_waiting_on`
+    // that is worse than a no-op: a person merely `involved` boosted a task
+    // that then received a real `waiting_on` row, one step, unconfirmed.
+    const relationCases = [
+      { action: "assign_project", hints: { project: "Acme" }, patch: { projectRef: "Acme" }, hit: "projectHintMatched" },
+      { action: "assign_context", hints: { context: "Work" }, patch: { contextRef: "Work" }, hit: "contextHintMatched" },
+      { action: "assign_person", hints: { person: "Ana" }, patch: { personRef: "Ana" }, hit: "personHintMatched" },
+      { action: "set_waiting_on", hints: { person: "Ana" }, patch: { personRef: "Ana" }, hit: "personHintMatched" },
+    ] as const;
+
+    for (const relationCase of relationCases) {
+      const result = rank(
+        [exactRow("t1", { [relationCase.hit]: true })],
+        command({
+          action: relationCase.action,
+          titleWords: ["report"],
+          ...relationCase.hints,
+          patch: relationCase.patch,
+        }),
+      );
+
+      expect(result.candidates[0].evidence).not.toContain("referenced_project");
+      expect(result.candidates[0].evidence).not.toContain("referenced_context");
+      expect(result.candidates[0].evidence).not.toContain("referenced_person");
+      // 0.82 is the title ladder alone: the relation contributed nothing.
+      expect(result.topScore).toBe(0.82);
+    }
+  });
+
+  it("still scores a relation the requested action does not write", () => {
+    // The guard must not be a blanket "ignore relation hints": for an action
+    // that writes no relation, the hint is ordinary evidence.
+    const result = rank(
+      [exactRow("t1", { projectHintMatched: true })],
+      command({ action: "complete_task", titleWords: ["report"], project: "Acme" }),
+    );
+
+    expect(result.candidates[0].evidence).toContain("referenced_project");
+  });
+
+  it("cannot be carried from ambiguous to a one-step apply by one relation hint", () => {
+    // The calibration this Critical turned on: two identically-titled tasks,
+    // one of which the hint matches. At 0.12 the hint alone closed the margin
+    // and applied. At 0.1 it cannot.
+    const result = rank(
+      [exactRow("t1", { projectHintMatched: true }), exactRow("t2")],
+      command({ action: "complete_task", titleWords: ["invoice"], project: "Acme" }),
+    );
+
+    expect(result.margin).toBeLessThan(TASK_MATCH_THRESHOLDS.minMargin);
+    expect(result.outcome).toBe("ambiguous");
+    expect(result.oneStep).toBe(false);
+  });
+
+  it("scores nothing for an audit row newer than the observation instant", () => {
+    // Critical #3. A garbage clock used to award every task full recency;
+    // clamping the age at zero is what stopped it, and deleting the clamp
+    // manufactures a one-step apply out of a bad timestamp.
+    const future = new Date(Date.parse(NOW) + 14 * 86_400_000).toISOString();
+    const result = rank(
+      [exactRow("t1", { lastAuditedAt: future }), exactRow("t2")],
+      command({ action: "complete_task", titleWords: ["invoice"] }),
+    );
+
+    expect(result.candidates[0].evidence).not.toContain("recent_activity");
+    expect(result.margin).toBe(0);
+    expect(result.outcome).toBe("ambiguous");
+  });
+
+  it("refuses an instant without a timezone designator", () => {
+    // Critical #3, the other half: `Date.parse("2026-07-25T12:00")` is defined
+    // to be *local* time, so the same command scored on two machines produced
+    // two outcomes.
+    const rows = [exactRow("t1")];
+    const cmd = command({ action: "complete_task", titleWords: ["report"] });
+
+    expect(() => rankTaskCandidates({
+      command: cmd, rows, ownerId: OWNER, now: "2026-07-25T12:00", timeZone: TIME_ZONE,
+    })).toThrow(TaskMatchInputError);
+    expect(() => rankTaskCandidates({
+      command: cmd, rows, ownerId: OWNER, now: "not a date", timeZone: TIME_ZONE,
+    })).toThrow(TaskMatchInputError);
+    expect(() => rankTaskCandidates({
+      command: cmd, rows, ownerId: OWNER, now: new Date(Number.NaN), timeZone: TIME_ZONE,
+    })).toThrow(TaskMatchInputError);
+  });
+
+  it("does not credit a status hint that every eligible candidate must satisfy", () => {
+    // `reopen_task` is eligible only from `completed`, so a hint of "completed"
+    // fires on every candidate and separates none of them — while inflating the
+    // score against the threshold. A review proved "reopen the completed report
+    // task" reached a one-step apply that "reopen the report task" did not.
+    // 0.22 + 0.1 + 0.1 + 0.1 = 0.52, just under the 0.55 threshold. The
+    // tautological hint would have added 0.08 and carried it to a one-step
+    // apply — so "reopen the completed report task" applied where "reopen the
+    // report task" asked.
+    const rows = () => [row({
+      taskId: "t1",
+      status: "completed",
+      prefilterTier: 2,
+      tokenOverlap: 1,
+      queryTokenCount: 1,
+      projectHintMatched: true,
+      contextHintMatched: true,
+      personHintMatched: true,
+    })];
+    const hints = { titleWords: ["report"], project: "Acme", context: "Work", person: "Ana" };
+
+    const withHint = rank(rows(), command({ action: "reopen_task", ...hints, status: "completed" }));
+    const withoutHint = rank(rows(), command({ action: "reopen_task", ...hints }));
+
+    expect(withHint.topScore).toBe(withoutHint.topScore);
+    expect(withHint.candidates[0].evidence).not.toContain("status_match");
+    expect(withHint.outcome).toBe(withoutHint.outcome);
+    expect(withHint.outcome).toBe("ambiguous");
+    expect(withHint.oneStep).toBe(false);
+  });
+
+  it("still credits a status hint that can separate candidates", () => {
+    // `complete_task` is eligible from six statuses, so naming one is real
+    // evidence rather than a tautology.
+    const result = rank(
+      [exactRow("t1", { status: "blocked" })],
+      command({ action: "complete_task", titleWords: ["report"], status: "blocked" }),
+    );
+
+    expect(result.candidates[0].evidence).toContain("status_match");
+  });
+
+  it("never resolves an ambiguous destructive action into a confirmation prompt", () => {
+    // Identification confidence is settled before action gravity is consulted.
+    // Hoisting the confirmation branch above the ambiguity branch would offer a
+    // single confirm control for an arbitrary one of two identical tasks — a
+    // cancellation applied to a task the user never identified.
+    for (const action of TASK_COMMAND_ACTIONS) {
+      const policy = actionPolicy(action);
+      if (!policy.requiresConfirmation) continue;
+      const result = rank(
+        [exactRow("t1"), exactRow("t2")],
+        command({ action, titleWords: ["invoice"], patch: patchFor(action) }),
+      );
+
+      expect(result.outcome).toBe("ambiguous");
+      expect(result.candidates).toHaveLength(2);
+      expect(result.oneStep).toBe(false);
+    }
+  });
+});
+
+describe("published score, ordering score, and the clamp between them", () => {
+  it("publishes within 0..1 while ordering on the uncapped value", () => {
+    // The weights can sum past 1. Clamping made a candidate with eight fired
+    // signals tie with one that had seven — which can only ever *cause*
+    // ambiguity, never a false match, but it also reversed their order in the
+    // disambiguation list. Both halves are asserted here because a mutation run
+    // proved each survived on its own.
+    // The titles are chosen so the tie-break *disagrees* with the score order:
+    // if the comparator ever ranks on the published (capped) score, these two
+    // tie at 1.0 and fall through to the title, which puts the weaker candidate
+    // first. With equal titles the mutation was invisible.
+    const eight = exactRow("t1", {
+      title: "z-eight-signals",
+      status: "blocked",
+      projectHintMatched: true,
+      contextHintMatched: true,
+      personHintMatched: true,
+      lastAuditedAt: "2026-07-25T11:00:00.000Z",
+      dueAt: TOMORROW,
+    });
+    const seven = exactRow("t2", {
+      title: "a-seven-signals",
+      status: "blocked",
+      projectHintMatched: true,
+      contextHintMatched: true,
+      personHintMatched: true,
+      dueAt: TOMORROW,
+    });
+
+    const result = rank([seven, eight], command({
+      action: "complete_task",
+      titleWords: ["report"],
+      project: "Acme",
+      context: "Work",
+      person: "Ana",
+      status: "blocked",
+      temporalPhrase: "tomorrow",
+    }));
+
+    // PRD §7's contract: nothing published above 1.
+    for (const candidate of result.candidates) {
+      expect(candidate.score).toBeLessThanOrEqual(1);
+    }
+    expect(result.topScore).toBe(1);
+    // ...and the richer candidate still sorts first, despite tying once capped.
+    expect(result.candidates.map((candidate) => candidate.taskId)).toEqual(["t1", "t2"]);
+  });
+
+  it("clamps the overlap fraction for a caller that skipped the reachability check", () => {
+    // `describeUnreachableCandidates` refuses `tokenOverlap > queryTokenCount`,
+    // so this row cannot come from `loadTaskCandidates`. The clamp is the
+    // defence for a caller that assembled rows some other way, and it is
+    // reachable only by calling the ranker directly — which is why no fixture
+    // covered it.
+    const overClaiming = rankTaskCandidates({
+      command: command({ action: "complete_task", titleWords: ["a", "b"] }),
+      rows: [row({ taskId: "t1", prefilterTier: 2, tokenOverlap: 8, queryTokenCount: 2 })],
+      ownerId: OWNER,
+      now: NOW,
+      timeZone: TIME_ZONE,
+    });
+    const honest = rankTaskCandidates({
+      command: command({ action: "complete_task", titleWords: ["a", "b"] }),
+      rows: [row({ taskId: "t1", prefilterTier: 2, tokenOverlap: 2, queryTokenCount: 2 })],
+      ownerId: OWNER,
+      now: NOW,
+      timeZone: TIME_ZONE,
+    });
+
+    expect(overClaiming.topScore).toBe(honest.topScore);
+    expect(overClaiming.topScore).toBe(TASK_MATCH_WEIGHTS.tokenOverlap);
+  });
+});
+
 describe("ownership and eligibility (2E-MATCH-001/002)", () => {
   it("drops a row belonging to another owner", () => {
     const result = rank(
@@ -607,6 +839,133 @@ describe("temporal proximity", () => {
 
     expect(result.candidates[0].evidence).not.toContain("temporal_proximity");
     expect(result.candidates[0].evidence).not.toContain("temporal_proximity_near");
+  });
+
+  it("takes the nearer of due and planned, not due unconditionally", () => {
+    // "move my dentist thing": a task planned for the hinted day but due next
+    // year is exactly what the user means, and preferring `due_at` lost it to a
+    // task merely due that day. No fixture carried both dates, so swapping the
+    // min for a max survived the whole suite.
+    const result = rank(
+      [exactRow("t1", {
+        plannedAt: TOMORROW,
+        dueAt: new Date(hintMs + 365 * 24 * 3_600_000).toISOString(),
+      })],
+      command({ action: "complete_task", titleWords: ["report"], temporalPhrase: "tomorrow" }),
+    );
+
+    expect(result.candidates[0].evidence).toContain("temporal_proximity");
+  });
+});
+
+describe("labels claim only what the score supports (2E-MATCH-014/015)", () => {
+  it("does not label a token overlap that contributed nothing", () => {
+    // 2E-DISAMBIG-001 renders these to the user, so "shares wording" against a
+    // contribution of zero is a claim the score does not support.
+    const result = rank(
+      [row({
+        taskId: "t1",
+        prefilterTier: 2,
+        tokenOverlap: 0,
+        queryTokenCount: 3,
+        projectHintMatched: true,
+      })],
+      command({ action: "complete_task", titleWords: ["a", "b", "c"], project: "Acme" }),
+    );
+
+    expect(result.candidates[0].evidence).not.toContain("normalized_token_overlap");
+    expect(result.candidates[0].evidence).toContain("referenced_project");
+  });
+
+  it("does not label recency whose contribution rounds away", () => {
+    // One second inside a fourteen-day window contributes ~5e-9, which rounds
+    // to zero. Labelling it would tell the user "recently active" on the
+    // strength of nothing.
+    const almostStale = new Date(
+      Date.parse(NOW) - (TASK_MATCH_LIMITS.recencyWindowDays * 86_400_000 - 1_000),
+    ).toISOString();
+
+    const result = rank(
+      [exactRow("t1", { lastAuditedAt: almostStale })],
+      command({ action: "complete_task", titleWords: ["report"] }),
+    );
+
+    expect(result.candidates[0].evidence).not.toContain("recent_activity");
+    expect(result.topScore).toBe(0.82);
+  });
+
+  it("accepts a candidate sitting exactly on the floor", () => {
+    // 2E-MATCH-015's floor is `>=`. The only fixture landing on 0.1 did so
+    // incidentally, in the baseline corpus, so tightening it to `>` here was
+    // invisible.
+    const result = rank(
+      [row({ taskId: "t1", prefilterTier: 2, tokenOverlap: 0, queryTokenCount: 4, projectHintMatched: true })],
+      command({ action: "complete_task", titleWords: ["a", "b", "c", "d"], project: "Acme" }),
+    );
+
+    expect(result.candidates[0].score).toBe(TASK_MATCH_THRESHOLDS.minCandidateScore);
+    expect(result.qualifyingCount).toBe(1);
+  });
+
+  it("drops a candidate one rounding step below the floor", () => {
+    const result = rank(
+      [row({ taskId: "t1", prefilterTier: 2, tokenOverlap: 2, queryTokenCount: 5 })],
+      command({ action: "complete_task", titleWords: ["a", "b", "c", "d", "e"] }),
+    );
+
+    expect(result.candidates[0]).toBeUndefined();
+    expect(result.qualifyingCount).toBe(0);
+    expect(result.outcome).toBe("unmatched");
+  });
+});
+
+describe("cross-row agreement on the values SQL computes once", () => {
+  it("reports the earliest observation, not the first row's", () => {
+    // This value guards 2E-UPDATE-003's TOCTOU check and feeds
+    // 2E-PREVIEW-004's fingerprint, and it was read from `rows[0]` on trust —
+    // even when that row is dropped moments later as cross-owner.
+    const earlier = "2026-07-25T11:59:00.000Z";
+    const result = rankTaskCandidates({
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      rows: [
+        exactRow("t1", { ownerId: OTHER_OWNER, observedBefore: NOW }),
+        exactRow("t2", { observedBefore: earlier }),
+      ],
+      ownerId: OWNER,
+      now: NOW,
+      timeZone: TIME_ZONE,
+    });
+
+    expect(result.observedBefore).toBe(earlier);
+  });
+
+  it("reports no observation at all when one is unreadable", () => {
+    const result = rankTaskCandidates({
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      rows: [exactRow("t1", { observedBefore: "not a date" })],
+      ownerId: OWNER,
+      now: NOW,
+      timeZone: TIME_ZONE,
+    });
+
+    expect(result.observedBefore).toBeNull();
+  });
+
+  it("reads the smallest declared limit, not the first row's", () => {
+    const rows = [
+      exactRow("t1", { effectiveLimit: 25 }),
+      exactRow("t2", { effectiveLimit: 1 }),
+    ];
+
+    const result = rankTaskCandidates({
+      command: command({ action: "complete_task", titleWords: ["report"] }),
+      rows,
+      ownerId: OWNER,
+      now: NOW,
+      timeZone: TIME_ZONE,
+    });
+
+    expect(result.overflowed).toBe(true);
   });
 });
 

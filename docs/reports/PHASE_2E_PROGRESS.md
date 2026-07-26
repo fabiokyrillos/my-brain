@@ -44,7 +44,7 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | # | Item | Disposition |
 |---|---|---|
 | 1 | Boundary mutation survivors | **Closed.** Fixtures at exactly the declared limit, exactly 0.55, exactly 0.12, seven qualifying candidates against a cap of five, and exactly 24h/72h temporal bands |
-| 2 | `localeCompare` survived | **Closed.** `"B"` vs `"a"` behavioural fixture, plus a structural guard over all three matching modules forbidding `.localeCompare(` and `Intl.Collator(`, extended into the existing normalizer-divergence architecture guard |
+| 2 | `localeCompare` survived | **Closed.** `"B"` vs `"a"` behavioural fixture, plus a structural guard forbidding `.localeCompare(` and `Intl.Collator(`, extended into the existing normalizer-divergence architecture guard. The acceptance review defeated the first version by *moving* the comparator to a new module, so the guard now enumerates the feature directory instead of a hard-coded file list |
 | 3 | Relation arguments permutable undetected | **Closed.** Three distinct values, each asserted by name |
 | 4 | Row-schema refinements untested | **Closed.** Table-driven over 17 invalid values and 14 missing keys, asserting the **specific** error code so a removed refinement cannot pass on the strength of a different layer |
 | 5 | Corpus triples not provably reachable | **Closed.** `describeUnreachableCandidates` in `matching.ts`, pinned against the migration text by `sql-reachability.test.ts`, enforced by `loadTaskCandidates`, asserted over every fixture in both corpora. One fixture was genuinely unreachable and was corrected |
@@ -52,22 +52,22 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | 7 | No slice report; `STATE`/`CHANGELOG`/`DECISIONS` untouched | **Closed.** `PHASE_2E_SLICE_02_REPORT.md`, plus **ADR-040** (security definer) and **ADR-041** (hand-maintained type, three-way parity) |
 | 8 | 2E-OPERATIONS-003 focused remote smoke | **Recorded as owed and blocked on deployment; not run, not claimed.** Non-blocking for the verdict — Epic 2E-B's criteria do not name one, and PRD §19.3 makes it a phase-level gate. Slice report §11, `TODO.md` |
 | 9 | Rollback undocumented | **Closed.** Slice report §10: routing-level, nothing calls it, no index or trigger changed any write path, no destructive down migration, and the grant posture on rollback |
-| 10 | Injection-string fixtures | **Closed.** `_`, embedded backslash, trailing backslash (the `22025` case), a wholly-metacharacter hint proven equal to an absent one, owner scope under a bare wildcard, and ordering stability. Plan 34 → 40 |
+| 10 | Injection-string fixtures | **Closed.** `_`, embedded backslash, trailing backslash (the `22025` case), a wholly-metacharacter hint proven equal to an absent one *and pinned to 4*, owner scope under a bare wildcard, and ordering stability. Plan 34 → 48, after the acceptance review added symmetric cross-owner absence, owner-scoped relation laterals, and the limit clamp at 0/101/null |
 | 11 | `SECURITY.md` has no entry | **Closed.** A full Phase 2E Slice 2E.2 section, including the residual impact if the ownership predicate regresses |
 
 ### Mutation verification
 
-Fifteen mutations were applied one at a time, run against the focused suite, and reverted. **All fifteen are killed.** The list and what each would have broken is in the slice report §8.
+Thirty-six mutations were applied one at a time across three rounds, run against the focused suite, and reverted. **All thirty-six are killed.** The fifteen from the sixth review are enumerated in the slice report §8, followed by the twenty-one the acceptance review added - including four that deleted this slice's own correction-pass fixes without reddening anything.
 
 ## The measured 2E-MATCH-018 baseline
 
-At policy version `2026-07-25.2`: one-step 0.429 · matched-needs-deliberateness 0.071 · confirmation-required 0.071 · ambiguous (incl. overflow) 0.214 · no-match 0.214.
+At policy version `2026-07-25.3`: one-step 0.429 · matched-needs-deliberateness 0.071 · confirmation-required 0.071 · ambiguous (incl. overflow) 0.214 · no-match 0.214.
 
 **State the scope when citing these.** The 14-scenario corpus supplies `prefilterTier`/`tokenOverlap`/`queryTokenCount` by hand, so the rates measure the *scoring layer against declared SQL verdicts*, not end-to-end matching. Every triple is now proven to be one SQL can actually emit, which the caveat did not previously cover. Slice 2E.8 must carry the rates into the phase report with that scope attached.
 
 ## Local gates on HEAD
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **1427 passed / 109 files** · focused `src/features/task-commands` **338 passed / 11 files** · `build` clean · `deno check` clean · `deno test` 46 passed.
+`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **1462 passed / 109 files** · focused `src/features/task-commands` **373 passed / 11 files** · `build` clean · `deno check` clean · `deno test` 46 passed.
 
 ## Next: Slice 2E.3 — Disambiguation and read-only preview (Epic 2E-C)
 

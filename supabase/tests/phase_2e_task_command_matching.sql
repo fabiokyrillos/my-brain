@@ -13,7 +13,7 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(40);
+select plan(48);
 
 -- Contract: signature, security, grants ------------------------------------
 
@@ -115,7 +115,12 @@ insert into auth.users (
   ('42222222-2222-4222-8222-222222222222', 'authenticated', 'authenticated', 'match-two@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 insert into public.projects (id, user_id, name) values
-  ('41000009-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Acme');
+  ('41000009-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', 'Acme'),
+  -- A second owner's project with the *same* name. The output laterals filter
+  -- on `r.user_id` and join on `p.user_id = tp.user_id`; nothing proved that
+  -- until there was a same-named row on the other side of the boundary to
+  -- confuse them.
+  ('42000009-2222-4222-8222-222222222222', '42222222-2222-4222-8222-222222222222', 'Acme');
 
 insert into public.tasks (id, user_id, title, status, created_at) values
   ('41000001-1111-4111-8111-111111111111', '41111111-1111-4111-8111-111111111111', U&'Relat\00F3rio final', 'todo', now() - interval '5 days'),
@@ -289,6 +294,27 @@ select is(
   'the second owner sees exactly its own matching task and none of the first owner''s'
 );
 
+-- Asserted as *absence*, matching the first direction. The count above already
+-- implies it given these fixtures, but this file's header claims absence is
+-- proven in both directions, and a count is not that claim. Under `security
+-- definer` these assertions are the ownership proof rather than a second
+-- opinion, so the two directions are held to the same standard.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', null, null, null, now(), 25)
+   where owner_id <> '42222222-2222-4222-8222-222222222222'),
+  0,
+  'and no candidate it receives carries the first owner'
+);
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], U&'relat\00F3rio', null, null, null, now(), 25)
+   where task_id = '41000001-1111-4111-8111-111111111111'),
+  0,
+  'the first owner''s identically-titled task is absent for the second owner too'
+);
+
 reset role;
 select set_config('request.jwt.claims', '', true);
 set local role authenticated;
@@ -322,6 +348,51 @@ select is(
      array[]::text[], U&'relat\00F3rio', null, null, null, now(), 25)),
   0,
   'an empty eligible set yields no candidates at all'
+);
+
+-- The projected relations are the caller's own ------------------------------
+
+select is(
+  (select project_names from public.list_task_command_candidates(
+     array['todo'], null, 'Acme', null, null, now(), 25)
+   where task_id = '41000006-1111-4111-8111-111111111111'),
+  array['Acme'],
+  'the relation projection carries the caller''s project and not the identically-named one next door'
+);
+
+select is(
+  (select project_ids from public.list_task_command_candidates(
+     array['todo'], null, 'Acme', null, null, now(), 25)
+   where task_id = '41000006-1111-4111-8111-111111111111'),
+  array['41000009-1111-4111-8111-111111111111'::uuid],
+  'and it is the caller''s project id, so a preview cannot link the wrong row'
+);
+
+-- The limit clamp, at the bounds the TypeScript layer raises outside of -------
+--
+-- `describeUnreachableCandidates` refuses an `effective_limit` outside [1,100],
+-- so these are the values whose drift is an outage rather than a nuisance, and
+-- only `p_limit = 1` was ever exercised.
+
+select is(
+  (select distinct effective_limit from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 0)),
+  1,
+  'a limit of zero clamps up to one rather than returning nothing'
+);
+
+select is(
+  (select distinct effective_limit from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 101)),
+  100,
+  'a limit above the ceiling clamps down to one hundred'
+);
+
+select is(
+  (select distinct effective_limit from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), null)),
+  25,
+  'and a null limit falls back to the declared default'
 );
 
 -- The hint cannot widen its own pattern -------------------------------------
@@ -377,12 +448,22 @@ select is(
 -- candidate and the overflow flag is what says the truncation was arbitrary.
 -- What it must not do is reach further than an absent hint would - across the
 -- eligible statuses, or across the owner boundary.
+-- Pinned to 4, not merely compared against the null-hint call: two counts
+-- compared against each other are both satisfied by zero, so the assertion
+-- survived the function regressing to returning nothing at all.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], '%_' || chr(92), null, null, null, now(), 25)),
+  4,
+  'a wholly-metacharacter hint returns the caller''s four eligible tasks, exactly as an absent hint does'
+);
+
 select is(
   (select count(*)::integer from public.list_task_command_candidates(
      array['todo'], '%_' || chr(92), null, null, null, now(), 25)),
   (select count(*)::integer from public.list_task_command_candidates(
      array['todo'], null, null, null, null, now(), 25)),
-  'a wholly-metacharacter hint is exactly an absent hint, never a wider one'
+  'and it is the same set an absent hint produces, never a wider one'
 );
 
 select is(

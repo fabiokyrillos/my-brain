@@ -82,7 +82,11 @@ describe("policy digest", () => {
       TASK_MATCH_SCORE_BANDS,
     ];
     expect({ version: TASK_MATCH_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.2",
+      // `.3` moved the version without moving the digest: the status hint
+      // stopped firing for single-eligible-status actions, which changes what
+      // the scorer decides while changing no number in the policy module. The
+      // version tracks the scorer's behaviour, not only these constants.
+      version: "2026-07-25.3",
       digest: "2354d889a2db7e15",
     });
   });

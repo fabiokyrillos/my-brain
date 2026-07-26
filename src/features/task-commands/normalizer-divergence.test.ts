@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -165,11 +165,16 @@ describe("normalizer divergence (2E-MATCH-008)", () => {
   });
 
   it("runs every corpus entry in SQL and nothing else", () => {
-    // The count is what closes co-drift. Both corpora agreeing is only evidence
-    // if the SQL side is *executing* all of them: without this, deleting an
-    // entry from both files leaves the suite green, and so does adding one to
-    // this file that pgTAP never runs. The runtime proof is pgTAP's; this makes
-    // sure the proof covers the whole corpus.
+    // What this actually closes, stated precisely, because the first version of
+    // this comment claimed more than the assertion delivers: it catches a pgTAP
+    // corpus assertion with no CORPUS entry, and an entry commented out or
+    // deleted on the SQL side alone.
+    //
+    // It does *not* catch co-drift. Deleting an entry from both files leaves
+    // `7 === 7` and stays green, and so does a coordinated three-line edit that
+    // changes an expected value in both files plus `plan(N)`. Only executing
+    // the SQL catches that, which pgTAP does from an empty database on every
+    // push - and `plan(40)` is what objects if the count moves without the plan.
     const executed = pgTap.match(/^select is\(public\.normalize_entity_alias\(/gm) ?? [];
     expect(executed).toHaveLength(CORPUS.length);
   });
@@ -211,7 +216,14 @@ describe("normalizer divergence (2E-MATCH-008)", () => {
 });
 
 describe("the authoritative normalizer is the only one matching consults", () => {
-  const sources = ["matching.ts", "candidates.ts", "match-policy.ts"] as const;
+  // Enumerated from the directory, not hard-coded. A review moved the title
+  // comparator into a new sibling module that called `localeCompare` and the
+  // guard stayed green - it had stopped applying to the code it was written for
+  // the moment that code moved. Reading the directory means a new module is
+  // covered on the day it is added rather than the day someone remembers.
+  const sources = readdirSync(path.resolve(process.cwd(), FEATURE_DIR))
+    .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+    .sort();
 
   it.each(sources)("%s neither imports nor calls the TypeScript normalizer", (file) => {
     const text = source(`${FEATURE_DIR}/${file}`);

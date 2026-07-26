@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { Database } from "@/lib/supabase/database.types";
 
 import {
+  ISO_INSTANT,
   describeUnreachableCandidates,
   eligibleStatusesFor,
   type TaskCandidateRow,
@@ -176,6 +177,21 @@ export async function loadTaskCandidates(
   // Parsed before it is formatted: `new Date("not a date").toISOString()` throws
   // a bare RangeError, and an unclassified crash on the way to a candidate
   // query is not a failure a caller can map to copy.
+  //
+  // A string must carry a timezone designator, exactly as `rankTaskCandidates`
+  // requires. `Date.parse("2026-07-26T00:30")` is defined to be *local* time, so
+  // without this check the instant this function sends as `p_observed_before` —
+  // and therefore the recency window, the audit cut-off and the observation
+  // instant echoed back for a later TOCTOU gate — depend on the machine. That
+  // the ranker throws afterwards is no defence: the query has already run
+  // against the wrong instant, and a caller using this function alone gets a
+  // silently host-dependent answer.
+  if (typeof now === "string" && !ISO_INSTANT.test(now)) {
+    throw new TaskCandidateQueryError(
+      "injected instant must be ISO-8601 with a timezone designator",
+      "invalid_clock",
+    );
+  }
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   if (!Number.isFinite(nowMs)) {
     throw new TaskCandidateQueryError("injected instant is not a valid date", "invalid_clock");

@@ -192,8 +192,15 @@ export type TaskMatchInput = {
 const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
 
-/** Full ISO-8601 with an explicit offset or `Z`. Mirrors `temporal.ts`. */
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+/**
+ * Full ISO-8601 with an explicit offset or `Z`. Mirrors `temporal.ts`.
+ *
+ * Exported so `candidates.ts` applies the identical rule rather than writing a
+ * third copy: the data-access layer must refuse a zone-less instant for the same
+ * reason this module does, and a second regex that drifted would leave one of
+ * the two layers host-dependent.
+ */
+export const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function instantMs(value: string | Date | null): number | null {
   if (value === null) return null;
@@ -258,6 +265,23 @@ function writesRelation(action: TaskCommandAction, field: "project" | "context" 
   return changed.includes("task_people:involved") || changed.includes("task_people:waiting_on");
 }
 
+/**
+ * The earliest instant any row was observed against, or null for no rows.
+ *
+ * An unparseable value is not silently skipped: it makes the whole answer
+ * unknown, because "the earliest of the ones I could read" is a stronger claim
+ * than the data supports and this value guards a write.
+ */
+function earliestObservation(rows: readonly TaskCandidateRow[]): string | null {
+  let earliest: { value: string; ms: number } | null = null;
+  for (const row of rows) {
+    const ms = instantMs(row.observedBefore);
+    if (ms === null) return null;
+    if (earliest === null || ms < earliest.ms) earliest = { value: row.observedBefore, ms };
+  }
+  return earliest?.value ?? null;
+}
+
 type ScoredCandidate = RankedTaskCandidate & { readonly rawScore: number };
 
 function scoreRow(input: {
@@ -300,12 +324,29 @@ function scoreRow(input: {
   }
 
   // The status hint was canonicalized to one of the eight literals by
-  // `validateTaskCommand`, so this is a comparison and never a parse. It is
-  // skipped when the hint names the same status the patch is about to set,
-  // because then it describes the destination rather than the current state.
+  // `validateTaskCommand`, so this is a comparison and never a parse.
+  //
+  // It is skipped in two cases, both of which are hints that cannot separate one
+  // candidate from another:
+  //
+  //   1. the hint names the status the patch is about to set, so it describes
+  //      the destination rather than the current state;
+  //   2. the action has a single eligible source status. `isEligibleStatus`
+  //      already guarantees every candidate holds it, so the hint fires on all
+  //      of them, discriminates nothing, and only inflates the score against a
+  //      threshold. A review proved the consequence: under `reopen_task`, "the
+  //      completed report task" reached a one-step apply that "the report task"
+  //      did not, on a word that excluded no candidate.
   const statusHint = command.targetHints.status;
+  const eligible = actionPolicy(command.action).eligibleFrom;
   const describesDestination = statusHint !== undefined && command.patch.status === statusHint;
-  if (statusHint !== undefined && statusHint === row.status && !describesDestination) {
+  const canSeparateCandidates = eligible.length > 1;
+  if (
+    statusHint !== undefined
+    && statusHint === row.status
+    && !describesDestination
+    && canSeparateCandidates
+  ) {
     score += TASK_MATCH_WEIGHTS.statusMatch;
     evidence.push("status_match");
   }
@@ -463,7 +504,17 @@ export function rankTaskCandidates(input: TaskMatchInput): TaskMatchResult {
     destructive: policy.destructive,
     qualifyingCount: qualifying.length,
     ownerId,
-    observedBefore: rows.length > 0 ? rows[0].observedBefore : null,
+    // The *earliest* observation, not the first row's.
+    //
+    // SQL cross-joins one `observed_before` onto every row, so in practice they
+    // agree — `loadTaskCandidates` raises if they do not. But this value is what
+    // 2E-UPDATE-003's TOCTOU gate will compare against and what 2E-PREVIEW-004
+    // will hash, and it was being read from `rows[0]` on trust, even when that
+    // row is dropped moments later as cross-owner or ineligible. The same
+    // argument that makes `effectiveLimit` a minimum applies here and more
+    // sharply: of two disagreeing instants the earlier is the weaker claim, and
+    // a gate should be built on the weaker one.
+    observedBefore: earliestObservation(rows),
     matchPolicyVersion: TASK_MATCH_POLICY_VERSION,
   } as const;
 
@@ -541,6 +592,7 @@ export type TaskCandidateShape = {
   readonly contextHintMatched: boolean;
   readonly personHintMatched: boolean;
   readonly effectiveLimit: number;
+  readonly observedBefore: string;
 };
 
 function describeUnreachableRow(row: TaskCandidateShape): string | null {
@@ -637,12 +689,21 @@ export function describeUnreachableCandidates(
     const reason = describeUnreachableRow(row);
     if (reason !== null) return `row ${index}: ${reason}`;
   }
-  // `query_token_count` is `cardinality(q.tokens)`, computed once per query and
-  // cross-joined onto every row, so one result set carrying two different values
-  // is a broken contract rather than an unusual query.
-  const counts = [...new Set(rows.map((row) => row.queryTokenCount))];
-  if (counts.length > 1) {
-    return `query token count differs across one result set (${counts.sort((left, right) => left - right).join(", ")}), and SQL computes it once per query`;
-  }
-  return null;
+  // Three values are computed once per query and cross-joined onto every row —
+  // `cardinality(q.tokens)`, `b.lim` and `b.observed_before` — so a result set
+  // carrying two of any of them is a broken contract rather than an unusual
+  // query. All three are checked, because a review found the defence applied to
+  // one and not the other two, and `observed_before` is the one that will guard
+  // a write in Slice 2E.4.
+  const disagreement = (label: string, values: readonly (string | number)[]): string | null => {
+    const distinct = [...new Set(values)];
+    if (distinct.length <= 1) return null;
+    return `${label} differs across one result set (${distinct.slice(0, 4).map(String).sort().join(", ")}), and SQL computes it once per query`;
+  };
+
+  return (
+    disagreement("query token count", rows.map((row) => row.queryTokenCount))
+    ?? disagreement("effective limit", rows.map((row) => row.effectiveLimit))
+    ?? disagreement("observation instant", rows.map((row) => row.observedBefore))
+  );
 }
