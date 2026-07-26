@@ -89,6 +89,16 @@
 -- `sent` hourly with no user act, so gating a write on it would manufacture a
 -- stale refusal on a cron tick.
 --
+-- **The patch's `description` is bounded by what an append can produce, not by the
+-- note's own 2000.** `append_note`'s canonical patch is the *concatenation*
+-- `pre.description || E'\n\n' || note` (`preview.ts:429-437`), and PRD
+-- 2E-COMMAND-008's "description ≤ 2000" governs the fragment the model may emit,
+-- which `MAX_NOTE_LENGTH` already enforces in `schema.ts`. Bounding the RPC at
+-- 2000 therefore bounded the accumulated notes of a whole task, so the first task
+-- to reach 2000 characters of notes could never take another one — and the
+-- preview would still offer a one-step apply the RPC then refuses. The ceiling is
+-- stated at the validation site with the number and the reason.
+--
 -- **Reminder reconciliation lives in this function, not in a trigger.** An
 -- `after update on public.tasks` trigger would fire for `persistTaskStatus`
 -- (`src/features/operations/actions.ts:140-152`) and for `createRecord` too,
@@ -138,6 +148,56 @@
 -- is now in the past — a past-due `scheduled` reminder firing on the next tick is
 -- the state that existed, and `202607250056:611-619` counts it deliberately. The
 -- cost is dead rows; that is accepted.
+--
+-- **The undo guard is as wide as the undo write: ten columns, not one.** The
+-- compensating UPDATE sets all ten scalars from `before_state`, so an optimistic
+-- guard on `status` alone lets a second command's whole effect be discarded in
+-- silence. The reachable sequence is two commands and one undo: rename a `todo`
+-- task with no due date (U1), `reschedule_due` it (U2, which sets `due_at` and
+-- arms a reminder), then undo U1. The status never moved, so a status-only guard
+-- matches, the restore also writes `due_at = null`, and the reminder U2 armed
+-- stays `scheduled` on a task with no due date — with `{"undone": true}`
+-- returned. Guarding one column while writing ten is exactly what 2E-UPDATE-014
+-- and 2E-UNDO-004 ("undo refuses when a newer change would be silently
+-- discarded") forbid. So step 23 records `applied_state` — the ten columns **as
+-- the forward UPDATE left them**, from the `effective_*` values it computed and
+-- `locked_task` for the rest — and the handler compares every one of them with
+-- `is not distinct from`, mirroring the forward path's twelve-column staleness
+-- gate in shape and in intent. Narrowing the SET list to the columns each action
+-- touches was the other candidate fix and is rejected: withdrawn decision D17
+-- makes the status branch write both terminal timestamps unconditionally, so a
+-- narrowed restore would strand a `completed_at` the forward path cleared. An
+-- operation recorded without `applied_state` fails closed with
+-- `2E_UNDO_RESTORE_INTEGRITY` rather than falling back to the status-only guard;
+-- nothing in this migration has ever been applied to the linked project, so no
+-- such row exists anywhere except a hand-edited fixture.
+--
+-- **The undo's reminder post-condition is read back from the table too**, and the
+-- pre-insert element-shape gate stays alongside it. They refuse different things:
+-- the shape gate refuses malformed *evidence* before it can surface as a raw
+-- `23502` or `22007`, and is cheap input validation; the count refuses a *state*
+-- the restore did not produce, whose one reachable cause is the concurrent direct
+-- client write `authenticated` can still perform because it keeps INSERT and
+-- UPDATE on `public.reminders` (`202607160007:152-166`, PRD §14 permits it and
+-- §16.4 records it as residual risk). Shipping only the shape gate left
+-- `2E_UNDO_REMINDER_INTEGRITY` unraisable from any state the forward path can
+-- produce — which is the identical objection this file uses to reject the
+-- tautological count form a few lines further down, so the file contradicted
+-- itself. The count is scoped to operations that actually reconciled reminders,
+-- recorded as `after_state.reminders_reconciled`: unconditional, it would refuse
+-- the undo of a rename on a task legitimately holding a live reminder the rename
+-- never touched, because a rename records an empty `reminders_cancelled` array.
+--
+-- **`p_policy_version` is recorded on the operation, not only hashed into the
+-- fingerprint.** 2E-PROVENANCE-001 requires every Phase 2E decision to record the
+-- policy version that governed it, and a fingerprint is a one-way digest that
+-- attributes nothing: given a stored operation there was no way to say which
+-- policy decided it. One key on `after_state`, which the mandatory step-23 UPDATE
+-- also copies into `audit_logs.after_state`, so the same value lands on both the
+-- undo row and the audit row. No new column, and the alternative was considered:
+-- `undo_operations` is shared by every action_type in the project, so a
+-- `policy_version` column would be null on every row every other feature writes,
+-- and a Phase 2E provenance key does not warrant widening a table that shared.
 --
 -- **Two `action_type` values, one RPC, two handlers.** The nine column actions
 -- record `'apply_task_command'` and the four relation actions record
@@ -375,6 +435,10 @@ declare
   undo_expires_at timestamptz;
   undo_before_state jsonb;
   undo_after_state jsonb;
+  -- The ten scalar columns as step 21 left them, which is what the undo handler
+  -- guards its compensating UPDATE on. Built at step 23 rather than declared with
+  -- a value, because every input to it is only known once the row is locked.
+  undo_applied_state jsonb;
 
   effective_status text;
   effective_title text;
@@ -418,10 +482,14 @@ begin
   --     Refusing the key would make the fingerprint the preview computed
   --     unreachable and both actions unappliable; accepting a patch *without* it
   --     would hash a different object and never match a stored replay.
-  --   * `private.undo_apply_task_command_fields` guards its restoration on the
-  --     status the forward operation *produced*, which it reads from
-  --     `after_state -> 'applied_patch' ->> 'status'`. An absent key would make it
-  --     fall back to the pre-state's status and refuse every undo of a completion.
+  --   * `applied_patch` is the only record of what the caller *asked for*, as
+  --     against `applied_state`, which records what the row ended up holding. An
+  --     absent `status` would leave the first silent about a transition that
+  --     demonstrably happened, and the two are read for different questions in
+  --     Slice 2E.5's destructive-confirmation audit. (This bullet used to say the
+  --     undo handler guards on `applied_patch ->> 'status'`; it does not any more.
+  --     A one-column guard over a ten-column restore discarded a newer change in
+  --     silence, so the guard now reads all ten columns out of `applied_state`.)
   --
   -- The key is admitted with a single allowed value — the taxonomy's own
   -- destination, resolved below — so it cannot become a second route to a
@@ -674,10 +742,31 @@ begin
   -- `buildTaskCommandPreview`, which is what the user saw and what the
   -- fingerprint hashed, so re-deriving it here would be a second copy of a
   -- domain rule that could disagree with the preview.
+  --
+  -- **100000, not the note's 2000.** This value is not a note — it is
+  -- `pre.description || E'\n\n' || note`, built by `buildCanonicalPatch`
+  -- (`src/features/task-commands/preview.ts:429-437`). 2E-COMMAND-008's
+  -- "description ≤ 2000" governs the fragment the model may emit, and
+  -- `MAX_NOTE_LENGTH` (`src/features/task-commands/schema.ts:34`) already refuses a
+  -- longer one at the parse boundary. Bounding the *result* at 2000 was written and
+  -- is the defect this replaces: it made a task whose notes already totalled 2000
+  -- characters unable to take another legal note ever again, and it did so after
+  -- the preview had already offered a one-step apply — the RPC then refused a
+  -- payload the user was told would land. The alternative fix, refusing the append
+  -- in the preview with a new declared refusal, was rejected: silently making a
+  -- legal note unappliable on a long task is a worse product outcome than an
+  -- unbounded description.
+  --
+  -- And it is genuinely unbounded: `tasks.description` is bare `text` with no CHECK
+  -- (`202607160003:110`), unlike `title`, so this is the only ceiling that exists on
+  -- the column and repeated appends accumulate without one. 100000 is kept finite
+  -- only so a definer function cannot be turned into a way to write megabyte rows —
+  -- it is about fifty maximum-length notes, past any plausible note history, and the
+  -- request already carries this text twice, here and inside `p_pre_state`.
   if p_patch ? 'description' then
     patch_description := p_patch ->> 'description';
     if pg_catalog.jsonb_typeof(p_patch -> 'description') <> 'string'
-      or pg_catalog.char_length(patch_description) > 2000
+      or pg_catalog.char_length(patch_description) > 100000
     then
       raise exception 'Invalid task command description' using errcode = '22023';
     end if;
@@ -951,10 +1040,18 @@ begin
       'task_id', p_task_id,
       'action', p_action,
       'undo_strategy', action_undo_strategy,
+      'policy_version', p_policy_version,
       'request_fingerprint', canonical_fingerprint,
       'applied_patch', p_patch,
       'reminders_cancelled_count', 0,
+      'reminders_reconciled', action_touches_reminders,
       'reminder_created_id', null,
+      -- The one key that cannot carry even a placeholder value: it describes the
+      -- ten columns after step 21, and the row is not locked yet. Recorded null so
+      -- the reservation keeps the same key set as the patched row, and so a row
+      -- that somehow reached a handler unpatched fails that handler's closed
+      -- evidence gate instead of being restored against a state nobody observed.
+      'applied_state', null,
       'relation', null
     ),
     internal_operation_key,
@@ -1348,14 +1445,93 @@ begin
     'no_due_reason', locked_task.no_due_reason,
     'reminders_cancelled', reminders_cancelled_json
   );
+
+  -- The post-forward scalar state, which is the evidence the undo guard needs and
+  -- the one thing `before_state` cannot supply. Every value here is what step 21
+  -- actually wrote, re-derived from the same inputs rather than read back with a
+  -- second SELECT: a re-read would also pick up a concurrent committed write and
+  -- record it as this command's own effect, which is the opposite of what the guard
+  -- is for. Each branch mirrors the matching branch of step 21 term for term, so
+  -- adding an action there means adding it here — `completed_at` is the trap: a
+  -- `rename_task` on a completed task leaves `effective_status = 'completed'` while
+  -- the timestamp is untouched, so the guard is the action, not the status.
+  --
+  -- `pg_catalog.now()` is `transaction_timestamp()`, fixed for the whole
+  -- transaction, so re-evaluating it here yields the identical instant step 21
+  -- stored. Instants are formatted exactly as `before_state` formats them and never
+  -- with `to_jsonb(timestamptz)`, which renders through the session `TimeZone` GUC
+  -- that `set search_path = ''` does not pin; `timestamptz` is microsecond-resolution
+  -- and `US` renders all six digits, so the text round-trips back to the stored value
+  -- bit for bit and the handler can compare it against a typed column.
+  --
+  -- Recorded for the relation actions too, where every key falls through to
+  -- `locked_task` because their patch touches no column of `public.tasks`. That is
+  -- truthful — the relation handler restores no scalar and never reads this — and it
+  -- keeps step 23 free of a branch that would have to be kept in step with step 21.
+  undo_applied_state := pg_catalog.jsonb_build_object(
+    'status', effective_status,
+    'title', effective_title,
+    'description', case
+      when p_action = 'append_note' then patch_description
+      else locked_task.description
+    end,
+    'due_at', pg_catalog.to_char(effective_due_at, 'YYYY-MM-DD"T"HH24:MI:SS.USOF'),
+    'planned_at', pg_catalog.to_char(
+      case when p_action = 'set_planned' then patch_planned_at else locked_task.planned_at end,
+      'YYYY-MM-DD"T"HH24:MI:SS.USOF'
+    ),
+    'manual_priority', case
+      when p_action = 'set_priority' then patch_manual_priority
+      else locked_task.manual_priority
+    end,
+    'completed_at', pg_catalog.to_char(
+      case
+        when p_action not in ('complete_task', 'reopen_task', 'set_status')
+          then locked_task.completed_at
+        when effective_status = 'completed' then pg_catalog.now()
+        else null::timestamptz
+      end,
+      'YYYY-MM-DD"T"HH24:MI:SS.USOF'
+    ),
+    'cancelled_at', pg_catalog.to_char(
+      case
+        when p_action not in ('complete_task', 'reopen_task', 'set_status')
+          then locked_task.cancelled_at
+        when effective_status = 'cancelled' then pg_catalog.now()
+        else null::timestamptz
+      end,
+      'YYYY-MM-DD"T"HH24:MI:SS.USOF'
+    ),
+    -- These two repeat step 21's own expressions verbatim, keyed on the patch and
+    -- not on the action, because that is how step 21 writes them and only
+    -- `reschedule_due` may carry either key.
+    'intentional_no_due', case
+      when p_patch ? 'intentionalNoDue' then patch_intentional_no_due
+      else locked_task.intentional_no_due
+    end,
+    'no_due_reason', case
+      when p_patch ? 'noDueReason' then patch_no_due_reason
+      else locked_task.no_due_reason
+    end
+  );
+
   undo_after_state := pg_catalog.jsonb_build_object(
     'task_id', p_task_id,
     'action', p_action,
     'undo_strategy', action_undo_strategy,
+    -- 2E-PROVENANCE-001: the policy version that governed this decision, durably
+    -- recorded rather than only hashed into the fingerprint. It reaches
+    -- `audit_logs.after_state` through the same object at step 24.
+    'policy_version', p_policy_version,
     'request_fingerprint', canonical_fingerprint,
     'applied_patch', p_patch,
     'reminders_cancelled_count', reminders_cancelled_count,
+    -- Whether step 22 ran at all, which is what scopes the undo's reminder
+    -- post-condition. Derived from the taxonomy here so the handler does not have to
+    -- carry a second copy of "which actions touch reminders".
+    'reminders_reconciled', action_touches_reminders,
     'reminder_created_id', reminder_created_id,
+    'applied_state', undo_applied_state,
     'relation', case
       when relation_table is null then null::jsonb
       else pg_catalog.jsonb_build_object(
@@ -1458,9 +1634,14 @@ declare
   -- error` turns such a reference into a runtime ambiguity failure rather than
   -- silently preferring one meaning.
   target_task_id uuid;
-  expected_status text;
+  -- The ten scalar columns as the forward UPDATE left them, recorded at the RPC's
+  -- step 23. This is the evidence the compensating UPDATE is guarded on; there is no
+  -- `expected_status` any more, because guarding one column while writing ten let a
+  -- second command's effect be discarded in silence.
+  applied_state jsonb;
   recorded_reminders jsonb;
   reminders_restored integer := 0;
+  live_reminders integer := 0;
   affected integer := 0;
 begin
   select * into operation
@@ -1474,19 +1655,43 @@ begin
   end if;
 
   -- Fail closed on the recorded evidence before touching a row. Everything below
-  -- restores *from* `before_state`, so an absent or non-object one means the
-  -- forward operation's step-23 patch never ran and there is nothing truthful to
-  -- restore — refusing is the only honest answer (`202607220045:85-96`).
-  if pg_catalog.jsonb_typeof(operation.before_state) <> 'object'
-    or pg_catalog.jsonb_typeof(operation.after_state) <> 'object'
-    or pg_catalog.jsonb_typeof(operation.before_state -> 'reminders_cancelled') <> 'array'
-    or pg_catalog.cardinality(operation.entity_ids) <> 1
+  -- restores *from* `before_state` and guards *on* `after_state -> 'applied_state'`,
+  -- so an absent or non-object either one means the forward operation's step-23
+  -- patch never ran and there is nothing truthful to restore — refusing is the only
+  -- honest answer (`202607220045:85-96`).
+  --
+  -- Every term is `is distinct from`, never `<>`. `jsonb_typeof` is strict and `->`
+  -- on an absent key is SQL NULL, so `jsonb_typeof(x -> 'k') <> 'array'` evaluates
+  -- to NULL for precisely the shape it is written to refuse; one NULL term makes the
+  -- whole `or`-chain NULL unless some other term is already true, and plpgsql treats
+  -- a NULL `if` condition as false. That is how this gate first shipped fail-open
+  -- for a null `before_state` and for a missing `reminders_cancelled` — the two
+  -- shapes the paragraph above claims it refuses — while the element-shape gate
+  -- further down already used the correct idiom for the identical reason.
+  -- `cardinality(NULL)` is NULL as well, so that term needs it too.
+  --
+  -- `applied_state` and `reminders_reconciled` are *required*, not defaulted. An
+  -- operation recorded before they existed can be neither guarded nor reconciled
+  -- truthfully, and refusing it is strictly better than silently falling back to a
+  -- status-only guard over a ten-column write. No such row exists anywhere: this
+  -- migration has never been applied to the linked project, so this is a contract
+  -- statement rather than a compatibility shim.
+  if pg_catalog.jsonb_typeof(operation.before_state) is distinct from 'object'
+    or pg_catalog.jsonb_typeof(operation.after_state) is distinct from 'object'
+    or pg_catalog.jsonb_typeof(operation.before_state -> 'reminders_cancelled')
+       is distinct from 'array'
+    or pg_catalog.jsonb_typeof(operation.after_state -> 'applied_state')
+       is distinct from 'object'
+    or pg_catalog.jsonb_typeof(operation.after_state -> 'reminders_reconciled')
+       is distinct from 'boolean'
+    or pg_catalog.cardinality(operation.entity_ids) is distinct from 1
   then
     raise exception 'Task command undo integrity check failed'
       using errcode = 'P0001', detail = '2E_UNDO_RESTORE_INTEGRITY';
   end if;
 
   target_task_id := operation.entity_ids[1];
+  applied_state := operation.after_state -> 'applied_state';
   recorded_reminders := operation.before_state -> 'reminders_cancelled';
 
   -- The compensating column write is performed by the system executing a stored
@@ -1497,16 +1702,28 @@ begin
   -- reopening `audit_task_change` again.
   perform pg_catalog.set_config('app.audit_actor', 'system', true);
 
-  -- Guarded by the status the forward operation *produced*, not the one it
-  -- replaced: undo must refuse when a newer change would be silently discarded
-  -- (2E-UPDATE-014, 2E-UNDO-004). The applied patch carries the resulting status
-  -- for the actions that changed one; for the rest the resulting status is the
-  -- recorded pre-state's.
-  expected_status := coalesce(
-    operation.after_state -> 'applied_patch' ->> 'status',
-    operation.before_state ->> 'status'
-  );
-
+  -- Guarded on all ten columns this SET list writes, against the state the forward
+  -- operation *produced* — not on `status` alone. Undo must refuse when a newer
+  -- change would be silently discarded (2E-UPDATE-014, 2E-UNDO-004), and a
+  -- status-only guard did not: two commands on one task (a rename, then a
+  -- `reschedule_due`) followed by an undo of the *first* left the status untouched,
+  -- so the guard matched, the restore wrote `due_at = null` on top of the second
+  -- command, and the reminder that command armed stayed `scheduled` on a task with
+  -- no due date — reported as `{"undone": true}`.
+  --
+  -- This is the forward path's twelve-column staleness gate (step 17) in the
+  -- compensating direction, and the same shape for the same reason: every term is
+  -- `is not distinct from`, because nine of the ten columns are nullable and `=`
+  -- would make a NULL column never match and refuse every undo of a task that has
+  -- one. `created_at` and `updated_at` are the two the forward gate has and this one
+  -- does not: neither is restored here, and `updated_at` moves for any write to any
+  -- column outside these ten (`tasks_updated_at`, `202607160003:180`), so guarding
+  -- on it would refuse undos that would discard nothing at all.
+  --
+  -- Narrowing the SET list to the columns the recorded action touches is the other
+  -- way to close the same hole, and it is rejected: withdrawn decision D17 makes the
+  -- forward status branch write `completed_at` and `cancelled_at` unconditionally,
+  -- so a narrowed restore would strand a `completed_at` the forward path cleared.
   update public.tasks
   set
     status = operation.before_state ->> 'status',
@@ -1524,7 +1741,17 @@ begin
     no_due_reason = operation.before_state ->> 'no_due_reason'
   where user_id = p_user_id
     and id = target_task_id
-    and status = expected_status;
+    and status is not distinct from applied_state ->> 'status'
+    and title is not distinct from applied_state ->> 'title'
+    and description is not distinct from applied_state ->> 'description'
+    and due_at is not distinct from (applied_state ->> 'due_at')::timestamptz
+    and planned_at is not distinct from (applied_state ->> 'planned_at')::timestamptz
+    and manual_priority is not distinct from applied_state ->> 'manual_priority'
+    and completed_at is not distinct from (applied_state ->> 'completed_at')::timestamptz
+    and cancelled_at is not distinct from (applied_state ->> 'cancelled_at')::timestamptz
+    and intentional_no_due
+        is not distinct from (applied_state ->> 'intentional_no_due')::boolean
+    and no_due_reason is not distinct from applied_state ->> 'no_due_reason';
   get diagnostics affected = row_count;
   if affected <> 1 then
     raise exception 'Task command undo integrity check failed'
@@ -1549,13 +1776,14 @@ begin
     -- and a sent reminder is history that undo does not rewrite (ADR-018).
   end if;
 
-  -- Fail closed on the recorded element *shape* before inserting, not on the
-  -- insert's row count afterwards. `jsonb_array_elements` yields exactly one row
-  -- per element and the evidence gate above already proved the value is an array,
-  -- so `reminders_restored <> jsonb_array_length(recorded_reminders)` compared the
-  -- array's length against itself: it was written, and rejected as structurally
-  -- unprovokable, which for a declared member of the closed `2E_*` vocabulary is
-  -- the same defect as no raise at all.
+  -- Fail closed on the recorded element *shape* before inserting. This is not the
+  -- reminder post-condition — that one is below, read back from the table — and the
+  -- two are kept apart because they refuse different things. `jsonb_array_elements`
+  -- yields exactly one row per element and the evidence gate above already proved
+  -- the value is an array, so `reminders_restored <> jsonb_array_length(recorded_reminders)`
+  -- compared the array's length against itself: it was written, and rejected as
+  -- structurally unprovokable, which for a declared member of the closed `2E_*`
+  -- vocabulary is the same defect as no raise at all.
   --
   -- What is genuinely reachable is a recorded element that does not carry the four
   -- fields the forward path writes. `->>` yields NULL for a non-object and for an
@@ -1563,10 +1791,12 @@ begin
   -- out of the instant cast — that no mapper case covers, instead of this slice's
   -- declared code. Whatever the forward path records becomes a hard contract the
   -- undo enforces (`202607220045:85-96`); this states that contract where it can
-  -- still refuse cheaply. Written with `is distinct from` rather than the `<>` of
-  -- the gate above, deliberately: `jsonb_typeof` of an absent key is SQL NULL, and
-  -- `NULL <> 'string'` is NULL, so `<>` would let exactly the malformed element
-  -- this is here to catch pass through.
+  -- still refuse cheaply. `is distinct from` on every term, for the reason the
+  -- evidence gate above now spells out at length: `jsonb_typeof` of an absent key is
+  -- SQL NULL and `NULL <> 'string'` is NULL, so `<>` would let exactly the malformed
+  -- element this exists to catch pass straight through. This gate had that idiom
+  -- right from the first commit, which is how the evidence gate above — written with
+  -- `<>` and documented as fail-closed — was found not to be.
   if exists (
     select 1
     from pg_catalog.jsonb_array_elements(recorded_reminders) as recorded(value)
@@ -1588,6 +1818,48 @@ begin
     coalesce((recorded.value ->> 'important')::boolean, false)
   from pg_catalog.jsonb_array_elements(recorded_reminders) as recorded(value);
   get diagnostics reminders_restored = row_count;
+
+  -- The reminder post-condition, read back from the table — the forward path's own
+  -- shape (its step 22), which this handler was missing. The element gate above
+  -- refuses malformed *evidence*, and the forward path cannot write malformed
+  -- evidence, so on its own it left `2E_UNDO_REMINDER_INTEGRITY` unraisable from any
+  -- state a real operation can reach. That is the identical objection step 22 uses
+  -- to reject its own tautological count form, so the file was inconsistent with
+  -- itself: a declared member of a closed error vocabulary that no reachable state
+  -- can provoke is the same defect as a missing raise.
+  --
+  -- The expected count is exact, not approximate. The forward reconciliation closed
+  -- EVERY `scheduled` row and recorded each one, this handler cancelled the single
+  -- row that reconciliation created and re-inserted exactly the recorded ones, and
+  -- nothing else in the product inserts a reminder for an existing task —
+  -- `create_due_task_reminder` is `after insert on public.tasks` only
+  -- (`202607160007:209`), so neither UPDATE above can have added one. What is
+  -- reachable on the other side is the direct client write `authenticated` can still
+  -- perform, because it keeps INSERT and UPDATE on `public.reminders`
+  -- (`202607160007:152-166`, permitted by PRD §14 and recorded as residual risk in
+  -- §16.4), committing between the forward close and here: that leaves the task
+  -- holding a live reminder no operation in this chain ever disclosed, on top of a
+  -- pre-state the undo has just restored. Refusing is retryable and truthful.
+  --
+  -- Scoped to operations that actually reconciled reminders, from the recorded
+  -- `reminders_reconciled` rather than from a second copy of the taxonomy. Run
+  -- unconditionally it would refuse the undo of a `rename_task` or an `append_note`
+  -- on a task legitimately holding a live reminder neither ever touched: those
+  -- actions record an empty array, so the comparison would be against zero.
+  if (operation.after_state ->> 'reminders_reconciled')::boolean then
+    select pg_catalog.count(*)::integer
+    into live_reminders
+    from public.reminders as live_reminder
+    where live_reminder.task_id = target_task_id
+      and live_reminder.user_id = p_user_id
+      and live_reminder.status = 'scheduled';
+    if live_reminders
+      is distinct from pg_catalog.jsonb_array_length(recorded_reminders)
+    then
+      raise exception 'Task command undo reminder integrity check failed'
+        using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
+    end if;
+  end if;
 
   update public.undo_operations
   set status = 'undone', undone_at = pg_catalog.now()
@@ -1662,9 +1934,25 @@ begin
     raise exception 'Unsupported undo operation' using errcode = 'P0001';
   end if;
 
-  if pg_catalog.jsonb_typeof(operation.after_state) <> 'object'
-    or pg_catalog.jsonb_typeof(operation.after_state -> 'relation') <> 'object'
-    or pg_catalog.cardinality(operation.entity_ids) <> 1
+  -- `is distinct from`, not `<>`, on every term, for the reason the fields handler
+  -- records at length: `jsonb_typeof` is strict, `->` on an absent key is SQL NULL,
+  -- and a NULL term makes an `or`-chain NULL, which plpgsql reads as false. Written
+  -- with `<>` this gate did not fire for the absent `relation` it exists to refuse.
+  -- `cardinality(NULL)` is NULL as well.
+  --
+  -- The recorded table name is checked *here*, at the gate, and not left to the
+  -- `else` of the delete chain below. Both raise the same code, but a fail-closed
+  -- gate that in fact fails closed one screen later has already run
+  -- `set_config('app.audit_actor', …)` and the `::uuid` cast, and reads to a
+  -- maintainer as though an unknown table were an expected branch. `coalesce(…, '')`
+  -- makes the comparison total: `->>` is NULL for an absent key, for a JSON null and
+  -- for a non-object, and `NULL not in (…)` is NULL, which is the same fail-open the
+  -- paragraph above describes.
+  if pg_catalog.jsonb_typeof(operation.after_state) is distinct from 'object'
+    or pg_catalog.jsonb_typeof(operation.after_state -> 'relation') is distinct from 'object'
+    or coalesce(operation.after_state -> 'relation' ->> 'table', '')
+       not in ('task_projects', 'task_contexts', 'task_people')
+    or pg_catalog.cardinality(operation.entity_ids) is distinct from 1
   then
     raise exception 'Task command undo integrity check failed'
       using errcode = 'P0001', detail = '2E_UNDO_RESTORE_INTEGRITY';
@@ -1706,6 +1994,10 @@ begin
       and person_id = relation_target_id
       and role = relation_role;
   else
+    -- Unreachable: the evidence gate proved the recorded name is one of the three
+    -- above. Kept as the chain's terminator anyway — without it, an unknown name
+    -- would fall through to `get diagnostics`, which would then report the row count
+    -- of whatever statement ran last and pass a check designed to catch exactly this.
     raise exception 'Task command undo integrity check failed'
       using errcode = 'P0001', detail = '2E_UNDO_RESTORE_INTEGRITY';
   end if;
@@ -1785,7 +2077,7 @@ revoke all on function private.undo_apply_task_command_relation(uuid, uuid)
   from public, anon, authenticated, service_role;
 
 comment on function public.apply_task_command(uuid, text, jsonb, jsonb, text, text, text) is
-  'Phase 2E task command apply (PRD 2E-UPDATE-001..017). The single mutation path for the thirteen non-destructive actions of PRD 11.2: owner-scoped, idempotent on (user_id, operation_key), replay-safe from the stored after_state, gated on a typed twelve-column pre-state comparison that raises 55P03, reconciling reminders by close-and-insert, audited with a transaction-local actor and undoable through a registered private handler. cancel_task and restore_task are refused with 2E_ACTION_NOT_ENABLED until Slice 2E.5 supplies the server-issued confirmation evidence 2E-DESTRUCTIVE-004 requires.';
+  'Phase 2E task command apply (PRD 2E-UPDATE-001..017). The single mutation path for the thirteen non-destructive actions of PRD 11.2: owner-scoped, idempotent on (user_id, operation_key), replay-safe from the stored after_state, gated on a typed twelve-column pre-state comparison that raises 55P03, reconciling reminders by close-and-insert, audited with a transaction-local actor, recording the governing policy version (2E-PROVENANCE-001) and the post-write scalar state on the undo row so the compensating write is guarded on all ten columns it restores (2E-UNDO-004), and undoable through a registered private handler. cancel_task and restore_task are refused with 2E_ACTION_NOT_ENABLED until Slice 2E.5 supplies the server-issued confirmation evidence 2E-DESTRUCTIVE-004 requires.';
 
 -- ---------------------------------------------------------------------------
 -- Fail-closed post-deploy assertions
@@ -1873,6 +2165,21 @@ begin
     or position('pg_catalog.greatest(' in lower(bundle)) > 0
     or position('pg_catalog.least(' in lower(bundle)) > 0 then
     raise exception 'apply_task_command schema-qualified a SQL special form (coalesce/nullif/greatest/least), which cannot resolve under an empty search_path'
+      using errcode = 'P0001';
+  end if;
+
+  -- The undo guard is only ever as wide as the evidence the apply records, and the
+  -- RPC and its handler are `create or replace`-able independently of each other. So
+  -- both keys the handler's closed evidence gate now requires are re-proven from the
+  -- catalog: a later revision that drops either one reds here, at deploy, instead of
+  -- at a user's first undo, where the gate would refuse every compensation for
+  -- operations that were applied perfectly well. `policy_version` is the same
+  -- guarantee for 2E-PROVENANCE-001, which nothing else in the schema can enforce —
+  -- it is a key in a jsonb payload, not a column with a NOT NULL.
+  if position('''applied_state'', undo_applied_state' in bundle) = 0
+    or position('''policy_version'', p_policy_version' in bundle) = 0
+  then
+    raise exception 'apply_task_command no longer records the applied_state its undo handler guards on, or the policy version 2E-PROVENANCE-001 requires'
       using errcode = 'P0001';
   end if;
 

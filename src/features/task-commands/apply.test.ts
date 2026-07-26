@@ -770,8 +770,11 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
    * languages, and a disagreement surfaces as a bare `22023` on a user's first
    * command with nothing red beforehand. `complete_task` is the sharpest case: it
    * carries `status` even though the destination is read from the taxonomy, and
-   * the RPC requires the key precisely because the fingerprint hashed it and the
-   * undo handler reads the resulting status back out of it.
+   * the RPC requires the key precisely because `buildCanonicalPatch` writes it and
+   * the fingerprint hashed it — a patch without it hashes a different object than
+   * the preview did, so no replay of it could ever match. (The RPC's undo handler
+   * used to read the resulting status back out of this key too; since the
+   * ten-column guard it reads `after_state -> 'applied_state'` instead.)
    */
   const MIGRATION = "supabase/migrations/202607260058_phase_2e_task_command_apply.sql";
   const migration = readFileSync(path.resolve(process.cwd(), MIGRATION), "utf8").replace(
