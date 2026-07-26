@@ -1,6 +1,6 @@
 # Phase 2E — Execution Progress
 
-**Status: IN PROGRESS — Slice 2E.3 implemented, corrected and CI-green; Slice 2E.4 next.**
+**Status: IN PROGRESS — Slice 2E.3 accepted; Slice 2E.4 next.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -35,7 +35,7 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 |---|---|---|
 | 2E.1 — Bounded task command contract | 2E-A | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_01_REPORT.md` |
 | 2E.2 — Deterministic matching and margins | 2E-B | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_02_REPORT.md` |
-| 2E.3 — Disambiguation and read-only preview | 2E-C | **IMPLEMENTED AND CORRECTED — not yet accepted.** See below |
+| 2E.3 — Disambiguation and read-only preview | 2E-C | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_03_REPORT.md` |
 | 2E.4 — Reversible non-destructive updates | 2E-D | not started |
 | 2E.5 — Destructive actions and confirmation | 2E-E | not started |
 | 2E.6 — No-match activity creation | 2E-F | not started |
