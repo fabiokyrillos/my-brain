@@ -99,3 +99,13 @@ gh pr checks 18                                     # the database gate
 - **Scripted edits to SQL files must not pass backslash escapes through a shell heredoc.** `\00F3` became a literal NUL twice and silently disabled the entire pgTAP suite. Build backslashes with `chr(92)`, or edit the file with a text-editing tool rather than a script. `status-vocabulary-parity.test.ts` now fails on a NUL byte or raw non-ASCII outside a comment, so the failure mode is caught rather than silent.
 - The linked project is reachable, so remote parity and deployed worker versions can be verified locally.
 - `gh` is authenticated as `fabiokyrillos`.
+
+## Stop reason
+
+Session context exhausted at a clean boundary: Slice 2E.2 accepted, Slice 2E.3 not started.
+
+Slice 2E.2 was taken from "implemented and CI-green" to accepted by closing all eleven outstanding items, then submitting it to three independent acceptance reviewers across the seven named dimensions. That review was worth running: it found **one live defect** (the tautological status hint, which bought a one-step apply for a word that excluded no candidate), **three Criticals** that were all untested fixes from this slice's *own* earlier correction pass — including the `writesRelation` guard whose removal restores the exact "unconfirmed `waiting_on` write on the wrong task" defect it was added for — and two Importants found independently by two reviewers. All are fixed, each verified by applying the mutation and confirming the failure.
+
+Stopping here rather than opening 2E.3 is deliberate. That slice designs the preview contract and the 2E-PREVIEW-004 fingerprint, and it is the last point at which `202607250056` can still be corrected in place; beginning it with little context left risks a half-specified contract that a later slice inherits. The next session starts from a clean tree, green CI, and the specific reading list above.
+
+**What the next session must not assume:** that the widened projection is sufficient. Confirm it against PRD §13.3/§13.4 *before* writing the preview, because after 2E.3 the only way to change a result column is a `_v2` (`42P13`).
