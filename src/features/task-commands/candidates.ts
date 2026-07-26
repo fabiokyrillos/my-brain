@@ -104,6 +104,15 @@ const rowSchema = z
     project_ref_id: z.string().uuid().nullable(),
     context_ref_id: z.string().uuid().nullable(),
     person_ref_id: z.string().uuid().nullable(),
+    // The resolved entity's stored name, query-scalar alongside its id and
+    // nullable on exactly the same terms. Not narrowed beyond `string`: this is
+    // a user-authored `projects.name`/`contexts.name`/`people.name`, so any
+    // shape rule here would be a second, quieter copy of a column constraint
+    // that already holds — and would reject a legal name rather than catching a
+    // projection change.
+    project_ref_name: z.string().nullable(),
+    context_ref_name: z.string().nullable(),
+    person_ref_name: z.string().nullable(),
     // Per-row, and non-null: SQL coalesces the count to 0, so a null here means
     // the projection changed. Parsed as a non-negative integer for the same
     // reason the other counts are — an undefined arriving where a count is
@@ -162,6 +171,9 @@ function toCandidateRow(row: z.infer<typeof rowSchema>): TaskCandidateRow {
     projectRefId: row.project_ref_id,
     contextRefId: row.context_ref_id,
     personRefId: row.person_ref_id,
+    projectRefName: row.project_ref_name,
+    contextRefName: row.context_ref_name,
+    personRefName: row.person_ref_name,
     scheduledReminderCount: row.scheduled_reminder_count,
     nextReminderAt: row.next_reminder_at,
   };
@@ -262,8 +274,8 @@ export async function loadTaskCandidates(
   const parsed = rowsSchema.safeParse(result.data ?? []);
   if (!parsed.success) {
     // The offending path travels with the error. A bare "unexpected row shape"
-    // against a thirty-five-column projection tells whoever is paged nothing, and
-    // the most likely cause is a migration that landed ahead of this code.
+    // against a thirty-eight-column projection tells whoever is paged nothing,
+    // and the most likely cause is a migration that landed ahead of this code.
     const issue = parsed.error.issues[0];
     const path = (issue?.path ?? []).join(".");
     throw new TaskCandidateQueryError(

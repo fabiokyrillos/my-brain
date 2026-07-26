@@ -44,13 +44,6 @@ export const TASK_COMMAND_LINKED_EFFECTS = [
   "reminder_created",
   /** The action touches reminders and the task has none scheduled. */
   "reminders_none",
-  /**
-   * The task already holds a scheduled reminder that PRD §11.3 assumes it
-   * cannot have. Real, not defensive: nothing in this repository has ever
-   * cancelled a reminder on completion or cancellation, so a task that was
-   * completed before Phase 2E can still carry a live one.
-   */
-  "reminders_already_scheduled",
   /** Cancelling removes the task from the active lists (2E-PREVIEW-003). */
   "leaves_active_lists",
 ] as const;
@@ -218,7 +211,6 @@ const ptBR: TaskCommandCopy = {
     reminders_cancelled: "Os lembretes agendados desta tarefa serão cancelados.",
     reminder_created: "Um novo lembrete será agendado.",
     reminders_none: "Esta tarefa não tem lembretes agendados, então nenhum será afetado.",
-    reminders_already_scheduled: "Esta tarefa já tem lembretes agendados.",
     leaves_active_lists: "A tarefa sai das suas listas ativas.",
   },
   values: {
@@ -357,7 +349,6 @@ const en: TaskCommandCopy = {
     reminders_cancelled: "This task's scheduled reminders will be cancelled.",
     reminder_created: "A new reminder will be scheduled.",
     reminders_none: "This task has no scheduled reminders, so none are affected.",
-    reminders_already_scheduled: "This task already has scheduled reminders.",
     leaves_active_lists: "The task leaves your active lists.",
   },
   values: {

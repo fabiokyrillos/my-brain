@@ -81,6 +81,9 @@ function sqlRow(overrides: Record<string, unknown> = {}) {
     project_ref_id: null,
     context_ref_id: null,
     person_ref_id: null,
+    project_ref_name: null,
+    context_ref_name: null,
+    person_ref_name: null,
     scheduled_reminder_count: 0,
     next_reminder_at: null,
     ...overrides,
@@ -375,6 +378,9 @@ describe("what comes back", () => {
         projectRefId: null,
         contextRefId: null,
         personRefId: null,
+        projectRefName: null,
+        contextRefName: null,
+        personRefName: null,
         scheduledReminderCount: 0,
         nextReminderAt: null,
       },
@@ -382,17 +388,21 @@ describe("what comes back", () => {
   });
 
   it("carries the resolved references and the reminder state through to the row", async () => {
-    // The preview half of the projection, and the only place the five columns
+    // The preview half of the projection, and the only place the eight columns
     // Slice 2E.3 added are proven to arrive with values rather than as the nulls
     // the base fixture uses. Each is mapped from a differently-named SQL column,
-    // so a transposition here would silently show one relation's id under
-    // another's label.
+    // so a transposition here would silently show one relation's id — or one
+    // relation's *name*, which is what 2E-PREVIEW-002 renders — under another's
+    // label. Three deliberately different names is what makes that visible.
     const { client } = recordingClient({
       data: [
         sqlRow({
           project_ref_id: "66666666-6666-4666-8666-666666666666",
           context_ref_id: "77777777-7777-4777-8777-777777777777",
           person_ref_id: "88888888-8888-4888-8888-888888888888",
+          project_ref_name: "ACME Corp.",
+          context_ref_name: "Trabalho profundo",
+          person_ref_name: "Ana Ribeiro",
           scheduled_reminder_count: 2,
           next_reminder_at: "2026-07-26T09:00:00.000Z",
         }),
@@ -411,13 +421,16 @@ describe("what comes back", () => {
       projectRefId: "66666666-6666-4666-8666-666666666666",
       contextRefId: "77777777-7777-4777-8777-777777777777",
       personRefId: "88888888-8888-4888-8888-888888888888",
+      projectRefName: "ACME Corp.",
+      contextRefName: "Trabalho profundo",
+      personRefName: "Ana Ribeiro",
       scheduledReminderCount: 2,
       nextReminderAt: "2026-07-26T09:00:00.000Z",
     });
   });
 
   it("raises on a reminder column renamed to something plausible", async () => {
-    // `.strict()` over the five new columns, asserted against a near-miss rather
+    // `.strict()` over the eight new columns, asserted against a near-miss rather
     // than an obviously foreign key: a projection that started returning
     // `reminder_count` would leave `scheduled_reminder_count` missing *and* add
     // an undeclared key, and a schema that merely ignored unknown keys would
@@ -532,6 +545,12 @@ describe("what comes back", () => {
     ["a project reference that is not a uuid", { project_ref_id: "Acme" }],
     ["a context reference that is not a uuid", { context_ref_id: "deep-work" }],
     ["a person reference that is not a uuid", { person_ref_id: "11111111-1111-4111-8111" }],
+    // The names are user-authored text, so nothing narrower than `string` can be
+    // asserted about them — but a non-string is still a projection that stopped
+    // returning a name, and a preview would render it into a label.
+    ["a non-string project reference name", { project_ref_name: 42 }],
+    ["a non-string context reference name", { context_ref_name: false }],
+    ["a non-string person reference name", { person_ref_name: { name: "Ana" } }],
     // Non-null and non-negative: SQL coalesces the count to 0, so both a null
     // and a negative mean the projection changed. Either would be read as "no
     // reminders" by a preview that trusted the number.
@@ -563,6 +582,12 @@ describe("what comes back", () => {
     // preview must not give when the truth is "the projection stopped telling
     // us".
     "project_ref_id", "context_ref_id", "person_ref_id",
+    // And the same for the stored names. A dropped one would arrive as undefined
+    // and `relationAfter` reads it as "the id resolved but its name did not",
+    // which falls back to rendering the relations the task already holds — so the
+    // preview would quietly stop naming the thing it was about to add, which is
+    // the defect that produced a bare "+1" in the first place.
+    "project_ref_name", "context_ref_name", "person_ref_name",
     "scheduled_reminder_count", "next_reminder_at",
   ] as const;
 
@@ -581,7 +606,7 @@ describe("what comes back", () => {
     ).rejects.toMatchObject({ code: "invalid_row_shape" });
   });
 
-  it("names the field that was wrong, so a paged human is not reading a thirty-five-column diff", async () => {
+  it("names the field that was wrong, so a paged human is not reading a thirty-eight-column diff", async () => {
     const { client } = recordingClient({ data: [sqlRow({ prefilter_tier: 9 })], error: null });
 
     await expect(
@@ -653,6 +678,13 @@ describe("what comes back", () => {
     ["the resolved project reference", { project_ref_id: "66666666-6666-4666-8666-666666666666" }],
     ["the resolved context reference", { context_ref_id: "77777777-7777-4777-8777-777777777777" }],
     ["the resolved person reference", { person_ref_id: "88888888-8888-4888-8888-888888888888" }],
+    // The names are derived from those ids in the same single-row cross join, so
+    // they are query-scalars on identical terms. A set agreeing on the id and
+    // disagreeing on the name is the sharper failure of the two: the write would
+    // target one project while one candidate's preview named another.
+    ["the resolved project reference name", { project_ref_name: "ACME Corp." }],
+    ["the resolved context reference name", { context_ref_name: "Trabalho profundo" }],
+    ["the resolved person reference name", { person_ref_name: "Ana Ribeiro" }],
   ])("refuses a set whose rows disagree about %s", async (_label, overrides) => {
     // `b.observed_before` and `b.lim` are single-row cross joins, exactly like
     // `cardinality(q.tokens)`. The observation instant is the one that matters

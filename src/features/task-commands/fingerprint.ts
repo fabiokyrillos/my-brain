@@ -78,6 +78,25 @@ export type TaskCommandFingerprintInput = {
  */
 export function buildFingerprintPayload(input: TaskCommandFingerprintInput): FingerprintArgs {
   const { preview, preState, ownerId, operationKey } = input;
+  // `TaskCommandPreview.observedBefore` is nullable, and there is exactly one
+  // shape that carries the null: a shell whose match ranked no candidates, so
+  // there was no observation to report. That shape is never fingerprintable —
+  // `buildTaskCommandPreview` raises `missing_observation` before it can produce
+  // a `previewed` or `matched_requires_confirmation` disposition without one, and
+  // `loadTaskCommandFingerprint` returns null for every other disposition — so
+  // this is unreachable and is a throw rather than a substitution.
+  //
+  // Substituting anything at all is the failure worth refusing. The value is
+  // hashed, and `public.task_command_fingerprint` is `strict`: a null argument
+  // yields null instead of a digest, and an empty string yields a *valid* one
+  // over a fabricated instant. Two different requests would then share an
+  // identity, which is precisely what 2E-UPDATE-006's replay check reads.
+  if (preview.observedBefore === null) {
+    throw new TaskCommandFingerprintError(
+      "a fingerprintable preview must carry the instant its pre-state was observed at",
+      "missing_observation",
+    );
+  }
   return {
     p_owner_id: ownerId,
     p_task_id: preview.task.taskId,

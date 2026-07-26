@@ -182,6 +182,12 @@ returns table (
   project_ref_id uuid,
   context_ref_id uuid,
   person_ref_id uuid,
+  -- The resolved entity's stored name, so 2E-PREVIEW-002 can render the
+  -- proposed value of a relation the task does not hold yet. Null exactly when
+  -- its id is null.
+  project_ref_name text,
+  context_ref_name text,
+  person_ref_name text,
   -- Per-row, unlike the three above: reminders belong to the candidate.
   -- `scheduled` only — the heartbeat selects no other status, so a `snoozed`,
   -- `sent` or `cancelled` row can never fire and cancelling it would be a
@@ -211,6 +217,21 @@ as $$
       -- gates on is one this function vouched for.
       coalesce(p_observed_before, now()) as observed_before
   ),
+  ref_ids as (
+    select
+      cl.id as owner_id,
+      public.resolve_owned_entity_exact(
+        cl.id, 'project', left(coalesce(p_project_ref, ''), 160), b.observed_before
+      ) as project_ref_id,
+      public.resolve_owned_entity_exact(
+        cl.id, 'context', left(coalesce(p_context_ref, ''), 120), b.observed_before
+      ) as context_ref_id,
+      public.resolve_owned_entity_exact(
+        cl.id, 'person', left(coalesce(p_person_ref, ''), 160), b.observed_before
+      ) as person_ref_id
+    from caller cl
+    cross join bounds b
+  ),
   refs as (
     -- The patch's relation references, resolved once per query.
     --
@@ -237,17 +258,41 @@ as $$
     -- Resolved at `observed_before`, not at `now()`, so the alias window is the
     -- same instant the pre-state was read at.
     select
-      public.resolve_owned_entity_exact(
-        cl.id, 'project', left(coalesce(p_project_ref, ''), 160), b.observed_before
-      ) as project_ref_id,
-      public.resolve_owned_entity_exact(
-        cl.id, 'context', left(coalesce(p_context_ref, ''), 120), b.observed_before
-      ) as context_ref_id,
-      public.resolve_owned_entity_exact(
-        cl.id, 'person', left(coalesce(p_person_ref, ''), 160), b.observed_before
-      ) as person_ref_id
-    from caller cl
-    cross join bounds b
+      ri.project_ref_id,
+      ri.context_ref_id,
+      ri.person_ref_id,
+      -- The resolved entity's *stored* name, which the id alone cannot supply.
+      --
+      -- Added after a review proved the preview could never name the thing it
+      -- was about to add: it was looking the resolved id up in the arrays of
+      -- relations the task *already holds*, so the name resolved only in the
+      -- `no_change` case — the one case where it is not needed — and the real
+      -- addition rendered a bare "+1". 2E-PREVIEW-002 asks for the proposed
+      -- value, and "+1" is not a value.
+      --
+      -- The stored name rather than the user's own words, because the preview
+      -- is a statement about the user's data: `normalize_entity_alias` folds
+      -- case, accents and punctuation, so a ref of "acme corp" legitimately
+      -- resolves a project stored as "ACME Corp." and echoing the typing back
+      -- would confirm something the database does not hold.
+      --
+      -- Owner-scoped again here, even though the id came from an owner-scoped
+      -- resolver. The predicate costs nothing on a primary-key lookup and this
+      -- is a `security definer` function where the predicate is the only
+      -- ownership control there is.
+      (
+        select p.name from public.projects p
+        where p.id = ri.project_ref_id and p.user_id = ri.owner_id
+      ) as project_ref_name,
+      (
+        select c.name from public.contexts c
+        where c.id = ri.context_ref_id and c.user_id = ri.owner_id
+      ) as context_ref_name,
+      (
+        select pe.name from public.people pe
+        where pe.id = ri.person_ref_id and pe.user_id = ri.owner_id
+      ) as person_ref_name
+    from ref_ids ri
   ),
   statuses as (
     -- Eligibility is owned by the TypeScript taxonomy (PRD §11.2 as data), so
@@ -478,7 +523,15 @@ as $$
     rf.project_ref_id,
     rf.context_ref_id,
     rf.person_ref_id,
-    coalesce(rm.scheduled_count, 0),
+    rf.project_ref_name,
+    rf.context_ref_name,
+    rf.person_ref_name,
+    -- `count(*)` over an empty set is 0, not null, and an aggregate subquery
+    -- with no GROUP BY always returns exactly one row — so the `left join` can
+    -- never null this and no coalesce is needed. A review flagged the one that
+    -- was here as unreachable, and an unreachable guard reads as a claim the
+    -- data cannot make.
+    rm.scheduled_count,
     rm.next_remind_at
   from ranked r
   cross join bounds b

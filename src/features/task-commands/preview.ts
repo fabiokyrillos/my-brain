@@ -116,8 +116,14 @@ export type TaskCommandLinkedEffect = {
 
 export type TaskCommandPreviewTask = {
   readonly taskId: string;
-  readonly title: string;
-  readonly status: string;
+  /**
+   * Null on a stale or refused preview.
+   *
+   * Those shapes are produced before ownership has been established, so they
+   * carry no task content at all rather than content no check has cleared.
+   */
+  readonly title: string | null;
+  readonly status: string | null;
 };
 
 export type TaskCommandPreview = {
@@ -142,8 +148,15 @@ export type TaskCommandPreview = {
   readonly requiresConfirmation: boolean;
   /** A single Apply control is permitted. False for every non-`previewed` disposition. */
   readonly oneStep: boolean;
-  /** The instant the pre-state was observed at; the fingerprint's TOCTOU anchor. */
-  readonly observedBefore: string;
+  /**
+   * The instant the pre-state was observed at; the fingerprint's TOCTOU anchor.
+   *
+   * Null only on a shell whose match carried no candidates, where there is no
+   * observation to report. It was an empty string, which is a fabricated
+   * instant — the one value this field must never hold, since Slice 2E.4 hashes
+   * it.
+   */
+  readonly observedBefore: string | null;
   readonly policyVersion: string;
   /** Carried for provenance, deliberately *not* hashed — see `fingerprint.ts`. */
   readonly matchPolicyVersion: string;
@@ -185,9 +198,6 @@ export type TaskCommandPreviewInput = {
   readonly locale: Locale;
   readonly timeZone: string;
 };
-
-/** Mirrors `create_due_task_reminder`: `greatest(now(), due_at - interval '1 hour')`. */
-const REMINDER_LEAD_MS = 3_600_000;
 
 function instantMs(value: string | null): number | null {
   if (value === null) return null;
@@ -292,7 +302,16 @@ export function buildTaskCommandPreview(input: TaskCommandPreviewInput): TaskCom
       : "previewed";
 
   const effects = changed
-    ? buildLinkedEffects({ action: command.action, pre, patch, row, copy, locale, timeZone })
+    ? buildLinkedEffects({
+        action: command.action,
+        pre,
+        patch,
+        row,
+        observedBefore: result.observedBefore,
+        copy,
+        locale,
+        timeZone,
+      })
     : [];
 
   return {
@@ -515,15 +534,24 @@ function buildDeltas(input: {
         push("status", textValue(pre.status), textValue(after), after !== pre.status);
         break;
       }
+      // Set on entering the terminal status, cleared on leaving it — mirroring
+      // `persistTaskStatus`, so the two write paths cannot disagree.
+      //
+      // Entering is *always* a change, whatever the column held. An earlier
+      // version asked whether the value was null, which reported
+      // `changed: false` for a non-terminal task carrying a stale
+      // `completed_at` — a state that is reachable today, because PRD §3.2
+      // records no CHECK relating `status` to these columns and the live write
+      // path is a plain client UPDATE. The row then rendered an instant on the
+      // left, "when you apply" on the right, and `changed: false` between them,
+      // contradicting itself.
       case "completed_at": {
-        // Set on entering `completed`, cleared on leaving it — mirroring
-        // `persistTaskStatus`, so the two write paths cannot disagree.
         const entering = patch.status === "completed";
         push(
           "completed_at",
           nullableInstant(pre.completedAt),
           entering ? { kind: "atApply", text: copy.values.atApply } : emptyValue(copy),
-          entering ? pre.completedAt === null : pre.completedAt !== null,
+          entering || pre.completedAt !== null,
         );
         break;
       }
@@ -533,7 +561,7 @@ function buildDeltas(input: {
           "cancelled_at",
           nullableInstant(pre.cancelledAt),
           entering ? { kind: "atApply", text: copy.values.atApply } : emptyValue(copy),
-          entering ? pre.cancelledAt === null : pre.cancelledAt !== null,
+          entering || pre.cancelledAt !== null,
         );
         break;
       }
@@ -604,7 +632,7 @@ function buildDeltas(input: {
         push(
           field,
           relationBefore(field, row, copy),
-          relationAfter(field, row, patch, copy),
+          relationAfter(field, row, action, patch, copy),
           relationChanges(action, row, resolvedIdOf(patch)),
         );
         break;
@@ -641,34 +669,40 @@ function relationBefore(
 function relationAfter(
   field: TaskChangedField,
   row: TaskCandidateRow,
+  action: TaskCommandAction,
   patch: TaskCommandCanonicalPatch,
   copy: ReturnType<typeof getTaskCommandCopy>,
 ): TaskCommandDeltaValue {
+  const before = relationBefore(field, row, copy);
   const resolved = resolvedIdOf(patch);
-  if (resolved === null) return relationBefore(field, row, copy);
-  // The name is read out of the arrays SQL already returned, positionally
-  // aligned with the ids, rather than echoed from the user's words: showing the
-  // stored name is what makes the preview a statement about the user's data
-  // instead of a restatement of their typing.
-  const nameFor = (ids: readonly string[], names: readonly string[]): string | null => {
-    const index = ids.indexOf(resolved);
-    return index === -1 ? null : names[index];
-  };
+  if (resolved === null) return before;
+
+  // The resolved entity's *stored* name, projected by SQL alongside its id.
+  //
+  // An earlier version looked the id up in the row's own relation arrays — the
+  // relations the task already holds — which meant the name resolved only when
+  // the task already had it, and the actual addition rendered "+1". A review
+  // proved it: `assign_project` onto a task with no project produced
+  // `after: "+1"`, and onto a task that already held the project produced
+  // "Acme, Acme" beside copy saying nothing would change.
   const resolvedName =
     field === "task_projects"
-      ? nameFor(row.projectIds, row.projectNames)
+      ? row.projectRefName
       : field === "task_contexts"
-        ? nameFor(row.contextIds, row.contextNames)
-        : nameFor(row.personIds, row.personNames);
+        ? row.contextRefName
+        : row.personRefName;
 
-  const before = relationBefore(field, row, copy);
+  // Already held under the role this action writes, so `after` *is* `before`.
+  // Appending here is what produced the duplicated name, and it contradicted
+  // the `no_change` verdict computed from the same facts.
+  if (!relationChanges(action, row, resolved)) return before;
+
   if (resolvedName === null) {
-    // Resolved to an entity the task does not hold, so its name is not in the
-    // row's arrays. The addition is still truthful; only the label is unknown
-    // here, and the surface renders the count rather than inventing a name.
-    return before.kind === "empty"
-      ? { kind: "text", text: "+1" }
-      : { kind: "text", text: `${before.text}, +1` };
+    // The id resolved but its name did not, which SQL only produces if the
+    // entity was deleted between the resolver and the name lookup inside one
+    // `stable` snapshot — not reachable today. Falling back to `before` states
+    // less than we know rather than inventing a label.
+    return before;
   }
   return before.kind === "empty"
     ? textValue(resolvedName)
@@ -692,6 +726,17 @@ function buildLinkedEffects(input: {
   pre: TaskPreState;
   patch: TaskCommandCanonicalPatch;
   row: TaskCandidateRow;
+  /**
+   * The one instant this preview treats as now.
+   *
+   * Taken from the match result rather than from `row.observedBefore`, so the
+   * reminder decision and the fingerprint's TOCTOU anchor are the same moment.
+   * `rankTaskCandidates` reports the *earliest* observation across the set for a
+   * stated reason — of two disagreeing instants the earlier is the weaker claim,
+   * and a gate should rest on the weaker one — and a review pointed out that
+   * reading the selected row's own value here silently opted out of that.
+   */
+  observedBefore: string;
   copy: ReturnType<typeof getTaskCommandCopy>;
   locale: Locale;
   timeZone: string;
@@ -709,12 +754,21 @@ function buildLinkedEffects(input: {
   const entersTerminal = patch.status === "completed" || patch.status === "cancelled";
   const dueAfter = patch.dueAt !== undefined ? patch.dueAt : input.pre.dueAt;
   const dueMs = instantMs(dueAfter);
-  // A reminder is only created where a *future* due date survives the change,
-  // mirroring `greatest(now(), due_at - interval '1 hour')`: a due date already
-  // past would produce a reminder that fires immediately, which §11.3 does not
-  // ask for and a user would not expect.
-  const nowMs = instantMs(row.observedBefore);
-  const dueIsFuture = dueMs !== null && nowMs !== null && dueMs - REMINDER_LEAD_MS > nowMs;
+
+  // "where a future due date remains" (§11.3), which means the due date is in
+  // the future — nothing more.
+  //
+  // An earlier version required a full hour of lead, on the mistaken reading
+  // that `greatest(now(), due_at - interval '1 hour')` implies one. It does
+  // not: the `greatest` exists precisely so a due date less than an hour out
+  // still gets a reminder, at `now()`. A review proved the consequence —
+  // "move it to 5pm" typed at 4:30pm disclosed "no reminders are affected"
+  // while the mechanism would have created one. `create_due_task_reminder`
+  // itself has no future condition at all; the future test here is §11.3's,
+  // and it is what stops a preview promising a reminder for a date already
+  // past.
+  const nowMs = instantMs(input.observedBefore);
+  const dueIsFuture = dueMs !== null && nowMs !== null && dueMs > nowMs;
 
   if (entersTerminal) {
     effects.push(
@@ -725,16 +779,22 @@ function buildLinkedEffects(input: {
     return effects;
   }
 
-  // Leaving a terminal status, or moving a due date. Both close what is there
-  // and, where a future due date remains, open a fresh one — never updating a
-  // row in place, because a reminder id that has already notified can never
-  // notify again (§11.3).
+  // Leaving a terminal status, or moving a due date. §11.3's mechanism is the
+  // same for both and is not optional — "closing a row and inserting a new one,
+  // never by updating in place" — because a reminder id that has already
+  // notified can never notify again.
+  //
+  // So an existing scheduled reminder is *closed*, including under
+  // `reopen_task` and `restore_task`. §11.3 describes those two as "re-creating
+  // the reminder the INSERT-only trigger cannot", which presumes there is none
+  // to close; that presumption is false for rows written before Phase 2E, since
+  // nothing in this repository has ever cancelled a reminder on completion or
+  // cancellation. Disclosing "one already exists" and "a new one will be
+  // created" together — as an earlier version did — commits the phase to
+  // leaving two live reminders, which is the outcome the close-and-insert
+  // mechanism exists to prevent.
   if (hasScheduled) {
-    effects.push(
-      policy.targetStatus !== null
-        ? { kind: "reminders_already_scheduled", text: copy.effects.reminders_already_scheduled }
-        : { kind: "reminders_cancelled", text: copy.effects.reminders_cancelled },
-    );
+    effects.push({ kind: "reminders_cancelled", text: copy.effects.reminders_cancelled });
   }
   if (dueIsFuture) {
     effects.push({ kind: "reminder_created", text: copy.effects.reminder_created });
@@ -753,17 +813,25 @@ function shell(
 ): TaskCommandPreview {
   const { command, result, selectedTaskId } = input;
   const policy = actionPolicy(command.action);
-  const candidate = result.candidates.find((entry) => entry.taskId === selectedTaskId);
   return {
     willMutate: false,
     disposition,
     refusal,
     action: command.action,
-    task: {
-      taskId: selectedTaskId,
-      title: candidate?.preState.title ?? "",
-      status: candidate?.preState.status ?? "",
-    },
+    // Deliberately no title and no status.
+    //
+    // A shell is reached before ownership has been established — the stale path
+    // fires when the selected id is absent from `rows`, which is exactly when
+    // the cross-owner `throw` cannot run. Reading the candidate's `preState`
+    // here was the one path in the module that returned task content the owner
+    // check had not cleared, and a review demonstrated a hand-assembled result
+    // leaking another owner's title through it. Not reachable through
+    // `loadTaskCandidates`, which raises on a foreign row — but the module had
+    // already decided cross-owner is a throw, and this bypassed that decision.
+    //
+    // Nothing is lost: a stale or refused preview sends the caller back for a
+    // fresh match, and its copy is the declared localized text, not the title.
+    task: { taskId: selectedTaskId, title: null, status: null },
     deltas: [],
     effects: [],
     canonicalPatch: {},
@@ -772,7 +840,7 @@ function shell(
     destructive: policy.destructive,
     requiresConfirmation: policy.requiresConfirmation,
     oneStep: false,
-    observedBefore: result.observedBefore ?? "",
+    observedBefore: result.observedBefore,
     policyVersion: command.policyVersion,
     matchPolicyVersion: result.matchPolicyVersion,
     copy: {

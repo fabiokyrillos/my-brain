@@ -130,6 +130,33 @@ export type TaskCandidateRow = TaskPreState & {
   readonly contextRefId: string | null;
   readonly personRefId: string | null;
   /**
+   * The resolved entity's *stored* name — what the database holds, not what the
+   * command carried. Null exactly when its id is null.
+   *
+   * Projected because the id alone cannot name the thing the preview is about to
+   * add. A review proved the consequence: `relationAfter` was looking the
+   * resolved id up in the arrays of relations the task *already holds*, so the
+   * name resolved only in the `no_change` case — the one case where it is not
+   * needed — and the real addition rendered a bare "+1". 2E-PREVIEW-002 asks for
+   * the proposed value, and "+1" is not a value.
+   *
+   * The stored name rather than `patch.projectRef` for the same reason the id is
+   * bound rather than the words: `normalize_entity_alias` folds case, accents and
+   * punctuation, so a reference of "acme corp" legitimately resolves a project
+   * stored as "ACME Corp." and echoing the typing back would confirm something
+   * the user's data does not say. Reading it off the row is also the only way to
+   * get it without re-normalizing a name in TypeScript, which is the divergence
+   * 2E-MATCH-008 characterizes.
+   *
+   * Query-scalar and outside scoring on exactly the same evidence as the three
+   * ids above: `writesRelation` exists because the relation a command is *adding*
+   * must never boost the task that already holds it, and a name is no safer to
+   * score on than an id.
+   */
+  readonly projectRefName: string | null;
+  readonly contextRefName: string | null;
+  readonly personRefName: string | null;
+  /**
    * The task's live reminders — how many are `scheduled`, and when the next one
    * fires (null when none is).
    *
@@ -627,14 +654,21 @@ const SQL_MAX_QUERY_TOKENS = 16;
 const SQL_MAX_EFFECTIVE_LIMIT = 100;
 
 /**
- * Stands in for an unresolved `*_ref_id` in the cross-row agreement check below.
+ * Stands in for an unresolved `*_ref_id` or `*_ref_name` in the cross-row
+ * agreement check below.
  *
- * The check keys on value identity, and the three reference columns are the only
+ * The check keys on value identity, and the six reference columns are the only
  * query-scalars that are nullable. Dropping the nulls instead would make a set of
  * one resolved and one unresolved row *agree* — which is precisely the
  * disagreement worth catching — so they are folded to a value that cannot be
  * mistaken for one `resolve_owned_entity_exact` returns, since that function
  * returns a uuid or nothing.
+ *
+ * A stored *name* could in principle be this string, unlike a uuid. That costs
+ * nothing here: the folding only ever *creates* agreement between a null and a
+ * literal `<unresolved>`, and a set mixing those two carries one resolved
+ * reference and one unresolved one — which the id columns, resolved by the same
+ * CTE from the same argument, already report as a disagreement.
  */
 const UNRESOLVED_REF = "<unresolved>";
 
@@ -672,6 +706,21 @@ export type TaskCandidateRefScalars = {
   readonly projectRefId?: string | null;
   readonly contextRefId?: string | null;
   readonly personRefId?: string | null;
+  /**
+   * The resolved entities' stored names, checked on exactly the same ground as
+   * the ids: the `refs` CTE derives them from `ref_ids` in the same single-row
+   * cross join, so a result set whose rows disagree about one is a broken
+   * contract rather than an unusual query.
+   *
+   * Not redundant with the ids. A set could agree on `projectRefId` and disagree
+   * on `projectRefName` only if the name subqueries stopped being keyed on the
+   * id — a projection that had started reading a name from somewhere else — and
+   * that is precisely the failure a preview would render as the wrong label
+   * beside the right assignment.
+   */
+  readonly projectRefName?: string | null;
+  readonly contextRefName?: string | null;
+  readonly personRefName?: string | null;
 };
 
 function describeUnreachableRow(row: TaskCandidateShape): string | null {
@@ -768,13 +817,13 @@ export function describeUnreachableCandidates(
     const reason = describeUnreachableRow(row);
     if (reason !== null) return `row ${index}: ${reason}`;
   }
-  // Six values are computed once per query and cross-joined onto every row —
-  // `cardinality(q.tokens)`, `b.lim`, `b.observed_before` and the three
-  // `rf.*_ref_id` the `refs` CTE resolves — so a result set carrying two of any
-  // of them is a broken contract rather than an unusual query. All six are
-  // checked, because a review found the defence applied to one and not the
-  // others, and `observed_before` is the one that will guard a write in Slice
-  // 2E.4.
+  // Nine values are computed once per query and cross-joined onto every row —
+  // `cardinality(q.tokens)`, `b.lim`, `b.observed_before`, the three
+  // `rf.*_ref_id` the `refs` CTE resolves and the three `rf.*_ref_name` it reads
+  // for them — so a result set carrying two of any of them is a broken contract
+  // rather than an unusual query. All nine are checked, because a review found
+  // the defence applied to one and not the others, and `observed_before` is the
+  // one that will guard a write in Slice 2E.4.
   const disagreement = (label: string, values: readonly (string | number)[]): string | null => {
     const distinct = [...new Set(values)];
     if (distinct.length <= 1) return null;
@@ -791,6 +840,10 @@ export function describeUnreachableCandidates(
     pick: (row: TaskCandidateRefScalars) => string | null | undefined,
   ): readonly string[] => rows.map((row) => pick(row) ?? UNRESOLVED_REF);
 
+  // The names are checked as well as the ids, and not as a formality. They are
+  // what 2E-PREVIEW-002 renders as the proposed value of a relation, so a set
+  // carrying two of them means one candidate's preview would name a different
+  // project from another's — while the ids, and therefore the write, agreed.
   return (
     disagreement("query token count", rows.map((row) => row.queryTokenCount))
     ?? disagreement("effective limit", rows.map((row) => row.effectiveLimit))
@@ -798,5 +851,8 @@ export function describeUnreachableCandidates(
     ?? disagreement("resolved project reference", references((row) => row.projectRefId))
     ?? disagreement("resolved context reference", references((row) => row.contextRefId))
     ?? disagreement("resolved person reference", references((row) => row.personRefId))
+    ?? disagreement("resolved project reference name", references((row) => row.projectRefName))
+    ?? disagreement("resolved context reference name", references((row) => row.contextRefName))
+    ?? disagreement("resolved person reference name", references((row) => row.personRefName))
   );
 }

@@ -13,7 +13,7 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(66);
+select plan(73);
 
 -- Contract: signature, security, grants ------------------------------------
 
@@ -78,7 +78,7 @@ select is(
 select is(
   (select proargnames from pg_proc where oid =
     'public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
-  array['p_eligible_statuses', 'p_title_query', 'p_project_hint', 'p_context_hint', 'p_person_hint', 'p_observed_before', 'p_limit', 'p_project_ref', 'p_context_ref', 'p_person_ref', 'task_id', 'owner_id', 'title', 'description', 'status', 'due_at', 'planned_at', 'manual_priority', 'completed_at', 'cancelled_at', 'intentional_no_due', 'no_due_reason', 'created_at', 'updated_at', 'project_ids', 'project_names', 'context_ids', 'context_names', 'person_ids', 'person_names', 'person_roles', 'project_hint_matched', 'context_hint_matched', 'person_hint_matched', 'last_audited_at', 'observed_before', 'prefilter_tier', 'token_overlap', 'query_token_count', 'effective_limit', 'project_ref_id', 'context_ref_id', 'person_ref_id', 'scheduled_reminder_count', 'next_reminder_at'],
+  array['p_eligible_statuses', 'p_title_query', 'p_project_hint', 'p_context_hint', 'p_person_hint', 'p_observed_before', 'p_limit', 'p_project_ref', 'p_context_ref', 'p_person_ref', 'task_id', 'owner_id', 'title', 'description', 'status', 'due_at', 'planned_at', 'manual_priority', 'completed_at', 'cancelled_at', 'intentional_no_due', 'no_due_reason', 'created_at', 'updated_at', 'project_ids', 'project_names', 'context_ids', 'context_names', 'person_ids', 'person_names', 'person_roles', 'project_hint_matched', 'context_hint_matched', 'person_hint_matched', 'last_audited_at', 'observed_before', 'prefilter_tier', 'token_overlap', 'query_token_count', 'effective_limit', 'project_ref_id', 'context_ref_id', 'person_ref_id', 'project_ref_name', 'context_ref_name', 'person_ref_name', 'scheduled_reminder_count', 'next_reminder_at'],
   'the catalog signature is the one the migration declares and the generated types describe'
 );
 
@@ -697,6 +697,101 @@ select is(
    where project_ref_id is null and context_ref_id is null and person_ref_id is null),
   4,
   'and an omitted reference is null on every row rather than an accidental resolution'
+);
+
+-- The resolved entity's stored name (2E-PREVIEW-002) ------------------------
+--
+-- The id alone cannot name the thing the preview is about to add. A review
+-- proved `relationAfter` was looking the resolved id up in the arrays of
+-- relations the task *already holds*, so the name resolved only in the
+-- `no_change` case and the real addition rendered a bare "+1".
+--
+-- What these assert is that the *stored* name comes back, not the caller's
+-- reference text. `normalize_entity_alias` folds case, accents and punctuation,
+-- so an unaccented uppercase reference legitimately resolves an accented
+-- mixed-case project - and echoing the typing back would confirm something the
+-- database does not hold. The accented fixture is what makes the two
+-- distinguishable, and it is written with unicode escapes for the reason the
+-- corpus above is: an editor re-encoding the character would silently make the
+-- assertion tautological.
+
+select is(
+  (select project_ref_name from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'ORCAMENTO ANUAL', null, null)),
+  U&'Or\00E7amento Anual',
+  'the stored name comes back for the resolved project, not the unaccented uppercase reference the caller sent'
+);
+
+select is(
+  (select context_ref_name from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     null, 'casa', null)),
+  'Casa',
+  'and for the resolved context, with its stored capitalization rather than the lowercase reference'
+);
+
+select is(
+  (select person_ref_name from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     null, null, 'BRUNO SILVA')),
+  'Bruno Silva',
+  'and for the resolved person, likewise'
+);
+
+-- A name exists exactly when its id does. Written as a count over the whole
+-- result set rather than as a scalar subquery, because a scalar subquery over
+-- zero rows is also null and would satisfy the claim for the wrong reason.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25)
+   where project_ref_name is null and context_ref_name is null and person_ref_name is null),
+  4,
+  'an omitted reference carries no name either, on every row'
+);
+
+-- The unresolvable case, and the one that matters most: `Duplicado` names two
+-- owned projects that collapse under the authoritative normalizer, so
+-- `resolve_owned_entity_exact` returns nothing. A preview must be unable to
+-- label a relation it could not identify, so the name has to be null alongside
+-- the id rather than naming whichever row sorts first.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Duplicado', null, null)
+   where project_ref_id is null and project_ref_name is null),
+  1,
+  'an ambiguous reference resolves to neither an id nor a name'
+);
+
+-- A project only the second owner has. The name subqueries carry their own
+-- `user_id = ri.owner_id` predicate on top of the owner-scoped resolver, and
+-- `sql-reachability.test.ts` anchors that; what is observable *through* this
+-- function is that a caller naming someone else's project is told nothing about
+-- it - neither its id nor its name.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'comprar leite', null, null, null, now(), 25,
+     'Initech', null, null)
+   where project_ref_name is null),
+  1,
+  'and a project only the second owner has yields no name for the first, rather than the name of a row it does not own'
+);
+
+-- Query-scalar exactly as the three ids are: resolved once by the `refs` CTE and
+-- cross-joined onto every row. `candidates.ts` refuses a set whose rows disagree
+-- about one, so a per-row name would make the TypeScript layer reject legal
+-- result sets. Pinned to four rather than compared against zero disagreements,
+-- which zero rows would also satisfy.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25,
+     'orcamento anual', 'Casa', 'Bruno Silva')
+   where project_ref_name = U&'Or\00E7amento Anual'
+     and context_ref_name = 'Casa'
+     and person_ref_name = 'Bruno Silva'),
+  4,
+  'the three names are query-scalar: every one of the caller''s four candidates carries the same stored names'
 );
 
 -- 2E-MATCH-003 under the amendment: the references changed nothing -----------

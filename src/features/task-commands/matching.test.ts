@@ -105,12 +105,15 @@ function row(overrides: Partial<TaskCandidateRow> & { taskId: string }): TaskCan
     queryTokenCount: 0,
     effectiveLimit: TASK_MATCH_LIMITS.candidates,
     // Preview data, and inert here by construction: `scoreRow` reads none of
-    // these five, so no fixture can move a rate by setting them. They are
+    // these eight, so no fixture can move a rate by setting them. They are
     // defaulted to "nothing resolved, no reminders" so the corpus keeps saying
     // what it said before Slice 2E.3 widened the projection.
     projectRefId: null,
     contextRefId: null,
     personRefId: null,
+    projectRefName: null,
+    contextRefName: null,
+    personRefName: null,
     scheduledReminderCount: 0,
     nextReminderAt: null,
     ...overrides,

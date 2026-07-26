@@ -2546,6 +2546,7 @@ export type Database = {
           context_ids: string[]
           context_names: string[]
           context_ref_id: string
+          context_ref_name: string
           created_at: string
           description: string
           due_at: string
@@ -2561,6 +2562,7 @@ export type Database = {
           person_ids: string[]
           person_names: string[]
           person_ref_id: string
+          person_ref_name: string
           person_roles: string[]
           planned_at: string
           prefilter_tier: number
@@ -2568,6 +2570,7 @@ export type Database = {
           project_ids: string[]
           project_names: string[]
           project_ref_id: string
+          project_ref_name: string
           query_token_count: number
           scheduled_reminder_count: number
           status: string

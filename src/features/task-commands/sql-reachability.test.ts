@@ -136,6 +136,48 @@ describe("the rules match the SQL that produces the rows", () => {
     expect(refs).toBeLessThan(scanned);
   });
 
+  it("the ids are resolved before the names that are read from them", () => {
+    // `ref_ids` calls the resolver; `refs` reads each resolved entity's stored
+    // name from it. The split is what keeps the six values one single-row cross
+    // join rather than two — and therefore what puts the names on the same
+    // query-scalar footing as the ids, which is the ground `candidates.ts`
+    // refuses a disagreeing set on.
+    const refIds = migration.indexOf("\n  ref_ids as (");
+    const refs = migration.indexOf("\n  refs as (");
+    const scanned = migration.indexOf("\n  scanned as (");
+    expect(refIds).toBeGreaterThan(-1);
+    expect(refs).toBeGreaterThan(refIds);
+    expect(refs).toBeLessThan(scanned);
+  });
+
+  it("every name is read under the owner predicate, not from the id alone", () => {
+    // This is a `security definer` function, so the predicate *is* the ownership
+    // control — RLS is not a second wall inside it. The id already came from an
+    // owner-scoped resolver, which is exactly why a reader could delete these
+    // predicates as redundant and every other assertion in this file would stay
+    // green while the only control there is had been narrowed to one layer.
+    expect(migration).toMatch(
+      /select p\.name from public\.projects p\s*\n\s*where p\.id = ri\.project_ref_id and p\.user_id = ri\.owner_id/,
+    );
+    expect(migration).toMatch(
+      /select c\.name from public\.contexts c\s*\n\s*where c\.id = ri\.context_ref_id and c\.user_id = ri\.owner_id/,
+    );
+    expect(migration).toMatch(
+      /select pe\.name from public\.people pe\s*\n\s*where pe\.id = ri\.person_ref_id and pe\.user_id = ri\.owner_id/,
+    );
+  });
+
+  it("the reminder count is projected without an unreachable coalesce", () => {
+    // `count(*)` over an empty set is 0, not null, and an aggregate subquery with
+    // no GROUP BY always returns exactly one row — so the `left join lateral`
+    // cannot null it, and the guard that used to be here claimed something the
+    // data cannot do. Pinned rather than merely deleted: `candidates.ts` parses
+    // this column as a non-negative integer and *not* nullable, so a coalesce
+    // reappearing would be the visible sign that someone believed otherwise.
+    expect(migration).not.toContain("coalesce(rm.scheduled_count");
+    expect(migration).toMatch(/\n\s*rm\.scheduled_count,\s*\n\s*rm\.next_remind_at\s*\n/);
+  });
+
   it("the references never reach the scanning or ranking path", () => {
     // 2E-MATCH-005 in its sharpest form: the relation a command is *adding* must
     // not qualify or boost the task that already holds it — the defect
@@ -191,6 +233,13 @@ describe("the rules match the SQL that produces the rows", () => {
         "project_ref_id",
         "context_ref_id",
         "person_ref_id",
+        // The names travel with their ids and are excluded on the same ground.
+        // Ordering on one would be the same defect wearing a different column:
+        // which candidates survive truncation would depend on what the command is
+        // trying to assign, which is what `writesRelation` exists to prevent.
+        "project_ref_name",
+        "context_ref_name",
+        "person_ref_name",
         "scheduled_reminder_count",
         "next_reminder_at",
       ]) {
