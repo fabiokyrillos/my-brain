@@ -7,7 +7,12 @@ import {
   TASK_MATCH_THRESHOLDS,
   TASK_MATCH_WEIGHTS,
 } from "./match-policy";
-import { eligibleStatusesFor, rankTaskCandidates, type TaskCandidateRow } from "./matching";
+import {
+  describeUnreachableCandidates,
+  eligibleStatusesFor,
+  rankTaskCandidates,
+  type TaskCandidateRow,
+} from "./matching";
 import { validateTaskCommand, type ValidatedTaskCommand } from "./schema";
 import { TASK_COMMAND_ACTIONS, actionPolicy, type TaskCommandAction } from "./taxonomy";
 import { resolveTemporalPhrase } from "./temporal";
@@ -16,6 +21,17 @@ const NOW = "2026-07-25T12:00:00.000Z";
 const TIME_ZONE = "America/Sao_Paulo";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const OTHER_OWNER = "22222222-2222-4222-8222-222222222222";
+
+/**
+ * What the lexicon resolves "tomorrow" to, taken from `temporal.ts` rather than
+ * written out: a fixture that hard-codes the instant stops testing proximity the
+ * moment the lexicon's day boundary changes.
+ */
+const TOMORROW = (() => {
+  const resolved = resolveTemporalPhrase("tomorrow", { now: NOW, timeZone: TIME_ZONE });
+  if (resolved.status !== "resolved") throw new Error("the lexicon no longer resolves 'tomorrow'");
+  return resolved.instant;
+})();
 
 /**
  * Fixtures are built through `validateTaskCommand` rather than as bare object
@@ -96,7 +112,21 @@ function exactRow(taskId: string, overrides: Partial<TaskCandidateRow> = {}): Ta
   return row({ taskId, prefilterTier: 0, tokenOverlap: 1, queryTokenCount: 1, ...overrides });
 }
 
+/**
+ * Every fixture in this file goes through here, so none of them can assert
+ * behaviour against a `(tier, overlap, queryTokenCount)` triple SQL has no
+ * execution that produces. `sql-reachability.test.ts` is where those rules are
+ * stated and pinned against the migration; this is what applies them.
+ *
+ * Deliberately a throw rather than an expectation: an unreachable fixture is a
+ * broken test, and it should fail where it was written rather than add a
+ * passing assertion to whichever `it` happened to use it.
+ */
 function rank(rows: readonly TaskCandidateRow[], cmd: ValidatedTaskCommand) {
+  const unreachable = describeUnreachableCandidates(rows);
+  if (unreachable !== null) {
+    throw new Error(`fixture rows are not reachable from SQL: ${unreachable}`);
+  }
   return rankTaskCandidates({ command: cmd, rows, ownerId: OWNER, now: NOW, timeZone: TIME_ZONE });
 }
 
@@ -243,12 +273,29 @@ describe("overflow (2E-MATCH-004)", () => {
   });
 
   it("never returns ambiguous_overflow with nothing to disambiguate", () => {
+    // The non-qualifying rows share one token out of five (0.044, below the
+    // floor) rather than being tier-3 no-hint rows: `query_token_count` is
+    // computed once per query, so a set mixing 1 and 0 is not one SQL can
+    // return, and the fixture used to assert against exactly that.
+    const cmd = command({ action: "complete_task", titleWords: ["a", "b", "c", "d", "e"] });
     for (const qualifying of [0, 1, 2]) {
       const rows = Array.from({ length: qualifying + 2 }, (_, index) =>
         index < qualifying
-          ? exactRow(`t${index}`, { effectiveLimit: 1 })
-          : row({ taskId: `t${index}`, effectiveLimit: 1 }));
-      const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
+          ? row({
+            taskId: `t${index}`,
+            effectiveLimit: 1,
+            prefilterTier: 0,
+            tokenOverlap: 5,
+            queryTokenCount: 5,
+          })
+          : row({
+            taskId: `t${index}`,
+            effectiveLimit: 1,
+            prefilterTier: 2,
+            tokenOverlap: 1,
+            queryTokenCount: 5,
+          }));
+      const result = rank(rows, cmd);
       if (result.outcome !== "ambiguous_overflow") continue;
       expect(result.candidates.length).toBeGreaterThan(0);
     }
@@ -265,6 +312,22 @@ describe("overflow (2E-MATCH-004)", () => {
     expect(result.overflowed).toBe(false);
   });
 
+  it("is not overflowed at exactly the declared limit, and is one row above it", () => {
+    // `rows.length > declaredLimit`. With no fixture sitting *on* the limit,
+    // relaxing that to `>=` left the suite green while making every full page
+    // report a truncation — which 2E-MATCH-004 turns into a refusal to
+    // one-step apply, so the mutation silently disables the happy path.
+    const atLimit = [
+      exactRow("t1", { effectiveLimit: 2 }),
+      exactRow("t2", { effectiveLimit: 2 }),
+    ];
+    const overLimit = [...atLimit, exactRow("t3", { effectiveLimit: 2 })];
+    const cmd = command({ action: "complete_task", titleWords: ["report"] });
+
+    expect(rank(atLimit, cmd).overflowed).toBe(false);
+    expect(rank(overLimit, cmd).overflowed).toBe(true);
+  });
+
   it("the probe row is never scored as a candidate", () => {
     const rows = [
       exactRow("t1", { effectiveLimit: 1 }),
@@ -274,6 +337,86 @@ describe("overflow (2E-MATCH-004)", () => {
     const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
 
     expect(result.candidates.map((candidate) => candidate.taskId)).toEqual(["t1"]);
+  });
+});
+
+/**
+ * 2E-MATCH-011 says "at or above", and every comparison implementing it is a
+ * strict one whose boundary no fixture sat on. Each test here fails under the
+ * off-by-one that a mutation run proved the suite could not see.
+ */
+describe("thresholds are inclusive at the boundary (2E-MATCH-011/015)", () => {
+  it("accepts a top score sitting exactly on the threshold", () => {
+    // 0.22 x 6/11 + 0.1 + 0.1 + 0.1 + 0.08 + 0.05 = 0.55, which is
+    // TASK_MATCH_THRESHOLDS.topScore to the digit. Assembled from six weaker
+    // signals rather than a title hit because the title ladder alone cannot
+    // land on it.
+    const result = rank(
+      [
+        row({
+          taskId: "t1",
+          status: "todo",
+          prefilterTier: 2,
+          tokenOverlap: 6,
+          queryTokenCount: 11,
+          projectHintMatched: true,
+          contextHintMatched: true,
+          personHintMatched: true,
+          dueAt: new Date(Date.parse(TOMORROW) + 48 * 3_600_000).toISOString(),
+        }),
+      ],
+      command({
+        action: "complete_task",
+        titleWords: ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"],
+        project: "Acme",
+        context: "Work",
+        person: "Ana",
+        status: "todo",
+        temporalPhrase: "tomorrow",
+      }),
+    );
+
+    expect(result.topScore).toBe(TASK_MATCH_THRESHOLDS.topScore);
+    expect(result.outcome).toBe("matched");
+    expect(result.oneStep).toBe(true);
+  });
+
+  it("accepts a margin sitting exactly on the threshold", () => {
+    // 0.82 against 0.70. A `<=` here would send the clearest two-candidate
+    // separation the policy can express back to a disambiguation list.
+    const result = rank(
+      [
+        exactRow("t1", { status: "todo" }),
+        row({
+          taskId: "t2",
+          status: "blocked",
+          prefilterTier: 1,
+          tokenOverlap: 1,
+          queryTokenCount: 1,
+        }),
+      ],
+      command({ action: "complete_task", titleWords: ["report"], status: "blocked" }),
+    );
+
+    expect(result.topScore).toBe(0.82);
+    expect(result.margin).toBe(TASK_MATCH_THRESHOLDS.minMargin);
+    expect(result.outcome).toBe("matched");
+    expect(result.oneStep).toBe(true);
+  });
+
+  it("caps the presented list without capping the count it reports", () => {
+    // Deleting the `TASK_MATCH_LIMITS.ranked` slice survived every scenario in
+    // the suite, because none produced more candidates than the cap. 2E.3 reads
+    // `qualifyingCount` to choose its copy and `candidates` to render, so the
+    // two have to disagree here.
+    const rows = Array.from({ length: TASK_MATCH_LIMITS.ranked + 2 }, (_, index) =>
+      exactRow(`t${index}`));
+
+    const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
+
+    expect(result.qualifyingCount).toBe(TASK_MATCH_LIMITS.ranked + 2);
+    expect(result.candidates).toHaveLength(TASK_MATCH_LIMITS.ranked);
+    expect(result.overflowed).toBe(false);
   });
 });
 
@@ -399,9 +542,7 @@ describe("signals and evidence (2E-MATCH-005/014)", () => {
 });
 
 describe("temporal proximity", () => {
-  const resolved = resolveTemporalPhrase("tomorrow", { now: NOW, timeZone: TIME_ZONE });
-  if (resolved.status !== "resolved") throw new Error("the lexicon no longer resolves 'tomorrow'");
-  const hintMs = Date.parse(resolved.instant);
+  const hintMs = Date.parse(TOMORROW);
 
   function withDue(offsetHours: number) {
     return rank(
@@ -436,11 +577,36 @@ describe("temporal proximity", () => {
 
   it("falls back to planned_at when there is no due date", () => {
     const result = rank(
-      [exactRow("t1", { plannedAt: resolved.instant })],
+      [exactRow("t1", { plannedAt: TOMORROW })],
       command({ action: "complete_task", titleWords: ["report"], temporalPhrase: "tomorrow" }),
     );
 
     expect(result.candidates[0].evidence).toContain("temporal_proximity");
+  });
+
+  it("puts a distance of exactly temporalExactHours in the exact band, not the near one", () => {
+    // `distanceHours <= temporalExactHours`. Tightening it to `<` moved this
+    // case into the half-weight band and no fixture noticed, because none sat
+    // on the boundary — so a task due exactly a day from the hint quietly
+    // stopped being "on that day".
+    const result = withDue(TASK_MATCH_LIMITS.temporalExactHours);
+
+    expect(result.candidates[0].evidence).toContain("temporal_proximity");
+    expect(result.candidates[0].evidence).not.toContain("temporal_proximity_near");
+  });
+
+  it("puts a distance of exactly temporalNearHours in the near band, not out of range", () => {
+    const result = withDue(TASK_MATCH_LIMITS.temporalNearHours);
+
+    expect(result.candidates[0].evidence).toContain("temporal_proximity_near");
+    expect(result.candidates[0].evidence).not.toContain("temporal_proximity");
+  });
+
+  it("drops the signal one hour past the near band", () => {
+    const result = withDue(TASK_MATCH_LIMITS.temporalNearHours + 1);
+
+    expect(result.candidates[0].evidence).not.toContain("temporal_proximity");
+    expect(result.candidates[0].evidence).not.toContain("temporal_proximity_near");
   });
 });
 
@@ -476,7 +642,7 @@ describe("recency (2E-MATCH-006)", () => {
 });
 
 describe("determinism (2E-MATCH-009/017)", () => {
-  it("orders by score, then title, then id — and by nothing locale-dependent", () => {
+  it("orders by score, then title, then id", () => {
     const rows = [
       exactRow("t3", { title: "b" }),
       exactRow("t1", { title: "b" }),
@@ -486,6 +652,23 @@ describe("determinism (2E-MATCH-009/017)", () => {
     const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
 
     expect(result.candidates.map((candidate) => candidate.taskId)).toEqual(["t2", "t1", "t3"]);
+  });
+
+  it("breaks a title tie by code point, not by the host's collation", () => {
+    // "a"/"b" collate identically either way, so the previous fixture could not
+    // tell `<` from `localeCompare` and the swap survived a mutation run.
+    // "B" (U+0042) sorts before "a" (U+0061) by code unit and after it in every
+    // locale ICU implements — which is the whole reason 2E-MATCH-009 forbids
+    // `localeCompare`: the tie-break must not depend on the machine.
+    const rows = [exactRow("t1", { title: "a" }), exactRow("t2", { title: "B" })];
+
+    const result = rank(rows, command({ action: "complete_task", titleWords: ["report"] }));
+
+    expect(result.candidates.map((candidate) => candidate.preState.title)).toEqual(["B", "a"]);
+    // Pins the premise rather than assuming it: if a future ICU made these
+    // collate by code point too, the fixture would stop discriminating and this
+    // is what would say so.
+    expect("B".localeCompare("a")).toBeGreaterThan(0);
   });
 
   it("produces byte-identical results for the same input", () => {

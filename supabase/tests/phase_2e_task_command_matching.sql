@@ -13,7 +13,7 @@
 -- both places, proven here against the real function.
 
 begin;
-select plan(34);
+select plan(40);
 
 -- Contract: signature, security, grants ------------------------------------
 
@@ -335,6 +335,74 @@ select is(
      array['todo'], 'rel%rio', null, null, null, now(), 25)),
   0,
   'a LIKE metacharacter in a hint matches nothing instead of everything'
+);
+
+-- `_` is the other LIKE wildcard, and the more dangerous of the two here: it
+-- matches exactly one character, so an unescaped `rel_rio` would match the
+-- normalized `relatorio`-free titles at token level without looking like a
+-- wildcard to a reviewer skimming the hint.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'rel_rio', null, null, null, now(), 25)),
+  0,
+  'a LIKE single-character wildcard is a token boundary, not a match of one character'
+);
+
+-- Backslash is LIKE's default escape character, so it is the one metacharacter
+-- that can raise rather than merely over-match. Built with `chr(92)` rather
+-- than written as a literal: a scripted edit to this file turned an escape into
+-- a NUL byte twice, and Postgres rejects a NUL (22021) by aborting the whole
+-- file, which silently voids every assertion in it.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'rel' || chr(92) || 'rio', null, null, null, now(), 25)),
+  0,
+  'an embedded backslash neither escapes nor matches'
+);
+
+-- A *trailing* backslash is the 22025 case: `like '% relatorio\ %'` would raise
+-- `invalid escape sequence` and take the whole query with it. Normalization
+-- removes it before any pattern is built, so the hint behaves exactly as the
+-- same hint without it - two tasks whose normalized titles carry `relatorio` as
+-- a complete word.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], 'relatorio' || chr(92), null, null, null, now(), 25)),
+  2,
+  'a trailing backslash cannot raise 22025, and the hint still matches on its own terms'
+);
+
+-- A hint made only of metacharacters normalizes to the empty string, which is
+-- the documented no-hint path: every eligible task of the *caller* becomes a
+-- candidate and the overflow flag is what says the truncation was arbitrary.
+-- What it must not do is reach further than an absent hint would - across the
+-- eligible statuses, or across the owner boundary.
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], '%_' || chr(92), null, null, null, now(), 25)),
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], null, null, null, null, now(), 25)),
+  'a wholly-metacharacter hint is exactly an absent hint, never a wider one'
+);
+
+select is(
+  (select count(*)::integer from public.list_task_command_candidates(
+     array['todo'], '%', null, null, null, now(), 25)
+   where owner_id <> '41111111-1111-4111-8111-111111111111'),
+  0,
+  'and a bare wildcard still reaches nothing the caller does not own'
+);
+
+-- Determinism survives the metacharacters: the same hint twice returns the same
+-- rows in the same order, which is what 2E-MATCH-003 promises before truncation.
+-- `array_agg` without its own ORDER BY preserves the order rows arrive in, so
+-- comparing two aggregations compares the two executions' orderings.
+select is(
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], 'relatorio' || chr(92), null, null, null, now(), 25)),
+  (select array_agg(task_id) from public.list_task_command_candidates(
+     array['todo'], 'relatorio' || chr(92), null, null, null, now(), 25)),
+  'and the order is identical across executions of the same escaped hint'
 );
 
 select * from finish();

@@ -151,10 +151,34 @@ describe("normalizer divergence (2E-MATCH-008)", () => {
     // The pgTAP file is what proves the `authoritative` column above against a
     // real Postgres. If the two corpora drift, one of them is asserting values
     // nothing checks.
-    const expectedFragment =
-      `public.normalize_entity_alias(${sqlUnicodeLiteral(entry.input)}), ` +
-      `${sqlUnicodeLiteral(entry.authoritative)},`;
-    expect(pgTap).toContain(expectedFragment);
+    //
+    // Anchored on the whole assertion, not on a fragment: `toContain` alone was
+    // satisfied by the substring appearing anywhere at all - inside a comment,
+    // or inside an assertion whose expected value had been changed - so a
+    // *commented-out* corpus line would still have passed this.
+    const expected =
+      `select is(public.normalize_entity_alias(${sqlUnicodeLiteral(entry.input)}), `
+      + `${sqlUnicodeLiteral(entry.authoritative)},`;
+    expect(pgTap).toMatch(
+      new RegExp(`^${expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m"),
+    );
+  });
+
+  it("runs every corpus entry in SQL and nothing else", () => {
+    // The count is what closes co-drift. Both corpora agreeing is only evidence
+    // if the SQL side is *executing* all of them: without this, deleting an
+    // entry from both files leaves the suite green, and so does adding one to
+    // this file that pgTAP never runs. The runtime proof is pgTAP's; this makes
+    // sure the proof covers the whole corpus.
+    const executed = pgTap.match(/^select is\(public\.normalize_entity_alias\(/gm) ?? [];
+    expect(executed).toHaveLength(CORPUS.length);
+  });
+
+  it("gives every corpus entry a distinct input", () => {
+    // Two entries with the same input would satisfy the count above while
+    // leaving a case unproven.
+    expect(new Set(CORPUS.map((entry) => entry.input)).size).toBe(CORPUS.length);
+    expect(new Set(CORPUS.map((entry) => entry.id)).size).toBe(CORPUS.length);
   });
 
   it("covers every case PRD revision 3 named", () => {
@@ -204,5 +228,22 @@ describe("the authoritative normalizer is the only one matching consults", () =>
     // the alphanumeric squeeze. Both belong to SQL in Phase 2E.
     expect(text).not.toContain('normalize("NFD")');
     expect(text).not.toContain("[^a-z0-9]");
+  });
+
+  it.each(sources)("%s decides no text comparison against the host's ICU data", (file) => {
+    // The third re-implementation move, and the one a mutation run proved the
+    // behavioural fixtures could not catch: `rankEntityCandidates` breaks its
+    // ties with `localeCompare`, and copying that here would make the 2E-MATCH-009
+    // ordering resolve against whatever collation the machine happens to carry.
+    // Unlike the two above this is not a normalizer, so it needs its own guard,
+    // and unlike a fixture, a structural check cannot be defeated by two strings
+    // that happen to collate the same way.
+    //
+    // Matched as a call, for the reason the assertion above is: `matching.ts`
+    // documents at length why its comparator does not use `localeCompare`, and
+    // a substring check would forbid the explanation along with the behaviour.
+    const text = source(`${FEATURE_DIR}/${file}`);
+    expect(text).not.toMatch(/\.localeCompare\s*\(/);
+    expect(text).not.toMatch(/Intl\.Collator\s*\(/);
   });
 });

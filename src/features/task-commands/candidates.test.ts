@@ -134,6 +134,33 @@ describe("candidate query arguments", () => {
     expect(calls[0].args.p_person_hint).toBeUndefined();
   });
 
+  it("sends each relation hint to its own argument", async () => {
+    // Asserted with three distinct values, because the previous coverage only
+    // checked that all three were *absent* — under which any permutation of the
+    // three arguments, or all three reading from one hint, passes. The RPC
+    // compares each against a different table, so a swap silently matches
+    // people against project names.
+    const { calls, client } = recordingClient({ data: [], error: null });
+
+    await loadTaskCandidates({
+      client,
+      command: command({
+        action: "complete_task",
+        titleWords: ["report"],
+        project: "Acme Holdings",
+        context: "Deep Work",
+        person: "Ana Paula",
+      }),
+      ownerId: OWNER,
+      now: NOW,
+    });
+
+    expect(calls[0].args.p_project_hint).toBe("Acme Holdings");
+    expect(calls[0].args.p_context_hint).toBe("Deep Work");
+    expect(calls[0].args.p_person_hint).toBe("Ana Paula");
+    expect(calls[0].args.p_title_query).toBe("report");
+  });
+
   it("passes the injected instant, so the recency window is never the server's clock", async () => {
     const { calls, client } = recordingClient({ data: [], error: null });
 
@@ -273,6 +300,163 @@ describe("what comes back", () => {
         now: NOW,
       }),
     ).rejects.toMatchObject({ code: "invalid_row_shape" });
+  });
+
+  /**
+   * Every refinement in `rowSchema`, driven from a table.
+   *
+   * A mutation run showed each of these survived removal: the one test that
+   * existed deleted `prefilter_tier`, and `prefilter_tier: z.any()` parses a
+   * missing key happily, so the weakest possible schema passed the check meant
+   * to defend it.
+   *
+   * The assertion is on the *code*, not merely on rejection, and that is
+   * load-bearing. Several of these values are also refused one layer later by
+   * `describeUnreachableCandidates`, which raises `unreachable_row_shape`. If
+   * this asserted "it throws", removing a refinement would leave the suite green
+   * on the strength of a different control. Relaxing any of these to a generic
+   * rejection un-pins the layer it was written to pin.
+   */
+  const invalidRows: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+    ["a task id that is not a uuid", { task_id: "not-a-uuid" }],
+    ["an owner id that is not a uuid", { owner_id: "11111111-1111-4111-8111" }],
+    ["a negative token overlap", { token_overlap: -1 }],
+    ["a fractional token overlap", { token_overlap: 1.5 }],
+    ["a negative query token count", { query_token_count: -1 }],
+    ["an effective limit below one", { effective_limit: 0 }],
+    ["a negative effective limit", { effective_limit: -25 }],
+    ["a fractional prefilter tier", { prefilter_tier: 1.5 }],
+    ["a prefilter tier below the vocabulary", { prefilter_tier: -1 }],
+    ["a prefilter tier above the vocabulary", { prefilter_tier: 4 }],
+    ["a null where a count is expected", { token_overlap: null }],
+    ["a string where a count is expected", { prefilter_tier: "0" }],
+    ["a null title", { title: null }],
+    ["a null status", { status: null }],
+    ["a null observation instant", { observed_before: null }],
+    ["a null intentional_no_due", { intentional_no_due: null }],
+    ["person arrays that are not aligned", { person_ids: ["a"], person_names: [], person_roles: [] }],
+  ];
+
+  it.each(invalidRows)("refuses %s at the schema", async (_label, overrides) => {
+    const { client } = recordingClient({ data: [sqlRow(overrides)], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_row_shape" });
+  });
+
+  const requiredKeys = [
+    "task_id", "owner_id", "title", "status", "observed_before",
+    "prefilter_tier", "token_overlap", "query_token_count", "effective_limit",
+    "intentional_no_due", "created_at", "updated_at", "project_ids", "person_roles",
+  ] as const;
+
+  it.each(requiredKeys)("refuses a row missing %s", async (key) => {
+    const row: Record<string, unknown> = { ...sqlRow() };
+    delete row[key];
+    const { client } = recordingClient({ data: [row], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_row_shape" });
+  });
+
+  it("names the field that was wrong, so a paged human is not reading a thirty-column diff", async () => {
+    const { client } = recordingClient({ data: [sqlRow({ prefilter_tier: 9 })], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toThrow(/prefilter_tier/);
+  });
+
+  /**
+   * The second layer: values every field-level rule accepts, in combinations
+   * `list_task_command_candidates` has no execution that produces.
+   */
+  const unreachableRows: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+    [
+      "an exact title hit carrying only part of the hint",
+      { prefilter_tier: 0, token_overlap: 1, query_token_count: 4 },
+    ],
+    [
+      "a phrase hit carrying only part of it",
+      { prefilter_tier: 1, token_overlap: 2, query_token_count: 5 },
+    ],
+    [
+      "an overlap larger than the token array it counts",
+      { prefilter_tier: 2, token_overlap: 6, query_token_count: 5 },
+    ],
+    [
+      "a tier-2 row with neither a shared token nor a relation hit",
+      { prefilter_tier: 2, token_overlap: 0, query_token_count: 3, project_hint_matched: false },
+    ],
+    [
+      "a tier-3 row that carries a relation hit",
+      {
+        prefilter_tier: 3,
+        token_overlap: 0,
+        query_token_count: 0,
+        project_hint_matched: true,
+      },
+    ],
+    [
+      "a tier-3 row that reports query tokens",
+      { prefilter_tier: 3, token_overlap: 0, query_token_count: 2, project_hint_matched: false },
+    ],
+  ];
+
+  it.each(unreachableRows)("refuses %s", async (_label, overrides) => {
+    const { client } = recordingClient({ data: [sqlRow(overrides)], error: null });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "unreachable_row_shape" });
+  });
+
+  it("refuses a set whose rows disagree about the query's token count", async () => {
+    // Each row is individually reachable. `query_token_count` is computed once
+    // per query and cross-joined onto every row, so this set is not.
+    const { client } = recordingClient({
+      data: [
+        sqlRow(),
+        sqlRow({
+          task_id: "44444444-4444-4444-8444-444444444444",
+          prefilter_tier: 2,
+          token_overlap: 1,
+          query_token_count: 4,
+        }),
+      ],
+      error: null,
+    });
+
+    await expect(
+      loadTaskCandidates({
+        client,
+        command: command({ action: "complete_task", titleWords: ["report"] }),
+        ownerId: OWNER,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "unreachable_row_shape" });
   });
 
   it("raises, never filters, when a row belongs to another owner", async () => {

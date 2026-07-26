@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { TASK_MATCH_LIMITS, TASK_MATCH_POLICY_VERSION } from "./match-policy";
-import { rankTaskCandidates, type TaskCandidateRow, type TaskMatchOutcome } from "./matching";
+import {
+  describeUnreachableCandidates,
+  rankTaskCandidates,
+  type TaskCandidateRow,
+  type TaskMatchOutcome,
+} from "./matching";
 import { validateTaskCommand, type ValidatedTaskCommand } from "./schema";
 import type { TaskCommandAction } from "./taxonomy";
 
@@ -205,6 +210,16 @@ describe("match-quality baseline (2E-MATCH-018)", () => {
   it.each(results)("$scenario.id resolves as the corpus declares", ({ scenario, result }) => {
     expect(result.outcome).toBe(scenario.outcome);
     expect(result.oneStep).toBe(scenario.oneStep);
+  });
+
+  it.each(CORPUS)("$id is a set SQL could actually have returned", (scenario) => {
+    // The corpus supplies `prefilterTier`, `tokenOverlap` and `queryTokenCount`
+    // by hand — that is the declared scope of this baseline, and the caveat the
+    // phase report carries. What must not also be true is that the hand-written
+    // triples are ones no execution of `list_task_command_candidates` produces:
+    // a rate measured over impossible inputs is not a measurement of anything.
+    // `sql-reachability.test.ts` pins these rules against the migration.
+    expect(describeUnreachableCandidates(scenario.rows)).toBeNull();
   });
 
   it("measures the baseline the phase report cites", () => {

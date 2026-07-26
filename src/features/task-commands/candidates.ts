@@ -17,7 +17,11 @@ import { z } from "zod";
 
 import type { Database } from "@/lib/supabase/database.types";
 
-import { eligibleStatusesFor, type TaskCandidateRow } from "./matching";
+import {
+  describeUnreachableCandidates,
+  eligibleStatusesFor,
+  type TaskCandidateRow,
+} from "./matching";
 import { TASK_MATCH_LIMITS } from "./match-policy";
 import type { ValidatedTaskCommand } from "./schema";
 
@@ -216,6 +220,19 @@ export async function loadTaskCandidates(
   }
 
   const rows = parsed.data.map(toCandidateRow);
+
+  // The row shape is legal; this asks whether the *values* are ones the query
+  // could have produced. `rowSchema` cannot: a tier of 0 alongside an overlap of
+  // 0 passes every field-level rule and is still a combination no execution of
+  // `list_task_command_candidates` can emit. Raising rather than scoring keeps a
+  // migration that landed ahead of this code visible.
+  const unreachable = describeUnreachableCandidates(rows);
+  if (unreachable !== null) {
+    throw new TaskCandidateQueryError(
+      `list_task_command_candidates returned rows it could not have produced: ${unreachable}`,
+      "unreachable_row_shape",
+    );
+  }
 
   // 2E-MATCH-001 and 2E-OWNERSHIP-001. The RPC is `security definer` — it has
   // to be, because `normalize_entity_alias` is not executable by

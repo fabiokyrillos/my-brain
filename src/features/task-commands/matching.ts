@@ -508,3 +508,141 @@ export function rankTaskCandidates(input: TaskMatchInput): TaskMatchResult {
 export function eligibleStatusesFor(action: TaskCommandAction): readonly string[] {
   return actionPolicy(action).eligibleFrom;
 }
+
+/**
+ * The bound `list_task_command_candidates` puts on the hint's token array.
+ *
+ * Mirrors `limit 16` in the migration's `hint_query` CTE. Deliberately *not* in
+ * `match-policy.ts`: it is a query bound rather than a scoring knob — no
+ * well-formed command can reach it, because 2E-COMMAND-005 caps `titleWords` at
+ * 12 — and putting it inside the policy digest would make a SQL-side query
+ * change look like a scoring change and force a `TASK_MATCH_POLICY_VERSION` bump
+ * that misattributes every past match. `sql-reachability.test.ts` pins it
+ * against the migration text instead, which is the same cross-file technique
+ * `status-vocabulary-parity.test.ts` uses for the status literals.
+ */
+const SQL_MAX_QUERY_TOKENS = 16;
+
+/** Mirrors `least(greatest(coalesce(p_limit, 25), 1), 100)` in the migration. */
+const SQL_MAX_EFFECTIVE_LIMIT = 100;
+
+/**
+ * The part of a candidate row whose values SQL derives rather than reads.
+ *
+ * `TaskCandidateRow` satisfies this structurally; naming the subset keeps the
+ * reachability rules from appearing to depend on the pre-state columns, which
+ * are projected verbatim from `public.tasks` and constrain nothing.
+ */
+export type TaskCandidateShape = {
+  readonly prefilterTier: number;
+  readonly tokenOverlap: number;
+  readonly queryTokenCount: number;
+  readonly projectHintMatched: boolean;
+  readonly contextHintMatched: boolean;
+  readonly personHintMatched: boolean;
+  readonly effectiveLimit: number;
+};
+
+function describeUnreachableRow(row: TaskCandidateShape): string | null {
+  const tiers: readonly number[] = Object.values(TASK_MATCH_PREFILTER_TIERS);
+  if (!Number.isInteger(row.prefilterTier) || !tiers.includes(row.prefilterTier)) {
+    return `prefilter tier ${row.prefilterTier} is not one of the declared tiers`;
+  }
+  if (!Number.isInteger(row.tokenOverlap) || row.tokenOverlap < 0) {
+    return `token overlap ${row.tokenOverlap} is not a non-negative integer`;
+  }
+  if (!Number.isInteger(row.queryTokenCount) || row.queryTokenCount < 0) {
+    return `query token count ${row.queryTokenCount} is not a non-negative integer`;
+  }
+  if (row.queryTokenCount > SQL_MAX_QUERY_TOKENS) {
+    return `query token count ${row.queryTokenCount} exceeds the ${SQL_MAX_QUERY_TOKENS}-token bound the hint CTE applies`;
+  }
+  // `overlap` counts a subset of `q.tokens`, so it can never exceed its
+  // cardinality. A row claiming otherwise would score a fraction above 1.
+  if (row.tokenOverlap > row.queryTokenCount) {
+    return `token overlap ${row.tokenOverlap} exceeds the query's ${row.queryTokenCount} tokens`;
+  }
+  if (
+    !Number.isInteger(row.effectiveLimit)
+    || row.effectiveLimit < 1
+    || row.effectiveLimit > SQL_MAX_EFFECTIVE_LIMIT
+  ) {
+    return `effective limit ${row.effectiveLimit} is outside the clamp SQL applies`;
+  }
+
+  const anyRelationHit =
+    row.projectHintMatched || row.contextHintMatched || row.personHintMatched;
+
+  // Tiers 0 and 1 both mean "the whole normalized hint is present in the title
+  // as complete words", so every one of the hint's tokens is in the title and
+  // the overlap is necessarily total. A tier-0 row reporting partial overlap is
+  // a contradiction SQL cannot produce, and scoring it would credit an exact
+  // title with a fractional token bonus no query could have justified.
+  if (
+    row.prefilterTier === TASK_MATCH_PREFILTER_TIERS.exactTitle
+    || row.prefilterTier === TASK_MATCH_PREFILTER_TIERS.titlePhrase
+  ) {
+    if (row.queryTokenCount < 1) {
+      return `tier ${row.prefilterTier} requires a non-empty normalized hint, so it cannot report zero query tokens`;
+    }
+    if (row.tokenOverlap !== row.queryTokenCount) {
+      return `tier ${row.prefilterTier} carries every hint token, so overlap must equal the query's ${row.queryTokenCount} tokens, not ${row.tokenOverlap}`;
+    }
+    return null;
+  }
+
+  if (row.prefilterTier === TASK_MATCH_PREFILTER_TIERS.connected) {
+    if (row.tokenOverlap === 0 && !anyRelationHit) {
+      return "tier 2 is reached by a shared token or a relation hit, and this row reports neither";
+    }
+    return null;
+  }
+
+  // Tier 3 is computed for any unconnected row, but the `ranked` CTE only
+  // *returns* one when every hint was empty — so a returned tier-3 row cannot
+  // carry a relation hit or a token count.
+  if (anyRelationHit) {
+    return "tier 3 cannot carry a relation hit, which would have qualified the row as tier 2";
+  }
+  if (row.queryTokenCount !== 0 || row.tokenOverlap !== 0) {
+    return "tier 3 is only returned when the command carried no hint at all, so it cannot report query tokens";
+  }
+  return null;
+}
+
+/**
+ * Why this result set could not have come from `list_task_command_candidates`,
+ * or null when it could have.
+ *
+ * The scorer reads `prefilterTier`, `tokenOverlap` and `queryTokenCount` as the
+ * authoritative normalizer's verdict and never re-derives them (2E-MATCH-007),
+ * which means it trusts combinations it has no way to check. Some of those
+ * combinations are not merely unlikely, they are unproducible: a tier-0 row
+ * with partial token overlap, a tier-3 row carrying a relation hit, an overlap
+ * larger than the token array it counts. Left unstated, a fixture could assert
+ * behaviour against an input SQL cannot emit — and a migration that started
+ * emitting one would be scored rather than caught.
+ *
+ * Consumed by `loadTaskCandidates`, which raises on a violation for the same
+ * reason it raises on a cross-owner row: the likeliest cause is a migration that
+ * landed ahead of this code, and scoring it quietly would hide that.
+ * `rankTaskCandidates` deliberately does *not* call this — it must stay total
+ * for callers that did not come through the data-access layer, and its own
+ * filters already refuse to act on a row it cannot justify.
+ */
+export function describeUnreachableCandidates(
+  rows: readonly TaskCandidateShape[],
+): string | null {
+  for (const [index, row] of rows.entries()) {
+    const reason = describeUnreachableRow(row);
+    if (reason !== null) return `row ${index}: ${reason}`;
+  }
+  // `query_token_count` is `cardinality(q.tokens)`, computed once per query and
+  // cross-joined onto every row, so one result set carrying two different values
+  // is a broken contract rather than an unusual query.
+  const counts = [...new Set(rows.map((row) => row.queryTokenCount))];
+  if (counts.length > 1) {
+    return `query token count differs across one result set (${counts.sort((left, right) => left - right).join(", ")}), and SQL computes it once per query`;
+  }
+  return null;
+}
