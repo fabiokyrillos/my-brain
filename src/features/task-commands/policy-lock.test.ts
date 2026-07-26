@@ -1,9 +1,13 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
   TASK_COMMAND_ACTIONS,
   TASK_COMMAND_POLICY_VERSION,
+  TASK_COMMAND_UNDO_WINDOW_HOURS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   actionPolicy,
@@ -45,15 +49,68 @@ describe("policy digest", () => {
   it("pins the action taxonomy to its declared version", () => {
     const canonical = TASK_COMMAND_ACTIONS.map((action) => [action, actionPolicy(action)]);
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.1",
-      digest: "29ae7e7cdb90cdcd",
+      version: "2026-07-25.2",
+      digest: "7390ce73be772c2c",
     });
+  });
+
+  it("declares a target status exactly when the action decides it, not the patch", () => {
+    // The biconditional `targetStatus !== null` <-> (the action changes
+    // `status` AND does not take it from the patch). A fail-open null would
+    // make the preview render "Status: todo -> " with nothing after the arrow,
+    // and a fail-closed non-null on `set_status` would override the value the
+    // user actually asked for — the direction that silently writes the wrong
+    // status.
+    for (const action of TASK_COMMAND_ACTIONS) {
+      const policy = actionPolicy(action);
+      const decidesItself =
+        policy.changedFields.includes("status") && policy.targetValueField !== "status";
+      expect(
+        { action, hasTarget: policy.targetStatus !== null },
+        `${action} must declare a target status exactly when it decides one itself`,
+      ).toEqual({ action, hasTarget: decidesItself });
+    }
+  });
+
+  it("only ever targets a status the vocabulary has, reachable by its inverse", () => {
+    for (const action of TASK_COMMAND_ACTIONS) {
+      const target = actionPolicy(action).targetStatus;
+      if (target === null) continue;
+      expect(TASK_STATUSES).toContain(target);
+      // The escape hatch has to exist: a target status no action is eligible
+      // from is a one-way door out of the product. `completed` is reachable
+      // back through `reopen_task`, `cancelled` through `restore_task`, and
+      // `todo` through everything.
+      const inverses = TASK_COMMAND_ACTIONS.filter((candidate) =>
+        (actionPolicy(candidate).eligibleFrom as readonly string[]).includes(target),
+      );
+      expect(inverses.length, `nothing can act on a task left in ${target}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("mirrors the undo window the database actually enforces", () => {
+    // `TASK_COMMAND_UNDO_WINDOW_HOURS` is a mirror, not a source:
+    // `undo_operations.expires_at` defaults to `now() + interval '24 hours'`
+    // and the database is what decides whether an undo is still available.
+    // Two independent declarations of one number is precisely the silent
+    // cross-language drift `status-vocabulary-parity.test.ts` exists to catch,
+    // so this pins the constant against the migration that owns it.
+    const migration = readFileSync(
+      path.resolve(process.cwd(), "supabase/migrations/202607160003_intelligent_capture.sql"),
+      "utf8",
+    );
+    expect(migration).toContain(
+      `now() + interval '${TASK_COMMAND_UNDO_WINDOW_HOURS} hours'`,
+    );
   });
 
   it("pins the status and priority vocabularies to the same version", () => {
     const canonical = [...TASK_STATUSES, ...TASK_PRIORITIES];
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.1",
+      // The digest is unchanged from `2026-07-25.1`, and that is the point:
+      // Slice 2E.3 added `targetStatus` to the action policies and touched no
+      // status or priority literal. Only the version moved.
+      version: "2026-07-25.2",
       digest: "e8c8bb1bd473e41f",
     });
   });
@@ -64,7 +121,7 @@ describe("policy digest", () => {
     expect(TEMPORAL_LEXICON_VERSION).toBe(TASK_COMMAND_POLICY_VERSION);
     const canonical = TEMPORAL_LEXICON.map((entry) => [entry.id, entry.rule, String(entry.pattern)]);
     expect({ version: TEMPORAL_LEXICON_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.1",
+      version: "2026-07-25.2",
       digest: "a5b7f3be24a9abe1",
     });
   });

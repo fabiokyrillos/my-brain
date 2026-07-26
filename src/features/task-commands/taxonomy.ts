@@ -112,8 +112,32 @@ export type TaskCommandUnsupportedReason = (typeof TASK_COMMAND_UNSUPPORTED_REAS
  * Bumped whenever any weight, threshold, eligibility rule or allowed value in
  * this module or in the matching policy changes, so a recorded decision stays
  * attributable to the rules that produced it (PRD §10.4).
+ *
+ * `2026-07-25.2` — Slice 2E.3 added `targetStatus` to every action's policy.
+ * The bump is not bookkeeping: this value is one of the seven inputs to
+ * 2E-PREVIEW-004's fingerprint, so from Slice 2E.4 onwards changing it
+ * invalidates every stored fingerprint and every unexpired confirmation token.
+ * Nothing stores one yet, which is precisely why the field had to arrive with
+ * its bump now rather than later.
  */
-export const TASK_COMMAND_POLICY_VERSION = "2026-07-25.1";
+export const TASK_COMMAND_POLICY_VERSION = "2026-07-25.2";
+
+/**
+ * The window in which a Phase 2E operation stays undoable (2E-UNDO-006).
+ *
+ * A mirror, not a source: `undo_operations.expires_at` defaults to
+ * `now() + interval '24 hours'` (`202607160003:153`), and the database is what
+ * actually decides whether an undo is still available. Declared here because
+ * 2E-PREVIEW-002 requires the preview to state the window and a component may
+ * not reach into a migration — and pinned against that migration's text by
+ * `policy-lock.test.ts`, because two independent declarations of one number is
+ * the drift `status-vocabulary-parity.test.ts` exists to catch elsewhere.
+ *
+ * Deliberately *outside* the policy digest: it is a property of the undo
+ * primitive this phase reuses, not of the action taxonomy, so changing it must
+ * not silently re-attribute past match decisions to a new policy version.
+ */
+export const TASK_COMMAND_UNDO_WINDOW_HOURS = 24;
 
 /** The patch field names a command may carry. */
 export const TASK_COMMAND_PATCH_FIELDS = [
@@ -193,6 +217,26 @@ export type TaskCommandActionPolicy = {
    * field would declare its allowed values and have them silently ignored.
    */
   readonly targetValueField: TaskCommandPatchField | null;
+  /**
+   * The status this action moves the task to, when the action decides it
+   * rather than the patch — or null when it changes no status, or takes the
+   * destination from the patch.
+   *
+   * PRD §11.2 states these as `status→completed` in its `Changes` column, and
+   * until now that arrow existed only as prose. 2E-PREVIEW-002 requires the
+   * preview to show the proposed value of every field the patch touches, and
+   * for the four actions with no patch fields at all — `complete_task`,
+   * `reopen_task`, `cancel_task`, `restore_task` — the proposed status is not
+   * derivable from anything the command carries. A conditional in the preview
+   * would be the fourth copy of taxonomy knowledge this module exists to
+   * prevent.
+   *
+   * Non-null exactly when `changedFields` contains `status` and
+   * `targetValueField` is not `status`; `policy-lock.test.ts` pins that
+   * biconditional, because a fail-open null here would make the preview render
+   * "Status: Not started → " with nothing after the arrow.
+   */
+  readonly targetStatus: TaskStatus | null;
   readonly requiredPatchFields: readonly TaskCommandPatchField[];
   readonly allowedPatchFields: readonly TaskCommandPatchField[];
   /** The §11.2 `Changes` column: every field and linked effect this action writes. */
@@ -214,6 +258,7 @@ function policy(
   return {
     allowedTargetValues: null,
     targetValueField: null,
+    targetStatus: null,
     requiredPatchFields: [],
     allowedPatchFields: [],
     destructive: false,
@@ -229,10 +274,12 @@ function policy(
 const POLICIES: Record<TaskCommandAction, TaskCommandActionPolicy> = {
   complete_task: policy({
     eligibleFrom: ACTIVE_ONLY,
+    targetStatus: "completed",
     changedFields: ["status", "completed_at", "reminders"],
   }),
   reopen_task: policy({
     eligibleFrom: ["completed"],
+    targetStatus: "todo",
     changedFields: ["status", "completed_at", "reminders"],
   }),
   set_status: policy({
@@ -245,6 +292,7 @@ const POLICIES: Record<TaskCommandAction, TaskCommandActionPolicy> = {
   }),
   cancel_task: policy({
     eligibleFrom: ACTIVE_ONLY,
+    targetStatus: "cancelled",
     changedFields: ["status", "cancelled_at", "reminders"],
     destructive: true,
     oneStepEligible: false,
@@ -257,6 +305,7 @@ const POLICIES: Record<TaskCommandAction, TaskCommandActionPolicy> = {
   // deliberateness as the cancellation.
   restore_task: policy({
     eligibleFrom: ["cancelled"],
+    targetStatus: "todo",
     changedFields: ["status", "cancelled_at", "reminders"],
     oneStepEligible: false,
   }),
