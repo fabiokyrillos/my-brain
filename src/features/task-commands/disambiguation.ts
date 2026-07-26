@@ -46,8 +46,23 @@ export type TaskDisambiguationCandidateView = {
   readonly projectNames: readonly string[];
   readonly contextNames: readonly string[];
   readonly score: number;
-  /** The signals that fired, localized (2E-MATCH-014, 2E-DISAMBIG-001). */
-  readonly evidence: readonly { readonly signal: TaskMatchEvidence; readonly text: string }[];
+  /**
+   * The signals that fired, localized (2E-MATCH-014, 2E-DISAMBIG-001).
+   *
+   * `distinguishing` is false for a signal that fired on *every* listed
+   * candidate. 2E-DISAMBIG-001 asks for "the evidence that distinguishes
+   * them", and a signal they all share distinguishes nothing — "the title
+   * contains what you said", shown identically under two identically-titled
+   * tasks, is the canonical §12.2 ambiguity restated rather than resolved.
+   * Both are carried rather than the shared ones dropped, because a candidate
+   * rendered with an empty evidence list would look like a candidate with no
+   * reason to be there.
+   */
+  readonly evidence: readonly {
+    readonly signal: TaskMatchEvidence;
+    readonly text: string;
+    readonly distinguishing: boolean;
+  }[];
 };
 
 export type TaskDisambiguationView = {
@@ -108,6 +123,18 @@ export function buildTaskDisambiguation(
           : "list"
         : "none";
 
+  // A signal is shared when every listed candidate carries it. Computed over
+  // the candidates actually being shown, not over the qualifying population:
+  // the user is being asked to tell apart the ones in front of them.
+  const shown = kind === "none" ? [] : result.candidates;
+  const sharedSignals = new Set<TaskMatchEvidence>(
+    shown.length <= 1
+      ? []
+      : shown[0].evidence.filter((signal) =>
+          shown.every((candidate) => candidate.evidence.includes(signal)),
+        ),
+  );
+
   const candidates =
     kind === "none"
       ? []
@@ -133,6 +160,10 @@ export function buildTaskDisambiguation(
           evidence: candidate.evidence.map((signal) => ({
             signal,
             text: copy.evidence[signal],
+            // With a single candidate shown nothing is shared, so every signal
+            // it carries is a reason it is the one — which is exactly what the
+            // confirm-this-one prompt needs to justify itself.
+            distinguishing: !sharedSignals.has(signal),
           })),
         }));
 
@@ -148,7 +179,7 @@ export function buildTaskDisambiguation(
       kind === "overflow"
         ? copy.outcomes.ambiguous_overflow
         : kind === "confirm_one"
-          ? { title: copy.outcomes.ambiguous.title, description: copy.preview.ambiguousOne }
+          ? { title: copy.preview.ambiguousOneTitle, description: copy.preview.ambiguousOne }
           : kind === "list"
             ? copy.outcomes.ambiguous
             : { title: "", description: "" },

@@ -131,11 +131,15 @@ describe.each(locales)("disambiguation projection (%s)", (locale) => {
 
     expect(view.kind).toBe("confirm_one");
     expect(view.candidates).toHaveLength(1);
-    expect(view.copy.title).toBe(copy.outcomes.ambiguous.title);
+    expect(view.copy.title).toBe(copy.preview.ambiguousOneTitle);
     expect(view.copy.description).toBe(copy.preview.ambiguousOne);
-    // The confirm-one prompt does not reuse the list's "more than one task"
-    // description, which would be untrue of a single candidate.
+    // The confirm-one prompt reuses neither half of the list's copy. The
+    // description would be untrue of a single candidate, and the title — "I
+    // need you to choose" — asks the user to pick between things when there is
+    // only one thing. A review caught the two speech acts contradicting each
+    // other, so both halves are pinned, not just the description.
     expect(view.copy.description).not.toBe(copy.outcomes.ambiguous.description);
+    expect(view.copy.title).not.toBe(copy.outcomes.ambiguous.title);
   });
 
   it("renders more than one qualifying ambiguous candidate as a list", () => {
@@ -270,13 +274,38 @@ describe.each(locales)("disambiguation projection (%s)", (locale) => {
 
     expect(view.candidates[0].evidence.map((entry) => entry.signal)).toEqual([...TASK_MATCH_EVIDENCE]);
     for (const entry of view.candidates[0].evidence) {
-      expect(Object.keys(entry).sort()).toEqual(["signal", "text"]);
+      expect(Object.keys(entry).sort()).toEqual(["distinguishing", "signal", "text"]);
       expect(entry.text).toBe(copy.evidence[entry.signal]);
       expect(entry.text.trim()).not.toBe("");
     }
     expect(view.candidates[1].evidence).toEqual([
-      { signal: "recent_activity", text: copy.evidence.recent_activity },
+      { signal: "recent_activity", text: copy.evidence.recent_activity, distinguishing: false },
     ]);
+
+    // 2E-DISAMBIG-001 asks for "the evidence that distinguishes them".
+    // `recent_activity` is the one signal both candidates carry, so it
+    // separates nothing and is the only one marked non-distinguishing; every
+    // other signal fired on `t1` alone. Asserting both sides matters — marking
+    // everything distinguishing, or nothing, would each satisfy a one-sided
+    // check.
+    const shared = view.candidates[0].evidence
+      .filter((entry) => !entry.distinguishing)
+      .map((entry) => entry.signal);
+    expect(shared).toEqual(["recent_activity"]);
+    expect(
+      view.candidates[0].evidence.filter((entry) => entry.distinguishing).length,
+    ).toBe(TASK_MATCH_EVIDENCE.length - 1);
+  });
+
+  it("marks every signal distinguishing when only one candidate is shown", () => {
+    // The confirm-this-one prompt has nothing to compare against, so each
+    // signal is a reason this is the task rather than a reason it is not
+    // another one. A `shown.length <= 1` guard that returned "all shared"
+    // instead would leave that prompt with no evidence to justify itself.
+    const view = build(ambiguous([candidate({ taskId: "t1", evidence: TASK_MATCH_EVIDENCE })]), locale);
+
+    expect(view.kind).toBe("confirm_one");
+    expect(view.candidates[0].evidence.every((entry) => entry.distinguishing)).toBe(true);
   });
 
   it("carries no evidence entry for a signal that did not fire", () => {

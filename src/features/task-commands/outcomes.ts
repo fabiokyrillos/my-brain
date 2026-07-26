@@ -60,8 +60,10 @@ export type TaskCommandOutcome = (typeof TASK_COMMAND_OUTCOMES)[number];
  * apply has not come to rest; it is waiting for the user, which is the whole
  * point of 2E-UX-001's own "every apply is user-initiated" (PRD §23.7).
  *
- * `preview.test.ts` pins the containment: every disposition except `previewed`
- * must be a declared outcome, so the two vocabularies cannot drift apart.
+ * `copy.test.ts` pins the containment in both directions: every disposition
+ * except `previewed` must be a declared outcome, and `previewed` must not be
+ * one — so the two vocabularies cannot drift apart, and neither can this
+ * comment quietly stop being true.
  */
 export const TASK_COMMAND_PREVIEW_DISPOSITIONS = [
   /** Ready. A single Apply control is permitted iff the match said `oneStep`. */

@@ -83,6 +83,16 @@ export type TaskCommandCopy = {
     destructive: string;
     confirmationRequired: string;
     oneStep: string;
+    /**
+     * The confirm-this-one prompt's own title.
+     *
+     * Separate from `outcomes.ambiguous.title` deliberately. Reusing "I need
+     * you to choose" here contradicted the body text: a `qualifyingCount === 1`
+     * result offers nothing to choose *between*, and 2E-UX-001 requires each
+     * outcome to have a distinct, truthful presentation. A review caught the
+     * two speech acts pointing in different directions.
+     */
+    ambiguousOneTitle: string;
     ambiguousOne: string;
   };
 };
@@ -224,6 +234,7 @@ const ptBR: TaskCommandCopy = {
     destructive: "Esta ação é destrutiva.",
     confirmationRequired: "Esta ação precisa da sua confirmação explícita.",
     oneStep: "Um toque aplica.",
+    ambiguousOneTitle: "É esta?",
     ambiguousOne: "Encontrei uma tarefa, mas não tenho certeza de que é esta.",
   },
 };
@@ -362,6 +373,7 @@ const en: TaskCommandCopy = {
     destructive: "This action is destructive.",
     confirmationRequired: "This action needs your explicit confirmation.",
     oneStep: "One tap applies it.",
+    ambiguousOneTitle: "Is this the one?",
     ambiguousOne: "I found one task, but I am not sure it is this one.",
   },
 };
