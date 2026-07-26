@@ -1306,13 +1306,21 @@ begin
     -- the task holding a live reminder this command never disclosed closing.
     -- `rejected_conflict`, retryable, is the truthful answer to that: a retry
     -- closes the newcomer too.
+    -- The `case` is parenthesized because plpgsql reads an `if` condition by
+    -- scanning for the first `then` at paren-depth zero
+    -- (`read_sql_expression(K_THEN)`), so a bare `case … when … then … end` in
+    -- this position ends the condition at the `case`'s own `then`. The rest of
+    -- the expression is then parsed as statements and the function fails to
+    -- create with `42601 syntax error at end of input` — which is exactly how
+    -- this line first reached CI. The parentheses put the inner `then` at
+    -- depth one, where the scanner ignores it.
     if (
       select pg_catalog.count(*)::integer
       from public.reminders as live_reminder
       where live_reminder.task_id = p_task_id
         and live_reminder.user_id = current_user_id
         and live_reminder.status = 'scheduled'
-    ) <> case when reminder_created_id is null then 0 else 1 end then
+    ) <> (case when reminder_created_id is null then 0 else 1 end) then
       raise exception 'Task command reminder reconciliation failed'
         using errcode = 'P0001', detail = '2E_REMINDER_INTEGRITY';
     end if;
