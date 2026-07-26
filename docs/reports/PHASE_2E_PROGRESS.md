@@ -9,11 +9,11 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Field | Value |
 |---|---|
 | Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, divergence `0 0`) |
-| Branch HEAD | `958d50e` plus the documentation commit that carries this file |
+| Branch HEAD | `56111ac` |
 | Phase base | `2e2acfd` |
 | Working tree | clean |
 | Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | **all three jobs green** on `958d50e` (run 30181480563): `application`, `edge worker`, `database and journey` |
+| CI | **all three jobs green** on `56111ac` (run 30182925282): `application`, `edge worker`, `database and journey`. The pgTAP suite reports `Files=26, Tests=883, Result: PASS` |
 | Merged | nothing |
 | Tagged / released | nothing |
 

@@ -11,7 +11,7 @@
 | Branch | `codex/phase-2e-natural-language-task-updates` |
 | Phase base | `2e2acfd` (Pre-Phase-2E Foundation Hardening, PR #17) |
 | Slice base | `79a3021` (Slice 2E.1 accepted) |
-| HEAD at acceptance | `958d50e` |
+| HEAD at acceptance | `56111ac` |
 | Commits | `b143b42`, `5de68eb`, `d7b4eb3`, `a2c263d`, `c32a5bd` (correction pass over four reviews), `120e4a1` (the fifth review's Critical), `6177f81` (progress record), `958d50e` (mutation hardening), plus the acceptance-review corrections |
 | Migration | `202607250056_phase_2e_task_command_matching.sql` — **local only, not applied to the linked project** |
 | Remote migration parity | `202607250054`, unchanged since the pre-2E cutover |
@@ -186,9 +186,9 @@ All of these were re-verified by mutation: **21 further mutations applied, 21 ki
 | `deno check` (both entrypoints) | clean |
 | `deno test supabase/functions/` | 46 passed |
 | Mutation verification | 36 applied across three rounds, **36 killed**, all reverted |
-| CI `application` | pass |
-| CI `edge worker` | pass |
-| CI `database and journey` | pass — migrations from zero, 48 pgTAP assertions, `db lint`, foundation e2e on desktop and Pixel 7 |
+| CI `application` | pass (run 30182925282) |
+| CI `edge worker` | pass (run 30182925282) |
+| CI `database and journey` | pass (run 30182925282) — the whole migration chain applied from an empty database, the full pgTAP suite `Files=26, Tests=883, Result: PASS` with this slice's 48 assertions among them, `db lint`, and the foundation journey on desktop and Pixel 7 |
 
 Docker is unavailable on this workstation, so `supabase db reset`, `supabase test db` and `supabase db lint --local` **cannot run locally**. Draft PR #18's `database` job is the only execution path for them, and it is the evidence cited above — not a local run reported as one.
 
