@@ -5,9 +5,9 @@
 | Field | Value |
 |---|---|
 | Branch | `codex/phase-2e-natural-language-task-updates` |
-| Commits | `3e506c8` (database contract), `9d614e9` (TypeScript), `b22fe24` (post-deploy guard fix) |
+| Commits | `3e506c8` database contract · `9d614e9` TypeScript · `b22fe24` post-deploy guard fix · `5ac8076` + `d6cd690` + `af0bd03` pgTAP fixture corrections · `6bb2841` **withdrawal of the candidate-slot collision** |
 | Migration added | `202607260059_phase_2e_destructive_confirmation.sql` |
-| pgTAP added | `supabase/tests/phase_2e_task_command_destructive.sql`, `plan(96)` |
+| pgTAP added | `supabase/tests/phase_2e_task_command_destructive.sql`, `plan(91)` |
 | Deployment | **nothing merged, deployed, tagged or released.** `202607250055`–`202607260059` are local only; remote parity remains `202607250054` |
 
 ---
@@ -34,11 +34,18 @@ closes every door through which a task that cannot legitimately come back could 
 | **2E-DESTRUCTIVE-008** | The cancel/creation-undo collision, in **both** orderings | **MET** | Ordering A is asserted as a real sequence — confirmed cancel, then `public.undo_operation` on the creation through the real router, then the cancel-undo — refused with `55P03:2E_CREATION_UNDONE`, with the operation left `available` because the whole undo rolled back. Ordering B's live door is `restore_task`, refused with the same token; its other half is a `no_change` that writes nothing. A **negative control** takes the identical cancellation with no creation operation and undoes successfully. |
 | **2E-DESTRUCTIVE-009** | The same guard closes every other door | **MET** | One `private.task_creation_undone`, three readers: `restore_task`, the cancel-undo, and `list_task_command_candidates`. The listing exclusion is asserted against a subject that is still `todo`, so the eligible-status filter cannot be what hides it, with a control proving an intact task still ranks. |
 
-## 3. The two defects the design review found before any code was written
+## 3. Two review rounds, and what each cost
 
-A five-lens adversarial round ran against the *design*, before implementation. It was **incomplete** — the
-synthesiser and three of twenty-five refutations died on a session limit, and that is recorded as an open
-item rather than reported as a clean round. It nonetheless produced two findings that changed the slice:
+Two adversarial rounds ran: one against the **design**, before any code, and one against the **shipped
+code**, reading the migration, the pgTAP suite and the TypeScript together. Both changed the slice
+materially, and the second one reversed part of the first.
+
+### 3.1 The design round — five lenses, incomplete
+
+It was **incomplete**: the synthesiser and three of twenty-five refutations died on a session limit. The
+twenty-two refutations that ran were used; the three that did not were evaluated by hand against the
+code, and the synthesis was done by hand. Recorded as incomplete rather than reported as clean. It
+produced two findings that changed the slice — one of which the second round then disproved:
 
 **1. Five lockstep edits, two of which fail silently.** Enabling the two verbs required them to join five
 separate `p_action in ('complete_task', 'reopen_task', 'set_status')` predicates: the delta against the
@@ -49,27 +56,58 @@ ten-column undo guard refuse **every** cancel-undo forever — and Slice 2E.4's 
 named the hazard ("adding an action there means adding it here"). The five copies are now one declared
 `status_writing_actions` constant.
 
-**2. A second collision nobody had named — and this one was reachable.** `202607220040:13-19` made
-candidate identity unique only over non-cancelled rows, precisely so a candidate whose task was
-compensatingly cancelled by undo could be confirmed again. `confirm_entry_task_candidates_v6` records a
-resolution row only for a disposition **other than** `'confirmed'` (`202607220044:1357-1358`), so a
-confirmed candidate leaves no ledger entry and the `2C_TERMINAL_DISPOSITION` gate never fires for it; the
-re-materialization gate explicitly tolerates a cancelled task; and the entry surface filters with
-`.neq("status", "cancelled")`. So: confirm candidate 3 → task T, `cancel_task` T, the surface re-offers
-candidate 3, the user confirms it, T2 takes the slot — and now `restore_task` on T, or the undo of the
-cancel, writes a non-cancelled status and Postgres raises a bare `23505`. `apply.ts` maps that to
-`undeclared_failure` with `retryable: true`, so the surface would invite a retry that can never succeed,
-and a cancellation the preview called "restorable afterwards" would be permanent. That falsifies
-2E-DESTRUCTIVE-006 and 2E-UNDO-001 at once.
+### 3.2 The finding the design round got wrong, and the shipped round reversed
 
-**This slice is what makes it reachable**, because this slice is what gives a user a deliberate way to
-cancel a task. It is closed by `private.task_candidate_slot_taken` — which mirrors both partial indexes
-exactly, including their absence of an owner column, because a predicate laxer than the constraint it
-anticipates lets the `23505` through the gap — plus a `unique_violation` backstop on both status writes
-for the concurrent case. Two mechanisms, one declared token, no undeclared SQLSTATE either way.
+**2. A second collision that turned out not to exist.** The design round argued that
+`202607220040:13-19` made candidate identity unique only over non-cancelled rows, and that
+`confirm_entry_task_candidates_v6` records a resolution row only for a disposition **other than**
+`'confirmed'` (`202607220044:1357-1358`) — so a confirmed candidate would leave no ledger entry, the
+`2C_TERMINAL_DISPOSITION` gate would never fire for it, cancelling would free the candidate slot, and a
+re-confirmed duplicate would make the later restore a bare `23505` that `apply.ts` reports as retryable
+forever. A whole guard shipped on that argument: `2E_CANDIDATE_REMATERIALIZED`,
+`private.task_candidate_slot_taken`, two raises, two `unique_violation` traps and a pgTAP section.
 
-The comment at `taxonomy.ts:301-305` asserted the opposite ("re-confirmation ... is gated by the
-`entry_task_candidate_resolutions` ledger, not by the relaxed unique index") and is corrected.
+**It was wrong, and the review of the shipped code found it — four of five lenses independently.**
+The claim is true of the RPC and false of the system. `public.record_entry_task_candidate_confirmation`
+(`202607220041:299-364`) is an `after insert or update` trigger on `public.tasks` that writes exactly
+that `'confirmed'` row — which is *why* v6 does not, and why `undo_confirm_entry_tasks` deletes
+resolutions by `task_id` as well as by `undo_operation_id`. The row is keyed
+`unique (user_id, interpretation_id, candidate_index)`, it survives the task's cancellation, and the
+terminal-disposition gate reads it: **the duplicate can never be created.** The one path that does free
+the slot is a creation-undo, which deletes those rows — and that path is already refused by
+`2E_CREATION_UNDONE` at step 15b, before the row is even locked.
+
+So the token was a declared member of a closed vocabulary no reachable state can provoke. **All of it
+was removed** rather than kept as defence in depth, because ADR-049 — written in this same slice — says
+exactly that an unprovokable member is the same defect as a missing raise. Applying one's own doctrine
+to one's own work is the whole point of writing it down. In its place, both the migration and the pgTAP
+suite now assert that `tasks_record_candidate_confirmation` still exists, because that trigger is the
+load-bearing reason no guard is needed and nothing else in the repository would notice if it went.
+
+The comment at `taxonomy.ts:301-305` was **right all along**, and this slice's "correction" of it was the
+error. It is restored, with the misreading recorded at the site so the next reader does not repeat it.
+
+**The lesson, stated plainly:** a reachability argument assembled from one function's source is a claim
+about that function, not about the system. Triggers are where the difference hides, and neither the
+requirement text nor the RPC being extended mentions this one.
+
+### 3.3 The shipped-code round — five lenses, complete, fifteen findings
+
+All five lenses returned; no agent errored. Findings, and their disposition:
+
+| # | Finding | Verdict |
+|---|---|---|
+| 7 | The candidate-slot collision is unreachable; the guard, its token, its predicate, its traps and its pgTAP are dead weight, and `taxonomy.ts` now states the inverse of the truth. Raised by four lenses independently, from four different angles — SQL correctness, contract, pgTAP truth, cross-artifact. | **SURVIVED. Fixed** by withdrawing all of it (§3.2). The one finding that mattered most, and the one a single-artifact review could not have produced: it needed the RPC, a 2C trigger, a partial index and a ledger constraint read together. |
+| 1 | `dest_iso` builds `observed_before` with a `+00` offset the RPC's ISO regex rejects, so every call in the suite returns `22023` instead of the thing under test. | **SURVIVED. Already fixed** — CI had found the same defect two runs earlier, and the lens confirmed both the cause and the fix. |
+| 1 | The ordering-A reachability assertion is unfalsifiable: every instant in the transaction is `transaction_timestamp()`, so comparing `cancelled_at` against the recorded `applied_state` passes whether or not the creation-undo wrote anything. | **SURVIVED. Fixed** — it now counts `task_updated` rows, which the audit trigger writes only when a watched column really changed. This is the slice's own "unfalsifiable guard" doctrine turned on its own test. |
+| 3 | Three comments describe code that is not there: a read-only half of the confirmation gate before the reservation, a third reader of `2E_CREATION_UNDONE` (`list_restorable_cancelled_tasks`, written and deleted), and a claim that a second destructive action acquires the gate by setting one taxonomy variable when three places name `cancel_task` literally. | **SURVIVED. Fixed** — all three corrected. Documentation that describes an earlier draft is a trap for the next reader, and two of these described things this slice had itself removed. |
+| 1 | The declared-vocabulary modules miscount themselves. | **SURVIVED. Fixed** by the withdrawal: 11 → 10, with every count assertion updated. |
+| 2 | The `unique_violation` backstop is preempted by a `P0001` the BEFORE trigger raises first, and over-broad because it can swallow a `23505` from another table. | **SURVIVED, and MOOT** — the backstop is gone with the guard it served. Recorded because the reasoning is right and would apply to any future trap of that shape. |
+
+**Nothing was refuted as wrong.** Two findings were partially superseded by fixes already in flight, and
+one became moot through a larger correction; none was dismissed. The round's whole value came from
+reading four artifacts together — the exact discipline Slice 2E.4 recorded as its own lesson, now
+vindicated twice.
 
 ## 4. Decisions taken, and one reversed
 
@@ -115,12 +153,12 @@ The comment at `taxonomy.ts:301-305` asserted the opposite ("re-confirmation ...
 
 ## 5. The vocabulary
 
-`TASK_COMMAND_ERROR_DETAILS` goes 9 → 11: minus `2E_ACTION_NOT_ENABLED`, plus `2E_CONFIRMATION_REQUIRED`
-(`P0001`), `2E_CREATION_UNDONE` (`55P03`) and `2E_CANDIDATE_REMATERIALIZED` (`55P03`). All three are
-`refused` and none is retryable — resending changes nothing, and `retryable: true` would put a "try
-again" control in front of a command that fails identically forever.
+`TASK_COMMAND_ERROR_DETAILS` goes 9 → 10: minus `2E_ACTION_NOT_ENABLED`, plus `2E_CONFIRMATION_REQUIRED`
+(`P0001`) and `2E_CREATION_UNDONE` (`55P03`). Both are `refused` and neither is retryable — resending
+changes nothing, and `retryable: true` would put a "try again" control in front of a command that fails
+identically forever. (An eleventh token shipped and was withdrawn; see §3.2.)
 
-**`55P03` now carries a DETAIL on two paths and none on the third**, which forced a mapper change:
+**`55P03` now carries a DETAIL on one path and none on the other**, which forced a mapper change:
 `mapTaskCommandApplyError` reads the token first and falls back to `stale_pre_state`. Matching on the
 code alone, as Slice 2E.4 did and documented as deliberate, would have degraded "that task was deleted"
 into "the task changed since the preview" — inviting a refresh-and-retry that can never succeed. The
@@ -141,8 +179,8 @@ consecutive slice in which it paid for itself.
 
 ## 7. Local gates
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2041 passed / 115 files** · focused
-`src/features/task-commands` **949 passed / 17 files** · `build` clean · `deno check` clean on both
+`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2039 passed / 115 files** · focused
+`src/features/task-commands` **947 passed / 17 files** · `build` clean · `deno check` clean on both
 Edge Function entrypoints.
 
 **pgTAP cannot run locally — Docker is unavailable**, so `supabase db reset`, `supabase test db` and
@@ -151,7 +189,32 @@ anywhere in this report.
 
 ## 8. Database evidence
 
-<!-- CI-EVIDENCE -->
+All three jobs green on `6bb2841` (run [30241338626](https://github.com/fabiokyrillos/my-brain/actions/runs/30241338626)):
+`application` 2m04s · `edge worker` 11s · `database and journey` 3m45s.
+
+**The arithmetic, not the pass.**
+
+| Check | Evidence |
+|---|---|
+| Migration chain applies from an empty database | `supabase db reset` applied 118 migrations, `202607260059_phase_2e_destructive_confirmation.sql` among them. The post-deploy `DO` block therefore executed and every one of its catalog assertions held. |
+| pgTAP totals | `Files=29, Tests=1150, Result: PASS`, `All tests successful.` Slice 2E.4's baseline was `Files=28, Tests=1059`, so the delta is **exactly `+1` file and `+91` assertions** — the new file's whole `plan(91)`, with `phase_2e_task_command_apply.sql` unchanged at 132 and `rpc_version_retirement.sql` at 24. |
+| The new file executed rather than being skipped | `phase_2e_task_command_destructive.sql .......... ok` appears in the log, and `phase_2e_task_command_apply.sql ................ ok` beside it. |
+| Nothing was skipped, voided or plan-mismatched | Zero occurrences of `not ok`, `# SKIP`, `# TODO`, `Bad plan` or `Failed` anywhere in the job log. |
+| Database lint | `supabase db lint --local --schema public,private --level warning --fail-on error` — **both** schemas, failing on error. |
+| Journey | `e2e/foundation.spec.ts` against the production build, desktop and Pixel 7. |
+
+Three earlier runs on this branch were red, and each is worth recording because each names a defect a
+local gate could not have seen:
+
+1. `9d614e9`/`b22fe24` — `2C_INVALID_CANDIDATE_PROVENANCE` on a fixture insert. **16 assertions ran and
+   all passed**, which is what proved the migration applies and its post-deploy block holds.
+2. `5ac8076` — `Invalid observed-before instant`; 44 ran, 22 failed on one wrong offset format, and the
+   direct RPC call at the 44th aborted the transaction so the remaining 52 never ran. `Bad plan` was the
+   symptom; a single refusal was the cause.
+3. `d6cd690`/`af0bd03` — green on everything except the candidate-slot section, which the shipped-code
+   review then removed entirely.
+
+**pgTAP never ran locally**, in any of this. Docker is unavailable on the workstation.
 
 ## 9. Open items owed by Slice 2E.5
 
@@ -171,8 +234,11 @@ anywhere in this report.
    asserted; the rendering of `restore_task` beside each row is not, because there is nothing to render
    into.
 6. **`confirmation.ts` and `apply.ts` still have no production caller.** By design; Slice 2E.7.
-7. **The candidate-slot collision is closed but its `unique_violation` backstop is not provoked by
-   pgTAP.** The deterministic guard is asserted from both doors with a positive control; the concurrent
-   path that the backstop exists for needs two sessions and belongs with the owed remote smoke.
-8. **The pre-existing flaky test** `src/features/tasks/task-candidate-form.test.tsx` still reds CI
+7. **The candidate-slot reasoning now rests on a trigger, and that dependence is new.**
+   `record_entry_task_candidate_confirmation` is why a cancelled task keeps its candidate slot, and both
+   the migration and the pgTAP suite assert it still exists — but the *consequence* (that a re-confirmation
+   is refused with `2C_TERMINAL_DISPOSITION`) is asserted nowhere in this slice, because it is 2C's
+   contract and 2C's suite. If a future slice touches that trigger, the assertion here fires and points at
+   this reasoning; if it touches the terminal-disposition gate instead, nothing here notices.
+9. **The pre-existing flaky test** `src/features/tasks/task-candidate-form.test.tsx` still reds CI
    intermittently.
