@@ -170,11 +170,10 @@ select is(
   array[
     -- Slice 2E.5 retired `2E_ACTION_NOT_ENABLED` when it enabled both destructive
     -- verbs - with all fifteen actions resolved from the taxonomy, no reachable
-    -- state raised it any more - and added the confirmation refusal plus the two
-    -- collision tokens. This array reads `pg_get_functiondef` from the catalog, so
-    -- it describes the function `202607260059` left behind, not the one
-    -- `202607260058` declared.
-    '2E_CANDIDATE_REMATERIALIZED',
+    -- state raised it any more - and added the confirmation refusal plus the
+    -- creation-undo collision token. This array reads `pg_get_functiondef` from
+    -- the catalog, so it describes the function `202607260059` left behind, not
+    -- the one `202607260058` declared.
     '2E_CONFIRMATION_REQUIRED',
     '2E_CREATION_UNDONE',
     '2E_DUE_CONSISTENCY',
@@ -217,12 +216,11 @@ select is(
     ) as found(token)
   ),
   array[
-    -- The two collision tokens are raised on BOTH sides on purpose: PRD
+    -- The collision token is raised on BOTH sides on purpose: PRD
     -- 2E-DESTRUCTIVE-009 requires the same declared code on every door into a
     -- task that cannot come back, and `restore_task` and the cancel-undo are two
-    -- of those doors. Their presence here is therefore the requirement, not a
-    -- leak of an apply-path token into a handler.
-    '2E_CANDIDATE_REMATERIALIZED',
+    -- of those doors. Its presence here is therefore the requirement, not a leak
+    -- of an apply-path token into a handler.
     '2E_CREATION_UNDONE',
     '2E_UNDO_REMINDER_INTEGRITY',
     '2E_UNDO_RESTORE_INTEGRITY'

@@ -82,23 +82,11 @@ export const TASK_COMMAND_ERROR_DETAILS = [
    * `confirm_entry_task*` operation names it.
    *
    * Raised by `restore_task` and by the undo of a `cancel_task`, both with
-   * `55P03`, so neither door can resurrect it — and read, not raised, by
-   * `public.list_restorable_cancelled_tasks`, which simply omits the row.
+   * `55P03`, so neither door can resurrect it. The third door raises nothing:
+   * `public.list_task_command_candidates` reads the same private predicate and
+   * simply omits the row, so a deleted task is never offered in the first place.
    */
   "2E_CREATION_UNDONE",
-  /**
-   * Returning this task to an active status would collide with the task that
-   * took its candidate slot while it was cancelled.
-   *
-   * The second collision `202607260059` makes reachable, and a different one
-   * from `2E_CREATION_UNDONE`: that task is deleted, this one is *blocked*. The
-   * two partial indexes `202607220040` created exclude cancelled rows, so
-   * cancelling frees the candidate slot, the entry surface re-offers the
-   * candidate, and a re-confirmed duplicate then makes the restore a bare
-   * `23505`. Raised by `restore_task` and by the cancel-undo — the same two
-   * doors, because they are the only two that leave `cancelled`.
-   */
-  "2E_CANDIDATE_REMATERIALIZED",
   /** The locked status is not in the action's `eligibleFrom`. */
   "2E_INELIGIBLE_STATUS",
   /** The guarded domain write affected no row: another command reached the task first. */
@@ -278,17 +266,6 @@ export const TASK_COMMAND_FAILURE_POLICY: Record<
     sqlstate: "55P03",
     message: "Task creation was undone",
   },
-  "2E_CANDIDATE_REMATERIALIZED": {
-    outcome: "refused",
-    // Not retryable, and honestly so: resending changes nothing while the
-    // duplicate is live. It is nonetheless the one refusal in this vocabulary
-    // the user can clear by acting elsewhere — cancel the duplicate and the
-    // restore succeeds — which is why the copy names the condition rather than
-    // pronouncing a verdict.
-    retryable: false,
-    sqlstate: "55P03",
-    message: "The task candidate slot was taken by a newer task",
-  },
   "2E_INELIGIBLE_STATUS": {
     outcome: "refused",
     retryable: false,
@@ -387,10 +364,6 @@ export const TASK_COMMAND_UNDO_ERROR_DETAILS = [
   // reaches TypeScript through `public.undo_operation`, and without this branch
   // the honest "that task was deleted" collapses onto "Could not undo."
   "2E_CREATION_UNDONE",
-  // Same door, same reason: the cancel-undo is one of the two writes that can
-  // hit the candidate-identity indexes, and its refusal has to reach the user as
-  // itself rather than as the generic undo failure.
-  "2E_CANDIDATE_REMATERIALIZED",
 ] as const satisfies readonly TaskCommandErrorDetail[];
 
 export type TaskCommandUndoErrorDetail = (typeof TASK_COMMAND_UNDO_ERROR_DETAILS)[number];

@@ -68,11 +68,11 @@ const RAISED_TOKENS: readonly string[] = [
 ].sort();
 
 describe("the declared vocabulary is closed and internally consistent", () => {
-  it("is exactly the eleven detail tokens plus the five untagged failures", () => {
+  it("is exactly the ten detail tokens plus the five untagged failures", () => {
     // Nine after Slice 2E.4. Slice 2E.5 retired `2E_ACTION_NOT_ENABLED` when it
-    // enabled both destructive verbs, and added `2E_CONFIRMATION_REQUIRED`,
-    // `2E_CREATION_UNDONE` and `2E_CANDIDATE_REMATERIALIZED`.
-    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(11);
+    // enabled both destructive verbs, and added `2E_CONFIRMATION_REQUIRED` and
+    // `2E_CREATION_UNDONE`.
+    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(10);
     expect(TASK_COMMAND_UNTAGGED_FAILURES).toHaveLength(5);
     expect([...TASK_COMMAND_APPLY_FAILURES]).toEqual([
       ...TASK_COMMAND_ERROR_DETAILS,
@@ -138,8 +138,7 @@ describe("the declared vocabulary is closed and internally consistent", () => {
     //
     // **`55P03` is the third pairing, and Slice 2E.5 added it deliberately.** PRD
     // 2E-DESTRUCTIVE-008 names that SQLSTATE by hand for the creation-undo
-    // collision, and the candidate-slot collision is the same kind of refusal, so
-    // both carry it. The list here is not a style preference — it is the set of
+    // collision. The list here is not a style preference — it is the set of
     // codes `mapTaskCommandApplyError` looks a detail up under, so a fourth
     // pairing invented without touching the mapper would leave the token silently
     // unreachable. That is why this is asserted as an exact allow-list rather
@@ -151,20 +150,17 @@ describe("the declared vocabulary is closed and internally consistent", () => {
     }
   });
 
-  it("gives 55P03 exactly the two collision tokens, and no other detail", () => {
+  it("gives 55P03 exactly the one collision token, and no other detail", () => {
     // The mapper's `55P03` branch consults the detail first and falls back to
-    // `stale_pre_state`. That fallback is only safe while the detailed raises on
-    // that code are the collisions: a third token added here without a matching
+    // `stale_pre_state`. That fallback is only safe while the detailed raise on
+    // that code is the collision: a second token added here without a matching
     // raise would be dead, and a raise added there without a token here would
     // degrade to "the task changed since the preview" and invite a retry that
     // cannot succeed.
     const under55P03 = TASK_COMMAND_ERROR_DETAILS.filter(
       (detail) => TASK_COMMAND_FAILURE_POLICY[detail].sqlstate === "55P03",
     );
-    expect([...under55P03].sort()).toEqual([
-      "2E_CANDIDATE_REMATERIALIZED",
-      "2E_CREATION_UNDONE",
-    ]);
+    expect([...under55P03]).toEqual(["2E_CREATION_UNDONE"]);
   });
 
   it("leaves the SQLSTATE null for the one failure no database raises", () => {
@@ -259,22 +255,21 @@ describe("the declared vocabulary describes the migration that was written", () 
     }
   });
 
-  it("raises each shared collision token on both the apply side and the undo side", () => {
+  it("raises the shared collision token on both the apply side and the undo side", () => {
     // 2E-DESTRUCTIVE-009: "every door into that task — undo, `restore_task`, and
     // the recovery affordance — is closed by the same guard". Two of those doors
     // raise, and this is what proves they raise the *same* token rather than two
-    // that happen to read alike.
+    // that happen to read alike. The third door does not raise: the candidate
+    // listing reads the same private predicate and omits the row.
     const handlersBegin = migration.indexOf(
       "create or replace function private.undo_apply_task_command_fields(",
     );
-    for (const detail of ["2E_CREATION_UNDONE", "2E_CANDIDATE_REMATERIALIZED"] as const) {
-      const clause = `detail = '${detail}'`;
-      const first = migration.indexOf(clause);
-      const last = migration.lastIndexOf(clause);
-      expect(first, `${detail} is not raised on the apply side`).toBeGreaterThan(0);
-      expect(first, `${detail} is not raised before the handler`).toBeLessThan(handlersBegin);
-      expect(last, `${detail} is not raised inside the handler`).toBeGreaterThan(handlersBegin);
-    }
+    const clause = "detail = '2E_CREATION_UNDONE'";
+    const first = migration.indexOf(clause);
+    const last = migration.lastIndexOf(clause);
+    expect(first, "2E_CREATION_UNDONE is not raised on the apply side").toBeGreaterThan(0);
+    expect(first, "2E_CREATION_UNDONE is not raised before the handler").toBeLessThan(handlersBegin);
+    expect(last, "2E_CREATION_UNDONE is not raised inside the handler").toBeGreaterThan(handlersBegin);
   });
 
   it("keeps the undo tokens a subset of the declared details", () => {
@@ -282,7 +277,7 @@ describe("the declared vocabulary describes the migration that was written", () 
     for (const detail of TASK_COMMAND_UNDO_ERROR_DETAILS) {
       expect(declared).toContain(detail);
     }
-    expect(TASK_COMMAND_UNDO_ERROR_DETAILS).toHaveLength(4);
+    expect(TASK_COMMAND_UNDO_ERROR_DETAILS).toHaveLength(3);
   });
 });
 

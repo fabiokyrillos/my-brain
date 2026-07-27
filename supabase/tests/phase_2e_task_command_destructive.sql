@@ -4,7 +4,7 @@
 -- A separate file from `phase_2e_task_command_apply.sql` on purpose. That file
 -- proves the mutation contract shared by every action; this one proves the two
 -- things only the destructive verbs have - a server-issued single-use
--- confirmation, and two collisions that make leaving `cancelled` refusable. Its
+-- confirmation, and the collision that makes leaving `cancelled` refusable. Its
 -- fixtures reserve the `63xxxxxx` prefix, so nothing here can disturb a
 -- `61xxxxxx`/`62xxxxxx` subject and no assertion in either file depends on the
 -- other having run.
@@ -29,10 +29,15 @@
 --     scoped to a recorded `cancel_task` because no other field-undo can pass the
 --     ten-column guard on a creation-undone task. That is a claim about the other
 --     fourteen actions, and it is asserted rather than trusted;
---   * **the candidate-slot collision.** `202607220040:13-19` made candidate
---     identity unique only over non-cancelled rows, so cancelling frees the slot
---     and a re-confirmed duplicate makes the restore a bare `23505`. Nothing
---     outside a database can observe that.
+--   * **that a restored task survives the candidate-provenance triggers.**
+--     `202607220040:13-19` made candidate identity unique only over non-cancelled
+--     rows, so a cancelled task carrying real provenance is outside two partial
+--     indexes and two triggers that a restore puts it back inside. Nothing
+--     outside a database can observe that, and an earlier revision of this slice
+--     read it as a collision and guarded it - wrongly, because
+--     `record_entry_task_candidate_confirmation` keeps the slot held. The
+--     assertion that the trigger still exists is what keeps that reasoning
+--     honest.
 --
 -- Every negative assertion is paired with a positive control. A guard wired to
 -- `true` refuses everything and passes every refusal test in this file; the
@@ -41,7 +46,7 @@
 -- Written in pure ASCII, following `phase_2e_task_command_matching.sql`.
 
 begin;
-select plan(96);
+select plan(91);
 
 set local timezone to 'UTC';
 
@@ -169,12 +174,25 @@ select ok(
   'restore_task and the cancel-undo raise the SAME declared token, which is what 2E-DESTRUCTIVE-009 asks of every door'
 );
 
+-- The trigger that makes a candidate-slot guard unnecessary. An earlier revision
+-- of this slice guarded that collision with a declared token of its own, on a
+-- reading of `202607220044:1357-1358` that was true of the RPC and false of the
+-- system: `public.record_entry_task_candidate_confirmation`
+-- (`202607220041:299-364`) writes the `'confirmed'` resolution row the RPC does
+-- not, that row survives the task's cancellation, and
+-- `2C_TERMINAL_DISPOSITION` therefore refuses the re-confirmation that would take
+-- the freed slot. The guard and its token are removed rather than kept as
+-- defence in depth, and this assertion is what stops the premise from being
+-- silently withdrawn: drop that trigger and the collision becomes reachable
+-- again, with nothing left to catch it.
 select ok(
-  position('detail = ''2E_CANDIDATE_REMATERIALIZED''' in pg_get_functiondef(
-    'public.apply_task_command(uuid, text, jsonb, jsonb, text, text, text)'::regprocedure)) > 0
-  and position('detail = ''2E_CANDIDATE_REMATERIALIZED''' in pg_get_functiondef(
-    'private.undo_apply_task_command_fields(uuid, uuid)'::regprocedure)) > 0,
-  'and so do the two doors of the candidate-slot collision'
+  exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.tasks'::regclass
+      and tgname = 'tasks_record_candidate_confirmation'
+      and not tgisinternal
+  ),
+  'a confirmed candidate still writes a resolution row, which is what keeps a cancelled task holding its candidate slot'
 );
 
 -- The listing is the third door, and it excludes rather than raises. Read from
@@ -244,13 +262,12 @@ insert into public.tasks (
   -- Ordering B: creation-undone first, from `todo`, so the handler's UPDATE
   -- really cancels it and really writes the audit row 2E-DESTRUCTIVE-007 needs.
   ('63000006-1111-4111-8111-111111111111', '63111111-1111-4111-8111-111111111111', 'Colisao ordem B', null, 'todo', null, null, null, null, null, false, null, null, null, null),
-  -- The candidate-slot collision: cancelled, holding candidate 0 of the
-  -- interpretation above, with a live duplicate below.
-  ('63000007-1111-4111-8111-111111111111', '63111111-1111-4111-8111-111111111111', 'Fatia tomada', null, 'cancelled', null, null, null, null, now() - interval '1 hour', false, null, '63000f01-1111-4111-8111-111111111111', '63000f02-1111-4111-8111-111111111111', 0),
-  -- The duplicate that took the slot while the row above was cancelled.
-  ('63000008-1111-4111-8111-111111111111', '63111111-1111-4111-8111-111111111111', 'Duplicata viva', null, 'todo', null, null, null, null, null, false, null, '63000f01-1111-4111-8111-111111111111', '63000f02-1111-4111-8111-111111111111', 0),
-  -- The control for that refusal: cancelled, candidate 1, nothing occupying it,
-  -- and dated so the restore must re-create the reminder 11.3 requires.
+  -- Carries real candidate provenance, cancelled, and restored below: the one
+  -- fixture that proves a task can leave `cancelled` while holding a candidate
+  -- slot. `tasks_candidate_provenance` (`202607220041:260-272`) exempts a
+  -- cancelled row and applies in full to the restored one, so this is also what
+  -- proves the restore survives that trigger.
+  -- Dated so the restore must re-create the reminder 11.3 requires.
   -- `tasks_create_due_reminder` skips a row inserted as `cancelled`, so the
   -- reminder state here is exactly "none", which is what makes the restore's
   -- insert observable.
@@ -1132,12 +1149,21 @@ select is(
 -- because its UPDATE carries `and status <> 'cancelled'`. So the ten scalars still
 -- equal the applied_state the cancellation recorded and the ten-column guard would
 -- pass - which is exactly why a second guard is needed.
+--
+-- **Asserted through the audit trigger, not through `cancelled_at`.** Comparing
+-- the column against the recorded `applied_state` is unfalsifiable inside one
+-- transaction: `pg_catalog.now()` is `transaction_timestamp()`, so had the
+-- creation-undo written `cancelled_at = now()` it would have written the *same*
+-- instant and the comparison would still pass. `audit_task_change` fires only
+-- when a watched column actually changes, so the absence of a second
+-- `task_updated` row is a fact about what was written rather than about what
+-- time it was.
 select is(
-  (select cancelled_at from public.tasks where id = '63000004-1111-4111-8111-111111111111'),
-  (select (operation.after_state -> 'applied_state' ->> 'cancelled_at')::timestamptz
-   from public.undo_operations operation
-   where operation.id = pg_temp.dest_undo_id('63000004-1111-4111-8111-111111111111')),
-  'and it changes nothing on an already-cancelled task, so the ten-column undo guard would still match'
+  (select count(*)::integer from public.audit_logs
+   where entity_id = '63000004-1111-4111-8111-111111111111'
+     and action_type = 'task_updated'),
+  1,
+  'and it changes nothing on an already-cancelled task - only the cancellation left a trigger row, so the ten-column undo guard would still match'
 );
 
 select is(
@@ -1212,63 +1238,6 @@ select is(
   pg_temp.dest_undo(pg_temp.dest_undo_id('6300000c-1111-4111-8111-111111111111')),
   'P0001:2E_UNDO_RESTORE_INTEGRITY',
   'and the rename-undo is refused by the TEN-COLUMN guard, not by the collision guard - which is why that guard is scoped to cancel_task'
-);
-
--- ---------------------------------------------------------------------------
--- The candidate-slot collision
--- ---------------------------------------------------------------------------
--- `202607220040:13-19` made candidate identity unique only over non-cancelled
--- rows, so a cancelled task releases its slot and a re-confirmed duplicate takes
--- it. Returning the original to an active status is then a bare 23505, which no
--- mapper case covers and which `apply.ts` would report as retryable forever.
-
-select is(
-  pg_temp.dest_apply(
-    '63000007-1111-4111-8111-111111111111',
-    'restore_task',
-    jsonb_build_object('status', 'todo'),
-    pg_temp.dest_snap('63000007-1111-4111-8111-111111111111'),
-    pg_temp.dest_iso(now()),
-    'task-command-policy-v1',
-    'pgtap-2e5-slot'
-  ),
-  '55P03:2E_CANDIDATE_REMATERIALIZED',
-  'restore_task refuses a task whose candidate slot a live duplicate has taken, with a declared code rather than a raw 23505'
-);
-
-select is(
-  (select status from public.tasks where id = '63000007-1111-4111-8111-111111111111'),
-  'cancelled',
-  'and leaves it cancelled'
-);
-
--- The way out, which is what makes this a different refusal from a creation-undo:
--- cancel the duplicate and the restore succeeds. Nothing else in this file proves
--- the predicate reads the CURRENT occupancy rather than a permanent verdict.
-select is(
-  pg_temp.dest_cancel('63000008-1111-4111-8111-111111111111', 'pgtap-2e5-dup'),
-  'accepted',
-  'cancelling the duplicate releases the slot'
-);
-
-select is(
-  pg_temp.dest_apply(
-    '63000007-1111-4111-8111-111111111111',
-    'restore_task',
-    jsonb_build_object('status', 'todo'),
-    pg_temp.dest_snap('63000007-1111-4111-8111-111111111111'),
-    pg_temp.dest_iso(now()),
-    'task-command-policy-v1',
-    'pgtap-2e5-slot2'
-  ),
-  'accepted',
-  'and the restore then succeeds, so the refusal was a condition and not a verdict'
-);
-
-select is(
-  (select status from public.tasks where id = '63000007-1111-4111-8111-111111111111'),
-  'todo',
-  'putting the task back'
 );
 
 -- ---------------------------------------------------------------------------

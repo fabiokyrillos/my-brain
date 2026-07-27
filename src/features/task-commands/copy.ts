@@ -215,10 +215,6 @@ const ptBR: TaskCommandCopy = {
     // the task's criação foi desfeita, which is what the sentence says.
     "2E_CREATION_UNDONE":
       "Esta tarefa saiu das suas listas quando você desfez a criação dela, então não dá mais para trazê-la de volta.",
-    // Names the condition and the way out, because this is the one refusal here
-    // the user can clear by acting on something else.
-    "2E_CANDIDATE_REMATERIALIZED":
-      "Enquanto esta tarefa estava cancelada, outra foi criada a partir do mesmo item. Cancele a mais nova para poder trazer esta de volta.",
     "2E_INELIGIBLE_STATUS": "O status atual da tarefa não permite esta ação.",
     "2E_TRANSITION_INTEGRITY":
       "Outra alteração chegou a esta tarefa primeiro, então nada foi alterado. Tente novamente.",
@@ -390,8 +386,6 @@ const en: TaskCommandCopy = {
       "This action needs your confirmation. Check the fresh preview and confirm to continue.",
     "2E_CREATION_UNDONE":
       "This task left your lists when you undid its creation, so it can no longer be brought back.",
-    "2E_CANDIDATE_REMATERIALIZED":
-      "While this task was cancelled, another one was created from the same item. Cancel the newer one to bring this one back.",
     "2E_INELIGIBLE_STATUS": "The task's current status does not allow this action.",
     "2E_TRANSITION_INTEGRITY":
       "Another change reached this task first, so nothing was changed. Try again.",

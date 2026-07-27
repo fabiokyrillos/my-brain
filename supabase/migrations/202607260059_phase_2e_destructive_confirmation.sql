@@ -56,10 +56,13 @@
 -- **A replay never reaches the gate.** The consuming UPDATE sits after the
 -- replay branch, which returns from the stored `after_state` before any lock is
 -- taken (`202607260058:1064-1099`), so an exact resubmission returns the
--- original outcome marked replayed and consumes nothing (2E-UPDATE-005). The
--- read-only half of the gate sits *before* the reservation, for the reason the
--- unlocked ownership probe and the relation-ownership probes already give: a
--- payload that cannot possibly apply must not burn an operation key.
+-- original outcome marked replayed and consumes nothing (2E-UPDATE-005).
+--
+-- **The gate is that one statement and nothing else.** A read-only pre-check
+-- before the reservation was written and removed: two halves can disagree after
+-- a later edit, the read half would have had to be re-checked under the write
+-- anyway, and it bought nothing — a raise rolls the reservation back with
+-- everything else, so refusing before it burns no operation key either way.
 --
 -- **Two concurrent requests carrying one confirmation necessarily share an
 -- operation key**, because the key is what resolves the confirmation. They are
@@ -132,19 +135,26 @@
 -- raises the bare `22023 'Invalid task command action'` that step 2 already
 -- gives an unknown action — a refusal that *is* provokable, through step 2.
 --
--- Three tokens replace it. `2E_CONFIRMATION_REQUIRED` (`P0001`) covers all three
+-- Two tokens replace it. `2E_CONFIRMATION_REQUIRED` (`P0001`) covers all three
 -- ways confirmation evidence can be absent — no row, a row bound to a different
 -- digest, and a row already consumed — because the remedy is identical in all
 -- three and `errors.ts:83-88` already rejects a vocabulary that distinguishes
 -- failures a caller cannot act on differently. `2E_CREATION_UNDONE` (`55P03`) is
 -- the single token §13.6 asks for, closing the cancel-undo and `restore_task`
--- and scoping the candidate listing. `2E_CANDIDATE_REMATERIALIZED` (`55P03`) is
--- the second collision this slice makes reachable, described at length above
--- `private.task_candidate_slot_taken`: it is a *different* cause with a
--- different remedy — the duplicate is cancellable and the restore then succeeds
--- — so folding it into the first would have told the user their task was
--- deleted when it is merely blocked. The RPC's SQLSTATE set is unchanged at
+-- and scoping the candidate listing. The RPC's SQLSTATE set is unchanged at
 -- `{22023, 42501, 55P03, P0001, P0002}`.
+--
+-- **A third token was written and removed before this slice was accepted.** It
+-- guarded a candidate-slot collision that an adversarial review of the shipped
+-- code proved unreachable: `record_entry_task_candidate_confirmation`
+-- (`202607220041:299-364`) writes the `'confirmed'` resolution row that
+-- `confirm_entry_task_candidates_v6`'s terminal-disposition gate reads, so the
+-- duplicate that would take a cancelled task's slot cannot be created — and the
+-- one path that deletes those rows is a creation-undo, which step 15b already
+-- refuses. Removing it rather than keeping it as defence in depth is ADR-049
+-- applied to this slice's own work. The reasoning that produced it is preserved
+-- at step 18b, because the trigger it depends on is now load-bearing and a
+-- future reader deserves to know why nothing guards that transition.
 --
 -- **`55P03` now carries a DETAIL on one path and none on the other**, which
 -- `src/features/task-commands/apply.ts` must read in that order: the token
@@ -307,102 +317,6 @@ revoke all on function private.task_creation_undone(uuid, uuid)
 
 comment on function private.task_creation_undone(uuid, uuid) is
   'Phase 2E: is this task deleted, in the sense PRD 2E-DESTRUCTIVE-008 defines - an undone confirm_entry_task* operation whose entity_ids contain it. The single definition the cancel-undo guard, restore_task and the candidate listing all read.';
-
--- ---------------------------------------------------------------------------
--- The candidate-slot collision (2E-DESTRUCTIVE-006, 2E-UNDO-001)
--- ---------------------------------------------------------------------------
--- A second collision, of the same family as 2E-DESTRUCTIVE-008's and reachable
--- for the first time in this slice, because this slice is what gives a user a
--- way to cancel a task on purpose.
---
--- `202607220040:13-19` made candidate identity unique only over *active* rows:
---
---   create unique index tasks_source_interpretation_candidate_key
---     on public.tasks (source_interpretation_id, candidate_index)
---     where source_interpretation_id is not null and status <> 'cancelled';
---
--- plus the legacy twin keyed on `(source_entry_id, candidate_index)` where the
--- interpretation id is null. That was correct for the problem it solved — a
--- candidate whose task had been compensatingly cancelled by undo must be
--- confirmable again — and it means a cancelled task **releases its slot**.
---
--- Nothing else re-takes it. `confirm_entry_task_candidates_v6` records a
--- resolution row only for a disposition other than `'confirmed'`
--- (`202607220044:1357-1358`), so a confirmed candidate leaves no ledger entry
--- and the `2C_TERMINAL_DISPOSITION` gate (`:1179-1189`) never fires for it; the
--- re-materialization gate (`:1191-1197`) explicitly tolerates a cancelled task;
--- and `src/features/interpretations/data.ts:253` filters the surface's task list
--- with `.neq("status", "cancelled")`, so the entry page re-offers the candidate
--- the moment the task is cancelled.
---
--- So: confirm candidate 3 → task T. `cancel_task` T. The entry page re-offers
--- candidate 3, the user confirms it, T2 takes the slot. Now `restore_task` on T,
--- or undo of the cancel, writes a non-cancelled status onto T and Postgres
--- raises a bare `23505` — an undeclared SQLSTATE that `apply.ts` maps to
--- `undeclared_failure` with `retryable: true`, so the surface invites a retry
--- that can never succeed. A cancellation the preview disclosed as "restorable
--- afterwards" would be permanent, which falsifies 2E-DESTRUCTIVE-006 and
--- 2E-UNDO-001 at once.
---
--- The comment at `src/features/task-commands/taxonomy.ts:301-305` asserted the
--- opposite — "re-confirmation of the originating candidate is gated by the
--- entry_task_candidate_resolutions ledger, not by the relaxed unique index" —
--- and this slice corrects it, because the ledger is exactly what a confirmed
--- candidate does not write.
---
--- **This predicate mirrors the two indexes and is deliberately not owner-scoped
--- on the occupant.** Neither index carries `user_id`, so a predicate that added
--- one would be *laxer* than the constraint it exists to anticipate, and a
--- `23505` would escape through the gap. Cross-owner occupancy is unrepresentable
--- anyway — `source_entry_id` and `source_interpretation_id` are owner-scoped by
--- composite FK — so the difference is theoretical; being at least as strict as
--- the index is not.
---
--- Unlike `task_creation_undone` this is a *blocked*, not a *deleted*, state: the
--- duplicate is a live task the user can cancel, after which the restore
--- succeeds. That is why the listing does not hide such a task and why the
--- refusal names a condition rather than a verdict.
-
-create or replace function private.task_candidate_slot_taken(
-  p_user_id uuid,
-  p_task_id uuid
-)
-returns boolean
-language sql
-stable
-set search_path = ''
-as $$
-  select exists (
-    select 1
-    from public.tasks as subject
-    join public.tasks as occupant
-      on occupant.id <> subject.id
-     and occupant.status <> 'cancelled'
-     and occupant.candidate_index is not distinct from subject.candidate_index
-     and (
-       (
-         subject.source_interpretation_id is not null
-         and occupant.source_interpretation_id
-             is not distinct from subject.source_interpretation_id
-       )
-       or (
-         subject.source_interpretation_id is null
-         and occupant.source_interpretation_id is null
-         and subject.source_entry_id is not null
-         and occupant.source_entry_id is not distinct from subject.source_entry_id
-       )
-     )
-    where subject.user_id = p_user_id
-      and subject.id = p_task_id
-      and subject.candidate_index is not null
-  );
-$$;
-
-revoke all on function private.task_candidate_slot_taken(uuid, uuid)
-  from public, anon, authenticated, service_role;
-
-comment on function private.task_candidate_slot_taken(uuid, uuid) is
-  'Phase 2E: would returning this cancelled task to an active status collide with tasks_source_interpretation_candidate_key or its legacy twin (202607220040:13-19). Mirrors both partial indexes exactly, including their absence of an owner column, so it can never be laxer than the constraint it anticipates. Read by restore_task and by the cancel-undo, which refuse with 2E_CANDIDATE_REMATERIALIZED rather than letting a bare 23505 escape.';
 
 -- ---------------------------------------------------------------------------
 -- Issuance (2E-DESTRUCTIVE-002, 2E-DESTRUCTIVE-003)
@@ -655,8 +569,17 @@ declare
   action_touches_reminders boolean := false;
   -- PRD §11.2's Confirmation column, resolved from the taxonomy like every other
   -- policy value rather than by naming the action at the gate. `cancel_task` is
-  -- the only row that carries it today; a second destructive action added later
-  -- acquires the gate by setting this, not by editing a condition elsewhere.
+  -- the only row that carries it today.
+  --
+  -- Setting this is **necessary but not sufficient** for a second destructive
+  -- action: `public.task_command_confirmations`' `action` CHECK and
+  -- `public.issue_task_command_confirmation`'s own closed action list both name
+  -- `cancel_task` literally, so an action that set this without widening those
+  -- two would be permanently unappliable — gated here, and refused a
+  -- confirmation there. Both are deliberate: the CHECK is the structural floor
+  -- and the issuance list is what stops a caller minting a row no apply can
+  -- consume. A second destructive action is a three-place change, and this is
+  -- the place that is easy to find.
   action_requires_confirmation boolean := false;
   action_undo_strategy text;
   action_undo_action_type text;
@@ -1556,24 +1479,38 @@ begin
       using errcode = 'P0001', detail = '2E_INELIGIBLE_STATUS';
   end if;
 
-  -- 18b. The candidate-slot collision ------------------------------------------
-  -- Only an action that takes a task *out* of `cancelled` can collide, because
-  -- only a cancelled row is absent from the two partial indexes; among the
-  -- fifteen that is `restore_task` alone. Read under the task lock, so the
-  -- subject cannot move underneath the answer.
+  -- No candidate-slot guard here, and the absence is deliberate --------------
+  -- `202607220040:13-19` made candidate identity unique only over non-cancelled
+  -- rows, so a cancelled task releases its slot and returning it to an active
+  -- status looks like it could collide with a task that took the slot meanwhile.
+  -- It cannot, and the reason is a trigger rather than an RPC:
+  -- `public.record_entry_task_candidate_confirmation`
+  -- (`202607220041:299-364`) fires `after insert or update` on `public.tasks`
+  -- and writes a `'confirmed'` row into `public.entry_task_candidate_resolutions`
+  -- for every active task carrying valid candidate provenance. That row is keyed
+  -- `unique (user_id, interpretation_id, candidate_index)`
+  -- (`202607220041:29-30`), it survives the task's cancellation — nothing deletes
+  -- it but `private.undo_confirm_entry_tasks` — and
+  -- `confirm_entry_task_candidates_v6`'s terminal-disposition gate
+  -- (`202607220044:1179-1189`) reads it. So re-confirming the candidate of a
+  -- task this RPC cancelled is refused with `2C_TERMINAL_DISPOSITION`, and the
+  -- duplicate that would take the slot can never exist.
   --
-  -- The declared refusal is the deterministic path and the one pgTAP asserts.
-  -- Step 21 additionally traps `unique_violation` and re-raises the same token,
-  -- because this check and that write are two statements and a concurrent
-  -- re-confirmation committing between them is genuinely reachable on two
-  -- devices. Two mechanisms, one code, no undeclared SQLSTATE either way.
-  if locked_task.status = 'cancelled'
-    and effective_status <> 'cancelled'
-    and private.task_candidate_slot_taken(current_user_id, p_task_id)
-  then
-    raise exception 'The task candidate slot was taken by a newer task'
-      using errcode = '55P03', detail = '2E_CANDIDATE_REMATERIALIZED';
-  end if;
+  -- The one path that *does* free the slot is a creation-undo, because that is
+  -- what deletes the resolution rows (`202607250052:317-325`) — and that is
+  -- precisely the path step 15b already refuses with `2E_CREATION_UNDONE`, before
+  -- the row is even locked. The slot check would therefore have been subsumed by
+  -- a guard that runs earlier, and a declared token no reachable state can raise
+  -- is the defect this phase rejects twice elsewhere and codifies in ADR-049.
+  --
+  -- An earlier revision of this slice shipped that guard, a second private
+  -- predicate, a `unique_violation` trap on both status writes and a declared
+  -- `2E_CANDIDATE_REMATERIALIZED`, on the strength of a reading of
+  -- `202607220044:1357-1358` — "records a resolution row only for a disposition
+  -- other than `'confirmed'`" — which is true of the RPC and false of the system,
+  -- because the trigger writes the confirmed rows the RPC does not. An
+  -- adversarial review of the shipped code found it. All of it is removed rather
+  -- than kept as defence in depth.
 
   -- 19. Delta against the locked row -------------------------------------------
   -- Defence in depth for the scalar actions: step 17 has proven claimed ==
@@ -1667,28 +1604,15 @@ begin
   -- `set_status`, which is also how Slice 2E.5 admits `cancel_task` and
   -- `restore_task` without adding a write path.
   if p_action = any(status_writing_actions) then
-    -- The `exception` block is the race backstop step 18b names, and it wraps
-    -- only this branch because only a status write can move a row into or out of
-    -- the two partial candidate indexes. `unique_violation` here can be nothing
-    -- else: the pkey and `tasks_user_id_id_key` are untouched by a status
-    -- change, and the reminder writes are step 22, outside this block. The
-    -- subtransaction it opens costs one savepoint per status command, which is
-    -- the price of never surfacing an undeclared `23505` to a mapper that would
-    -- call it retryable.
-    begin
-      update public.tasks
-      set
-        status = effective_status,
-        completed_at = case when effective_status = 'completed' then pg_catalog.now() else null end,
-        cancelled_at = case when effective_status = 'cancelled' then pg_catalog.now() else null end
-      where id = p_task_id
-        and user_id = current_user_id
-        and status = locked_task.status;
-      get diagnostics affected = row_count;
-    exception when unique_violation then
-      raise exception 'The task candidate slot was taken by a newer task'
-        using errcode = '55P03', detail = '2E_CANDIDATE_REMATERIALIZED';
-    end;
+    update public.tasks
+    set
+      status = effective_status,
+      completed_at = case when effective_status = 'completed' then pg_catalog.now() else null end,
+      cancelled_at = case when effective_status = 'cancelled' then pg_catalog.now() else null end
+    where id = p_task_id
+      and user_id = current_user_id
+      and status = locked_task.status;
+    get diagnostics affected = row_count;
   elsif p_action = 'rename_task' then
     update public.tasks
     set title = patch_title
@@ -2207,22 +2131,12 @@ begin
     end if;
   end if;
 
-  -- The candidate-slot collision, on the undo side. Keyed on the transition the
-  -- restore performs rather than on the recorded action, so it covers any future
-  -- action that leaves `cancelled` without needing to be told about it: the
-  -- forward operation left the row `cancelled` and this undo would take it out,
-  -- which is exactly when the two partial indexes of `202607220040:13-19` start
-  -- applying to it again. The private predicate's own comment carries the
-  -- reachable sequence; the short version is that cancelling frees the candidate
-  -- slot, the entry surface re-offers the candidate, and a re-confirmed
-  -- duplicate then makes the restore a `23505`.
-  if applied_state ->> 'status' is not distinct from 'cancelled'
-    and operation.before_state ->> 'status' is distinct from 'cancelled'
-    and private.task_candidate_slot_taken(p_user_id, target_task_id)
-  then
-    raise exception 'The task candidate slot was taken by a newer task'
-      using errcode = '55P03', detail = '2E_CANDIDATE_REMATERIALIZED';
-  end if;
+  -- There is no candidate-slot guard here either, for the reason the forward
+  -- path records at step 18b: `public.record_entry_task_candidate_confirmation`
+  -- writes a `'confirmed'` resolution row for every active candidate task, that
+  -- row survives cancellation, and `2C_TERMINAL_DISPOSITION` therefore refuses
+  -- the re-confirmation that would take the slot. The only path that frees it is
+  -- a creation-undo, which the guard directly above already refuses.
 
   -- The compensating column write is performed by the system executing a stored
   -- operation, which is what the trigger row describes; the `operation_undone`
@@ -2254,11 +2168,6 @@ begin
   -- way to close the same hole, and it is rejected: withdrawn decision D17 makes the
   -- forward status branch write `completed_at` and `cancelled_at` unconditionally,
   -- so a narrowed restore would strand a `completed_at` the forward path cleared.
-  -- Wrapped for the same reason step 21's status branch is: the guard above and
-  -- this write are two statements, and a re-confirmation committing between them
-  -- would otherwise surface as a bare `23505` that `mapUndoOperationFailure`
-  -- renders as the unactionable "Could not undo."
-  begin
   update public.tasks
   set
     status = operation.before_state ->> 'status',
@@ -2288,10 +2197,6 @@ begin
         is not distinct from (applied_state ->> 'intentional_no_due')::boolean
     and no_due_reason is not distinct from applied_state ->> 'no_due_reason';
   get diagnostics affected = row_count;
-  exception when unique_violation then
-    raise exception 'The task candidate slot was taken by a newer task'
-      using errcode = '55P03', detail = '2E_CANDIDATE_REMATERIALIZED';
-  end;
   if affected <> 1 then
     raise exception 'Task command undo integrity check failed'
       using errcode = 'P0001', detail = '2E_UNDO_RESTORE_INTEGRITY';
@@ -3177,7 +3082,6 @@ begin
     pg_get_functiondef('private.undo_confirm_entry_tasks(uuid, uuid)'::regprocedure),
     pg_get_functiondef('public.issue_task_command_confirmation(uuid, text, jsonb, jsonb, text, text, text)'::regprocedure),
     pg_get_functiondef('private.task_creation_undone(uuid, uuid)'::regprocedure),
-    pg_get_functiondef('private.task_candidate_slot_taken(uuid, uuid)'::regprocedure),
     pg_get_functiondef('public.list_task_command_candidates(text[], text, text, text, text, timestamptz, integer, text, text, text)'::regprocedure),
     pg_get_functiondef('public.audit_task_change()'::regprocedure)
   );
@@ -3264,41 +3168,21 @@ begin
       using errcode = 'P0001';
   end if;
 
-  -- The candidate-slot collision. Both the deterministic guard and the
-  -- `unique_violation` backstop are re-proven, because either one alone leaves a
-  -- reachable path to a bare `23505` that no mapper case covers.
-  if position('2E_CANDIDATE_REMATERIALIZED' in apply_body) = 0
-    or position('2E_CANDIDATE_REMATERIALIZED' in handler_body) = 0
-    or position('private.task_candidate_slot_taken' in apply_body) = 0
-    or position('private.task_candidate_slot_taken' in handler_body) = 0
-  then
-    raise exception 'the candidate-slot collision is no longer refused with a declared code on both doors that can leave the cancelled status'
-      using errcode = 'P0001';
-  end if;
-  if position('exception when unique_violation then' in apply_body) = 0
-    or position('exception when unique_violation then' in handler_body) = 0
-  then
-    raise exception 'a status write lost its unique_violation backstop, so a concurrent candidate re-confirmation would surface as an undeclared 23505'
-      using errcode = 'P0001';
-  end if;
-
-  -- The two partial indexes the predicate above mirrors still exist, and still
-  -- exclude cancelled rows. If a later migration made candidate identity total,
-  -- the collision would move rather than disappear — a cancelled task would
-  -- occupy its slot forever and re-confirmation would break instead — and this
-  -- slice's guard would silently be guarding the wrong thing.
+  -- The trigger that makes a candidate-slot guard unnecessary must still be the
+  -- trigger this slice reasoned about. `record_entry_task_candidate_confirmation`
+  -- is what writes the `'confirmed'` resolution row that survives a cancellation
+  -- and lets `2C_TERMINAL_DISPOSITION` refuse the re-confirmation which would
+  -- otherwise take the freed slot. Drop it, or narrow it to INSERT, and the
+  -- collision this slice argued is unreachable becomes reachable again — and
+  -- nothing else in the repository would notice, because the guard that would
+  -- have caught it is deliberately absent.
   if not exists (
-    select 1 from pg_indexes
-    where schemaname = 'public'
-      and indexname = 'tasks_source_interpretation_candidate_key'
-      and indexdef like '%status <> ''cancelled''%'
-  ) or not exists (
-    select 1 from pg_indexes
-    where schemaname = 'public'
-      and indexname = 'tasks_legacy_source_entry_candidate_key'
-      and indexdef like '%status <> ''cancelled''%'
+    select 1 from pg_trigger
+    where tgrelid = 'public.tasks'::regclass
+      and tgname = 'tasks_record_candidate_confirmation'
+      and not tgisinternal
   ) then
-    raise exception 'the partial candidate-identity indexes 202607220040 created no longer exclude cancelled rows, so private.task_candidate_slot_taken no longer mirrors them'
+    raise exception 'tasks_record_candidate_confirmation is gone, so a cancelled task no longer holds its candidate slot through the resolution ledger and restore_task can collide with a re-confirmed duplicate'
       using errcode = 'P0001';
   end if;
 

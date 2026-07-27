@@ -981,18 +981,15 @@ describe("55P03 now means two things, and the DETAIL is what separates them", ()
     expect(mapped.retryable).toBe(false);
   });
 
-  it.each(["2E_CREATION_UNDONE", "2E_CANDIDATE_REMATERIALIZED"] as const)(
-    "resolves %s rather than degrading it to staleness",
-    (detail) => {
-      const mapped = mapTaskCommandApplyError({ code: "55P03", details: detail });
+  it("resolves 2E_CREATION_UNDONE rather than degrading it to staleness", () => {
+    const mapped = mapTaskCommandApplyError({ code: "55P03", details: "2E_CREATION_UNDONE" });
 
-      expect(mapped.failure).toBe(detail);
-      expect(mapped.outcome).toBe("refused");
-      // The distinction that matters to a user: staleness invites a fresh preview,
-      // and neither of these can ever succeed on a retry.
-      expect(mapped.retryable).toBe(false);
-    },
-  );
+    expect(mapped.failure).toBe("2E_CREATION_UNDONE");
+    expect(mapped.outcome).toBe("refused");
+    // The distinction that matters to a user: staleness invites a fresh preview,
+    // and this one can never succeed on a retry.
+    expect(mapped.retryable).toBe(false);
+  });
 
   it("does not accept a collision token arriving under the wrong SQLSTATE", () => {
     // A `P0001` carrying `2E_CREATION_UNDONE` is not that failure; it is something
