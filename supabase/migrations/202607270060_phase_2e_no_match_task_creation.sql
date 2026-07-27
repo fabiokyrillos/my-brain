@@ -197,10 +197,12 @@ begin
     relation_reference := p_patch ->> relation_key;
     if relation_reference is null
       or pg_catalog.btrim(relation_reference) = ''
-      or pg_catalog.char_length(relation_reference) > case relation_type
-        when 'context' then 120
-        else 160
-      end
+      or pg_catalog.char_length(relation_reference) > (
+        case relation_type
+          when 'context' then 120
+          else 160
+        end
+      )
     then
       raise exception 'Relation reference did not resolve'
         using errcode = '22023', detail = '2E_INVALID_RELATION';

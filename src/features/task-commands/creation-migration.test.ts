@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { parsePlPgSQL } from "libpg-query";
 import { describe, expect, it } from "vitest";
 
 const MIGRATION =
@@ -30,8 +31,27 @@ function functionDeclaration(sql: string, signature: string): string {
   return sql.slice(start, bodyStart);
 }
 
+function functionStatement(sql: string, signature: string): string {
+  const functionName = signature.slice(0, signature.indexOf("("));
+  const start = sql.indexOf(`create or replace function ${functionName}(`);
+  if (start < 0) throw new Error(`${signature} is not declared by ${MIGRATION}`);
+  const bodyStart = sql.indexOf("as $$", start);
+  const bodyEnd = sql.indexOf("\n$$;", bodyStart);
+  if (bodyStart < 0 || bodyEnd < 0) throw new Error(`${signature} has no parseable statement`);
+  return sql.slice(start, bodyEnd + "\n$$;".length);
+}
+
 describe("Slice 2E.6 forward migration contract", () => {
   const sql = source(MIGRATION);
+
+  it("parses the creation payload helper with PostgreSQL's PL/pgSQL parser", async () => {
+    const payload = functionStatement(
+      sql,
+      "private.task_command_creation_payload(uuid, text, text[], jsonb, text)",
+    );
+
+    await expect(parsePlPgSQL(payload)).resolves.toBeDefined();
+  });
 
   it("ships one first-generation unversioned preview, issuer and creation RPC", () => {
     expect(sql.match(/create or replace function public\.preview_task_command_creation\(/g))
