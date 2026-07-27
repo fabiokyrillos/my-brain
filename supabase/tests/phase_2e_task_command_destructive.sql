@@ -300,9 +300,23 @@ insert into public.undo_operations (
 -- Helpers
 -- ---------------------------------------------------------------------------
 
+-- Strict ISO-8601, which `to_char(..., 'OF')` is NOT.
+--
+-- `OF` renders a whole-hour offset as `+00` rather than `+00:00`, and
+-- `apply_task_command`'s observed-before regex requires
+-- `[Zz]|[+-][0-9]{2}:[0-9]{2}` - so every instant this helper produced was
+-- refused with `Invalid observed-before instant` before any gate under test was
+-- reached. The RPC uses the `OF` form when it *writes* an instant into
+-- `before_state`/`applied_state`, where nothing re-parses it against that regex;
+-- a caller sending one is a different matter. `phase_2e_task_command_apply.sql:371-376`
+-- had this right and this file did not copy it.
+--
+-- Used for the pre-state instants too, which are cast rather than matched, so
+-- one format serves both and the fingerprint stays byte-stable across the
+-- issue/apply pair.
 create function pg_temp.dest_iso(p_instant timestamptz)
 returns text language sql immutable as $$
-  select to_char(p_instant, 'YYYY-MM-DD"T"HH24:MI:SS.USOF');
+  select to_char(p_instant at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') || 'Z';
 $$;
 
 -- Built from the live row rather than from literals, so a pre-state can never
