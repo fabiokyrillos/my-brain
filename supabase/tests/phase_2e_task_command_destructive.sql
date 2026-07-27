@@ -205,13 +205,24 @@ insert into public.entries (id, user_id, original_content) values
 
 -- `confidence` and `raw_output` carry no default and are NOT NULL
 -- (`202607160003:76,82`), so both are supplied rather than relying on one.
+--
+-- **`task_candidates` must be long enough to contain the indexes the fixtures
+-- claim.** `tasks_candidate_provenance` (`202607220041:260-272`) refuses an
+-- active task whose `candidate_index` is not less than
+-- `jsonb_array_length(task_candidates)`, with `2C_INVALID_CANDIDATE_PROVENANCE`.
+-- A `cancelled` row is exempt (`:224-226`), which is why the two cancelled
+-- candidate-slot fixtures below were accepted while the live duplicate was not -
+-- and it is also why the exemption cannot be relied on here: the whole point of
+-- that fixture is that `restore_task` takes it back out of `cancelled`, at which
+-- point the trigger applies in full. Two elements cover indexes 0 and 1.
 insert into public.entry_interpretations (
   id, user_id, entry_id, model, prompt_version, strategy_version, summary,
-  confidence, raw_output
+  confidence, raw_output, task_candidates
 ) values
   ('63000f02-1111-4111-8111-111111111111', '63111111-1111-4111-8111-111111111111',
    '63000f01-1111-4111-8111-111111111111', 'test-model', 'v1', 'v1', 'Resumo',
-   0.900, '{}'::jsonb);
+   0.900, '{}'::jsonb,
+   '[{"title": "Candidato zero"}, {"title": "Candidato um"}]'::jsonb);
 
 insert into public.tasks (
   id, user_id, title, description, status, manual_priority,
