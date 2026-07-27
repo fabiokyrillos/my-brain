@@ -1,6 +1,6 @@
 # Phase 2E — Execution Progress
 
-**Status: IN PROGRESS — Slice 2E.5 ACCEPTED. Slice 2E.6 next.**
+**Status: IN PROGRESS — Slice 2E.6 ACCEPTED. Paused before Slice 2E.7 by explicit user request.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -9,25 +9,25 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Field | Value |
 |---|---|
 | Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, in sync) |
-| Branch HEAD | `6bb2841` (plus the docs commit that carries this file) |
+| Branch HEAD | `2540ca5` implementation/test HEAD (plus the docs commit that carries this file) |
 | Phase base | `2e2acfd` |
-| Working tree | clean |
+| Working tree | Clean at the implementation/test HEAD; this file and the Slice 2E.6 report are carried by the following docs-only closeout commit |
 | Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | **all three jobs green** on `6bb2841` (run `30241338626`). The pgTAP suite reports `Files=29, Tests=1150, Result: PASS` |
+| CI | **all three jobs green** on `2540ca5` (run `30292038500`). The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` |
 | Merged / tagged / released | nothing |
 
 **Drift corrected on entry to this session** (docs-only, not a regression): this file named branch HEAD `bfa28a1` and CI run `30227374101`. Both were stale by one docs commit — the true HEAD on entry was `f0fa112`, with a *newer* green run `30227814871`. This is the third consecutive session to find that drift, and the cause is structural: this file is written before the docs commit that contains it. **Verify HEAD from `git rev-parse`, never from this table.**
 
-Slices 2E.1–2E.4 remain accepted.
+Slices 2E.1–2E.5 remain accepted.
 
 ## Deployment state
 
 | Artifact | State |
 |---|---|
 | Remote migration parity | `202607250054` — unchanged since the pre-2E cutover, verified this session with `npx supabase migration list --linked` |
-| `202607250055`–`202607260059` | **local only.** The whole chain applies from an empty database in CI; none is applied to the linked project |
-| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged. Slices 2E.1–2E.5 touch no worker code |
-| Generated types | hand-written (ADR-041). Parity for `apply_task_command`, `issue_task_command_confirmation` and `list_task_command_candidates` is proven three ways — migration text, content comparison, and `pg_proc` from the real catalog |
+| `202607250055`–`202607270060` | **local only.** The whole chain applies from an empty database in CI; none is applied to the linked project |
+| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged. Slices 2E.1–2E.6 touch no worker code |
+| Generated types | hand-written (ADR-041). Slice 2E.6 adds parity for the preview, confirmation and creation RPCs through migration-source, content and executable catalog contracts |
 
 **`202607250056`'s amendment window is still closed by exhaustion** for its *result columns and argument list*. Slice 2E.5 amended its **body** by `create or replace`, which costs nothing — that distinction is now load-bearing and should not be misremembered as "the file is frozen".
 
@@ -42,9 +42,30 @@ Slices 2E.1–2E.4 remain accepted.
 | 2E.3 — Disambiguation and read-only preview | 2E-C | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_03_REPORT.md` |
 | 2E.4 — Reversible non-destructive updates | 2E-D | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_04_REPORT.md` |
 | 2E.5 — Destructive actions and confirmation | 2E-E | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_05_REPORT.md` |
-| 2E.6 — No-match activity creation | 2E-F | not started |
+| 2E.6 — No-match activity creation | 2E-F | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_06_REPORT.md` |
 | 2E.7 — Conversational and task-surface integration | 2E-G | not started |
 | 2E.8 — Convergence and closeout | 2E-H | not started |
+
+## Slice 2E.6 — what shipped
+
+**A validated task-like no-match can now become one confirmed standalone inbox task.** Preview is
+read-only; the server issues and consumes a single-use confirmation; creation is owner-scoped,
+idempotent and auditable; undo cancels the task and its exact live reminder without allowing later
+resurrection.
+
+| Artifact | Responsibility |
+|---|---|
+| `202607270060` (new) | Canonical creation payload; owned relation resolution; preview, confirmation and creation RPCs; compensating undo; shared creation-family guards; grants; post-deploy assertions |
+| `phase_2e_task_command_creation.sql` | `plan(127)` |
+| `creation.ts` and tests | Capability-bound one-clarification continuation and terminal outcome contract |
+| `creation-migration.test.ts` | Executable parser/AST gates over the shipped helper, final `DO` block and undo handler |
+| `local-task-command-creation-race.mjs` | Real two-session same-key PostgREST proof plus evidence self-test |
+| CI database job | Runs the race after migrations, pgTAP and database lint |
+
+Created rows have `created_by = 'agent'`, `status = 'inbox'` and null
+`source_entry_id`/`source_interpretation_id`/`candidate_index`. The existing task insert trigger remains
+the only due-reminder creator. Exact replay returns the original identities, including after undo;
+it never recreates or restores the task.
 
 ## Slice 2E.5 — what shipped
 
@@ -89,35 +110,42 @@ Slices 2E.1–2E.4 remain accepted.
 
 ## Local gates on HEAD
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2039 passed / 115 files** · focused `src/features/task-commands` **947 passed / 17 files** · `build` clean · `deno check` clean.
+`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2110 passed / 118 files** ·
+focused `src/features/task-commands` **1018 passed / 20 files** · migration parser/AST **17/17** ·
+`build` clean · deployed-entrypoint Deno checks clean · Deno tests **46/46** · race evidence
+validator self-test clean.
 
-pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and `supabase db lint --local` never execute on this workstation. It ran **in CI**: `Files=29, Tests=1150, Result: PASS`. That is `1059 + 91` against Slice 2E.4's baseline and `28 + 1` files. **The arithmetic is the evidence, not the pass.**
+pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and
+`supabase db lint --local` never execute on this workstation. Exact-SHA run `30292038500` supplied the
+authoritative database evidence: empty-database migration chain, both lint schemas, real two-session
+race, `phase_2e_task_command_creation.sql ............. ok`, and
+`Files=30, Tests=1277, Result: PASS`. That is exactly `29 + 1` files and `1150 + 127` assertions.
 
-## Open items owed by Slice 2E.5
+## Open items after accepted Slice 2E.6
 
-1. **The design round was incomplete** (session limit); the shipped-code round is recorded in the slice report.
-2. **No dedicated mutation round ran**, for the second slice running.
-3. **2E-OPERATIONS-003's focused remote smoke — owed, blocked on deployment.** Epic 2E-E adds to Epic 2E-D's list: a real two-session race on one confirmation, consumption across two PostgREST requests, cross-owner confirmation denial with two real owners, and the `unique_violation` backstop that pgTAP cannot provoke inside one transaction.
-4. **Authenticated desktop/mobile Playwright journeys** — blocked on there being no surface (ADR-043).
-5. **2E-DESTRUCTIVE-006's rendered affordance is Slice 2E.7's.** The owner-scoped query and its exclusion ship here and are asserted; the rendering of `restore_task` beside each cancelled row is not.
-6. **2E-UNDO-005's task-scoped undo listing is not built.** Owed by Slice 2E.7.
-7. **`apply.ts`, `confirmation.ts` and `errors.ts` have no production caller.** By design; Slice 2E.7.
-8. **The pre-existing flaky test** `src/features/tasks/task-candidate-form.test.tsx` still reds CI intermittently.
-9. **Alias-driven relation resolution remains unproven in pgTAP** — unchanged, and this slice does not depend on it.
+1. **No deployment occurred.** The linked project remains at migration `202607250054`, so an
+   authenticated online smoke of the new RPCs is blocked on separate deployment authorization.
+2. **No rendered production caller exists yet.** Conversational integration, task-scoped undo listing,
+   cancelled-task restore affordance and authenticated surface journeys belong to Slice 2E.7.
+3. **No dedicated mutation-testing round ran.** The adversarial review, executable parser/AST gates,
+   127-assertion pgTAP suite and real two-session race are the acceptance evidence used here.
+4. **The earlier Slice 2E.5 design round remained incomplete.** Its limitation is preserved in that
+   slice's report; Slice 2E.6's shipped-code review and scoped CI re-reviews completed.
+5. Draft PR #18 remains intentionally open and unmerged. Nothing was deployed, tagged or released.
 
 ## Next: the continuation point, precisely
 
-**Slice 2E.5 is accepted. Begin Slice 2E.6 — No-match activity creation (Epic 2E-F).** Read PRD §13.7 (`2E-NOMATCH-001..009`), §12.4, §12.5, §10.3, §19.1 (Epic 2E-F), then `202607260059` — which 2E.6 extends or sits beside, and whose primitives it is required to share.
+**Stop here. Slice 2E.6 is accepted and the user explicitly requested that Slice 2E.7 not start in this
+session.** No 2E.7 source, test or design artifact was created.
 
-What 2E.6 inherits:
+When separately authorized, the next slice is 2E.7 — Conversational and task-surface integration
+(Epic 2E-G). Its starting contract is the accepted 2E.1–2E.6 stack, especially:
 
-- **2E-NOMATCH-004 requires a *creation* RPC "in the same versioned family as the mutation RPC, sharing its operation-key, fingerprint, audit and undo-registry primitives"** — and explicitly forbids reusing the entry-scoped candidate materialization path, which cannot create a standalone task. So this is a **new** function, unlike 2E.5's `create or replace`, and it needs its own undo handler and registry row.
-- **`created_by = 'agent'` is the distinguishing mark** (2E-NOMATCH-007), and `audit_task_change`'s INSERT branch already derives `'agent'` from it without any change — ADR-046 recorded that deliberately.
-- **The candidate-provenance trigger is the trap.** `202607220041:224-272` refuses an active task carrying a `candidate_index` that no interpretation backs. A command-created task has **no** entry and **no** candidate, so it must leave `source_entry_id`, `source_interpretation_id` and `candidate_index` all null — and 2E.5's fixture failure is the evidence of what happens when that is got wrong.
-- **The two collision predicates are `private` and shared.** A created task has no creation operation in the `confirm_entry_task*` family, so `task_creation_undone` is false for it — but the undo of a *2E.6 creation* is a third member of the "compensating operation that deletes a task" family, and §13.6's guard reads a hardcoded four-element `action_type` list. **2E.6 must decide whether its own creation action_type joins that list**, and the answer is almost certainly yes: undoing a command-created task and then restoring it would be the same resurrection 2E-DESTRUCTIVE-008 forbids.
-- **The confirmation ledger's `action` CHECK is `in ('cancel_task')`.** 2E-NOMATCH-005 requires creation to be "previewed before it happens and confirmed by the user" — if that confirmation is to be the same server-issued kind, the CHECK and the issuance RPC's action list both widen, and `2E-DESTRUCTIVE-002`'s properties come along for free. If it is a lighter confirmation, say why.
-
-**Run the review the way this slice did.** Attack the design *before* writing code — it found the two defects that mattered, and both were invisible from the requirement text alone. Then audit the post-deploy greps by hand before pushing. Then expect CI to find a fixture problem anyway, and read the first failing line rather than the summary: `Failed 80/96` meant "16 ran, 80 never got the chance", and the sixteen that ran had already proven the migration.
+- the one production caller must select among update, destructive-confirmation and confirmed-creation
+  continuations without widening their closed outcome vocabularies;
+- task-scoped undo listing and cancelled-task restore affordances must stay owner-scoped;
+- desktop/mobile, pt-BR/en and accessibility evidence belongs to that rendered slice;
+- no task row belongs inside an LLM prompt; the existing bounded command contracts remain the boundary.
 
 Useful commands:
 
