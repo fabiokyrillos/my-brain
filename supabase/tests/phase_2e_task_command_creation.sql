@@ -1246,6 +1246,7 @@ select is(
   '55P03:2E_CREATION_UNDONE',
   'the restore door refuses to resurrect the command-created task'
 );
+reset role;
 select is(
   (
     select position('private.is_task_creation_action' in pg_get_functiondef(
@@ -1254,6 +1255,7 @@ select is(
   true,
   'the cancel-undo locking door uses the centralized creation family'
 );
+set local role authenticated;
 select is(
   pg_temp.creation_cancel(
     (select id from public.tasks where operation_key = 'pgtap-2e6-happy'),
