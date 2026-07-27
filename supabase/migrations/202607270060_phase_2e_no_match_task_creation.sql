@@ -2937,50 +2937,50 @@ begin
     family_body
   );
 
-  if pg_catalog.position('errcode = ''40001''' in bundle) > 0 then
+  if position('errcode = ''40001''' in bundle) > 0 then
     raise exception 'Slice 2E.6 reintroduced the gateway-hanging SQLSTATE'
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('private.is_task_creation_action(creation.action_type)' in predicate_body) = 0
-    or pg_catalog.position('private.is_task_creation_action(creation.action_type)' in apply_body) = 0
-    or pg_catalog.position('private.is_task_creation_action(creation.action_type)' in field_undo_body) = 0
-    or pg_catalog.position('''create_task_command''' in family_body) = 0
+  if position('private.is_task_creation_action(creation.action_type)' in predicate_body) = 0
+    or position('private.is_task_creation_action(creation.action_type)' in apply_body) = 0
+    or position('private.is_task_creation_action(creation.action_type)' in field_undo_body) = 0
+    or position('''create_task_command''' in family_body) = 0
   then
     raise exception 'the creation family is not centralized across all three readers'
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('insert into public.undo_operations' in create_body) = 0
-    or pg_catalog.position('update public.task_command_confirmations' in create_body) = 0
-    or pg_catalog.position('insert into public.tasks' in create_body) = 0
-    or pg_catalog.position('insert into public.undo_operations' in create_body)
-       > pg_catalog.position('update public.task_command_confirmations' in create_body)
-    or pg_catalog.position('update public.task_command_confirmations' in create_body)
-       > pg_catalog.position('insert into public.tasks' in create_body)
+  if position('insert into public.undo_operations' in create_body) = 0
+    or position('update public.task_command_confirmations' in create_body) = 0
+    or position('insert into public.tasks' in create_body) = 0
+    or position('insert into public.undo_operations' in create_body)
+       > position('update public.task_command_confirmations' in create_body)
+    or position('update public.task_command_confirmations' in create_body)
+       > position('insert into public.tasks' in create_body)
   then
     raise exception 'create_task_command lost reservation-confirmation-task lock order'
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('''creation_undone'', existing_operation.status = ''undone''' in create_body) = 0
-    or pg_catalog.position('''idempotent'', true' in create_body) = 0
+  if position('''creation_undone'', existing_operation.status = ''undone''' in create_body) = 0
+    or position('''idempotent'', true' in create_body) = 0
   then
     raise exception 'create_task_command lost exact replay-after-undo semantics'
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('source_entry_id' in create_body) = 0
-    or pg_catalog.position('source_interpretation_id' in create_body) = 0
-    or pg_catalog.position('candidate_index' in create_body) = 0
-    or pg_catalog.position('''agent''' in create_body) = 0
-    or pg_catalog.position('''inbox''' in create_body) = 0
+  if position('source_entry_id' in create_body) = 0
+    or position('source_interpretation_id' in create_body) = 0
+    or position('candidate_index' in create_body) = 0
+    or position('''agent''' in create_body) = 0
+    or position('''inbox''' in create_body) = 0
   then
     raise exception 'create_task_command lost standalone provenance or inbox semantics'
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('insert into public.reminders' in create_body) > 0
+  if position('insert into public.reminders' in create_body) > 0
     or not exists (
       select 1
       from pg_catalog.pg_trigger
@@ -2993,10 +2993,10 @@ begin
       using errcode = 'P0001';
   end if;
 
-  if pg_catalog.position('detail = ''2E_CONFIRMATION_REQUIRED''' in create_body) = 0
-    or pg_catalog.position('detail = ''2E_IDEMPOTENCY_MISMATCH''' in create_body) = 0
-    or pg_catalog.position('detail = ''2E_UNDO_RESTORE_INTEGRITY''' in undo_body) = 0
-    or pg_catalog.position('detail = ''2E_UNDO_REMINDER_INTEGRITY''' in undo_body) = 0
+  if position('detail = ''2E_CONFIRMATION_REQUIRED''' in create_body) = 0
+    or position('detail = ''2E_IDEMPOTENCY_MISMATCH''' in create_body) = 0
+    or position('detail = ''2E_UNDO_RESTORE_INTEGRITY''' in undo_body) = 0
+    or position('detail = ''2E_UNDO_REMINDER_INTEGRITY''' in undo_body) = 0
   then
     raise exception 'a reachable Slice 2E.6 failure lost its declared detail'
       using errcode = 'P0001';

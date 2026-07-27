@@ -41,6 +41,12 @@ function functionStatement(sql: string, signature: string): string {
   return sql.slice(start, bodyEnd + "\n$$;".length);
 }
 
+function finalDoStatement(sql: string): string {
+  const start = sql.lastIndexOf("\ndo $$\n");
+  if (start < 0) throw new Error(`${MIGRATION} has no final DO statement`);
+  return sql.slice(start + 1);
+}
+
 describe("Slice 2E.6 forward migration contract", () => {
   const sql = source(MIGRATION);
 
@@ -51,6 +57,10 @@ describe("Slice 2E.6 forward migration contract", () => {
     );
 
     await expect(parsePlPgSQL(payload)).resolves.toBeDefined();
+  });
+
+  it("parses the fail-closed post-deploy block with PostgreSQL's PL/pgSQL parser", async () => {
+    await expect(parsePlPgSQL(finalDoStatement(sql))).resolves.toBeDefined();
   });
 
   it("ships one first-generation unversioned preview, issuer and creation RPC", () => {
