@@ -20,6 +20,10 @@ import {
   TASK_COMMAND_FAILURE_POLICY,
   type TaskCommandApplyFailure,
 } from "./errors";
+import {
+  issueTaskCommandConfirmation,
+  type TaskCommandConfirmationClient,
+} from "./confirmation";
 import { buildFingerprintPayload } from "./fingerprint";
 import { TASK_MATCH_LIMITS } from "./match-policy";
 import {
@@ -31,6 +35,7 @@ import {
 import { buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
 import { validateTaskCommand, type ValidatedTaskCommand } from "./schema";
 import {
+  TASK_COMMAND_ACTIONS,
   TASK_COMMAND_POLICY_VERSION,
   actionPolicy,
   type TaskCommandAction,
@@ -786,7 +791,18 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
    * used to read the resulting status back out of this key too; since the
    * ten-column guard it reads `after_state -> 'applied_state'` instead.)
    */
-  const MIGRATION = "supabase/migrations/202607260058_phase_2e_task_command_apply.sql";
+  /**
+   * The migration holding the CURRENT `public.apply_task_command`.
+   *
+   * `202607260059` replaced `202607260058`'s definition with `create or replace`,
+   * so 0058's text is superseded. Reading the older file left this whole block
+   * asserting a taxonomy `case` the database no longer runs — and, worse, left
+   * the "both destructive actions are refused" assertion below permanently green
+   * against a migration that will always contain the refusal it was written to
+   * observe. Whenever a later migration replaces this function again, this
+   * constant moves with it.
+   */
+  const MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
   const migration = readFileSync(path.resolve(process.cwd(), MIGRATION), "utf8").replace(
     /\r\n/g,
     "\n",
@@ -818,11 +834,18 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
     set_waiting_on: { personRefId: "88888888-8888-4888-8888-888888888888", personRefName: "Ana" },
   };
 
-  /** The thirteen the RPC enables. `cancel_task` and `restore_task` are refused. */
+  /**
+   * All fifteen. Slice 2E.5 enabled the two the RPC used to refuse, so this list
+   * is now the whole taxonomy — and it is written out rather than derived from
+   * `TASK_COMMAND_ACTIONS` on purpose: deriving it would make a taxonomy entry
+   * silently drop out of coverage the day someone removes it from the RPC.
+   */
   const ENABLED: readonly TaskCommandAction[] = [
     "complete_task",
     "reopen_task",
     "set_status",
+    "cancel_task",
+    "restore_task",
     "rename_task",
     "append_note",
     "reschedule_due",
@@ -841,8 +864,14 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
     const sent = Object.keys(preview.canonicalPatch).sort();
 
     // Guards the fixture: a `refused` or shell preview carries an empty patch and
-    // would satisfy the subset check vacuously.
-    expect(preview.disposition, `${action} did not produce an applicable preview`).toBe("previewed");
+    // would satisfy the subset check vacuously. Both applicable dispositions are
+    // admitted, which is the same pair `buildFingerprintPayload` accepts
+    // (`fingerprint.ts:140`) — `cancel_task` is `matched_requires_confirmation`
+    // and is no less appliable for it.
+    expect(
+      ["previewed", "matched_requires_confirmation"],
+      `${action} did not produce an applicable preview`,
+    ).toContain(preview.disposition);
     for (const key of sent) {
       expect(allowed, `${action} sends ${key}, which the RPC rejects`).toContain(key);
     }
@@ -851,28 +880,50 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
     }
   });
 
-  it("requires status on the two actions whose destination the taxonomy decides", () => {
+  it("requires status on the four actions whose destination the taxonomy decides", () => {
     // The migration admits the key with a single allowed value — the taxonomy's
     // own destination — so it cannot become a second route to a transition another
-    // action guards. Refusing it would make both actions unappliable; accepting a
+    // action guards. Refusing it would make these actions unappliable; accepting a
     // patch without it would hash a different object than the preview did.
-    for (const action of ["complete_task", "reopen_task"] as const) {
-      expect(keysFor(action)).toEqual({ allowed: ["status"], required: ["status"] });
-      expect(Object.keys(scenario(action).preview.canonicalPatch)).toEqual(["status"]);
+    const destinations = {
+      complete_task: "completed",
+      reopen_task: "todo",
+      cancel_task: "cancelled",
+      restore_task: "todo",
+    } as const;
+    for (const [action, destination] of Object.entries(destinations)) {
+      const typed = action as keyof typeof destinations;
+      expect(keysFor(typed), action).toEqual({ allowed: ["status"], required: ["status"] });
+      expect(Object.keys(scenario(typed).preview.canonicalPatch), action).toEqual(["status"]);
+      expect(scenario(typed).preview.canonicalPatch.status, action).toBe(destination);
     }
-    expect(scenario("complete_task").preview.canonicalPatch.status).toBe("completed");
-    expect(scenario("reopen_task").preview.canonicalPatch.status).toBe("todo");
   });
 
-  it("refuses the two destructive actions until Slice 2E.5", () => {
-    // Structural, because the RPC is the only place this is enforced and the
-    // taxonomy still declares both verbs: `cancel_task` and `restore_task` have no
-    // taxonomy branch in the migration's `case`, so they fall to the `else` that
-    // raises `2E_ACTION_NOT_ENABLED`.
+  it("enables both destructive actions and retires the token that refused them", () => {
+    // Slice 2E.4 asserted the opposite here, against migration 0058. This is the
+    // same structural claim in the other direction, and it is the assertion that
+    // would have failed had `MIGRATION` been left pointing at the superseded file:
+    // 0058 still literally contains `detail = '2E_ACTION_NOT_ENABLED'` and no
+    // taxonomy branch for either verb.
     for (const action of ["cancel_task", "restore_task"] as const) {
-      expect(() => keysFor(action)).toThrow();
+      expect(() => keysFor(action), action).not.toThrow();
     }
-    expect(migration).toContain("detail = '2E_ACTION_NOT_ENABLED'");
+    expect(migration).not.toContain("detail = '2E_ACTION_NOT_ENABLED'");
+  });
+
+  it("gates exactly the action PRD §11.2 marks as requiring confirmation", () => {
+    // 2E-DESTRUCTIVE-002 and -004 are enforced only inside the RPC, and the gate
+    // is keyed on a taxonomy-resolved flag rather than on an action name — so the
+    // property worth pinning is that `cancel_task` is the one branch that sets it.
+    // `restore_task` deliberately does not: §11.2 marks it "Confirmation: no".
+    const gated = [...migration.matchAll(/\n    when '([a-z_]+)' then\n([\s\S]*?)(?=\n    when '|\n    else\n)/g)]
+      .filter(([, , body]) => body.includes("action_requires_confirmation := true"))
+      .map(([, action]) => action);
+    expect(gated).toEqual(["cancel_task"]);
+
+    // And the taxonomy agrees, which is the half a surface reads.
+    const declared = TASK_COMMAND_ACTIONS.filter((action) => actionPolicy(action).requiresConfirmation);
+    expect([...declared]).toEqual(["cancel_task"]);
   });
 });
 
@@ -911,5 +962,155 @@ describe("a failed apply resolves rather than rejecting", () => {
     }
     expect(result.failure).toBe("2E_INELIGIBLE_STATUS");
     expect(result.retryable).toBe(false);
+  });
+});
+
+describe("55P03 now means two things, and the DETAIL is what separates them", () => {
+  // Slice 2E.4's mapper matched `55P03` on the code alone and documented that its
+  // details were "deliberately not consulted". Slice 2E.5 gave that code two
+  // declared tokens — PRD 2E-DESTRUCTIVE-008 names the SQLSTATE by hand — so the
+  // mapper reads the token first and falls back to staleness. Getting the order
+  // wrong is silent: both collisions would be reported as "the task changed since
+  // the preview", which invites a refresh-and-retry that can never succeed.
+
+  it("keeps a detail-less 55P03 as staleness, which is the convention every gate follows", () => {
+    const mapped = mapTaskCommandApplyError({ code: "55P03", message: "Task changed since the preview" });
+
+    expect(mapped.failure).toBe("stale_pre_state");
+    expect(mapped.outcome).toBe("rejected_stale");
+    expect(mapped.retryable).toBe(false);
+  });
+
+  it.each(["2E_CREATION_UNDONE", "2E_CANDIDATE_REMATERIALIZED"] as const)(
+    "resolves %s rather than degrading it to staleness",
+    (detail) => {
+      const mapped = mapTaskCommandApplyError({ code: "55P03", details: detail });
+
+      expect(mapped.failure).toBe(detail);
+      expect(mapped.outcome).toBe("refused");
+      // The distinction that matters to a user: staleness invites a fresh preview,
+      // and neither of these can ever succeed on a retry.
+      expect(mapped.retryable).toBe(false);
+    },
+  );
+
+  it("does not accept a collision token arriving under the wrong SQLSTATE", () => {
+    // A `P0001` carrying `2E_CREATION_UNDONE` is not that failure; it is something
+    // upstream mislabelling one. The pairing is read from the policy table, so this
+    // falls through to the undeclared branch rather than being narrated as a
+    // collision.
+    const mapped = mapTaskCommandApplyError({ code: "P0001", details: "2E_CREATION_UNDONE" });
+
+    expect(mapped.failure).toBe("undeclared_failure");
+  });
+
+  it("maps the confirmation refusal as refused and not retryable", () => {
+    // Retryable would be a lie with a cost: the surface would offer "try again"
+    // for a command that fails identically until the user confirms afresh.
+    const mapped = mapTaskCommandApplyError({
+      code: "P0001",
+      details: "2E_CONFIRMATION_REQUIRED",
+      message: "Destructive action requires server-issued confirmation",
+    });
+
+    expect(mapped.failure).toBe("2E_CONFIRMATION_REQUIRED");
+    expect(mapped.outcome).toBe("refused");
+    expect(mapped.retryable).toBe(false);
+  });
+});
+
+describe("issuing confirmation sends exactly what the apply will send", () => {
+  const CONFIRMATION_KEY = "pgtap-confirmation-key";
+
+  function confirmationClient(response: {
+    data: unknown;
+    error: { message: string; code?: string; details?: string } | null;
+  }) {
+    const calls: Array<{ fn: string; args: unknown }> = [];
+    const client: TaskCommandConfirmationClient = {
+      rpc(fn, args) {
+        calls.push({ fn, args });
+        return Promise.resolve(response);
+      },
+    };
+    return { calls, client };
+  }
+
+  function issued(overrides: Record<string, unknown> = {}) {
+    return {
+      confirmation_id: "9f1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d",
+      task_id: TASK_ID,
+      action: "cancel_task",
+      request_fingerprint: "a".repeat(64),
+      status: "issued",
+      replayed: false,
+      ...overrides,
+    };
+  }
+
+  it("sends the identical seven arguments buildApplyPayload produces", async () => {
+    // The whole binding rests on this. The RPC derives the digest from these seven
+    // values and `apply_task_command` derives it again from its own seven; if the
+    // two calls ever sent different values the confirmation would be bound to a
+    // digest the apply never computes, and every cancellation would be refused
+    // with `2E_CONFIRMATION_REQUIRED` as though the user had never confirmed.
+    const input = inputFor(CONFIRMATION_KEY, "cancel_task");
+    const { calls, client } = confirmationClient({ data: issued(), error: null });
+
+    await issueTaskCommandConfirmation(client, input);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("issue_task_command_confirmation");
+    expect(calls[0].args).toEqual(buildApplyPayload(input));
+  });
+
+  it("refuses to issue confirmation for an action that requires none", async () => {
+    // Not a second opinion on the taxonomy — the RPC refuses it too — but a row no
+    // apply can ever consume is a caller bug worth naming where it happens.
+    const { calls, client } = confirmationClient({ data: issued(), error: null });
+
+    await expect(
+      issueTaskCommandConfirmation(client, inputFor(CONFIRMATION_KEY, "restore_task")),
+    ).rejects.toThrow(/does not require confirmation/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reports a spent confirmation as spent rather than as fresh", async () => {
+    // Reached by re-issuing after the apply already succeeded. Presenting it as
+    // fresh would put a Confirm control in front of a user whose command has
+    // already committed.
+    const { client } = confirmationClient({
+      data: issued({ status: "consumed", replayed: true }),
+      error: null,
+    });
+
+    const result = await issueTaskCommandConfirmation(client, inputFor(CONFIRMATION_KEY, "cancel_task"));
+
+    if (result.outcome !== "issued") throw new Error("issuance was reported as a failure");
+    expect(result.consumed).toBe(true);
+    expect(result.replayed).toBe(true);
+  });
+
+  it("maps a refusal through the one shared failure vocabulary", async () => {
+    // Both calls speak the same codes, so a surface has one set of sentences
+    // rather than two that can drift.
+    const { client } = confirmationClient({
+      data: null,
+      error: { message: "Operation key payload mismatch", code: "P0001", details: "2E_IDEMPOTENCY_MISMATCH" },
+    });
+
+    const result = await issueTaskCommandConfirmation(client, inputFor(CONFIRMATION_KEY, "cancel_task"));
+
+    if (result.outcome === "issued") throw new Error("a refusal was reported as an issuance");
+    expect(result.failure).toBe("2E_IDEMPOTENCY_MISMATCH");
+    expect(result.retryable).toBe(false);
+  });
+
+  it("throws on a shape it cannot parse, rather than inventing a confirmation", async () => {
+    const { client } = confirmationClient({ data: { confirmation_id: "not-a-uuid" }, error: null });
+
+    await expect(
+      issueTaskCommandConfirmation(client, inputFor(CONFIRMATION_KEY, "cancel_task")),
+    ).rejects.toThrow(/unexpected result shape/);
   });
 });

@@ -32,7 +32,9 @@ function source(relativePath: string): string {
   return readFileSync(path.resolve(process.cwd(), relativePath), "utf8").replace(/\r\n/g, "\n");
 }
 
-const MIGRATION = "supabase/migrations/202607250056_phase_2e_task_command_matching.sql";
+// The CURRENT definition — `202607260059` re-declared this function by
+// `create or replace`, so the earlier file's text is superseded.
+const MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const PGTAP = "supabase/tests/phase_2e_task_command_matching.sql";
 
 describe("SQL and TypeScript agree on the vocabularies they share", () => {

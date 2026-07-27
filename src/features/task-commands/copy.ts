@@ -47,6 +47,20 @@ export const TASK_COMMAND_LINKED_EFFECTS = [
   "reminders_none",
   /** Cancelling removes the task from the active lists (2E-PREVIEW-003). */
   "leaves_active_lists",
+  /**
+   * The fourth clause of 2E-DESTRUCTIVE-005, which the other three did not say.
+   *
+   * "The preview states that a cancelled task leaves the active lists, that its
+   * scheduled reminders are cancelled, that it is undoable for 24 hours, **and
+   * that it remains restorable afterwards**." The first is
+   * `leaves_active_lists`, the second is the reminder pair, the third is
+   * `reversible` plus `undoWindowHours` — and until Slice 2E.5 the fourth had no
+   * effect kind and no string, so the preview disclosed a 24-hour window and
+   * then fell silent about what happens when it closes. That silence is exactly
+   * what PRD §3.3 consequence 3 and §23.4 identify as unacceptable: a
+   * cancellation the user believes is permanent after a day.
+   */
+  "restorable_after_undo_window",
 ] as const;
 
 export type TaskCommandLinkedEffectKind = (typeof TASK_COMMAND_LINKED_EFFECTS)[number];
@@ -191,7 +205,20 @@ const ptBR: TaskCommandCopy = {
   failures: {
     "2E_IDEMPOTENCY_MISMATCH":
       "Esta tentativa reaproveita a identificação de outro pedido. Veja a previsão atualizada e tente de novo.",
-    "2E_ACTION_NOT_ENABLED": "Esta ação ainda não está disponível.",
+    // Names the remedy, and names it as a fresh act rather than as a retry: this
+    // failure is not retryable, and "tente de novo" would send the user in a
+    // loop that cannot terminate.
+    "2E_CONFIRMATION_REQUIRED":
+      "Esta ação precisa da sua confirmação. Confira a previsão atualizada e confirme para continuar.",
+    // Deliberately does not offer restoration: restoring is the door this refusal
+    // closes. It also avoids the word "excluída", because nothing was deleted -
+    // the task's criação foi desfeita, which is what the sentence says.
+    "2E_CREATION_UNDONE":
+      "Esta tarefa saiu das suas listas quando você desfez a criação dela, então não dá mais para trazê-la de volta.",
+    // Names the condition and the way out, because this is the one refusal here
+    // the user can clear by acting on something else.
+    "2E_CANDIDATE_REMATERIALIZED":
+      "Enquanto esta tarefa estava cancelada, outra foi criada a partir do mesmo item. Cancele a mais nova para poder trazer esta de volta.",
     "2E_INELIGIBLE_STATUS": "O status atual da tarefa não permite esta ação.",
     "2E_TRANSITION_INTEGRITY":
       "Outra alteração chegou a esta tarefa primeiro, então nada foi alterado. Tente novamente.",
@@ -267,6 +294,8 @@ const ptBR: TaskCommandCopy = {
     reminder_created: "Um novo lembrete será agendado.",
     reminders_none: "Esta tarefa não tem lembretes agendados, então nenhum será afetado.",
     leaves_active_lists: "A tarefa sai das suas listas ativas.",
+    restorable_after_undo_window:
+      "Depois que a janela de desfazer fechar, você ainda pode restaurar esta tarefa.",
   },
   values: {
     empty: "vazio",
@@ -357,7 +386,12 @@ const en: TaskCommandCopy = {
   failures: {
     "2E_IDEMPOTENCY_MISMATCH":
       "This attempt reuses another request's identifier. Check the fresh preview and try again.",
-    "2E_ACTION_NOT_ENABLED": "This action is not available yet.",
+    "2E_CONFIRMATION_REQUIRED":
+      "This action needs your confirmation. Check the fresh preview and confirm to continue.",
+    "2E_CREATION_UNDONE":
+      "This task left your lists when you undid its creation, so it can no longer be brought back.",
+    "2E_CANDIDATE_REMATERIALIZED":
+      "While this task was cancelled, another one was created from the same item. Cancel the newer one to bring this one back.",
     "2E_INELIGIBLE_STATUS": "The task's current status does not allow this action.",
     "2E_TRANSITION_INTEGRITY":
       "Another change reached this task first, so nothing was changed. Try again.",
@@ -429,6 +463,8 @@ const en: TaskCommandCopy = {
     reminder_created: "A new reminder will be scheduled.",
     reminders_none: "This task has no scheduled reminders, so none are affected.",
     leaves_active_lists: "The task leaves your active lists.",
+    restorable_after_undo_window:
+      "After the undo window closes, you can still restore this task.",
   },
   values: {
     empty: "empty",

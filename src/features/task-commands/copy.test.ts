@@ -226,15 +226,17 @@ describe("the preview dispositions and the outcome vocabulary (2E-UX-001)", () =
 describe("every declared 2E_* detail code has copy in both locales (2E-I18N-003)", () => {
   // The `failures` row of VOCABULARIES already proves the section is keyed
   // *exactly* by `TASK_COMMAND_APPLY_FAILURES`. This states the narrower
-  // requirement separately, because that row would still pass if the nine
+  // requirement separately, because that row would still pass if the eleven
   // database tokens were removed from the declared list along with their copy —
-  // and 2E-UPDATE-017 is about those nine specifically.
-  it.each(locales)("%s localizes all nine database tokens", (locale) => {
+  // and 2E-UPDATE-017 is about those eleven specifically.
+  it.each(locales)("%s localizes all eleven database tokens", (locale) => {
     const copy = getTaskCommandCopy(locale);
     for (const detail of TASK_COMMAND_ERROR_DETAILS) {
       expect(Object.keys(copy.failures), `${locale} is missing ${detail}`).toContain(detail);
     }
-    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(9);
+    // Nine after Slice 2E.4; Slice 2E.5 retired `2E_ACTION_NOT_ENABLED` and added
+    // the confirmation refusal plus the two collision tokens.
+    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(11);
   });
 
   it("covers the failures that carry no token as well", () => {

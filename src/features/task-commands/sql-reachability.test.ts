@@ -27,7 +27,11 @@ import { describeUnreachableCandidates, type TaskCandidateShape } from "./matchi
  */
 
 const MIGRATION_PATH =
-  "supabase/migrations/202607250056_phase_2e_task_command_matching.sql";
+  // The CURRENT definition. `202607260059` amended this function's body by
+  // `create or replace` to exclude creation-undone tasks (2E-DESTRUCTIVE-009), so
+  // `202607250056`'s text is superseded and every assertion below would be
+  // describing SQL the database no longer runs.
+  "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 
 function source(relativePath: string): string {
   return readFileSync(path.resolve(process.cwd(), relativePath), "utf8");

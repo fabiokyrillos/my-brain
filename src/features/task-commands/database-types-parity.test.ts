@@ -56,10 +56,26 @@ function source(relativePath: string): string {
   return readFileSync(path.resolve(process.cwd(), relativePath), "utf8").replace(/\r\n/g, "\n");
 }
 
-const CANDIDATES_MIGRATION = "supabase/migrations/202607250056_phase_2e_task_command_matching.sql";
+/**
+ * The migration holding each function's CURRENT definition.
+ *
+ * Migrations are append-only, so `create or replace` in a later file supersedes
+ * an earlier declaration and parity has to be proven against the later one.
+ * `202607260059` re-declares **both** Phase 2E functions this file covers — it
+ * amends `list_task_command_candidates`'s body to exclude creation-undone tasks,
+ * and it replaces `apply_task_command` outright to enable the two destructive
+ * verbs — so both constants point at it. Pointing them at the original files
+ * would prove parity against declarations the database has replaced, which is a
+ * green result about the wrong subject.
+ */
+const CANDIDATES_MIGRATION =
+  "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const CANDIDATES_PGTAP = "supabase/tests/phase_2e_task_command_matching.sql";
-const APPLY_MIGRATION = "supabase/migrations/202607260058_phase_2e_task_command_apply.sql";
+const APPLY_MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const APPLY_PGTAP = "supabase/tests/phase_2e_task_command_apply.sql";
+const CONFIRMATION_MIGRATION =
+  "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
+const CONFIRMATION_PGTAP = "supabase/tests/phase_2e_task_command_destructive.sql";
 const TYPES = "src/lib/supabase/database.types.ts";
 
 /**
@@ -105,6 +121,12 @@ const CANDIDATES: FunctionSpec = {
 const APPLY: FunctionSpec = {
   fn: "apply_task_command",
   migration: APPLY_MIGRATION,
+  language: "plpgsql",
+};
+
+const CONFIRMATION: FunctionSpec = {
+  fn: "issue_task_command_confirmation",
+  migration: CONFIRMATION_MIGRATION,
   language: "plpgsql",
 };
 
@@ -374,5 +396,50 @@ describe(`${APPLY.fn} generated-type parity (2E-OPERATIONS-002)`, () => {
     // casts its literal.
     expect(source(APPLY_PGTAP)).toContain("pronargdefaults");
     expect(source(APPLY_PGTAP)).toContain("0::smallint");
+  });
+});
+
+describe(`${CONFIRMATION.fn} generated-type parity (2E-OPERATIONS-002)`, () => {
+  const migration = parseMigration(CONFIRMATION);
+  const generated = parseGeneratedTypes(CONFIRMATION);
+
+  describeArgumentParity(migration, generated);
+
+  it("returns a scalar jsonb, which the generator emits as Json", () => {
+    expect(migration.returns.kind).toBe("scalar");
+    if (migration.returns.kind !== "scalar" || generated.returns.kind !== "scalar") {
+      throw new Error(`${CONFIRMATION.fn} no longer returns a scalar`);
+    }
+    expect(migration.returns.sqlType).toBe("jsonb");
+    expect(generated.returns.tsType).toBe("Json");
+  });
+
+  it("takes the identical seven arguments the apply RPC takes, in the identical order", () => {
+    // Not a coincidence and not decoration: `issueTaskCommandConfirmation` builds
+    // its payload with `buildApplyPayload`, the same function `applyTaskCommand`
+    // uses, precisely so the two calls cannot send different values. That only
+    // works while the two signatures agree, and this is what makes a divergence
+    // fail here rather than as a `2E_CONFIRMATION_REQUIRED` on a user's first
+    // cancellation — the confirmation would be bound to a digest the apply never
+    // derives, and the refusal would be indistinguishable from never having
+    // confirmed at all.
+    const applyArgs = parseMigration(APPLY).args.map((arg) => arg.name);
+    expect(migration.args.map((arg) => arg.name)).toEqual(applyArgs);
+  });
+
+  it("defaults none of them, and does not take the owner", () => {
+    // Same reasoning as the apply RPC: a defaulted argument is a binding that can
+    // be skipped by omission, and an owner argument is an owner a caller could
+    // name. 2E-DESTRUCTIVE-002's "bound to owner" is `auth.uid()` or it is
+    // nothing.
+    expect(migration.args.filter((arg) => arg.hasDefault)).toEqual([]);
+    expect(generated.args.filter((arg) => arg.optional)).toEqual([]);
+    expect(migration.args.map((arg) => arg.name)).not.toContain("p_owner_id");
+  });
+
+  it("agrees with the signature pgTAP pins against the real catalog", () => {
+    const expected = migration.args.map((arg) => `'${arg.name}'`).join(", ");
+
+    expect(source(CONFIRMATION_PGTAP)).toContain(`array[${expected}]`);
   });
 });

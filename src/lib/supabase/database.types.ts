@@ -1921,6 +1921,50 @@ export type Database = {
         }
         Relationships: []
       }
+      task_command_confirmations: {
+        Row: {
+          action: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          operation_key: string
+          request_fingerprint: string
+          status: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          operation_key: string
+          request_fingerprint: string
+          status?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          operation_key?: string
+          request_fingerprint?: string
+          status?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_command_confirmations_task_owner_fk"
+            columns: ["user_id", "task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       task_contexts: {
         Row: {
           context_id: string
@@ -2522,6 +2566,18 @@ export type Database = {
           p_record_only?: boolean
         }
         Returns: string
+      }
+      issue_task_command_confirmation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: Json
       }
       list_needs_attention: {
         Args: {

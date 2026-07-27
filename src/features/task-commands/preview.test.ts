@@ -1043,12 +1043,45 @@ describe("2E-PREVIEW-003 — linked effects", () => {
     expect(effectKinds(withoutReminders)).not.toContain("reminders_cancelled");
   });
 
-  it("discloses that cancelling removes the task from the active lists, always", () => {
+  it("discloses all four things 2E-DESTRUCTIVE-005 requires of a cancellation", () => {
+    // "The preview states that a cancelled task leaves the active lists, that its
+    // scheduled reminders are cancelled, that it is undoable for 24 hours, and
+    // that it remains restorable afterwards."
+    //
+    // Asserted as the exact ordered list, because the fourth clause is the one
+    // Slice 2E.4 shipped without and nothing noticed — three of four disclosures
+    // satisfy every "contains" assertion that could be written about them. The
+    // order is the PRD's own: what happens, what it does to reminders, and what
+    // survives the undo window.
     const withReminders = build({ action: "cancel_task", row: { scheduledReminderCount: 1 } });
     const withoutReminders = build({ action: "cancel_task", row: { scheduledReminderCount: 0 } });
 
-    expect(effectKinds(withReminders)).toEqual(["leaves_active_lists", "reminders_cancelled"]);
-    expect(effectKinds(withoutReminders)).toEqual(["leaves_active_lists", "reminders_none"]);
+    expect(effectKinds(withReminders)).toEqual([
+      "leaves_active_lists",
+      "reminders_cancelled",
+      "restorable_after_undo_window",
+    ]);
+    expect(effectKinds(withoutReminders)).toEqual([
+      "leaves_active_lists",
+      "reminders_none",
+      "restorable_after_undo_window",
+    ]);
+
+    // The undo-window half of the same requirement, which lives on the preview
+    // rather than in the effect list.
+    expect(withReminders.reversible).toBe(true);
+    expect(withReminders.undoWindowHours).toBe(24);
+  });
+
+  it("promises restoration only for the action that needs it", () => {
+    // `restorable_after_undo_window` is scoped to destructive actions, and
+    // `cancel_task` is the only one. Offering it on a completion would be an
+    // invitation to `restore_task`, which refuses a completed task outright.
+    for (const action of ["complete_task", "reopen_task", "restore_task", "rename_task"] as const) {
+      expect(effectKinds(build({ action })), action).not.toContain(
+        "restorable_after_undo_window",
+      );
+    }
   });
 
   it("does not claim a completion removes the task from the active lists", () => {
@@ -1224,6 +1257,7 @@ describe("2E-PREVIEW-003 — linked effects", () => {
       "reminder_created",
       "reminders_cancelled",
       "reminders_none",
+      "restorable_after_undo_window",
     ]);
   });
 

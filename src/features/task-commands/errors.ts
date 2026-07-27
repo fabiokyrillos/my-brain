@@ -39,20 +39,66 @@
 import type { TaskCommandOutcome } from "./outcomes";
 
 /**
- * The nine `2E_*` DETAIL tokens migration `202607260058` raises.
+ * The ten `2E_*` DETAIL tokens migrations `202607260058` and `202607260059`
+ * raise.
  *
- * In the order the slice contract tabulates them: the seven the apply path can
- * reach first, then the two only an undo handler raises. The naming follows the
- * house convention `<PHASE>_<SUBJECT>_<FAILURE-NOUN>` that the `2C_*` and `2D_*`
- * corpora established, and every one of them pairs with `P0001` except the two
- * invalid-value members, which pair with `22023` — mirroring `2C_INVALID_*`
- * rather than inventing a second pairing rule for this phase.
+ * In the order the slice contract tabulates them: the eight the apply path can
+ * reach first, then the two only an undo handler raises — `2E_CREATION_UNDONE`
+ * appears in the first group because both doors raise it, and it is listed once
+ * rather than twice.
+ *
+ * The naming follows the house convention `<PHASE>_<SUBJECT>_<FAILURE-NOUN>`
+ * that the `2C_*` and `2D_*` corpora established. Most pair with `P0001`; the
+ * two invalid-value members pair with `22023`, mirroring `2C_INVALID_*`, and
+ * `2E_CREATION_UNDONE` pairs with `55P03` because PRD 2E-DESTRUCTIVE-008 names
+ * that SQLSTATE for it by hand.
+ *
+ * **`2E_ACTION_NOT_ENABLED` was retired by Slice 2E.5** and is deliberately
+ * absent. It meant "`cancel_task`/`restore_task` are not available yet", and
+ * both are now enabled behind the confirmation gate, so no reachable state in
+ * `202607260059` raises it. A declared member of a closed vocabulary that
+ * nothing can provoke is the same defect as a missing raise — the objection this
+ * phase already used twice against tautological reminder guards — so it is gone
+ * from here, from `copy.ts`, and from the migration's own `else` terminator,
+ * which now raises the provokable bare `22023` instead.
  */
 export const TASK_COMMAND_ERROR_DETAILS = [
   /** The operation key is already reserved for a different canonical payload. */
   "2E_IDEMPOTENCY_MISMATCH",
-  /** `cancel_task`/`restore_task` until Slice 2E.5 supplies confirmation evidence. */
-  "2E_ACTION_NOT_ENABLED",
+  /**
+   * A destructive action arrived with no valid, unused confirmation evidence
+   * (2E-DESTRUCTIVE-004).
+   *
+   * One token for three states — no confirmation for this `(owner, operation
+   * key)`, one bound to a different fingerprint, and one already consumed —
+   * because the remedy is identical in all three: obtain fresh confirmation for
+   * the proposal as it now stands. That is the same reasoning that keeps
+   * `invalid_payload` from being twenty tokens, and the three states are still
+   * separately provoked in pgTAP.
+   */
+  "2E_CONFIRMATION_REQUIRED",
+  /**
+   * The task is deleted in PRD 2E-DESTRUCTIVE-008's sense: an `undone`
+   * `confirm_entry_task*` operation names it.
+   *
+   * Raised by `restore_task` and by the undo of a `cancel_task`, both with
+   * `55P03`, so neither door can resurrect it — and read, not raised, by
+   * `public.list_restorable_cancelled_tasks`, which simply omits the row.
+   */
+  "2E_CREATION_UNDONE",
+  /**
+   * Returning this task to an active status would collide with the task that
+   * took its candidate slot while it was cancelled.
+   *
+   * The second collision `202607260059` makes reachable, and a different one
+   * from `2E_CREATION_UNDONE`: that task is deleted, this one is *blocked*. The
+   * two partial indexes `202607220040` created exclude cancelled rows, so
+   * cancelling frees the candidate slot, the entry surface re-offers the
+   * candidate, and a re-confirmed duplicate then makes the restore a bare
+   * `23505`. Raised by `restore_task` and by the cancel-undo — the same two
+   * doors, because they are the only two that leave `cancelled`.
+   */
+  "2E_CANDIDATE_REMATERIALIZED",
   /** The locked status is not in the action's `eligibleFrom`. */
   "2E_INELIGIBLE_STATUS",
   /** The guarded domain write affected no row: another command reached the task first. */
@@ -74,11 +120,17 @@ export type TaskCommandErrorDetail = (typeof TASK_COMMAND_ERROR_DETAILS)[number]
 /**
  * The five failures no DETAIL token names.
  *
- * The first three are the SQLSTATE-only raises. `55P03` in particular carries no
- * detail and no hint **by design**: `src/features/agent/actions.ts:221` branches
- * on `error.code === "55P03"` alone before it looks at `details`, and attaching a
- * token to that raise would make this phase the one exception to a convention
+ * The first three are the SQLSTATE-only raises. **The staleness raise carries no
+ * detail and no hint by design**: `src/features/agent/actions.ts:221` branches on
+ * `error.code === "55P03"` alone before it looks at `details`, and attaching a
+ * token to *that* raise would make this phase the one exception to a convention
  * every other staleness gate in the repository follows.
+ *
+ * Slice 2E.5 gave `55P03` a second, detailed raise — `2E_CREATION_UNDONE` — and
+ * that does not weaken the sentence above, because the two are told apart by the
+ * presence of a DETAIL rather than by the code. `mapTaskCommandApplyError` reads
+ * the token first and falls back to `stale_pre_state`, so a detail-less `55P03`
+ * still lands exactly where it always did.
  *
  * `invalid_payload` is the bare-`22023` family — roughly twenty distinct
  * validation messages in the RPC, deliberately *not* enumerated here. They are
@@ -207,11 +259,35 @@ export const TASK_COMMAND_FAILURE_POLICY: Record<
     sqlstate: "P0001",
     message: "Operation key payload mismatch",
   },
-  "2E_ACTION_NOT_ENABLED": {
+  "2E_CONFIRMATION_REQUIRED": {
     outcome: "refused",
+    // Not retryable, and the distinction matters: resending this exact command
+    // fails identically forever. The remedy is a *new* confirmation, which is a
+    // different act by the user, not a retry of this one.
     retryable: false,
     sqlstate: "P0001",
-    message: "Action is not enabled yet",
+    message: "Destructive action requires server-issued confirmation",
+  },
+  "2E_CREATION_UNDONE": {
+    outcome: "refused",
+    retryable: false,
+    // `55P03`, which PRD 2E-DESTRUCTIVE-008 names by hand. It is the only
+    // declared token that pairs with that SQLSTATE, and the staleness raise it
+    // shares the code with still carries no detail at all — which is what lets
+    // `mapTaskCommandApplyError` tell them apart.
+    sqlstate: "55P03",
+    message: "Task creation was undone",
+  },
+  "2E_CANDIDATE_REMATERIALIZED": {
+    outcome: "refused",
+    // Not retryable, and honestly so: resending changes nothing while the
+    // duplicate is live. It is nonetheless the one refusal in this vocabulary
+    // the user can clear by acting elsewhere — cancel the duplicate and the
+    // restore succeeds — which is why the copy names the condition rather than
+    // pronouncing a verdict.
+    retryable: false,
+    sqlstate: "55P03",
+    message: "The task candidate slot was taken by a newer task",
   },
   "2E_INELIGIBLE_STATUS": {
     outcome: "refused",
@@ -288,7 +364,7 @@ export const TASK_COMMAND_FAILURE_POLICY: Record<
 };
 
 /**
- * The two tokens only an undo handler raises.
+ * The three tokens an undo handler can raise.
  *
  * Split out because they reach TypeScript through a different door: not
  * `apply_task_command`, but `public.undo_operation`, the shared router that every
@@ -305,6 +381,16 @@ export const TASK_COMMAND_FAILURE_POLICY: Record<
 export const TASK_COMMAND_UNDO_ERROR_DETAILS = [
   "2E_UNDO_RESTORE_INTEGRITY",
   "2E_UNDO_REMINDER_INTEGRITY",
+  // Slice 2E.5. Unlike the other two this one is *also* raised on the apply
+  // path, by `restore_task` — the two doors PRD 2E-DESTRUCTIVE-009 requires to
+  // refuse with one code. It has to be here because the undo of a `cancel_task`
+  // reaches TypeScript through `public.undo_operation`, and without this branch
+  // the honest "that task was deleted" collapses onto "Could not undo."
+  "2E_CREATION_UNDONE",
+  // Same door, same reason: the cancel-undo is one of the two writes that can
+  // hit the candidate-identity indexes, and its refusal has to reach the user as
+  // itself rather than as the generic undo failure.
+  "2E_CANDIDATE_REMATERIALIZED",
 ] as const satisfies readonly TaskCommandErrorDetail[];
 
 export type TaskCommandUndoErrorDetail = (typeof TASK_COMMAND_UNDO_ERROR_DETAILS)[number];
@@ -337,8 +423,10 @@ export function taskCommandErrorDetailFor(
  * The declared undo-path failure a `public.undo_operation` error carries, or null.
  *
  * For callers of the shared undo router, which cannot know in advance whether the
- * operation it is compensating belongs to Phase 2E. Every one of these pairs with
- * `P0001`, so the SQLSTATE is checked here rather than asked of the caller.
+ * operation it is compensating belongs to Phase 2E. Two of these pair with
+ * `P0001` and `2E_CREATION_UNDONE` pairs with `55P03`, so the pairing is read
+ * from the policy table rather than assumed — a `P0001` carrying
+ * `2E_CREATION_UNDONE` is not that failure, and this returns null for it.
  */
 export function taskCommandUndoErrorDetailFor(
   sqlstate: string | undefined,

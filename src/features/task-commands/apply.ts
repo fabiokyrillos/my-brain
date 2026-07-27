@@ -333,15 +333,25 @@ function failure(code: TaskCommandApplyFailure, error: TaskCommandRpcError): Tas
  * brief names against the 2C mapper. Here the detail lookup happens first inside
  * the same branch, so the two cannot be reordered independently.
  *
- * `55P03` is matched on the code alone and its `details` are deliberately not
- * consulted: the RPC's staleness raise carries none, and
- * `src/features/agent/actions.ts:221` established that convention for every
- * staleness gate in the repository.
+ * **`55P03` now has two meanings and the detail is what separates them.** The
+ * staleness raise still carries none, which is the convention
+ * `src/features/agent/actions.ts:221` established for every staleness gate in
+ * the repository and which this preserves as the *fallback*. Slice 2E.5 added
+ * one detailed raise on that code — `2E_CREATION_UNDONE`, the SQLSTATE PRD
+ * 2E-DESTRUCTIVE-008 names by hand — so the token is looked up first. Matching
+ * on the code alone, as this did before, would have degraded "that task was
+ * deleted, and it cannot be restored" into "the task changed since the preview",
+ * which invites a refresh-and-retry that can never succeed.
  */
 export function mapTaskCommandApplyError(error: TaskCommandRpcError): TaskCommandApplyFailed {
   if (error.code === "42501") return failure("unauthenticated", error);
   if (error.code === "P0002") return failure("task_not_found", error);
-  if (error.code === "55P03") return failure("stale_pre_state", error);
+
+  if (error.code === "55P03") {
+    const detail = taskCommandErrorDetailFor("55P03", error.details);
+    if (detail !== null) return failure(detail, error);
+    return failure("stale_pre_state", error);
+  }
 
   if (error.code === "P0001") {
     const detail = taskCommandErrorDetailFor("P0001", error.details);

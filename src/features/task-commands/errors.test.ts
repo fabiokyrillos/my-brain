@@ -13,6 +13,7 @@ import {
   isTaskCommandErrorDetail,
   taskCommandErrorDetailFor,
   taskCommandUndoErrorDetailFor,
+  type TaskCommandErrorDetail,
 } from "./errors";
 import { TASK_COMMAND_OUTCOMES } from "./outcomes";
 
@@ -41,7 +42,22 @@ function source(relativePath: string): string {
   return readFileSync(path.resolve(process.cwd(), relativePath), "utf8").replace(/\r\n/g, "\n");
 }
 
-const MIGRATION = "supabase/migrations/202607260058_phase_2e_task_command_apply.sql";
+/**
+ * The migration that holds the CURRENT definition of `public.apply_task_command`
+ * and `private.undo_apply_task_command_fields`.
+ *
+ * **It must be the latest one, and keeping it at `202607260058` was a real trap.**
+ * Migrations are append-only, so `202607260059` re-declares both functions with
+ * `create or replace` and 0058's text is superseded the moment the chain is
+ * applied. A vocabulary test pointed at 0058 reports on a body the database no
+ * longer runs: it would have gone red for `2E_ACTION_NOT_ENABLED`, which Slice
+ * 2E.5 correctly retired but which 0058 still literally contains, and it would
+ * have stayed green for the detail-free-`55P03` assertion below, whose subject
+ * had moved. Whenever a later migration replaces these functions again, this
+ * constant moves with it — and the assertion that every declared token is raised
+ * is what makes forgetting loud.
+ */
+const MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const migration = source(MIGRATION);
 
 /** Every token the migration actually raises, read out of its `raise ... detail` clauses. */
@@ -52,8 +68,11 @@ const RAISED_TOKENS: readonly string[] = [
 ].sort();
 
 describe("the declared vocabulary is closed and internally consistent", () => {
-  it("is exactly the nine detail tokens plus the five untagged failures", () => {
-    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(9);
+  it("is exactly the eleven detail tokens plus the five untagged failures", () => {
+    // Nine after Slice 2E.4. Slice 2E.5 retired `2E_ACTION_NOT_ENABLED` when it
+    // enabled both destructive verbs, and added `2E_CONFIRMATION_REQUIRED`,
+    // `2E_CREATION_UNDONE` and `2E_CANDIDATE_REMATERIALIZED`.
+    expect(TASK_COMMAND_ERROR_DETAILS).toHaveLength(11);
     expect(TASK_COMMAND_UNTAGGED_FAILURES).toHaveLength(5);
     expect([...TASK_COMMAND_APPLY_FAILURES]).toEqual([
       ...TASK_COMMAND_ERROR_DETAILS,
@@ -113,13 +132,39 @@ describe("the declared vocabulary is closed and internally consistent", () => {
     ]);
   });
 
-  it("pairs each detail token with one SQLSTATE, and only P0001 or 22023", () => {
+  it("pairs each detail token with one of the three SQLSTATEs the mapper branches on", () => {
     // The `2C_INVALID_*` precedent: detail tokens pair with `P0001` except the
-    // invalid-value family, which pairs with `22023`. Inventing a third pairing
-    // would make the mapper's two branches insufficient without failing anything.
+    // invalid-value family, which pairs with `22023`.
+    //
+    // **`55P03` is the third pairing, and Slice 2E.5 added it deliberately.** PRD
+    // 2E-DESTRUCTIVE-008 names that SQLSTATE by hand for the creation-undo
+    // collision, and the candidate-slot collision is the same kind of refusal, so
+    // both carry it. The list here is not a style preference — it is the set of
+    // codes `mapTaskCommandApplyError` looks a detail up under, so a fourth
+    // pairing invented without touching the mapper would leave the token silently
+    // unreachable. That is why this is asserted as an exact allow-list rather
+    // than as "some SQLSTATE".
     for (const detail of TASK_COMMAND_ERROR_DETAILS) {
-      expect(["P0001", "22023"], detail).toContain(TASK_COMMAND_FAILURE_POLICY[detail].sqlstate);
+      expect(["P0001", "22023", "55P03"], detail).toContain(
+        TASK_COMMAND_FAILURE_POLICY[detail].sqlstate,
+      );
     }
+  });
+
+  it("gives 55P03 exactly the two collision tokens, and no other detail", () => {
+    // The mapper's `55P03` branch consults the detail first and falls back to
+    // `stale_pre_state`. That fallback is only safe while the detailed raises on
+    // that code are the collisions: a third token added here without a matching
+    // raise would be dead, and a raise added there without a token here would
+    // degrade to "the task changed since the preview" and invite a retry that
+    // cannot succeed.
+    const under55P03 = TASK_COMMAND_ERROR_DETAILS.filter(
+      (detail) => TASK_COMMAND_FAILURE_POLICY[detail].sqlstate === "55P03",
+    );
+    expect([...under55P03].sort()).toEqual([
+      "2E_CANDIDATE_REMATERIALIZED",
+      "2E_CREATION_UNDONE",
+    ]);
   });
 
   it("leaves the SQLSTATE null for the one failure no database raises", () => {
@@ -161,28 +206,74 @@ describe("the declared vocabulary describes the migration that was written", () 
     }
   });
 
-  it("signals staleness with 55P03 and attaches no detail to it", () => {
+  it("signals staleness with a 55P03 that carries no detail", () => {
     // `src/features/agent/actions.ts` branches on `error.code === "55P03"` alone
-    // before it looks at `details`, so a token attached to this raise would make
+    // before it looks at `details`, so a token attached to *this* raise would make
     // Phase 2E the one exception to a convention every staleness gate follows.
-    expect(migration).toContain(`raise exception 'Task changed since the preview' using errcode = '55P03';`);
-    expect(migration).not.toMatch(/errcode = '55P03',\s*detail/);
+    // The raise is asserted with its trailing semicolon, which is what proves the
+    // absence — `using errcode = '55P03';` cannot be carrying a DETAIL.
+    expect(migration).toContain(
+      `raise exception 'Task changed since the preview' using errcode = '55P03';`,
+    );
     expect(TASK_COMMAND_FAILURE_POLICY.stale_pre_state.sqlstate).toBe("55P03");
     expect(isTaskCommandErrorDetail("stale_pre_state")).toBe(false);
   });
 
-  it("raises the two undo tokens only inside the undo handlers", () => {
+  it("attaches a detail to every OTHER 55P03 it raises", () => {
+    // Slice 2E.4 asserted `not.toMatch(/errcode = '55P03',\s*detail/)` — no
+    // detailed 55P03 anywhere. Slice 2E.5 has two of them, so the invariant is
+    // restated as the thing that actually protects the mapper: every detailed
+    // 55P03 carries a *declared* token. A detailed 55P03 with an undeclared
+    // token would fall through `taskCommandErrorDetailFor` and be reported as
+    // staleness, which is the degradation this pair of tests exists to stop.
+    const detailedFiftyFive = [
+      ...migration.matchAll(/errcode = '55P03',\s*detail = '(2E_[A-Z_]+)'/g),
+    ].map((match) => match[1]);
+    expect(detailedFiftyFive.length).toBeGreaterThan(0);
+    for (const detail of detailedFiftyFive) {
+      expect(isTaskCommandErrorDetail(detail), detail).toBe(true);
+      expect(TASK_COMMAND_FAILURE_POLICY[detail as TaskCommandErrorDetail].sqlstate, detail).toBe(
+        "55P03",
+      );
+    }
+  });
+
+  it("raises the two undo-only tokens nowhere but inside the undo handler", () => {
     // Positional, because the split between apply-path and undo-path tokens is
-    // what `taskCommandUndoErrorDetailFor` and the agent action rely on: an undo
-    // token raised by the apply RPC would be reported through the shared undo
-    // router's copy for a failure that never involved an undo.
+    // what `taskCommandUndoErrorDetailFor` and the agent action rely on: an
+    // undo-only token raised by the apply RPC would be reported through the
+    // shared undo router's copy for a failure that never involved an undo.
+    //
+    // Pinned to a literal pair rather than derived from
+    // `TASK_COMMAND_UNDO_ERROR_DETAILS`, which since Slice 2E.5 also carries the
+    // two *shared* collision tokens — those are raised on both sides on purpose
+    // (PRD 2E-DESTRUCTIVE-009's "the same declared code" on every door), and the
+    // next assertion is what covers them.
     const handlersBegin = migration.indexOf(
       "create or replace function private.undo_apply_task_command_fields(",
     );
     expect(handlersBegin).toBeGreaterThan(0);
-    for (const detail of TASK_COMMAND_UNDO_ERROR_DETAILS) {
+    for (const detail of ["2E_UNDO_RESTORE_INTEGRITY", "2E_UNDO_REMINDER_INTEGRITY"] as const) {
       const clause = `detail = '${detail}'`;
       expect(migration.indexOf(clause), detail).toBeGreaterThan(handlersBegin);
+    }
+  });
+
+  it("raises each shared collision token on both the apply side and the undo side", () => {
+    // 2E-DESTRUCTIVE-009: "every door into that task — undo, `restore_task`, and
+    // the recovery affordance — is closed by the same guard". Two of those doors
+    // raise, and this is what proves they raise the *same* token rather than two
+    // that happen to read alike.
+    const handlersBegin = migration.indexOf(
+      "create or replace function private.undo_apply_task_command_fields(",
+    );
+    for (const detail of ["2E_CREATION_UNDONE", "2E_CANDIDATE_REMATERIALIZED"] as const) {
+      const clause = `detail = '${detail}'`;
+      const first = migration.indexOf(clause);
+      const last = migration.lastIndexOf(clause);
+      expect(first, `${detail} is not raised on the apply side`).toBeGreaterThan(0);
+      expect(first, `${detail} is not raised before the handler`).toBeLessThan(handlersBegin);
+      expect(last, `${detail} is not raised inside the handler`).toBeGreaterThan(handlersBegin);
     }
   });
 
@@ -191,7 +282,7 @@ describe("the declared vocabulary describes the migration that was written", () 
     for (const detail of TASK_COMMAND_UNDO_ERROR_DETAILS) {
       expect(declared).toContain(detail);
     }
-    expect(TASK_COMMAND_UNDO_ERROR_DETAILS).toHaveLength(2);
+    expect(TASK_COMMAND_UNDO_ERROR_DETAILS).toHaveLength(4);
   });
 });
 
@@ -230,10 +321,23 @@ describe("taskCommandErrorDetailFor requires the pairing, not just the token", (
 });
 
 describe("taskCommandUndoErrorDetailFor answers only for the undo path", () => {
-  it("resolves both undo tokens", () => {
+  it("resolves every undo token under its own declared SQLSTATE", () => {
+    // Read from the policy table rather than hardcoded to `P0001`, which is what
+    // this asserted before Slice 2E.5 gave two of these tokens `55P03`. Hardcoding
+    // it would now make the two collision tokens resolve to null here while
+    // resolving correctly in production — a test that passes by asking the wrong
+    // question.
     for (const detail of TASK_COMMAND_UNDO_ERROR_DETAILS) {
-      expect(taskCommandUndoErrorDetailFor("P0001", detail), detail).toBe(detail);
+      const { sqlstate } = TASK_COMMAND_FAILURE_POLICY[detail];
+      expect(taskCommandUndoErrorDetailFor(sqlstate as string, detail), detail).toBe(detail);
     }
+  });
+
+  it("refuses an undo token arriving under the wrong SQLSTATE", () => {
+    // The pairing is the contract, and a mislabelled collision token must not be
+    // narrated as a collision.
+    expect(taskCommandUndoErrorDetailFor("P0001", "2E_CREATION_UNDONE")).toBeNull();
+    expect(taskCommandUndoErrorDetailFor("55P03", "2E_UNDO_RESTORE_INTEGRITY")).toBeNull();
   });
 
   it("returns null for an apply-path token", () => {

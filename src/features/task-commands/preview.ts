@@ -721,7 +721,7 @@ function relationAfter(
  * `authenticated` can insert and delete reminders directly. So a completed task
  * may still carry a live `scheduled` row, and the preview says what is there.
  */
-function buildLinkedEffects(input: {
+type LinkedEffectsInput = {
   action: TaskCommandAction;
   pre: TaskPreState;
   patch: TaskCommandCanonicalPatch;
@@ -740,16 +740,54 @@ function buildLinkedEffects(input: {
   copy: ReturnType<typeof getTaskCommandCopy>;
   locale: Locale;
   timeZone: string;
-}): readonly TaskCommandLinkedEffect[] {
-  const { action, patch, row, copy } = input;
+};
+
+function buildLinkedEffects(input: LinkedEffectsInput): readonly TaskCommandLinkedEffect[] {
+  const { action, copy } = input;
   const policy = actionPolicy(action);
   const effects: TaskCommandLinkedEffect[] = [];
 
   if (policy.destructive) {
     effects.push({ kind: "leaves_active_lists", text: copy.effects.leaves_active_lists });
   }
-  if (!policy.changedFields.includes("reminders")) return effects;
 
+  // Restructured from three early returns into one, so 2E-DESTRUCTIVE-005's
+  // fourth clause can be appended after the reminder disclosures rather than
+  // wedged between the first and the second. The reminder logic below is
+  // unchanged; only its exits are.
+  if (policy.changedFields.includes("reminders")) {
+    appendReminderEffects(effects, input);
+  }
+
+  // 2E-DESTRUCTIVE-005, last because it describes what happens after everything
+  // above: "...that it is undoable for 24 hours, and that it remains restorable
+  // afterwards." The undo window itself is on the preview as `reversible` and
+  // `undoWindowHours`; this is the sentence about what survives its closing, and
+  // without it the preview promised a 24-hour reversal and said nothing about
+  // hour 25 — which PRD §3.3 consequence 3 names as the reason `restore_task`
+  // exists at all.
+  if (policy.destructive) {
+    effects.push({
+      kind: "restorable_after_undo_window",
+      text: copy.effects.restorable_after_undo_window,
+    });
+  }
+
+  return effects;
+}
+
+/**
+ * §11.3's reminder disclosures, appended in place.
+ *
+ * Extracted from `buildLinkedEffects` when 2E-DESTRUCTIVE-005's fourth clause
+ * had to be appended *after* them: this block has two early exits, and a
+ * trailing push in the caller cannot follow an exit taken inside it.
+ */
+function appendReminderEffects(
+  effects: TaskCommandLinkedEffect[],
+  input: LinkedEffectsInput,
+): void {
+  const { patch, row, copy } = input;
   const hasScheduled = row.scheduledReminderCount > 0;
   const entersTerminal = patch.status === "completed" || patch.status === "cancelled";
   const dueAfter = patch.dueAt !== undefined ? patch.dueAt : input.pre.dueAt;
@@ -776,7 +814,7 @@ function buildLinkedEffects(input: {
         ? { kind: "reminders_cancelled", text: copy.effects.reminders_cancelled }
         : { kind: "reminders_none", text: copy.effects.reminders_none },
     );
-    return effects;
+    return;
   }
 
   // Leaving a terminal status, or moving a due date. §11.3's mechanism is the
@@ -802,7 +840,6 @@ function buildLinkedEffects(input: {
   if (!hasScheduled && !dueIsFuture) {
     effects.push({ kind: "reminders_none", text: copy.effects.reminders_none });
   }
-  return effects;
 }
 
 function shell(

@@ -298,11 +298,20 @@ const POLICIES: Record<TaskCommandAction, TaskCommandActionPolicy> = {
     oneStepEligible: false,
     requiresConfirmation: true,
   }),
-  // Cancellation would otherwise be terminal once the 24h undo window closes:
-  // re-confirmation of the originating candidate is gated by the
-  // entry_task_candidate_resolutions ledger, not by the relaxed unique index.
+  // Cancellation would otherwise be terminal once the 24h undo window closes.
   // Not one-step, because undoing a deliberate cancellation deserves the same
   // deliberateness as the cancellation.
+  //
+  // **The second sentence this comment used to carry was false and Slice 2E.5
+  // removed it.** It claimed "re-confirmation of the originating candidate is
+  // gated by the entry_task_candidate_resolutions ledger, not by the relaxed
+  // unique index". The ledger records a resolution only for a disposition other
+  // than `confirmed` (`202607220044:1357-1358`), so a confirmed candidate leaves
+  // no row and the terminal-disposition gate never fires for it; the relaxed
+  // index (`202607220040:13-19`) is therefore exactly what governs, and a
+  // cancelled task genuinely releases its candidate slot. `restore_task` and the
+  // cancel-undo consequently refuse a re-taken slot with
+  // `2E_CANDIDATE_REMATERIALIZED` rather than emitting a bare `23505`.
   restore_task: policy({
     eligibleFrom: ["cancelled"],
     targetStatus: "todo",
