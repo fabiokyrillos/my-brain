@@ -407,6 +407,34 @@ exception when others then
 end;
 $$;
 
+-- One key of a successful result, or `SQLSTATE:DETAIL`.
+--
+-- Exists because a **direct** `select public.apply_task_command(...)` inside an
+-- assertion aborts the whole transaction on an unexpected raise, and psql then
+-- fails every remaining statement in the file. That is how one wrong instant
+-- format hid fifty-two downstream assertions behind "Bad plan": the failure that
+-- mattered was a single refusal, and the report was a plan mismatch. Routing the
+-- call through a catching helper turns the same fault into one failed assertion
+-- that names its own cause.
+create function pg_temp.dest_apply_key(
+  p_task_id uuid, p_action text, p_patch jsonb, p_pre_state jsonb,
+  p_observed_before text, p_policy_version text, p_operation_key text, p_key text
+)
+returns text language plpgsql as $$
+declare
+  result jsonb;
+  failure_detail text;
+begin
+  result := public.apply_task_command(
+    p_task_id, p_action, p_patch, p_pre_state, p_observed_before, p_policy_version, p_operation_key
+  );
+  return result ->> p_key;
+exception when others then
+  get stacked diagnostics failure_detail = pg_exception_detail;
+  return sqlstate || ':' || coalesce(nullif(failure_detail, ''), sqlerrm);
+end;
+$$;
+
 create function pg_temp.dest_issue(
   p_task_id uuid, p_action text, p_patch jsonb, p_pre_state jsonb,
   p_observed_before text, p_policy_version text, p_operation_key text
@@ -814,16 +842,17 @@ select is(
 );
 
 select is(
-  (select (public.apply_task_command(
-     '63000001-1111-4111-8111-111111111111',
-     'cancel_task',
-     jsonb_build_object('status', 'cancelled'),
-     pg_temp.dest_snap('63000001-1111-4111-8111-111111111111'),
-     pg_temp.dest_iso(now()),
-     'task-command-policy-v1',
-     'pgtap-2e5-happy'
-   ) ->> 'idempotent')::boolean),
-  true,
+  pg_temp.dest_apply_key(
+    '63000001-1111-4111-8111-111111111111',
+    'cancel_task',
+    jsonb_build_object('status', 'cancelled'),
+    pg_temp.dest_snap('63000001-1111-4111-8111-111111111111'),
+    pg_temp.dest_iso(now()),
+    'task-command-policy-v1',
+    'pgtap-2e5-happy',
+    'idempotent'
+  ),
+  'true',
   'and reports itself as replayed (2E-IDEMPOTENCY-004)'
 );
 
