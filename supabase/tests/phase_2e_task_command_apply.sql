@@ -42,7 +42,7 @@
 -- and an editor re-encoding one would change what is being asserted.
 
 begin;
-select plan(116);
+select plan(132);
 
 -- `to_char(..., 'OF')` and the reminder round-trip below both render through the
 -- session TimeZone, which `set search_path = ''` does not pin. Fixing it makes
@@ -281,6 +281,38 @@ insert into public.tasks (
   ('61000021-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa cliente status', null, 'todo', null, null, null, null, null, false, null),
   ('61000022-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa cliente titulo', null, 'todo', null, null, null, null, null, false, null),
   ('61000023-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa cliente nota', 'Nota antiga', 'todo', null, null, null, null, null, false, null),
+  -- Two commands land on this one and the OLDER is then undone. It starts with no
+  -- due date on purpose: the second command sets one, which is the column the
+  -- widened undo guard refuses on while the status - the only column the guard
+  -- used to read - never moves.
+  ('61000024-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa de dois comandos', null, 'todo', null, null, null, null, null, false, null),
+  -- The control for that refusal: one command, no interference, and its undo must
+  -- succeed. Widening the guard to something unsatisfiable would pass every undo
+  -- refusal in this file and break every real undo, and this is the only assertion
+  -- that notices.
+  ('61000025-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa de renome desfeito', null, 'todo', null, null, null, null, null, false, null),
+  -- Dated, so `tasks_create_due_reminder` arms a reminder the completion below
+  -- closes and records; an ordinary client INSERT then adds a live one before the
+  -- undo, which is the state the undo's reminder post-condition refuses.
+  ('61000026-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa com lembrete intruso', null, 'todo', null, now() + interval '5 days', null, null, null, false, null),
+  -- Its stored operation has its `before_state` emptied afterwards, which is the
+  -- shape the undo handler's evidence gate is documented to refuse.
+  ('61000027-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa sem evidencia', null, 'todo', null, null, null, null, null, false, null),
+  -- 1995 characters of existing notes, so one more legal note pushes the canonical
+  -- `description` past 2000. Built with `repeat` rather than written out, so the
+  -- number under test is legible.
+  ('61000028-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa de nota longa', repeat('x', 1995), 'todo', null, null, null, null, null, false, null),
+  -- Dated, so it holds a live reminder while a NON-reminder action runs against
+  -- it. Nothing else in this file pairs those two, which is what left
+  -- `action_touches_reminders` unfalsifiable.
+  ('61000029-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa priorizada com lembrete', null, 'todo', null, now() + interval '5 days', null, null, null, false, null),
+  -- Dated and completed below, which is the only state in which the reminder
+  -- insert half's terminal-status guard is load-bearing: the completion that
+  -- already exists above has no due date, so that guard is never reached there.
+  ('6100002a-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa concluida com prazo', null, 'todo', null, now() + interval '5 days', null, null, null, false, null),
+  -- Carries the one assertion that pins the return's whole key set, which no
+  -- assertion that strips a key can do.
+  ('6100002b-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', 'Tarefa de chaves do retorno', null, 'todo', null, null, null, null, null, false, null),
   ('62000001-2222-4222-8222-222222222222', '62222222-2222-4222-8222-222222222222', 'Tarefa do outro dono', null, 'todo', null, null, null, null, null, false, null);
 
 -- The person is already linked under a role the command below does not write.
@@ -300,7 +332,13 @@ insert into public.reminders (id, user_id, task_id, title, remind_at, important,
   ('61000044-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', '61000001-1111-4111-8111-111111111111', 'Lembrete adiado', now() + interval '1 hour', false, 'snoozed', now() + interval '3 hours'),
   -- Slice 2E.3 verified that a task written before Phase 2E may already hold a
   -- live scheduled row. This is that row, on the task `reopen_task` will touch.
-  ('61000045-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', '61000002-1111-4111-8111-111111111111', 'Lembrete do reaberto', now() + interval '6 hours', false, 'scheduled', null);
+  ('61000045-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', '61000002-1111-4111-8111-111111111111', 'Lembrete do reaberto', now() + interval '6 hours', false, 'scheduled', null),
+  -- A second live row on the task a NON-reminder action runs against. Its subject
+  -- already holds the one the insert trigger armed for its due date, whose id is
+  -- `gen_random_uuid()` and therefore unnameable; this one carries a literal id so
+  -- the assertion can say "that exact row is still scheduled" rather than only
+  -- counting rows. Both must survive `set_priority` untouched.
+  ('61000049-1111-4111-8111-111111111111', '61111111-1111-4111-8111-111111111111', '61000029-1111-4111-8111-111111111111', 'Lembrete preservado', now() + interval '7 hours', false, 'scheduled', null);
 
 -- Helpers ---------------------------------------------------------------------
 --
@@ -1081,9 +1119,41 @@ select is(
 -- id, the fingerprint, the expiry, and the created reminder id where there is one
 -- - are removed before comparison, because they are asserted against the ledger
 -- rows they came from further down rather than against themselves. Everything
--- else is pinned as a whole object, so a key appearing or disappearing from the
--- return is a failure and not a silent contract change for
+-- else is pinned as a whole object, so any key outside those four appearing or
+-- disappearing from the return is a failure and not a silent contract change for
 -- `src/features/task-commands`.
+--
+-- The stripped keys are the exception, and the operator is why: `jsonb -
+-- array[...]` removes a key when it is present and does nothing at all when it is
+-- not. A return that stopped carrying `undo_id`, `request_fingerprint` or
+-- `undo_expires_at` would therefore strip nothing and still compare equal, and the
+-- two assertions below that also strip `reminder_created_id` cannot tell its null
+-- value from its absence either. This comment used to claim the stripped form
+-- caught a key appearing or disappearing; for those keys it never did. So the full
+-- key set is pinned once, immediately below, on a fresh applied return, and the
+-- per-action assertions are left to pin the values.
+
+select is(
+  (
+    select array_agg(returned_key.key_name order by returned_key.key_name)
+    from jsonb_object_keys(
+      public.apply_task_command(
+        '6100002b-1111-4111-8111-111111111111',
+        'set_planned',
+        jsonb_build_object('plannedAt', pg_temp.taskcmd_iso(now() + interval '4 days')),
+        pg_temp.taskcmd_pre_state('6100002b-1111-4111-8111-111111111111'),
+        pg_temp.taskcmd_iso(now()),
+        'task-command-policy-v1',
+        'pgtap-2e4-keyset'
+      )
+    ) as returned_key(key_name)
+  ),
+  array[
+    'action', 'idempotent', 'outcome', 'reminder_created_id', 'reminders_cancelled',
+    'request_fingerprint', 'task_id', 'undo_expires_at', 'undo_id'
+  ],
+  'a fresh applied return carries exactly the nine declared keys and no others, which no assertion that strips a key can prove'
+);
 
 -- complete_task ---------------------------------------------------------------
 
@@ -1156,6 +1226,49 @@ select is(
   ),
   1,
   'and the co-firing trigger leaves exactly one task_updated row carrying the actor the RPC set'
+);
+
+-- The same action against a task whose due date is still in the future ----------
+--
+-- This is the only state in which the reminder insert half's terminal-status guard
+-- is load-bearing, and nothing above reaches it. The subject above has no due date
+-- at all, so `effective_due_at is not null` short-circuits first and
+-- `effective_status not in ('completed', 'cancelled')` could be deleted from the
+-- migration without reddening a single assertion; `reopen_task` reaches the guard
+-- only in the direction that passes it. Here both earlier conditions hold, so that
+-- clause is the only thing between a completion and a reminder armed for a task
+-- nobody will look at again - which would also make the return's
+-- `reminder_created_id` contradict what the preview disclosed.
+
+select is(
+  public.apply_task_command(
+    '6100002a-1111-4111-8111-111111111111',
+    'complete_task',
+    jsonb_build_object('status', 'completed'),
+    pg_temp.taskcmd_pre_state('6100002a-1111-4111-8111-111111111111'),
+    pg_temp.taskcmd_iso(now()),
+    'task-command-policy-v1',
+    'pgtap-2e4-complete-dated'
+  ) - array['undo_id', 'request_fingerprint', 'undo_expires_at'],
+  jsonb_build_object(
+    'outcome', 'applied',
+    'task_id', '6100002a-1111-4111-8111-111111111111',
+    'action', 'complete_task',
+    'idempotent', false,
+    'reminders_cancelled', 1,
+    'reminder_created_id', null
+  ),
+  'completing a task whose due date is still in the future closes its reminder and truthfully claims it armed no replacement'
+);
+
+select results_eq(
+  $$ select
+       (count(*) filter (where status = 'scheduled'))::integer,
+       (count(*) filter (where status = 'cancelled'))::integer,
+       count(*)::integer
+     from public.reminders where task_id = '6100002a-1111-4111-8111-111111111111' $$,
+  $$ values (0, 1, 1) $$,
+  'and the completed task is left holding no live reminder, even though the future due date it was armed from survives the transition'
 );
 
 -- reopen_task -----------------------------------------------------------------
@@ -1357,6 +1470,44 @@ select is(
   'and the description is the patch text verbatim, never re-concatenated inside the database'
 );
 
+-- The append whose RESULT passes 2000 characters --------------------------------
+--
+-- `MAX_NOTE_LENGTH` bounds the fragment the model may emit, at the parse boundary.
+-- The canonical patch is the concatenation `pre.description || E'\n\n' || note`, so
+-- bounding the RPC at the note's own 2000 bounded the accumulated notes of a whole
+-- task instead: the first task to reach 2000 characters of notes could never take
+-- another one, and the preview had already offered a one-step apply the RPC then
+-- refused. The remaining ceiling is about stopping a definer function from writing
+-- megabyte rows, not about note length.
+--
+-- The pre-state's 1995 characters are built with `repeat` rather than written out,
+-- so the number under test is legible: 1995 + two newlines + a 26-character note is
+-- 2023. Under the old bound this call returned `22023:Invalid task command
+-- description`.
+
+select is(
+  public.apply_task_command(
+    '61000028-1111-4111-8111-111111111111',
+    'append_note',
+    jsonb_build_object(
+      'description',
+      repeat('x', 1995) || chr(10) || chr(10) || 'Nota que passa de dois mil'
+    ),
+    pg_temp.taskcmd_pre_state('61000028-1111-4111-8111-111111111111'),
+    pg_temp.taskcmd_iso(now()),
+    'task-command-policy-v1',
+    'pgtap-2e4-longnote'
+  ) ->> 'outcome',
+  'applied',
+  'an append_note whose result exceeds 2000 characters applies, because the RPC bounds the concatenation and not the note'
+);
+
+select is(
+  (select char_length(description) from public.tasks where id = '61000028-1111-4111-8111-111111111111'),
+  2023,
+  'and all 2023 characters land, so a long note history never makes the next legal note unappliable'
+);
+
 -- reschedule_due --------------------------------------------------------------
 --
 -- The subject was inserted with a due date, so `tasks_create_due_reminder` gave it
@@ -1520,6 +1671,64 @@ select is(
   (select manual_priority from public.tasks where id = '61000009-1111-4111-8111-111111111111'),
   'urgent',
   'and the manual priority is the patch value, which the trigger records under the key it has always used'
+);
+
+-- The same action against a subject that HOLDS live reminders --------------------
+--
+-- This is what makes `action_touches_reminders` falsifiable at all. Every reminder
+-- assertion above pairs a reminder-touching action with a reminder-holding task, or
+-- a non-touching action with a task that holds nothing and has no due date - and in
+-- that second pairing the whole reconciliation block is a no-op, so flipping a
+-- non-reminder action's taxonomy flag to true would change no observable outcome.
+-- This subject has a future due date, so it holds the row the insert trigger armed
+-- plus one fixture row carrying a literal id, and `set_priority` must leave both
+-- exactly as they are.
+
+select is(
+  public.apply_task_command(
+    '61000029-1111-4111-8111-111111111111',
+    'set_priority',
+    jsonb_build_object('manualPriority', 'high'),
+    pg_temp.taskcmd_pre_state('61000029-1111-4111-8111-111111111111'),
+    pg_temp.taskcmd_iso(now()),
+    'task-command-policy-v1',
+    'pgtap-2e4-priority-reminder'
+  ) - array['undo_id', 'request_fingerprint', 'undo_expires_at'],
+  jsonb_build_object(
+    'outcome', 'applied',
+    'task_id', '61000029-1111-4111-8111-111111111111',
+    'action', 'set_priority',
+    'idempotent', false,
+    'reminders_cancelled', 0,
+    'reminder_created_id', null
+  ),
+  'set_priority on a task holding two live reminders still reports closing none and arming none'
+);
+
+select results_eq(
+  $$ select
+       (count(*) filter (where status = 'scheduled'))::integer,
+       (count(*) filter (where status = 'cancelled'))::integer,
+       count(*)::integer
+     from public.reminders where task_id = '61000029-1111-4111-8111-111111111111' $$,
+  $$ values (2, 0, 2) $$,
+  'and that report is true against the table: nothing was cancelled and no third row was armed from the surviving due date'
+);
+
+-- The close half cancels in place and the insert half adds a row, so naming a
+-- pre-existing id and finding it still `scheduled` is what separates "untouched"
+-- from "closed and replaced by an identical-looking row": a replacement armed from
+-- the same unchanged due date would carry the same title and the same `remind_at`,
+-- and only the id would differ.
+select results_eq(
+  $$ select id, status from public.reminders
+     where task_id = '61000029-1111-4111-8111-111111111111'
+       and id = '61000049-1111-4111-8111-111111111111' $$,
+  $$ values (
+       '61000049-1111-4111-8111-111111111111'::uuid,
+       'scheduled'::text
+     ) $$,
+  'and the row the task already held is still that same row under its original id, not a fresh one wearing its values'
 );
 
 -- assign_project --------------------------------------------------------------
@@ -1963,6 +2172,26 @@ select is(
   'the recorded fingerprint is the one task_command_fingerprint derives from the bare caller key and the verbatim observed pre-state'
 );
 
+-- 2E-PROVENANCE-001: the governing policy version is recorded, not only hashed ---
+--
+-- The assertion directly above proves the version reached the digest. A digest
+-- attributes nothing: hashed only, there was no way to say from a stored operation
+-- which policy decided it, which is exactly what 2E-PROVENANCE-001 requires of
+-- every Phase 2E decision. The key sits on `after_state`, and the mandatory step-23
+-- UPDATE copies that same object into `audit_logs.after_state`, so one write lands
+-- the value on both the undo row and the audit row. Compared against the literal
+-- the call passed, never against a re-read of the request.
+
+select is(
+  (
+    select after_state ->> 'policy_version' from public.undo_operations
+    where user_id = '61111111-1111-4111-8111-111111111111'
+      and operation_key = 'taskcmd-v1:pgtap-2e4-replay'
+  ),
+  'task-command-policy-v1',
+  'the stored operation records the policy version that governed it, so a decision is attributable without recomputing a digest'
+);
+
 -- 2E-UPDATE-014: undo of a column command --------------------------------------
 --
 -- Routed through `public.undo_operation`, so this also proves the registry entry
@@ -2110,6 +2339,63 @@ select is(
   'with its own operation_undone row, recorded against the task entity the operation named'
 );
 
+-- The ten-column undo guard, in the direction that must SUCCEED ------------------
+--
+-- Every undo refusal in this file is also satisfied by a guard that matches
+-- nothing, so a widening that made the compensating UPDATE unsatisfiable would pass
+-- all of them and break every real undo in the product. This is the control: a
+-- command on a task nothing else has touched, whose ten recorded columns all still
+-- hold what the forward operation left, must still compensate.
+--
+-- It is deliberately a `rename_task` rather than another `complete_task`. Every
+-- undo above is a completion, so the status branch is the only forward branch whose
+-- recorded `applied_state` has ever been exercised - and for a rename nine of those
+-- ten keys fall through to `locked_task` instead, including the `completed_at` the
+-- migration calls the trap. A branch that recorded any of them wrongly refuses
+-- here, and nowhere else.
+
+select public.apply_task_command(
+  '61000025-1111-4111-8111-111111111111',
+  'rename_task',
+  jsonb_build_object('title', 'Tarefa de renome desfeito, novo nome'),
+  pg_temp.taskcmd_pre_state('61000025-1111-4111-8111-111111111111'),
+  pg_temp.taskcmd_iso(now()),
+  'task-command-policy-v1',
+  'pgtap-2e4-rename-undo'
+);
+
+select is(
+  public.undo_operation((
+    select operation.id from public.undo_operations operation
+    where operation.user_id = '61111111-1111-4111-8111-111111111111'
+      and operation.operation_key = 'taskcmd-v1:pgtap-2e4-rename-undo'
+  )),
+  jsonb_build_object(
+    'undone', true,
+    'affected', 1,
+    'reminders_restored', 0,
+    'idempotent', false
+  ),
+  'undoing a rename nothing intervened on restores exactly one row and restores no reminder, because the rename closed none'
+);
+
+select results_eq(
+  $$ select title, status, due_at
+     from public.tasks where id = '61000025-1111-4111-8111-111111111111' $$,
+  $$ values ('Tarefa de renome desfeito'::text, 'todo'::text, null::timestamptz) $$,
+  'the superseded title is put back, and the columns the rename never touched are restored to the values they already held'
+);
+
+select is(
+  (
+    select status from public.undo_operations
+    where user_id = '61111111-1111-4111-8111-111111111111'
+      and operation_key = 'taskcmd-v1:pgtap-2e4-rename-undo'
+  ),
+  'undone',
+  'and the operation is marked undone, so a compensation that already ran cannot run a second time against the state it produced'
+);
+
 -- 2E_UNDO_RESTORE_INTEGRITY: a guarded state that moved --------------------------
 --
 -- The restoration is guarded by the status the forward operation *produced*, not
@@ -2138,6 +2424,66 @@ select is(
   )),
   'P0001:2E_UNDO_RESTORE_INTEGRITY',
   'an undo whose guarded status moved after the apply refuses rather than overwriting the newer state'
+);
+
+-- 2E-UNDO-004: undoing the OLDER of two commands on one task ---------------------
+--
+-- The most important assertion in this file, because it passed silently before the
+-- guard was widened. The case above varies the one column the guard used to read, so
+-- it passed under a status-only guard too; this one varies none of it. Two commands,
+-- one task, undo the first: a rename (which moves no status), then a
+-- `reschedule_due` (which sets `due_at` and arms a reminder), then the rename's own
+-- undo. Under the shipped status-only guard the status still matched, so the
+-- compensating UPDATE - which writes all ten scalars from `before_state` - matched
+-- too, wrote `due_at = null` straight over the second command, left the reminder
+-- that command armed `scheduled` on a task with no due date, and returned
+-- `{"undone": true}`. Guarding one column while writing ten is precisely what
+-- 2E-UPDATE-014 ("restores every field it changed") and 2E-UNDO-004 ("refuses when a
+-- newer change would be silently discarded") forbid.
+--
+-- The refusal is only half the proof: the second assertion is what shows the newer
+-- change survived rather than merely that something raised. Both applies are
+-- unasserted setup, as above - had either failed, the undo lookup would report a
+-- missing operation instead.
+
+select public.apply_task_command(
+  '61000024-1111-4111-8111-111111111111',
+  'rename_task',
+  jsonb_build_object('title', 'Tarefa de dois comandos, renomeada'),
+  pg_temp.taskcmd_pre_state('61000024-1111-4111-8111-111111111111'),
+  pg_temp.taskcmd_iso(now()),
+  'task-command-policy-v1',
+  'pgtap-2e4-older-rename'
+);
+
+select public.apply_task_command(
+  '61000024-1111-4111-8111-111111111111',
+  'reschedule_due',
+  jsonb_build_object('dueAt', pg_temp.taskcmd_iso(now() + interval '8 days')),
+  pg_temp.taskcmd_pre_state('61000024-1111-4111-8111-111111111111'),
+  pg_temp.taskcmd_iso(now()),
+  'task-command-policy-v1',
+  'pgtap-2e4-older-reschedule'
+);
+
+select is(
+  pg_temp.taskcmd_undo((
+    select operation.id from public.undo_operations operation
+    where operation.user_id = '61111111-1111-4111-8111-111111111111'
+      and operation.operation_key = 'taskcmd-v1:pgtap-2e4-older-rename'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'undoing the older of two commands is refused on a column the older one never wrote, because the guard is as wide as the ten-column restore'
+);
+
+select results_eq(
+  $$ select title, due_at
+     from public.tasks where id = '61000024-1111-4111-8111-111111111111' $$,
+  $$ values (
+       'Tarefa de dois comandos, renomeada'::text,
+       now() + interval '8 days'
+     ) $$,
+  'and the newer command survives intact - the due date it set is still on the row, which is exactly what a status-only guard discarded in silence'
 );
 
 -- 2E_UNDO_REMINDER_INTEGRITY: recorded evidence that cannot be replayed ----------
@@ -2184,6 +2530,103 @@ select is(
   )),
   'P0001:2E_UNDO_REMINDER_INTEGRITY',
   'a recorded reminder missing the title the restore needs is refused with the declared code, not with a raw not-null violation'
+);
+
+-- The same token from a state the forward path can actually reach -----------------
+--
+-- The refusal above is the element-SHAPE gate, and it needs a hand-corrupted row
+-- because the forward path cannot write a malformed element. On its own that left
+-- `2E_UNDO_REMINDER_INTEGRITY` unraisable from any state a real operation can reach,
+-- which for a declared member of a closed error vocabulary is the same defect as no
+-- raise at all - and it is the identical objection the migration uses to reject its
+-- own tautological count forms, so the file contradicted itself.
+--
+-- The post-condition below is read back from the table instead, and its cause needs
+-- no privilege and no tampering: `authenticated` keeps INSERT on `public.reminders`
+-- (PRD 14 permits it, 16.4 records it as residual risk), so an ordinary client can
+-- add a live reminder between the forward close and the undo. That is the row
+-- inserted here, as the fixture user's own role. What the undo would otherwise
+-- produce is a restored pre-state on a task holding a live reminder no operation in
+-- the chain ever disclosed; refusing is retryable and truthful.
+--
+-- The scoping matters as much as the check. Run unconditionally this count would
+-- refuse the rename undo asserted further up, whose task legitimately held a live
+-- reminder the rename never touched and whose recorded array is empty. It is scoped
+-- by the recorded `after_state.reminders_reconciled`.
+
+select public.apply_task_command(
+  '61000026-1111-4111-8111-111111111111',
+  'complete_task',
+  jsonb_build_object('status', 'completed'),
+  pg_temp.taskcmd_pre_state('61000026-1111-4111-8111-111111111111'),
+  pg_temp.taskcmd_iso(now()),
+  'task-command-policy-v1',
+  'pgtap-2e4-undo-live-reminder'
+);
+
+insert into public.reminders (id, user_id, task_id, title, remind_at, important, status)
+values (
+  '61000048-1111-4111-8111-111111111111',
+  '61111111-1111-4111-8111-111111111111',
+  '61000026-1111-4111-8111-111111111111',
+  'Lembrete intruso',
+  now() + interval '4 hours',
+  false,
+  'scheduled'
+);
+
+select is(
+  pg_temp.taskcmd_undo((
+    select operation.id from public.undo_operations operation
+    where operation.user_id = '61111111-1111-4111-8111-111111111111'
+      and operation.operation_key = 'taskcmd-v1:pgtap-2e4-undo-live-reminder'
+  )),
+  'P0001:2E_UNDO_REMINDER_INTEGRITY',
+  'an undo that would leave the task holding a live reminder no operation in the chain disclosed is refused, from a state a plain client write reaches'
+);
+
+-- The evidence gate, on a shape it was documented to refuse and did not -----------
+--
+-- Every term of that gate reads `is distinct from` rather than `<>` for one reason:
+-- `jsonb_typeof` is strict, so `jsonb_typeof(null)` is SQL NULL, `NULL <> 'object'`
+-- is NULL, one NULL term makes the whole `or`-chain NULL unless another term is
+-- already true, and plpgsql reads a NULL `if` condition as false. Written with `<>`
+-- the gate therefore failed OPEN for exactly the null `before_state` its own comment
+-- claimed it refused, and then restored `status = null` into a NOT NULL column - a
+-- raw 23502 no mapper case covers, in place of this slice's declared code.
+--
+-- The row is emptied with the fixture role's privileges because `authenticated`
+-- cannot write the undo ledger at all, which is the same reason the RPC has to be
+-- SECURITY DEFINER. Nothing this migration writes can produce this shape; the point
+-- is that the gate is the contract, and a contract that never fires is not one.
+
+select public.apply_task_command(
+  '61000027-1111-4111-8111-111111111111',
+  'rename_task',
+  jsonb_build_object('title', 'Tarefa sem evidencia, renomeada'),
+  pg_temp.taskcmd_pre_state('61000027-1111-4111-8111-111111111111'),
+  pg_temp.taskcmd_iso(now()),
+  'task-command-policy-v1',
+  'pgtap-2e4-undo-noevidence'
+);
+
+reset role;
+
+update public.undo_operations
+set before_state = null
+where user_id = '61111111-1111-4111-8111-111111111111'
+  and operation_key = 'taskcmd-v1:pgtap-2e4-undo-noevidence';
+
+set local role authenticated;
+
+select is(
+  pg_temp.taskcmd_undo((
+    select operation.id from public.undo_operations operation
+    where operation.user_id = '61111111-1111-4111-8111-111111111111'
+      and operation.operation_key = 'taskcmd-v1:pgtap-2e4-undo-noevidence'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'an operation carrying no before_state at all is refused at the evidence gate with the declared code, where the <> form would have proceeded to restore a null status'
 );
 
 -- Handler posture and registration ---------------------------------------------
