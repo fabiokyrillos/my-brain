@@ -29,6 +29,7 @@
 
 import type { Database } from "@/lib/supabase/database.types";
 
+import { normalizeTaskCommandOperationKey } from "./apply";
 import type { TaskCommandPreview } from "./preview";
 import type { TaskPreState } from "./matching";
 
@@ -107,7 +108,14 @@ export function buildFingerprintPayload(input: TaskCommandFingerprintInput): Fin
     p_pre_state: preState as unknown as FingerprintArgs["p_pre_state"],
     p_patch: preview.canonicalPatch as unknown as FingerprintArgs["p_patch"],
     p_policy_version: preview.policyVersion,
-    p_operation_key: operationKey,
+    // Normalized here rather than trusted from the caller. `apply_task_command`
+    // btrims the key before hashing it, so a padded key sent to this builder and
+    // a normalized one sent to the apply call would derive two different
+    // fingerprints for one request — and every retry would then look like a new
+    // request rather than a replay (2E-UPDATE-005/006). An adversarial review
+    // found the two builders disagreeing on exactly this, with a test that
+    // asserted the disagreement and so forbade fixing it at the source.
+    p_operation_key: normalizeTaskCommandOperationKey(operationKey),
   };
 }
 

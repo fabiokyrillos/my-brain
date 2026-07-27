@@ -340,19 +340,29 @@ describe("the operation key is normalized once and used twice (2E-IDEMPOTENCY-00
     expect(fingerprintPayload.p_operation_key).toBe(applyPayload.p_operation_key);
   });
 
-  it("is what makes the two agree, and its absence is what breaks them", () => {
+  it("normalizes inside the fingerprint builder, so a padded key cannot reach the digest", () => {
     // The negative half, so the assertion above is not merely satisfied by both
-    // sides happening to receive the same string. Skipping the helper on the
-    // fingerprint side is the concrete mistake this file exists to forbid.
+    // sides happening to receive the same string.
+    //
+    // An earlier revision of this test asserted the opposite — that passing the
+    // padded key straight to `buildFingerprintPayload` produced a *different*
+    // value from the apply payload — which documented the divergence as correct
+    // and forbade fixing it at the source. An adversarial review found that the
+    // two builders really did disagree whenever a caller passed an untrimmed
+    // key, and that this test was what protected the disagreement. The
+    // normalization now lives inside `buildFingerprintPayload`, so what has to
+    // be proven is that the padding is gone rather than that the two differ.
     const input = inputFor(padded);
-    const unnormalized = buildFingerprintPayload({
+    const fromPadded = buildFingerprintPayload({
       preview: input.preview,
       preState: input.preState,
       ownerId: OWNER,
       operationKey: padded,
     });
 
-    expect(unnormalized.p_operation_key).not.toBe(buildApplyPayload(input).p_operation_key);
+    expect(fromPadded.p_operation_key).toBe(OPERATION_KEY);
+    expect(fromPadded.p_operation_key).not.toBe(padded);
+    expect(fromPadded.p_operation_key).toBe(buildApplyPayload(input).p_operation_key);
   });
 
   it("trims ASCII spaces, matching btrim", () => {

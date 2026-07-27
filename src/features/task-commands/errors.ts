@@ -91,9 +91,23 @@ export type TaskCommandErrorDetail = (typeof TASK_COMMAND_ERROR_DETAILS)[number]
  * so that an error outside this vocabulary stays *visible* instead of being
  * quietly folded onto a declared code that would then be a lie — the TypeScript
  * counterpart of 2E-UPDATE-017's "fails if the RPC raises an undeclared one".
- * It is the only failure marked retryable alongside the two integrity codes: the
- * whole RPC is one transaction, so an unrecognized raise rolled everything back
- * and a retry is the truthful next step.
+ * It is the only failure marked retryable alongside the two integrity codes, but
+ * **not** for the reason an earlier revision of this comment gave. That revision
+ * argued "the whole RPC is one transaction, so an unrecognized raise rolled
+ * everything back" — true of a raise, and false of the case this member actually
+ * has to cover. `@supabase/postgrest-js` *catches* a client-side fetch failure
+ * and resolves with `{ error: { message: "TypeError: fetch failed", code: "" } }`
+ * rather than rejecting, so a lost response after a successful commit arrives
+ * here with no SQLSTATE at all. Nothing in this process can tell that apart from
+ * a rolled-back raise.
+ *
+ * What makes a retry safe is therefore idempotency, not rollback: the operation
+ * key is unique per `(user_id, operation_key)` in the database, so a replay of a
+ * committed request returns the original outcome marked replayed and writes
+ * nothing new (2E-UPDATE-005). That is the only claim the copy for this member
+ * may make, and `copy.ts` says exactly that much and no more — an adversarial
+ * review found it asserting "nothing was changed", which is a promise this
+ * process cannot keep.
  */
 export const TASK_COMMAND_UNTAGGED_FAILURES = [
   /** `42501` — no `auth.uid()`. */

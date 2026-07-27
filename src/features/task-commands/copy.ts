@@ -208,7 +208,13 @@ const ptBR: TaskCommandCopy = {
     task_not_found: "Não encontramos esta tarefa.",
     stale_pre_state: "A tarefa mudou desde a previsão, então nada foi aplicado.",
     invalid_payload: "Este pedido chegou fora do formato esperado. Refaça a previsão e tente de novo.",
-    undeclared_failure: "Não foi possível aplicar agora. Nada foi alterado — tente novamente.",
+    // Deliberately does not say "nada foi alterado". This member also catches an
+    // error carrying no SQLSTATE — a lost response, which `postgrest-js` reports
+    // as a caught fetch failure rather than a rejection — where the write may
+    // well have committed. What is safe to promise is the retry, because the
+    // operation key makes a replay return the original outcome (2E-UPDATE-005).
+    undeclared_failure:
+      "Não foi possível confirmar esta alteração. Tente de novo — reenviar não duplica nada.",
   },
   actions: {
     complete_task: "concluir a tarefa",
@@ -368,7 +374,9 @@ const en: TaskCommandCopy = {
     task_not_found: "We could not find this task.",
     stale_pre_state: "The task changed since the preview, so nothing was applied.",
     invalid_payload: "This request did not arrive in the expected shape. Build a fresh preview and try again.",
-    undeclared_failure: "Could not apply right now. Nothing was changed — try again.",
+    // See the pt-BR entry: this must not claim nothing changed.
+    undeclared_failure:
+      "We could not confirm this change. Try again — resubmitting will not duplicate it.",
   },
   actions: {
     complete_task: "complete the task",
