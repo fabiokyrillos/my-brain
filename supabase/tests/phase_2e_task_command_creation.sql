@@ -998,7 +998,7 @@ select is(
   'creation undo cancels rather than deletes the task, preserving history'
 );
 select is(
-  (select status from public.reminders r join public.tasks t on t.id = r.task_id
+  (select r.status from public.reminders r join public.tasks t on t.id = r.task_id
    where t.operation_key = 'pgtap-2e6-happy'),
   'cancelled',
   'creation undo cancels the exact still-live reminder'
