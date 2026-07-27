@@ -3,12 +3,14 @@
 **Epic 2E-D — Reversible non-destructive updates.**
 
 - **Branch:** `codex/phase-2e-natural-language-task-updates`
-- **Slice HEAD:** `aba6d6b`
+- **Slice HEAD:** `bfa28a1`
 - **Phase base:** `2e2acfd`
 - **Draft PR:** [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8**
 - **Normative contract:** `docs/PHASE_2E_PRD.md` §13.5 (`2E-UPDATE-001..018`), §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D)
 - **New ADRs:** ADR-044, ADR-045, ADR-046
-- **Verdict:** **IMPLEMENTATION COMPLETE AND CI-GREEN — ACCEPTANCE PENDING ONE OWED REVIEW ROUND.** See §11.
+- **Verdict:** **READY WITH NON-BLOCKING NOTES.** See §11.
+
+> **Revision note.** An earlier revision of this report carried the verdict "acceptance pending one owed review round", because the second whole-artifact adversarial pass had failed on a session limit. **That round has since run in full** — five lenses, every finding put to a skeptic — and found seven distinct defects, one of them a Critical that this report had recorded as a met requirement. All seven are fixed, the fixes are CI-green, and §4.2, §7 and §11 below describe the corrected state. Two disposition rows in §7 (2E-UPDATE-014 and 2E-PROVENANCE-001) said **MET** when they were not; both now hold, and the correction is recorded rather than quietly applied.
 
 ## 1. What shipped
 
@@ -16,8 +18,8 @@ The first RPC in this codebase that mutates an existing task. Before this slice 
 
 | Artifact | Responsibility |
 |---|---|
-| `202607260058` (new, 1895 lines) | `public.apply_task_command`; the re-pasted `public.audit_task_change`; `private.undo_apply_task_command_fields`; `private.undo_apply_task_command_relation`; two registry rows; grants; five post-deploy fail-closed DO blocks |
-| `supabase/tests/phase_2e_task_command_apply.sql` (new) | `plan(116)` |
+| `202607260058` (new, 2203 lines) | `public.apply_task_command`; the re-pasted `public.audit_task_change`; `private.undo_apply_task_command_fields`; `private.undo_apply_task_command_relation`; two registry rows; grants; six post-deploy fail-closed DO blocks |
+| `supabase/tests/phase_2e_task_command_apply.sql` (new) | `plan(132)` — 116 for the original contract, +16 from the second review round |
 | `supabase/tests/rpc_version_retirement.sql` | the new RPC added to the `prosecdef` + `search_path=""` array; `plan(24)` unchanged |
 | `src/features/task-commands/errors.ts` | the closed `2E_*` failure vocabulary as iterable `as const`, with outcome/retryable/SQLSTATE carried as data |
 | `src/features/task-commands/apply.ts` | the RPC wrapper: injected client, shared operation-key normalization, Zod-validated discriminated union, `(code, details)` mapper |
@@ -65,7 +67,29 @@ The claimed instants are cast to `timestamptz` **for comparison** while the same
 2. **Three reminder-integrity guards were tautological**, which for a declared member of a closed error vocabulary is the same defect as a missing raise — 2E-UPDATE-017 requires a database test to provoke every declared code. `jsonb_agg` emits exactly one element per input row, so `jsonb_array_length(...) <> count(*)` over one CTE could never differ; `returning id into` on a `gen_random_uuid()` primary key could never yield null. Replaced with one postcondition read back from `public.reminders`, which has independent provenance on each side and guards the reachable cause: `authenticated` still holds INSERT and UPDATE on `public.reminders`, so a direct client write committing between the close and the check would leave a live reminder the command never disclosed closing.
 3. **One finding was refuted with verified reasoning** — the terminal-timestamp gating described in §2. The refutation was checked against `src/features/operations/actions.ts:148-152` before being accepted.
 
-**A second whole-artifact adversarial round across five lenses did not run.** See §11.
+## 4.2 The second round, and the seven defects it found
+
+The whole-artifact round ran across five lenses — SQL execution, concurrency/replay, undo truthfulness, ownership/security, test adequacy — with **every** finding handed to a separate skeptic instructed to default to refuting it. **19 findings; 10 survived refutation; 7 distinct defects after deduplicating across lenses.** Nine were refuted with reasoning, including three that were technically correct about SQL semantics but had no reachable failure state.
+
+**1. Critical — the undo guard was one column wide while the write was ten.** `undo_apply_task_command_fields` restored all ten scalar columns from `before_state` but guarded only on `status`. Reproduction: rename a task, reschedule it, undo the rename — `expected_status` still matched, so `affected = 1` and the restore wrote `due_at = null`, **silently discarding the reschedule** and returning `{"undone": true}`. Because `after_state.reminder_created_id` is null for a rename, the reminder the reschedule armed was never cancelled, leaving the task with a null due date holding a live `scheduled` reminder the heartbeat would fire. Three lenses found it independently; four skeptics failed to refute it.
+
+The asymmetry was the tell: the forward path gates on **twelve** columns to protect a write of at most three, while the undo path gated on **one** to protect a write of ten. It had no evidence to gate with — `before_state` records the pre-state and nothing recorded what the forward write left behind. Step 23 now records `applied_state`, and the compensating UPDATE guards all ten with `is not distinct from`. An operation lacking `applied_state` fails closed rather than falling back.
+
+**2. Important — `2E_UNDO_REMINDER_INTEGRITY` could not fire from any production state.** The handler had replaced the contract's post-condition with an element-**shape** check over data the forward path can never write malformed — the *exact* objection this migration's own comment uses to reject the tautological count form, so the file contradicted itself. It now re-queries the live scheduled count after the restore, scoped by a recorded `reminders_reconciled` flag (unconditional, it would refuse every undo of a task legitimately holding a reminder the action never touched).
+
+**3. Important — the policy version was durably recorded nowhere**, so no applied command could be attributed to the policy that governed it. **This report recorded 2E-PROVENANCE-001 as MET.** One key on `after_state`, which flows into the undo row and the audit row.
+
+**4. Minor — two fail-closed evidence gates did not fail closed.** `jsonb_typeof(...) <> …` yields SQL NULL for an absent key and plpgsql treats a NULL `if` as false, so the gates missed exactly the two shapes their comments said they refused — while the same file documented `is distinct from` as the fix ninety lines later.
+
+**5. Important — `append_note` was unappliable past 2000 characters.** The RPC bounded the canonical `description` by the *note* bound while the preview produces `description + note`, so a task with a long description could never take another note and the preview offered a one-step apply the RPC would refuse.
+
+**6–8. Important — three guards were unfalsifiable by the suite.** No fixture gave a non-reminder action a reminder-holding subject, so deleting the `action_touches_reminders` gate left all 116 assertions green while every command would churn reminders. Nothing constrained reminders after a *successful* `complete_task`, so the insert half's terminal-status guard could be deleted freely. And every undo fixture was a `complete_task`, so the seven-action path and the reminder-cancel block never executed.
+
+**9. Important — user-facing copy promised a rollback it cannot know about.** `undeclared_failure` said "Nothing was changed", but the mapper also routes there for an error with no SQLSTATE, and `@supabase/postgrest-js` *catches* a client-side fetch failure and resolves rather than rejecting — so a lost response after a successful commit landed on that copy. Reworded to claim only the retry, which is safe by idempotency rather than by rollback.
+
+Also fixed: `buildFingerprintPayload` sent the raw operation key while the apply call sent the normalized one, and the test guarding that invariant asserted the **disagreement**, which documented the divergence as correct and forbade fixing it at the source.
+
+**What this round cost, stated plainly:** the first round reviewed the migration only. It found two Criticals, but it could not have found any of these seven, because five live in code it never read and two require reasoning across the migration and the test suite together. The lesson is the one Slice 2E.3 already recorded and this slice re-learned: a review scoped to one artifact cannot see a contract that two artifacts disagree about.
 
 ## 5. Verification
 
@@ -73,16 +97,20 @@ The claimed instants are cast to `timestamptz` **for comparison** while the same
 |---|---|
 | `npm run lint` | 0 errors, 0 warnings |
 | `npm run typecheck` | 0 errors |
-| `npx vitest run` | **2007 passed / 115 files** |
-| `npx vitest run src/features/task-commands` | **915 passed / 17 files** (from 786 / 15) |
+| `npx vitest run` | **2009 passed / 115 files** |
+| `npx vitest run src/features/task-commands` | **917 passed / 17 files** (from 786 / 15) |
 | `npm run build` | clean |
-| CI `application` / `edge worker` / `database and journey` | **all three pass** on `aba6d6b`, run `30215531422` |
-| Full pgTAP suite in CI | **`Files=28, Tests=1043, Result: PASS`** |
+| CI `application` / `edge worker` / `database and journey` | **all three pass** on `bfa28a1`, run `30227374101` |
+| Full pgTAP suite in CI | **`Files=28, Tests=1059, Result: PASS`** |
 | Migration chain from zero | **PASS in CI** — `202607260058` applies to an empty database |
 | `supabase db lint --schema public,private` | **PASS in CI** |
 | `supabase db reset`, `supabase test db`, `db lint --local` | **cannot run on this workstation — Docker is unavailable.** No local result is claimed anywhere in this report |
 
-**The arithmetic is the evidence, not the pass.** `Files=28` is `27 + 1` and `Tests=1043` is `927 + 116` against the Slice 2E.3 baseline, and the CI log shows `phase_2e_task_command_apply.sql ................ ok`. That confirms every one of the 116 assertions this slice added **executed** rather than being skipped — a suite that silently skipped a whole file would look identical without the arithmetic, and this repository has already lost a whole pgTAP file to a NUL byte while TypeScript stayed green. It also confirms `rpc_version_retirement.sql` stayed at `plan(24)`, because adding an element to a literal array is not an assertion.
+**The arithmetic is the evidence, not the pass.** `Files=28` is `27 + 1` and `Tests=1059` is `927 + 132` against the Slice 2E.3 baseline, and the CI log shows `phase_2e_task_command_apply.sql ................ ok`. That confirms every one of the 132 assertions **executed** rather than being skipped — a suite that silently skipped a whole file would look identical without the arithmetic, and this repository has already lost a whole pgTAP file to a NUL byte while TypeScript stayed green. It also confirms `rpc_version_retirement.sql` stayed at `plan(24)`, because adding an element to a literal array is not an assertion.
+
+The 132 is itself two numbers: 116 for the original contract, and **16 added after the second adversarial round**, one per guard that round fixed or proved unfalsifiable. The most load-bearing is the Critical's exact reproduction — rename, reschedule, undo the rename — which **silently passed before the fix**. Its companion asserts the same shape must still *succeed* when nothing intervened, because widening the guard to something unsatisfiable would pass the first assertion and break every real undo.
+
+Because Docker is unavailable and CI is the only place this file can execute, the 16 new assertions were **independently audited before pushing**: plan count 132 against 132 counted assertions (verified by a lexer that skips comments, strings and dollar-quoted bodies), pure ASCII with no CRLF or NUL bytes, dollar-quotes balanced, every new assertion traced to a pass against the corrected migration, every row-counting assertion checked against the eight new fixture tasks and one new reminder for collisions, role switches correctly bracketed, and both fault injections confined to the rolled-back transaction. CI then confirmed the audit.
 
 **CI caught a defect no local gate could.** The first push red-ed the `database` job with `42601 syntax error at end of input` — the migration would not apply at all. plpgsql reads an `if` condition with `read_sql_expression(K_THEN)`, which scans for the first `then` at paren-depth zero, so a bare `case … when … then … end` in that position ends the condition at the `case`'s own `then`; the remainder is parsed as statements and the parser reaches the end of the body still expecting `end if`. One site, fixed by parenthesizing, with the rule recorded in a comment. Every other `case` in the file was then audited: three are plpgsql `case` statements closed with `end case;`, and the rest sit in assignments, `values(…)` or `jsonb_build_object(…)` arguments — all at paren-depth one or deeper, where the scanner never reads them as a terminator. The pgTAP file's own `pg_temp` plpgsql helpers were audited for the same trap and are clean.
 
@@ -90,7 +118,7 @@ This is the second member of one family this slice hit, after `pg_catalog.coales
 
 ## 6. The pgTAP suite, and the three assertions that are fault-injected
 
-`plan(116)`, pure ASCII, fixtures under the reserved `6xxxxxxx` prefix. Coverage by area: RPC posture 6, the closed vocabulary read out of `pg_get_functiondef` 3, `audit_task_change` 7, ownership non-disclosure 3, bare-`22023` validation 7, `2E_INVALID_RELATION` 1, the two refused actions 2, staleness 13, `no_change` 3, per-action application 34, `2E_INELIGIBLE_STATUS` 1, due consistency 4, `2E_REMINDER_INTEGRITY` 1, replay 5, undo-fields 7, undo-relation 3, undo integrity 2, handler posture 8, plus the signature pins and the mirror fixture.
+`plan(132)`, pure ASCII, fixtures under the reserved `6xxxxxxx` prefix. The original 116 by area: RPC posture 6, the closed vocabulary read out of `pg_get_functiondef` 3, `audit_task_change` 7, ownership non-disclosure 3, bare-`22023` validation 7, `2E_INVALID_RELATION` 1, the two refused actions 2, staleness 13, `no_change` 3, per-action application 34, `2E_INELIGIBLE_STATUS` 1, due consistency 4, `2E_REMINDER_INTEGRITY` 1, replay 5, undo-fields 7, undo-relation 3, undo integrity 2, handler posture 8, plus the signature pins and the mirror fixture.
 
 **All thirteen declared codes are provoked** (2E-UPDATE-017). `throws_ok`'s third argument matches the exception MESSAGE and never the DETAIL, so the closed-token assertions use the `SQLSTATE:DETAIL`-with-`'accepted'`-sentinel `pg_temp` helper from `ai_interpretation_bounds.sql:134-153` rather than `throws_ok`.
 
@@ -117,12 +145,12 @@ This is the second member of one family this slice hit, after `pg_catalog.coales
 | 2E-UPDATE-011 (reminder consistency by close-and-insert, never in place) | **MET** | Every scheduled row cancelled (two-row fixture), fresh row created when a future due date survives, `create_due_task_reminder`'s formula reproduced with `case when a >= b`, `sent`/`snoozed` untouched |
 | 2E-UPDATE-012 (due change on an intentionally-undated task clears the flags atomically or is refused with a declared code; never a raw `23514`) | **MET** | `2E_DUE_CONSISTENCY` at two sites — the patch's own self-consistency pre-lock, and the locked row's flag |
 | 2E-UPDATE-013 (one registered handler and registry row per operation; the fail-closed trigger proves registration) | **MET** | Two `action_type`s → two handlers. Registration is structurally mandatory: an unregistered `action_type` raises `UNDO_HANDLER_NOT_REGISTERED` at INSERT time |
-| 2E-UPDATE-014 (undo restores every field and linked effect, safe twice, refuses to discard newer work) | **MET** | Both handlers guarded by recorded state with affected-count integrity; double undo is the router's success path; `2E_UNDO_RESTORE_INTEGRITY` when the guarded state moved |
+| 2E-UPDATE-014 (undo restores every field and linked effect, safe twice, refuses to discard newer work) | **MET — after correction. An earlier revision of this row claimed MET while the requirement was violated** | The "refuses to discard newer work" clause was **not** met: the handler restored ten columns while guarding one, so undoing an older operation silently reverted every later non-status change (§4.2 defect 1). Step 23 now records `applied_state` — the ten scalars as the forward write left them — and the compensating UPDATE guards all ten with `is not distinct from`, failing closed when `applied_state` is absent. Proven by the reproduction case *and* its success companion, so the guard is neither absent nor unsatisfiable. The linked-effect clause is likewise now enforced by a post-restore re-query rather than a shape check that could never fire (defect 2) |
 | 2E-UPDATE-015 (relation undo removes only the row that operation created) | **MET** | Asserted with a task holding both an `involved` and a `waiting_on` person: only the recorded one is removed |
 | 2E-UPDATE-016 (relation assignments prove ownership of both sides; never cross-owner) | **MET** | The composite owner FKs on all three relation tables, plus explicit pre-reservation ownership probes raising `2E_INVALID_RELATION` |
 | 2E-UPDATE-017 (closed declared `2E_*` list; a DB test provokes each; a TS test fails if the mapper lacks a case) | **MET** | 13 codes, all provoked. `errors.test.ts` asserts the list describes the migration **in both directions** — every declared token is raised, and every raised token is declared |
 | 2E-UPDATE-018 (added to the versioned-RPC inventory and its retirement test) | **MET by the applicable half** | The name carries no `_vN` suffix so it neither joins nor forks an inventoried family (ADR-044); it is nonetheless added to the retirement test's posture array, which is the part that would otherwise never notice it |
-| 2E-PROVENANCE-001/003 | **MET** | Policy version hashed into every fingerprint and recorded on the operation; automatic vs user-initiated distinguishable at the trigger layer via `app.audit_actor` |
+| 2E-PROVENANCE-001/003 | **MET — after correction. An earlier revision of this row claimed the policy version was "recorded on the operation" when no row carried it** | The version reached the RPC and was hashed into the fingerprint, but a digest is not a record: nothing could attribute an applied command to the policy that governed it (§4.2 defect 3). `after_state` now carries `'policy_version'`, which flows into both the undo row and the audit row, and pgTAP pins it. `-003` was and remains met via `app.audit_actor` — apply sets `'user'`, undo sets `'system'` |
 | 2E-PROVENANCE-002 (tokens and price snapshot before any dependent domain write) | **N/A this slice** | No AI call on the apply path. Command parsing is Slice 2E.1/2E.7; `202607250055` already widened `ai_usage_events.operation` |
 | 2E-IDEMPOTENCY-001..004 | **MET** | `'taskcmd-v1:'` namespacing inside the 8..240 caller bound; DB-enforced uniqueness; `jsonb_build_object` canonicalization makes key-order and whitespace stability structural; replay marked |
 | 2E-OWNERSHIP-001..003, -005 | **MET** | Every read and write inside the definer function carries its own `user_id` predicate; another owner's task and a nonexistent uuid both yield `P0002 'Task not found'`; nothing executable by `anon` or `PUBLIC`; no grant widened; no model on this path |
@@ -131,7 +159,7 @@ This is the second member of one family this slice hit, after `pg_catalog.coales
 | 2E-UNDO-005 (Phase 2E operations need their own owner-scoped task-scoped undo listing) | **NOT MET — owed by Slice 2E.7** | The operations are recorded task-scoped with `entity_type = 'task'` and `entity_ids = array[task_id]`, which is what a listing needs; the listing itself is a surface concern and no surface exists |
 | 2E-UNDO-006 (24h window disclosed wherever reversibility is claimed; affordance not rendered when expired) | **MET** (contract half) | `undo_expires_at` returned by the RPC; `TASK_COMMAND_UNDO_WINDOW_HOURS` pinned against `202607160003:153`. The rendering half is Slice 2E.7 |
 | 2E-I18N-003 (every declared `2E_*` code maps to localized copy in both locales, asserted against the declared list) | **MET — and this closes Slice 2E.3's open item 3** | The eighth `VOCABULARIES` row. The requirement's literal subject did not exist until this slice raised the codes |
-| 2E-OPERATIONS-001 (additive, forward-only, chain resets from zero) | **MET** | Verified in CI on `aba6d6b` |
+| 2E-OPERATIONS-001 (additive, forward-only, chain resets from zero) | **MET** | Verified in CI on `bfa28a1` |
 | 2E-OPERATIONS-002 (generated-type parity by content comparison) | **MET, three ways** | §6 |
 | 2E-OPERATIONS-003 (focused disposable remote smoke) | **NOT RUN — blocked on deployment** | §9 |
 | 2E-OPERATIONS-005 (rollback documented, no reverted migration) | **MET** | §8 |
@@ -151,8 +179,8 @@ This is the second member of one family this slice hit, after `pg_catalog.coales
 
 1. **2E-OPERATIONS-003's focused remote smoke — owed, blocked on deployment, not claimed to have passed.** It would exercise `apply_task_command` against the linked project, which does not have it. Epic 2E-D's acceptance criteria (PRD §19.1) **explicitly name** "a disposable remote smoke and authenticated desktop/mobile journeys", unlike Epics 2E-B and 2E-C — so unlike the two previous slices this is **not** dismissible as a phase-level item. It is a genuine gap in Epic 2E-D's acceptance, recorded as such. What it must prove beyond the earlier specifications: a real two-session concurrency race (2E-UPDATE-008's loser path, unprovable inside one pgTAP transaction); replay across two separate PostgREST requests rather than two calls in one transaction; that the fingerprint TypeScript computes through `buildFingerprintPayload` equals the one the RPC derives, over the wire, for all thirteen actions; and cross-owner denial with two real owners.
 2. **Authenticated desktop/mobile Playwright journeys — owed by the same clause, blocked on the same dependency and on there being no surface** (ADR-043).
-3. **A second whole-artifact adversarial round did not run.** Five independent lenses (SQL execution, concurrency/replay, undo truthfulness, ownership/security, test adequacy) with per-finding refutation were launched and **all five failed on a session limit before producing any finding**. No result is claimed from it. The round that *did* run covered the migration only, not the pgTAP suite or the TypeScript surface. **This is the reason the verdict below is not "accepted".**
-4. **No mutation-testing round ran for this slice.** Slice 2E.2's 36-mutation discipline was not repeated here.
+3. ~~A second whole-artifact adversarial round did not run.~~ **CLOSED.** It ran in full — five lenses, 19 findings, every one put to a separate skeptic, 10 survived, 7 distinct defects fixed and CI-green. See §4.2. (It failed on a session limit on first attempt; that attempt produced no findings and none were claimed from it.)
+4. **No dedicated mutation-testing round ran for this slice.** Slice 2E.2's 36-mutation discipline was not repeated as its own pass. Partial substitute, stated for what it is: the test-adequacy lens of §4.2 *was* a mutation analysis in effect — it identified three specific mutations that survived all 116 assertions, and all three are now killed. That is narrower than 2E.2's systematic sweep and is not claimed as equivalent.
 5. **No local pgTAP, `supabase test db` or `db lint` execution**, and no type regeneration (ADR-041).
 6. **`apply.ts` and `errors.ts` have no production caller.** By design; their consumer is Slice 2E.7. Behaviour is proven through an injected client double.
 
@@ -165,15 +193,26 @@ This is the second member of one family this slice hit, after `pg_catalog.coales
 
 ## 11. Verdict
 
-**IMPLEMENTATION COMPLETE AND CI-GREEN — ACCEPTANCE PENDING ONE OWED REVIEW ROUND.**
+**READY WITH NON-BLOCKING NOTES.**
 
-Every `2E-UPDATE` requirement is met, the closed error vocabulary is provoked token by token in a suite whose arithmetic proves it executed, the migration chain applies from an empty database, `db lint` is clean over `public,private`, and the foundation journey still passes on desktop and Pixel 7 — which matters more this slice than last, because this is the first Phase 2E migration to change an object the existing product already uses.
+Every `2E-UPDATE` requirement is met — two of them only after the second review round proved this report's own claims about them false. The closed error vocabulary is provoked token by token, the migration chain applies from an empty database, `db lint` is clean over `public,private`, and the foundation journey still passes on desktop and Pixel 7 — which matters more this slice than any before it, because this is the first Phase 2E migration to change an object the existing product already uses.
 
-Two Criticals were found and fixed before CI, one of which would have broken every existing task UPDATE in the product. A third defect — the one that would have prevented the migration applying at all — was found by CI and not by any local gate, which is precisely the division of labour ADR-038 established and the reason draft PR #18 exists.
+**Three review rounds and CI each caught something the others could not**, and that division is the substantive finding of this slice:
 
-**What holds the verdict short of acceptance is §9.3:** the second, whole-artifact adversarial round across five lenses was launched and failed on a session limit, so the pgTAP suite and the TypeScript surface have had no independent adversarial pass. The process this phase has followed for three slices requires one, and Slice 2E.3 is the reason to insist: its two Criticals both lived in code written earlier in the same slice and were invisible to the author. That round, plus a mutation round, is the named continuation point.
+- **The migration-scoped adversarial round** caught `pg_catalog.coalesce` at eleven sites — a SQL special form that cannot be schema-qualified — two of them inside `audit_task_change`, so the first `public.tasks` update touching a watched column would have broken `persistTaskStatus`, `undo_confirm_entry_tasks` and two existing pgTAP suites. It also caught three tautological guards.
+- **CI** caught `42601`: the migration would not apply at all, because a bare `case … then … end` cannot sit in a plpgsql `if` condition. **No local gate could see this** — which is precisely the division of labour ADR-038 established and the reason draft PR #18 exists.
+- **The whole-artifact round** caught seven more, including a Critical this report had recorded as a met requirement: an undo that restored ten columns while guarding one, silently discarding a later command's work and stranding a live reminder against a null due date. Five of the seven live in code the migration-scoped round never read; two require reasoning across the migration and the test suite together.
 
-**Also genuinely outstanding for Epic 2E-D specifically**, unlike the two slices before it: §9.1's remote smoke and §9.2's authenticated journeys are named in Epic 2E-D's own acceptance criteria, not merely at phase level. They are blocked on deployment and on Slice 2E.7's surface, and they are recorded as gaps rather than argued away.
+The honest summary of that sequence is that **scoping a review to one artifact cannot find a contract that two artifacts disagree about**, and that a report claiming a requirement is met is exactly the claim a review should attack first. Two disposition rows in §7 are marked as corrected rather than silently rewritten.
+
+**Non-blocking notes, each owed by a named slice or blocked on a named dependency:**
+
+- §9.1's focused remote smoke and §9.2's authenticated journeys are named in **Epic 2E-D's own** acceptance criteria, not merely at phase level — unlike the two slices before it. Both are blocked on deployment and on Slice 2E.7's surface, and are recorded as gaps rather than argued away. The smoke must prove what pgTAP structurally cannot: a real two-session race, replay across two PostgREST requests, and TypeScript/RPC fingerprint agreement over the wire.
+- §9.4: no dedicated mutation round; the test-adequacy lens is a narrower substitute and is not claimed as equivalent.
+- §7: 2E-UNDO-005's task-scoped undo listing and every `2E-A11Y` requirement are Slice 2E.7's, per ADR-043.
+- §10: the deferred split of `undeclared_failure` into database-raised and transport variants.
+
+**What is deliberately not claimed:** no local pgTAP or `db lint` execution, no type regeneration, no remote smoke, no authenticated journey, and no dedicated mutation round.
 
 ## 12. Next
 
