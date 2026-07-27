@@ -3241,7 +3241,7 @@ begin
   -- single-use property; an unguarded UPDATE would consume a row twice.
   if position('2E_CONFIRMATION_REQUIRED' in apply_body) = 0
     or position('public.task_command_confirmations' in apply_body) = 0
-    or position('and confirmation_row.status = ''issued''' in apply_body) = 0
+    or position('and confirmation.status = ''issued''' in apply_body) = 0
   then
     raise exception 'apply_task_command no longer enforces the single-use confirmation 2E-DESTRUCTIVE-002 and -004 require'
       using errcode = 'P0001';
