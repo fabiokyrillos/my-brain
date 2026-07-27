@@ -61,21 +61,23 @@ function source(relativePath: string): string {
  *
  * Migrations are append-only, so `create or replace` in a later file supersedes
  * an earlier declaration and parity has to be proven against the later one.
- * `202607260059` re-declares **both** Phase 2E functions this file covers — it
- * amends `list_task_command_candidates`'s body to exclude creation-undone tasks,
- * and it replaces `apply_task_command` outright to enable the two destructive
- * verbs — so both constants point at it. Pointing them at the original files
- * would prove parity against declarations the database has replaced, which is a
- * green result about the wrong subject.
+ * `202607260059` remains current for `list_task_command_candidates` and the
+ * destructive confirmation issuer. `202607270060` re-declares
+ * `apply_task_command` to centralize the expanded creation action family.
+ * Pointing any constant at an earlier declaration would prove parity against a
+ * function the database has replaced.
  */
 const CANDIDATES_MIGRATION =
   "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const CANDIDATES_PGTAP = "supabase/tests/phase_2e_task_command_matching.sql";
-const APPLY_MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
+const APPLY_MIGRATION = "supabase/migrations/202607270060_phase_2e_no_match_task_creation.sql";
 const APPLY_PGTAP = "supabase/tests/phase_2e_task_command_apply.sql";
 const CONFIRMATION_MIGRATION =
   "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
 const CONFIRMATION_PGTAP = "supabase/tests/phase_2e_task_command_destructive.sql";
+const CREATION_MIGRATION =
+  "supabase/migrations/202607270060_phase_2e_no_match_task_creation.sql";
+const CREATION_PGTAP = "supabase/tests/phase_2e_task_command_creation.sql";
 const TYPES = "src/lib/supabase/database.types.ts";
 
 /**
@@ -127,6 +129,24 @@ const APPLY: FunctionSpec = {
 const CONFIRMATION: FunctionSpec = {
   fn: "issue_task_command_confirmation",
   migration: CONFIRMATION_MIGRATION,
+  language: "plpgsql",
+};
+
+const CREATION_PREVIEW: FunctionSpec = {
+  fn: "preview_task_command_creation",
+  migration: CREATION_MIGRATION,
+  language: "plpgsql",
+};
+
+const CREATION_CONFIRMATION: FunctionSpec = {
+  fn: "issue_task_command_creation_confirmation",
+  migration: CREATION_MIGRATION,
+  language: "plpgsql",
+};
+
+const CREATION_APPLY: FunctionSpec = {
+  fn: "create_task_command",
+  migration: CREATION_MIGRATION,
   language: "plpgsql",
 };
 
@@ -443,3 +463,43 @@ describe(`${CONFIRMATION.fn} generated-type parity (2E-OPERATIONS-002)`, () => {
     expect(source(CONFIRMATION_PGTAP)).toContain(`array[${expected}]`);
   });
 });
+
+for (const spec of [CREATION_PREVIEW, CREATION_CONFIRMATION, CREATION_APPLY]) {
+  describe(`${spec.fn} generated-type parity (2E-OPERATIONS-002)`, () => {
+    const migration = parseMigration(spec);
+    const generated = parseGeneratedTypes(spec);
+
+    describeArgumentParity(migration, generated);
+
+    it("returns the scalar jsonb its strict TypeScript parser consumes", () => {
+      expect(migration.returns.kind).toBe("scalar");
+      if (migration.returns.kind !== "scalar" || generated.returns.kind !== "scalar") {
+        throw new Error(`${spec.fn} no longer returns a scalar`);
+      }
+      expect(migration.returns.sqlType).toBe("jsonb");
+      expect(generated.returns.tsType).toBe("Json");
+    });
+
+    it("takes the identical six server-bound creation values in the identical order", () => {
+      expect(migration.args.map((arg) => arg.name)).toEqual([
+        "p_action",
+        "p_title_words",
+        "p_patch",
+        "p_observed_before",
+        "p_policy_version",
+        "p_operation_key",
+      ]);
+    });
+
+    it("defaults none of the binding and never lets the caller name an owner", () => {
+      expect(migration.args.filter((arg) => arg.hasDefault)).toEqual([]);
+      expect(generated.args.filter((arg) => arg.optional)).toEqual([]);
+      expect(migration.args.map((arg) => arg.name)).not.toContain("p_owner_id");
+    });
+
+    it("agrees with the signature pgTAP pins against the real catalog", () => {
+      const expected = migration.args.map((arg) => `'${arg.name}'`).join(", ");
+      expect(source(CREATION_PGTAP)).toContain(`array[${expected}]`);
+    });
+  });
+}

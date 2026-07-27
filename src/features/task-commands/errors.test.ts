@@ -46,18 +46,18 @@ function source(relativePath: string): string {
  * The migration that holds the CURRENT definition of `public.apply_task_command`
  * and `private.undo_apply_task_command_fields`.
  *
- * **It must be the latest one, and keeping it at `202607260058` was a real trap.**
- * Migrations are append-only, so `202607260059` re-declares both functions with
- * `create or replace` and 0058's text is superseded the moment the chain is
- * applied. A vocabulary test pointed at 0058 reports on a body the database no
- * longer runs: it would have gone red for `2E_ACTION_NOT_ENABLED`, which Slice
+ * **It must be the latest one.** Migrations are append-only, so `202607270060`
+ * re-declares both functions with `create or replace`; every earlier body is
+ * superseded the moment the chain is applied. A vocabulary test pointed at an
+ * older migration reports on a body the database no longer runs: it would have
+ * gone red for `2E_ACTION_NOT_ENABLED`, which Slice
  * 2E.5 correctly retired but which 0058 still literally contains, and it would
  * have stayed green for the detail-free-`55P03` assertion below, whose subject
  * had moved. Whenever a later migration replaces these functions again, this
  * constant moves with it — and the assertion that every declared token is raised
  * is what makes forgetting loud.
  */
-const MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
+const MIGRATION = "supabase/migrations/202607270060_phase_2e_no_match_task_creation.sql";
 const migration = source(MIGRATION);
 
 /** Every token the migration actually raises, read out of its `raise ... detail` clauses. */

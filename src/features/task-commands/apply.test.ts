@@ -794,15 +794,15 @@ describe("the canonical patch satisfies the RPC's per-action key contract", () =
   /**
    * The migration holding the CURRENT `public.apply_task_command`.
    *
-   * `202607260059` replaced `202607260058`'s definition with `create or replace`,
-   * so 0058's text is superseded. Reading the older file left this whole block
+   * `202607270060` replaced `202607260059`'s definition with `create or replace`,
+   * so both older texts are superseded. Reading an older file leaves this block
    * asserting a taxonomy `case` the database no longer runs — and, worse, left
    * the "both destructive actions are refused" assertion below permanently green
    * against a migration that will always contain the refusal it was written to
    * observe. Whenever a later migration replaces this function again, this
    * constant moves with it.
    */
-  const MIGRATION = "supabase/migrations/202607260059_phase_2e_destructive_confirmation.sql";
+  const MIGRATION = "supabase/migrations/202607270060_phase_2e_no_match_task_creation.sql";
   const migration = readFileSync(path.resolve(process.cwd(), MIGRATION), "utf8").replace(
     /\r\n/g,
     "\n",

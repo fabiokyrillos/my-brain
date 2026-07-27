@@ -65,7 +65,7 @@ const VOCABULARIES: readonly {
  * either pinned against a declared list or deliberately exempt — a new section
  * added to `TaskCommandCopy` fails there rather than going untested.
  */
-const FREE_FORM_SECTIONS: readonly (keyof TaskCommandCopy)[] = ["values", "preview"];
+const FREE_FORM_SECTIONS: readonly (keyof TaskCommandCopy)[] = ["values", "preview", "creation"];
 
 type CopyLeaf = { readonly path: string; readonly value: string };
 

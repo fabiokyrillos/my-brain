@@ -2519,6 +2519,17 @@ export type Database = {
         }
         Returns: Json
       }
+      create_task_command: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
+      }
       element_trust_evidence: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_policies: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_scores: { Args: { p_element_trust: Json }; Returns: Json }
@@ -2566,6 +2577,17 @@ export type Database = {
           p_record_only?: boolean
         }
         Returns: string
+      }
+      issue_task_command_creation_confirmation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
       }
       issue_task_command_confirmation: {
         Args: {
@@ -2709,6 +2731,17 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      preview_task_command_creation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
       record_ai_usage: {

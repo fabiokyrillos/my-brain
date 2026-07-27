@@ -129,6 +129,14 @@ export type TaskCommandCopy = {
     ambiguousOneTitle: string;
     ambiguousOne: string;
   };
+  creation: {
+    readOnlyNotice: string;
+    confirmationRequired: string;
+    reversible: string;
+    reminderScheduled: string;
+    reminderAtCreation: string;
+    noReminder: string;
+  };
 };
 
 const ptBR: TaskCommandCopy = {
@@ -309,6 +317,14 @@ const ptBR: TaskCommandCopy = {
     ambiguousOneTitle: "É esta?",
     ambiguousOne: "Encontrei uma tarefa, mas não tenho certeza de que é esta.",
   },
+  creation: {
+    readOnlyNotice: "Nada foi criado ainda. Esta é apenas uma previsão.",
+    confirmationRequired: "A nova tarefa só será criada depois da sua confirmação explícita.",
+    reversible: "Você poderá desfazer a criação por 24 horas.",
+    reminderScheduled: "Um lembrete será agendado para esta tarefa.",
+    reminderAtCreation: "Um lembrete será agendado assim que a tarefa for criada.",
+    noReminder: "Esta tarefa não criará um lembrete.",
+  },
 };
 
 const en: TaskCommandCopy = {
@@ -475,6 +491,14 @@ const en: TaskCommandCopy = {
     oneStep: "One tap applies it.",
     ambiguousOneTitle: "Is this the one?",
     ambiguousOne: "I found one task, but I am not sure it is this one.",
+  },
+  creation: {
+    readOnlyNotice: "Nothing has been created yet. This is only a preview.",
+    confirmationRequired: "The new task will be created only after your explicit confirmation.",
+    reversible: "You will be able to undo the creation for 24 hours.",
+    reminderScheduled: "A reminder will be scheduled for this task.",
+    reminderAtCreation: "A reminder will be scheduled as soon as the task is created.",
+    noReminder: "This task will not create a reminder.",
   },
 };
 
