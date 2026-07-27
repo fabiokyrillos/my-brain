@@ -122,7 +122,12 @@ select is(
       'public.resolve_pending_question_v2(uuid, jsonb, text)',
       'public.resolve_pending_question_v3(uuid, jsonb, text)',
       'public.confirm_entry_tasks(uuid, integer[])',
-      'public.apply_task_command(uuid, text, jsonb, jsonb, text, text, text)'
+      'public.apply_task_command(uuid, text, jsonb, jsonb, text, text, text)',
+      -- Slice 2E.5. It mutates `public.task_command_confirmations`, which no
+      -- client role may write, so it carries the identical posture obligation as
+      -- the mutation RPC it authorizes and would otherwise be invisible to this
+      -- hardcoded array for the same reason `apply_task_command` was.
+      'public.issue_task_command_confirmation(uuid, text, jsonb, jsonb, text, text, text)'
     ]) as signature
     join pg_proc procedure on procedure.oid = signature::regprocedure::oid
     where not procedure.prosecdef

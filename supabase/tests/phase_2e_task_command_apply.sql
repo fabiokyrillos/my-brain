@@ -168,7 +168,15 @@ select is(
     ) as found(token)
   ),
   array[
-    '2E_ACTION_NOT_ENABLED',
+    -- Slice 2E.5 retired `2E_ACTION_NOT_ENABLED` when it enabled both destructive
+    -- verbs - with all fifteen actions resolved from the taxonomy, no reachable
+    -- state raised it any more - and added the confirmation refusal plus the two
+    -- collision tokens. This array reads `pg_get_functiondef` from the catalog, so
+    -- it describes the function `202607260059` left behind, not the one
+    -- `202607260058` declared.
+    '2E_CANDIDATE_REMATERIALIZED',
+    '2E_CONFIRMATION_REQUIRED',
+    '2E_CREATION_UNDONE',
     '2E_DUE_CONSISTENCY',
     '2E_IDEMPOTENCY_MISMATCH',
     '2E_INELIGIBLE_STATUS',
@@ -176,7 +184,7 @@ select is(
     '2E_REMINDER_INTEGRITY',
     '2E_TRANSITION_INTEGRITY'
   ],
-  'the RPC raises exactly the seven apply-path DETAIL tokens the contract declares, and no others'
+  'the RPC raises exactly the nine apply-path DETAIL tokens the contract declares, and no others'
 );
 
 -- The SQLSTATE half of the same contract. This is also the structural guard
@@ -208,8 +216,18 @@ select is(
       'g'
     ) as found(token)
   ),
-  array['2E_UNDO_REMINDER_INTEGRITY', '2E_UNDO_RESTORE_INTEGRITY'],
-  'and the two handlers raise exactly the two undo-path tokens, so compensation failures are distinguishable from apply failures'
+  array[
+    -- The two collision tokens are raised on BOTH sides on purpose: PRD
+    -- 2E-DESTRUCTIVE-009 requires the same declared code on every door into a
+    -- task that cannot come back, and `restore_task` and the cancel-undo are two
+    -- of those doors. Their presence here is therefore the requirement, not a
+    -- leak of an apply-path token into a handler.
+    '2E_CANDIDATE_REMATERIALIZED',
+    '2E_CREATION_UNDONE',
+    '2E_UNDO_REMINDER_INTEGRITY',
+    '2E_UNDO_RESTORE_INTEGRITY'
+  ],
+  'and the two handlers raise exactly the two undo-only tokens plus the two shared collision tokens'
 );
 
 -- Fixtures --------------------------------------------------------------------
@@ -839,39 +857,43 @@ select is(
   'a patch naming another owner''s project is refused with the declared code, before the reservation burns a key'
 );
 
--- The two destructive verbs are refused, not absent ---------------------------
+-- The two destructive verbs, from this file's point of view ------------------
 --
--- 2E-UPDATE-001 requires one RPC for every Phase 2E task mutation, and
--- 2E-DESTRUCTIVE-004 requires the database itself to refuse a destructive action
--- with no confirmation evidence - which does not exist until Slice 2E.5. Refusing
--- them inside the single RPC is what stops them acquiring a second write path.
+-- Slice 2E.4 asserted here that both were refused with `2E_ACTION_NOT_ENABLED`.
+-- Slice 2E.5 enabled them, and their behaviour is proven in full by
+-- `phase_2e_task_command_destructive.sql`. What stays worth asserting *here*, in
+-- the file that owns the shared mutation contract, is that enabling them did not
+-- open either of the two holes the taxonomy exists to keep shut: a cancellation
+-- with no confirmation, and a destination taken from the patch instead of from
+-- the taxonomy. Both targets are the never-mutated validation task, and both roll
+-- back.
 
 select is(
   pg_temp.taskcmd_apply(
     '61000018-1111-4111-8111-111111111111',
     'cancel_task',
-    '{}'::jsonb,
+    jsonb_build_object('status', 'cancelled'),
     pg_temp.taskcmd_new_pre_state('Tarefa de validacao', 'todo'),
     pg_temp.taskcmd_iso(now()),
     'task-command-policy-v1',
     'pgtap-2e4-refused'
   ),
-  'P0001:2E_ACTION_NOT_ENABLED',
-  'cancel_task is a declared action of the taxonomy and is refused with the declared code, not with an unknown-action error'
+  'P0001:2E_CONFIRMATION_REQUIRED',
+  'cancel_task is enabled but still unappliable without server-issued confirmation (2E-DESTRUCTIVE-004)'
 );
 
 select is(
   pg_temp.taskcmd_apply(
     '61000018-1111-4111-8111-111111111111',
     'restore_task',
-    '{}'::jsonb,
+    jsonb_build_object('status', 'in_progress'),
     pg_temp.taskcmd_new_pre_state('Tarefa de validacao', 'todo'),
     pg_temp.taskcmd_iso(now()),
     'task-command-policy-v1',
     'pgtap-2e4-refused'
   ),
-  'P0001:2E_ACTION_NOT_ENABLED',
-  'and so is restore_task, because PRD 23.4 ships cancellation''s escape with cancellation'
+  '22023:Invalid task command status',
+  'and restore_task admits its patched status only at the taxonomy''s own destination, so it cannot become a second route to any other transition'
 );
 
 -- 2E-UPDATE-003: the typed twelve-column staleness gate ------------------------
