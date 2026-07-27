@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { parsePlPgSQL } from "libpg-query";
+import { parse, parsePlPgSQL } from "libpg-query";
 import { describe, expect, it } from "vitest";
 
 const MIGRATION =
@@ -47,6 +47,59 @@ function finalDoStatement(sql: string): string {
   return sql.slice(start + 1);
 }
 
+type AstNode = Record<string, unknown>;
+
+function isAstNode(value: unknown): value is AstNode {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function collectAstNodes(value: unknown, nodeName: string, found: AstNode[] = []): AstNode[] {
+  if (Array.isArray(value)) {
+    for (const item of value) collectAstNodes(item, nodeName, found);
+    return found;
+  }
+  if (!isAstNode(value)) return found;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key === nodeName && isAstNode(child)) found.push(child);
+    collectAstNodes(child, nodeName, found);
+  }
+  return found;
+}
+
+function astString(value: unknown): string | undefined {
+  if (!isAstNode(value) || !isAstNode(value.String)) return undefined;
+  return typeof value.String.sval === "string" ? value.String.sval : undefined;
+}
+
+function securityDefiner(parsedStatement: unknown): boolean {
+  const securityOption = collectAstNodes(parsedStatement, "DefElem")
+    .find((option) => option.defname === "security");
+  if (!securityOption || !isAstNode(securityOption.arg) || !isAstNode(securityOption.arg.Boolean)) {
+    return false;
+  }
+  return securityOption.arg.Boolean.boolval === true;
+}
+
+function executableSqlQueries(parsedPlPgSql: unknown): string[] {
+  return collectAstNodes(parsedPlPgSql, "PLpgSQL_stmt_execsql").flatMap((statement) =>
+    collectAstNodes(statement, "PLpgSQL_expr")
+      .map((expression) => expression.query)
+      .filter((query): query is string => typeof query === "string"),
+  );
+}
+
+function qualifiedSpecialForms(parsedSql: unknown): string[] {
+  const specialForms = new Set(["coalesce", "nullif", "greatest", "least"]);
+
+  return collectAstNodes(parsedSql, "FuncCall").flatMap((call) => {
+    if (!Array.isArray(call.funcname)) return [];
+    const parts = call.funcname.map(astString).filter((part): part is string => part !== undefined);
+    const lastPart = parts.at(-1)?.toLowerCase();
+    return parts.length > 1 && lastPart && specialForms.has(lastPart) ? [parts.join(".")] : [];
+  });
+}
+
 describe("Slice 2E.6 forward migration contract", () => {
   const sql = source(MIGRATION);
 
@@ -61,6 +114,20 @@ describe("Slice 2E.6 forward migration contract", () => {
 
   it("parses the fail-closed post-deploy block with PostgreSQL's PL/pgSQL parser", async () => {
     await expect(parsePlPgSQL(finalDoStatement(sql))).resolves.toBeDefined();
+  });
+
+  it("keeps the registered creation undo handler security invoker", async () => {
+    const undo = functionStatement(sql, "private.undo_create_task_command(uuid, uuid)");
+
+    expect(securityDefiner(await parse(undo))).toBe(false);
+  });
+
+  it("uses SQL special forms instead of unresolved qualified calls in creation undo", async () => {
+    const undo = functionStatement(sql, "private.undo_create_task_command(uuid, uuid)");
+    const body = await parsePlPgSQL(undo);
+    const parsedQueries = await Promise.all(executableSqlQueries(body).map((query) => parse(query)));
+
+    expect(parsedQueries.flatMap(qualifiedSpecialForms)).toEqual([]);
   });
 
   it("ships one first-generation unversioned preview, issuer and creation RPC", () => {

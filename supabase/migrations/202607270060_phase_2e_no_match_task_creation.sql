@@ -2647,7 +2647,7 @@ create or replace function private.undo_create_task_command(
 )
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
@@ -2745,7 +2745,7 @@ begin
   order by reminder.id
   for update;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(reminder.id order by reminder.id),
     array[]::uuid[]
   )
