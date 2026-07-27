@@ -43,22 +43,36 @@ function titleOf(command: ValidatedTaskCommand): string | null {
   return length >= 1 && length <= 240 ? title : null;
 }
 
-export type TaskCommandNoMatchDecision =
-  | {
-      readonly outcome: "creation_offered";
-      readonly title: string;
-      readonly operationKey: string;
-      readonly policyVersion: string;
-      readonly clarificationUsed: boolean;
-      readonly terminal: false;
-    }
+type TaskCommandCreationOffered<ClarificationUsed extends boolean> = {
+  readonly outcome: "creation_offered";
+  readonly title: string;
+  readonly operationKey: string;
+  readonly policyVersion: string;
+  readonly clarificationUsed: ClarificationUsed;
+  readonly terminal: false;
+};
+
+const taskCommandNoMatchContinuationCommand: unique symbol = Symbol(
+  "TaskCommandNoMatchContinuation.command",
+);
+
+export type TaskCommandNoMatchContinuation = {
+  readonly [taskCommandNoMatchContinuationCommand]: ValidatedTaskCommand;
+};
+
+export type TaskCommandNoMatchInitialDecision =
+  | TaskCommandCreationOffered<false>
   | {
       readonly outcome: "clarification_requested";
       readonly operationKey: string;
       readonly policyVersion: string;
       readonly clarificationUsed: true;
       readonly terminal: false;
-    }
+      readonly continuation: TaskCommandNoMatchContinuation;
+    };
+
+export type TaskCommandNoMatchContinuationDecision =
+  | TaskCommandCreationOffered<true>
   | {
       readonly outcome: "still_unmatched";
       readonly operationKey: string;
@@ -67,19 +81,10 @@ export type TaskCommandNoMatchDecision =
       readonly terminal: true;
     };
 
-export type TaskCommandNoMatchContinuation = {
-  readonly command: ValidatedTaskCommand;
-  readonly clarificationUsed: true;
-};
-
-/**
- * Builds the one allowed re-match input without letting a clarification alter
- * the validated action, patch, policy version or operation key.
- */
-export function mergeTaskCommandNoMatchClarification(
+function mergeTaskCommandNoMatchClarification(
   command: ValidatedTaskCommand,
   clarification: TaskCommandTargetHints,
-): TaskCommandNoMatchContinuation {
+): ValidatedTaskCommand {
   const targetHints: TaskCommandTargetHints = {
     ...command.targetHints,
     ...(clarification.titleWords === undefined
@@ -93,16 +98,13 @@ export function mergeTaskCommandNoMatchClarification(
       ? {}
       : { temporalPhrase: clarification.temporalPhrase }),
   };
-  return {
-    command: { ...command, targetHints },
-    clarificationUsed: true,
-  };
+  return { ...command, targetHints };
 }
 
-export function decideTaskCommandNoMatch(
+function creationOffered<ClarificationUsed extends boolean>(
   command: ValidatedTaskCommand,
-  clarificationUsed: boolean,
-): TaskCommandNoMatchDecision {
+  clarificationUsed: ClarificationUsed,
+): TaskCommandCreationOffered<ClarificationUsed> | null {
   const title = titleOf(command);
   if (isTaskLikeCreationAction(command.action) && title !== null) {
     return {
@@ -114,15 +116,43 @@ export function decideTaskCommandNoMatch(
       terminal: false,
     };
   }
-  if (!clarificationUsed) {
-    return {
-      outcome: "clarification_requested",
-      operationKey: command.operationKey,
-      policyVersion: command.policyVersion,
-      clarificationUsed: true,
-      terminal: false,
-    };
-  }
+  return null;
+}
+
+export function decideInitialTaskCommandNoMatch(
+  command: ValidatedTaskCommand,
+): TaskCommandNoMatchInitialDecision {
+  const offered = creationOffered(command, false);
+  if (offered) return offered;
+
+  return {
+    outcome: "clarification_requested",
+    operationKey: command.operationKey,
+    policyVersion: command.policyVersion,
+    clarificationUsed: true,
+    terminal: false,
+    continuation: {
+      [taskCommandNoMatchContinuationCommand]: command,
+    },
+  };
+}
+
+/**
+ * Consumes the one server-side continuation state. Its result type deliberately
+ * has no clarification_requested member, so callers cannot spend the bounded
+ * clarification slot more than once by supplying a fresh boolean.
+ */
+export function continueTaskCommandNoMatch(
+  continuation: TaskCommandNoMatchContinuation,
+  clarification: TaskCommandTargetHints,
+): TaskCommandNoMatchContinuationDecision {
+  const command = mergeTaskCommandNoMatchClarification(
+    continuation[taskCommandNoMatchContinuationCommand],
+    clarification,
+  );
+  const offered = creationOffered(command, true);
+  if (offered) return offered;
+
   return {
     outcome: "still_unmatched",
     operationKey: command.operationKey,
@@ -157,7 +187,7 @@ export type TaskCommandCreationClient = {
 export function buildTaskCommandCreationPayload(
   input: TaskCommandCreationInput,
 ): PreviewArgs {
-  const decision = decideTaskCommandNoMatch(input.command, false);
+  const decision = decideInitialTaskCommandNoMatch(input.command);
   if (decision.outcome !== "creation_offered") {
     throw new TaskCommandApplyError(
       `${input.command.action} does not carry the bounded positive payload required for standalone creation`,

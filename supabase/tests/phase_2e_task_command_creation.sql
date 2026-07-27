@@ -3,7 +3,7 @@
 -- Phase 2E pgTAP file. Written in ASCII so checkout encoding cannot alter SQL.
 
 begin;
-select plan(117);
+select plan(127);
 set local timezone to 'UTC';
 
 -- Contract and security posture ---------------------------------------------
@@ -241,6 +241,10 @@ insert into public.projects (id, user_id, name) values
   ('71000102-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'Beta'),
   ('71000103-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'Twin!'),
   ('71000104-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'Twin?'),
+  ('71000106-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', '123'),
+  ('71000107-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'true'),
+  ('71000108-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'name object ref'),
+  ('71000109-1111-4111-8111-111111111111', '71111111-1111-4111-8111-111111111111', 'array ref'),
   ('71000105-2222-4222-8222-222222222222', '71222222-2222-4222-8222-222222222222', 'Other owner');
 
 insert into public.contexts (id, user_id, name) values
@@ -655,6 +659,42 @@ select is(
   ),
   '22023:2E_INVALID_RELATION',
   'another owner relation collapses to the same answer as nonexistent'
+);
+select is(
+  pg_temp.creation_try(
+    'preview', 'assign_project', array['numeric relation'],
+    '{"projectRef":123}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2e6-relation-number'
+  ),
+  '22023:2E_INVALID_RELATION',
+  'a numeric relation reference is rejected before text coercion can resolve it'
+);
+select is(
+  pg_temp.creation_try(
+    'preview', 'assign_project', array['boolean relation'],
+    '{"projectRef":true}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2e6-relation-boolean'
+  ),
+  '22023:2E_INVALID_RELATION',
+  'a boolean relation reference is rejected before text coercion can resolve it'
+);
+select is(
+  pg_temp.creation_try(
+    'preview', 'assign_project', array['object relation'],
+    '{"projectRef":{"name":"object ref"}}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2e6-relation-object'
+  ),
+  '22023:2E_INVALID_RELATION',
+  'an object relation reference is rejected before JSON text can resolve it'
+);
+select is(
+  pg_temp.creation_try(
+    'preview', 'assign_project', array['array relation'],
+    '{"projectRef":["array ref"]}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2e6-relation-array'
+  ),
+  '22023:2E_INVALID_RELATION',
+  'an array relation reference is rejected before JSON text can resolve it'
 );
 
 -- Explicit confirmation, creation, replay and provenance --------------------
@@ -1081,6 +1121,75 @@ select is(
   )),
   'P0001:2E_UNDO_REMINDER_INTEGRITY',
   'undo refuses a still-live reminder whose recorded state was edited'
+);
+
+select is(
+  pg_temp.creation_confirm_and_create(
+    'reschedule_due', array['snoozed original reminder'],
+    jsonb_build_object('dueAt', pg_temp.creation_iso(now() + interval '4 days')),
+    pg_temp.creation_iso(now()), 'pgtap-2e6-snoozed-original', 'outcome'
+  ),
+  'applied',
+  'snoozed-original undo fixture is created'
+);
+update public.reminders
+set status = 'snoozed', snoozed_until = now() + interval '1 day'
+where task_id = (
+  select id from public.tasks where operation_key = 'pgtap-2e6-snoozed-original'
+);
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2e6-snoozed-original'
+  ))::jsonb ->> 'reminders_cancelled',
+  '1',
+  'creation undo cancels its exact recorded reminder after it is snoozed'
+);
+
+select is(
+  pg_temp.creation_confirm_and_create(
+    'reschedule_due', array['extra scheduled reminder'],
+    jsonb_build_object('dueAt', pg_temp.creation_iso(now() + interval '4 days')),
+    pg_temp.creation_iso(now()), 'pgtap-2e6-extra-scheduled', 'outcome'
+  ),
+  'applied',
+  'extra-scheduled undo fixture is created'
+);
+insert into public.reminders (user_id, task_id, title, remind_at, important, status)
+select user_id, id, 'Extra scheduled reminder', now() + interval '2 days', false, 'scheduled'
+from public.tasks where operation_key = 'pgtap-2e6-extra-scheduled';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2e6-extra-scheduled'
+  )),
+  'P0001:2E_UNDO_REMINDER_INTEGRITY',
+  'creation undo refuses an additional scheduled live reminder'
+);
+
+select is(
+  pg_temp.creation_confirm_and_create(
+    'reschedule_due', array['extra snoozed reminder'],
+    jsonb_build_object('dueAt', pg_temp.creation_iso(now() + interval '4 days')),
+    pg_temp.creation_iso(now()), 'pgtap-2e6-extra-snoozed', 'outcome'
+  ),
+  'applied',
+  'extra-snoozed undo fixture is created'
+);
+insert into public.reminders (
+  user_id, task_id, title, remind_at, important, status, snoozed_until
+)
+select
+  user_id, id, 'Extra snoozed reminder', now() + interval '2 days',
+  false, 'snoozed', now() + interval '3 days'
+from public.tasks where operation_key = 'pgtap-2e6-extra-snoozed';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2e6-extra-snoozed'
+  )),
+  'P0001:2E_UNDO_REMINDER_INTEGRITY',
+  'creation undo refuses an additional snoozed live reminder'
 );
 
 -- Cancel/creation-undo collision and every resurrection door ----------------

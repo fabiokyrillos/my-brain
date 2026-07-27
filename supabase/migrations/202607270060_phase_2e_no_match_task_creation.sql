@@ -74,6 +74,7 @@ declare
   planned_at timestamptz;
   manual_priority text;
   relation_type text;
+  relation_key text;
   relation_reference text;
   relation_id uuid;
   relation_name text;
@@ -184,11 +185,16 @@ begin
       when 'assign_context' then 'context'
       else 'person'
     end;
-    relation_reference := case relation_type
-      when 'project' then p_patch ->> 'projectRef'
-      when 'context' then p_patch ->> 'contextRef'
-      else p_patch ->> 'personRef'
+    relation_key := case relation_type
+      when 'project' then 'projectRef'
+      when 'context' then 'contextRef'
+      else 'personRef'
     end;
+    if pg_catalog.jsonb_typeof(p_patch -> relation_key) is distinct from 'string' then
+      raise exception 'Relation reference did not resolve'
+        using errcode = '22023', detail = '2E_INVALID_RELATION';
+    end if;
+    relation_reference := p_patch ->> relation_key;
     if relation_reference is null
       or pg_catalog.btrim(relation_reference) = ''
       or pg_catalog.char_length(relation_reference) > case relation_type
@@ -2650,6 +2656,7 @@ declare
   current_relations jsonb;
   reminder_evidence jsonb;
   reminder_row public.reminders%rowtype;
+  live_reminder_ids uuid[] := array[]::uuid[];
   legitimate_cancel boolean := false;
   affected integer := 0;
   reminder_cancelled integer := 0;
@@ -2724,6 +2731,28 @@ begin
   end if;
 
   reminder_evidence := operation.after_state -> 'reminder_state';
+
+  -- The task row is already locked. Lock every existing reminder row next in
+  -- deterministic id order, then derive the complete live set. The task lock
+  -- blocks FK-backed inserts while these row locks prevent a non-live reminder
+  -- from being concurrently changed to snoozed during reconciliation.
+  perform reminder.id
+  from public.reminders as reminder
+  where reminder.user_id = p_user_id
+    and reminder.task_id = target_task.id
+  order by reminder.id
+  for update;
+
+  select pg_catalog.coalesce(
+    pg_catalog.array_agg(reminder.id order by reminder.id),
+    array[]::uuid[]
+  )
+  into live_reminder_ids
+  from public.reminders as reminder
+  where reminder.user_id = p_user_id
+    and reminder.task_id = target_task.id
+    and reminder.status in ('scheduled', 'snoozed');
+
   if reminder_evidence is not null and pg_catalog.jsonb_typeof(reminder_evidence) <> 'null' then
     select reminder.*
     into reminder_row
@@ -2736,31 +2765,30 @@ begin
       raise exception 'Task creation undo reminder integrity check failed'
         using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
     end if;
-    if reminder_row.status = 'scheduled' then
+    if reminder_row.status in ('scheduled', 'snoozed') then
       if reminder_row.title is distinct from reminder_evidence ->> 'title'
         or reminder_row.remind_at is distinct from (reminder_evidence ->> 'remindAt')::timestamptz
         or reminder_row.important is distinct from
           (reminder_evidence ->> 'important')::boolean
+        or live_reminder_ids is distinct from array[reminder_row.id]
       then
         raise exception 'Task creation undo reminder integrity check failed'
           using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
       end if;
       update public.reminders
       set status = 'cancelled', updated_at = pg_catalog.now()
-      where id = reminder_row.id and status = 'scheduled';
+      where id = reminder_row.id
+        and status in ('scheduled', 'snoozed');
       get diagnostics reminder_cancelled = row_count;
       if reminder_cancelled <> 1 then
         raise exception 'Task creation undo reminder integrity check failed'
           using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
       end if;
+    elsif pg_catalog.cardinality(live_reminder_ids) <> 0 then
+      raise exception 'Task creation undo reminder integrity check failed'
+        using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
     end if;
-  elsif exists (
-    select 1
-    from public.reminders as reminder
-    where reminder.user_id = p_user_id
-      and reminder.task_id = target_task.id
-      and reminder.status = 'scheduled'
-  ) then
+  elsif pg_catalog.cardinality(live_reminder_ids) <> 0 then
     raise exception 'Task creation undo reminder integrity check failed'
       using errcode = 'P0001', detail = '2E_UNDO_REMINDER_INTEGRITY';
   end if;

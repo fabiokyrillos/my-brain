@@ -127,6 +127,37 @@ describe("Slice 2E.6 forward migration contract", () => {
     expect(sql).toContain("create_due_task_reminder");
   });
 
+  it("requires a JSON string before extracting any relation reference", () => {
+    const payload = functionBody(
+      sql,
+      "private.task_command_creation_payload(uuid, text, text[], jsonb, text)",
+    );
+    const typeGate = payload.indexOf(
+      "pg_catalog.jsonb_typeof(p_patch -> relation_key) is distinct from 'string'",
+    );
+    const extraction = payload.indexOf("relation_reference := p_patch ->> relation_key");
+
+    expect(typeGate).toBeGreaterThan(0);
+    expect(extraction).toBeGreaterThan(typeGate);
+  });
+
+  it("locks the complete scheduled-or-snoozed reminder set before reconciling creation undo", () => {
+    const undo = functionBody(sql, "private.undo_create_task_command(uuid, uuid)");
+    const reminderSetLock = undo.indexOf("perform reminder.id");
+    const lock = undo.indexOf("for update", reminderSetLock);
+    const liveSet = undo.indexOf("status in ('scheduled', 'snoozed')");
+    const exactCancellation = undo.search(
+      /where id = reminder_row\.id\s+and status in \('scheduled', 'snoozed'\)/,
+    );
+
+    expect(reminderSetLock).toBeGreaterThan(0);
+    expect(lock).toBeGreaterThan(reminderSetLock);
+    expect(liveSet).toBeGreaterThan(lock);
+    expect(undo).toContain("live_reminder_ids");
+    expect(undo).toContain("array[reminder_row.id]");
+    expect(exactCancellation).toBeGreaterThan(lock);
+  });
+
   it("uses only the already-declared reachable 2E detail vocabulary", () => {
     const found = [...sql.matchAll(/detail = '([A-Z0-9_]+)'/g)]
       .map((match) => match[1])
@@ -183,7 +214,7 @@ describe("Slice 2E.6 forward migration contract", () => {
     const assertions =
       pgtap.match(/^select (?:has_function|is|ok|has_trigger|col_is_null|results_eq)\(/gm) ?? [];
 
-    expect(plan).toBe(117);
+    expect(plan).toBe(127);
     expect(assertions).toHaveLength(plan);
   });
 });

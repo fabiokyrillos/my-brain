@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Locale } from "@/lib/preferences";
 
@@ -6,13 +6,14 @@ import { TaskCommandApplyError } from "./apply";
 import {
   TASK_LIKE_CREATION_ACTIONS,
   buildTaskCommandCreationPayload,
+  continueTaskCommandNoMatch,
   createTaskCommand,
-  decideTaskCommandNoMatch,
+  decideInitialTaskCommandNoMatch,
   issueTaskCommandCreationConfirmation,
-  mergeTaskCommandNoMatchClarification,
   previewTaskCommandCreation,
   type TaskCommandCreationClient,
   type TaskCommandCreationInput,
+  type TaskCommandNoMatchContinuation,
 } from "./creation";
 import type { ValidatedTaskCommand } from "./schema";
 import type { TaskCommandAction, TaskCommandPatchField } from "./taxonomy";
@@ -92,9 +93,8 @@ describe("deterministic no-match classification (2E-NOMATCH-001..003, 008)", () 
   it.each(TASK_LIKE_CREATION_ACTIONS)(
     "offers creation for %s and derives the title by trimming words and joining one space",
     (action) => {
-      const decision = decideTaskCommandNoMatch(
+      const decision = decideInitialTaskCommandNoMatch(
         command(action, { targetHints: { titleWords: ["  book", "the  ", " flights "] } }),
-        false,
       );
 
       expect(decision).toEqual({
@@ -118,11 +118,8 @@ describe("deterministic no-match classification (2E-NOMATCH-001..003, 008)", () 
     const mutableTargetHints =
       targetHints === undefined ? undefined : { titleWords: [...targetHints.titleWords] };
     expect(
-      decideTaskCommandNoMatch(
-        command(action, { targetHints: mutableTargetHints }),
-        false,
-      ),
-    ).toEqual({
+      decideInitialTaskCommandNoMatch(command(action, { targetHints: mutableTargetHints })),
+    ).toMatchObject({
       outcome: "clarification_requested",
       operationKey: OPERATION_KEY,
       policyVersion: "task-match-v1",
@@ -131,19 +128,42 @@ describe("deterministic no-match classification (2E-NOMATCH-001..003, 008)", () 
     });
   });
 
-  it("makes the second no-match terminal under the same operation key and policy version", () => {
-    expect(decideTaskCommandNoMatch(command("rename_task"), true)).toEqual({
+  it("makes the continuation no-match terminal without exposing a second clarification branch", () => {
+    const initial = decideInitialTaskCommandNoMatch(command("rename_task"));
+    if (initial.outcome !== "clarification_requested") {
+      throw new Error(`expected clarification_requested, received ${initial.outcome}`);
+    }
+
+    const decision = continueTaskCommandNoMatch(initial.continuation, {
+      titleWords: ["renamed report"],
+    });
+
+    expect(decision).toEqual({
       outcome: "still_unmatched",
       operationKey: OPERATION_KEY,
       policyVersion: "task-match-v1",
       clarificationUsed: true,
       terminal: true,
     });
+    expectTypeOf(decision.outcome).toEqualTypeOf<"creation_offered" | "still_unmatched">();
   });
 
-  it("preserves that clarification was used when the merged command becomes task-like", () => {
-    expect(decideTaskCommandNoMatch(command("set_priority"), true)).toMatchObject({
+  it("preserves that clarification was used when the opaque continuation becomes task-like", () => {
+    const initial = decideInitialTaskCommandNoMatch(
+      command("set_priority", { targetHints: { project: "Acme" } }),
+    );
+    if (initial.outcome !== "clarification_requested") {
+      throw new Error(`expected clarification_requested, received ${initial.outcome}`);
+    }
+
+    expect(
+      continueTaskCommandNoMatch(initial.continuation, {
+        titleWords: ["book", "flights"],
+        context: "Office",
+      }),
+    ).toMatchObject({
       outcome: "creation_offered",
+      title: "book flights",
       operationKey: OPERATION_KEY,
       policyVersion: "task-match-v1",
       clarificationUsed: true,
@@ -151,28 +171,14 @@ describe("deterministic no-match classification (2E-NOMATCH-001..003, 008)", () 
     });
   });
 
-  it("merges only validated target hints while preserving the original command identity", () => {
-    const original = command("reschedule_due", {
-      targetHints: { project: "Acme" },
-    });
+  it("requires the initial decision's opaque continuation instead of a caller-controlled boolean", () => {
+    expectTypeOf<Parameters<typeof continueTaskCommandNoMatch>[0]>()
+      .toEqualTypeOf<TaskCommandNoMatchContinuation>();
 
-    const continuation = mergeTaskCommandNoMatchClarification(original, {
-      titleWords: ["book", "flights"],
-      context: "Office",
-    });
-
-    expect(continuation).toEqual({
-      command: {
-        ...original,
-        targetHints: {
-          project: "Acme",
-          titleWords: ["book", "flights"],
-          context: "Office",
-        },
-      },
-      clarificationUsed: true,
-    });
-    expect(original.targetHints).toEqual({ project: "Acme" });
+    if (false) {
+      // @ts-expect-error A validated command cannot forge the opaque continuation state.
+      continueTaskCommandNoMatch(command("set_priority"), { titleWords: ["book flights"] });
+    }
   });
 });
 

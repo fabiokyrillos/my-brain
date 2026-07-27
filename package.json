@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:online": "node scripts/online-playwright.mjs",
+    "test:local:2e:creation-race": "node scripts/local-task-command-creation-race.mjs",
     "test:remote:interpretations": "node scripts/remote-interpretation-revisions-smoke.mjs",
     "test:remote:jobs": "node scripts/remote-job-reliability-smoke.mjs",
     "test:remote:entry-processing": "node scripts/remote-entry-processing-smoke.mjs",
