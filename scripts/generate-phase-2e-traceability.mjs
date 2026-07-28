@@ -170,21 +170,32 @@ const evidenceByFamily = {
   },
 };
 
-// Requirements whose status at closeout is anything other than "complete". Every entry
-// here is repeated in the phase report's deferred-work section — this map is the single
+// Requirements NOT delivered by Phase 2E. Every entry is repeated with the same
+// justification in the phase report's deferred-work section — this map is the single
 // place the matrix and the report agree, and an entry with no justification is a bug.
-const statusOverrides = {
+//
+// The distinction from `deliveredWithNote` below is the headline count, so it is drawn
+// on the requirement's own text rather than on how satisfying the outcome feels.
+const notDelivered = {
   "2E-COMMAND-012":
-    "deferred to Phase 2F — reclassified in PRD revision 4. Prompt and strategy versions travel on the command session and are pinned as build constants by task-command-contract.test.ts, but no Phase 2E RPC and no ai_usage_events column persists them. Closing it literally requires changing record_ai_usage's signature, which is shared by every AI path in the product and pinned by two ::regprocedure casts and a has_function array in pgTAP. Attribution today is by ai_usage_events.created_at joined to the deploy history",
-  "2E-MATCH-018":
-    "complete, with its scope stated — the baseline measures the scoring layer against declared SQL verdicts, not end-to-end matching, because the corpus supplies prefilterTier/tokenOverlap/queryTokenCount by hand. Transcribed into the phase report with that caveat attached",
+    "NOT DELIVERED — reclassified to Phase 2F in PRD revision 4 (ADR-053). Prompt and strategy versions travel on the command session and are pinned as build constants by task-command-contract.test.ts, but no Phase 2E RPC and no ai_usage_events column persists them. Closing it requires drop-and-recreate of apply_task_command (~1,460 lines), create_task_command, or record_ai_usage — the last shared by every AI path in the product and pinned by two ::regprocedure casts and a has_function array across two pgTAP files. Attribution today is by ai_usage_events.created_at joined to the deploy history",
   "2E-OWNERSHIP-004":
-    "database half complete (pgTAP proves cross-owner denial from zero); the disposable two-owner remote smoke is written and blocked on deployment authorization",
+    "NOT DELIVERED — half of it is. The database half is proven (pgTAP shows cross-owner denial from an empty database in CI); the disposable two-owner remote smoke the requirement also names is written and blocked on deployment authorization",
   "2E-OPERATIONS-003":
-    "specified and partly written; blocked on deployment authorization. No Phase 2E RPC exists in the linked project",
+    "NOT DELIVERED — blocked on deployment authorization. The requirement asks for a focused disposable remote smoke per slice; no Phase 2E RPC exists in the linked project, so none can run",
   "2E-OPERATIONS-004":
-    "aggregate smoke written to be drain-safe and deterministic; blocked on deployment authorization",
+    "NOT DELIVERED — blocked on deployment authorization. The aggregate smoke is written and drain-safe by construction (it creates no entries, so it never competes with the interpretation drain) and its preflight refuses correctly today, but it has never executed its assertions",
 };
+
+// Delivered, with a scope the reader must carry forward. Counted as delivered, because
+// the requirement's own text is satisfied — recording it here rather than silently is
+// what stops a Phase 2F comparison being made against the wrong thing.
+const deliveredWithNote = {
+  "2E-MATCH-018":
+    "delivered, with its measurement scope stated: the baseline covers the scoring layer against declared SQL verdicts, not end-to-end matching, because the corpus supplies prefilterTier/tokenOverlap/queryTokenCount by hand. A sibling assertion proves every hand-written triple is one list_task_command_candidates could actually produce, so the rates are not measured over impossible inputs. Any Phase 2F comparison must use this scope or re-measure",
+};
+
+const statusOverrides = { ...notDelivered, ...deliveredWithNote };
 
 const requirementPattern = /^- \*\*(2E-[A-Z0-9]+-\d{3}):\*\*\s*(.+)$/gm;
 const requirements = [...prd.matchAll(requirementPattern)].map((match) => ({
@@ -285,7 +296,9 @@ function requirementRow({ id, description, family }) {
   return `| \`${id}\` | ${escapeCell(description)} | ${escapeCell(evidence.slice)} | ${escapeCell(evidence.artifacts)} | ${escapeCell(evidence.local)} | ${escapeCell(evidence.remote)} | ${escapeCell(status)} |`;
 }
 
-const overriddenCount = Object.keys(statusOverrides).length;
+const notDeliveredCount = Object.keys(notDelivered).length;
+const notedCount = Object.keys(deliveredWithNote).length;
+const deliveredCount = requirements.length - notDeliveredCount;
 const totalRows = requirements.length + epics.length + globalGates.length;
 
 const matrix = [
@@ -297,7 +310,9 @@ const matrix = [
   "",
   `The generator fails closed if the PRD inventory is not exactly ${requirements.length} functional IDs with the expected per-family counts, ${epics.length} epic-acceptance bullets, and ${globalGates.length} global gates; if any family lacks an evidence mapping; or if a status override names an ID the PRD does not declare.`,
   "",
-  `**${requirements.length - overriddenCount} requirements are complete. ${overriddenCount} carry a status other than "complete", and every one of them is repeated with the same justification in \`PHASE_2E_FINAL_REPORT.md\`.** One is a deliberate scope reclassification (\`2E-COMMAND-012\`, PRD revision 4); the other four are blocked on deployment authorization and on nothing else — the code and the specifications exist, and the linked project is at migration \`202607250054\` while the phase ends at \`202607280061\`.`,
+  `**${deliveredCount} of ${requirements.length} requirements are delivered. ${notDeliveredCount} are not**, and every one of them is repeated with the same justification in \`PHASE_2E_FINAL_REPORT.md\` §7. One is a deliberate reclassification to Phase 2F (\`2E-COMMAND-012\`, PRD revision 4, ADR-053); the other three are blocked on deployment authorization and on nothing else — the code and the specifications exist, and the linked project is at migration \`202607250054\` while the phase ends at \`202607280061\`.`,
+  "",
+  `A further ${notedCount} requirement is delivered but carries a scope note the reader must carry forward (\`2E-MATCH-018\`). It is counted as delivered because its own text is satisfied; the note exists so a Phase 2F comparison is not made against the wrong measurement.`,
   "",
   "Nothing in this phase is merged, deployed, tagged or released. This matrix describes a branch.",
   "",
@@ -329,5 +344,5 @@ writeFileSync(outputPath, matrix, "utf8");
 console.log(
   `Wrote ${outputPath} with ${totalRows} traceability rows `
   + `(${requirements.length} requirements, ${epics.length} epics, ${globalGates.length} global gates; `
-  + `${overriddenCount} non-complete statuses).`,
+  + `${deliveredCount} delivered, ${notDeliveredCount} not delivered, ${notedCount} delivered with a scope note).`,
 );

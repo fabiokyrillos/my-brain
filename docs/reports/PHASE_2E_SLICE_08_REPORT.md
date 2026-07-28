@@ -112,10 +112,12 @@ See `PHASE_2E_FINAL_REPORT.md` §6 for the full picture. Local gate results for 
 
 ## 8. Requirements this slice discharges
 
+Phase 2E closes with **118 of 122 requirements delivered and 4 not delivered.**
+
 - **Fully:** `2E-OPERATIONS-001`, `2E-OPERATIONS-002`, `2E-OPERATIONS-005`, and Epic 2E-H's convergence, traceability, cleanup-verifier and permanent-documentation obligations.
-- **Measured and transcribed:** `2E-MATCH-018`, with its scope caveat carried into the phase report rather than dropped.
+- **Measured and transcribed, counted as delivered:** `2E-MATCH-018`. Its own text asks for a baseline measured over a committed corpus and recorded in the phase report, and that is what exists; the scoping caveat travels with the number rather than downgrading it.
 - **Reclassified, not delivered:** `2E-COMMAND-012` (§5).
-- **Written and blocked on deployment:** `2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half.
+- **Not delivered, blocked on deployment:** `2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half.
 - **Repaired by the audit:** `2E-COMMAND-004` and PRD §10.4's versioning rule, at the vocabulary layer where they were silently unenforced (§3).
 
 ## 9. Open items after this slice

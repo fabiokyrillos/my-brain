@@ -4,7 +4,7 @@
 
 **The phase report is `PHASE_2E_FINAL_REPORT.md`, and it supersedes this file for anything about the phase as a whole.** This file remains the session-to-session handoff and is authoritative only for *where the work stands*.
 
-**117 of 122 requirements are complete.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half and `2E-MATCH-018`'s end-to-end scope are blocked on deployment authorization and on nothing else. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
+**118 of 122 requirements are delivered; four are not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half are blocked on deployment authorization and on nothing else. `2E-MATCH-018` is delivered with a scope note rather than counted against the phase, because its own text is satisfied. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
 
 **PR #18 is READY FOR REVIEW.**
 

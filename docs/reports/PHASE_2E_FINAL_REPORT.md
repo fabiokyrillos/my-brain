@@ -14,8 +14,9 @@
 | Deployed | **no** — remote migration parity is `202607250054`; the phase ends at `202607280061` |
 | Tagged / released | **no** — the last release is `phase-2d-complete` |
 | Requirement inventory | 122 functional IDs across 16 families, 8 epic acceptance criteria, 5 global gates |
-| Requirements complete | 117 of 122 |
-| Requirements not complete | 5 — one deliberate reclassification, four blocked on deployment authorization and nothing else |
+| Requirements delivered | **118 of 122** |
+| Requirements not delivered | **4** — one deliberate reclassification to Phase 2F (`2E-COMMAND-012`), three blocked on deployment authorization and nothing else (`2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half) |
+| Delivered with a scope note | 1 — `2E-MATCH-018`. Counted as delivered because its own text is satisfied; the note (§3) exists so a Phase 2F comparison is not made against the wrong measurement |
 
 **Read this line before any other claim in this document.** Phase 2E is complete *as a branch*. It has never run against the linked project, no user has ever typed a command into it, and every online journey named in Epic 2E-G's acceptance is blocked on a deployment that has not been authorized. Everything below distinguishes what is proven from what is merely written.
 
@@ -115,17 +116,23 @@ Why it is deferred rather than done: discharging it literally means changing the
 
 Residual risk, stated plainly: if a prompt change ships and a bad command lands, attribution requires joining `ai_usage_events.created_at` to the deploy history rather than reading a column. That is weaker than the requirement intends and is the reason this is recorded as deferred rather than satisfied.
 
-### 7.2 Blocked on deployment authorization, and on nothing else
+### 7.2 Not delivered, blocked on deployment authorization and on nothing else
 
 Deployment of migrations `202607250055`–`202607280061` to the linked project is the single gate. The code exists; the specifications exist.
 
-1. **Every authenticated online journey for Epic 2E-G.** Typing a command, resolving a disambiguation, confirming a cancellation, creating from a no-match, undoing, restoring from the recovery page. The credential-free route/auth/locale journeys do run in CI.
-2. **`2E-OPERATIONS-003`** — the focused per-slice disposable remote smokes. None can run; no Phase 2E RPC exists remotely.
-3. **`2E-OPERATIONS-004`** — the aggregate remote smoke. Written, wired to `npm run test:remote:2e`, drain-safe by construction (it creates no entries, so it never competes with the `pg_cron`/`pg_net` interpretation drain), two-owner, fail-closed on cleanup. Its preflight runs today and correctly refuses.
-4. **`2E-OWNERSHIP-004`'s remote half** — the disposable two-owner cross-owner-denial proof. The database half is proven by pgTAP from an empty database in CI.
-5. **`2E-MATCH-018` end-to-end baseline.** The measured baseline is scoped to the scoring layer (§3). An end-to-end corpus needs a database.
+1. **`2E-OPERATIONS-003`** — the focused per-slice disposable remote smokes. None can run; no Phase 2E RPC exists remotely.
+2. **`2E-OPERATIONS-004`** — the aggregate remote smoke. Written, wired to `npm run test:remote:2e`, drain-safe by construction (it creates no entries, so it never competes with the `pg_cron`/`pg_net` interpretation drain), two-owner, fail-closed on cleanup. Its preflight runs today and correctly refuses.
+3. **`2E-OWNERSHIP-004`'s remote half** — the disposable two-owner cross-owner-denial proof. The requirement names database tests *and* a remote smoke; the database half is proven by pgTAP from an empty database in CI, so half of it stands.
 
-### 7.3 Known limitations, disclosed rather than hidden
+### 7.3 Delivered, but the reader must carry the scope
+
+- **`2E-MATCH-018`.** The baseline is measured, committed and transcribed into §3, which is what the requirement asks for — so it is counted as delivered rather than held against the phase. Its scope is the **scoring layer against declared SQL verdicts**, not end-to-end matching. An end-to-end corpus needs a database and therefore needs deployment. Any Phase 2F semantic comparison must use this scope or re-measure; comparing a future end-to-end number against these rates would be comparing two different things.
+
+### 7.4 Blocked on deployment, but not a requirement of their own
+
+- **Every authenticated online journey for Epic 2E-G.** Typing a command, resolving a disambiguation, confirming a cancellation, creating from a no-match, undoing, restoring from the recovery page. These are acceptance evidence for requirements already delivered in code, not separate requirements. The credential-free route/auth/locale journeys do run in CI.
+
+### 7.5 Known limitations, disclosed rather than hidden
 
 - **The `restore_task` recovery path depends on the task being ranked by its own title.** The cancelled-task listing renders the title and builds the restore command from it, so an exact-title tier-0 match is near-certain — but a user with more than 25 cancelled tasks sharing one title could see a stale-shell preview instead of a restore. `hasMore` already tells the user the list is truncated.
 - **Write-path consolidation is deferred by design** (PRD §5, §16.4, §23.3). `applyWorkItemAction`/`createRecord` still write `public.tasks` directly and `authenticated` retains those grants. Phase 2E guarantees *its* mutations are validated, audited and undoable; it does not close the pre-existing direct-write path. Recorded in `docs/TODO.md`.
@@ -196,6 +203,8 @@ What *is* recorded, in the slice reports and `STATE.md`, are the refutations tha
 
 ## 14. Verdict
 
-Every Phase 2E requirement is implemented, intentionally deferred with a written justification, or blocked only by deployment authorization. The convergence audit found three real defects and they are fixed. The closeout tooling exists, and two of its three pieces were executed against the live linked project rather than merely written.
+**118 of 122 requirements are delivered.** Of the four that are not, one is a deliberate reclassification to Phase 2F with its reasoning and residual risk recorded in four places (ADR-053), and three are blocked on deployment authorization and on nothing else. Every Phase 2E requirement is therefore implemented, intentionally deferred with a written justification, or blocked only by deployment authorization.
+
+The convergence audit found three real defects and they are fixed. The closeout tooling exists, and two of its three pieces were executed against the live linked project rather than merely written — which is how one of them was found to be broken.
 
 Phase 2E is complete as a branch. It is not merged, not deployed, not tagged and not released, and the next action is a human decision about authorization — not more engineering.
