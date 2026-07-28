@@ -377,7 +377,44 @@ try {
   assert(expectedEventNames.every((name) => counts[name] >= 1), "Funnel count query found a missing canonical event");
   assert(durations.length >= 4 && durations.every((value) => value >= 0 && value <= 86_400_000), "Latency query found an invalid duration");
   assert(verificationEvents.every((event) => event.is_synthetic === true), "Disposable smoke traffic was not uniformly synthetic");
-  assert(!/original|summary|title|answer|prompt|error/i.test(JSON.stringify(verificationEvents.map((event) => event.properties))), "Verification query exposed a forbidden free-content property");
+  // 2E-ANALYTICS-003: no product event carries user-authored content.
+  //
+  // This was a substring match for `original|summary|title|answer|prompt|error`
+  // over the whole properties blob, and Phase 2E made it fail on its own payload:
+  // line 106 above records `signalCategories: ["normalized_exact_title", …]`, a
+  // member of the closed `taskMatchEvidenceLabels` vocabulary in `contracts.ts`. The
+  // *label's name* contains "title"; the label carries no content whatsoever. The
+  // check could not tell a category from the thing it categorizes.
+  //
+  // Replacing it with a shape test is stricter, not looser, in the direction that
+  // matters. The old form missed every leak that avoided those six words — a raw
+  // title of "Buy milk" passed it cleanly. Every declared property value is a
+  // boolean, a number, or an identifier-shaped string: a category label, an enum
+  // member, a policy version, an instant. User prose has whitespace and runs long.
+  // So whitespace or length is the discriminator, and it needs no vocabulary
+  // restatement to stay correct as the taxonomy grows — which is the same drift
+  // that produced this failure in the first place.
+  //
+  // The key check is kept as-is: a property *named* `title` or `originalContent`
+  // would be a contract defect regardless of what it happened to hold.
+  const freeContentFindings = [];
+  for (const event of verificationEvents) {
+    for (const [key, value] of Object.entries(event.properties ?? {})) {
+      if (/original|summary|title|answer|prompt|error/i.test(key)) {
+        freeContentFindings.push(`${event.event_name}: property named "${key}"`);
+      }
+      for (const item of Array.isArray(value) ? value : [value]) {
+        if (typeof item !== "string") continue;
+        if (/\s/.test(item) || item.length > 64) {
+          freeContentFindings.push(`${event.event_name}.${key} = ${JSON.stringify(item)}`);
+        }
+      }
+    }
+  }
+  assert(
+    freeContentFindings.length === 0,
+    `Verification query exposed a forbidden free-content property: ${freeContentFindings.join("; ")}`,
+  );
 
   console.log("Remote product-events smoke passed:", {
     taxonomyEvents: expectedEventNames.length,
