@@ -181,6 +181,15 @@ matters — the new route answers identically to an existing one — rather than
 cannot pass by accident if that contract is ever deliberately changed. Migrations, pgTAP and database
 lint were green on that same run.
 
+**A pre-existing test is flaky under CI load, and it is not this slice's.** The docs-only closeout
+commit `7a3e4a5` — which changes two markdown files and no source — failed the `application` job on
+`src/features/tasks/task-candidate-form.test.tsx` ("Unable to find an accessible element with the
+role button and name *Resolver 2 sugestões*"). That file contains **zero** references to task-command
+code, it passes 3/3 locally, and re-running the same job on the same SHA is green on all three jobs.
+It is recorded here rather than left for the next session to rediscover: the failure is a timing
+sensitivity in a Phase 2C component test, not a Phase 2E regression, and it is a real (if minor)
+maintenance item for Slice 2E.8 or later.
+
 ## 8. Requirements this slice discharges
 
 - **Fully:** `2E-UX-002`, `2E-A11Y-001`, `2E-A11Y-002`, `2E-A11Y-003`, `2E-A11Y-004`,
@@ -217,7 +226,10 @@ to make. It is Slice 2E.8's, and is listed in §9.
    is essentially certain — but a user with more than 25 cancelled tasks sharing one title could see
    a stale-shell preview instead. Disclosed rather than hidden; `hasMore` already tells the user the
    list is truncated.
-6. **Draft PR #18 remains open and unmerged.** Nothing was deployed, tagged or released.
+6. **`src/features/tasks/task-candidate-form.test.tsx` is flaky under CI load** — a Phase 2C
+   component test, unrelated to this slice, that failed once on a docs-only commit and passed on
+   re-run. Worth fixing; not this slice's to fix.
+7. **Draft PR #18 remains open and unmerged.** Nothing was deployed, tagged or released.
 
 ## 10. Continuation point for Slice 2E.8
 

@@ -166,6 +166,15 @@ to the proxy at all. Migrations, pgTAP and database lint were green on that same
 now pins the invariant that matters — the new route answers identically to an existing one — rather
 than a status literal.
 
+**A pre-existing test is flaky under CI load, and it is not this slice's.** The docs-only closeout
+commit `7a3e4a5` — which changes two markdown files and no source — failed the `application` job on
+`src/features/tasks/task-candidate-form.test.tsx` ("Unable to find an accessible element with the
+role button and name *Resolver 2 sugestões*"). That file contains **zero** references to task-command
+code, it passes 3/3 locally, and re-running the same job on the same SHA is green on all three jobs.
+It is recorded here rather than left for the next session to rediscover: the failure is a timing
+sensitivity in a Phase 2C component test, not a Phase 2E regression, and it is a real (if minor)
+maintenance item for Slice 2E.8 or later.
+
 ## Open items after accepted Slice 2E.7
 
 1. **No deployment occurred.** The linked project remains at migration `202607250054`, so every
