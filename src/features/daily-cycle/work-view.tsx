@@ -4,6 +4,9 @@ import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
 import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { runTaskCommand } from "@/features/task-commands/actions";
+import { CommandConsole } from "@/features/task-commands/command-console";
+import { getTaskCommandCopy } from "@/features/task-commands/copy";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
 import { workViews, type WorkViewId } from "./work-projection";
@@ -71,7 +74,18 @@ export function WorkView({
         {text.views[candidate].label}
       </Link>)}
     </nav>
+    <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
     <TaskList emptyHint={active.empty} locale={locale} tasks={items} timezone={timezone} />
+    {/*
+      2E-DESTRUCTIVE-006's explicit affordance. It lives here rather than in the
+      navigation because `capabilities.ts`'s `nested: true` drives active-state
+      highlighting only — links render from `primaryNavigationKeys` and
+      `moreNavigationGroups`, so a nested route with no link of its own is
+      reachable only by typing the URL.
+    */}
+    <Link className="task-command-recovery-link" href={`/${locale}/app/work/cancelled`}>
+      {getTaskCommandCopy(locale).recovery.entryPoint}
+    </Link>
     <PaginationLinks
       locale={locale}
       path="work"

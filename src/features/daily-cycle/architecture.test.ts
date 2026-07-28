@@ -81,6 +81,58 @@ const surfaces: Surface[] = [
       /from\s*["']@\/features\/daily-cycle\/technical-details-projection["']/,
     ],
   },
+  /*
+   * Phase 2E Slice 2E.7. The same boundary, applied to the command surfaces:
+   * a component reads a projection and localized copy, never a row and never a
+   * locale ternary. `ADR-036` and 2E-I18N-001 make the second one explicit —
+   * "no locale ternaries in components" — and a regex is the only thing that
+   * notices a `locale === "pt-BR" ? … : …` creeping back in.
+   */
+  {
+    label: "Task command console",
+    filePath: "src/features/task-commands/command-console.tsx",
+    forbidden: [
+      /database\.types/i,
+      /from\s*["']@\/lib\/supabase/,
+      /\.from\(\s*["']/,
+      /locale\s*===\s*["']pt-BR["']/,
+    ],
+    required: [
+      /from\s*["']\.\/copy["']/,
+      // The state arrives already decided; the component renders `control`
+      // rather than re-deriving it from the preview's disposition.
+      /state\.control/,
+    ],
+  },
+  {
+    label: "Cancelled-task recovery view",
+    filePath: "src/features/task-commands/cancelled-tasks-view.tsx",
+    forbidden: [
+      /database\.types/i,
+      /from\s*["']@\/lib\/supabase/,
+      /\.from\(\s*["']/,
+      /locale\s*===\s*["']pt-BR["']/,
+    ],
+    required: [
+      /from\s*["']\.\/copy["']/,
+      /from\s*["']\.\/recovery["']/,
+    ],
+  },
+  {
+    label: "Cancelled-task recovery page",
+    filePath: "src/app/[locale]/app/work/cancelled/page.tsx",
+    forbidden: [
+      /database\.types/i,
+      // The listing goes through `list_task_command_candidates`, which is where
+      // the creation-undone guard of 2E-DESTRUCTIVE-009 lives. A direct read of
+      // `tasks` here would be a second door into a task that guard closes.
+      /\.from\(\s*["']tasks["']\s*\)/,
+      /status\s*===\s*["']cancelled["']/,
+    ],
+    required: [
+      /from\s*["']@\/features\/task-commands\/recovery["']/,
+    ],
+  },
 ];
 
 describe("daily-cycle projection boundary (Slice 2X.16)", () => {

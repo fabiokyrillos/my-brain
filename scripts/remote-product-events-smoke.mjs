@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
+import { readProductEventVocabulary } from "./product-event-vocabulary.mjs";
 
 function assert(condition, label) {
   if (!condition) throw new Error(label);
@@ -17,27 +18,13 @@ const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 const password = `Phase-2X-${crypto.randomUUID()}!`;
 const createdUsers = [];
 const createdClients = [];
-const expectedEventNames = [
-  "capture_started",
-  "capture_save_succeeded",
-  "capture_save_failed",
-  "capture_processing_enqueued",
-  "capture_processing_completed",
-  "capture_processing_failed",
-  "needs_attention_viewed",
-  "needs_attention_item_opened",
-  "interpretation_review_viewed",
-  "interpretation_corrected",
-  "technical_details_opened",
-  "task_candidates_presented",
-  "candidate_edit_started",
-  "candidate_edit_reset",
-  "task_candidates_confirmed",
-  "question_answered_basic",
-  "processing_retry_requested",
-  "work_view_viewed",
-  "task_status_changed",
-];
+// PRD 2E-ANALYTICS-006. Read from `src/features/product-analytics/contracts.ts`
+// rather than restated here, so a name added in TypeScript cannot drift from
+// this smoke. The nineteen names that used to be written out below had already
+// fallen three behind the contracts module without anything going red
+// (`docs/PHASE_2E_PRD.md §3.4`), which is the defect this closes.
+const { eventNames: expectedEventNames, surfaces: expectedSurfaces } =
+  readProductEventVocabulary();
 
 function baseEvent(overrides = {}) {
   return {
@@ -96,9 +83,53 @@ function eventMatrix({ entryId, taskId, questionId }) {
     { name: "candidate_edit_reset", surface: "interpretation_review", properties: { editedFieldCount: 2 }, ...entrySubject },
     { name: "task_candidates_confirmed", surface: "interpretation_review", properties: { candidateCount: 2, editedCandidateCount: 1, editedFieldCount: 2 }, ...entrySubject },
     { name: "question_answered_basic", surface: "server", properties: {}, p_subject_type: "pending_question", p_subject_id: questionId },
+    // These three were in the contracts module and not in this matrix. The
+    // vocabulary is now read from `contracts.ts` (2E-ANALYTICS-006), so their
+    // absence is a red assertion rather than an untested gap nobody notices.
+    { name: "question_resolved", surface: "questions", properties: { kind: "deferred" }, p_subject_type: "pending_question", p_subject_id: questionId },
+    { name: "question_effect_previewed", surface: "questions", properties: {}, p_subject_type: "pending_question", p_subject_id: questionId },
+    { name: "question_reinterpret_applied", surface: "questions", properties: {}, p_subject_type: "pending_question", p_subject_id: questionId },
     { name: "processing_retry_requested", surface: "interpretation_review", properties: { retrySource: "user" }, ...entrySubject },
     { name: "work_view_viewed", surface: "work", properties: { workView: "today" } },
     { name: "task_status_changed", surface: "work", properties: { fromStatus: "waiting", toStatus: "todo" }, p_subject_type: "task", p_subject_id: taskId },
+    // Phase 2E Slice 2E.7. No subject: a command event names no entity, which
+    // is 2E-ANALYTICS-003 as a shape rather than as a promise.
+    {
+      name: "task_command_previewed",
+      surface: "task_command",
+      properties: {
+        commandOrigin: "chat",
+        outcomeCategory: "matched_requires_confirmation",
+        candidateCount: 1,
+        scoreBand: "high",
+        marginBand: "high",
+        signalCategories: ["normalized_exact_title", "recent_activity"],
+        oneStep: false,
+        requiresConfirmation: true,
+        policyVersion: "2026-07-25.2",
+      },
+    },
+    {
+      name: "task_command_disambiguated",
+      surface: "task_command",
+      properties: { commandOrigin: "work", candidateCount: 3, selectedRank: 2, policyVersion: "2026-07-25.2" },
+    },
+    {
+      name: "task_command_applied",
+      surface: "task_command",
+      properties: {
+        commandOrigin: "chat",
+        outcomeCategory: "applied",
+        applyRoute: "direct",
+        replayed: false,
+        policyVersion: "2026-07-25.2",
+      },
+    },
+    {
+      name: "task_command_undone",
+      surface: "task_command",
+      properties: { commandOrigin: "work", undoResult: "undone", policyVersion: "2026-07-25.2" },
+    },
   ];
 }
 
@@ -150,6 +181,13 @@ try {
   const sessionId = crypto.randomUUID();
   const matrix = eventMatrix({ entryId: ownedEntry.id, taskId: ownedTask.id, questionId: ownedQuestion.id });
   assert(matrix.map((event) => event.name).join("|") === expectedEventNames.join("|"), "Smoke event matrix drifted from the canonical taxonomy");
+  assert(matrix.every((event) => expectedSurfaces.includes(event.surface)), "Smoke event matrix names a surface the contracts module does not declare");
+  // Every declared surface must be reachable through the RPC, not merely
+  // declared in TypeScript. 2E-ANALYTICS-005 requires the value to exist in all
+  // three allowlists, and this is the only one of the three a remote smoke can
+  // observe: a surface present in `productSurfaces` and missing from the
+  // `p_surface` guard fails here rather than in production.
+  assert(expectedSurfaces.some((surface) => matrix.some((event) => event.surface === surface)) , "No declared surface was exercised");
   const recordedByName = new Map();
   for (const event of matrix) {
     const idempotencyKey = crypto.randomUUID();

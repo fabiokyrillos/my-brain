@@ -34,8 +34,15 @@ import type {
   TaskCommandOutcome,
   TaskCommandPreviewDisposition,
   TaskCommandPreviewRefusal,
+  TaskCommandUndoState,
 } from "./outcomes";
-import type { TaskChangedField, TaskCommandAction } from "./taxonomy";
+import type {
+  TaskChangedField,
+  TaskCommandAction,
+  TaskCommandUnsupportedReason,
+} from "./taxonomy";
+import type { TaskCommandValidationReason } from "./schema";
+import type { TaskCommandProviderErrorCode } from "@/lib/ai/task-command-schema";
 
 /** The linked effects a preview can disclose (2E-PREVIEW-003). */
 export const TASK_COMMAND_LINKED_EFFECTS = [
@@ -136,6 +143,82 @@ export type TaskCommandCopy = {
     reminderScheduled: string;
     reminderAtCreation: string;
     noReminder: string;
+  };
+  /**
+   * Why a command is outside what the product does (2E-COMMAND-007/017).
+   *
+   * `outcomes.unsupported` supplies the title; this supplies the reason, and
+   * the reason is the whole value of the outcome. "This request is outside what
+   * I can do with tasks" told to someone who asked for a recurring task is
+   * true, unhelpful, and indistinguishable from the answer they would get for a
+   * typo.
+   */
+  unsupportedReasons: Record<TaskCommandUnsupportedReason, string>;
+  /**
+   * Why a proposal failed the closed schema (2E-COMMAND-013).
+   *
+   * These are reached when the model returns something the deterministic
+   * validator refuses. None of them names a value — 2E-COMMAND-013 requires a
+   * "classified, content-free error", and echoing the offending value back
+   * would put model output the schema already rejected in front of the user.
+   */
+  validation: Record<TaskCommandValidationReason, string>;
+  /** Why the parse could not happen at all. A code, never the provider's prose. */
+  provider: Record<TaskCommandProviderErrorCode, string>;
+  /**
+   * 2E-UNDO-007: "Expired and no-longer-available undo are distinct, localized
+   * outcomes carrying declared detail codes."
+   *
+   * Distinct sentences for distinct facts, both read from the operation row
+   * rather than from a `P0001` message — see `undo-listing.ts`. `available` is
+   * present so the record is exhaustive over the declared vocabulary; it is the
+   * label the affordance itself carries.
+   */
+  undoStates: Record<TaskCommandUndoState, OutcomeCopy>;
+  /** The console's own chrome. Free-form: no declared vocabulary behind it. */
+  console: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    inputLabel: string;
+    inputPlaceholder: string;
+    submit: string;
+    pending: string;
+    pendingAnnouncement: string;
+    apply: string;
+    confirm: string;
+    create: string;
+    choose: string;
+    chooseSubmit: string;
+    candidateLegend: string;
+    dismiss: string;
+    undo: string;
+    undone: string;
+    retry: string;
+    clarifyLabel: string;
+    clarifyPlaceholder: string;
+    clarifySubmit: string;
+    dialogTitle: string;
+    dialogCancel: string;
+    resultRegionLabel: string;
+    previewedState: string;
+    sessionExpired: string;
+    unauthenticated: string;
+    unexpected: string;
+    scoreLabel: string;
+    evidenceLabel: string;
+  };
+  /** The cancelled-task recovery surface (2E-DESTRUCTIVE-006). */
+  recovery: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    empty: string;
+    entryPoint: string;
+    restore: string;
+    cancelledAtLabel: string;
+    dueAtLabel: string;
+    hasMore: string;
   };
 };
 
@@ -325,6 +408,94 @@ const ptBR: TaskCommandCopy = {
     reminderAtCreation: "Um lembrete será agendado assim que a tarefa for criada.",
     noReminder: "Esta tarefa não criará um lembrete.",
   },
+  unsupportedReasons: {
+    unsupported_action: "Ainda não tenho esse verbo para tarefas.",
+    multiple_actions: "Essa frase pede duas mudanças diferentes. Peça uma de cada vez.",
+    multiple_targets: "Um comando muda uma tarefa por vez. Diga qual é a tarefa.",
+    integration_requested: "Não me conecto a e-mail, calendário ou aplicativos de mensagem.",
+    recurrence_requested: "Ainda não trabalho com agendas que se repetem.",
+    retroactive_requested: "Não consigo reescrever algo que já aconteceu.",
+    not_a_task_command: "Isso não parece uma mudança em uma tarefa.",
+    value_not_allowed_for_action:
+      "Esse valor existe, mas não para esta ação. Concluir e cancelar têm comandos próprios.",
+  },
+  validation: {
+    invalid_shape: "Não consegui ler isso como um comando. Tente dizer de outro jeito.",
+    unknown_field: "Não consegui ler isso como um comando. Tente dizer de outro jeito.",
+    value_too_long: "Um dos detalhes é longo demais. Tente uma frase mais curta.",
+    value_too_short: "Um dos detalhes chegou vazio. Tente dizer de outro jeito.",
+    invalid_value: "Um dos detalhes não é algo que eu consiga usar aqui.",
+    target_hints_too_large: "Essa descrição é longa demais para eu buscar. Seja mais específico.",
+    forbidden_patch_field: "Essa mudança não pertence a esta ação.",
+    missing_patch_field: "Falta uma informação neste comando. Diga para o que mudar.",
+    unrecognized_value: "Não tenho um status ou uma prioridade com esse nome.",
+  },
+  provider: {
+    empty_command_text: "Escreva o que você quer mudar.",
+    command_text_too_long: "Isso é longo demais. Diga em uma frase.",
+    provider_unavailable: "Não consegui ler seu comando agora. Tente de novo.",
+    no_structured_output: "Não consegui ler seu comando agora. Tente de novo.",
+    invalid_model_output: "Não consegui ler seu comando agora. Tente de novo.",
+  },
+  undoStates: {
+    available: {
+      title: "Dá para desfazer",
+      description: "Você pode desfazer isto por 24 horas.",
+    },
+    expired: {
+      title: "A janela para desfazer fechou",
+      description:
+        "Passaram-se mais de 24 horas, então isto não pode mais ser desfeito. Uma tarefa cancelada ainda pode ser restaurada.",
+    },
+    unavailable: {
+      title: "Não há mais nada para desfazer",
+      description: "Esta mudança já foi desfeita.",
+    },
+  },
+  console: {
+    eyebrow: "COMANDOS",
+    title: "Mude uma tarefa com suas palavras",
+    description: "Diga o que mudou. Eu mostro exatamente o que acontece antes de acontecer.",
+    inputLabel: "O que mudou?",
+    inputPlaceholder: "ex.: marque a tarefa do relatório como feita",
+    submit: "Enviar",
+    pending: "Lendo…",
+    pendingAnnouncement: "Lendo seu comando.",
+    apply: "Aplicar",
+    confirm: "Sim, cancelar esta tarefa",
+    create: "Criar a tarefa",
+    choose: "Qual delas você quis dizer?",
+    chooseSubmit: "Usar esta",
+    candidateLegend: "Tarefas correspondentes",
+    dismiss: "Descartar",
+    undo: "Desfazer",
+    undone: "Desfeito.",
+    retry: "Tentar de novo",
+    clarifyLabel: "Qual tarefa você quis dizer?",
+    clarifyPlaceholder: "ex.: a nota fiscal da Acme",
+    clarifySubmit: "Responder",
+    dialogTitle: "Confirme este cancelamento",
+    dialogCancel: "Manter a tarefa",
+    resultRegionLabel: "Resultado do comando",
+    previewedState: "Previsão pronta.",
+    sessionExpired: "Sua sessão expirou. Entre de novo e tente outra vez.",
+    unauthenticated: "Sua sessão expirou. Entre de novo e tente outra vez.",
+    unexpected: "Algo deu errado e nada foi alterado. Tente de novo.",
+    scoreLabel: "Pontuação",
+    evidenceLabel: "Por que esta",
+  },
+  recovery: {
+    eyebrow: "RECUPERAÇÃO",
+    title: "Tarefas canceladas",
+    description:
+      "Tarefas que você cancelou. Restaurar uma devolve ela às suas listas ativas e reagenda o lembrete, se ainda houver um prazo futuro.",
+    empty: "Você não cancelou nenhuma tarefa.",
+    entryPoint: "Tarefas canceladas",
+    restore: "Restaurar",
+    cancelledAtLabel: "Cancelada",
+    dueAtLabel: "Prazo",
+    hasMore: "Há mais tarefas canceladas do que cabem aqui.",
+  },
 };
 
 const en: TaskCommandCopy = {
@@ -499,6 +670,94 @@ const en: TaskCommandCopy = {
     reminderScheduled: "A reminder will be scheduled for this task.",
     reminderAtCreation: "A reminder will be scheduled as soon as the task is created.",
     noReminder: "This task will not create a reminder.",
+  },
+  unsupportedReasons: {
+    unsupported_action: "I do not have that verb for tasks yet.",
+    multiple_actions: "That sentence asks for two different changes. Ask for one at a time.",
+    multiple_targets: "A command changes one task at a time. Name a single task.",
+    integration_requested: "I do not connect to email, calendar or messaging apps.",
+    recurrence_requested: "I do not handle repeating schedules yet.",
+    retroactive_requested: "I cannot rewrite something that already happened.",
+    not_a_task_command: "That does not look like a change to a task.",
+    value_not_allowed_for_action:
+      "That value exists, but not for this action. Completing and cancelling have their own commands.",
+  },
+  validation: {
+    invalid_shape: "I could not read that as a command. Try phrasing it differently.",
+    unknown_field: "I could not read that as a command. Try phrasing it differently.",
+    value_too_long: "One of the details is too long. Try a shorter phrasing.",
+    value_too_short: "One of the details came through empty. Try phrasing it differently.",
+    invalid_value: "One of the details is not something I can use here.",
+    target_hints_too_large: "That description is too long for me to search on. Be more specific.",
+    forbidden_patch_field: "That change does not belong to this action.",
+    missing_patch_field: "That command is missing something it needs. Say what to change it to.",
+    unrecognized_value: "I do not have a status or priority by that name.",
+  },
+  provider: {
+    empty_command_text: "Write what you want to change.",
+    command_text_too_long: "That is too long. Say it in a sentence.",
+    provider_unavailable: "I could not read your command right now. Try again.",
+    no_structured_output: "I could not read your command right now. Try again.",
+    invalid_model_output: "I could not read your command right now. Try again.",
+  },
+  undoStates: {
+    available: {
+      title: "Undo available",
+      description: "You can undo this for 24 hours.",
+    },
+    expired: {
+      title: "The undo window has closed",
+      description:
+        "More than 24 hours have passed, so this can no longer be undone. A cancelled task can still be restored.",
+    },
+    unavailable: {
+      title: "Nothing left to undo",
+      description: "This change was already undone.",
+    },
+  },
+  console: {
+    eyebrow: "COMMANDS",
+    title: "Change a task in your own words",
+    description: "Say what changed. I will show you exactly what happens before anything does.",
+    inputLabel: "What changed?",
+    inputPlaceholder: "e.g. mark the report task as done",
+    submit: "Send",
+    pending: "Reading…",
+    pendingAnnouncement: "Reading your command.",
+    apply: "Apply",
+    confirm: "Yes, cancel this task",
+    create: "Create the task",
+    choose: "Which one did you mean?",
+    chooseSubmit: "Use this one",
+    candidateLegend: "Matching tasks",
+    dismiss: "Discard",
+    undo: "Undo",
+    undone: "Undone.",
+    retry: "Try again",
+    clarifyLabel: "Which task did you mean?",
+    clarifyPlaceholder: "e.g. the invoice for Acme",
+    clarifySubmit: "Answer",
+    dialogTitle: "Confirm this cancellation",
+    dialogCancel: "Keep the task",
+    resultRegionLabel: "Command result",
+    previewedState: "Preview ready.",
+    sessionExpired: "Your session expired. Sign in and try again.",
+    unauthenticated: "Your session expired. Sign in and try again.",
+    unexpected: "Something went wrong and nothing was changed. Try again.",
+    scoreLabel: "Match score",
+    evidenceLabel: "Why this one",
+  },
+  recovery: {
+    eyebrow: "RECOVERY",
+    title: "Cancelled tasks",
+    description:
+      "Tasks you cancelled. Restoring one puts it back in your active lists and schedules its reminder again if it still has a future due date.",
+    empty: "You have not cancelled any task.",
+    entryPoint: "Cancelled tasks",
+    restore: "Restore",
+    cancelledAtLabel: "Cancelled",
+    dueAtLabel: "Due",
+    hasMore: "There are more cancelled tasks than fit here.",
   },
 };
 

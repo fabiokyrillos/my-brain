@@ -95,3 +95,21 @@ export type TaskCommandPreviewDisposition = (typeof TASK_COMMAND_PREVIEW_DISPOSI
 export const TASK_COMMAND_PREVIEW_REFUSALS = ["relation_reference_unresolved"] as const;
 
 export type TaskCommandPreviewRefusal = (typeof TASK_COMMAND_PREVIEW_REFUSALS)[number];
+
+/**
+ * Whether an undo can still be offered, and if not, why (2E-UNDO-006/007).
+ *
+ * Declared here with the other vocabularies rather than beside the projection
+ * that computes it, because `undo-listing.ts` begins `import "server-only"` and
+ * `copy.ts` is bundled for the client. A vocabulary a surface must localize
+ * cannot live behind a server-only guard, or the copy module would have to
+ * import one — which works only because `import type` is erased, and would stop
+ * working the moment someone needed the runtime array.
+ *
+ * 2E-UNDO-007 is the reason `expired` and `unavailable` are separate members:
+ * it requires them to be "distinct, localized outcomes", and a single
+ * `unavailable` would make the honest "the 24 hours are up" unsayable.
+ */
+export const TASK_COMMAND_UNDO_STATES = ["available", "expired", "unavailable"] as const;
+
+export type TaskCommandUndoState = (typeof TASK_COMMAND_UNDO_STATES)[number];

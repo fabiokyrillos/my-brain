@@ -178,9 +178,11 @@ jobs:
       - name: Run the deterministic foundation journey
         # foundation.spec.ts needs no OpenAI key and no seeded user: it proves
         # the proxy's auth boundary, the locale redirects and the accessible
-        # auth forms. The remaining specs are credential-gated against the
-        # linked project and skip themselves; remote smokes stay manual.
-        run: npx playwright test e2e/foundation.spec.ts --project=desktop --project=mobile
+        # auth forms. task-command.spec.ts is credential-free for the same
+        # reason and proves Slice 2E.7's new nested route joins both contracts.
+        # The remaining specs are credential-gated against the linked project
+        # and skip themselves; remote smokes stay manual.
+        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop --project=mobile
 
       - name: Collect the Playwright report
         if: failure()

@@ -15,8 +15,15 @@ import {
   TASK_COMMAND_OUTCOMES,
   TASK_COMMAND_PREVIEW_DISPOSITIONS,
   TASK_COMMAND_PREVIEW_REFUSALS,
+  TASK_COMMAND_UNDO_STATES,
 } from "./outcomes";
-import { TASK_CHANGED_FIELDS, TASK_COMMAND_ACTIONS } from "./taxonomy";
+import { TASK_COMMAND_VALIDATION_REASONS } from "./schema";
+import {
+  TASK_CHANGED_FIELDS,
+  TASK_COMMAND_ACTIONS,
+  TASK_COMMAND_UNSUPPORTED_REASONS,
+} from "./taxonomy";
+import { TASK_COMMAND_PROVIDER_ERROR_CODES } from "@/lib/ai/task-command-schema";
 import { locales, type Locale } from "@/lib/preferences";
 
 /**
@@ -56,6 +63,15 @@ const VOCABULARIES: readonly {
   { section: "fields", declared: TASK_CHANGED_FIELDS },
   { section: "evidence", declared: TASK_MATCH_EVIDENCE },
   { section: "effects", declared: TASK_COMMAND_LINKED_EFFECTS },
+  // Slice 2E.7. Each is a vocabulary a rendered surface must speak, and each is
+  // declared somewhere else — `unsupportedReasons` and `validation` are what a
+  // command that never reaches the database resolves to, `provider` is what a
+  // parse that never happened resolves to, and `undoStates` is 2E-UNDO-007's
+  // "expired and no-longer-available are distinct outcomes".
+  { section: "unsupportedReasons", declared: TASK_COMMAND_UNSUPPORTED_REASONS },
+  { section: "validation", declared: TASK_COMMAND_VALIDATION_REASONS },
+  { section: "provider", declared: TASK_COMMAND_PROVIDER_ERROR_CODES },
+  { section: "undoStates", declared: TASK_COMMAND_UNDO_STATES },
 ];
 
 /**
@@ -65,7 +81,15 @@ const VOCABULARIES: readonly {
  * either pinned against a declared list or deliberately exempt — a new section
  * added to `TaskCommandCopy` fails there rather than going untested.
  */
-const FREE_FORM_SECTIONS: readonly (keyof TaskCommandCopy)[] = ["values", "preview", "creation"];
+const FREE_FORM_SECTIONS: readonly (keyof TaskCommandCopy)[] = [
+  "values",
+  "preview",
+  "creation",
+  // Slice 2E.7. The console's and the recovery surface's own chrome: labels,
+  // placeholders and control names, with no declared vocabulary behind them.
+  "console",
+  "recovery",
+];
 
 type CopyLeaf = { readonly path: string; readonly value: string };
 
