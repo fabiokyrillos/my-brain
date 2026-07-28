@@ -3,6 +3,29 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-28 — Phase 2E Slice 2E.8: convergence and closeout (branch `codex/phase-2e-natural-language-task-updates`)
+
+Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/PHASE_2E_FINAL_REPORT.md` and `docs/reports/PHASE_2E_SLICE_08_REPORT.md`.
+
+### Added
+
+- **`scripts/generate-phase-2e-traceability.mjs` and `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md`** — 135 mapped rows: 122 requirement IDs across 16 families, 8 epic acceptance criteria, 5 global gates. The generator fails closed on any inventory drift, and that was **tested rather than asserted**: four tamper runs (drop a requirement, add one to a family, introduce a new family, remove an epic bullet) all threw, with the PRD byte-identical afterwards. Phase 2E is the first phase whose families carry digits (`2E-I18N`, `2E-A11Y`), so the family regex is `[A-Z0-9]+` — a letters-only class silently drops seven requirements and still emits a well-formed matrix, which is why the expected total is 122 and not 115.
+- **`scripts/verify-phase-2e-cleanup.mjs`** — residual-data check over 18 owned tables, adding `task_command_confirmations`, `reminders`, `undo_operations` and `ai_usage_events` to the inherited set. Passes against the live linked project.
+- **`scripts/remote-phase-2e-smoke.mjs`** — the aggregate two-owner remote smoke (2E-OPERATIONS-003/004). Drain-safe by construction: it creates **no entries**, so no `interpret_entry` job is enqueued and the per-minute `pg_cron`/`pg_net` drain has nothing to race. Its preflight runs today and exits **2** with `BLOCKED ON DEPLOYMENT`, deliberately distinct from an assertion failure (exit 1).
+- **npm scripts** `docs:phase-2e:traceability`, `test:remote:2e`, `test:remote:2e:cleanup`.
+- **`src/features/task-commands/vocabulary.ts` — `canonicalVocabularyEntries()`**, emitting the bilingual term tables as sorted `["kind", "term", "literal"]` triples for digesting. Sorted by plain code-unit comparison, **not** `localeCompare`: a digest pinned in a test must not move when the runtime's ICU data does.
+
+### Fixed
+
+- **The bilingual vocabulary was outside the versioning regime, and the test that claimed to guard it guarded something else.** `policy-lock.test.ts`'s *"pins the status and priority vocabularies to the same version"* digested `TASK_STATUSES` and `TASK_PRIORITIES` — the closed database literals, which `vocabulary.ts` cannot change — while the 61 term mappings it does own were digested by nothing. Re-pointing `bloqueada` from `blocked` to `deferred` would move a user's task to a state they never named with the entire suite green. The term tables are now digested under `TASK_VOCABULARY_VERSION`, which is asserted equal to `TASK_COMMAND_POLICY_VERSION`; the misnamed case is renamed to what it pins.
+- **`TASK_VOCABULARY_VERSION` was orphaned** — read by nothing, and therefore already stale at `2026-07-25.1` while `TASK_COMMAND_POLICY_VERSION` was at `.2`, in direct contradiction of its own docstring. Bumped to `.2` and now enforced by test, as PRD §10.4 requires.
+- **`vocabularyCoversEveryLiteral()` was exported and never called**, duplicating two assertions in the same test file. It is now called, so the duplication retires rather than the guard.
+- **`verify-phase-2e-cleanup.mjs` detected an absent table by the wrong error code.** It tested for SQLSTATE `42P01`; PostgREST answers from its schema cache and never reaches Postgres for an unknown relation, so it returns `PGRST205`. The verifier died on the first Phase 2E table — the exact failure its own branch existed to prevent — and was found only because the script was executed rather than shipped read-only.
+
+### Changed
+
+- **`docs/PHASE_2E_PRD.md` revision 4** makes two corrections, both of them admissions rather than redefinitions. (1) **`2E-COMMAND-012` is reclassified to Phase 2F and is not delivered by Phase 2E.** Recording prompt and strategy versions on the operation requires changing the argument list of `apply_task_command`, `create_task_command` or `record_ai_usage` — impossible by `create or replace`, since a different argument list is a different function in PostgreSQL and the surviving overload makes every existing call ambiguous. Each needs `drop function` plus a full re-declaration: ~1,460 lines for `apply_task_command`, and `record_ai_usage` is shared by every AI path in the product and pinned by two `::regprocedure` casts and a `has_function` type array across two pgTAP files, hand-written types and the Deno worker. Residual risk: attribution now requires joining `ai_usage_events.created_at` to the deploy history. (2) **Revision 2's promise that nineteen refuted PRD-round findings would be recorded at closeout is withdrawn as unkeepable** — they were never persisted to the repository and reconstructing them would be fabrication.
+
 ## 2026-07-28 — Phase 2E Slice 2E.7: conversational and task-surface integration (branch `codex/phase-2e-natural-language-task-updates`)
 
 Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/PHASE_2E_SLICE_07_REPORT.md`.

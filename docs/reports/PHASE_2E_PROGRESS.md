@@ -1,6 +1,12 @@
 # Phase 2E — Execution Progress
 
-**Status: IN PROGRESS — Slice 2E.7 ACCEPTED. Slice 2E.8 (Epic 2E-H, convergence and closeout) has not started.**
+**Status: COMPLETE AS A BRANCH — all eight slices ACCEPTED, including Slice 2E.8 (Epic 2E-H, convergence and closeout). Nothing merged, deployed, tagged or released.**
+
+**The phase report is `PHASE_2E_FINAL_REPORT.md`, and it supersedes this file for anything about the phase as a whole.** This file remains the session-to-session handoff and is authoritative only for *where the work stands*.
+
+**117 of 122 requirements are complete.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half and `2E-MATCH-018`'s end-to-end scope are blocked on deployment authorization and on nothing else. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
+
+**PR #18 is READY FOR REVIEW.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -46,7 +52,27 @@ Slices 2E.1–2E.6 remain accepted.
 | 2E.5 — Destructive actions and confirmation | 2E-E | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_05_REPORT.md` |
 | 2E.6 — No-match activity creation | 2E-F | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_06_REPORT.md` |
 | 2E.7 — Conversational and task-surface integration | 2E-G | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_07_REPORT.md` |
-| 2E.8 — Convergence and closeout | 2E-H | not started |
+| 2E.8 — Convergence and closeout | 2E-H | **ACCEPTED.** `PHASE_2E_SLICE_08_REPORT.md`, `PHASE_2E_FINAL_REPORT.md`, `PHASE_2E_TRACEABILITY_MATRIX.md` |
+
+## Slice 2E.8 — what shipped
+
+**No product behaviour and no migration.** Its database footprint is zero, which is why pgTAP is expected to hold at `Files=30, Tests=1277`.
+
+| Artifact | Responsibility |
+|---|---|
+| `scripts/generate-phase-2e-traceability.mjs` (new) | Fail-closed generator; 135 rows from 122 requirement IDs, 8 epics, 5 gates. Proven by four tamper runs, not asserted |
+| `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md` (new) | Generated. `npm run docs:phase-2e:traceability` |
+| `scripts/verify-phase-2e-cleanup.mjs` (new) | 18 owned tables. **Passes against the live linked project** |
+| `scripts/remote-phase-2e-smoke.mjs` (new) | Two-owner aggregate smoke, drain-safe (creates no entries). Preflight exits 2 with `BLOCKED ON DEPLOYMENT` |
+| `docs/reports/PHASE_2E_FINAL_REPORT.md` (new) | Phase report + deployment, rollback, merge and release checklists |
+| `vocabulary.ts` / `policy-lock.test.ts` | The convergence audit's three fixes |
+| ADR-053, PRD revision 4 | The `2E-COMMAND-012` reclassification, and the withdrawal of an unkeepable revision-2 promise |
+
+**The convergence audit found a real defect seven slices had missed.** The `policy-lock.test.ts` case named *"pins the status and priority vocabularies to the same version"* digested `TASK_STATUSES`/`TASK_PRIORITIES` — the **closed database literals `vocabulary.ts` neither owns nor can change** — while the 61 bilingual term mappings it does own were digested by nothing. Re-pointing `bloqueada` from `blocked` to `deferred` would move a user's task to a state they never named, suite green. `TASK_VOCABULARY_VERSION` was orphaned and already stale at `.1` while the policy version was `.2`, contradicting its own docstring; `vocabularyCoversEveryLiteral()` was exported and never called. All three fixed; the new digest sorts by code unit, not `localeCompare`, so an ICU update cannot move a pinned gate.
+
+**Running the closeout tooling is what found its own defect.** `verify-phase-2e-cleanup.mjs` detected an absent table by SQLSTATE `42P01`; PostgREST answers from its schema cache and returns `PGRST205` without reaching Postgres, so it died on the first Phase 2E table — the exact failure its branch existed to prevent. A verifier that has never run is a claim, not a gate.
+
+**One obligation could not be met and is recorded as unmet.** PRD revision 2 promised nineteen refuted PRD-round findings would be recorded here. They were never persisted to the repository; revision 4 withdraws the promise rather than fabricating them.
 
 ## Slice 2E.7 — what shipped
 
@@ -141,13 +167,24 @@ it never recreates or restores the task.
 
 ## Local gates on HEAD
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2254 passed / 124 files** ·
-focused `src/features/task-commands` **1152 passed / 26 files** · `build` clean, with
-`/[locale]/app/work/cancelled` registered · deployed-entrypoint Deno checks clean · Deno tests
-**46/46** · `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop
---project=mobile` **12 passed**.
+**Slice 2E.8 tree:** `lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2256 passed /
+124 files** · `build` clean, with `/[locale]/app/work/cancelled` registered ·
+deployed-entrypoint Deno checks clean · Deno tests **46/46** · `npx playwright test
+e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop --project=mobile` **12 passed**.
 
-The Slice 2E.6 baseline was 2110 / 118 files, so Slice 2E.7 adds **144 assertions across 6 files**.
+The Slice 2E.7 baseline was 2254 / 124 files, so Slice 2E.8 adds **2 assertions across 0 new files** —
+the vocabulary digest and the call to the guard that was dead. A closeout slice that added a large
+number here would be doing something other than closeout.
+
+Also executed against the **live linked project**, the only two Phase 2E gates that can run before
+deployment: `npm run test:remote:2e:cleanup` **passes** (zero disposable users, zero orphaned rows
+across 17 existing tables, zero remote-smoke storage objects, `task_command_confirmations` correctly
+reported absent-because-undeployed), and `npm run test:remote:2e` exits **2** with `BLOCKED ON
+DEPLOYMENT`. The traceability generator's fail-closed behaviour was proven by four tamper runs
+against a restored PRD copy; all four threw and the PRD was byte-identical afterwards.
+
+**Slice 2E.7 tree, for comparison:** `npm test` 2254 / 124; the Slice 2E.6 baseline was 2110 / 118,
+so Slice 2E.7 added **144 assertions across 6 files**.
 
 pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and
 `supabase db lint --local` never execute on this workstation. CI supplied the authoritative database
@@ -175,7 +212,23 @@ It is recorded here rather than left for the next session to rediscover: the fai
 sensitivity in a Phase 2C component test, not a Phase 2E regression, and it is a real (if minor)
 maintenance item for Slice 2E.8 or later.
 
-## Open items after accepted Slice 2E.7
+## Open items after accepted Slice 2E.8 — the phase's final list
+
+Fuller justification for every one of these is in `PHASE_2E_FINAL_REPORT.md` §7.
+
+1. **Deployment is not authorized, and it gates everything else.** Items 2–5 below are blocked on it and on nothing else.
+2. **`2E-OPERATIONS-003`** — focused per-slice remote smokes. None can run.
+3. **`2E-OPERATIONS-004`** — the aggregate smoke, written and wired, refusing correctly at preflight.
+4. **`2E-OWNERSHIP-004`'s remote half** — the two-owner disposable proof. The database half is proven by pgTAP from an empty database in CI.
+5. **Every authenticated online journey for Epic 2E-G.** The credential-free route/auth/locale journeys do run in CI.
+6. **`2E-COMMAND-012`** is reclassified to Phase 2F by decision, not blocked (ADR-053, PRD revision 4).
+7. **The nineteen refuted PRD-round findings** are permanently unrecoverable; PRD revision 4 withdraws the promise.
+8. **`src/features/tasks/task-candidate-form.test.tsx` flakiness** under CI load — a Phase 2C test, never reproduced locally, deliberately not fixed blind.
+9. **`PHASE_2E_SLICE_07_DESIGN.md` §6** promises 42 findings the file does not contain.
+10. **The `restore_task` >25-same-title cancelled-task edge**, disclosed with `hasMore`.
+11. **PR #18 is READY FOR REVIEW** and remains open. Merge, deployment and release are three separate authorizations, none given.
+
+## Open items recorded after Slice 2E.7 (historical — superseded by the list above)
 
 1. **No deployment occurred.** The linked project remains at migration `202607250054`, so every
    Phase 2E RPC — including the three this slice calls — is unreachable online. **Every
@@ -199,7 +252,12 @@ maintenance item for Slice 2E.8 or later.
    restore. Disclosed; `hasMore` already tells the user the list is truncated.
 7. Draft PR #18 remains intentionally open and unmerged. Nothing was deployed, tagged or released.
 
-## Next: the continuation point, precisely
+## Next: there is no next slice
+
+Phase 2E is complete as a branch. **The next action is a human authorization decision, not engineering** — merge (checklist in `PHASE_2E_FINAL_REPORT.md` §12), then deployment (§10), then release (§11 is the rollback plan, §13 the release steps). Phase 2F is out of scope and must not be started against this branch.
+
+<details>
+<summary>Historical: the continuation point Slice 2E.7 recorded for Slice 2E.8, now discharged</summary>
 
 The next slice is **2E.8 — Convergence and closeout (Epic 2E-H)**. Its inputs:
 
@@ -216,6 +274,8 @@ The next slice is **2E.8 — Convergence and closeout (Epic 2E-H)**. Its inputs:
 - **Deployment authorization gates every item in §Open items.** Deployment order for Slice 2E.7 is
   migrations only — it touches no worker code.
 
+</details>
+
 Useful commands:
 
 ```powershell
@@ -225,6 +285,9 @@ deno check supabase/functions/process-jobs/index.ts supabase/functions/heartbeat
 npx supabase migration list --linked                # parity
 gh pr checks 18                                     # the database gate
 gh run view <id> --log-failed                       # the first failing line, not the summary
+npm run docs:phase-2e:traceability                  # must produce no diff before merge
+npm run test:remote:2e:cleanup                      # runs today
+npm run test:remote:2e                              # exits 2 until the chain is deployed
 ```
 
 ## Environment constraints that shape the workflow
