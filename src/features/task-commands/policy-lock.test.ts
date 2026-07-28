@@ -23,7 +23,13 @@ import {
   TASK_MATCH_WEIGHTS,
 } from "./match-policy";
 import { TEMPORAL_LEXICON, TEMPORAL_LEXICON_VERSION } from "./temporal";
-import { resolvePriorityTerm, resolveStatusTerm } from "./vocabulary";
+import {
+  TASK_VOCABULARY_VERSION,
+  canonicalVocabularyEntries,
+  resolvePriorityTerm,
+  resolveStatusTerm,
+  vocabularyCoversEveryLiteral,
+} from "./vocabulary";
 
 /**
  * PRD §10.4 and 2E-MATCH-016: "Changing a weight, threshold, margin or prompt
@@ -104,7 +110,7 @@ describe("policy digest", () => {
     );
   });
 
-  it("pins the status and priority vocabularies to the same version", () => {
+  it("pins the closed database literals to the command policy version", () => {
     const canonical = [...TASK_STATUSES, ...TASK_PRIORITIES];
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
       // The digest is unchanged from `2026-07-25.1`, and that is the point:
@@ -112,6 +118,25 @@ describe("policy digest", () => {
       // status or priority literal. Only the version moved.
       version: "2026-07-25.2",
       digest: "e8c8bb1bd473e41f",
+    });
+  });
+
+  it("pins the bilingual term tables, which are the part this codebase owns", () => {
+    // Slice 2E.8 found the case above misnamed and the real hazard unpinned.
+    // `TASK_STATUSES`/`TASK_PRIORITIES` are the *database's* closed literals,
+    // which `vocabulary.ts` cannot change; the term tables are the mapping it
+    // decides, and re-pointing one entry — `bloqueada` from `blocked` to
+    // `deferred` — moves a user's task to a state they never named. Nothing
+    // digested them, and `TASK_VOCABULARY_VERSION` was read by no test at all,
+    // so it had drifted to one version behind while claiming in its own
+    // docstring to move with the policy version.
+    expect(TASK_VOCABULARY_VERSION).toBe(TASK_COMMAND_POLICY_VERSION);
+    expect({
+      version: TASK_VOCABULARY_VERSION,
+      digest: digest(canonicalVocabularyEntries()),
+    }).toEqual({
+      version: "2026-07-25.2",
+      digest: "ee9b0095c8418659",
     });
   });
 
@@ -373,6 +398,15 @@ describe("vocabulary covers the database literals", () => {
 
   it("maps every priority literal to itself", () => {
     for (const priority of TASK_PRIORITIES) expect(resolvePriorityTerm(priority), priority).toBe(priority);
+  });
+
+  it("agrees with the module's own self-check, which nothing was calling", () => {
+    // `vocabularyCoversEveryLiteral` shipped exported and uncalled, duplicating
+    // the two cases above. Calling it here retires the duplicate rather than
+    // the guard: the two cases localize *which* literal broke, and this one
+    // proves the exported helper still means what its name says, so a caller
+    // that trusts it is not trusting dead code.
+    expect(vocabularyCoversEveryLiteral()).toBe(true);
   });
 
   it("names no value the database CHECK would refuse", () => {

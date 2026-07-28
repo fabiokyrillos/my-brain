@@ -22,8 +22,17 @@ import { TASK_PRIORITIES, TASK_STATUSES, type TaskPriority, type TaskStatus } fr
  * guess.
  */
 
-/** Bumped with the policy version whenever an entry is added or re-pointed. */
-export const TASK_VOCABULARY_VERSION = "2026-07-25.1";
+/**
+ * Bumped with the policy version whenever an entry is added or re-pointed.
+ *
+ * Slice 2E.8 found this constant orphaned: nothing read it, so it sat at
+ * `2026-07-25.1` while `TASK_COMMAND_POLICY_VERSION` had already moved to
+ * `.2`, and the term tables below were free to change without any version
+ * moving at all. `policy-lock.test.ts` now digests those tables under this
+ * constant and asserts it equals the command policy version, which is what
+ * PRD §10.4 means by "enforced by test".
+ */
+export const TASK_VOCABULARY_VERSION = "2026-07-25.2";
 
 /** Accent-folded, lowercased, punctuation-collapsed — the temporal module's rule. */
 export function normalizeVocabularyTerm(value: string): string {
@@ -134,4 +143,35 @@ export function vocabularyCoversEveryLiteral(): boolean {
     TASK_STATUSES.every((status) => resolveStatusTerm(status) === status)
     && TASK_PRIORITIES.every((priority) => resolvePriorityTerm(priority) === priority)
   );
+}
+
+/**
+ * Every declared term paired with the literal it resolves to, sorted.
+ *
+ * Exists so `policy-lock.test.ts` can digest what this module actually
+ * decides. Until Slice 2E.8 the test named "pins the status and priority
+ * vocabularies" digested `TASK_STATUSES` and `TASK_PRIORITIES` — the closed
+ * database literals, which this module does not own and cannot change. The
+ * mapping *is* the policy: re-pointing `bloqueada` from `blocked` to
+ * `deferred` moves a user's task to a state they never named, and no gate
+ * would have seen it.
+ *
+ * Emitted as a flat sorted array of `["kind", "term", "literal"]` triples so
+ * the digest is stable under key-insertion order, which object iteration is
+ * not guaranteed to preserve across engines.
+ *
+ * Sorted by plain code-unit comparison rather than `localeCompare`, because a
+ * digest pinned in a test must not move when the runtime's ICU data does.
+ */
+export function canonicalVocabularyEntries(): readonly (readonly [string, string, string])[] {
+  const entries = [
+    ...Object.entries(STATUS_TERMS).map(([term, literal]) => ["status", term, literal] as const),
+    ...Object.entries(PRIORITY_TERMS).map(([term, literal]) => ["priority", term, literal] as const),
+  ];
+  return entries.sort((a, b) => {
+    const left = `${a[0]}/${a[1]}`;
+    const right = `${b[0]}/${b[1]}`;
+    if (left < right) return -1;
+    return left > right ? 1 : 0;
+  });
 }
