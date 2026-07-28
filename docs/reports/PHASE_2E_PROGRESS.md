@@ -1,12 +1,12 @@
 # Phase 2E — Execution Progress
 
-**Status: COMPLETE AS A BRANCH — all eight slices ACCEPTED, including Slice 2E.8 (Epic 2E-H, convergence and closeout). Nothing merged, deployed, tagged or released.**
+**Status: MERGED — all eight slices ACCEPTED, including Slice 2E.8 (Epic 2E-H, convergence and closeout). PR #18 merged into `main` on 2026-07-28 as `5d22400`. Nothing deployed, tagged or released.**
 
 **The phase report is `PHASE_2E_FINAL_REPORT.md`, and it supersedes this file for anything about the phase as a whole.** This file remains the session-to-session handoff and is authoritative only for *where the work stands*.
 
 **118 of 122 requirements are delivered; four are not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half are blocked on deployment authorization and on nothing else. `2E-MATCH-018` is delivered with a scope note rather than counted against the phase, because its own text is satisfied. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
 
-**PR #18 is READY FOR REVIEW.**
+**PR #18 is MERGED. Deployment is the next authorization, and it has not been given.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -14,14 +14,13 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 
 | Field | Value |
 |---|---|
-| Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, in sync) |
-| Branch HEAD | `62a0d86` — the phase's final commit, verified by `git rev-parse` at the merge-preparation pass (2026-07-28) |
-| Phase base | `2e2acfd` |
-| Working tree | Clean at `62a0d86`; the branch is in sync with its remote |
-| vs `origin/main` | **62 ahead, 0 behind** |
-| PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — `MERGEABLE`, `mergeStateStatus: CLEAN`. **Ready for review** since the merge-preparation pass; it was a CI-evidence-only draft through Slice 2E.7 |
-| CI | **all three jobs green on the exact HEAD `62a0d86`** (run `30377372448`). The last run to report pgTAP counts was `4af285d` (run `30369501161`): `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic, because neither Slice 2E.7 nor 2E.8 adds a pgTAP file |
-| Merged / tagged / released | nothing |
+| Branch | `codex/phase-2e-natural-language-task-updates` — merged; retained, not deleted |
+| Merge commit | **`5d22400`** on `main`, parents `2e2acfd` (phase base) and `96cf178` (branch HEAD) |
+| Merge strategy | **merge commit**, matching PRs #15, #16 and #17. All 64 commit messages survive; a squash would have discarded the refutations, the withdrawn ADR half and the defects CI found that no local gate could |
+| Branch HEAD at merge | `96cf178` — two docs-only commits past Slice 2E.8's `62a0d86`, both from the merge-preparation reconciliation |
+| PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — **MERGED** 2026-07-28T17:57:34Z |
+| CI on the merge SHA | **all three jobs green on `96cf178`** (run `30383879590`). The last run to report pgTAP counts was `4af285d` (run `30369501161`): `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic, because neither Slice 2E.7 nor 2E.8 adds a pgTAP file |
+| Deployed / tagged / released | **nothing** |
 
 **This table drifted structurally for five consecutive sessions and is now pinned to verified truth.** It used to be written *before* the docs commit that carried it, so its HEAD was always one commit stale by the time anyone read it — the Slice 2E.7 entry check found the file naming `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`, and the Slice 2E.8 tree left it at `ffd66ca` / run `30369501161`. The row above was reconciled against `git rev-parse`, `gh pr view` and `gh run list` at the merge-preparation pass. **Verify HEAD from `git rev-parse` anyway, never from this table.**
 
@@ -227,7 +226,7 @@ Fuller justification for every one of these is in `PHASE_2E_FINAL_REPORT.md` §7
 8. **`src/features/tasks/task-candidate-form.test.tsx` flakiness** under CI load — a Phase 2C test, never reproduced locally, deliberately not fixed blind.
 9. **`PHASE_2E_SLICE_07_DESIGN.md` §6** promises 42 findings the file does not contain.
 10. **The `restore_task` >25-same-title cancelled-task edge**, disclosed with `hasMore`.
-11. **PR #18 is READY FOR REVIEW** and remains open. Merge, deployment and release are three separate authorizations, none given.
+11. **PR #18 is MERGED** (`5d22400`). Of Phase 2E's three separate authorizations, the first is given; **deployment and release are not**, and item 1 above is what they gate.
 
 ## Open items recorded after Slice 2E.7 (historical — superseded by the list above)
 
@@ -255,7 +254,9 @@ Fuller justification for every one of these is in `PHASE_2E_FINAL_REPORT.md` §7
 
 ## Next: there is no next slice
 
-Phase 2E is complete as a branch. **The next action is a human authorization decision, not engineering** — merge (checklist in `PHASE_2E_FINAL_REPORT.md` §12), then deployment (§10), then release (§11 is the rollback plan, §13 the release steps). Phase 2F is out of scope and must not be started against this branch.
+Phase 2E is merged. **The next action is a human authorization decision, not engineering** — deployment (checklist in `PHASE_2E_FINAL_REPORT.md` §10), then release (§13; §11 is the rollback plan). The merge checklist in §12 is discharged. Phase 2F is out of scope.
+
+**Before deploying, re-verify parity rather than trusting this file:** `npx supabase migration list --linked` must still show `202607250054` as the last applied, with `202607250055`–`202607280061` local-only. If it shows anything else, stop — the assumption the whole deployment plan rests on is false.
 
 <details>
 <summary>Historical: the continuation point Slice 2E.7 recorded for Slice 2E.8, now discharged</summary>
