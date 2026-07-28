@@ -1,6 +1,7 @@
 import type {
   TaskCommandApplyRoute,
   TaskCommandOrigin,
+  TaskCommandPreviewedOutcome,
   TaskCommandUndoResult,
 } from "@/features/task-commands/analytics";
 import type { TaskMatchEvidence, TaskMatchScoreBand } from "@/features/task-commands/match-policy";
@@ -33,6 +34,17 @@ const taskCommandOutcomeCategories: readonly TaskCommandOutcome[] = [
   "rejected_conflict",
   "refused",
 ];
+/**
+ * The preview event's own category list: the twelve outcomes plus `previewed`.
+ *
+ * A preview waiting for the user has not come to rest, so `previewed` is not an
+ * outcome — but it is the category a one-step-eligible match belongs to, and
+ * the preview event has to be able to say so.
+ */
+const taskCommandPreviewedOutcomes: readonly TaskCommandPreviewedOutcome[] = [
+  ...taskCommandOutcomeCategories,
+  "previewed",
+];
 const taskCommandApplyRoutes: readonly TaskCommandApplyRoute[] = [
   "direct",
   "confirmed",
@@ -62,6 +74,7 @@ const taskMatchEvidenceLabels: readonly TaskMatchEvidence[] = [
 export const taskCommandAnalyticsVocabularies = {
   origins: taskCommandOrigins,
   outcomeCategories: taskCommandOutcomeCategories,
+  previewedOutcomes: taskCommandPreviewedOutcomes,
   applyRoutes: taskCommandApplyRoutes,
   undoResults: taskCommandUndoResults,
   scoreBands: taskMatchScoreBands,
@@ -212,7 +225,7 @@ export type ProductEventPropertiesByName = {
   // the four, so 2E-ANALYTICS-003 holds structurally.
   task_command_previewed: {
     commandOrigin: TaskCommandOrigin;
-    outcomeCategory: TaskCommandOutcome;
+    outcomeCategory: TaskCommandPreviewedOutcome;
     candidateCount: number;
     scoreBand: TaskMatchScoreBand;
     marginBand: TaskMatchScoreBand;
@@ -437,7 +450,7 @@ function arePropertiesValid<Name extends ProductEventName>(
         "policyVersion",
       ])
         && isOneOf(value.commandOrigin, taskCommandOrigins)
-        && isOneOf(value.outcomeCategory, taskCommandOutcomeCategories)
+        && isOneOf(value.outcomeCategory, taskCommandPreviewedOutcomes)
         && isBoundedInteger(value.candidateCount, 0, 100)
         && isOneOf(value.scoreBand, taskMatchScoreBands)
         && isOneOf(value.marginBand, taskMatchScoreBands)

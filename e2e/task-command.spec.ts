@@ -36,15 +36,25 @@ test("the cancelled-task recovery route is protected in both locales", async ({ 
   }
 });
 
-test("a locale-less recovery URL resolves to a locale before it resolves to auth", async ({ request }) => {
-  // The nested route must not bypass the locale contract `src/proxy.ts` owns —
-  // a route reachable only with an explicit locale prefix would be a route no
-  // language switch could preserve.
-  const response = await request.get("/app/work/cancelled", { maxRedirects: 0 });
-  expect([307, 308]).toContain(response.status());
-  const location = response.headers().location;
-  expect(location).toBeDefined();
-  expect(location).toMatch(/\/(pt-BR|en)\//);
+test("a locale-less recovery URL is not a way around the auth boundary", async ({ request }) => {
+  /*
+   * `src/proxy.ts` reads the locale from `parts[1]` and the section from
+   * `parts[2]`, so a locale-less `/app/...` path is not an app path to it at
+   * all — `inApp` is false, no redirect is issued, and Next.js answers 404
+   * because no route exists there. That is the pre-existing contract, and the
+   * only thing this slice must prove is that its nested route joins it rather
+   * than opening a hole beside it.
+   *
+   * Asserted against an existing route rather than against a literal status,
+   * so the test states the invariant ("the same as every other app path") and
+   * cannot pass by accident if that contract is ever deliberately changed.
+   */
+  const [existing, added] = await Promise.all([
+    request.get("/app/work", { maxRedirects: 0 }),
+    request.get("/app/work/cancelled", { maxRedirects: 0 }),
+  ]);
+  expect(added.status()).toBe(existing.status());
+  expect(added.status()).toBe(404);
 });
 
 test("no command surface is reachable without a session", async ({ page }) => {

@@ -36,6 +36,7 @@
  * making.
  */
 
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -54,6 +55,7 @@ import {
   createProductEventIdempotencyKey,
   recordProductEvent,
 } from "@/features/product-analytics/server";
+import type { ProductEventName } from "@/features/product-analytics/contracts";
 
 import {
   TASK_COMMAND_ORIGINS,
@@ -62,6 +64,7 @@ import {
   buildTaskCommandPreviewedProperties,
   buildTaskCommandUndoneProperties,
   type TaskCommandOrigin,
+  type TaskCommandPreviewedOutcome,
   type TaskCommandUndoResult,
 } from "./analytics";
 import { TaskCommandApplyError, applyTaskCommand } from "./apply";
@@ -76,6 +79,7 @@ import {
   previewTaskCommandCreation,
 } from "./creation";
 import { buildTaskDisambiguation } from "./disambiguation";
+import type { TaskMatchEvidence } from "./match-policy";
 import { TaskMatchInputError, rankTaskCandidates } from "./matching";
 import type { TaskCommandOutcome } from "./outcomes";
 import { TaskPreviewInputError, buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
@@ -99,6 +103,41 @@ import {
   type TaskCommandControl,
 } from "./console-state";
 import { loadTaskCommandUndoOperation } from "./undo-listing";
+
+/**
+ * Emits the parse-match-preview measurement.
+ *
+ * Takes the resolved outcome as an argument rather than deriving it from the
+ * match verdict, because the two are not the same thing: a `matched` verdict
+ * comes to rest at whatever the *preview* decided (`previewed`, `no_change`,
+ * `rejected_stale`, `refused`), and an `unmatched` verdict comes to rest at
+ * `creation_offered`, `clarification_requested` or `still_unmatched`. Deriving
+ * it here would report the verdict and call it the outcome.
+ */
+function emitPreviewed(
+  context: CommandContext,
+  operationKey: string,
+  outcome: TaskCommandPreviewedOutcome,
+  match: {
+    readonly candidateCount: number;
+    readonly topScore: number;
+    readonly margin: number;
+    readonly evidence: readonly (readonly TaskMatchEvidence[])[];
+    readonly oneStep: boolean;
+    readonly requiresConfirmation: boolean;
+  },
+): void {
+  emit(
+    context,
+    "task_command_previewed",
+    `${operationKey}:${outcome}`,
+    buildTaskCommandPreviewedProperties({
+      origin: context.origin,
+      outcome,
+      ...match,
+    }) as unknown as Record<string, unknown>,
+  );
+}
 
 function resolved(
   partial: Partial<TaskCommandConsoleState> & { heading: string; detail: string },
@@ -199,7 +238,7 @@ async function loadCommandContext(formData: FormData): Promise<CommandContext> {
  */
 function emit(
   context: Pick<CommandContext, "locale">,
-  name: Parameters<typeof recordProductEvent>[0] extends never ? never : string,
+  name: ProductEventName,
   scope: string,
   properties: Record<string, unknown>,
 ): void {
@@ -358,21 +397,18 @@ async function runCommandRound(
     timeZone,
   });
 
-  const previewEvent = () =>
-    emit(context, "task_command_previewed", `${command.operationKey}:${result.outcome}`,
-      buildTaskCommandPreviewedProperties({
-        origin: context.origin,
-        outcome: outcomeOf(result.outcome),
-        candidateCount: result.candidates.length,
-        topScore: result.topScore,
-        margin: result.margin,
-        evidence: result.candidates.map((candidate) => candidate.evidence),
-        oneStep: result.oneStep,
-        requiresConfirmation: result.requiresConfirmation,
-      }) as unknown as Record<string, unknown>);
+  const report = (outcome: TaskCommandPreviewedOutcome) =>
+    emitPreviewed(context, command.operationKey, outcome, {
+      candidateCount: result.candidates.length,
+      topScore: result.topScore,
+      margin: result.margin,
+      evidence: result.candidates.map((candidate) => candidate.evidence),
+      oneStep: result.oneStep,
+      requiresConfirmation: result.requiresConfirmation,
+    });
 
   if (result.outcome === "ambiguous" || result.outcome === "ambiguous_overflow") {
-    previewEvent();
+    report(result.outcome);
     const view = buildTaskDisambiguation({ result, locale, timeZone });
     return {
       session,
@@ -390,8 +426,12 @@ async function runCommandRound(
   }
 
   if (result.outcome === "unmatched") {
-    previewEvent();
-    return noMatchRound(context, session);
+    // Reported by `noMatchRound`, which is where the outcome is actually
+    // decided. Emitting "unmatched" here and the real outcome there would be
+    // two events for one round, and 2E-UX-001 has no `unmatched` member —
+    // a no-match comes to rest at `creation_offered`, `clarification_requested`
+    // or `still_unmatched`.
+    return noMatchRound(context, session, report);
   }
 
   const selectedTaskId = options.selectedTaskId ?? result.candidates[0]?.taskId;
@@ -419,7 +459,11 @@ async function runCommandRound(
     locale,
     timeZone,
   });
-  previewEvent();
+  // The preview's own disposition, which is the truthful category: a
+  // one-step-eligible match rests at `previewed`, and reporting it as
+  // `matched_requires_confirmation` would make "how often did a command match
+  // in one step" — PRD §18's first question — unanswerable from this event.
+  report(preview.disposition);
 
   // The witness the *rendered* preview observed. Recorded before anything can
   // be applied, so the write path has something to compare against.
@@ -452,26 +496,6 @@ async function runCommandRound(
   return { session: next, state: presentPreview(context, next, preview) };
 }
 
-/** The match outcome as one of 2E-UX-001's twelve. */
-function outcomeOf(outcome: string): TaskCommandOutcome {
-  switch (outcome) {
-    case "matched":
-      // A confident match has not come to rest — it is previewed. The nearest
-      // *outcome* it will reach is `applied`, but reporting that before the
-      // user acts would overstate what happened, so the preview event carries
-      // the disposition's own category instead.
-      return "matched_requires_confirmation";
-    case "matched_requires_confirmation":
-      return "matched_requires_confirmation";
-    case "ambiguous":
-      return "ambiguous";
-    case "ambiguous_overflow":
-      return "ambiguous_overflow";
-    default:
-      return "still_unmatched";
-  }
-}
-
 function presentFailure(
   context: CommandContext,
   session: TaskCommandSession | null,
@@ -494,6 +518,7 @@ function presentFailure(
 async function noMatchRound(
   context: CommandContext,
   session: TaskCommandSession,
+  report: (outcome: TaskCommandPreviewedOutcome) => void,
 ): Promise<MatchRound> {
   const { copy, timeZone } = context;
   const base = deriveBaseTaskCommand(session, timeZone);
@@ -518,6 +543,7 @@ async function noMatchRound(
       // An answer arrived for a command that never asked a question. Nothing to
       // continue, and re-running the initial decision would let the slot be
       // spent twice.
+      report("still_unmatched");
       return {
         session,
         state: resolved({
@@ -529,6 +555,7 @@ async function noMatchRound(
     }
     const decision = continueTaskCommandNoMatch(initial.continuation, session.clarification);
     if (decision.outcome === "still_unmatched") {
+      report("still_unmatched");
       return {
         session,
         state: resolved({
@@ -538,11 +565,12 @@ async function noMatchRound(
         }),
       };
     }
-    return creationRound(context, session);
+    return creationRound(context, session, report);
   }
 
-  if (initial.outcome === "creation_offered") return creationRound(context, session);
+  if (initial.outcome === "creation_offered") return creationRound(context, session, report);
 
+  report("clarification_requested");
   return {
     session,
     state: resolved({
@@ -565,6 +593,7 @@ async function noMatchRound(
 async function creationRound(
   context: CommandContext,
   session: TaskCommandSession,
+  report: (outcome: TaskCommandPreviewedOutcome) => void,
 ): Promise<MatchRound> {
   const derived = deriveTaskCommand(session, context.timeZone);
   if (derived.status !== "ok") {
@@ -591,6 +620,7 @@ async function creationRound(
   if (issued.outcome !== "issued") {
     return { session, state: presentFailure(context, session, issued) };
   }
+  report("creation_offered");
   return {
     session,
     state: resolved({
@@ -838,8 +868,8 @@ async function writeRound(
       operationKey: command.operationKey,
     });
 
-    const outcome: TaskCommandOutcome =
-      applied.outcome === "applied" ? "applied" : applied.outcome === "no_change" ? "no_change" : applied.outcome;
+    // Already one of 2E-UX-001's twelve on every branch of the union.
+    const outcome: TaskCommandOutcome = applied.outcome;
     emit(
       context,
       "task_command_applied",
@@ -853,6 +883,7 @@ async function writeRound(
     );
 
     if (applied.outcome === "applied") {
+      refreshCommandSurfaces(context.locale);
       return resolved({
         heading: context.copy.outcomes.applied.title,
         detail: context.copy.outcomes.applied.description,
@@ -940,6 +971,7 @@ export async function createTaskFromCommand(
       locale: context.locale,
     });
     if (created.outcome !== "applied") return presentFailure(context, session, created);
+    refreshCommandSurfaces(context.locale);
 
     emit(
       context,
@@ -990,10 +1022,15 @@ export async function undoTaskCommand(
   // one answer, because 2E-OWNERSHIP-002 requires the first two to be
   // indistinguishable.
   if (operation === null) {
-    return undoResult(context, "unavailable", context.copy.undoStates.unavailable);
+    return undoResult(context, undoId.data, "unavailable", context.copy.undoStates.unavailable);
   }
   if (operation.state !== "available") {
-    return undoResult(context, operation.state, context.copy.undoStates[operation.state]);
+    return undoResult(
+      context,
+      undoId.data,
+      operation.state,
+      context.copy.undoStates[operation.state],
+    );
   }
 
   const { error } = await context.supabase.rpc("undo_operation", { p_undo_id: undoId.data });
@@ -1001,6 +1038,7 @@ export async function undoTaskCommand(
     const failure = context.copy.failures;
     return undoResult(
       context,
+      undoId.data,
       "refused",
       {
         title: context.copy.outcomes.refused.title,
@@ -1010,7 +1048,8 @@ export async function undoTaskCommand(
     );
   }
 
-  return undoResult(context, "undone", {
+  refreshCommandSurfaces(context.locale);
+  return undoResult(context, undoId.data, "undone", {
     title: context.copy.console.undone,
     description: context.copy.undoStates.available.description,
   });
@@ -1018,6 +1057,7 @@ export async function undoTaskCommand(
 
 function undoResult(
   context: CommandContext,
+  undoId: string,
   result: TaskCommandUndoResult,
   copy: { readonly title: string; readonly description: string },
   reason?: string,
@@ -1025,7 +1065,10 @@ function undoResult(
   emit(
     context,
     "task_command_undone",
-    `${context.userId}:${result}:${Math.floor(Date.now() / 60_000)}`,
+    // Keyed on the operation and its result rather than on a clock bucket: the
+    // undo of one operation is one event, and a user who clicks twice should
+    // not produce two.
+    `${undoId}:${result}`,
     buildTaskCommandUndoneProperties({ origin: context.origin, result }) as unknown as Record<string, unknown>,
   );
   return resolved({
@@ -1034,6 +1077,22 @@ function undoResult(
     reason: reason ?? null,
     terminal: true,
   });
+}
+
+/**
+ * Refreshes the surfaces a command's write invalidates.
+ *
+ * Without this the user applies a change, sees "Done", and the task list beside
+ * the console still shows the old state until they navigate — which reads as
+ * the command having silently failed. Both mounts are revalidated regardless of
+ * which one the command came from: a command driven from Chat still changes
+ * what the Work page must render, and a `revalidatePath` for a route nobody is
+ * looking at costs nothing.
+ */
+function refreshCommandSurfaces(locale: Locale): void {
+  for (const path of ["work", "work/cancelled", "chat", "today", "tasks", "waiting", "inbox"]) {
+    revalidatePath(`/${locale}/app/${path}`);
+  }
 }
 
 function expiredSession(context: CommandContext): TaskCommandConsoleState {

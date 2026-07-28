@@ -207,6 +207,8 @@ export type TaskCommandCopy = {
     unexpected: string;
     scoreLabel: string;
     evidenceLabel: string;
+    /** Names the before/after list, which is not the same thing as the evidence. */
+    changesLabel: string;
   };
   /** The cancelled-task recovery surface (2E-DESTRUCTIVE-006). */
   recovery: {
@@ -483,6 +485,7 @@ const ptBR: TaskCommandCopy = {
     unexpected: "Algo deu errado e nada foi alterado. Tente de novo.",
     scoreLabel: "Pontuação",
     evidenceLabel: "Por que esta",
+    changesLabel: "O que muda",
   },
   recovery: {
     eyebrow: "RECUPERAÇÃO",
@@ -746,6 +749,7 @@ const en: TaskCommandCopy = {
     unexpected: "Something went wrong and nothing was changed. Try again.",
     scoreLabel: "Match score",
     evidenceLabel: "Why this one",
+    changesLabel: "What changes",
   },
   recovery: {
     eyebrow: "RECOVERY",

@@ -393,11 +393,18 @@ begin
       ]);
     when 'task_command_previewed' then
       perform private.require_product_event_enum(p_properties, 'commandOrigin', array['chat', 'work']);
-      -- PRD 2E-UX-001's twelve, in the order the requirement lists them.
+      -- PRD 2E-UX-001's twelve, in the order the requirement lists them, plus
+      -- `previewed`. That thirteenth is the one preview *disposition* the
+      -- outcome vocabulary deliberately excludes (`outcomes.ts:53-67`), because
+      -- a preview waiting for the user has not come to rest -- and it is
+      -- precisely where a one-step-eligible match belongs. Folding it onto
+      -- another category would make PRD 18's first question, how often a
+      -- command matched in one step, unanswerable from this event.
       perform private.require_product_event_enum(p_properties, 'outcomeCategory', array[
         'applied', 'no_change', 'ambiguous', 'ambiguous_overflow',
         'matched_requires_confirmation', 'clarification_requested', 'still_unmatched',
-        'creation_offered', 'unsupported', 'rejected_stale', 'rejected_conflict', 'refused'
+        'creation_offered', 'unsupported', 'rejected_stale', 'rejected_conflict', 'refused',
+        'previewed'
       ]);
       -- Ceiling of 100 rather than of `TASK_MATCH_LIMITS.ranked`: the constant
       -- is a presentation cap that a policy change may raise, and a CHECK that

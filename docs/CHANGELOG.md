@@ -3,6 +3,57 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-28 — Phase 2E Slice 2E.7: conversational and task-surface integration (branch `codex/phase-2e-natural-language-task-updates`)
+
+Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/PHASE_2E_SLICE_07_REPORT.md`.
+
+### Added
+
+- **`src/features/task-commands/session.ts`** — the command envelope, and the reason the whole flow is deterministic. It carries the model's normalized proposal plus the instant the session was issued at; every step re-runs `validateTaskCommand`, `loadTaskCandidates` and `rankTaskCandidates` against **that** instant, so all of them recompute the identical command, the identical `observed_before` and therefore the identical fingerprint. It also carries the explicit selection and the staleness witness `{taskId, updatedAt}` from the preview that was actually rendered. Parsed by a Zod schema with a version literal, because it round-trips through the browser. See ADR-050.
+- **`src/features/task-commands/actions.ts`** — eight Server Actions (start, select, apply, confirm, clarify, create, undo, restore) behind one `runTaskCommand` dispatcher that validates a closed intent list. `useActionState` binds one action to one state, and this flow is one conversation with several steps.
+- **`src/features/task-commands/console-state.ts`** — the state contract, separate because a `"use server"` module may export **only** async functions. The production build caught this; lint and typecheck did not.
+- **`src/features/task-commands/analytics.ts`** — the score/margin band mapper and four content-free payload builders. Band boundaries are arithmetic over `TASK_MATCH_THRESHOLDS` rather than a fourth magic number, so re-tuning the policy moves the bands with it. `match-policy.ts:183-191` had deliberately deferred these until a caller existed; this is that caller.
+- **`src/features/task-commands/command-console.tsx`, `confirm-dialog.tsx`, `cancelled-tasks-view.tsx`** — the surface. The confirmation dialog is a hand-rolled `role="dialog" aria-modal="true"`: jsdom 29.1.1 has no `showModal`/`show`/`close`, verified by execution, and Vitest with jsdom is the only accessibility gate CI runs. Focus management, a Tab cycle and Escape-restores-focus are implemented and each has a test.
+- **`src/features/task-commands/undo-listing.ts`** — the task-scoped undo projection (2E-UNDO-005). Reading the row before calling the router is also how 2E-UNDO-007's "expired" and "no longer available" become distinct localized outcomes **without widening the SQL error vocabulary**: `public.undo_operation` reports both as `P0001` with message text and no detail token, and this repository's mapper keys on the token and never on the message.
+- **`src/features/task-commands/recovery.ts`** and **`/app/work/cancelled`** — the cancelled-task recovery surface (2E-DESTRUCTIVE-006). It lists through `list_task_command_candidates` rather than querying `public.tasks`, because that RPC is where 2E-DESTRUCTIVE-009's creation-undone predicate lives; a direct read would be a second, weaker door.
+- **Migration `202607280061`** — the `task_command` surface and four event names (`task_command_previewed`, `task_command_disambiguated`, `task_command_applied`, `task_command_undone`) added to the table CHECKs and to both guards inside `private.record_product_event`, in the same change as the first emitting code (2E-ANALYTICS-005). Three new property validators: a real JSON boolean, a bounded enum **set** with no repeats, and the policy version as a shape rather than as today's literal. Both private functions are re-declared in full from their current bodies, verified by `diff` against `202607230050`.
+- **`scripts/product-event-vocabulary.mjs`** — the reader the remote smoke uses instead of restating the taxonomy (2E-ANALYTICS-006), held to the real imported constants by a Vitest case. See ADR-052.
+- **`e2e/task-command.spec.ts`**, named in `ci.yml` beside `foundation.spec.ts` — credential-free, so it actually gates: the new nested route joins the auth boundary and the locale-redirect contract on desktop and mobile.
+
+### Changed
+
+- **`src/features/product-analytics/contracts.ts`** — `productSurfaces` 9 → 10, `productEventNames` 22 → 26, with typed properties and runtime validators for the four. Phase 2E's vocabularies arrive as **types** and their literals are restated, so the command taxonomy does not follow this module into the client bundle; `contracts.test.ts` holds every restated list to its declaring module by exact equality, because a type catches a wrong value and not a missing one.
+- **`scripts/remote-product-events-smoke.mjs`** — reads the vocabulary rather than restating it. Making it authoritative immediately exposed that its event matrix had never exercised `question_resolved`, `question_effect_previewed` or `question_reinterpret_applied`; all three are now covered.
+- **`src/features/task-commands/copy.ts`** — six new sections. Four are vocabulary-backed and registered in `copy.test.ts`'s exhaustiveness gate (`unsupportedReasons`, `validation`, `provider`, `undoStates`); two are the console's and the recovery surface's own chrome.
+- **`src/features/task-commands/outcomes.ts`** — `TASK_COMMAND_UNDO_STATES` declared here rather than beside the projection that computes it, because `undo-listing.ts` is `server-only` and `copy.ts` is bundled for the client.
+- **`src/features/daily-cycle/work-view.tsx`** — mounts the console and renders the recovery link. The link is here rather than in the navigation because `capabilities.ts`'s `nested: true` drives active-state highlighting only; links render from `primaryNavigationKeys`/`moreNavigationGroups`, so a nested route with none of its own is reachable only by typing the URL.
+- **Both chat pages** mount the console. `sendChatMessage` ends in `redirect()` to `chat/[conversationId]`, so mounting only on the list page would break Epic 2E-G's "behaves identically" the moment a user sent one message.
+- **`src/features/daily-cycle/architecture.test.ts`** — three new surfaces under the same boundary, including a regex against locale ternaries in components (2E-I18N-001).
+
+### Fixed
+
+- **The dialog focus trap selected unfocusable elements.** `input:not([disabled])` matches `type="hidden"`, and every form in the dialog carries hidden locale, origin and session fields — so "the first focusable element" resolved to a hidden input, `.focus()` was a silent no-op, and the dialog opened with focus still on the page behind it. The Tab cycle failed identically. Found by the tests written for 2E-A11Y-002/004, not by review.
+- **The result region had no role.** A bare `div` with an `aria-label` has no implicit role, so its name was announced only if focus happened to land there. It is now an explicit named `region`, which also makes it reachable by landmark navigation.
+
+
+## 2026-07-27 — Phase 2E Slice 2E.6: no-match activity creation (branch `codex/phase-2e-natural-language-task-updates`)
+
+Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `291cc75`, which touched only `PHASE_2E_PROGRESS.md` and that slice's report — so this entry, and the `STATE.md`/`TODO.md` entries beside it, are Slice 2E.7's documentation catch-up rather than same-commit records. The gap is stated rather than backdated. Migration `202607270060` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.7, §12.4, §12.5, §19.1 (Epic 2E-F). See `docs/reports/PHASE_2E_SLICE_06_REPORT.md`.
+
+### Added
+
+- **Migration `202607270060`** — the canonical creation payload, owned relation resolution, and three RPCs: `preview_task_command_creation`, `issue_task_command_creation_confirmation` and `create_task_command`, sharing the mutation contract's operation-key, fingerprint, audit and undo-registry primitives (2E-NOMATCH-004). A compensating `undo_create_task_command` handler cancels the exact created task and its still-live reminder after verifying recorded scalar and relation state, and the shared creation-family guards prevent later resurrection. Created rows carry `created_by = 'agent'`, `status = 'inbox'` and null `source_entry_id`/`source_interpretation_id`/`candidate_index`, so an activity is distinguishable from a user-confirmed candidate by actor and action type (2E-NOMATCH-007).
+- **`supabase/tests/phase_2e_task_command_creation.sql`** — `plan(127)`.
+- **`src/features/task-commands/creation.ts`** — the capability-bound one-clarification continuation and its terminal outcome. Its result type has no `clarification_requested` member, so the bounded slot of 2E-NOMATCH-008 cannot be spent twice by supplying a fresh boolean.
+- **`creation-migration.test.ts`** — executable parser/AST gates over the shipped helper, the final `DO` block and the undo handler.
+- **`scripts/local-task-command-creation-race.mjs`** — a real two-session same-key PostgREST proof plus an evidence self-test, run by the CI database job after migrations, pgTAP and database lint.
+
+### Notes
+
+- The existing task-insert trigger remains the only due-reminder creator. Exact replay returns the original identities, including after undo, and never recreates or restores the task (2E-NOMATCH-006).
+- **Still no UI, route, Server Action, product event or model call** at the time of acceptance; the consumer is Slice 2E.7.
+
+
 ## 2026-07-27 — Phase 2E Slice 2E.5: destructive actions and confirmation (branch `codex/phase-2e-natural-language-task-updates`)
 
 Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `cancel_task` is gated on a server-issued, single-use confirmation the database enforces; `restore_task` is gated on two collision guards. **Still no UI, route, Server Action, product event or model call** — nothing calls either RPC; the consumer is Slice 2E.7. Migration `202607260059` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.6, §11.2, §11.3, §12.3, §19.1 (Epic 2E-E). See ADR-047, ADR-048, ADR-049 and `docs/reports/PHASE_2E_SLICE_05_REPORT.md`.

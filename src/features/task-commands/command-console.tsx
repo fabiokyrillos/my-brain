@@ -244,7 +244,7 @@ export function TaskCommandResult({
             <div className="task-command-preview">
               <p className="task-command-notice">{state.preview.copy.notice}</p>
               <p className="task-command-task-title">{state.preview.task.title}</p>
-              <PreviewDeltas fieldsLabel={copy.console.evidenceLabel} preview={state.preview} />
+              <PreviewDeltas fieldsLabel={copy.console.changesLabel} preview={state.preview} />
               <PreviewEffects preview={state.preview} />
               <p className="task-command-reversibility">{state.preview.copy.reversibility}</p>
               {state.preview.copy.undoWindow === null ? null : (

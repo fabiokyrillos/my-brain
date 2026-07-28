@@ -3,9 +3,11 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { TASK_COMMAND_OUTCOMES } from "./outcomes";
 import {
   TASK_COMMAND_APPLY_ROUTES,
   TASK_COMMAND_ORIGINS,
+  TASK_COMMAND_PREVIEWED_OUTCOMES,
   TASK_COMMAND_UNDO_RESULTS,
   buildTaskCommandAppliedProperties,
   buildTaskCommandDisambiguatedProperties,
@@ -172,5 +174,16 @@ describe("content-free by construction (2E-ANALYTICS-003)", () => {
     expect(TASK_COMMAND_APPLY_ROUTES).toEqual(["direct", "confirmed", "created"]);
     expect(TASK_COMMAND_UNDO_RESULTS).toEqual(["undone", "unavailable", "expired", "refused"]);
     expect(TASK_MATCH_SCORE_BANDS).toEqual(["none", "low", "medium", "high"]);
+  });
+
+  it("adds exactly one member to the outcome vocabulary for the preview event", () => {
+    // `previewed` is a disposition, not an outcome, and this is the one place
+    // it has to be reportable. The assertion pins both halves: the twelve are
+    // untouched, and exactly one is added.
+    expect(TASK_COMMAND_PREVIEWED_OUTCOMES.slice(0, TASK_COMMAND_OUTCOMES.length))
+      .toEqual([...TASK_COMMAND_OUTCOMES]);
+    expect(TASK_COMMAND_PREVIEWED_OUTCOMES).toHaveLength(TASK_COMMAND_OUTCOMES.length + 1);
+    expect(TASK_COMMAND_PREVIEWED_OUTCOMES.at(-1)).toBe("previewed");
+    expect(TASK_COMMAND_OUTCOMES).not.toContain("previewed");
   });
 });

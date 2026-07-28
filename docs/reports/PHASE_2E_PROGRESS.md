@@ -1,6 +1,6 @@
 # Phase 2E — Execution Progress
 
-**Status: IN PROGRESS — Slice 2E.6 ACCEPTED. Paused before Slice 2E.7 by explicit user request.**
+**Status: IN PROGRESS — Slice 2E.7 ACCEPTED. Slice 2E.8 (Epic 2E-H, convergence and closeout) has not started.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -9,24 +9,26 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Field | Value |
 |---|---|
 | Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, in sync) |
-| Branch HEAD | `2540ca5` implementation/test HEAD (plus the docs commit that carries this file) |
+| Branch HEAD | `ffd66ca` implementation/test HEAD (plus the docs commit that carries this file) |
 | Phase base | `2e2acfd` |
-| Working tree | Clean at the implementation/test HEAD; this file and the Slice 2E.6 report are carried by the following docs-only closeout commit |
+| Working tree | Clean at the implementation/test HEAD; this file and the Slice 2E.7 report are carried by the following docs-only closeout commit |
 | Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | **all three jobs green** on `2540ca5` (run `30292038500`). The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` |
+| CI | see the run recorded below. The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic: Slice 2E.7 adds no pgTAP file |
 | Merged / tagged / released | nothing |
 
-**Drift corrected on entry to this session** (docs-only, not a regression): this file named branch HEAD `bfa28a1` and CI run `30227374101`. Both were stale by one docs commit — the true HEAD on entry was `f0fa112`, with a *newer* green run `30227814871`. This is the third consecutive session to find that drift, and the cause is structural: this file is written before the docs commit that contains it. **Verify HEAD from `git rev-parse`, never from this table.**
+**The structural drift in this table is now on its fifth consecutive session.** It is written *before* the docs commit that carries it, so its HEAD is always one commit stale by the time anyone reads it. **Verify HEAD from `git rev-parse`, never from this table.** The entry check for Slice 2E.7 found exactly that again — the file named `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`.
 
-Slices 2E.1–2E.5 remain accepted.
+**A different drift was found and paid off this session, and it was not docs-only in effect.** Commit `291cc75` accepted Slice 2E.6 while touching only this file and that slice's report, so `STATE.md`, `CHANGELOG.md`, `TODO.md` and `DECISIONS.md` were never updated for an accepted slice — a Definition-of-Done §13 gap. Slice 2E.7's closeout pays it: `STATE.md` and `CHANGELOG.md` now carry Slice 2E.6 entries marked as recorded late rather than backdated.
+
+Slices 2E.1–2E.6 remain accepted.
 
 ## Deployment state
 
 | Artifact | State |
 |---|---|
 | Remote migration parity | `202607250054` — unchanged since the pre-2E cutover, verified this session with `npx supabase migration list --linked` |
-| `202607250055`–`202607270060` | **local only.** The whole chain applies from an empty database in CI; none is applied to the linked project |
-| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged. Slices 2E.1–2E.6 touch no worker code |
+| `202607250055`–`202607280061` | **local only.** The whole chain applies from an empty database in CI; none is applied to the linked project |
+| Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged. Slices 2E.1–2E.7 touch no worker code |
 | Generated types | hand-written (ADR-041). Slice 2E.6 adds parity for the preview, confirmation and creation RPCs through migration-source, content and executable catalog contracts |
 
 **`202607250056`'s amendment window is still closed by exhaustion** for its *result columns and argument list*. Slice 2E.5 amended its **body** by `create or replace`, which costs nothing — that distinction is now load-bearing and should not be misremembered as "the file is frozen".
@@ -43,8 +45,37 @@ Slices 2E.1–2E.5 remain accepted.
 | 2E.4 — Reversible non-destructive updates | 2E-D | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_04_REPORT.md` |
 | 2E.5 — Destructive actions and confirmation | 2E-E | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_05_REPORT.md` |
 | 2E.6 — No-match activity creation | 2E-F | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_06_REPORT.md` |
-| 2E.7 — Conversational and task-surface integration | 2E-G | not started |
+| 2E.7 — Conversational and task-surface integration | 2E-G | **ACCEPTED — READY WITH NON-BLOCKING NOTES.** `PHASE_2E_SLICE_07_REPORT.md` |
 | 2E.8 — Convergence and closeout | 2E-H | not started |
+
+## Slice 2E.7 — what shipped
+
+**The phase has a user-visible surface for the first time.** One command console mounts on Chat (the
+list page *and* a conversation, because `sendChatMessage` ends in `redirect()` to the latter) and on
+the task surface, behind a single `runTaskCommand` dispatcher. `/app/work/cancelled` is the recovery
+route, linked from the Work page.
+
+| Artifact | Responsibility |
+|---|---|
+| `session.ts` (new) | The envelope: normalized proposal, **pinned** issuing instant, explicit selection, staleness witness, one bounded clarification |
+| `console-state.ts` (new) | The state contract and closed control/intent vocabularies — separate because a `"use server"` module may export only async functions |
+| `actions.ts` (new) | Eight Server Actions plus the dispatcher; auth, the caller's own timezone, AI-usage ordering, confirmation placement, fault mapping, analytics |
+| `analytics.ts` (new) | The band mapper `match-policy.ts` deferred until a caller existed, and four content-free payload builders |
+| `undo-listing.ts`, `recovery.ts` (new) | Server-only projections: task-scoped undo (2E-UNDO-005) and the cancelled-task listing |
+| `command-console.tsx`, `confirm-dialog.tsx`, `cancelled-tasks-view.tsx` (new) | The surface and the hand-rolled modal |
+| `202607280061` (new) | `task_command` surface + four event names in all three allowlists; three new property validators; both private functions re-declared in full |
+| `product-event-vocabulary.mjs` (new) | 2E-ANALYTICS-006's reader, mirrored by a Vitest case |
+| `e2e/task-command.spec.ts` (new), named in `ci.yml` | Credential-free, so it gates rather than skipping |
+
+**Three decisions are recorded as ADRs and are not re-litigable:** ADR-050 (continuation is
+re-derivation from a pinned clock), ADR-051 (the destructive confirmation is issued by the render,
+and the dialog is hand-rolled because jsdom 29.1.1 has no `showModal`), ADR-052 (`task_command` is
+its own analytics surface, and the smoke reads the vocabulary rather than restating it).
+
+**Two defects were found by this slice's own tests, and one by the build alone.** The dialog focus
+trap selected hidden inputs, so the modal opened with focus left on the page behind it; the result
+region had no role, so its accessible name was announced only by accident. The build — not lint, not
+typecheck — caught the state vocabulary being exported from a `"use server"` module.
 
 ## Slice 2E.6 — what shipped
 
@@ -110,42 +141,69 @@ it never recreates or restores the task.
 
 ## Local gates on HEAD
 
-`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2110 passed / 118 files** ·
-focused `src/features/task-commands` **1018 passed / 20 files** · migration parser/AST **17/17** ·
-`build` clean · deployed-entrypoint Deno checks clean · Deno tests **46/46** · race evidence
-validator self-test clean.
+`lint` 0 errors 0 warnings · `typecheck` 0 errors · `npm test` **2254 passed / 124 files** ·
+focused `src/features/task-commands` **1152 passed / 26 files** · `build` clean, with
+`/[locale]/app/work/cancelled` registered · deployed-entrypoint Deno checks clean · Deno tests
+**46/46** · `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop
+--project=mobile` **12 passed**.
+
+The Slice 2E.6 baseline was 2110 / 118 files, so Slice 2E.7 adds **144 assertions across 6 files**.
 
 pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and
-`supabase db lint --local` never execute on this workstation. Exact-SHA run `30292038500` supplied the
-authoritative database evidence: empty-database migration chain, both lint schemas, real two-session
-race, `phase_2e_task_command_creation.sql ............. ok`, and
-`Files=30, Tests=1277, Result: PASS`. That is exactly `29 + 1` files and `1150 + 127` assertions.
+`supabase db lint --local` never execute on this workstation. CI supplied the authoritative database
+evidence: empty-database migration chain including `202607280061`, both lint schemas, the real
+two-session race, and `Files=30, Tests=1277, Result: PASS`. **That count is unchanged from Slice
+2E.6, and that is the correct arithmetic** — this slice adds no pgTAP file and alters no RPC that
+one asserts. Its database change is the analytics allowlist, guarded by the migration's own
+post-deploy `DO` block and by `contracts.test.ts`.
 
-## Open items after accepted Slice 2E.6
+**The first CI run on this slice was red, and the failure was this slice's own new e2e assertion.**
+It claimed a locale-less `/app/work/cancelled` would redirect to a locale; it 404s, because
+`src/proxy.ts` reads the section from `parts[2]`, so a locale-less `/app/...` path is not an app path
+to the proxy at all. Migrations, pgTAP and database lint were green on that same run. The assertion
+now pins the invariant that matters — the new route answers identically to an existing one — rather
+than a status literal.
 
-1. **No deployment occurred.** The linked project remains at migration `202607250054`, so an
-   authenticated online smoke of the new RPCs is blocked on separate deployment authorization.
-2. **No rendered production caller exists yet.** Conversational integration, task-scoped undo listing,
-   cancelled-task restore affordance and authenticated surface journeys belong to Slice 2E.7.
-3. **No dedicated mutation-testing round ran.** The adversarial review, executable parser/AST gates,
-   127-assertion pgTAP suite and real two-session race are the acceptance evidence used here.
-4. **The earlier Slice 2E.5 design round remained incomplete.** Its limitation is preserved in that
-   slice's report; Slice 2E.6's shipped-code review and scoped CI re-reviews completed.
-5. Draft PR #18 remains intentionally open and unmerged. Nothing was deployed, tagged or released.
+## Open items after accepted Slice 2E.7
+
+1. **No deployment occurred.** The linked project remains at migration `202607250054`, so every
+   Phase 2E RPC — including the three this slice calls — is unreachable online. **Every
+   authenticated journey for Epic 2E-G is blocked on that, not on code**: typing a command, resolving
+   a disambiguation, confirming a cancellation, creating from a no-match, undoing, and restoring from
+   the recovery page. The credential-free route/auth/locale journeys do run in CI.
+2. **`2E-COMMAND-012` is not discharged.** Prompt and strategy versions travel on the session and are
+   available to the operation, but no Phase 2E RPC has a column for them, so recording them *on the
+   operation* needs a schema change this slice has no mandate to make. Slice 2E.8 must either add the
+   column or record a reclassification in the PRD.
+3. **No focused remote smoke for this slice** (2E-OPERATIONS-003), blocked on the same deployment.
+4. **No dedicated mutation-testing round ran.** The evidence used here is the adversarial design
+   review, the re-verification of its twelve corrections against the tree, 141 new assertions, the
+   architecture boundary gates, and CI's database job.
+5. **`PHASE_2E_SLICE_07_DESIGN.md` promises a 42-finding set in its §6 that the file does not
+   contain.** Only the twelve critical corrections and the follow-on paragraph survived the budget
+   exhaustion that ended that session. Recorded rather than pretended away; the twelve are what this
+   implementation was verified against.
+6. **The `restore_task` recovery path depends on the task being ranked by its own title.** A user
+   with more than 25 cancelled tasks sharing one title could see a stale-shell preview rather than a
+   restore. Disclosed; `hasMore` already tells the user the list is truncated.
+7. Draft PR #18 remains intentionally open and unmerged. Nothing was deployed, tagged or released.
 
 ## Next: the continuation point, precisely
 
-**Stop here. Slice 2E.6 is accepted and the user explicitly requested that Slice 2E.7 not start in this
-session.** No 2E.7 source, test or design artifact was created.
+The next slice is **2E.8 — Convergence and closeout (Epic 2E-H)**. Its inputs:
 
-When separately authorized, the next slice is 2E.7 — Conversational and task-surface integration
-(Epic 2E-G). Its starting contract is the accepted 2E.1–2E.6 stack, especially:
-
-- the one production caller must select among update, destructive-confirmation and confirmed-creation
-  continuations without widening their closed outcome vocabularies;
-- task-scoped undo listing and cancelled-task restore affordances must stay owner-scoped;
-- desktop/mobile, pt-BR/en and accessibility evidence belongs to that rendered slice;
-- no task row belongs inside an LLM prompt; the existing bounded command contracts remain the boundary.
+- **The convergence audit finally has a surface to audit.** One taxonomy, one matching policy, one
+  preview contract, one mutation contract, one error vocabulary, one undo registry and one analytics
+  allowlist now each have exactly one consumer; until this slice they had none.
+- **The traceability generator, the cleanup verifier and the aggregate remote smoke do not exist.**
+  2E-OPERATIONS-004 additionally requires the aggregate smoke to be deterministic and to not compete
+  with the shared queue drain.
+- **`2E-MATCH-018`'s measured baseline** is computed by `match-baseline.test.ts` over the committed
+  fixture corpus and needs transcribing into the phase report as the bar any future semantic signal
+  must beat.
+- **`2E-COMMAND-012`** needs the decision in item 2 above.
+- **Deployment authorization gates every item in §Open items.** Deployment order for Slice 2E.7 is
+  migrations only — it touches no worker code.
 
 Useful commands:
 

@@ -145,6 +145,7 @@ describe("product analytics contracts", () => {
     expect(restated.applyRoutes).toEqual([...analytics.TASK_COMMAND_APPLY_ROUTES]);
     expect(restated.undoResults).toEqual([...analytics.TASK_COMMAND_UNDO_RESULTS]);
     expect(restated.outcomeCategories).toEqual([...outcomes.TASK_COMMAND_OUTCOMES]);
+    expect(restated.previewedOutcomes).toEqual([...analytics.TASK_COMMAND_PREVIEWED_OUTCOMES]);
     expect(restated.scoreBands).toEqual([...matchPolicy.TASK_MATCH_SCORE_BANDS]);
     expect(restated.evidence).toEqual([...matchPolicy.TASK_MATCH_EVIDENCE]);
   });
@@ -192,6 +193,20 @@ describe("product analytics contracts", () => {
     expect(parse?.({
       ...base,
       properties: { ...base.properties, commandText: "cancel my gym task" },
+    })).toBeNull();
+    // The preview event accepts `previewed`, which is a disposition rather than
+    // an outcome — a one-step-eligible match rests there.
+    expect(parse?.({ ...base, properties: { ...base.properties, outcomeCategory: "previewed" } }))
+      .not.toBeNull();
+    // ...and still refuses a category from no vocabulary at all.
+    expect(parse?.({ ...base, properties: { ...base.properties, outcomeCategory: "matched" } }))
+      .toBeNull();
+    // The *apply* event does not accept it: an applied command has come to rest.
+    expect(parse?.({
+      ...basePayload,
+      surface: "task_command",
+      name: "task_command_applied",
+      properties: { ...propertiesByEvent.task_command_applied, outcomeCategory: "previewed" },
     })).toBeNull();
     // A band outside the permanent vocabulary.
     expect(parse?.({ ...base, properties: { ...base.properties, scoreBand: "certain" } })).toBeNull();

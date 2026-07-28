@@ -31,7 +31,7 @@ import {
   type TaskMatchScoreBand,
 } from "./match-policy";
 import { TASK_COMMAND_POLICY_VERSION } from "./taxonomy";
-import type { TaskCommandOutcome } from "./outcomes";
+import { TASK_COMMAND_OUTCOMES, type TaskCommandOutcome } from "./outcomes";
 
 /**
  * A score's band.
@@ -108,9 +108,26 @@ export type TaskCommandOrigin = (typeof TASK_COMMAND_ORIGINS)[number];
 export const TASK_COMMAND_APPLY_ROUTES = ["direct", "confirmed", "created"] as const;
 export type TaskCommandApplyRoute = (typeof TASK_COMMAND_APPLY_ROUTES)[number];
 
+/**
+ * 2E-UX-001's twelve outcomes plus `previewed`.
+ *
+ * `previewed` is the one `TASK_COMMAND_PREVIEW_DISPOSITIONS` member the outcome
+ * vocabulary deliberately excludes, and the preview event is exactly where it
+ * has to be reportable: a one-step-eligible match rests there, and folding it
+ * onto another category would make PRD §18's first question — how often a
+ * command matched in one step — unanswerable from the event that exists to
+ * answer it. The twelve are unchanged; this adds one and invents none.
+ */
+export const TASK_COMMAND_PREVIEWED_OUTCOMES = [
+  ...TASK_COMMAND_OUTCOMES,
+  "previewed",
+] as const;
+
+export type TaskCommandPreviewedOutcome = (typeof TASK_COMMAND_PREVIEWED_OUTCOMES)[number];
+
 export type TaskCommandPreviewedProperties = {
   readonly commandOrigin: TaskCommandOrigin;
-  readonly outcomeCategory: TaskCommandOutcome;
+  readonly outcomeCategory: TaskCommandPreviewedOutcome;
   readonly candidateCount: number;
   readonly scoreBand: TaskMatchScoreBand;
   readonly marginBand: TaskMatchScoreBand;
@@ -128,7 +145,7 @@ export type TaskCommandPreviewedProperties = {
  */
 export function buildTaskCommandPreviewedProperties(input: {
   readonly origin: TaskCommandOrigin;
-  readonly outcome: TaskCommandOutcome;
+  readonly outcome: TaskCommandPreviewedOutcome;
   readonly candidateCount: number;
   readonly topScore: number;
   readonly margin: number;

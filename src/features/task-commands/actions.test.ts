@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { getAIProvider } from "@/lib/ai";
 import { recordAIUsage } from "@/lib/ai/usage";
@@ -24,6 +25,7 @@ import { parseTaskCommandSession } from "./session";
 // `settings-view.test.ts` does.
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn(async () => true) }));
 vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
@@ -690,6 +692,42 @@ describe("the recovery surface", () => {
   });
 });
 
+describe("cache revalidation", () => {
+  it("refreshes the task surfaces after a write, so the list beside the console is not stale", async () => {
+    harness();
+    provider(modelProposal());
+    const previewed = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "mark the report as done" }),
+    );
+    vi.mocked(revalidatePath).mockClear();
+    await applyTaskCommandAction(
+      idleTaskCommandState,
+      form({ session: previewed.session as string }),
+    );
+
+    const paths = vi.mocked(revalidatePath).mock.calls.map(([path]) => path);
+    expect(paths).toContain("/en/app/work");
+    expect(paths).toContain("/en/app/work/cancelled");
+  });
+
+  it("revalidates nothing when the write did not happen", async () => {
+    const bench = harness();
+    provider(modelProposal());
+    const previewed = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "mark the report as done" }),
+    );
+    bench.rows = [sqlRow({ updated_at: "2026-07-28T09:00:00.000Z" })];
+    vi.mocked(revalidatePath).mockClear();
+    await applyTaskCommandAction(
+      idleTaskCommandState,
+      form({ session: previewed.session as string }),
+    );
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
 describe("analytics", () => {
   it("emits only bounded categories, never content", async () => {
     harness();
@@ -706,6 +744,13 @@ describe("analytics", () => {
     expect(properties).toMatchObject({
       commandOrigin: "chat",
       candidateCount: 1,
+      // The preview's own disposition, not the match verdict: a
+      // one-step-eligible match rests at `previewed`, and reporting it as
+      // `matched_requires_confirmation` would make PRD §18's first question
+      // unanswerable from the event that exists to answer it.
+      outcomeCategory: "previewed",
+      oneStep: true,
+      requiresConfirmation: false,
       policyVersion: expect.stringMatching(/^\d{4}-\d{2}-\d{2}\.\d+$/),
     });
   });
