@@ -1,22 +1,36 @@
 # Project State
 
-Last updated: 2026-07-28 (Phase 2E — merged to `main`; not deployed)
+Last updated: 2026-07-28 (Phase 2E — merged, deployed, validated and released)
 
 ## Current truth
 
-**Phase 2E — Natural-Language Task Updates is MERGED. All eight slices — 2E.1 (Epic 2E-A) through 2E.8 (Epic 2E-H) — are implemented, reviewed, corrected and accepted. PR #18 merged into `main` on 2026-07-28 as merge commit `5d22400`, a two-parent merge that preserves all 64 commit messages, with all three CI jobs green on the exact merge SHA `96cf178` (run `30383879590`).**
+**Phase 2E — Natural-Language Task Updates is RELEASED.** All eight slices — 2E.1 (Epic 2E-A) through 2E.8 (Epic 2E-H) — are implemented, reviewed, corrected, accepted, merged, deployed to the linked project and validated against it.
 
-**Nothing is deployed, tagged or released. Remote migration parity remains `202607250054` while `202607250055`–`202607280061` now sit on `main` and are still applied nowhere.** Merging changed no running system; deploying will. They were, and remain, separate authorizations — the second has not been given.
+**Remote migration parity is `202607280061`.** The whole chain `202607250055`–`202607280061` is applied; every post-deploy assertion held on the first attempt and no rollback was required.
 
-**The repository is deployment-ready and deployment-blocked at the same time, and the distinction matters:** there is no engineering left to do, and the only gate is a human decision. The checklist to execute when that decision is made is `docs/reports/PHASE_2E_FINAL_REPORT.md` §10; the rollback plan is §11; the release steps are §13.
+| Fact | Value |
+|---|---|
+| Phase merge | PR #18 → `5d22400` (merge commit, all 64 commit messages preserved), CI green on the exact merge SHA `96cf178` (run `30383879590`) |
+| Corrective merge | PR #20 → `0efcd82`, CI green on `08d3940` (run `30391388573`) |
+| Requirements | **121 of 122 delivered** |
+| Still deferred | **`2E-COMMAND-012` only** — Phase 2F, by recorded decision (ADR-053, PRD revision 4) |
+| Remote gates | aggregate smoke 23 assertions exit 0 · cleanup exit 0, zero residue · product-events exit 0 · Phase 2E online journeys 12/12 desktop+mobile, pt-BR+en |
 
-**118 of the phase's 122 requirements are delivered. Four are not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half are blocked on deployment authorization and on nothing else. A fifth, `2E-MATCH-018`, is **delivered with a scope note** — the measured baseline covers the scoring layer against declared SQL verdicts rather than end-to-end matching, so any Phase 2F comparison must use that scope or re-measure. The full accounting is `docs/reports/PHASE_2E_FINAL_REPORT.md`, and every requirement is individually mapped in `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md`.
+**The three requirements Phase 2E closed as blocked on deployment are now delivered:** `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half. They were never blocked on code.
+
+**Deployment found three broken validation scripts, and none was a fault in the deployed system.** Eight defects across `remote-phase-2e-smoke.mjs`, `verify-phase-2e-cleanup.mjs` and `remote-product-events-smoke.mjs` — seven of them the same mistake, tooling restating a contract instead of reading it. One assertion had been passing while testing nothing (`undefined !== "undone"` is permanently true). All three had never executed against a deployed database: the smoke had only ever run its own preflight, and the verifier had only ever taken its absent-table branch. `PHASE_2E_SLICE_08_REPORT.md` §4.2 had already named this exact failure mode after finding one instance at closeout. Fixed in PR #20; no migration, RPC, privilege or production contract changed.
+
+**Known non-blocking issue:** `e2e/intelligent-capture.spec.ts` does not pass deterministically online. It is model-dependent, predates Phase 2E, has no pre-deployment baseline, and its failures occur upstream of every Phase 2E mutation. Tracked in [issue #21](https://github.com/fabiokyrillos/my-brain/issues/21). **It is not a Phase 2E regression** and must not be recorded as one.
+
+**121 of the phase's 122 requirements are delivered. One is not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4) — the versions exist as build constants and travel on the command session, but no column persists them, and adding one means `drop function` plus a full re-declaration of a ~1,460-line RPC or of `record_ai_usage`, which every AI path in the product shares. Residual risk: attributing a bad command to its prompt requires joining `ai_usage_events.created_at` to the deploy history rather than reading a column.
+
+`2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half **were** blocked on deployment authorization and are now delivered and proven remotely. `2E-MATCH-018` is **delivered with a scope note** — the measured baseline covers the scoring layer against declared SQL verdicts rather than end-to-end matching, so any Phase 2F comparison must use that scope or re-measure. The full accounting is `docs/reports/PHASE_2E_FINAL_REPORT.md`, and every requirement is individually mapped in `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md`.
 
 **Slice 2E.8 closed the phase and its convergence audit found a real defect the seven slices before it had not.** `src/features/task-commands/vocabulary.ts` — the 61-entry bilingual status/priority term table — sat outside the versioning regime every other policy module lives inside. The `policy-lock.test.ts` case named *"pins the status and priority vocabularies"* actually digested `TASK_STATUSES`/`TASK_PRIORITIES`, the **closed database literals this module neither owns nor can change**, while the mappings it does own were digested by nothing. Re-pointing one entry — `bloqueada` from `blocked` to `deferred` — would have moved a user's task to a state they never named with the whole suite green. `TASK_VOCABULARY_VERSION` was orphaned and had already drifted a version behind while promising in its own docstring that it had not, and `vocabularyCoversEveryLiteral()` was exported and never called. All three are fixed, and the digest is sorted by code unit rather than `localeCompare` so an ICU update cannot move a pinned gate. See `docs/reports/PHASE_2E_SLICE_08_REPORT.md`.
 
 **The closeout tooling was executed, not merely written.** `npm run test:remote:2e:cleanup` passes against the live linked project; `npm run test:remote:2e` correctly exits 2 with `BLOCKED ON DEPLOYMENT`; the traceability generator's fail-closed behaviour was proven by four tamper runs. Running the cleanup verifier is what found its own defect — it detected an absent table by SQLSTATE `42P01`, but PostgREST answers from its schema cache and returns `PGRST205` without reaching Postgres, so it died on the first Phase 2E table.
 
-**PR #18 is MERGED.** Of the three separate authorizations Phase 2E needs, the first is given and the other two are not: deployment and release remain outstanding, and the checklists are in `PHASE_2E_FINAL_REPORT.md` §10–§13. The four undelivered requirements are unchanged by the merge — three of them unblock the moment the chain is deployed, and `2E-COMMAND-012` belongs to Phase 2F.
+**All three of Phase 2E's authorizations are given and discharged: merged, deployed, released.** The checklists in `PHASE_2E_FINAL_REPORT.md` §10–§13 are executed. The rollback posture in §11 remains valid and unchanged — no applied migration is ever reverted; rollback means unmounting the command console, which is the only entry point to every Phase 2E RPC, and `persistTaskStatus`/`applyWorkItemAction` were never migrated onto it.
 
 **Slice 2E.7 gives the phase its first user-visible behaviour.** Every contract Slices 2E.1–2E.6 built had no production caller; this slice is that caller. A command console mounts on Chat (both the list page and a conversation) and on the task surface, with one Server-Action dispatcher behind it; `/app/work/cancelled` is the cancelled-task recovery route 2E-DESTRUCTIVE-006 requires, linked from the Work page because `capabilities.ts`'s `nested: true` drives active-state highlighting only. Migration `202607280061` adds the `task_command` surface and four event names to all three allowlists. See `docs/reports/PHASE_2E_SLICE_07_REPORT.md`, ADR-050, ADR-051 and ADR-052.
 

@@ -9,14 +9,28 @@
 | Slices | 2E.1 … 2E.8, all eight accepted |
 | Branch | `codex/phase-2e-natural-language-task-updates` |
 | Phase base | `2e2acfd` (Pre-Phase-2E Foundation Hardening, PR #17) |
-| Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) |
-| Merged | **no** |
-| Deployed | **no** — remote migration parity is `202607250054`; the phase ends at `202607280061` |
-| Tagged / released | **no** — the last release is `phase-2d-complete` |
+| PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) |
+| Merged | **yes** — `5d22400`, 2026-07-28 |
+| Deployed | **yes** — remote migration parity is `202607280061` |
+| Tagged / released | **yes** — `phase-2e-complete` |
 | Requirement inventory | 122 functional IDs across 16 families, 8 epic acceptance criteria, 5 global gates |
-| Requirements delivered | **118 of 122** |
-| Requirements not delivered | **4** — one deliberate reclassification to Phase 2F (`2E-COMMAND-012`), three blocked on deployment authorization and nothing else (`2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half) |
+| Requirements delivered | **121 of 122** |
+| Requirements not delivered | **1** — the deliberate reclassification to Phase 2F (`2E-COMMAND-012`) |
 | Delivered with a scope note | 1 — `2E-MATCH-018`. Counted as delivered because its own text is satisfied; the note (§3) exists so a Phase 2F comparison is not made against the wrong measurement |
+
+> ## Release addendum — 2026-07-28
+>
+> **This report was written at closeout, before the phase was merged or deployed. Its body is preserved as written; this addendum records what changed and is authoritative where the two disagree.**
+>
+> Phase 2E is **merged, deployed, validated and released**. The sentence immediately below — that it has never run against the linked project — was true when written and is no longer true.
+>
+> - **Merged** as `5d22400` (PR #18), CI green on the exact merge SHA `96cf178` (run `30383879590`). A corrective PR #20 followed as `0efcd82` (run `30391388573`).
+> - **Deployed.** All seven migrations applied in order on the first attempt, every post-deploy `DO` block held, **no rollback required**. Remote parity is **`202607280061`**.
+> - **121 of 122 requirements delivered.** §7.2's three — `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half — are delivered; they were blocked on deployment authorization and on nothing else, exactly as §7.2 said. **`2E-COMMAND-012` (§7.1) remains the one undelivered requirement**, still Phase 2F's by ADR-053. §3's `2E-MATCH-018` scope note is unchanged and still travels with the number.
+> - **Gates executed against the deployed project:** aggregate smoke 23 assertions exit 0 · cleanup exit 0 with `tablesNotYetDeployed: []`, zero orphans and zero residue · product-events exit 0 across all nine controls · Phase 2E authenticated online journeys 12/12 on desktop and mobile in pt-BR and English.
+> - **§10's deployment checklist has one deviation, recorded rather than glossed.** Its "take a database backup or confirm the restore point" step could not be satisfied: the project has `pitr_enabled: false` and an empty backups list, and `supabase db dump` runs `pg_dump` in Docker, which is unavailable on this workstation. Deployment proceeded on explicit authorization, the project being a test environment with disposable data. It carried little risk regardless — the chain is verifiably additive, and §11's rollback never depended on a backup.
+> - **§6's claim that no closeout tool had been proven by execution turned out to understate the problem.** Deployment exposed eight defects across three validation scripts, seven of them the same mistake: tooling restating a contract instead of reading it. One assertion had been passing while testing nothing at all. None was a fault in a migration, an RPC, a deployed privilege or any production contract; all are fixed in PR #20. `PHASE_2E_SLICE_08_REPORT.md` §4.2 had already named this failure mode after finding one instance — *"A verifier that has never run is a claim, not a gate."* It recurred three more times, which is the sharpest lesson this phase produced.
+> - **One known non-blocking issue:** `e2e/intelligent-capture.spec.ts` does not pass deterministically online. Model-dependent, predates Phase 2E, no pre-deployment baseline, failures upstream of every Phase 2E mutation. [Issue #21](https://github.com/fabiokyrillos/my-brain/issues/21). **Not a Phase 2E regression.**
 
 **Read this line before any other claim in this document.** Phase 2E is complete *as a branch*. It has never run against the linked project, no user has ever typed a command into it, and every online journey named in Epic 2E-G's acceptance is blocked on a deployment that has not been authorized. Everything below distinguishes what is proven from what is merely written.
 

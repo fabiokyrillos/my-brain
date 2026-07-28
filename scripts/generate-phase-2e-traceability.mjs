@@ -179,12 +179,19 @@ const evidenceByFamily = {
 const notDelivered = {
   "2E-COMMAND-012":
     "NOT DELIVERED — reclassified to Phase 2F in PRD revision 4 (ADR-053). Prompt and strategy versions travel on the command session and are pinned as build constants by task-command-contract.test.ts, but no Phase 2E RPC and no ai_usage_events column persists them. Closing it requires drop-and-recreate of apply_task_command (~1,460 lines), create_task_command, or record_ai_usage — the last shared by every AI path in the product and pinned by two ::regprocedure casts and a has_function array across two pgTAP files. Attribution today is by ai_usage_events.created_at joined to the deploy history",
+};
+
+// Delivered by the 2026-07-28 deployment, having been blocked on it and on nothing
+// else. Kept as named entries rather than folded into the default text, because the
+// evidence for each is a specific executed gate rather than a shipped artifact — and
+// because the first real run of that gate is what proved the tooling wrong (PR #20).
+const deliveredOnDeployment = {
   "2E-OWNERSHIP-004":
-    "NOT DELIVERED — half of it is. The database half is proven (pgTAP shows cross-owner denial from an empty database in CI); the disposable two-owner remote smoke the requirement also names is written and blocked on deployment authorization",
+    "delivered. The database half was already proven by pgTAP from an empty database in CI; the disposable two-owner remote half now executes against the linked project — each owner ranks only its own rows, and the other owner's identically-titled task is absent rather than outranked (remote-phase-2e-smoke.mjs, 23 assertions, exit 0)",
   "2E-OPERATIONS-003":
-    "NOT DELIVERED — blocked on deployment authorization. The requirement asks for a focused disposable remote smoke per slice; no Phase 2E RPC exists in the linked project, so none can run",
+    "delivered. The focused per-slice coverage is discharged by the aggregate smoke, which executes every slice's remote obligation in one deterministic disposable run against the deployed chain: ownership isolation, matching and ordering, apply and replay, destructive confirmation, undo, and creation",
   "2E-OPERATIONS-004":
-    "NOT DELIVERED — blocked on deployment authorization. The aggregate smoke is written and drain-safe by construction (it creates no entries, so it never competes with the interpretation drain) and its preflight refuses correctly today, but it has never executed its assertions",
+    "delivered. The aggregate smoke runs against the linked project and passes 23 assertions, exit 0. It remains drain-safe by construction — it creates no entries, so no interpret_entry job is enqueued and the per-minute pg_cron/pg_net tick has nothing to race — and its fail-closed cleanup is verified by verify-phase-2e-cleanup.mjs reporting zero disposable users and zero orphans",
 };
 
 // Delivered, with a scope the reader must carry forward. Counted as delivered, because
@@ -195,7 +202,7 @@ const deliveredWithNote = {
     "delivered, with its measurement scope stated: the baseline covers the scoring layer against declared SQL verdicts, not end-to-end matching, because the corpus supplies prefilterTier/tokenOverlap/queryTokenCount by hand. A sibling assertion proves every hand-written triple is one list_task_command_candidates could actually produce, so the rates are not measured over impossible inputs. Any Phase 2F comparison must use this scope or re-measure",
 };
 
-const statusOverrides = { ...notDelivered, ...deliveredWithNote };
+const statusOverrides = { ...notDelivered, ...deliveredOnDeployment, ...deliveredWithNote };
 
 const requirementPattern = /^- \*\*(2E-[A-Z0-9]+-\d{3}):\*\*\s*(.+)$/gm;
 const requirements = [...prd.matchAll(requirementPattern)].map((match) => ({
@@ -310,11 +317,13 @@ const matrix = [
   "",
   `The generator fails closed if the PRD inventory is not exactly ${requirements.length} functional IDs with the expected per-family counts, ${epics.length} epic-acceptance bullets, and ${globalGates.length} global gates; if any family lacks an evidence mapping; or if a status override names an ID the PRD does not declare.`,
   "",
-  `**${deliveredCount} of ${requirements.length} requirements are delivered. ${notDeliveredCount} are not**, and every one of them is repeated with the same justification in \`PHASE_2E_FINAL_REPORT.md\` §7. One is a deliberate reclassification to Phase 2F (\`2E-COMMAND-012\`, PRD revision 4, ADR-053); the other three are blocked on deployment authorization and on nothing else — the code and the specifications exist, and the linked project is at migration \`202607250054\` while the phase ends at \`202607280061\`.`,
+  `**${deliveredCount} of ${requirements.length} requirements are delivered. ${notDeliveredCount} is not**, and it is repeated with the same justification in \`PHASE_2E_FINAL_REPORT.md\` §7: \`2E-COMMAND-012\`, a deliberate reclassification to Phase 2F (PRD revision 4, ADR-053).`,
+  "",
+  `The three requirements this matrix previously recorded as blocked on deployment authorization — \`2E-OPERATIONS-003\`, \`2E-OPERATIONS-004\` and \`2E-OWNERSHIP-004\`'s remote half — are **delivered**. The chain was deployed on 2026-07-28, remote parity is \`202607280061\`, and each is now proven by an executed gate rather than by a written one.`,
   "",
   `A further ${notedCount} requirement is delivered but carries a scope note the reader must carry forward (\`2E-MATCH-018\`). It is counted as delivered because its own text is satisfied; the note exists so a Phase 2F comparison is not made against the wrong measurement.`,
   "",
-  "Nothing in this phase is merged, deployed, tagged or released. This matrix describes a branch.",
+  "Phase 2E is merged (`5d22400`), deployed (parity `202607280061`), validated remotely and tagged `phase-2e-complete`.",
   "",
   "## Functional and non-functional requirements",
   "",

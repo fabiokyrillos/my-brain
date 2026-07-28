@@ -3,6 +3,25 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-28 — Phase 2E deployed, validated and released (`phase-2e-complete`)
+
+**The Phase 2E migration chain is applied to the linked project and remote parity is `202607280061`.** All seven migrations applied in order on the first attempt, every post-deploy `DO` block held, and **no rollback was required**. Deployment order was migrations only — `process-jobs` v15 and `heartbeat` v4 are untouched by this phase.
+
+**121 of 122 requirements are delivered.** The three that Phase 2E closed as blocked on deployment authorization — `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half — are now delivered and proven remotely. **`2E-COMMAND-012` is the only requirement Phase 2E did not deliver**, reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4), with its residual risk unchanged: attribution requires joining `ai_usage_events.created_at` to the deploy history rather than reading a column.
+
+Release gates, all executed against the deployed project:
+
+- `npm run test:remote:2e` — **23 assertions, exit 0.** Ownership isolation, cross-owner non-disclosure, anon denial, stable ordering, the `limit + 1` overflow probe, three injection-shaped title patterns, apply, exact replay, fingerprint-mismatch refusal, `55P03` staleness, unconfirmed-cancel refusal, confirmation issuance, the confirmed cancel, restore reachability, undo, undo replay, creation preview, creation replay and actor provenance.
+- `npm run test:remote:2e:cleanup` — **exit 0**, `tablesNotYetDeployed: []`, zero orphans, zero remote-smoke storage objects.
+- `npm run test:remote:product-events` — **exit 0**, 26 taxonomy events across all nine controls including `privacy`.
+- Phase 2E authenticated online journeys — **12/12** on desktop and mobile, pt-BR and English.
+
+**Deployment exposed eight defects in three validation scripts, and not one was a fault in the deployed system** (PR #20, merge commit `0efcd82`). Seven were the same mistake: tooling that restated a contract instead of reading it. `remote-phase-2e-smoke.mjs` sent an empty patch where the canonical patch must carry the destination status, read `.status` where the RPC returns `.outcome`, passed `p_operation_id` where the parameter is `p_undo_id`, and used `create_task` where the creation family's action is the qualifier the unmatched command carried. **One of its assertions had been passing while testing nothing** — `undefined !== "undone"` is permanently true. `verify-phase-2e-cleanup.mjs` read a `42501` on `task_command_confirmations` as a fault when it is the designed posture; that exception is now written as an assertion, so a *successful* read fails the check as a widened grant. `remote-product-events-smoke.mjs` failed its own free-content assertion because a declared evidence label is named `normalized_exact_title`; the substring match is replaced by a shape test that also catches the leaks the old form missed.
+
+All three scripts had never executed against a deployed database — the smoke had only ever run its own preflight, and the verifier had only ever taken its absent-table branch. `PHASE_2E_SLICE_08_REPORT.md` §4.2 had already named this failure mode after finding one instance at closeout: *"A verifier that has never run is a claim, not a gate."* Deployment found three more. No migration, RPC, deployed privilege or production contract was changed to fix them.
+
+**Known non-blocking issue, recorded rather than smoothed over.** `e2e/intelligent-capture.spec.ts` — the intelligent-capture journey, which predates Phase 2E — does not pass deterministically online. Its assertions wait on UI that renders only if a live OpenAI interpretation produced particular output, so it is non-reproducible by construction: the failing set moved on every run (10 failed parallel, then 9 with a different set, then 1 serially with a third). It is **not a Phase 2E regression** — failures occur upstream of every Phase 2E mutation, `editable-candidate-confirmation.spec.ts` passes 4/4 in isolation while exercising the one Phase 2C undo handler `202607260059` re-declared, and no failed or stuck jobs exist remotely. No pre-deployment baseline exists because the suite is manual and CI has never run it. Tracked in issue #21.
+
 ## 2026-07-28 — Phase 2E merged to `main` (PR #18, merge commit `5d22400`)
 
 **Phase 2E — Natural-Language Task Updates is merged and is not deployed.** PR #18 landed on `main` as a **merge commit**, matching PRs #15, #16 and #17, with parents `2e2acfd` (the phase base) and `96cf178` (the branch HEAD). A squash was considered and rejected: the 64 commit messages carry the phase's reasoning, including the refutations, ADR-048's withdrawn second half, and the defects CI found that no local gate could reproduce.
