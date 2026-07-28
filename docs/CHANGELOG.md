@@ -3,6 +3,18 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-28 — Phase 2E merged to `main` (PR #18, merge commit `5d22400`)
+
+**Phase 2E — Natural-Language Task Updates is merged and is not deployed.** PR #18 landed on `main` as a **merge commit**, matching PRs #15, #16 and #17, with parents `2e2acfd` (the phase base) and `96cf178` (the branch HEAD). A squash was considered and rejected: the 64 commit messages carry the phase's reasoning, including the refutations, ADR-048's withdrawn second half, and the defects CI found that no local gate could reproduce.
+
+All three CI jobs were green on the **exact merge SHA** `96cf178` (run `30383879590`) — not on an ancestor, which `PHASE_2E_FINAL_REPORT.md` §12 requires by name.
+
+The merge landed 125 files, +46,465/−64: seven additive migrations (`202607250055`–`202607280061`), fifteen ADRs (ADR-039 … ADR-053), 25 modules and 26 colocated test files under `src/features/task-commands/`, 6 new pgTAP files, one credential-free Playwright spec now gating CI, and five new scripts.
+
+**Nothing else changed.** No deployment, no tag, no release. Remote migration parity stays at `202607250054`, so every Phase 2E RPC remains unreachable online and the command console has no live path to a database that knows what it is asking for. The three requirements blocked on deployment (`2E-OPERATIONS-003`, `2E-OPERATIONS-004`, `2E-OWNERSHIP-004`'s remote half) are still blocked, and `2E-COMMAND-012` is still Phase 2F's. **Merging changed no running system; deploying will.**
+
+Two documentation commits were made during merge preparation and are part of the merge. `aee9c84` reconciled `PHASE_2E_PROGRESS.md`'s repository-state table against `git rev-parse` and retired two sentences that had gone false — `TODO.md`'s "Slice 2E.8 has not started" and `STATE.md`'s "will not be merged until Slice 2E.8". `96cf178` corrected the one scale figure in the final report that was counted wrong: it claimed 30 modules under `src/features/task-commands/` where `git ls-tree` reports 25 modules and 26 tests, and it ran this branch's 10,076 lines of SQL together with the pre-2E trio PR #17 had already merged. Both corrections are annotated in place rather than substituted silently.
+
 ## 2026-07-28 — Phase 2E Slice 2E.8: convergence and closeout (branch `codex/phase-2e-natural-language-task-updates`)
 
 Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/PHASE_2E_FINAL_REPORT.md` and `docs/reports/PHASE_2E_SLICE_08_REPORT.md`.
