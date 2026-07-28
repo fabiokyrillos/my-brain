@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import { getTaskCommandCopy } from "@/features/task-commands/copy";
+import { taskCommandUndoErrorDetailFor } from "@/features/task-commands/errors";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -457,6 +459,42 @@ export async function answerPendingQuestion(
   return resolvePendingQuestion(state, formData);
 }
 
+/**
+ * The reason a `public.undo_operation` call failed, localized (PRD 2E-UPDATE-017).
+ *
+ * `public.undo_operation` is a shared router: it loads the operation by id, looks
+ * its `action_type` up in `private.undo_operation_handlers` and calls whichever
+ * private handler is registered. Migration `202607260058` registered two more —
+ * `apply_task_command` and `apply_task_command_relation` — so from Slice 2E.4
+ * onwards an undo submitted here can come back carrying a Phase 2E detail token
+ * even though this action was written for pending questions. Without this branch
+ * both of them collapse onto `copy.undoFailed` ("Could not undo."), which is the
+ * one thing the user cannot act on: `2E_UNDO_RESTORE_INTEGRITY` means a newer
+ * change would have been silently discarded (2E-UNDO-004), and the honest answer
+ * names that rather than inviting a retry that will fail identically.
+ *
+ * The sentence comes from `task-commands/copy.ts`, keyed by the declared token, so
+ * there is no second copy of the Phase 2E failure vocabulary here (2E-I18N-003).
+ * Every other error keeps the pre-existing generic message — including `P0002` and
+ * the router's three errcode-less raises — because none of them belongs to a
+ * declared vocabulary this action could speak more precisely about.
+ *
+ * That this action can compensate a task-command operation at all is a property of
+ * the shared router, not something introduced here. PRD 2E-UNDO-005 assigns Phase
+ * 2E its own owner-scoped, task-scoped undo listing rather than stretching an
+ * entry- or question-scoped surface to carry operations that have no question, and
+ * this stays a faithful report either way.
+ */
+function mapUndoOperationFailure(
+  error: { code?: string; details?: string },
+  locale: Locale,
+  fallback: string,
+): string {
+  const detail = taskCommandUndoErrorDetailFor(error.code, error.details);
+  if (detail === null) return fallback;
+  return getTaskCommandCopy(locale).failures[detail];
+}
+
 export async function undoQuestionResolution(
   _state: QuestionUndoState,
   formData: FormData,
@@ -480,7 +518,7 @@ export async function undoQuestionResolution(
   if (!user) return { status: "error", message: copy.session };
 
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
-  if (error) return { status: "error", message: copy.undoFailed };
+  if (error) return { status: "error", message: mapUndoOperationFailure(error, locale, copy.undoFailed) };
 
   refreshQuestionSurfaces();
   return {

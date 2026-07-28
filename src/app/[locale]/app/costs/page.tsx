@@ -33,6 +33,7 @@ const operationLabels = {
   file_analysis: ["Análise de arquivos", "File analysis"],
   advanced_reasoning: ["Raciocínio avançado", "Advanced reasoning"],
   background: ["Rotinas internas", "Background routines"],
+  task_command: ["Comandos de tarefa", "Task commands"],
 } as const;
 
 const profileLabels = {

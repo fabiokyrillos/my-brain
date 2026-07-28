@@ -5,11 +5,29 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { chatAnswerSchema } from "./chat-schema";
 import { entryExtractionSchema } from "./extraction-schema";
 import type { AIProvider } from "./provider";
-import type { ChatInput, ChatResult, EmbeddingResult, ExtractionInput, ExtractionResult } from "./types";
+import {
+  TASK_COMMAND_MAX_OUTPUT_TOKENS,
+  TASK_COMMAND_PROMPT_VERSION,
+  TASK_COMMAND_STRATEGY_VERSION,
+  TaskCommandProviderError,
+  buildTaskCommandUserMessage,
+  classifyCommandText,
+  taskCommandProposalSchema,
+  taskCommandSystemPrompt,
+} from "./task-command-schema";
+import type {
+  ChatInput,
+  ChatResult,
+  EmbeddingResult,
+  ExtractionInput,
+  ExtractionResult,
+  TaskCommandParseInput,
+  TaskCommandParseResult,
+} from "./types";
 import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details";
 
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-export const EXTRACTION_PROMPT_VERSION = "2026-07-16.1";
+export const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
 
 /** Explicit ceiling per provider call. See the constructor for why. */
 export const NODE_OPENAI_TIMEOUT_MS = 120_000;
@@ -24,6 +42,7 @@ Security and truth rules:
 - Implicit work goes into taskCandidates for user confirmation. Set explicit=true only for direct commands such as "crie uma tarefa" or "me lembre".
 - When no date is stated, occurredAt equals currentTime. Resolve relative dates in the supplied IANA timezone.
 - dueAt is null when no defensible deadline exists. Do not silently invent one.
+- occurredAt and dueAt are full ISO-8601 timestamps with a timezone designator, never a bare date: 2026-07-31T23:59:59-03:00, not 2026-07-31. A deadline stated as a day means the end of that day in the supplied IANA timezone.
 - If ambiguity changes the meaning or action, add one short pending question.
 - Use concise natural-language summaries in the requested locale.
 - Evidence must be a short phrase grounded in the entry.
@@ -78,6 +97,90 @@ export class OpenAIProvider implements AIProvider {
       extraction: entryExtractionSchema.parse(response.output_parsed),
       model: response.model ?? this.model,
       rawOutput: response.output_parsed,
+    };
+  }
+
+  /**
+   * PRD 2E-COMMAND-009/013, §6.1.
+   *
+   * Transport only. It builds the fenced prompt, bounds the call, validates the
+   * response against the schema, and returns the proposal with its provenance —
+   * it does not decide anything. The caller records the usage this returns to
+   * `ai_usage_events` before persisting anything derived from the proposal
+   * (2E-PROVENANCE-002); the two cannot be inverted here, because the ledger
+   * write needs a Supabase client and this module deliberately has none.
+   *
+   * Every throw is a `TaskCommandProviderError` carrying a code and nothing
+   * else. An escaping SDK error would quote the request body — the user's raw
+   * command text — into whatever logs it.
+   */
+  async parseTaskCommand(input: TaskCommandParseInput): Promise<TaskCommandParseResult> {
+    const commandText = input.commandText.trim();
+    // Refused before the request, so an out-of-bounds input is never billed.
+    const bound = classifyCommandText(commandText);
+    if (bound !== null) throw new TaskCommandProviderError(bound);
+
+    let response;
+    try {
+      // `responses.create`, not `responses.parse`. `parse` runs the schema
+      // eagerly *inside* the awaited promise, so schema-violating output throws
+      // a ZodError indistinguishable here from a transport failure — it would
+      // be reported as `provider_unavailable`, inviting a retry of a
+      // deterministic model defect, and the response (with its usage) would be
+      // gone. Parsing below instead keeps both the classification and the bill.
+      response = await this.client.responses.create({
+        model: this.model,
+        reasoning: { effort: "low" },
+        // The proposal is a classification plus a handful of short strings.
+        // A model that starts writing prose gets truncated rather than billed.
+        max_output_tokens: TASK_COMMAND_MAX_OUTPUT_TOKENS,
+        input: [
+          { role: "system", content: taskCommandSystemPrompt },
+          {
+            role: "user",
+            content: buildTaskCommandUserMessage({ commandText, locale: input.locale }),
+          },
+        ],
+        text: { format: zodTextFormat(taskCommandProposalSchema, "task_command") },
+      });
+    } catch {
+      throw new TaskCommandProviderError("provider_unavailable");
+    }
+
+    // Past this point the call is billed, so every failure carries what it
+    // cost. The worker's rule, pinned by `usage-order.test.ts`: rejecting
+    // invalid output must not skip the cost already incurred.
+    const usage = normalizeResponseUsage(response);
+    const model = response.model ?? this.model;
+    const billed = { usage: usage as unknown as Record<string, unknown>, model };
+
+    // Empty when the response was truncated at the token ceiling, and when the
+    // model returned a refusal instead of content.
+    const outputText = response.output_text;
+    if (typeof outputText !== "string" || outputText.trim() === "") {
+      throw new TaskCommandProviderError("no_structured_output", billed);
+    }
+
+    let raw: unknown;
+    try {
+      raw = JSON.parse(outputText);
+    } catch {
+      throw new TaskCommandProviderError("invalid_model_output", billed);
+    }
+
+    const parsed = taskCommandProposalSchema.safeParse(raw);
+    if (!parsed.success) {
+      // Zod's issues quote the offending values, which are model echoes of the
+      // user's own words. The code travels; the detail does not.
+      throw new TaskCommandProviderError("invalid_model_output", billed);
+    }
+
+    return {
+      ...usage,
+      proposal: parsed.data,
+      model,
+      promptVersion: TASK_COMMAND_PROMPT_VERSION,
+      strategyVersion: TASK_COMMAND_STRATEGY_VERSION,
     };
   }
 

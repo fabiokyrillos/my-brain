@@ -1,3 +1,86 @@
+import type {
+  TaskCommandApplyRoute,
+  TaskCommandOrigin,
+  TaskCommandPreviewedOutcome,
+  TaskCommandUndoResult,
+} from "@/features/task-commands/analytics";
+import type { TaskMatchEvidence, TaskMatchScoreBand } from "@/features/task-commands/match-policy";
+import type { TaskCommandOutcome } from "@/features/task-commands/outcomes";
+
+/**
+ * Phase 2E's vocabularies arrive as **types**, and their runtime literals are
+ * restated below.
+ *
+ * A type-only import is erased at build time, so the command taxonomy does not
+ * follow this module into the client bundle that `interaction-events.tsx`
+ * ships — while still making a value outside the declared union a compile
+ * error. What a type cannot catch is an *omission*, so `contracts.test.ts`
+ * asserts each restated list against the imported runtime vocabulary by exact
+ * equality. Together those are the same guarantee `productTaskStatuses` gets
+ * from being restated and pinned, at no bundle cost.
+ */
+const taskCommandOrigins: readonly TaskCommandOrigin[] = ["chat", "work"];
+const taskCommandOutcomeCategories: readonly TaskCommandOutcome[] = [
+  "applied",
+  "no_change",
+  "ambiguous",
+  "ambiguous_overflow",
+  "matched_requires_confirmation",
+  "clarification_requested",
+  "still_unmatched",
+  "creation_offered",
+  "unsupported",
+  "rejected_stale",
+  "rejected_conflict",
+  "refused",
+];
+/**
+ * The preview event's own category list: the twelve outcomes plus `previewed`.
+ *
+ * A preview waiting for the user has not come to rest, so `previewed` is not an
+ * outcome — but it is the category a one-step-eligible match belongs to, and
+ * the preview event has to be able to say so.
+ */
+const taskCommandPreviewedOutcomes: readonly TaskCommandPreviewedOutcome[] = [
+  ...taskCommandOutcomeCategories,
+  "previewed",
+];
+const taskCommandApplyRoutes: readonly TaskCommandApplyRoute[] = [
+  "direct",
+  "confirmed",
+  "created",
+];
+const taskCommandUndoResults: readonly TaskCommandUndoResult[] = [
+  "undone",
+  "unavailable",
+  "expired",
+  "refused",
+];
+const taskMatchScoreBands: readonly TaskMatchScoreBand[] = ["none", "low", "medium", "high"];
+const taskMatchEvidenceLabels: readonly TaskMatchEvidence[] = [
+  "normalized_exact_title",
+  "normalized_title_phrase",
+  "normalized_token_overlap",
+  "referenced_project",
+  "referenced_context",
+  "referenced_person",
+  "status_match",
+  "temporal_proximity",
+  "temporal_proximity_near",
+  "recent_activity",
+];
+
+/** Exported for the exact-equality drift gate in `contracts.test.ts` only. */
+export const taskCommandAnalyticsVocabularies = {
+  origins: taskCommandOrigins,
+  outcomeCategories: taskCommandOutcomeCategories,
+  previewedOutcomes: taskCommandPreviewedOutcomes,
+  applyRoutes: taskCommandApplyRoutes,
+  undoResults: taskCommandUndoResults,
+  scoreBands: taskMatchScoreBands,
+  evidence: taskMatchEvidenceLabels,
+} as const;
+
 export const productEventNames = [
   "capture_started",
   "capture_save_succeeded",
@@ -21,6 +104,16 @@ export const productEventNames = [
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
+  // Phase 2E Slice 2E.7. Chosen against PRD §18's questions rather than against
+  // the code that happens to exist: how often did a command match in one step,
+  // how often did the user pick something other than the top candidate, how
+  // often did a preview go stale or produce no change, and how often was an
+  // applied change reversed. Migration `202607280061` carries the same four
+  // literals into the table CHECK and the `record_product_event` guard.
+  "task_command_previewed",
+  "task_command_disambiguated",
+  "task_command_applied",
+  "task_command_undone",
 ] as const;
 
 export type ProductEventName = (typeof productEventNames)[number];
@@ -40,6 +133,12 @@ export const productSurfaces = [
   "work",
   "questions",
   "server",
+  // Phase 2E Slice 2E.7 (2E-ANALYTICS-005). Its own surface rather than a fold
+  // into `work`: the command console mounts on both Chat and the task surface,
+  // and attributing it to either would make "where do commands come from"
+  // unanswerable. Which mount a command was driven from travels as the
+  // `commandOrigin` *property*, which is a bounded category.
+  "task_command",
 ] as const;
 
 export type ProductSurface = (typeof productSurfaces)[number];
@@ -120,6 +219,39 @@ export type ProductEventPropertiesByName = {
   processing_retry_requested: { retrySource: "user" | "worker" };
   work_view_viewed: { workView: "today" | "all" | "waiting" };
   task_status_changed: { fromStatus: ProductTaskStatus; toStatus: ProductTaskStatus };
+  // Phase 2E Slice 2E.7 — the seven categories 2E-ANALYTICS-001 allows, and
+  // nothing else. Every member below is a bounded category, a bounded integer,
+  // a boolean, or the policy version; there is no free-text property on any of
+  // the four, so 2E-ANALYTICS-003 holds structurally.
+  task_command_previewed: {
+    commandOrigin: TaskCommandOrigin;
+    outcomeCategory: TaskCommandPreviewedOutcome;
+    candidateCount: number;
+    scoreBand: TaskMatchScoreBand;
+    marginBand: TaskMatchScoreBand;
+    signalCategories: readonly TaskMatchEvidence[];
+    oneStep: boolean;
+    requiresConfirmation: boolean;
+    policyVersion: string;
+  };
+  task_command_disambiguated: {
+    commandOrigin: TaskCommandOrigin;
+    candidateCount: number;
+    selectedRank: number;
+    policyVersion: string;
+  };
+  task_command_applied: {
+    commandOrigin: TaskCommandOrigin;
+    outcomeCategory: TaskCommandOutcome;
+    applyRoute: TaskCommandApplyRoute;
+    replayed: boolean;
+    policyVersion: string;
+  };
+  task_command_undone: {
+    commandOrigin: TaskCommandOrigin;
+    undoResult: TaskCommandUndoResult;
+    policyVersion: string;
+  };
 };
 
 type ProductEventPayloadFor<Name extends ProductEventName> = {
@@ -195,6 +327,39 @@ function isBoundedDuration(value: unknown): value is number {
 
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && uuidPattern.test(value);
+}
+
+/**
+ * A set drawn from a closed enum: every member allowed, no repeats, no more
+ * members than the enum has.
+ *
+ * The repeat check matters as much as the membership check. `signalCategories`
+ * is produced as a deduplicated subset in the declared order, so a repeated
+ * label means the payload did not come from the builder — and an array that can
+ * repeat is an array whose length carries information the category vocabulary
+ * was supposed to bound. Mirrors `private.require_product_event_enum_array`.
+ */
+function isBoundedEnumSet<Value extends string>(
+  value: unknown,
+  allowed: readonly Value[],
+): value is readonly Value[] {
+  if (!Array.isArray(value) || value.length > allowed.length) return false;
+  if (!value.every((member) => isOneOf(member, allowed))) return false;
+  return new Set(value).size === value.length;
+}
+
+/**
+ * The policy version, checked as a shape rather than against today's literal.
+ *
+ * PRD §10.4 requires the version to be bumped whenever a weight, threshold,
+ * margin or lexicon entry changes, so pinning the current value here would make
+ * every legitimate bump a breaking change to the analytics contract. Mirrors
+ * `private.require_product_event_policy_version`.
+ */
+const policyVersionPattern = /^\d{4}-\d{2}-\d{2}\.\d{1,3}$/;
+
+function isPolicyVersion(value: unknown): value is string {
+  return typeof value === "string" && policyVersionPattern.test(value);
 }
 
 function isProductEventSubject(value: unknown): value is ProductEventSubject {
@@ -278,6 +443,42 @@ function arePropertiesValid<Name extends ProductEventName>(
       return hasExactKeys(value, ["fromStatus", "toStatus"])
         && isOneOf(value.fromStatus, productTaskStatuses)
         && isOneOf(value.toStatus, productTaskStatuses);
+    case "task_command_previewed":
+      return hasExactKeys(value, [
+        "commandOrigin", "outcomeCategory", "candidateCount", "scoreBand",
+        "marginBand", "signalCategories", "oneStep", "requiresConfirmation",
+        "policyVersion",
+      ])
+        && isOneOf(value.commandOrigin, taskCommandOrigins)
+        && isOneOf(value.outcomeCategory, taskCommandPreviewedOutcomes)
+        && isBoundedInteger(value.candidateCount, 0, 100)
+        && isOneOf(value.scoreBand, taskMatchScoreBands)
+        && isOneOf(value.marginBand, taskMatchScoreBands)
+        && isBoundedEnumSet(value.signalCategories, taskMatchEvidenceLabels)
+        && typeof value.oneStep === "boolean"
+        && typeof value.requiresConfirmation === "boolean"
+        && isPolicyVersion(value.policyVersion);
+    case "task_command_disambiguated":
+      return hasExactKeys(value, ["commandOrigin", "candidateCount", "selectedRank", "policyVersion"])
+        && isOneOf(value.commandOrigin, taskCommandOrigins)
+        && isBoundedInteger(value.candidateCount, 0, 100)
+        // Zero is a real rank: the pick was not in the list this process ranked,
+        // which happens when a candidate went ineligible between listing and
+        // selection (2E-DISAMBIG-005).
+        && isBoundedInteger(value.selectedRank, 0, 100)
+        && isPolicyVersion(value.policyVersion);
+    case "task_command_applied":
+      return hasExactKeys(value, ["commandOrigin", "outcomeCategory", "applyRoute", "replayed", "policyVersion"])
+        && isOneOf(value.commandOrigin, taskCommandOrigins)
+        && isOneOf(value.outcomeCategory, taskCommandOutcomeCategories)
+        && isOneOf(value.applyRoute, taskCommandApplyRoutes)
+        && typeof value.replayed === "boolean"
+        && isPolicyVersion(value.policyVersion);
+    case "task_command_undone":
+      return hasExactKeys(value, ["commandOrigin", "undoResult", "policyVersion"])
+        && isOneOf(value.commandOrigin, taskCommandOrigins)
+        && isOneOf(value.undoResult, taskCommandUndoResults)
+        && isPolicyVersion(value.policyVersion);
   }
 }
 

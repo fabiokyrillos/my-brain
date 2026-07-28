@@ -202,8 +202,15 @@ describe("TaskCandidateForm", () => {
 
     await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
 
+    // Awaited, not read synchronously. The sibling failure test below already
+    // uses `findByText` for the same alert, and this one did not: it passed
+    // whenever the validation state happened to flush inside the click's own
+    // act() and failed when it did not, which it did once locally and once in
+    // CI run 30177038383. Asserting the alert first also gives the component
+    // every chance to have wrongly submitted before `action` is checked.
+    expect(await screen.findByText("Revise as decisões e edições antes de continuar."))
+      .toHaveAttribute("role", "alert");
     expect(action).not.toHaveBeenCalled();
-    expect(screen.getByText("Revise as decisões e edições antes de continuar.")).toHaveAttribute("role", "alert");
   });
 
   it("retains edits after a recoverable action failure", async () => {

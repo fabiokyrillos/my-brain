@@ -698,4 +698,58 @@ describe("undoQuestionResolution", () => {
     expect(result.status).toBe("error");
     expect(client.rpc).not.toHaveBeenCalled();
   });
+
+  // `public.undo_operation` is a shared router: migration 202607260058 registered
+  // `apply_task_command` and `apply_task_command_relation` in
+  // `private.undo_operation_handlers`, so from Slice 2E.4 onwards an undo
+  // submitted here can come back carrying a Phase 2E detail token. Without the
+  // branch these cover, both collapse onto "Não foi possível desfazer." — the one
+  // answer the user cannot act on, since `2E_UNDO_RESTORE_INTEGRITY` means a newer
+  // change would have been silently discarded (2E-UNDO-004).
+  it.each([
+    [
+      "2E_UNDO_RESTORE_INTEGRITY",
+      "A tarefa mudou depois desta operação, então desfazer descartaria essa alteração mais recente.",
+      "The task changed after this operation, so undoing it would discard that newer change.",
+    ],
+    [
+      "2E_UNDO_REMINDER_INTEGRITY",
+      "Não foi possível recriar os lembretes desta operação, então nada foi desfeito.",
+      "This operation's reminders could not be re-created, so nothing was undone.",
+    ],
+  ])("names %s instead of the generic undo failure, in both locales", async (details, ptBR, en) => {
+    for (const [locale, expected] of [["pt-BR", ptBR], ["en", en]] as const) {
+      vi.mocked(createClient).mockResolvedValue(
+        resolutionClient({
+          data: null,
+          error: { code: "P0001", details, message: "Task command undo integrity check failed" },
+        }) as never,
+      );
+
+      const result = await undoQuestionResolution({ status: "idle", message: "" }, undoForm(locale));
+
+      expect(result.status).toBe("error");
+      expect(result.message).toBe(expected);
+    }
+  });
+
+  it("keeps the generic message for an apply-path token and for the router's own raises", async () => {
+    // Only the two undo tokens may be narrated here. An apply-path token reaching
+    // this action would describe a failure that never involved an undo, and the
+    // router's three errcode-less raises ('Unsupported undo operation', 'Undo
+    // operation is no longer available', 'Undo operation expired') belong to no
+    // declared vocabulary this action can speak more precisely about.
+    for (const error of [
+      { code: "P0001", details: "2E_TRANSITION_INTEGRITY", message: "Task command transition failed" },
+      { code: "P0001", message: "Undo operation expired" },
+      { code: "P0002", message: "Undo operation not found" },
+    ]) {
+      vi.mocked(createClient).mockResolvedValue(resolutionClient({ data: null, error }) as never);
+
+      const result = await undoQuestionResolution({ status: "idle", message: "" }, undoForm("en"));
+
+      expect(result.status).toBe("error");
+      expect(result.message).toBe("Could not undo.");
+    }
+  });
 });

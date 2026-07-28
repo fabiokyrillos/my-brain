@@ -97,7 +97,16 @@ select is(
   'no retained mutation version is executable by PUBLIC'
 );
 
--- Every retained version keeps the security posture the policy requires ------
+-- Every mutation RPC keeps the security posture the policy requires ----------
+--
+-- This array is hardcoded, so it is the one assertion in this file that does not
+-- discover its own subjects: a new definer mutation RPC is invisible to it until
+-- its signature is added here. `public.apply_task_command` is therefore listed
+-- alongside the inventoried versions even though it carries no `_vN` suffix and
+-- adds no inventory row (ADR-037 §1 warrants a version only when a closed input
+-- shape changes incompatibly, and Slice 2E.4 has no predecessor to supersede).
+-- Policy point 7 is about the posture, not about the naming, so the posture is
+-- what is checked.
 
 select is(
   (
@@ -112,14 +121,24 @@ select is(
       'public.resolve_pending_question_v1(uuid, jsonb, text)',
       'public.resolve_pending_question_v2(uuid, jsonb, text)',
       'public.resolve_pending_question_v3(uuid, jsonb, text)',
-      'public.confirm_entry_tasks(uuid, integer[])'
+      'public.confirm_entry_tasks(uuid, integer[])',
+      'public.apply_task_command(uuid, text, jsonb, jsonb, text, text, text)',
+      -- Slice 2E.5. It mutates `public.task_command_confirmations`, which no
+      -- client role may write, so it carries the identical posture obligation as
+      -- the mutation RPC it authorizes and would otherwise be invisible to this
+      -- hardcoded array for the same reason `apply_task_command` was.
+      'public.issue_task_command_confirmation(uuid, text, jsonb, jsonb, text, text, text)',
+      -- Slice 2E.6 first-generation creation mutation and its server-issued
+      -- confirmation sibling follow the same ADR-037/044 posture.
+      'public.issue_task_command_creation_confirmation(text, text[], jsonb, text, text, text)',
+      'public.create_task_command(text, text[], jsonb, text, text, text)'
     ]) as signature
     join pg_proc procedure on procedure.oid = signature::regprocedure::oid
     where not procedure.prosecdef
       or not ('search_path=""' = any(coalesce(procedure.proconfig, array[]::text[])))
   ),
   0,
-  'every version, retained or retired, is SECURITY DEFINER with an explicit safe search path'
+  'every mutation RPC, retained or retired or first-generation, is SECURITY DEFINER with an explicit safe search path'
 );
 
 -- Retired: confirm_entry_tasks (migration 202607250054) ----------------------

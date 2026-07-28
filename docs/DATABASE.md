@@ -87,6 +87,15 @@ O gate final confirmou migrations locais/remotas sincronizadas até `20260718003
 - **Ordem de deploy:** o worker primeiro, a migration depois. Invertido, um worker em voo com o código antigo gastaria as tentativas em um `P0001` que não consegue corrigir.
 - Rollback: `drop trigger entry_interpretations_ai_bounds on public.entry_interpretations;`.
 
+## Vocabulário de `ai_usage_events.operation`
+
+Oito literais, fixados em dois lugares que precisam concordar: o CHECK da tabela (`202607160015:58-61`, reescrito por `202607250055`) e a lista de guarda dentro de `record_ai_usage` (`202607170018:55`, reescrita pela mesma migration). São `capture_extraction`, `semantic_search`, `chat`, `review`, `file_analysis`, `advanced_reasoning`, `background` e — desde a Fase 2E, Slice 2E.1 — `task_command`.
+
+- **Por que um literal novo, e não um emprestado.** Registrar a análise de comando como `chat` ou `background` tornaria o gasto da Fase 2E inatribuível no painel de custos. O ledger é append-only e o rótulo é permanente, então tomar emprestado é uma mentira que não dá para desfazer.
+- **Ampliar exige as duas pontas na mesma migration.** CHECK e guarda discordando é uma falha que só aparece em produção: a guarda recusa antes de a tabela ver o valor, ou a tabela recusa um valor que a guarda aprovou. `supabase/tests/phase_2e_task_command_ai_usage.sql` exercita as duas de forma independente, e confirma que os sete literais anteriores sobreviveram a ambas as reescritas.
+- **`create or replace`, não uma nova versão `_vN`.** A política abaixo vale para famílias de RPC de *mutação* versionadas. `record_ai_usage` não é uma: ampliar o conjunto de valores aceitos não quebra chamador algum nem muda a semântica de nenhuma escrita (DATABASE.md §1), então não há geração nova a criar nem inventário ADR-037 a estender. O que a reescrita *pode* perder silenciosamente é a postura de segurança, então o pgTAP afirma `prosecdef` e `search_path` explicitamente depois dela.
+- **`source_type` continua com cinco valores** (`entry`, `memory`, `conversation`, `summary`, `attachment`). Na hora da análise nenhuma tarefa foi selecionada — por construção — então `null` é a classificação verdadeira. `'task'` é decisão da Fase 2F, junto com os embeddings de tarefa (PRD da Fase 2E §22), e continua recusado com `22023`.
+
 ## Política de aposentadoria de versões de RPC
 
 Vale para toda família de RPC de mutação versionada (`*_vN`). Ver ADR-037; primeira aplicação na migration `202607250054`.
@@ -114,6 +123,24 @@ Vale para toda família de RPC de mutação versionada (`*_vN`). Ver ADR-037; pr
 | `resolve_pending_question_v1` | sim | nenhum | DEFERRED — aposentadoria não autorizada (PRD §21.7, ADR-034) |
 | `resolve_pending_question_v2` | sim | nenhum | DEFERRED — aposentadoria não autorizada (PRD §21.7, ADR-034) |
 | `resolve_pending_question_v3` | sim | `src/features/agent/actions.ts` | ACTIVE |
+
+**Funções Phase 2E deliberadamente fora deste inventário.** `list_task_command_candidates`, `task_command_fingerprint` e `apply_task_command` não carregam sufixo `_vN` e por isso não pertencem a nenhuma família versionada — o inventário rastreia famílias que **já se ramificaram**, e ADR-037 §1 só justifica uma nova versão quando um formato de entrada fechado muda de forma incompatível. Nenhuma delas tem antecessora. Ver **ADR-044**, que registra a decisão para `apply_task_command` (Slice 2E.4) e explica por que a versão do contrato vive em `TASK_COMMAND_POLICY_VERSION` — um dos sete insumos do `request_fingerprint` — e no prefixo `'taskcmd-v1:'` de `undo_operations.operation_key`, e não no identificador. As três **estão** cobertas por `supabase/tests/rpc_version_retirement.sql`: `apply_task_command` foi adicionada ao array literal que exige `prosecdef` e `search_path=""`, porque esse array é fixo e de outro modo nunca notaria uma nova função `security definer`. A primeira mudança incompatível de assinatura cria a família que o inventário espera e passa a exigir a linha.
+
+## Mutação de tarefas (Phase 2E Slice 2E.4)
+
+`public.apply_task_command(p_task_id uuid, p_action text, p_patch jsonb, p_pre_state jsonb, p_observed_before text, p_policy_version text, p_operation_key text) returns jsonb` é a **primeira RPC deste repositório que muta uma tarefa existente**. `security definer`, `set search_path = ''`, `grant execute` só para `authenticated`, nenhum argumento com `default` — um `p_pre_state` opcional tornaria o portão de obsolescência satisfazível por omissão, e um `p_operation_key` opcional tornaria a reserva de idempotência opcional.
+
+Treze das quinze ações da PRD §11.2 estão habilitadas; `cancel_task` e `restore_task` são recusadas com o código declarado `2E_ACTION_NOT_ENABLED` até a Slice 2E.5, que as habilita por `create or replace` na **mesma** função — não por um segundo caminho de escrita.
+
+Ordem de escrita, herdada de `confirm_entry_task_candidates_v6` e não negociável: toda validação pura e as duas sondagens de propriedade primeiro; depois a reserva em `undo_operations` como **primeira** escrita; depois o ramo de replay, que retorna **antes** de qualquer trava na tarefa; depois `select … for update`, o portão de obsolescência tipado de doze colunas (`55P03`, deliberadamente **sem** `detail`), o portão de elegibilidade, a escrita de domínio, a reconciliação de lembretes, o `update` obrigatório que preenche `before_state`/`after_state`, e a linha de auditoria por último. `no_change` é decidido **antes** da reserva e não escreve nada (ADR-045).
+
+Lembretes são reconciliados por **fechar-e-inserir**, nunca por atualizar no lugar: `run_all_heartbeats` marca um lembrete como `sent` quando *existe* uma notificação com `dedupe_key = 'reminder:' || reminder.id`, então um id que já notificou nunca notifica de novo. O mesmo mecanismo vale no undo.
+
+Dois `action_type` distintos, uma RPC: `'apply_task_command'` para as nove ações de coluna e `'apply_task_command_relation'` para as quatro de relação, de modo que `private.undo_operation_handlers` roteie para o handler correto sem um `if` dentro de um handler. Ambos os handlers são `(uuid, uuid) returns jsonb`, `set search_path = ''` e **`security invoker`** — `undo_operation_routing.sql` afirma `prosecdef = false`.
+
+`public.audit_task_change` passou a derivar o ator de um ajuste local de transação, `app.audit_actor` (ADR-046), lido com `missing_ok` e com padrão `'user'` para que `persistTaskStatus` continue byte-idêntico, e gravado com `is_local => true` para não vazar em conexão de pool. O caminho de aplicação define `'user'`; os handlers de undo definem `'system'`. As colunas observadas passaram a incluir `title` e `description`, que o gatilho ignorava por completo — fechando o ponto cego que 2E-MATCH-006 declarava, **de agora em diante e não retroativamente**. O ramo de INSERT não foi tocado. **Esta é a primeira migration da Phase 2E que altera um objeto que o produto já usa**, então o rollback é re-colar o corpo de `202607160014` em uma migration adiante, nunca dropar.
+
+Duas armadilhas de SQL que custaram duas idas ao CI e valem registro: `coalesce`, `nullif`, `greatest` e `least` são **formas especiais da gramática**, sem entrada em `pg_proc`, então `pg_catalog.coalesce(...)` não resolve sob `search_path = ''` (`42883`) — escreva sem qualificar; e um `case … when … then … end` sem parênteses **não pode** aparecer na condição de um `if` em plpgsql, porque o leitor da condição para no primeiro `then` em profundidade zero de parênteses e a função falha ao ser criada com `42601`. O primeiro caso é vigiado por um bloco `DO` pós-deploy que faz grep em `pg_get_functiondef`; o segundo, por ora, apenas por comentário.
 
 ## pgTAP local e em CI
 

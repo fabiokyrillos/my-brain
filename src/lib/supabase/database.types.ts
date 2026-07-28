@@ -1921,6 +1921,50 @@ export type Database = {
         }
         Relationships: []
       }
+      task_command_confirmations: {
+        Row: {
+          action: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          operation_key: string
+          request_fingerprint: string
+          status: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          operation_key: string
+          request_fingerprint: string
+          status?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          operation_key?: string
+          request_fingerprint?: string
+          status?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_command_confirmations_task_owner_fk"
+            columns: ["user_id", "task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       task_contexts: {
         Row: {
           context_id: string
@@ -2342,6 +2386,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_task_command: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: Json
+      }
       begin_entry_interpretation: {
         Args: { p_entry_id: string; p_service_user_id?: string }
         Returns: Json
@@ -2463,6 +2519,17 @@ export type Database = {
         }
         Returns: Json
       }
+      create_task_command: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
+      }
       element_trust_evidence: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_policies: { Args: { p_element_trust: Json }; Returns: Json }
       element_trust_scores: { Args: { p_element_trust: Json }; Returns: Json }
@@ -2511,6 +2578,29 @@ export type Database = {
         }
         Returns: string
       }
+      issue_task_command_creation_confirmation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
+      }
+      issue_task_command_confirmation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: Json
+      }
       list_needs_attention: {
         Args: {
           p_cursor_entry_id?: string
@@ -2524,6 +2614,60 @@ export type Database = {
           occurred_at: string
           open_question_id: string
           reason: string
+        }[]
+      }
+      list_task_command_candidates: {
+        Args: {
+          p_context_hint?: string
+          p_context_ref?: string
+          p_eligible_statuses: string[]
+          p_limit?: number
+          p_observed_before?: string
+          p_person_hint?: string
+          p_person_ref?: string
+          p_project_hint?: string
+          p_project_ref?: string
+          p_title_query?: string
+        }
+        Returns: {
+          cancelled_at: string
+          completed_at: string
+          context_hint_matched: boolean
+          context_ids: string[]
+          context_names: string[]
+          context_ref_id: string
+          context_ref_name: string
+          created_at: string
+          description: string
+          due_at: string
+          effective_limit: number
+          intentional_no_due: boolean
+          last_audited_at: string
+          manual_priority: string
+          next_reminder_at: string
+          no_due_reason: string
+          observed_before: string
+          owner_id: string
+          person_hint_matched: boolean
+          person_ids: string[]
+          person_names: string[]
+          person_ref_id: string
+          person_ref_name: string
+          person_roles: string[]
+          planned_at: string
+          prefilter_tier: number
+          project_hint_matched: boolean
+          project_ids: string[]
+          project_names: string[]
+          project_ref_id: string
+          project_ref_name: string
+          query_token_count: number
+          scheduled_reminder_count: number
+          status: string
+          task_id: string
+          title: string
+          token_overlap: number
+          updated_at: string
         }[]
       }
       match_internal_knowledge: {
@@ -2587,6 +2731,17 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      preview_task_command_creation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
+        }
+        Returns: Json
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
       record_ai_usage: {
@@ -2682,6 +2837,18 @@ export type Database = {
       save_profile_settings: {
         Args: { p_preferences: Json; p_profile: Json }
         Returns: undefined
+      }
+      task_command_fingerprint: {
+        Args: {
+          p_observed_before: string
+          p_operation_key: string
+          p_owner_id: string
+          p_patch: Json
+          p_policy_version: string
+          p_pre_state: Json
+          p_task_id: string
+        }
+        Returns: string
       }
       undo_operation: { Args: { p_undo_id: string }; Returns: Json }
       validate_element_trust: {

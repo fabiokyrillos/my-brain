@@ -37,6 +37,10 @@ const eventNames = [
   "processing_retry_requested",
   "work_view_viewed",
   "task_status_changed",
+  "task_command_previewed",
+  "task_command_disambiguated",
+  "task_command_applied",
+  "task_command_undone",
 ] as const;
 
 const basePayload = {
@@ -70,10 +74,39 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
   processing_retry_requested: { retrySource: "user" },
   work_view_viewed: { workView: "today" },
   task_status_changed: { fromStatus: "inbox", toStatus: "in_progress" },
+  task_command_previewed: {
+    commandOrigin: "chat",
+    outcomeCategory: "matched_requires_confirmation",
+    candidateCount: 1,
+    scoreBand: "high",
+    marginBand: "high",
+    signalCategories: ["normalized_exact_title", "recent_activity"],
+    oneStep: false,
+    requiresConfirmation: true,
+    policyVersion: "2026-07-25.2",
+  },
+  task_command_disambiguated: {
+    commandOrigin: "work",
+    candidateCount: 3,
+    selectedRank: 2,
+    policyVersion: "2026-07-25.2",
+  },
+  task_command_applied: {
+    commandOrigin: "chat",
+    outcomeCategory: "applied",
+    applyRoute: "direct",
+    replayed: false,
+    policyVersion: "2026-07-25.2",
+  },
+  task_command_undone: {
+    commandOrigin: "work",
+    undoResult: "undone",
+    policyVersion: "2026-07-25.2",
+  },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of twenty-two product events", () => {
+  it("defines the complete closed taxonomy of twenty-six product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -85,7 +118,102 @@ describe("product analytics contracts", () => {
       "work",
       "questions",
       "server",
+      "task_command",
     ]);
+  });
+
+  /**
+   * The drift gate for the restated Phase 2E vocabularies (Epic 2E-H).
+   *
+   * `contracts.ts` imports these as *types* so the command taxonomy stays out
+   * of the client bundle, which means a value outside the union is a compile
+   * error but a missing member is not. This closes that half: each restated
+   * list is held to the real runtime vocabulary by exact equality, so adding an
+   * outcome, a band or an evidence label without teaching the analytics
+   * allowlist about it reds here rather than being rejected by a CHECK
+   * constraint in production.
+   */
+  it("restates every Phase 2E vocabulary exactly as its declaring module holds it", async () => {
+    const [analytics, matchPolicy, outcomes, actual] = await Promise.all([
+      import("@/features/task-commands/analytics"),
+      import("@/features/task-commands/match-policy"),
+      import("@/features/task-commands/outcomes"),
+      import("./contracts"),
+    ]);
+    const restated = actual.taskCommandAnalyticsVocabularies;
+    expect(restated.origins).toEqual([...analytics.TASK_COMMAND_ORIGINS]);
+    expect(restated.applyRoutes).toEqual([...analytics.TASK_COMMAND_APPLY_ROUTES]);
+    expect(restated.undoResults).toEqual([...analytics.TASK_COMMAND_UNDO_RESULTS]);
+    expect(restated.outcomeCategories).toEqual([...outcomes.TASK_COMMAND_OUTCOMES]);
+    expect(restated.previewedOutcomes).toEqual([...analytics.TASK_COMMAND_PREVIEWED_OUTCOMES]);
+    expect(restated.scoreBands).toEqual([...matchPolicy.TASK_MATCH_SCORE_BANDS]);
+    expect(restated.evidence).toEqual([...matchPolicy.TASK_MATCH_EVIDENCE]);
+  });
+
+  /**
+   * PRD 2E-ANALYTICS-006, proven rather than asserted.
+   *
+   * The remote smoke is plain Node and cannot `import` this TypeScript module,
+   * so it reads the two declarations out of the source. This holds that reader
+   * to the real constants by exact equality, which is what makes it a mirror
+   * instead of a fourth copy: a name added here and unparseable there fails on
+   * this line, in the `app` CI job, rather than in a manual remote run nobody
+   * is watching.
+   */
+  it("exposes both vocabularies to the remote smoke's reader, byte for byte", async () => {
+    const { readProductEventVocabulary } = await import("../../../scripts/product-event-vocabulary.mjs");
+    const read = readProductEventVocabulary(process.cwd());
+    expect(read.eventNames).toEqual([...(contracts.productEventNames ?? [])]);
+    expect(read.surfaces).toEqual([...(contracts.productSurfaces ?? [])]);
+  });
+
+  it("refuses a Phase 2E payload that carries content instead of a category", () => {
+    const parse = contracts.parseProductEventPayload;
+    const base = {
+      ...basePayload,
+      surface: "task_command",
+      name: "task_command_previewed",
+      properties: propertiesByEvent.task_command_previewed,
+    };
+    expect(parse?.(base)).not.toBeNull();
+    // A raw title smuggled in as a signal category.
+    expect(parse?.({
+      ...base,
+      properties: { ...base.properties, signalCategories: ["Send the invoice"] },
+    })).toBeNull();
+    // A repeated label: the builder deduplicates, so this did not come from it.
+    expect(parse?.({
+      ...base,
+      properties: {
+        ...base.properties,
+        signalCategories: ["recent_activity", "recent_activity"],
+      },
+    })).toBeNull();
+    // An extra property nobody declared.
+    expect(parse?.({
+      ...base,
+      properties: { ...base.properties, commandText: "cancel my gym task" },
+    })).toBeNull();
+    // The preview event accepts `previewed`, which is a disposition rather than
+    // an outcome — a one-step-eligible match rests there.
+    expect(parse?.({ ...base, properties: { ...base.properties, outcomeCategory: "previewed" } }))
+      .not.toBeNull();
+    // ...and still refuses a category from no vocabulary at all.
+    expect(parse?.({ ...base, properties: { ...base.properties, outcomeCategory: "matched" } }))
+      .toBeNull();
+    // The *apply* event does not accept it: an applied command has come to rest.
+    expect(parse?.({
+      ...basePayload,
+      surface: "task_command",
+      name: "task_command_applied",
+      properties: { ...propertiesByEvent.task_command_applied, outcomeCategory: "previewed" },
+    })).toBeNull();
+    // A band outside the permanent vocabulary.
+    expect(parse?.({ ...base, properties: { ...base.properties, scoreBand: "certain" } })).toBeNull();
+    // A policy version that is free text rather than a version.
+    expect(parse?.({ ...base, properties: { ...base.properties, policyVersion: "latest" } })).toBeNull();
+    // A string standing in for a boolean, which the SQL validator also refuses.
+    expect(parse?.({ ...base, properties: { ...base.properties, oneStep: "true" } })).toBeNull();
   });
 
   // Slice 2D.3: suggestion provenance is a bounded enum, never content.
