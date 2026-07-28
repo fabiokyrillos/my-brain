@@ -26,6 +26,35 @@ import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
 // `audit_logs` and `product_events` are append-only and are deliberately *not* in the
 // orphan scan: both are designed to survive their subject, and `product_events` is
 // verified by the owner token after Auth deletion the same way Phase 2D verified it.
+// (`product_events` also answers 403 to `service_role`, for that same append-only
+// reason. It needs no exception here because it is not scanned at all — the
+// exception below is deliberately not widened to cover it.)
+//
+// One scanned table is unreadable by this verifier, by design
+// -----------------------------------------------------------
+// `202607260059:258-261` revokes ALL on `public.task_command_confirmations` from
+// `public, anon, authenticated, service_role` and grants `select` back to
+// `authenticated` alone. This verifier authenticates as `service_role`, so its read
+// is refused with `42501` / HTTP 403. That is the deployed posture being correct,
+// not a fault — the table's own comment says "No role may write it: both writers are
+// SECURITY DEFINER functions."
+//
+// The first run of this verifier against a *deployed* chain died here, for the same
+// underlying reason its first run ever died on `PGRST205`: before deployment the
+// table did not exist, so only the absent-table branch had ever executed. A branch
+// that has never run is a claim, not a gate — twice now, in the same file.
+//
+// The exception is written as an assertion rather than a tolerance, and the
+// difference is load-bearing. If the read *succeeds*, the grant has been widened and
+// the check FAILS. Silently accepting either answer would turn a security posture
+// into a coin flip, and 2E-OWNERSHIP-003 says this phase widens no grant.
+//
+// Excluding it from the orphan scan costs no coverage, which is why this is not a
+// weakening. An orphan here is defined as a row whose `user_id` is absent from
+// `auth.users`, and `202607260059:214` declares
+// `user_id uuid not null references auth.users(id) on delete cascade` — so deleting
+// a disposable owner deletes its confirmations. The row this scan looks for cannot
+// exist. The database enforces structurally what the scan could only observe.
 
 const credentials = getLinkedSupabaseCredentials();
 const admin = createClient(credentials.url, credentials.serviceRoleKey, {
@@ -71,6 +100,21 @@ const ownedTables = [
   "ai_usage_events",
 ];
 
+// Tables whose correct deployed posture is "service_role cannot read this", mapped
+// to the reason. Keyed by table so the exception can never be a blanket rule: a 403
+// from any table not named here is still a hard failure.
+const serviceRoleCannotRead = {
+  task_command_confirmations:
+    "202607260059 revokes all from service_role and grants select to authenticated only",
+};
+
+const PRIVILEGE_DENIED = new Set(["42501", "PGRST301", "PGRST302"]);
+
+function isPrivilegeDenied(error) {
+  return PRIVILEGE_DENIED.has(error?.code ?? "")
+    || /permission denied/i.test(error?.message ?? "");
+}
+
 const users = [];
 for (let page = 1; ; page += 1) {
   const result = await admin.auth.admin.listUsers({ page, perPage: 1_000 });
@@ -85,11 +129,32 @@ const disposableUsers = users.filter((user) => disposablePrefixes.some(
 const currentUserIds = new Set(users.map((user) => user.id));
 const orphanCounts = {};
 const missingTables = [];
+const privilegeProtectedTables = [];
 
 for (const table of ownedTables) {
   let orphanCount = 0;
   for (let offset = 0; ; offset += 1_000) {
     const result = await admin.from(table).select("user_id").range(offset, offset + 999);
+
+    // A table declared unreadable by `service_role` must actually be unreadable.
+    // Checked before the error branch so that a *successful* read is caught: that
+    // means a grant was widened, which is a security regression this verifier is
+    // now the only thing watching for.
+    if (table in serviceRoleCannotRead) {
+      if (!result.error) {
+        throw new Error(
+          `${table}: service_role could read this table, but ${serviceRoleCannotRead[table]}. `
+          + "A grant has been widened — refusing to pass.",
+        );
+      }
+      if (isPrivilegeDenied(result.error)) {
+        privilegeProtectedTables.push(table);
+        break;
+      }
+      // Not a privilege error — fall through so an absent table is still reported
+      // as absent and anything else still fails closed.
+    }
+
     if (result.error) {
       // A Phase 2E table that does not exist yet is the expected state until the
       // 202607250055–202607280061 chain is deployed. Record it and keep going rather
@@ -114,7 +179,9 @@ for (const table of ownedTables) {
     orphanCount += result.data.filter((row) => row.user_id && !currentUserIds.has(row.user_id)).length;
     if (result.data.length < 1_000) break;
   }
-  if (!missingTables.includes(table)) orphanCounts[table] = orphanCount;
+  if (!missingTables.includes(table) && !privilegeProtectedTables.includes(table)) {
+    orphanCounts[table] = orphanCount;
+  }
 }
 
 let storageObjects = 0;
@@ -154,6 +221,7 @@ const result = {
   disposableUsers: disposableUsers.length,
   orphanCounts,
   tablesNotYetDeployed: missingTables,
+  tablesServiceRoleCannotRead: privilegeProtectedTables,
   productEvents: "verified by the product-events owner token after Auth deletion",
   storageObjects,
   remoteSmokeObjects,
@@ -164,6 +232,13 @@ if (disposableUsers.length > 0 || Object.values(orphanCounts).some(Boolean) || r
 }
 
 console.log("Phase 2E cleanup verification passed:", result);
+for (const table of privilegeProtectedTables) {
+  console.log(
+    `Note: ${table} was not orphan-scanned because service_role cannot read it — `
+    + `${serviceRoleCannotRead[table]}. That refusal was asserted, not assumed. An orphan `
+    + "there is structurally impossible: user_id references auth.users(id) on delete cascade.",
+  );
+}
 if (missingTables.length > 0) {
   console.log(
     `Note: ${missingTables.length} Phase 2E table(s) are absent because migrations `

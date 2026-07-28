@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
+import { canonicalStatusPatch, readTaskCommandTaxonomy } from "./task-command-taxonomy.mjs";
 
 // Phase 2E aggregate remote smoke (PRD 2E-OPERATIONS-003/004, 2E-OWNERSHIP-004).
 //
@@ -30,6 +31,21 @@ import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
 // CI wiring can tell "not deployed yet" from "deployed and broken".
 //
 // Cleanup is fail-closed: any leftover fixture fails the smoke.
+//
+// Why the canonical patch is read rather than written here
+// --------------------------------------------------------
+// The first post-deployment run of this smoke failed on its own payload: it sent
+// `p_patch: {}` for `complete_task`, and the RPC requires the canonical patch to
+// carry the destination status (`202607260059`: `required_patch_keys :=
+// array['status']`). Every other side of the contract was right — pgTAP sends
+// `jsonb_build_object('status', 'completed')`, and production derives the patch in
+// `preview.ts` rather than writing it. This script was the only caller that
+// restated the contract by hand, and it had never executed past its own preflight,
+// so nothing could have caught it earlier. The destination statuses now come from
+// `taxonomy.ts` through `task-command-taxonomy.mjs`, which a Vitest case pins to
+// the real `actionPolicy` by exact equality.
+
+const { targetStatuses } = readTaskCommandTaxonomy();
 
 const credentials = getLinkedSupabaseCredentials();
 const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
@@ -203,7 +219,7 @@ async function main() {
   const applyArgs = {
     p_task_id: target.task_id,
     p_action: "complete_task",
-    p_patch: {},
+    p_patch: canonicalStatusPatch("complete_task", targetStatuses),
     p_pre_state: preStateOf(target),
     p_observed_before: target.observed_before,
     p_policy_version: POLICY_VERSION,
@@ -212,7 +228,10 @@ async function main() {
 
   const applied = await ownerA.client.rpc("apply_task_command", applyArgs);
   if (applied.error) throw new Error(`apply: ${applied.error.code} ${applied.error.message} ${applied.error.details ?? ""}`);
-  check("2E-UPDATE-002/004: an eligible non-destructive apply commits", applied.data?.status === "applied", JSON.stringify(applied.data));
+  // `outcome`, not `status`: 2E-UX-001's vocabulary is the RPC's discriminator and
+  // `apply.ts` parses it with `z.discriminatedUnion("outcome", …)`. Reading `.status`
+  // compared `undefined` to a literal, which is a check that can only fail.
+  check("2E-UPDATE-002/004: an eligible non-destructive apply commits", applied.data?.outcome === "applied", JSON.stringify(applied.data));
   check("2E-UPDATE-007: an undo row exists for the applied operation", Boolean(applied.data?.undo_id));
 
   const replayed = await ownerA.client.rpc("apply_task_command", applyArgs);
@@ -247,7 +266,7 @@ async function main() {
   const cancelArgs = {
     p_task_id: gym.task_id,
     p_action: "cancel_task",
-    p_patch: {},
+    p_patch: canonicalStatusPatch("cancel_task", targetStatuses),
     p_pre_state: preStateOf(gym),
     p_observed_before: gym.observed_before,
     p_policy_version: POLICY_VERSION,
@@ -267,7 +286,7 @@ async function main() {
 
   const confirmed = await ownerA.client.rpc("apply_task_command", cancelArgs);
   if (confirmed.error) throw new Error(`confirmed cancel: ${confirmed.error.message}`);
-  check("2E-DESTRUCTIVE: the confirmed cancel commits", confirmed.data?.status === "applied");
+  check("2E-DESTRUCTIVE: the confirmed cancel commits", confirmed.data?.outcome === "applied", JSON.stringify(confirmed.data));
 
   const cancelledRow = await ownerA.client.from("tasks").select("status").eq("id", gym.task_id).single();
   check("2E-DESTRUCTIVE: the task is cancelled", cancelledRow.data?.status === "cancelled");
@@ -284,7 +303,7 @@ async function main() {
   );
 
   // ---- 2E-UNDO -------------------------------------------------------------
-  const undone = await ownerA.client.rpc("undo_operation", { p_operation_id: applied.data.undo_id });
+  const undone = await ownerA.client.rpc("undo_operation", { p_undo_id: applied.data.undo_id });
   if (undone.error) throw new Error(`undo: ${undone.error.message}`);
   const restored = await ownerA.client.from("tasks").select("status, completed_at").eq("id", target.task_id).single();
   check(
@@ -293,19 +312,42 @@ async function main() {
     JSON.stringify(restored.data),
   );
 
-  const undoneTwice = await ownerA.client.rpc("undo_operation", { p_operation_id: applied.data.undo_id });
+  const undoneTwice = await ownerA.client.rpc("undo_operation", { p_undo_id: applied.data.undo_id });
+  // `undo_operation` returns `{undone, affected, idempotent}`. This previously read
+  // `.status`, which is not a field it has — so the right-hand side was
+  // `undefined !== "undone"`, permanently true, and the assertion passed without
+  // testing anything. It was vacuous rather than failing, which is why no earlier
+  // run exposed it.
+  //
+  // "Honestly" is the requirement's word and it is the operative one. A second undo
+  // does *not* report `undone: false` — it reports `undone: true, idempotent: true,
+  // affected: 0`, which is the truthful answer to "undo this operation" when the
+  // operation is already undone: the post-condition holds, and nothing was done a
+  // second time. What would be dishonest is claiming fresh work, so that is what is
+  // asserted — `affected` must be zero and the replay must be marked.
   check(
     "2E-UNDO-003: a second undo attempt is safe and reports itself honestly",
-    Boolean(undoneTwice.error) || undoneTwice.data?.status !== "undone",
+    Boolean(undoneTwice.error)
+      || (undoneTwice.data?.idempotent === true && undoneTwice.data?.affected === 0),
     JSON.stringify(undoneTwice.error ?? undoneTwice.data),
   );
 
   // ---- 2E-NOMATCH: creation is replay-safe ---------------------------------
+  // The creation family's `p_action` is the *qualifier* the unmatched command
+  // carried — one of the seven `202607270060:87-96` accepts — not the literal
+  // "create_task", which is `creation.ts`'s decision label rather than an RPC
+  // argument. The title comes from `p_title_words`, and `p_patch` must carry
+  // exactly the action's own key (`202607270060:128-142` compares the key sets with
+  // `is distinct from`, so a stray `title` is as invalid as a missing `priority`).
+  //
+  // `set_priority` is the deliberate choice: it is the only qualifier that needs
+  // neither an owned entity to resolve nor an instant to parse, so the fixture stays
+  // deterministic, which 2E-OPERATIONS-004 requires of this smoke.
   const createKey = `smoke-${suffix}-create`;
   const createArgs = {
-    p_action: "create_task",
-    p_title_words: ["book", "the", "flights"],
-    p_patch: { title: `Book the flights ${suffix}` },
+    p_action: "set_priority",
+    p_title_words: ["book", "the", "flights", suffix],
+    p_patch: { priority: "medium" },
     p_observed_before: new Date().toISOString(),
     p_policy_version: POLICY_VERSION,
     p_operation_key: createKey,
