@@ -13,7 +13,7 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Phase base | `2e2acfd` |
 | Working tree | Clean at the implementation/test HEAD; this file and the Slice 2E.7 report are carried by the following docs-only closeout commit |
 | Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | see the run recorded below. The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic: Slice 2E.7 adds no pgTAP file |
+| CI | **all three jobs green** on `4af285d` (run `30369501161`). The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic: Slice 2E.7 adds no pgTAP file |
 | Merged / tagged / released | nothing |
 
 **The structural drift in this table is now on its fifth consecutive session.** It is written *before* the docs commit that carries it, so its HEAD is always one commit stale by the time anyone reads it. **Verify HEAD from `git rev-parse`, never from this table.** The entry check for Slice 2E.7 found exactly that again — the file named `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`.
@@ -151,8 +151,10 @@ The Slice 2E.6 baseline was 2110 / 118 files, so Slice 2E.7 adds **144 assertion
 
 pgTAP cannot run locally — Docker is unavailable, so `supabase db reset`, `supabase test db` and
 `supabase db lint --local` never execute on this workstation. CI supplied the authoritative database
-evidence: empty-database migration chain including `202607280061`, both lint schemas, the real
-two-session race, and `Files=30, Tests=1277, Result: PASS`. **That count is unchanged from Slice
+evidence on the exact SHA `4af285d` (run `30369501161`): the empty-database migration chain with
+`Applying migration 202607280061_phase_2e_task_command_analytics.sql`, both lint schemas, the real
+two-session race, `Files=30, Tests=1277, Result: PASS`, and `12 passed` for the two credential-free
+Playwright specs across desktop and mobile. **That count is unchanged from Slice
 2E.6, and that is the correct arithmetic** — this slice adds no pgTAP file and alters no RPC that
 one asserts. Its database change is the analytics allowlist, guarded by the migration's own
 post-deploy `DO` block and by `contracts.test.ts`.

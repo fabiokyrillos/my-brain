@@ -159,16 +159,18 @@ actions. Lint and typecheck both passed with them there.
 `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop --project=mobile`
 **12 passed**.
 
-**CI, the authoritative database evidence** (Docker is unavailable on this workstation, so no local
-pgTAP run is reported):
+**CI, the authoritative database evidence** — run `30369501161` on the exact accepted SHA `4af285d`,
+all three jobs `success` (Docker is unavailable on this workstation, so no local pgTAP run is
+reported):
 
-- Migration chain applies from an **empty database**, including `202607280061`.
+- Migration chain applies from an **empty database**: `Applying migration 202607280061_phase_2e_task_command_analytics.sql` appears in both the stack start and the explicit from-zero reset.
 - pgTAP `Files=30, Tests=1277, Result: PASS` — **unchanged from the Slice 2E.6 baseline, which is
   the correct arithmetic**: this slice adds no pgTAP file and alters no RPC that one asserts. Its
   database change is the analytics allowlist, whose guard is the migration's own post-deploy `DO`
   block plus `contracts.test.ts`.
 - `supabase db lint --schema public,private` clean.
 - The two-session creation race still passes.
+- Playwright `12 passed` — `foundation.spec.ts` and `task-command.spec.ts` across desktop and mobile.
 
 **A failure worth recording rather than hiding.** The first CI run on this slice was red, and the
 failure was **this slice's own new e2e assertion**, not the database. It claimed a locale-less
