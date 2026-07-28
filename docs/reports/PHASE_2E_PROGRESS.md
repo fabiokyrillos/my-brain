@@ -1,12 +1,12 @@
 # Phase 2E — Execution Progress
 
-**Status: MERGED — all eight slices ACCEPTED, including Slice 2E.8 (Epic 2E-H, convergence and closeout). PR #18 merged into `main` on 2026-07-28 as `5d22400`. Nothing deployed, tagged or released.**
+**Status: RELEASED — merged (`5d22400`), deployed (parity `202607280061`), validated remotely, and tagged `phase-2e-complete`. 121 of 122 requirements delivered.**
 
 **The phase report is `PHASE_2E_FINAL_REPORT.md`, and it supersedes this file for anything about the phase as a whole.** This file remains the session-to-session handoff and is authoritative only for *where the work stands*.
 
-**118 of 122 requirements are delivered; four are not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4); `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half are blocked on deployment authorization and on nothing else. `2E-MATCH-018` is delivered with a scope note rather than counted against the phase, because its own text is satisfied. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
+**121 of 122 requirements are delivered; one is not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4). `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half **were** blocked on deployment authorization and are now delivered, proven by the aggregate smoke and cleanup verifier against the deployed project. `2E-MATCH-018` is delivered with a scope note rather than counted against the phase, because its own text is satisfied. Every requirement is individually mapped in `PHASE_2E_TRACEABILITY_MATRIX.md`.
 
-**PR #18 is MERGED. Deployment is the next authorization, and it has not been given.**
+**Phase 2E is released. All three authorizations — merge, deployment, release — are given and discharged.**
 
 This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
@@ -20,7 +20,9 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Branch HEAD at merge | `96cf178` — two docs-only commits past Slice 2E.8's `62a0d86`, both from the merge-preparation reconciliation |
 | PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — **MERGED** 2026-07-28T17:57:34Z |
 | CI on the merge SHA | **all three jobs green on `96cf178`** (run `30383879590`). The last run to report pgTAP counts was `4af285d` (run `30369501161`): `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic, because neither Slice 2E.7 nor 2E.8 adds a pgTAP file |
-| Deployed / tagged / released | **nothing** |
+| Corrective merge | **`0efcd82`** (PR #20) — validation tooling only, CI green on `08d3940` (run `30391388573`) |
+| Deployed | **yes** — remote parity `202607280061`, all post-deploy assertions held, no rollback |
+| Tagged / released | **`phase-2e-complete`** |
 
 **This table drifted structurally for five consecutive sessions and is now pinned to verified truth.** It used to be written *before* the docs commit that carried it, so its HEAD was always one commit stale by the time anyone read it — the Slice 2E.7 entry check found the file naming `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`, and the Slice 2E.8 tree left it at `ffd66ca` / run `30369501161`. The row above was reconciled against `git rev-parse`, `gh pr view` and `gh run list` at the merge-preparation pass. **Verify HEAD from `git rev-parse` anyway, never from this table.**
 
@@ -252,11 +254,13 @@ Fuller justification for every one of these is in `PHASE_2E_FINAL_REPORT.md` §7
    restore. Disclosed; `hasMore` already tells the user the list is truncated.
 7. Draft PR #18 remains intentionally open and unmerged. Nothing was deployed, tagged or released.
 
-## Next: there is no next slice
+## Next: there is no next slice, and no next authorization
 
-Phase 2E is merged. **The next action is a human authorization decision, not engineering** — deployment (checklist in `PHASE_2E_FINAL_REPORT.md` §10), then release (§13; §11 is the rollback plan). The merge checklist in §12 is discharged. Phase 2F is out of scope.
+Phase 2E is released. §10, §12 and §13 of `PHASE_2E_FINAL_REPORT.md` are all discharged; §11's rollback plan remains valid and unexercised. **Phase 2F is out of scope and was not started.**
 
-**Before deploying, re-verify parity rather than trusting this file:** `npx supabase migration list --linked` must still show `202607250054` as the last applied, with `202607250055`–`202607280061` local-only. If it shows anything else, stop — the assumption the whole deployment plan rests on is false.
+**What deployment taught, recorded because it will apply to Phase 2F too:** the chain applied perfectly and three validation scripts did not. Every one of the eight defects was tooling restating a contract instead of reading it, and none was reachable before a real deployment existed — the smoke exited at preflight, the verifier took its absent-table branch. Slice 2E.8 had already found one instance of this and written the lesson down; it recurred three more times in the same phase. When a future phase writes a gate it cannot yet run, that gate is a claim until the day it runs, and the day it first runs is the day to expect it to be wrong.
+
+**One requirement remains open and belongs to Phase 2F:** `2E-COMMAND-012` (ADR-053). One maintenance item is open and belongs to nobody yet: `e2e/intelligent-capture.spec.ts`'s non-determinism, [issue #21](https://github.com/fabiokyrillos/my-brain/issues/21) — **not a Phase 2E regression**.
 
 <details>
 <summary>Historical: the continuation point Slice 2E.7 recorded for Slice 2E.8, now discharged</summary>
