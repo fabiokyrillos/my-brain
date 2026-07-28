@@ -35,7 +35,9 @@ Phase 2E lets a user act on a task they already have by typing an ordinary sente
 | 2E.7 | 2E-G | The first user-visible surface. One command console on Chat (list page *and* conversation) and the task surface behind a single `runTaskCommand` dispatcher; `/app/work/cancelled` recovery route; migration `202607280061` adding `task_command` to all three analytics allowlists; content-free analytics; the session envelope with a pinned clock (ADR-050); a hand-rolled dialog because jsdom 29.1.1 has no `showModal` (ADR-051) |
 | 2E.8 | 2E-H | This report, the traceability matrix and its fail-closed generator, the cleanup verifier, the aggregate remote smoke, the convergence audit, and permanent-document reconciliation |
 
-**Scale.** Seven additive migrations (`202607250055`–`202607280061`, 11,306 lines of SQL including the pre-2E trio), 30 modules under `src/features/task-commands/`, 6 Phase 2E pgTAP files, and 2,254 Vitest assertions across 124 files at the Slice 2E.7 boundary.
+**Scale.** Seven additive migrations (`202607250055`–`202607280061`, 10,076 lines of SQL; 11,306 counting the pre-2E trio `202607250052`–`202607250054`, which PR #17 merged), **25 modules and 26 colocated test files** under `src/features/task-commands/`, 6 Phase 2E pgTAP files, and 2,254 Vitest assertions across 124 files at the Slice 2E.7 boundary — 2,256 at 2E.8's.
+
+> The module count above was corrected during merge preparation. This line previously read "30 modules"; `git ls-tree` reports 51 files in that directory — 25 modules and 26 tests — at every slice boundary from 2E.7 onward. The SQL figure was right but ambiguous, and now separates this branch's seven migrations from the pre-2E trio it was counting alongside them. Nothing else in this report changed.
 
 ## 3. The match-quality baseline (2E-MATCH-018)
 
