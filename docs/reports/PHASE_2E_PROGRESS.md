@@ -15,14 +15,15 @@ This file is the handoff between execution sessions. It is authoritative for *wh
 | Field | Value |
 |---|---|
 | Branch | `codex/phase-2e-natural-language-task-updates` (tracks its remote, in sync) |
-| Branch HEAD | `ffd66ca` implementation/test HEAD (plus the docs commit that carries this file) |
+| Branch HEAD | `62a0d86` — the phase's final commit, verified by `git rev-parse` at the merge-preparation pass (2026-07-28) |
 | Phase base | `2e2acfd` |
-| Working tree | Clean at the implementation/test HEAD; this file and the Slice 2E.7 report are carried by the following docs-only closeout commit |
-| Draft PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8** |
-| CI | **all three jobs green** on `4af285d` (run `30369501161`). The pgTAP suite reports `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic: Slice 2E.7 adds no pgTAP file |
+| Working tree | Clean at `62a0d86`; the branch is in sync with its remote |
+| vs `origin/main` | **62 ahead, 0 behind** |
+| PR | [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — `MERGEABLE`, `mergeStateStatus: CLEAN`. **Ready for review** since the merge-preparation pass; it was a CI-evidence-only draft through Slice 2E.7 |
+| CI | **all three jobs green on the exact HEAD `62a0d86`** (run `30377372448`). The last run to report pgTAP counts was `4af285d` (run `30369501161`): `Files=30, Tests=1277, Result: PASS` — unchanged from Slice 2E.6, which is the correct arithmetic, because neither Slice 2E.7 nor 2E.8 adds a pgTAP file |
 | Merged / tagged / released | nothing |
 
-**The structural drift in this table is now on its fifth consecutive session.** It is written *before* the docs commit that carries it, so its HEAD is always one commit stale by the time anyone reads it. **Verify HEAD from `git rev-parse`, never from this table.** The entry check for Slice 2E.7 found exactly that again — the file named `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`.
+**This table drifted structurally for five consecutive sessions and is now pinned to verified truth.** It used to be written *before* the docs commit that carried it, so its HEAD was always one commit stale by the time anyone read it — the Slice 2E.7 entry check found the file naming `2540ca5` and run `30292038500` while the true HEAD was `b6ea9dd` with a newer green run `30353196022`, and the Slice 2E.8 tree left it at `ffd66ca` / run `30369501161`. The row above was reconciled against `git rev-parse`, `gh pr view` and `gh run list` at the merge-preparation pass. **Verify HEAD from `git rev-parse` anyway, never from this table.**
 
 **A different drift was found and paid off this session, and it was not docs-only in effect.** Commit `291cc75` accepted Slice 2E.6 while touching only this file and that slice's report, so `STATE.md`, `CHANGELOG.md`, `TODO.md` and `DECISIONS.md` were never updated for an accepted slice — a Definition-of-Done §13 gap. Slice 2E.7's closeout pays it: `STATE.md` and `CHANGELOG.md` now carry Slice 2E.6 entries marked as recorded late rather than backdated.
 
