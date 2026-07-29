@@ -901,14 +901,31 @@ begin
     raise exception 'expected exactly one defaulted argument, found %', defaults;
   end if;
 
-  create_definition := pg_catalog.pg_get_functiondef(
-    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure
+  -- **Comments are stripped before any of these bodies is matched.**
+  -- `pg_get_functiondef` returns the body verbatim, comments included, and these
+  -- functions explain themselves at length — including, in the undo guard below,
+  -- by quoting the exact clause this migration replaced. The first CI run of
+  -- this file failed on precisely that: the "the old clause is gone" assertion
+  -- matched the comment that says the old clause is gone. Matching code against
+  -- prose is the bug; stripping the prose is the fix, and it is the same
+  -- discipline the Phase 2F grammar guard already applies to migration text.
+  create_definition := pg_catalog.regexp_replace(
+    pg_catalog.pg_get_functiondef(
+      'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure
+    ),
+    '--[^' || pg_catalog.chr(10) || ']*', '', 'g'
   );
-  payload_definition := pg_catalog.pg_get_functiondef(
-    'private.task_command_creation_payload(uuid, text, text[], jsonb, text)'::regprocedure
+  payload_definition := pg_catalog.regexp_replace(
+    pg_catalog.pg_get_functiondef(
+      'private.task_command_creation_payload(uuid, text, text[], jsonb, text)'::regprocedure
+    ),
+    '--[^' || pg_catalog.chr(10) || ']*', '', 'g'
   );
-  undo_definition := pg_catalog.pg_get_functiondef(
-    'private.undo_create_task_command(uuid, uuid)'::regprocedure
+  undo_definition := pg_catalog.regexp_replace(
+    pg_catalog.pg_get_functiondef(
+      'private.undo_create_task_command(uuid, uuid)'::regprocedure
+    ),
+    '--[^' || pg_catalog.chr(10) || ']*', '', 'g'
   );
 
   -- The origin is bounded, defaulted, and actually written.

@@ -3,7 +3,7 @@
 -- Phase 2E pgTAP file. Written in ASCII so checkout encoding cannot alter SQL.
 
 begin;
-select plan(159);
+select plan(167);
 set local timezone to 'UTC';
 
 -- Contract and security posture ---------------------------------------------
@@ -1551,6 +1551,91 @@ select results_eq(
      where t.operation_key = 'pgtap-2f3-bare' $$,
   $$ values ('cancelled'::text, 'undone'::text) $$,
   'the compensation cancelled the task and closed the undo operation'
+);
+
+-- Phase 2F Slice 2F.3: the undo guard discriminates on origin ---------------
+--
+-- The PRD's bounded-domain refusal (`created_by not in ('user','agent')`) is
+-- **structurally unreachable at runtime**: `tasks_created_by_check` already
+-- forbids a third value, so no row can carry one. On its own that clause would
+-- therefore accept every task that exists and the guard would stop
+-- discriminating at all — which is what the paired equality against the recorded
+-- origin restores. Both halves are asserted: the domain bound by the constraint
+-- that makes it unreachable, and the equality by an actual drift.
+
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['origin drift user'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-u'
+  ),
+  'accepted',
+  'the user-origin drift fixture is confirmed'
+);
+select is(
+  pg_temp.creation_key_as(
+    'create_title_only', array['origin drift user'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-u', 'user', 'outcome'
+  ),
+  'applied',
+  'the user-origin drift fixture is created'
+);
+update public.tasks set created_by = 'agent'
+where operation_key = 'pgtap-2f3-drift-u';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2f3-drift-u'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'undo refuses a task whose origin drifted from the recorded user to agent'
+);
+
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['origin drift agent'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-a'
+  ),
+  'accepted',
+  'the agent-origin drift fixture is confirmed'
+);
+select is(
+  pg_temp.creation_key(
+    'create', 'create_title_only', array['origin drift agent'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-a', 'outcome'
+  ),
+  'applied',
+  'the agent-origin drift fixture is created through the defaulted call'
+);
+update public.tasks set created_by = 'user'
+where operation_key = 'pgtap-2f3-drift-a';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2f3-drift-a'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'undo refuses a task whose origin drifted from the recorded agent to user'
+);
+
+-- The other half: an origin outside the domain cannot be staged at all, and the
+-- guard nevertheless carries the clause. Asserted rather than exercised, and
+-- said plainly instead of dressed up as a behavioural test.
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    where c.conrelid = 'public.tasks'::regclass
+      and c.conname = 'tasks_created_by_check'
+      and pg_get_constraintdef(c.oid) like '%user%'
+      and pg_get_constraintdef(c.oid) like '%agent%'
+  ),
+  'tasks_created_by_check bounds the origin domain, so a third value cannot be staged'
+);
+select ok(
+  position('not in (''user'', ''agent'')' in pg_get_functiondef(
+    'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0
+  and position('expected_state ->> ''createdBy''' in pg_get_functiondef(
+    'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0,
+  'the creation-undo guard carries both the domain bound and the recorded-origin equality'
 );
 
 -- Other owner and unauthenticated -------------------------------------------

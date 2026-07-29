@@ -315,7 +315,7 @@ describe("Slice 2E.6 forward migration contract", () => {
     // (26 assertions), the cross-owner additions (4) and the two signature pins
     // the recreated seven-argument function needs. The literal is pinned rather
     // than derived so that a *silently* shrinking suite fails here.
-    expect(plan).toBe(159);
+    expect(plan).toBe(167);
     expect(assertions).toHaveLength(plan);
   });
 });
