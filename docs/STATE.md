@@ -1,22 +1,41 @@
 # Project State
 
-Last updated: 2026-07-29 (Phase 2F — Slice 2F.1 accepted and merged; Slice 2F.2 implemented on branch `codex/phase-2f-slice-2`)
+Last updated: 2026-07-29 (Phase 2F — Slices 2F.1, 2F.2 and 2F.3 accepted, merged and deployed; Slice 2F.4 implemented on branch `codex/phase-2f-slice-4`, undeployed)
 
 ## Current truth
 
-**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4** (68 requirements, 12 families, slices 2F.1–2F.6; exactly two migrations expected, neither of them in 2F.1 or 2F.2).
+**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.2** (68 requirements, 12 families, slices 2F.1–2F.6; exactly two migrations expected in the whole phase — 2F.3's creation contract, applied, and 2F.4's revocation, implemented and not yet deployed).
 
-### Slice 2F.2 — Work-surface mutation convergence (implemented, code-only, awaiting deployment-session gates)
+**Remote migration parity is `202607290062`.** Slice 2F.3's deployment moved it from `202607280061`; local head is identical and there is no drift. Slice 2F.4's `202607300063` is **branch-only and undeployed**, so it is not counted in parity.
+
+### Slice 2F.4 — Task grant revocation and test-suite semantic migration (implemented, undeployed)
+
+**`authenticated` no longer holds any write privilege on `public.tasks`.** Migration `202607300063` revokes `insert, update, delete` there and `update, delete` on `public.reminders`. **No application source file changed** — since Slice 2F.3 no module issued those writes, so the revocation removes a permission, not a caller. That is also why this is the only Phase 2F slice with **no data residual**: a revocation writes no rows.
+
+- **Final posture.** `public.tasks`: `authenticated` holds `SELECT` only. `public.reminders`: `SELECT` + `INSERT`, the latter being the Option C authoring exception whose sole caller is `createReminder`. `anon` holds nothing on either table. No grant widened anywhere (2F-REVOKE-006). The `tasks` direct-write allowlist stays **empty** and is compared by exact equality in both directions (2F-REVOKE-008).
+- **The 2F-REMINDER-003 determination is written and is a revocation** (owner decision A4, recorded in `SECURITY.md`): no production module issues a reminder UPDATE or DELETE; every surviving UPDATE runs inside `apply_task_command`, `run_user_heartbeat` or a definer-routed `private.undo_*` handler; and **no `delete` against `public.reminders` exists anywhere in the repository**, so rows are removed only by cascade.
+- **13 pgTAP statements dispositioned, not 11** (PRD Revision 4.2, owner decision A2). Slice 2F.3 had added two origin-drift stagings after Revision 4 fixed §9's table; Slice 2F.4's pre-code inventory found them. **10 change vehicle to the owning role; 3 — the reminder INSERTs — stay `authenticated` and double as living proof the retained Option C grant works.** No statement was mechanically re-roled and none was deleted: the interference proofs keep their exact behavioural pins, now writer-agnostic in fact rather than only in intent.
+- **The one claim that died is inverted rather than reworded.** `apply.sql`'s "a plain client-side task UPDATE still works" is false by construction now; the denial moved to `supabase/tests/phase_2f_task_write_grants.sql`, and the property that write was actually carrying — the audit trigger tolerating an unset `app.audit_actor` — is restaged privileged. Because a `postgres` vehicle proves nothing about production, `phase_2c_slice_5_task_graph.sql` gains the actor-default assertion for a real SECURITY DEFINER writer that sets no actor (2F-TESTMIG-003).
+- **Non-vacuity is now exact.** `phase_2f_task_write_grants.sql` re-issues, inside its own transaction, the grants `202607160003:195`/`202607160007:162` issued, proves the refused writes succeed, re-revokes and proves they refuse again — so the privilege is demonstrably the only variable.
+- **PRD Revision 4.2 corrects three facts** (owner decisions A1–A3), none of which changes a requirement: §12's privilege provenance (the grants are versioned in the chain, issued dynamically inside `DO` loops — not platform defaults, except for `service_role`, where the original claim holds), §9's row count, and five drifted `creation.sql` anchors.
+- **CI gains a re-grant rehearsal** as the `database` job's last step, with three explicit posture boundaries so no earlier assertion can have run under the wrong privileges. Its scope is stated everywhere it appears: it proves the committed rollback SQL applies and restores the versioned privileges; it does **not** prove PostgREST schema-cache convergence, in-flight session behaviour, or an operational production rollback.
+- **Deployment-session gates are pending and are not claimed:** the migration is not applied, the full remote suite has not run in-session, and the live schema-cache observation — the residual the CI rehearsal explicitly excludes — has not been made.
+
+### Slice 2F.3 — Manual task-creation convergence (accepted, merged, deployed)
+
+Merged as PR #26 → `48d6a83`, CI run `30467623925` green on all three jobs. **Migration parity moved `202607280061` → `202607290062`** in the deployment session of 2026-07-29 (2F-OPERATIONS-001), applied on the first attempt with every post-deploy `DO` assertion holding. All 21 deployment-session gates executed and passed, including manual creation through the rendered form persisting `created_by = 'user'` with audit actor `'user'` and an executed undo, the two-owner creation probe, and zero fixture residue. Exactly one `pg_proc` row for `create_task_command`; legacy six-argument callers remain byte-identical. See `docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md`.
+
+### Slice 2F.2 — Work-surface mutation convergence (accepted, merged, deployed)
 
 **The four Work buttons now route through `public.apply_task_command`.** A click resolves at click time through the deployed `public.list_task_command_candidates` — the rendered title as `p_title_query`, the mapped taxonomy action, the caller's own `auth.uid()` scope — selects the row whose `task_id` equals the clicked id, and applies. **No migration, no new RPC, no grant change, no change to `list_task_command_candidates`.**
 
-- **`persistTaskStatus` and `updateTaskStatus` are deleted** (2F-SURFACE-012/013). The architecture gate's `tasks` allowlist is now **one entry** — `createRecord`'s insert, which 2F.3 takes — and the gate fails on an allowlist entry whose writer no longer exists, so the reduction is mechanical rather than asserted.
+- **`persistTaskStatus` and `updateTaskStatus` are deleted** (2F-SURFACE-012/013). The architecture gate's `tasks` allowlist dropped to **one entry** at this slice — `createRecord`'s insert — which Slice 2F.3 then took, leaving it **empty**; the gate fails on an allowlist entry whose writer no longer exists, so each reduction is mechanical rather than asserted.
 - **Three disclosed behaviour changes, all owner-approved in PRD §4:** an unresolvable or ineligible click now **refuses with a localized refresh affordance** instead of blind-overwriting; **completing a task now cancels that task's scheduled reminders** (`apply_task_command` reconciles them; the deleted writer cancelled nothing) while `wait_task`/`resume_task` leave every reminder untouched; and **progressive enhancement without JavaScript is intentionally lost** for the four buttons, because rendering declared outcomes requires `useActionState`.
 - **Title drift is permissive** (owner decision 4): the clicked `task_id` is authoritative, a changed title never refuses on its own, and the outcome renders the title resolution returned rather than the stale rendered one.
 - **The ranker is deliberately not on this path.** `rankTaskCandidates`/`buildTaskCommandPreview` select through `result.candidates`, which is floored at `minCandidateScore` and capped at `TASK_MATCH_LIMITS.ranked`; routing a click through them would refuse legitimate clicks in exactly the drift and same-title cases 2F-SURFACE-004 forbids. Selection is by id out of the whole resolution result, which is what that requirement says. Everything else is reused: `validateTaskCommand`, `loadTaskCandidates`, `toTaskPreState`, `buildCanonicalPatch`, `buildApplyPayload`, `applyTaskCommand`.
 - **Analytics use the existing vocabulary** — `task_command_applied` with `commandOrigin: 'work'` (already allowlisted at `202607280061:434`) and `task_status_changed` unchanged in shape. **No analytics migration exists.**
 - **CI green on the exact head SHA `836ced3`** (run `30425313872`): `application`, `edge worker` and `database and journey` all successful — including the empty-DB migration chain, the full pgTAP suite, `db lint` and the foundation e2e on desktop and Pixel 7. The `application` job's green confirms the two local `sql-reachability.test.ts` failures are this workstation's (CRLF checkout), not the slice's; `git diff main` over that test and `supabase/` is empty. Local: lint 0/0, typecheck clean, build green, 2354/2356 unit tests.
-- **Deployment-session gates are pending and are not claimed:** the authenticated journeys (`e2e/work-actions.spec.ts`, credential-gated and deliberately outside CI's Playwright list), the two-owner disposable probe, the remote parity re-check before/after, and the live `commandOrigin: 'work'` observation. Reminder cancellation, audit actor, undo and click-time ownership are proven against injected clients and by construction, not yet against the deployed project.
+- **Its deployment-session gates were subsequently executed** and the slice is accepted, merged and live. This slice carried no migration, so parity was unchanged by it.
 
 ### Slice 2F.1 — Guardrails, decisions and preconditions (accepted, merged)
 
@@ -29,7 +48,7 @@ Accepted on `c7e03b3` with CI run `30422655547` green on all three jobs; merged 
 
 **Phase 2E — Natural-Language Task Updates is RELEASED.** All eight slices — 2E.1 (Epic 2E-A) through 2E.8 (Epic 2E-H) — are implemented, reviewed, corrected, accepted, merged, deployed to the linked project and validated against it.
 
-**Remote migration parity is `202607280061`.** The whole chain `202607250055`–`202607280061` is applied; every post-deploy assertion held on the first attempt and no rollback was required.
+**Phase 2E took remote migration parity to `202607280061`.** The whole chain `202607250055`–`202607280061` is applied; every post-deploy assertion held on the first attempt and no rollback was required. *(Current parity is `202607290062`, moved there by Slice 2F.3 — see the top of this section.)*
 
 | Fact | Value |
 |---|---|

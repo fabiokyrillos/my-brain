@@ -152,4 +152,45 @@ Duas armadilhas de SQL que custaram duas idas ao CI e valem registro: `coalesce`
 
 A mesma migration admite **uma** ação de criação sem qualificador, `create_title_only`, cujo conjunto esperado de chaves de patch é **vazio** — o formulário manual expressa um título e nada mais, e as sete ações qualificadoras exigem cada uma a sua chave exata. Duas armadilhas valem registro: `array_agg` sobre zero linhas devolve **NULL**, não array vazio, então a comparação de chaves precisa de `coalesce(actual_patch_keys, array[]::text[])` ou a única ação cujo patch deve ser vazio seria a única impossível de chamar; e `create_task` **não** podia ser o nome — já é o *tipo de confirmação* em `task_command_confirmations.action` (`202607270060:20`), membro do vocabulário de consequência de perguntas pendentes, e prefixo do `action_type` de undo `create_task_command`.
 
-**`reminders.status = 'snoozed'` é vocabulário morto em produção (2F-REMINDER-004).** O literal está declarado no CHECK da coluna, mas **nada em produção o escreve** e **nada dispara a partir dele**: o heartbeat não adia lembretes, não existe superfície de adiamento, e o worker não o produz. Ele é **diferido, não aposentado** nesta fase — remover um membro de CHECK exige migration e prova de que nenhuma linha o carrega, e a fase não tem essa evidência. Os ramos `snoozed` dos handlers de undo permanecem cobertos pelas montagens pgTAP de `phase_2e_task_command_creation.sql` justamente para que continuem falsificáveis enquanto o literal existir; sem essa cobertura, o código que trata um estado inalcançável deixaria de ser testado e passaria a ser adivinhação.
+**`reminders.status = 'snoozed'` é vocabulário morto em produção (2F-REMINDER-004).** O literal está declarado no CHECK da coluna, mas **nada em produção o escreve** e **nada dispara a partir dele**: o heartbeat não adia lembretes, não existe superfície de adiamento, e o worker não o produz. Ele é **diferido, não aposentado** nesta fase — remover um membro de CHECK exige migration e prova de que nenhuma linha o carrega, e a fase não tem essa evidência. Os ramos `snoozed` dos handlers de undo permanecem cobertos pelas montagens pgTAP de `phase_2e_task_command_creation.sql` justamente para que continuem falsificáveis enquanto o literal existir; sem essa cobertura, o código que trata um estado inalcançável deixaria de ser testado e passaria a ser adivinhação. *(A Slice 2F.4 moveu a montagem de `snoozed` para contexto privilegiado junto com a revogação do UPDATE de lembretes; o ramo continua exercitado e a dormência do literal segue registrada aqui, sem mudança.)*
+
+## Phase 2F — Slice 2F.4: grants finais de `tasks` e `reminders`
+
+**Migration `202607300063`.** `revoke insert, update, delete on public.tasks from authenticated` e `revoke update, delete on public.reminders from authenticated`. Nenhuma política, nenhum gatilho, nenhuma assinatura de função e nenhum dado foram tocados; nenhum grant foi alargado.
+
+### Postura vigente
+
+| Objeto | `anon` | `authenticated` | `service_role` |
+|---|---|---|---|
+| `public.tasks` | nada | `select` | default de plataforma |
+| `public.reminders` | nada | `select`, `insert` | default de plataforma |
+| `public.task_command_confirmations` | nada | `select` | **nada** (revogado explicitamente) |
+| `public.product_events` | nada | `select` | **nada** (revogado explicitamente) |
+| `public.undo_operations` | nada | `select` | default de plataforma |
+| `public.audit_logs` | nada | `select`, **`insert`** | default de plataforma |
+
+**Proveniência.** Os privilégios de `authenticated` em `tasks` e `reminders` **não** vêm de defaults de plataforma: `202607160003:195` e `202607160007:162` os concedem dentro de laços `DO` com `execute format(...)`, o que os torna invisíveis a uma busca literal por `grant … on public.tasks` — foi exatamente assim que a PRD Revisão 4 os deu como inexistentes, e a Revisão 4.2 corrige o registro. Para `service_role` a leitura original vale: não há grant de tabela algum para ele em toda a cadeia. Nenhuma sequência participa — as duas tabelas usam `uuid default gen_random_uuid()`, então não há privilégio de sequência em jogo. Nenhum `grant usage on schema` existe na cadeia, e é por isso que `private` é alcançável apenas pelo dono.
+
+### Políticas mantidas porém inalcançáveis
+
+As quatro políticas por dono continuam em cada tabela e RLS segue `enable` **e** `force`. Cinco delas deixaram de ser alcançáveis por DML direto de cliente, porque a checagem de grant precede a consulta à política:
+
+| Política | Estado |
+|---|---|
+| `tasks_select_own` | alcançável — é o caminho de leitura de todas as projeções |
+| `tasks_insert_own`, `tasks_update_own`, `tasks_delete_own` | **presentes e inalcançáveis** |
+| `reminders_select_own` | alcançável |
+| `reminders_insert_own` | alcançável — é a exceção Opção C (`createReminder`) |
+| `reminders_update_own`, `reminders_delete_own` | **presentes e inalcançáveis** |
+
+Mantê-las é decisão registrada (decisão do dono A5), não descuido: a fase declara que políticas não mudam, descartá-las seria uma segunda alteração com rollback próprio, e o script de re-grant precisa restaurar a postura anterior por inteiro. A migration verifica que as oito continuam existindo.
+
+### Escritores que sobrevivem
+
+Toda escrita em `public.tasks` passa agora por um destes: a família `security definer` da Phase 2E (`apply_task_command`, `create_task_command`), a família de materialização de candidatos da Phase 2C (`confirm_entry_task_candidates*`), os handlers `private.undo_*` alcançados pelo roteador `definer` `undo_operation`, os gatilhos que disparam dentro desses contextos, ou uma migration. Em `public.reminders` acrescenta-se `run_user_heartbeat` (marcação de envio, `service_role`) e o INSERT de cliente da exceção Opção C.
+
+`public.create_due_task_reminder` permanece `security invoker` — a migration assere isso. Como nenhum INSERT de tarefa pode mais originar-se em contexto de cliente, o gatilho passa a executar sempre como o dono da função que o disparou.
+
+### Correção de prosa (2F-TESTMIG-007)
+
+O comentário de `202607170028:33` afirma que `authenticated` não tem INSERT em `public.audit_logs`. É falso: `202607170016:196` revogou apenas `update, delete`. A migration **não foi editada** (cadeia append-only) e o grant **não foi alterado** — narrar a postura correta é função desta tabela, e a linha de `audit_logs` acima é a versão vigente.

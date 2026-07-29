@@ -92,8 +92,54 @@ Google OAuth e callbacks públicos serão configurados somente quando o usuário
 
 **Decisão do dono 3, Opção C (2F-REMINDER-001/002).** `public.reminders` mantém o grant de INSERT para `authenticated`, e `createReminder` (`src/features/agent/actions.ts:125`) continua sendo uma escrita direta de cliente. Esta é a **única** exceção ao invariante da Phase 2F ("`public.tasks` tem exatamente um caminho de escrita validado"), e ela é deliberada, delimitada e registrada aqui — não uma omissão.
 
-- **O que a exceção permite.** INSERT de linhas de lembrete escopadas ao próprio dono, e nada mais. Não há RPC `create_reminder`, e nenhuma foi introduzida. O grant não permite UPDATE nem DELETE por esta decisão — a determinação sobre revogar esses dois é trabalho separado da Slice 2F.4 (2F-REMINDER-003), com resultado escrito em qualquer direção.
+- **O que a exceção permite.** INSERT de linhas de lembrete escopadas ao próprio dono, e nada mais. Não há RPC `create_reminder`, e nenhuma foi introduzida. UPDATE e DELETE **foram revogados** pela Slice 2F.4 — a determinação 2F-REMINDER-003 está escrita na seção seguinte.
 - **Por que é aceitável hoje.** RLS continua forçada na tabela, então a linha inserida só pode pertencer a quem a insere; o censo de lembretes executado no pacote de gates pré-código não encontrou lembrete independente algum em produção; e não existe superfície de cancelamento ou edição de lembrete no produto, então não há caminho de cliente que altere uma linha depois de criada.
 - **O que a exceção *não* é.** Ela não é um contrato de autoria validado. Um INSERT direto não tem chave de operação, não tem pré-estado esperado, não grava linha de undo e não registra ator de auditoria próprio — exatamente as quatro propriedades que a família de comandos dá a toda escrita em `public.tasks`. Isto é dito aqui em vez de omitido.
 - **Condição de reabertura.** Um contrato de autoria validado para lembretes — qualquer superfície que permita criar, editar, adiar ou cancelar lembretes de forma auditável. No momento em que essa superfície existir, esta exceção deixa de ser justificável e o grant deve ser revogado junto com ela. **Nenhuma segunda exceção pode ser adicionada sem revisão da PRD.**
 - **Como a exceção é vigiada.** O gate de arquitetura (`src/lib/supabase/direct-write-guard.test.ts`, 2F-GUARD-002) carrega uma allowlist de `reminders` com exatamente esta entrada e compara por igualdade exata nos dois sentidos: um segundo escritor direto reprova o build, e uma allowlist que nomeie um escritor inexistente reprova também. A allowlist de `tasks`, por contraste, está **vazia** desde a Slice 2F.3 — o gate nunca afirma um vazio que seja falso.
+
+## Phase 2F — Slice 2F.4: revogação dos grants de escrita em `public.tasks` (2F-REVOKE-007)
+
+**O risco residual da §16.4 da PRD 2E está fechado para `public.tasks`.** A migration `202607300063` revogou `insert, update, delete` de `authenticated`. Desde a Slice 2F.2 nenhum módulo da aplicação fazia essas escritas; o que ainda as permitia era o grant, e ele não existe mais.
+
+### Postura final de privilégios
+
+| Objeto | `anon` | `authenticated` | `service_role` / definer |
+|---|---|---|---|
+| `public.tasks` | nada | **SELECT apenas**, escopado por RLS | inalterado |
+| `public.reminders` | nada | **SELECT + INSERT** (exceção Opção C) | inalterado |
+
+Nenhum grant foi alargado em lugar algum (2F-REVOKE-006), e `anon` continua sem privilégio de qualquer espécie nas duas tabelas — asserido, não presumido.
+
+### Determinação 2F-REMINDER-003 — escrita, com a evidência que a sustenta
+
+**Resultado: UPDATE e DELETE de `authenticated` sobre `public.reminders` são revogados; INSERT e SELECT permanecem.** A decisão do dono (A4) foi tomada sobre inventário de repositório, não sobre julgamento:
+
+- **Nenhum módulo de produção executa UPDATE ou DELETE em lembretes.** Todo UPDATE que sobrevive roda dentro de `apply_task_command` ou `run_user_heartbeat` (ambos `security definer`), ou dentro de um handler `private.undo_*` alcançado apenas pelo roteador `undo_operation`, que também é `definer`.
+- **Não existe `delete` contra `public.reminders` em lugar nenhum do repositório** — nem em produção, nem em script, nem em teste, nem em fixture. Linhas de lembrete só desaparecem por `on delete cascade` vindo de `public.tasks`, `public.entries` e `auth.users`.
+- **Não existe superfície de cancelamento, adiamento ou edição de lembrete no produto.** A intenção do usuário sobre lembretes é INSERT e nada mais; UPDATE é reconciliação derivada e manutenção de entrega, categorias que a Opção C nunca cobriu.
+- **Apenas duas afirmações de teste eram afetadas** (`phase_2e_task_command_creation.sql:1189` e `:1209`), ambas já classificadas como condicionais pelas linhas 8 e 9 da §9 da PRD, e ambas re-encenadas em contexto privilegiado sem alterar o que provam.
+
+### Políticas RLS presentes porém inalcançáveis — dito, não implícito
+
+As quatro políticas por dono de cada tabela continuam existindo. Três delas (`tasks_insert_own`, `tasks_update_own`, `tasks_delete_own`) e duas de `reminders` (`reminders_update_own`, `reminders_delete_own`) tornaram-se **inalcançáveis por DML direto de cliente**: a checagem de grant acontece antes de qualquer política ser consultada, então nenhuma instrução de `authenticated` chega até elas.
+
+Elas foram **deliberadamente mantidas** (decisão do dono A5), por três razões: 2F-REVOKE-006 diz que as políticas não mudam nesta fase; removê-las seria uma segunda mudança com rollback próprio; e o script de re-grant precisa restaurar exatamente a postura anterior, o que ele não conseguiria se as políticas tivessem sido descartadas.
+
+**A evidência perdida é nomeada, não dissimulada:** RLS do lado da escrita em `public.tasks` deixou de ser testável a partir de um role de cliente. A evidência compensatória é dupla e ambas rodam: RLS do lado da leitura, provada nos dois sentidos (o dono **vê** sua linha e o estranho **não vê**, para que a metade de isolamento não passe por vacuidade) em `phase_2f_task_write_grants.sql` e em `remote-supabase-smoke.mjs`; e negação na fronteira do RPC, onde `apply_task_command` contra a tarefa de outro dono levanta `P0002`.
+
+### A consequência de ordenação do gatilho (2F-REVOKE-002)
+
+`public.create_due_task_reminder` continua `security invoker` e dispara `after insert on public.tasks`. Antes da revogação, um INSERT de cliente o executava como `authenticated`. Depois dela **nenhum INSERT de tarefa pode originar-se em contexto de cliente**, então o gatilho só roda dentro de corpos `security definer` e, portanto, como o dono da função. O risco fecha por construção — e é asserido, não presumido: a migration verifica que a função continua `invoker`, e `phase_2f_task_write_grants.sql` §6 prova o caminho ponta a ponta chamando `confirm_entry_task_candidates_v6` como `authenticated`, um chamador que comprovadamente não tem INSERT.
+
+### Rollback
+
+`scripts/phase-2f-regrant-task-write-grants.sql` é o inverso textual exato das duas revogações e é ensaiado em CI a cada execução do job `database`. **O que o ensaio prova:** que o SQL aplica e restaura os privilégios versionados da cadeia de migrations. **O que ele não prova, e não pode ser citado como provando:** convergência do cache de schema do PostgREST, comportamento de sessões em voo, ou um rollback operacional contra produção. Esses três só são observáveis na sessão de deploy.
+
+### Proveniência dos privilégios — corrigida
+
+A PRD Revisão 4 afirmava que os privilégios de `tasks`/`reminders` vinham dos defaults de plataforma do Supabase e que nenhum `grant` explícito existia na cadeia. **Isso era falso para `authenticated`**: `202607160003:195` e `202607160007:162` concedem os quatro privilégios dentro de laços `DO`, invisíveis a uma busca literal. A Revisão 4.2 corrige o texto (decisão do dono A1). Para `service_role` a afirmação original procede — não há grant de tabela algum para ele na cadeia.
+
+### Correção de prosa obsoleta (2F-TESTMIG-007)
+
+O comentário de `202607170028:33` afirma que `authenticated` não tem INSERT em `public.audit_logs`; na verdade `202607170016:196` revogou apenas `update, delete`, então o INSERT permanece. **A migration não foi editada** — a cadeia é append-only — e o grant de `audit_logs` **não foi alterado**, por estar fora do escopo desta fase. A afirmação é corrigida aqui e em `DATABASE.md`, que é onde a postura vigente é documentada.
