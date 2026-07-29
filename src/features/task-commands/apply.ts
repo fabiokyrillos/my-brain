@@ -137,16 +137,33 @@ export function normalizeTaskCommandOperationKey(operationKey: string): string {
   return normalized;
 }
 
+/**
+ * The five values a resolved command contributes to the request.
+ *
+ * Declared structurally rather than as `TaskCommandPreview` because a preview is
+ * only one of the two things that can produce them. The chat surface resolves a
+ * natural-language command into a preview the user reads and then applies;
+ * Phase 2F's Work surface resolves a click through the same
+ * `list_task_command_candidates` read and applies immediately, with no preview
+ * to render — 2F-SURFACE-010's recorded trade. `TaskCommandPreview` satisfies
+ * this type, so the chat path is unchanged.
+ *
+ * These are exactly the values the fingerprint binds, which is why nothing wider
+ * is accepted: the request the RPC hashes is provably the request that was
+ * resolved.
+ */
+export type TaskCommandApplySource = {
+  readonly task: { readonly taskId: string };
+  readonly action: TaskCommandAction;
+  readonly canonicalPatch: TaskCommandPreview["canonicalPatch"];
+  readonly observedBefore: string | null;
+  readonly policyVersion: string;
+};
+
 export type TaskCommandApplyInput = {
-  /**
-   * The preview being applied.
-   *
-   * Read for the task id, the action, the canonical patch, the observation
-   * instant and the policy version — the five values the fingerprint bound, so
-   * the request the RPC hashes is provably the request the user was shown.
-   */
-  readonly preview: TaskCommandPreview;
-  /** The pre-state the preview observed. The RPC's twelve-column staleness gate. */
+  /** What is being applied — a preview, or a resolved Work-surface click. */
+  readonly source: TaskCommandApplySource;
+  /** The pre-state the resolution observed. The RPC's nineteen-key staleness gate. */
   readonly preState: TaskPreState;
   readonly operationKey: string;
 };
@@ -170,26 +187,26 @@ export type TaskCommandApplyInput = {
  * process sends stops being the value the preview hashed.
  */
 export function buildApplyPayload(input: TaskCommandApplyInput): ApplyArgs {
-  const { preview, preState, operationKey } = input;
+  const { source, preState, operationKey } = input;
   // The same refusal `buildFingerprintPayload` makes, for the same reason: the
   // instant is hashed, and an empty string would yield a *valid* digest over a
   // fabricated observation, so two different requests would share one identity.
   // Unreachable in the product — only a shell whose match ranked no candidates
   // carries the null, and no shell has a write ahead of it — which is why it is a
   // throw rather than a substitution.
-  if (preview.observedBefore === null) {
+  if (source.observedBefore === null) {
     throw new TaskCommandApplyError(
-      "an applicable preview must carry the instant its pre-state was observed at",
+      "an applicable command must carry the instant its pre-state was observed at",
       "missing_observation",
     );
   }
   return {
-    p_task_id: preview.task.taskId,
-    p_action: preview.action,
-    p_patch: preview.canonicalPatch as unknown as ApplyArgs["p_patch"],
+    p_task_id: source.task.taskId,
+    p_action: source.action,
+    p_patch: source.canonicalPatch as unknown as ApplyArgs["p_patch"],
     p_pre_state: preState as unknown as ApplyArgs["p_pre_state"],
-    p_observed_before: preview.observedBefore,
-    p_policy_version: preview.policyVersion,
+    p_observed_before: source.observedBefore,
+    p_policy_version: source.policyVersion,
     p_operation_key: normalizeTaskCommandOperationKey(operationKey),
   };
 }

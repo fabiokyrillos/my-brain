@@ -410,7 +410,19 @@ function relationChanges(
   );
 }
 
-function buildCanonicalPatch(input: {
+/**
+ * The one canonical-patch builder.
+ *
+ * Exported in Phase 2F Slice 2F.2 so the Work surface derives its patch here
+ * rather than beside its four buttons. The patch is hashed into the request
+ * fingerprint, so a second builder that agreed today and drifted tomorrow would
+ * surface as `2E_IDEMPOTENCY_MISMATCH` on a replay of an identical request —
+ * a failure whose cause is invisible from the failure.
+ *
+ * `resolvedId` is null for every action that writes no relation, which is all
+ * four Work verbs.
+ */
+export function buildCanonicalPatch(input: {
   command: ValidatedTaskCommand;
   pre: TaskPreState;
   resolvedId: string | null;

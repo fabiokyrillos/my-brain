@@ -180,6 +180,44 @@ export type TaskCandidateRow = TaskPreState & {
   readonly nextReminderAt: string | null;
 };
 
+/**
+ * The nineteen keys, projected out of a candidate row and nothing else.
+ *
+ * **`apply_task_command`'s guard is a `<> 19` count paired with an
+ * `any(array[…])` membership test** (`202607260059:876-886`), so a missing key is
+ * refused exactly as hard as an unknown one — which is why this is a projection
+ * and not a spread. `TaskCandidateRow` is structurally a `TaskPreState` plus
+ * eighteen further columns; handing the row straight to `p_pre_state` would send
+ * thirty-seven keys and be refused.
+ *
+ * Lifted out of `scoreRow` in Phase 2F Slice 2F.2 rather than copied: the Work
+ * surface needs the same projection from the same rows, and two projections of a
+ * count-exact contract is how one of them silently stops matching it.
+ */
+export function toTaskPreState(row: TaskCandidateRow): TaskPreState {
+  return {
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    dueAt: row.dueAt,
+    plannedAt: row.plannedAt,
+    manualPriority: row.manualPriority,
+    completedAt: row.completedAt,
+    cancelledAt: row.cancelledAt,
+    intentionalNoDue: row.intentionalNoDue,
+    noDueReason: row.noDueReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    projectIds: row.projectIds,
+    projectNames: row.projectNames,
+    contextIds: row.contextIds,
+    contextNames: row.contextNames,
+    personIds: row.personIds,
+    personNames: row.personNames,
+    personRoles: row.personRoles,
+  };
+}
+
 export type RankedTaskCandidate = {
   readonly taskId: string;
   readonly preState: TaskPreState;
@@ -462,27 +500,7 @@ function scoreRow(input: {
     }
   }
 
-  const preState: TaskPreState = {
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    dueAt: row.dueAt,
-    plannedAt: row.plannedAt,
-    manualPriority: row.manualPriority,
-    completedAt: row.completedAt,
-    cancelledAt: row.cancelledAt,
-    intentionalNoDue: row.intentionalNoDue,
-    noDueReason: row.noDueReason,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    projectIds: row.projectIds,
-    projectNames: row.projectNames,
-    contextIds: row.contextIds,
-    contextNames: row.contextNames,
-    personIds: row.personIds,
-    personNames: row.personNames,
-    personRoles: row.personRoles,
-  };
+  const preState = toTaskPreState(row);
 
   return {
     taskId: row.taskId,

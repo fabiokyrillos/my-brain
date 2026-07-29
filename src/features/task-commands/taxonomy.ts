@@ -430,3 +430,60 @@ export function isAllowedTargetValue(action: TaskCommandAction, value: string): 
 export function touchesReminders(action: TaskCommandAction): boolean {
   return actionPolicy(action).changedFields.includes("reminders");
 }
+
+/**
+ * The Work surface's own four-verb vocabulary (2F-SURFACE-002).
+ *
+ * `wait_task` and `resume_task` are **not** taxonomy actions — they are the
+ * names the Work projection offers on a row, and until Phase 2F they reached the
+ * database through a direct UPDATE that knew nothing about the taxonomy.
+ */
+export const WORK_SURFACE_ACTIONS = [
+  "complete_task",
+  "wait_task",
+  "resume_task",
+  "reopen_task",
+] as const;
+
+export type WorkSurfaceAction = (typeof WORK_SURFACE_ACTIONS)[number];
+
+/**
+ * What each Work verb *is*, in taxonomy terms.
+ *
+ * **Data, and deliberately here rather than in a component or a Server Action**
+ * (2F-SURFACE-002). The mapping is the whole of what 2F.2 adds to the mutation
+ * contract: everything downstream — eligibility, the canonical patch, the
+ * fingerprint, the audit row, the undo row, the reminder reconciliation — is the
+ * deployed Phase 2E contract acting on an ordinary command.
+ *
+ * `patch` is what the surface contributes to `validateTaskCommand`. It is empty
+ * for the two actions whose destination the taxonomy already decides
+ * (`complete_task → completed`, `reopen_task → todo`, both via
+ * `policy.targetStatus`); only `set_status` takes its destination from a patch,
+ * because it is the one action whose `targetValueField` is `status`.
+ *
+ * **`resume_task` and `reopen_task` map to different taxonomy actions despite
+ * both landing on `todo`**, and that is load-bearing rather than fussy: they
+ * start from different places. `reopen_task` is eligible only from `completed`
+ * and `set_status` never is, so a single shared mapping would make one of the two
+ * refuse on every row it is ever offered on.
+ *
+ * **No Work verb reaches `cancelled`.** The pre-2F surface enum admitted all
+ * eight statuses including `cancelled` (`operations/actions.ts`'s deleted
+ * `statusSchema`), which was an unconfirmed route to the transition `cancel_task`
+ * exists to guard. `set_status`'s `allowedTargetValues` is `ACTIVE_ONLY`, so the
+ * route is now closed by the taxonomy rather than by this table's restraint.
+ */
+export const WORK_ACTION_MAPPING = {
+  complete_task: { taxonomy: "complete_task", patch: {} },
+  wait_task: { taxonomy: "set_status", patch: { status: "waiting" } },
+  resume_task: { taxonomy: "set_status", patch: { status: "todo" } },
+  reopen_task: { taxonomy: "reopen_task", patch: {} },
+} as const satisfies Record<
+  WorkSurfaceAction,
+  { readonly taxonomy: TaskCommandAction; readonly patch: Readonly<Record<string, string>> }
+>;
+
+export function isWorkSurfaceAction(value: unknown): value is WorkSurfaceAction {
+  return typeof value === "string" && (WORK_SURFACE_ACTIONS as readonly string[]).includes(value);
+}
