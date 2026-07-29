@@ -18,8 +18,9 @@ import { describe, expect, it } from "vitest";
  * allowlist can only shrink through a reviewed edit (2F-GUARD-003).
  *
  * Allowlist lifecycle (PRD §2, §6.1):
- * - `tasks` — the two legacy writers, removed by 2F.2 (`persistTaskStatus`
- *   update) and 2F.3 (`createRecord` insert). **Empty at 2F.4** (2F-REVOKE-008).
+ * - `tasks` — **empty as of Slice 2F.3**. The two legacy writers left in 2F.2
+ *   (`persistTaskStatus` update) and 2F.3 (`createRecord` insert). 2F.4 revokes
+ *   the grants that would still permit one (2F-REVOKE-008).
  * - `reminders` — exactly the Option C exception (`createReminder` insert,
  *   owner decision 3), permanent until a PRD revision, so this gate never
  *   claims an emptiness that is false.
@@ -32,14 +33,20 @@ type GuardedTable = "tasks" | "reminders";
 type DmlMethod = (typeof DML_METHODS)[number];
 type Writer = { file: string; table: GuardedTable; op: DmlMethod };
 
-const TASKS_ALLOWLIST: readonly Writer[] = [
-  // `createRecord`'s task branch — consolidated onto the creation contract in 2F.3.
-  { file: "src/features/operations/actions.ts", table: "tasks", op: "insert" },
-  // `persistTaskStatus`'s UPDATE was here until Phase 2F Slice 2F.2 deleted it
-  // (2F-SURFACE-013). The list is compared by exact equality, so this entry
-  // could not simply be left behind: an allowlist naming a writer that no longer
-  // exists fails just as hard as an unlisted writer.
-];
+/**
+ * **Empty, as of Phase 2F Slice 2F.3.**
+ *
+ * `persistTaskStatus`'s UPDATE left in 2F.2 (2F-SURFACE-013) and `createRecord`'s
+ * INSERT left in 2F.3 (2F-CREATE-001). `public.tasks` now has exactly one
+ * validated write path from the application, which is the invariant PRD §2
+ * states — and this list reaching empty is the mechanical proof of it, not a
+ * claim about it.
+ *
+ * The list is compared by exact equality in both directions, so this cannot rot:
+ * a new direct writer fails, and so would a leftover entry naming a writer that
+ * no longer exists. 2F.4 revokes the grants that would still permit one.
+ */
+const TASKS_ALLOWLIST: readonly Writer[] = [];
 
 const REMINDERS_ALLOWLIST: readonly Writer[] = [
   // `createReminder` — the documented Option C exception (PRD §2 item 6).
@@ -99,7 +106,7 @@ function scanApplicationWriters(): Writer[] {
 }
 
 describe("2F-GUARD-002: no application module writes tasks or reminders outside the allowlists", () => {
-  it("finds exactly the allowlisted tasks writers — this list shrinks in 2F.2/2F.3 and is empty at 2F.4", () => {
+  it("finds exactly the allowlisted tasks writers — empty since 2F.3; 2F.4 revokes the grants that would still permit one", () => {
     const found = scanApplicationWriters().filter((writer) => writer.table === "tasks");
     expect(found).toEqual(TASKS_ALLOWLIST);
   });

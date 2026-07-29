@@ -16,7 +16,7 @@ import {
   type TaskCommandNoMatchContinuation,
 } from "./creation";
 import type { ValidatedTaskCommand } from "./schema";
-import type { TaskCommandAction, TaskCommandPatchField } from "./taxonomy";
+import { TASK_COMMAND_POLICY_VERSION, type TaskCommandAction, type TaskCommandPatchField } from "./taxonomy";
 
 const OPERATION_KEY = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
 const OBSERVED_BEFORE = "2026-07-27T15:00:00.000Z";
@@ -58,7 +58,25 @@ function input(
   action: TaskCommandAction = "reschedule_due",
   locale: Locale = "en",
 ): TaskCommandCreationInput {
-  return { command: command(action), observedBefore: OBSERVED_BEFORE, locale };
+  return {
+    intent: { kind: "no_match", command: command(action) },
+    observedBefore: OBSERVED_BEFORE,
+    locale,
+  };
+}
+
+/** The manual form's intent: a title, an operation key, and nothing inferred. */
+function manualInput(title: string, locale: Locale = "en"): TaskCommandCreationInput {
+  return {
+    intent: {
+      kind: "manual",
+      title,
+      operationKey: OPERATION_KEY,
+      policyVersion: TASK_COMMAND_POLICY_VERSION,
+    },
+    observedBefore: OBSERVED_BEFORE,
+    locale,
+  };
 }
 
 function clientReturning(
@@ -179,6 +197,107 @@ describe("deterministic no-match classification (2E-NOMATCH-001..003, 008)", () 
       // @ts-expect-error A validated command cannot forge the opaque continuation state.
       continueTaskCommandNoMatch(command("set_priority"), { titleWords: ["book flights"] });
     }
+  });
+});
+
+describe("2F-CREATE-002 — the bare manual creation intent", () => {
+  it("builds a title-only payload with an empty patch and invents nothing", () => {
+    expect(buildTaskCommandCreationPayload(manualInput("Ligar para o cliente"))).toEqual({
+      p_action: "create_title_only",
+      p_title_words: ["Ligar", "para", "o", "cliente"],
+      p_patch: {},
+      p_observed_before: OBSERVED_BEFORE,
+      p_policy_version: TASK_COMMAND_POLICY_VERSION,
+      p_operation_key: OPERATION_KEY,
+    });
+  });
+
+  it("never consults the no-match decision function", () => {
+    // The manual form is an explicit creation request, not an inference. The
+    // proof is that a bare intent builds a payload at all: every action the
+    // no-match decider offers is one of the seven, and `create_title_only` is
+    // not among them — so a build that went through it could only have thrown.
+    expect(TASK_LIKE_CREATION_ACTIONS as readonly string[]).not.toContain("create_title_only");
+    expect(() => buildTaskCommandCreationPayload(manualInput("A title"))).not.toThrow();
+  });
+
+  it("is the only creation action whose patch is empty", () => {
+    for (const action of TASK_LIKE_CREATION_ACTIONS) {
+      const payload = buildTaskCommandCreationPayload(input(action));
+      expect(Object.keys(payload.p_patch as object).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("groups a long title into twelve words rather than truncating it", () => {
+    const words = Array.from({ length: 30 }, (_, index) => `w${index}`);
+    const payload = buildTaskCommandCreationPayload(manualInput(words.join(" ")));
+
+    // At most twelve elements, which is the contract's ceiling — not exactly
+    // twelve, because the words are distributed evenly and 30 over 12 gives ten
+    // groups of three.
+    expect(payload.p_title_words.length).toBeLessThanOrEqual(12);
+    expect(payload.p_title_words.length).toBeGreaterThan(1);
+    // Every word survives, in order: the canonical title the RPC rebuilds with
+    // `string_agg(..., ' ')` is the user's own sentence.
+    expect(payload.p_title_words.join(" ")).toBe(words.join(" "));
+  });
+
+  it("normalizes runs of whitespace, which is the one title change it makes", () => {
+    const payload = buildTaskCommandCreationPayload(manualInput("  spaced   out  "));
+    expect(payload.p_title_words).toEqual(["spaced", "out"]);
+  });
+
+  it.each([
+    ["", "an empty title"],
+    ["   ", "a whitespace-only title"],
+    ["x".repeat(241), "a title past the 240-character ceiling"],
+    ["x".repeat(161), "a single token past the 160-character word ceiling"],
+  ])("refuses %j — %s", (title) => {
+    let thrown: unknown;
+    try {
+      buildTaskCommandCreationPayload(manualInput(title));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(TaskCommandApplyError);
+    expect((thrown as TaskCommandApplyError).code).toBe("creation_title_unrepresentable");
+  });
+
+  it("omits the origin entirely when it is agent, so the default resolves", async () => {
+    const { client, calls } = clientReturning({
+      outcome: "applied",
+      task_id: TASK_ID,
+      action: "create_title_only",
+      undo_id: UNDO_ID,
+      idempotent: false,
+      request_fingerprint: FINGERPRINT,
+      reminder_created_id: null,
+      undo_expires_at: "2026-07-28T15:00:00.000000+00",
+      creation_undone: false,
+    });
+
+    await createTaskCommand(client, manualInput("A title"));
+
+    expect(calls[0]?.args).not.toHaveProperty("p_created_by");
+  });
+
+  it("sends the origin only when it is user", async () => {
+    const { client, calls } = clientReturning({
+      outcome: "applied",
+      task_id: TASK_ID,
+      action: "create_title_only",
+      undo_id: UNDO_ID,
+      idempotent: false,
+      request_fingerprint: FINGERPRINT,
+      reminder_created_id: null,
+      undo_expires_at: "2026-07-28T15:00:00.000000+00",
+      creation_undone: false,
+    });
+
+    const created = await createTaskCommand(client, manualInput("A title"), "user");
+
+    expect((calls[0]?.args as { p_created_by?: string }).p_created_by).toBe("user");
+    expect(created.outcome).toBe("applied");
   });
 });
 

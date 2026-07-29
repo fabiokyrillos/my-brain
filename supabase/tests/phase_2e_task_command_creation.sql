@@ -3,7 +3,7 @@
 -- Phase 2E pgTAP file. Written in ASCII so checkout encoding cannot alter SQL.
 
 begin;
-select plan(127);
+select plan(167);
 set local timezone to 'UTC';
 
 -- Contract and security posture ---------------------------------------------
@@ -20,7 +20,7 @@ select has_function(
 );
 select has_function(
   'public', 'create_task_command',
-  array['text', 'text[]', 'jsonb', 'text', 'text', 'text'],
+  array['text', 'text[]', 'jsonb', 'text', 'text', 'text', 'text'],
   'the standalone creation RPC exists'
 );
 
@@ -36,11 +36,27 @@ select is(
   array['p_action', 'p_title_words', 'p_patch', 'p_observed_before', 'p_policy_version', 'p_operation_key'],
   'issuer catalog arguments match the shared TypeScript payload'
 );
+-- Phase 2F Slice 2F.3: the six shared values plus the trailing origin. Trailing
+-- is the load-bearing property — a defaulted argument anywhere else would make
+-- the positional calls that already exist resolve to a different parameter.
 select is(
   (select proargnames from pg_proc where oid =
-    'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure),
-  array['p_action', 'p_title_words', 'p_patch', 'p_observed_before', 'p_policy_version', 'p_operation_key'],
-  'creation catalog arguments match the shared TypeScript payload'
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure),
+  array['p_action', 'p_title_words', 'p_patch', 'p_observed_before', 'p_policy_version', 'p_operation_key', 'p_created_by'],
+  'creation catalog arguments match the shared TypeScript payload plus the origin'
+);
+select is(
+  (select pronargdefaults from pg_proc where oid =
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure),
+  1::smallint,
+  'exactly one creation argument is defaulted, so every pre-2F caller still resolves'
+);
+select is(
+  (select count(*)::integer from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'create_task_command'),
+  1,
+  'exactly one create_task_command exists — no overload, no 42725 ambiguity'
 );
 
 select is(
@@ -55,10 +71,16 @@ select is(
   0::smallint,
   'issuer defaults none of its fingerprint binding'
 );
+-- Phase 2F Slice 2F.3 corrects this assertion rather than deleting it. It read
+-- `pronargdefaults = 0` under the name "creation defaults none of its
+-- fingerprint binding", and the slice's trailing origin makes the literal count
+-- 1 while leaving the *stated invariant* intact: the origin is not one of the
+-- six values `private.task_command_creation_fingerprint` hashes, so nothing the
+-- fingerprint binds is defaulted. The count itself is pinned separately above.
 select is(
-  (select pronargdefaults from pg_proc where oid =
-    'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure),
-  0::smallint,
+  (select proargnames[1:pronargs - pronargdefaults] from pg_proc where oid =
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure),
+  array['p_action', 'p_title_words', 'p_patch', 'p_observed_before', 'p_policy_version', 'p_operation_key'],
   'creation defaults none of its fingerprint binding'
 );
 
@@ -76,7 +98,7 @@ select is(
 );
 select is(
   (select prosecdef from pg_proc where oid =
-    'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure),
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure),
   true,
   'creation is SECURITY DEFINER because clients cannot reserve undo rows'
 );
@@ -95,7 +117,7 @@ select is(
 );
 select is(
   (select array_to_string(proconfig, ',') from pg_proc where oid =
-    'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure),
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure),
   'search_path=""',
   'creation pins an empty search_path'
 );
@@ -119,7 +141,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_task_command(text, text[], jsonb, text, text, text)',
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)',
     'execute'
   ),
   'authenticated may create through the guarded RPC'
@@ -143,7 +165,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.create_task_command(text, text[], jsonb, text, text, text)',
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)',
     'execute'
   ),
   'anon may not create'
@@ -207,9 +229,9 @@ select ok(
 select ok(
   position('on conflict (user_id, operation_key) where operation_key is not null' in
     lower(pg_get_functiondef(
-      'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure))) > 0
+      'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure))) > 0
   and position('for update' in lower(pg_get_functiondef(
-    'public.create_task_command(text, text[], jsonb, text, text, text)'::regprocedure))) > 0,
+    'public.create_task_command(text, text[], jsonb, text, text, text, text)'::regprocedure))) > 0,
   'same-key concurrency is serialized by the unique reservation and locked replay read'
 );
 select has_trigger(
@@ -389,6 +411,58 @@ declare
 begin
   result := public.undo_operation(p_undo_id);
   return result::text;
+exception when others then
+  get stacked diagnostics failure_detail = pg_exception_detail;
+  return sqlstate || ':' || coalesce(nullif(failure_detail, ''), sqlerrm);
+end;
+$$;
+
+-- Phase 2F Slice 2F.3 -------------------------------------------------------
+-- The same two helpers, but passing the trailing origin explicitly. The
+-- six-argument helpers above are deliberately left alone: they are now also the
+-- standing proof that a caller which omits the parameter still resolves.
+
+create function pg_temp.creation_try_as(
+  p_action text,
+  p_title_words text[],
+  p_patch jsonb,
+  p_observed_before text,
+  p_operation_key text,
+  p_created_by text
+)
+returns text language plpgsql as $$
+declare failure_detail text;
+begin
+  perform public.create_task_command(
+    p_action, p_title_words, p_patch, p_observed_before,
+    'task-command-policy-v1', p_operation_key, p_created_by
+  );
+  return 'accepted';
+exception when others then
+  get stacked diagnostics failure_detail = pg_exception_detail;
+  return sqlstate || ':' || coalesce(nullif(failure_detail, ''), sqlerrm);
+end;
+$$;
+
+create function pg_temp.creation_key_as(
+  p_action text,
+  p_title_words text[],
+  p_patch jsonb,
+  p_observed_before text,
+  p_operation_key text,
+  p_created_by text,
+  p_key text
+)
+returns text language plpgsql as $$
+declare
+  result jsonb;
+  failure_detail text;
+begin
+  result := public.create_task_command(
+    p_action, p_title_words, p_patch, p_observed_before,
+    'task-command-policy-v1', p_operation_key, p_created_by
+  );
+  return result ->> p_key;
 exception when others then
   get stacked diagnostics failure_detail = pg_exception_detail;
   return sqlstate || ':' || coalesce(nullif(failure_detail, ''), sqlerrm);
@@ -1270,15 +1344,366 @@ select is(
   'cancellation after creation undo leaves the historical task cancelled'
 );
 
+-- Phase 2F Slice 2F.3: bare manual creation --------------------------------
+--
+-- The manual form expresses a title and nothing else. Before this slice the
+-- creation family could not represent that intent at all: every one of its seven
+-- actions demanded an exact patch key, so an empty patch was refused by all of
+-- them. `create_title_only` is the explicit bare intent, and it is the ONLY
+-- action whose expected patch-key set is empty — which is what the seven
+-- assertions below exist to keep true.
+
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['ligar para o cliente'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-bare'
+  ),
+  'accepted',
+  'the confirmation issuer accepts the bare creation intent with an empty patch'
+);
+select is(
+  pg_temp.creation_key_as(
+    'create_title_only', array['ligar para o cliente'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-bare', 'user', 'outcome'
+  ),
+  'applied',
+  'bare manual creation is applied through the same guarded RPC'
+);
+select results_eq(
+  $$ select title, status, created_by, due_at, planned_at, manual_priority,
+            description, source_entry_id, source_interpretation_id, candidate_index
+     from public.tasks
+     where operation_key = 'pgtap-2f3-bare' $$,
+  $$ values ('ligar para o cliente'::text, 'inbox'::text, 'user'::text,
+             null::timestamptz, null::timestamptz, null::text,
+             null::text, null::uuid, null::uuid, null::integer) $$,
+  'the manually created task carries the title, user provenance and no invented qualifier'
+);
+select is(
+  (select count(*)::integer from public.audit_logs a
+   join public.tasks t on t.id = a.entity_id
+   where t.operation_key = 'pgtap-2f3-bare'
+     and a.action_type = 'task_command_created' and a.actor = 'user'),
+  1,
+  'the command audit records actor user for the manual creation'
+);
+select is(
+  (select count(*)::integer from public.reminders r
+   join public.tasks t on t.id = r.task_id
+   where t.operation_key = 'pgtap-2f3-bare'),
+  0,
+  'a bare creation carries no due date, so the reminder trigger creates nothing'
+);
+
+-- Only the bare action may carry an empty patch.
+select is(
+  pg_temp.creation_try_as(
+    'create_title_only', array['with a qualifier'],
+    jsonb_build_object('dueAt', pg_temp.creation_iso(now() + interval '2 days')),
+    pg_temp.creation_iso(now()), 'pgtap-2f3-bare-patched', 'user'
+  ),
+  '22023:Invalid task creation patch',
+  'the bare action refuses any non-empty patch'
+);
+
+-- ...and no qualifier action may. This is the assertion that would fail if the
+-- bare action had been added by making empty patches valid everywhere.
+select is(
+  pg_temp.creation_try('create', 'reschedule_due', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-1'),
+  '22023:Invalid task creation patch',
+  'reschedule_due still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'set_planned', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-2'),
+  '22023:Invalid task creation patch',
+  'set_planned still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'set_priority', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-3'),
+  '22023:Invalid task creation patch',
+  'set_priority still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'assign_project', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-4'),
+  '22023:Invalid task creation patch',
+  'assign_project still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'assign_context', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-5'),
+  '22023:Invalid task creation patch',
+  'assign_context still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'assign_person', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-6'),
+  '22023:Invalid task creation patch',
+  'assign_person still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try('create', 'set_waiting_on', array['empty patch'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-empty-7'),
+  '22023:Invalid task creation patch',
+  'set_waiting_on still refuses an empty patch'
+);
+select is(
+  pg_temp.creation_try_as(
+    'create_title_only', array['extra key'],
+    jsonb_build_object('priority', 'high'),
+    pg_temp.creation_iso(now()), 'pgtap-2f3-bare-extra', 'user'
+  ),
+  '22023:Invalid task creation patch',
+  'the bare action refuses an unrelated patch key just as the qualifiers do'
+);
+select is(
+  pg_temp.creation_try_as(
+    'create_nothing', array['unknown action'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-unknown', 'user'
+  ),
+  '22023:Invalid task creation action',
+  'an action outside the widened vocabulary still refuses'
+);
+
+-- The origin is bounded, and defaulting is what keeps legacy callers identical.
+select is(
+  pg_temp.creation_try_as(
+    'create_title_only', array['bad origin'], '{}'::jsonb,
+    pg_temp.creation_iso(now()), 'pgtap-2f3-origin', 'robot'
+  ),
+  '22023:Invalid task creation origin',
+  'an origin outside the column domain refuses instead of being coerced'
+);
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['defaulted origin'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-default'
+  ),
+  'accepted',
+  'the confirmation issuer is unchanged and takes no origin'
+);
+select is(
+  pg_temp.creation_key(
+    'create', 'create_title_only', array['defaulted origin'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-default', 'outcome'
+  ),
+  'applied',
+  'a six-argument caller still resolves against the recreated function'
+);
+select is(
+  (select created_by from public.tasks where operation_key = 'pgtap-2f3-default'),
+  'agent',
+  'omitting the origin persists agent, byte-identically to the pre-2F contract'
+);
+
+-- Idempotency, both directions.
+select is(
+  pg_temp.creation_key_as(
+    'create_title_only', array['ligar para o cliente'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-bare', 'user', 'idempotent'
+  ),
+  'true',
+  'a duplicate submission on one operation key replays instead of creating twice'
+);
+select is(
+  (select count(*)::integer from public.tasks where operation_key = 'pgtap-2f3-bare'),
+  1,
+  'the replay created no second task'
+);
+select is(
+  pg_temp.creation_try_as(
+    'create_title_only', array['a different title'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-bare', 'user'
+  ),
+  'P0001:2E_IDEMPOTENCY_MISMATCH',
+  'reusing the key with a different payload is still refused'
+);
+
+-- The undo is recorded, and it actually compensates.
+select is(
+  (select status from public.undo_operations
+   where operation_key = 'taskcmd-v1:pgtap-2f3-bare'
+     and action_type = 'create_task_command'),
+  'available',
+  'the user-origin creation records an available undo operation'
+);
+select is(
+  (select (after_state -> 'applied_state' ->> 'createdBy')
+   from public.undo_operations where operation_key = 'taskcmd-v1:pgtap-2f3-bare'),
+  'user',
+  'the undo evidence records the real creation origin rather than a hardcoded agent'
+);
+select is(
+  (pg_temp.creation_undo(
+    (select id from public.undo_operations
+     where operation_key = 'taskcmd-v1:pgtap-2f3-bare')
+  )::jsonb) ->> 'undone',
+  'true',
+  'the recorded undo executes for a user-created task — the case the pre-2F guard refused'
+);
+select results_eq(
+  $$ select t.status, o.status
+     from public.tasks t
+     join public.undo_operations o on o.operation_key = 'taskcmd-v1:pgtap-2f3-bare'
+     where t.operation_key = 'pgtap-2f3-bare' $$,
+  $$ values ('cancelled'::text, 'undone'::text) $$,
+  'the compensation cancelled the task and closed the undo operation'
+);
+
+-- Phase 2F Slice 2F.3: the undo guard discriminates on origin ---------------
+--
+-- The PRD's bounded-domain refusal (`created_by not in ('user','agent')`) is
+-- **structurally unreachable at runtime**: `tasks_created_by_check` already
+-- forbids a third value, so no row can carry one. On its own that clause would
+-- therefore accept every task that exists and the guard would stop
+-- discriminating at all — which is what the paired equality against the recorded
+-- origin restores. Both halves are asserted: the domain bound by the constraint
+-- that makes it unreachable, and the equality by an actual drift.
+
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['origin drift user'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-u'
+  ),
+  'accepted',
+  'the user-origin drift fixture is confirmed'
+);
+select is(
+  pg_temp.creation_key_as(
+    'create_title_only', array['origin drift user'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-u', 'user', 'outcome'
+  ),
+  'applied',
+  'the user-origin drift fixture is created'
+);
+update public.tasks set created_by = 'agent'
+where operation_key = 'pgtap-2f3-drift-u';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2f3-drift-u'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'undo refuses a task whose origin drifted from the recorded user to agent'
+);
+
+select is(
+  pg_temp.creation_try(
+    'issue', 'create_title_only', array['origin drift agent'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-a'
+  ),
+  'accepted',
+  'the agent-origin drift fixture is confirmed'
+);
+select is(
+  pg_temp.creation_key(
+    'create', 'create_title_only', array['origin drift agent'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-drift-a', 'outcome'
+  ),
+  'applied',
+  'the agent-origin drift fixture is created through the defaulted call'
+);
+update public.tasks set created_by = 'user'
+where operation_key = 'pgtap-2f3-drift-a';
+select is(
+  pg_temp.creation_undo((
+    select id from public.undo_operations
+    where operation_key = 'taskcmd-v1:pgtap-2f3-drift-a'
+  )),
+  'P0001:2E_UNDO_RESTORE_INTEGRITY',
+  'undo refuses a task whose origin drifted from the recorded agent to user'
+);
+
+-- The other half: an origin outside the domain cannot be staged at all, and the
+-- guard nevertheless carries the clause. Asserted rather than exercised, and
+-- said plainly instead of dressed up as a behavioural test.
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    where c.conrelid = 'public.tasks'::regclass
+      and c.conname = 'tasks_created_by_check'
+      and pg_get_constraintdef(c.oid) like '%user%'
+      and pg_get_constraintdef(c.oid) like '%agent%'
+  ),
+  'tasks_created_by_check bounds the origin domain, so a third value cannot be staged'
+);
+-- Read as the owning role, not as `authenticated`. `authenticated` holds no
+-- USAGE on schema `private` — that is the posture the whole undo-handler design
+-- depends on — so resolving a `private.*` regprocedure under it raises
+-- `permission denied for schema private` before `pg_get_functiondef` is ever
+-- called. The role is restored immediately after, because everything below this
+-- point is owner-scoped behaviour again.
+reset role;
+select ok(
+  position('not in (''user'', ''agent'')' in pg_get_functiondef(
+    'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0
+  and position('expected_state ->> ''createdBy''' in pg_get_functiondef(
+    'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0,
+  'the creation-undo guard carries both the domain bound and the recorded-origin equality'
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"71111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
 -- Other owner and unauthenticated -------------------------------------------
 
 reset role;
+
+-- The first owner's real undo id is captured here, outside RLS, so the
+-- cross-owner refusal below is a refusal of a row that genuinely exists. Passing
+-- a subquery evaluated as the second owner would pass a NULL and prove only that
+-- `undo_operation(null)` raises — a vacuous check of the kind PRD 2F-OWNERSHIP
+-- exists to forbid.
+--
+-- Carried in a transaction-local GUC rather than a temp table: a temp table
+-- created here is owned by this role, and table privileges do not default to
+-- PUBLIC, so reading it back after `set local role authenticated` would raise
+-- `permission denied` — the same class of mistake as the `private` schema read
+-- above. A GUC needs no grant and is readable by any role in the session.
+select set_config(
+  'pgtap.phase_2f3_owner_one_undo',
+  (select id::text from public.undo_operations
+   where operation_key = 'taskcmd-v1:pgtap-2f3-bare'),
+  true
+);
+
+select ok(
+  nullif(current_setting('pgtap.phase_2f3_owner_one_undo', true), '') is not null,
+  'the first owner undo row was captured, so the cross-owner refusal below is not vacuous'
+);
+
 select set_config(
   'request.jwt.claims',
   '{"sub":"71222222-2222-4222-8222-222222222222","role":"authenticated"}',
   true
 );
 set local role authenticated;
+
+-- Phase 2F Slice 2F.3, cross-owner (2F-OWNERSHIP-002).
+select is(
+  (select count(*)::integer from public.tasks where operation_key = 'pgtap-2f3-bare'),
+  0,
+  'RLS discloses no manually created first-owner task to the second owner'
+);
+select is(
+  pg_temp.creation_undo(current_setting('pgtap.phase_2f3_owner_one_undo')::uuid),
+  'P0002:Undo operation not found',
+  'a second owner cannot undo the first owner manual creation'
+);
+select is(
+  pg_temp.creation_try_as(
+    'create_title_only', array['ligar para o cliente'],
+    '{}'::jsonb, pg_temp.creation_iso(now()), 'pgtap-2f3-bare', 'user'
+  ),
+  'P0001:2E_CONFIRMATION_REQUIRED',
+  'a second owner cannot reuse the first owner bare-creation key'
+);
 
 select is(
   pg_temp.creation_try(

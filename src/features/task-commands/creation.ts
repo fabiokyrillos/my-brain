@@ -25,6 +25,41 @@ export const TASK_LIKE_CREATION_ACTIONS = [
 
 export type TaskLikeCreationAction = (typeof TASK_LIKE_CREATION_ACTIONS)[number];
 
+/**
+ * The explicit bare-creation action: a title, and nothing else.
+ *
+ * **Deliberately not a `TaskCommandAction`.** The seven above are members of the
+ * apply taxonomy that the creation family reuses to mean "create the task and
+ * apply this one qualifier"; this one has no mutation meaning at all, and adding
+ * it to `TASK_COMMAND_ACTIONS` would widen the apply and Work-surface
+ * vocabularies with a verb neither can execute.
+ *
+ * **Named `create_title_only` because `create_task` was already taken, three
+ * times over.** It is the *confirmation kind* in `task_command_confirmations`
+ * (`202607270060:20`, mirrored at `confirmationSchema` below as
+ * `z.literal("create_task")`), a member of the pending-question consequence
+ * vocabulary, and a prefix of the `create_task_command` undo `action_type`.
+ * Reusing it would put two different `action` fields carrying the same literal
+ * with different meanings inside one function. PRD Revision 4.1 §6.5a records
+ * the analysis.
+ */
+export const TASK_CREATION_BARE_ACTION = "create_title_only" as const;
+
+export type TaskCreationBareAction = typeof TASK_CREATION_BARE_ACTION;
+
+/** Everything `public.create_task_command` accepts as `p_action`. */
+export const TASK_CREATION_ACTIONS = [
+  TASK_CREATION_BARE_ACTION,
+  ...TASK_LIKE_CREATION_ACTIONS,
+] as const;
+
+export type TaskCreationAction = (typeof TASK_CREATION_ACTIONS)[number];
+
+/** The closed domain of `tasks.created_by` (`202607160003:117`). */
+export const TASK_CREATION_ORIGINS = ["user", "agent"] as const;
+
+export type TaskCreationOrigin = (typeof TASK_CREATION_ORIGINS)[number];
+
 const taskLikeActions: readonly string[] = TASK_LIKE_CREATION_ACTIONS;
 
 function isTaskLikeCreationAction(action: TaskCommandAction): action is TaskLikeCreationAction {
@@ -166,45 +201,153 @@ type PreviewArgs =
   Database["public"]["Functions"]["preview_task_command_creation"]["Args"];
 
 export type TaskCommandCreationInput = {
-  readonly command: ValidatedTaskCommand;
+  readonly intent: TaskCommandCreationIntent;
   readonly observedBefore: string;
   readonly locale: Locale;
 };
 
+/**
+ * `create_task_command`'s own argument type.
+ *
+ * Split from `PreviewArgs` in Slice 2F.3: the three creation RPCs shared one
+ * shape until `create_task_command` gained its trailing origin, and preview and
+ * confirmation deliberately did **not** — neither of them writes, so neither has
+ * an origin to record.
+ */
+type CreateArgs = Database["public"]["Functions"]["create_task_command"]["Args"];
+
 export type TaskCommandCreationClient = {
   rpc(
-    fn:
-      | "preview_task_command_creation"
-      | "issue_task_command_creation_confirmation"
-      | "create_task_command",
+    fn: "preview_task_command_creation" | "issue_task_command_creation_confirmation",
     args: PreviewArgs,
+  ): PromiseLike<{
+    data: unknown;
+    error: { message: string; code?: string; details?: string } | null;
+  }>;
+  rpc(
+    fn: "create_task_command",
+    args: CreateArgs,
   ): PromiseLike<{
     data: unknown;
     error: { message: string; code?: string; details?: string } | null;
   }>;
 };
 
+/**
+ * What is being created, and on whose say-so.
+ *
+ * **This union is the boundary the slice exists to draw.** `no_match` is an
+ * *inference*: the user typed a command, nothing matched, and the system offered
+ * to create the task carrying the qualifier the command already had — so it must
+ * pass through `decideInitialTaskCommandNoMatch`, which is the function that
+ * decides whether offering is even honest. `manual` is not an inference at all:
+ * the user opened a form, typed a title, and pressed a button that says
+ * "add". There is nothing to decide and nothing to offer.
+ *
+ * Routing the manual form through the no-match decision would mean asserting
+ * `creation_offered` about a command nobody typed, which is why the two arrive
+ * here as different shapes rather than as one shape with a flag.
+ */
+export type TaskCommandCreationIntent =
+  | { readonly kind: "no_match"; readonly command: ValidatedTaskCommand }
+  | {
+      readonly kind: "manual";
+      readonly title: string;
+      readonly operationKey: string;
+      readonly policyVersion: string;
+    };
+
+/**
+ * The manual title, reduced to the bounded word list the contract accepts.
+ *
+ * The RPC requires 1..12 elements, each ≤160 characters after trimming, joining
+ * to a canonical title of 1..240. A title of more than twelve words is therefore
+ * **grouped** rather than truncated — every word survives, and the canonical
+ * title `string_agg(..., ' ')` reproduces is the user's own words in order.
+ * Truncating instead would silently save a different task than the one asked for.
+ *
+ * Returns null when the contract cannot represent the title at all: an empty
+ * title, one longer than 240 characters, or one containing a single unbroken
+ * token longer than 160. The caller renders a declared, localized refusal — it
+ * does not guess.
+ */
+export function bareCreationTitleWords(title: string): readonly string[] | null {
+  const words = title.split(/\s+/).filter((word) => word !== "");
+  if (words.length === 0) return null;
+  if ([...words.join(" ")].length > 240) return null;
+  if (words.some((word) => [...word].length > 160)) return null;
+  if (words.length <= 12) return words;
+
+  // More than twelve words: distribute them over exactly twelve groups, in
+  // order. Joining the groups with a single space rebuilds the same sentence.
+  const groups: string[] = [];
+  const perGroup = Math.ceil(words.length / 12);
+  for (let index = 0; index < words.length; index += perGroup) {
+    groups.push(words.slice(index, index + perGroup).join(" "));
+  }
+  if (groups.some((group) => [...group].length > 160)) return null;
+  return groups;
+}
+
+/**
+ * The one creation payload builder, for both intents.
+ *
+ * Kept single deliberately: the payload is hashed into the request fingerprint
+ * by `private.task_command_creation_fingerprint`, and a second builder that
+ * agreed today and drifted tomorrow would surface as `2E_IDEMPOTENCY_MISMATCH`
+ * on a replay of an identical request.
+ */
 export function buildTaskCommandCreationPayload(
   input: TaskCommandCreationInput,
 ): PreviewArgs {
-  const decision = decideInitialTaskCommandNoMatch(input.command);
+  const { intent } = input;
+  if (intent.kind === "manual") {
+    const words = bareCreationTitleWords(intent.title);
+    if (words === null) {
+      throw new TaskCommandApplyError(
+        "the supplied title cannot be represented by the creation contract",
+        "creation_title_unrepresentable",
+      );
+    }
+    return {
+      p_action: TASK_CREATION_BARE_ACTION,
+      p_title_words: [...words],
+      // The empty object, and nothing else. `create_title_only` is the only
+      // action whose expected patch-key set is empty; every other action still
+      // refuses `{}`.
+      p_patch: {} as PreviewArgs["p_patch"],
+      p_observed_before: input.observedBefore,
+      p_policy_version: intent.policyVersion,
+      p_operation_key: normalizeTaskCommandOperationKey(intent.operationKey),
+    };
+  }
+
+  const decision = decideInitialTaskCommandNoMatch(intent.command);
   if (decision.outcome !== "creation_offered") {
     throw new TaskCommandApplyError(
-      `${input.command.action} does not carry the bounded positive payload required for standalone creation`,
+      `${intent.command.action} does not carry the bounded positive payload required for standalone creation`,
       "creation_not_offered",
     );
   }
   return {
-    p_action: input.command.action,
-    p_title_words: [...normalizedTitleWords(input.command)],
-    p_patch: input.command.patch as PreviewArgs["p_patch"],
+    p_action: intent.command.action,
+    p_title_words: [...normalizedTitleWords(intent.command)],
+    p_patch: intent.command.patch as PreviewArgs["p_patch"],
     p_observed_before: input.observedBefore,
-    p_policy_version: input.command.policyVersion,
-    p_operation_key: normalizeTaskCommandOperationKey(input.command.operationKey),
+    p_policy_version: intent.command.policyVersion,
+    p_operation_key: normalizeTaskCommandOperationKey(intent.command.operationKey),
   };
 }
 
-const creationActionSchema = z.enum(TASK_LIKE_CREATION_ACTIONS);
+/**
+ * Every action the creation family accepts, bare included.
+ *
+ * Widened from the seven in Slice 2F.3. The preview, the confirmation issuer and
+ * the apply all echo the action back, and all three now see `create_title_only`
+ * — leaving this at the seven made a legitimate manual creation parse as a
+ * malformed result and report itself as a failure.
+ */
+const creationActionSchema = z.enum(TASK_CREATION_ACTIONS);
 const uuidSchema = z.string().uuid();
 const fingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
 const instantSchema = z.string().min(1);
@@ -250,7 +393,7 @@ const previewSchema = z
 export type TaskCommandCreationPreview = {
   readonly outcome: "creation_offered";
   readonly willMutate: false;
-  readonly action: TaskLikeCreationAction;
+  readonly action: TaskCreationAction;
   readonly title: string;
   readonly status: "inbox";
   readonly canonicalPayload: z.infer<typeof canonicalPayloadSchema>;
@@ -344,7 +487,7 @@ export type TaskCommandCreationConfirmationIssued = {
   readonly outcome: "issued";
   readonly confirmationId: string;
   readonly action: "create_task";
-  readonly commandAction: TaskLikeCreationAction;
+  readonly commandAction: TaskCreationAction;
   readonly requestFingerprint: string;
   readonly consumed: boolean;
   readonly replayed: boolean;
@@ -375,6 +518,8 @@ export async function issueTaskCommandCreationConfirmation(
   };
 }
 
+/** The apply result may carry any accepted action, bare included. */
+
 const creationResultSchema = z
   .object({
     outcome: z.literal("applied"),
@@ -392,7 +537,7 @@ const creationResultSchema = z
 export type TaskCommandCreated = {
   readonly outcome: "applied";
   readonly taskId: string;
-  readonly action: TaskLikeCreationAction;
+  readonly action: TaskCreationAction;
   readonly undoId: string;
   readonly replayed: boolean;
   readonly requestFingerprint: string;
@@ -401,13 +546,24 @@ export type TaskCommandCreated = {
   readonly creationUndone: boolean;
 };
 
+/**
+ * Creates the task.
+ *
+ * `createdBy` is **omitted from the payload when it is `'agent'`**, not sent
+ * explicitly. That is what keeps every pre-existing caller byte-identical
+ * against the recreated function: the argument is absent from the wire, the
+ * function's own `default 'agent'` applies, and the resolved call is exactly the
+ * one that resolved before this slice.
+ */
 export async function createTaskCommand(
   client: TaskCommandCreationClient,
   input: TaskCommandCreationInput,
+  createdBy: TaskCreationOrigin = "agent",
 ): Promise<TaskCommandCreated | TaskCommandApplyFailed> {
+  const payload = buildTaskCommandCreationPayload(input);
   const result = await client.rpc(
     "create_task_command",
-    buildTaskCommandCreationPayload(input),
+    (createdBy === "agent" ? payload : { ...payload, p_created_by: createdBy }) as CreateArgs,
   );
   if (result.error) return mapTaskCommandApplyError(result.error);
 

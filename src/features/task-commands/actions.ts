@@ -608,7 +608,7 @@ async function creationRound(
     };
   }
   const input = {
-    command: derived.command,
+    intent: { kind: "no_match" as const, command: derived.command },
     observedBefore: session.issuedAt,
     locale: context.locale,
   };
@@ -965,8 +965,11 @@ export async function createTaskFromCommand(
     const derived = deriveTaskCommand(session, context.timeZone);
     if (derived.status !== "ok") return expiredSession(context);
 
+    // No origin argument. The chat creation path keeps `'agent'`, and *omitting*
+    // the parameter rather than sending it explicitly is what proves the
+    // recreated function's default still resolves for every pre-existing caller.
     const created = await createTaskCommand(context.supabase, {
-      command: derived.command,
+      intent: { kind: "no_match", command: derived.command },
       observedBefore: session.issuedAt,
       locale: context.locale,
     });

@@ -131,7 +131,7 @@ select is(
       -- Slice 2E.6 first-generation creation mutation and its server-issued
       -- confirmation sibling follow the same ADR-037/044 posture.
       'public.issue_task_command_creation_confirmation(text, text[], jsonb, text, text, text)',
-      'public.create_task_command(text, text[], jsonb, text, text, text)'
+      'public.create_task_command(text, text[], jsonb, text, text, text, text)'
     ]) as signature
     join pg_proc procedure on procedure.oid = signature::regprocedure::oid
     where not procedure.prosecdef

@@ -2522,6 +2522,7 @@ export type Database = {
       create_task_command: {
         Args: {
           p_action: string
+          p_created_by?: string
           p_observed_before: string
           p_operation_key: string
           p_patch: Json
