@@ -107,7 +107,7 @@ export async function issueTaskCommandConfirmation(
   client: TaskCommandConfirmationClient,
   input: TaskCommandApplyInput,
 ): Promise<TaskCommandConfirmationResult> {
-  const { action } = input.preview;
+  const { action } = input.source;
   if (!actionPolicy(action).requiresConfirmation) {
     throw new TaskCommandApplyError(
       `${action} does not require confirmation, so issuing one would strand a row no apply can consume`,

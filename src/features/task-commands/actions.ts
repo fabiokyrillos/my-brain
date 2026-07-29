@@ -484,7 +484,7 @@ async function runCommandRound(
   // invalidates prior confirmation would be unreachable in its own flow.
   if (preview.disposition === "matched_requires_confirmation" && observed !== undefined) {
     const issued = await issueTaskCommandConfirmation(context.supabase, {
-      preview,
+      source: preview,
       preState: observed.preState,
       operationKey: command.operationKey,
     });
@@ -863,7 +863,7 @@ async function writeRound(
     if (observed === undefined) return presentPreview(context, session, preview);
 
     const applied = await applyTaskCommand(context.supabase, {
-      preview,
+      source: preview,
       preState: observed.preState,
       operationKey: command.operationKey,
     });

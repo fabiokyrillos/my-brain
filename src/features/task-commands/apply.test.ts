@@ -201,9 +201,20 @@ function scenario(
   };
 }
 
-function inputFor(operationKey = OPERATION_KEY, action: TaskCommandAction = "complete_task"): TaskCommandApplyInput {
+/**
+ * The apply input, plus the preview it was built from.
+ *
+ * `TaskCommandApplyInput.source` is the narrow five-field shape Slice 2F.2
+ * introduced so the Work surface can apply without a preview; the fingerprint
+ * builder still takes the whole preview. Returning both keeps the two callers
+ * below honest instead of casting one into the other.
+ */
+function inputFor(
+  operationKey = OPERATION_KEY,
+  action: TaskCommandAction = "complete_task",
+): TaskCommandApplyInput & { readonly preview: TaskCommandPreview } {
   const { preview, preState } = scenario(action);
-  return { preview, preState, operationKey };
+  return { source: preview, preview, preState, operationKey };
 }
 
 type ApplyArgs = Parameters<TaskCommandApplyClient["rpc"]>[1];
@@ -277,12 +288,12 @@ describe("the seven declared arguments (2E-OPERATIONS-002)", () => {
     const payload = buildApplyPayload(input);
 
     expect(payload.p_task_id).toBe(TASK_ID);
-    expect(payload.p_task_id).toBe(input.preview.task.taskId);
-    expect(payload.p_action).toBe(input.preview.action);
-    expect(payload.p_patch).toEqual(input.preview.canonicalPatch);
+    expect(payload.p_task_id).toBe(input.source.task.taskId);
+    expect(payload.p_action).toBe(input.source.action);
+    expect(payload.p_patch).toEqual(input.source.canonicalPatch);
     expect(payload.p_pre_state).toEqual(input.preState);
     expect(payload.p_observed_before).toBe(OBSERVED);
-    expect(payload.p_observed_before).toBe(input.preview.observedBefore);
+    expect(payload.p_observed_before).toBe(input.source.observedBefore);
     expect(payload.p_policy_version).toBe(TASK_COMMAND_POLICY_VERSION);
     expect(payload.p_operation_key).toBe(OPERATION_KEY);
   });
@@ -310,7 +321,7 @@ describe("the seven declared arguments (2E-OPERATIONS-002)", () => {
     // yield a valid digest over a fabricated instant, and two different requests
     // would share the identity 2E-UPDATE-006's replay check reads.
     const input = inputFor();
-    const withoutObservation = { ...input, preview: { ...input.preview, observedBefore: null } };
+    const withoutObservation = { ...input, source: { ...input.source, observedBefore: null } };
 
     expect(() => buildApplyPayload(withoutObservation)).toThrow(TaskCommandApplyError);
     try {
