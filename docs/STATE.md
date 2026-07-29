@@ -1,14 +1,22 @@
 # Project State
 
-Last updated: 2026-07-29 (Phase 2F — Slices 2F.1, 2F.2 and 2F.3 accepted, merged and deployed; Slice 2F.4 implemented on branch `codex/phase-2f-slice-4`, undeployed)
+Last updated: 2026-07-29 (Phase 2F — Slices 2F.1 through 2F.4 accepted, merged and deployed; remote parity `202607300063`; Slices 2F.5 and 2F.6 not started)
 
 ## Current truth
 
-**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.2** (68 requirements, 12 families, slices 2F.1–2F.6; exactly two migrations expected in the whole phase — 2F.3's creation contract, applied, and 2F.4's revocation, implemented and not yet deployed).
+**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.2** (68 requirements, 12 families, slices 2F.1–2F.6). **Both of the phase's two expected migrations are now applied** — 2F.3's creation contract and 2F.4's revocation. Slices 2F.5 (measurement reader) and 2F.6 (closeout) remain.
 
-**Remote migration parity is `202607290062`.** Slice 2F.3's deployment moved it from `202607280061`; local head is identical and there is no drift. Slice 2F.4's `202607300063` is **branch-only and undeployed**, so it is not counted in parity.
+**Remote migration parity is `202607300063`.** Slice 2F.4's deployment moved it from `202607290062` on 2026-07-29; local head is identical and there is no drift.
 
-### Slice 2F.4 — Task grant revocation and test-suite semantic migration (implemented, undeployed)
+**`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
+
+### Slice 2F.4 — Task grant revocation and test-suite semantic migration (accepted, merged, deployed)
+
+**Deployed 2026-07-29 18:38:20Z–18:38:28Z** via `npx supabase db push --linked`, applying exactly one migration with no manual intervention; all nine post-deploy assertion groups held. Merged as PR #28 → `c174f8f`, CI run `30479818771` green on all three jobs on the exact merge SHA.
+
+All sixteen deployment-acceptance gates passed, including live `42501` denials for task INSERT/UPDATE/DELETE on **both a stale pre-migration session and a fresh one** (PostgREST reflected the revocation immediately), the retained Option C reminder INSERT, the cross-owner `23503` proof, read-side task RLS in both directions, and 14/14 production-flow checks — among them `create_due_task_reminder` still firing inside a definer path, and the same caller that creates through the validated contract being refused `42501` on a direct INSERT. **No rollback was required or executed, and the slice has no data residual of any kind.**
+
+Gate 9 (full remote suite) required a **separate prerequisite correction**: two assertions in `scripts/remote-supabase-smoke.mjs` were written by `5099f81` for a one-event AI-usage fixture and never updated when `6c4a907` (Slice 2E.1) added a second legitimate event. **That defect predates Slice 2F.4**, which merely made the previously unreachable downstream checks matter for acceptance. Corrected in PR #29 → `ba63204` with no production semantics changed; `npm run test:remote` then passed exit 0 from merged main content.
 
 **`authenticated` no longer holds any write privilege on `public.tasks`.** Migration `202607300063` revokes `insert, update, delete` there and `update, delete` on `public.reminders`. **No application source file changed** — since Slice 2F.3 no module issued those writes, so the revocation removes a permission, not a caller. That is also why this is the only Phase 2F slice with **no data residual**: a revocation writes no rows.
 
