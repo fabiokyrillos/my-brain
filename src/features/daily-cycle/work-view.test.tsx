@@ -4,6 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkItemView } from "./contracts";
 
 vi.mock("server-only", () => ({}));
+// `TaskList` became a Client Component in Slice 2F.2 (2F-SURFACE-010) and reaches
+// `useRouter` for the refusal path's refresh affordance. There is no app router
+// mounted under `render`, so the hook is stubbed here — the affordance's own
+// behaviour is asserted in `operations/task-list.test.tsx`.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 const workViewViewed = vi.hoisted(() => vi.fn(() => null));
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   WorkViewViewed: workViewViewed,
@@ -91,7 +96,17 @@ describe("WorkView", () => {
     expect(screen.queryByText("waiting_on_someone")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Complete" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Resume" })).toBeVisible();
-    expect((document.querySelector('input[name="operationKey"]') as HTMLInputElement).value).toMatch(/^[0-9a-f-]{36}$/i);
+    // **Inverted by Slice 2F.2, deliberately.** This used to assert that a
+    // server-rendered `operationKey` hidden input carried a uuid. 2F-SURFACE-006
+    // forbids exactly that: the key is now minted client-side once per
+    // (row, action) and set on the FormData at submit time, because a
+    // client-minted value in the markup would hydration-mismatch against the SSR
+    // value on every row. Its lifecycle is asserted in
+    // `operations/task-list.test.tsx`.
+    expect(document.querySelector('input[name="operationKey"]')).toBeNull();
+    // The rendered title travels instead — as the resolution *query hint*, never
+    // as a gate (2F-SURFACE-004).
+    expect(document.querySelector('input[name="title"]')).toHaveValue("Send proposal");
   });
 
   it("renders planned date, priority, and an intentional no-due indicator (Slice 2C.2)", () => {

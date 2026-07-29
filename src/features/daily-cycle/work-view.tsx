@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createRecord } from "@/features/operations/actions";
+import { applyWorkItemAction, createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
 import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
@@ -75,7 +75,7 @@ export function WorkView({
       </Link>)}
     </nav>
     <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
-    <TaskList emptyHint={active.empty} locale={locale} tasks={items} timezone={timezone} />
+    <TaskList action={applyWorkItemAction} emptyHint={active.empty} locale={locale} tasks={items} timezone={timezone} />
     {/*
       2E-DESTRUCTIVE-006's explicit affordance. It lives here rather than in the
       navigation because `capabilities.ts`'s `nested: true` drives active-state
