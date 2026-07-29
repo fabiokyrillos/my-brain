@@ -1013,11 +1013,17 @@ begin
   end if;
 
   -- The registry still routes the action type at this handler.
+  --
+  -- Table and value both copied from the repository's own assertion of the same
+  -- fact (`202607270060:3046-3048`) rather than recalled: the registry is
+  -- `private.undo_operation_handlers`, and `handler_function` stores the bare
+  -- name `undo_create_task_command`, not a schema-qualified one. Getting either
+  -- wrong is what the second CI run of this file cost.
   if not exists (
     select 1
-    from private.undo_handlers as handler
+    from private.undo_operation_handlers as handler
     where handler.action_type = 'create_task_command'
-      and handler.handler_function = 'private.undo_create_task_command'
+      and handler.handler_function = 'undo_create_task_command'
   ) then
     raise exception 'the creation-undo handler registry row is missing or re-pointed';
   end if;
