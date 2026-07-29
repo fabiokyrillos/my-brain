@@ -246,13 +246,74 @@ try {
     await first.from("ai_usage_events").select("user_id,provider_request_id"),
     "read isolated AI usage",
   );
-  assert(visibleUsage.length === 1 && visibleUsage.every((row) => row.user_id === firstUser.id), "AI usage RLS leaked another user row");
+  // The ownership invariant and the fixture count are asserted separately, and
+  // that separation is the point of this block. They were one condition, and
+  // its message named only the first, so a stale count reported itself as
+  // "AI usage RLS leaked another user row" — the most alarming sentence in this
+  // script — while RLS was working perfectly. Splitting them means a fixture
+  // change can never again be read as a security failure.
+  //
+  // `first` legitimately records TWO events above: `ownUsageRequest` and
+  // `commandUsageRequest`. The two attempts after them are supposed to be
+  // refused (`22023` for the disallowed source type, `42501` for the cross-user
+  // write) and therefore write nothing, and `second` records one row that must
+  // stay invisible here.
+  const foreignUsage = visibleUsage.filter((row) => row.user_id !== firstUser.id);
+  assert(
+    foreignUsage.length === 0,
+    `AI usage RLS leaked ${foreignUsage.length} row(s) owned by another user`,
+  );
+  assert(
+    !visibleUsage.some((row) => row.provider_request_id === `smoke-second-${suffix}`),
+    "AI usage RLS exposed the second user's own recorded event",
+  );
+
+  // The count stays exact rather than lower-bounded. Both owners are created
+  // fresh for every run, so these rows are precisely what this script wrote —
+  // there is no incidental environment data to tolerate, and `>= 1` would hide
+  // both a lost fixture and a duplicated one.
+  assert(
+    visibleUsage.length === 2,
+    `Expected the 2 AI usage events this run records for the first user, saw ${visibleUsage.length}`,
+  );
+  assert(
+    visibleUsage.map((row) => row.provider_request_id).sort().join(",")
+      === [ownUsageRequest, commandUsageRequest].sort().join(","),
+    "The visible AI usage events are not the two this run recorded for the first user",
+  );
 
   const summary = dataOrThrow(
     await first.rpc("get_ai_cost_summary", { p_timezone: "America/New_York" }),
     "aggregate AI costs",
   );
-  assert(summary.allTimeCalls === 1 && summary.allTimeCostNanoUsd === 3_550_000, "Remote cost aggregate is inconsistent");
+  // The same stale-fixture defect as the block above, one assertion later, from
+  // the same origin: `5099f81` wrote both expectations when `first` recorded a
+  // single usage event, and `6c4a907` added the second without updating either.
+  //
+  // Split for the same reason, so the failure names its own cause. The counts
+  // and the money are different questions, and a drift in one should not be
+  // reported in the language of the other.
+  //
+  // The expected total is derived, not observed. `202607160015:167-172` bills
+  //   (input - cached) * input_price + cached * cached_price + output * output_price
+  // with reasoning tokens unbilled and the long-context multipliers inactive
+  // (both fixtures sit far under the 272,000-token threshold):
+  //
+  //   gpt-5.6-terra  1000/200/100/20 -> 800*2500 + 200*250 + 100*15000 = 3,550,000
+  //   gpt-5.6-luna    900/0/120/0    -> 900*1000 +   0*100 + 120*6000  = 1,620,000
+  //                                                              total = 5,170,000
+  //
+  // The terra figure is the value this assertion carried when it was written for
+  // one event, which is what makes the derivation self-checking rather than a
+  // number copied out of a failing run.
+  assert(
+    summary.allTimeCalls === 2,
+    `Expected the 2 AI usage events this run records, aggregate counted ${summary.allTimeCalls}`,
+  );
+  assert(
+    summary.allTimeCostNanoUsd === 5_170_000,
+    `Expected the exact aggregate cost of the 2 fixture events (5,170,000 nanoUSD), got ${summary.allTimeCostNanoUsd}`,
+  );
 
   // Phase 2F Slice 2F.4 (2F-TESTMIG-006). This row is seeded through the
   // service-role `admin` client because `202607300063` revoked `insert` on
