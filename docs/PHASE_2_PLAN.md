@@ -123,9 +123,9 @@ Render questions in chat and the queue; support natural and suggested answers, d
 
 Combine structured and semantic task search, calculate match margins, apply only unambiguous reversible updates, disambiguate competing matches, create an activity when no task matches, require confirmation for cancellation, and provide audit/undo.
 
-### Phase 2F — Retroactive history and finish
+### Phase 2F — One Write Path (re-scoped; see `docs/PHASE_2F_PRD.md`)
 
-Finalize occurrence/planned/due/completion/reminder date semantics, historical timeline placement, review invalidation, pagination, responsive and accessible UI, localization, complete automated matrices, linked smoke, permanent documentation, and phase closeout.
+**This section's original scope is displaced, not deleted (ADR-056).** Phase 2F is defined by the approved `docs/PHASE_2F_PRD.md` (Revision 4): task-domain write convergence onto the deployed Phase 2E contracts, the scoped reminder-authoring exception, task grant revocation, measured matching with the semantic-retrieval evidence gate, and closeout. The scope this section previously named — occurrence/planned/due/completion/reminder date semantics, historical timeline placement, review invalidation, recurrence, and the pagination/responsive/localization finish — is unscheduled future work, gated on repairing review generation first (`docs/TODO.md` M11), with the continuous items (responsive, accessible, localized) remaining per-slice Definition-of-Done obligations rather than a phase.
 
 The approved order is 2A, 2B, 2X, 2C, 2D, 2E, and 2F. Deterministic entity resolution and the confidence policy remain in 2B because they are prerequisites for safe corrections, candidate actions, questions, and task updates.
 
