@@ -1146,8 +1146,17 @@ select is(
   0,
   'a positive priority with no due date creates no reminder'
 );
+-- PHASE 2F SLICE 2F.4 (§9 row 7): the drift is staged privileged, because
+-- `202607300063` revoked `authenticated`'s UPDATE on `public.tasks`. The
+-- invariant is unchanged and was always writer-agnostic -- creation-undo refuses
+-- a task whose recorded scalar state moved after creation, regardless of who
+-- moved it. Its production analogue is a rename through `apply_task_command`,
+-- not a client write, which is what makes the privileged vehicle the more
+-- faithful staging rather than a weaker one.
+reset role;
 update public.tasks set title = 'Edited later'
 where operation_key = 'pgtap-2e6-edited-scalar';
+set local role authenticated;
 select is(
   pg_temp.creation_undo((
     select id from public.undo_operations
@@ -1186,8 +1195,19 @@ select is(
   'applied',
   'edited-reminder undo fixture is created'
 );
+-- PHASE 2F SLICE 2F.4 (§9 row 8, resolved by the 2F-REMINDER-003 determination):
+-- `202607300063` revoked `authenticated`'s UPDATE on `public.reminders`, so this
+-- staging moves to the owning role. The invariant is untouched -- creation-undo
+-- copes with a reminder whose `remind_at` moved after creation, **whoever moved
+-- it** -- and the privileged vehicle is the truthful one now, because every
+-- reminder UPDATE that survives in production runs inside `apply_task_command`,
+-- inside `run_user_heartbeat`, or inside a `private.undo_*` handler reached
+-- through the definer `undo_operation` router. No client can move a reminder at
+-- all any more; that is precisely the posture this staging must model.
+reset role;
 update public.reminders set remind_at = remind_at + interval '10 minutes'
 where task_id = (select id from public.tasks where operation_key = 'pgtap-2e6-edited-reminder');
+set local role authenticated;
 select is(
   pg_temp.creation_undo((
     select id from public.undo_operations
@@ -1206,11 +1226,20 @@ select is(
   'applied',
   'snoozed-original undo fixture is created'
 );
+-- PHASE 2F SLICE 2F.4 (§9 row 9, same determination as row 8): staged
+-- privileged for the same reason. The invariant is untouched, and it is the one
+-- that keeps `snoozed` falsifiable: `snoozed` is a declared CHECK member that
+-- nothing in production writes and nothing reactivates (2F-REMINDER-004 records
+-- it as dormant rather than retiring it), so this staging is the only thing in
+-- the repository that exercises the undo handlers' snoozed branches. Losing it
+-- would make a dormant vocabulary member an untested one.
+reset role;
 update public.reminders
 set status = 'snoozed', snoozed_until = now() + interval '1 day'
 where task_id = (
   select id from public.tasks where operation_key = 'pgtap-2e6-snoozed-original'
 );
+set local role authenticated;
 select is(
   pg_temp.creation_undo((
     select id from public.undo_operations
@@ -1579,8 +1608,21 @@ select is(
   'applied',
   'the user-origin drift fixture is created'
 );
+-- PHASE 2F SLICE 2F.4 (§9 row 12, added by PRD Revision 4.2 / owner decision A2).
+-- This staging and its mirror below were written by Slice 2F.3, after PRD
+-- Revision 4 fixed §9's table at eleven rows, so the normative table did not
+-- describe them. The inventory that preceded this slice found both; they are now
+-- dispositioned like every other interference proof: the vehicle moves to the
+-- owning role, the assertion does not move at all.
+--
+-- The invariant is writer-agnostic by construction -- `undo_create_task_command`
+-- compares the row's current `created_by` against the origin it recorded, and
+-- refuses on any difference. Who caused the difference is not an input to that
+-- comparison, which is why staging it privileged proves the same thing.
+reset role;
 update public.tasks set created_by = 'agent'
 where operation_key = 'pgtap-2f3-drift-u';
+set local role authenticated;
 select is(
   pg_temp.creation_undo((
     select id from public.undo_operations
@@ -1606,8 +1648,14 @@ select is(
   'applied',
   'the agent-origin drift fixture is created through the defaulted call'
 );
+-- PHASE 2F SLICE 2F.4 (§9 row 13): the agent-to-user direction, staged
+-- privileged for the reason given above. Both directions are kept because the
+-- guard is an equality, not a one-way check, and a regression that only
+-- refused one direction would pass a single-direction test.
+reset role;
 update public.tasks set created_by = 'user'
 where operation_key = 'pgtap-2f3-drift-a';
+set local role authenticated;
 select is(
   pg_temp.creation_undo((
     select id from public.undo_operations

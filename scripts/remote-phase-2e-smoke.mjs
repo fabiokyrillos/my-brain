@@ -140,8 +140,19 @@ async function main() {
 
   // ---- Fixtures: identical titles across owners, no entries, no jobs -------
   const sharedTitle = `Send invoice ${suffix}`;
+  // Seeded through the service-role `admin` client, not through the owner's own
+  // end-user client (2F-TESTMIG-006). Phase 2F Slice 2F.4 revoked `insert` on
+  // `public.tasks` from `authenticated` (`202607300063`), so an owner-client
+  // insert now raises `42501`.
+  //
+  // Re-pointing is the correct disposition here and not a weakening: these rows
+  // are pure fixtures. Nothing downstream asserts *who* inserted them — every
+  // assertion in this smoke is about `list_task_command_candidates` and
+  // `apply_task_command`, both reached through each owner's own end-user client,
+  // where the `auth.uid()` tenant boundary is actually exercised. `user_id` is
+  // still set explicitly per row, so ownership is unchanged.
   const seed = async (owner, rows) => {
-    const insert = await owner.client.from("tasks").insert(rows).select("id, title, status");
+    const insert = await admin.from("tasks").insert(rows).select("id, title, status");
     if (insert.error) throw new Error(`seed ${owner.email}: ${insert.error.message}`);
     return insert.data;
   };
