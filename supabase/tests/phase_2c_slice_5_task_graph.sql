@@ -13,7 +13,7 @@
 
 begin;
 
-select plan(34);
+select plan(35);
 
 select has_function(
   'public',
@@ -420,6 +420,42 @@ select results_eq(
   $$,
   array['5c510001-0000-4000-8000-000000000001'::uuid],
   'a taskId-typed parentRef resolves to the existing owned task'
+);
+
+-- 2F-TESTMIG-003: the audit actor defaults for a definer-context write ---------
+--
+-- Added by Phase 2F Slice 2F.4. `202607300063` revoked `authenticated`'s UPDATE
+-- on `public.tasks`, so `phase_2e_task_command_apply.sql`'s actor-default proof
+-- had to move to a privileged vehicle -- and a `postgres` vehicle proves the
+-- trigger's behaviour for a writer that does not exist in production. This
+-- assertion closes that gap with the shape that does.
+--
+-- The v6 call above is a deployed SECURITY DEFINER function that updates
+-- `public.tasks` (`202607220044:1307`, the parent-link pass) and **never sets
+-- `app.audit_actor`** -- the whole file predates ADR-046. So the trigger takes
+-- its `coalesce(current_setting('app.audit_actor', true), 'user')` default
+-- branch, under exactly the conditions production takes it: a definer body,
+-- owned by a privileged role, invoked by a client that holds no table
+-- privilege of its own.
+--
+-- This is the one write shape that survives Phase 2F for which the actor is
+-- defaulted rather than declared. `apply_task_command` sets `'user'` explicitly
+-- and the undo handlers set `'system'`, so neither exercises the default at all.
+select is(
+  (
+    select actor from public.audit_logs
+    where action_type = 'task_updated'
+      and entity_id = (
+        select id from public.tasks
+        where source_interpretation_id = (
+          select current_interpretation_id from public.entries
+          where id = '5c540001-0000-4000-8000-000000000001'
+        )
+          and candidate_index = 4
+      )
+  ),
+  'user',
+  'a SECURITY DEFINER writer that sets no app.audit_actor still records actor=user'
 );
 
 -- Successful materialization: intra-batch dependency and taskId dependency -----

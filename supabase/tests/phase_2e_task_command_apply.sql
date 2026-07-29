@@ -30,11 +30,17 @@
 --     leave orphans that still fire;
 --   * the transaction-local audit actor. `app.audit_actor` is read with
 --     `missing_ok => true` precisely so an UPDATE that never went through the RPC
---     keeps working, and the only way to prove that is a plain client-side UPDATE
---     under `authenticated` with the setting unset. That is why the trigger block
---     runs FIRST: `set_config(..., is_local => true)` survives to the end of the
---     transaction, so the moment the RPC runs once, no later statement in this
---     file can observe the unset default again.
+--     keeps working. Phase 2F Slice 2F.4 revoked `authenticated`'s UPDATE on
+--     `public.tasks` (`202607300063`), so that property is now staged in a
+--     privileged context rather than as a client write. The invariant is
+--     unchanged -- the trigger's tolerance of an unset setting never depended on
+--     who issued the UPDATE -- and the write shape that actually survives in
+--     production, a SECURITY DEFINER body that sets no actor, is proven
+--     separately in `phase_2c_slice_5_task_graph.sql` against
+--     `confirm_entry_task_candidates_v6` (2F-TESTMIG-003). The trigger block
+--     still runs FIRST: `set_config(..., is_local => true)` survives to the end
+--     of the transaction, so the moment the RPC runs once, no later statement in
+--     this file can observe the unset default again.
 --
 -- Written in pure ASCII, following the doctrine of
 -- `phase_2e_task_command_matching.sql`. Nothing here needs a non-ASCII value -
@@ -568,18 +574,46 @@ select set_config(
 -- The ordering is load-bearing and cannot be relaxed. `apply_task_command` sets
 -- `app.audit_actor` with `is_local => true`, which lasts to the end of the
 -- transaction - so once any command has run, no later statement in this file can
--- observe the unset default, and the property PRD 21 actually requires (the
--- pre-existing `persistTaskStatus` path stays byte-identical) becomes unprovable.
+-- observe the unset default, and the property PRD 21 actually requires becomes
+-- unprovable.
 --
--- The first assertion is the one that would have caught the worst available
+-- PHASE 2F SLICE 2F.4 -- WRITE VEHICLE, NOT INVARIANT (§9 rows 1-3)
+-- ----------------------------------------------------------------------------
+-- These three UPDATEs were client writes under `set local role authenticated`.
+-- `202607300063` revoked that privilege, so the block runs as the owning role
+-- instead. Read what changed carefully: the **vehicle** changed, the
+-- **invariants did not**. Each assertion below still pins exactly what it pinned
+-- before, because none of them was ever about the writer:
+--
+--   * the trigger tolerates an unset `app.audit_actor` instead of raising
+--     `42704` -- a property of `current_setting(..., missing_ok => true)`, not of
+--     the caller;
+--   * it defaults the actor to `'user'` when the setting is absent;
+--   * it watches `title` and `description`;
+--   * it records the superseded value on the before side.
+--
+-- One claim genuinely died and is not silently reworded: the old description of
+-- the first assertion said "a plain client-side task UPDATE still works". That
+-- is now false by construction and its inversion -- the denial itself -- is
+-- proven in `phase_2f_task_write_grants.sql` section 3, where it belongs
+-- (2F-TESTMIG-002). What remains here is the property that write was carrying.
+--
+-- The `postgres` vehicle is not a substitute for the production shape, so it is
+-- not claimed as one: the actor-default assertion for a real SECURITY DEFINER
+-- writer that sets no actor lives in `phase_2c_slice_5_task_graph.sql`
+-- (2F-TESTMIG-003).
+--
+-- The first assertion is still the one that would catch the worst available
 -- mistake: reading the setting without `missing_ok` raises `42704` on every task
 -- UPDATE in the product, and `create or replace function` deploys that happily
 -- because plpgsql parse-analyses an expression at first execution.
 
+reset role;
+
 select lives_ok(
   $$ update public.tasks set status = 'in_progress'
      where id = '61000021-1111-4111-8111-111111111111' $$,
-  'a plain client-side task UPDATE still works with app.audit_actor unset, rather than raising 42704'
+  'a task UPDATE with app.audit_actor unset does not raise 42704'
 );
 
 select is(
@@ -589,7 +623,7 @@ select is(
       and action_type = 'task_updated'
   ),
   'user',
-  'and it still records actor=user, so persistTaskStatus behaviour is byte-identical'
+  'and the trigger defaults the recorded actor to user when the setting is absent'
 );
 
 -- Title and description were unwatched: `202607250056:578-590` recorded that a
@@ -662,6 +696,14 @@ select is(
   'Nota nova do cliente',
   'and the appended note is what the row records'
 );
+
+-- Back to the client role. Everything below this point calls the RPCs through
+-- their real entry point, where `auth.uid()` is the entire ownership wall, so it
+-- must run as `authenticated` -- which the revocation did not touch, because
+-- `execute` on the RPC and `insert/update` on the table are different grants.
+-- `request.jwt.claims` was set transaction-locally above and is independent of
+-- the role, so it survived the `reset role` intact.
+set local role authenticated;
 
 -- 2E-OWNERSHIP-002: not-found and not-yours are one answer ---------------------
 --
@@ -1368,9 +1410,9 @@ select results_eq(
 -- ----------------------------------------------------------------------------
 --
 -- PRD 11.2 says of these two columns "mirroring `persistTaskStatus` so the two
--- paths cannot disagree", and `src/features/operations/actions.ts:148-152`
--- writes both unconditionally on every status change. So `set_status` clears a
--- stale `completed_at` rather than preserving it, even though its taxonomy
+-- paths cannot disagree", and the legacy `persistTaskStatus` wrote both
+-- unconditionally on every status change. So `set_status` clears a stale
+-- `completed_at` rather than preserving it, even though its taxonomy
 -- `changedFields` names only `status` -- `changedFields` is a disclosure list,
 -- not a write manifest, which `updated_at` already proves by being written on
 -- every UPDATE and named in no action's list.
@@ -1378,19 +1420,37 @@ select results_eq(
 -- A review proposed the opposite behaviour and it was refused on that evidence.
 -- The assertion exists because the two implementations differ on exactly one
 -- input, and without a fixture carrying it the suite would pass under either --
--- blessing whichever happened to be committed. The stale row is produced by a
--- direct client UPDATE, which is how it occurs in production: `authenticated`
--- retains insert/update/delete on `public.tasks` (PRD 3.2) and the legacy path
--- can leave a `completed_at` on a non-terminal row.
+-- blessing whichever happened to be committed.
+--
+-- PHASE 2F -- THE MIRROR IS GONE; THE INPUT IS NOT (§9 row 4)
+-- ----------------------------------------------------------------------------
+-- Two things changed under this comment and neither changes the assertion.
+--
+-- Slice 2F.2 deleted `persistTaskStatus`, so the sentence this block used to
+-- carry -- "the stale row is produced by a direct client UPDATE, which is how it
+-- occurs in production: `authenticated` retains insert/update/delete on
+-- `public.tasks` (PRD 3.2)" -- was false in two ways at once, and is corrected
+-- here at source rather than left to rot (2F-TESTMIG-007). Slice 2F.4 then
+-- revoked the grant that sentence described, so the staging runs privileged.
+--
+-- What the fixture still models is unchanged and still real: a non-terminal task
+-- carrying a `completed_at`. Such rows exist in production today as pre-existing
+-- data written before the command path existed, and can still be produced by any
+-- privileged writer -- a second RPC, a migration backfill, a worker. The
+-- assertion is about `apply_task_command`'s behaviour when it meets one, which
+-- never depended on who left it there. It is now writer-agnostic in fact as well
+-- as in intent.
+reset role;
 update public.tasks
 set completed_at = '2026-07-20T10:00:00+00:00'::timestamptz
 where id = '61000003-1111-4111-8111-111111111111';
+set local role authenticated;
 
 select results_eq(
   $$ select status, completed_at
      from public.tasks where id = '61000003-1111-4111-8111-111111111111' $$,
   $$ values ('in_progress'::text, '2026-07-20T10:00:00+00:00'::timestamptz) $$,
-  'a legacy direct write can leave a completed_at on a non-terminal task'
+  'a write from outside the command path can leave a completed_at on a non-terminal task'
 );
 
 select is(
@@ -2422,6 +2482,14 @@ select is(
 -- the one it replaced, so a newer change is refused rather than silently discarded.
 -- Setup is deliberately unasserted: if the apply had not landed, the assertion
 -- below would report a missing operation instead.
+--
+-- PHASE 2F (§9 row 5): the interfering write is staged privileged, because after
+-- `202607300063` that is the only shape it can take. The invariant is untouched
+-- and is explicitly writer-agnostic: the ten-column undo guard refuses when the
+-- task drifted after the apply, **whoever moved it**. Its production analogue was
+-- never really a client UPDATE anyway -- it is a second `apply_task_command` on
+-- the same task, which is what the 2E-UNDO-004 case immediately below stages
+-- through the RPC itself.
 
 select public.apply_task_command(
   '61000015-1111-4111-8111-111111111111',
@@ -2433,8 +2501,10 @@ select public.apply_task_command(
   'pgtap-2e4-undo-moved'
 );
 
+reset role;
 update public.tasks set status = 'in_progress'
 where id = '61000015-1111-4111-8111-111111111111';
+set local role authenticated;
 
 select is(
   pg_temp.taskcmd_undo((
