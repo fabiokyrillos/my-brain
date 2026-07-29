@@ -122,7 +122,19 @@ jobs:
         # Also runs supabase/seed.sql, which installs pgTAP for the next step.
         run: supabase db reset
 
-      - name: Run the pgTAP suite
+      # POSTURE: post-revocation. Everything from `db reset` through the
+      # Playwright step below runs against the privilege posture the migration
+      # chain actually produces — since `202607300063`, that means `authenticated`
+      # holds SELECT only on `public.tasks`, and SELECT + INSERT on
+      # `public.reminders`. `supabase/tests/phase_2f_task_write_grants.sql` is the
+      # file that asserts it, and the ten re-dispositioned statements in
+      # `phase_2e_task_command_apply.sql` / `phase_2e_task_command_creation.sql`
+      # depend on it.
+      #
+      # The re-grant rehearsal at the END of this job is the only step that runs
+      # under any other posture, and it restores this one before it finishes.
+      # Nothing between here and there sees a re-granted database.
+      - name: Run the pgTAP suite (post-revocation posture)
         run: supabase test db --local supabase/tests
 
       - name: Lint the database
@@ -164,6 +176,12 @@ jobs:
           echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
           echo "SUPABASE_ANON_KEY=$BROWSER_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$ADMIN_KEY" >> "$GITHUB_ENV"
+          # The re-grant rehearsal needs a direct owner connection: it issues
+          # GRANT/REVOKE, which no API key can do. `supabase status` reports
+          # DB_URL for the local stack; the fallback is the port config.toml
+          # pins (54322), so a CLI that stops reporting it fails loudly on the
+          # rehearsal rather than silently skipping it.
+          echo "LOCAL_DB_URL=${DB_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}" >> "$GITHUB_ENV"
 
       - name: Prove same-key standalone creation with two database sessions
         run: npm run test:local:2e:creation-race
@@ -183,6 +201,69 @@ jobs:
         # The remaining specs are credential-gated against the linked project
         # and skip themselves; remote smokes stay manual.
         run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop --project=mobile
+
+      # 2F-REVOKE-003 — the re-grant rollback rehearsal.
+      #
+      # WHY IT IS LAST. Every step above must see the posture the migration chain
+      # produces. This step is the only one that changes that posture, so it runs
+      # after all of them and restores the posture before it exits. Three
+      # explicit boundaries make the "which assertions ran under which posture"
+      # question unambiguous rather than a matter of reading step order:
+      #
+      #   A. it FAILS if the stack is not in the post-revocation posture when it
+      #      starts, so it can never be the thing that made an earlier step pass;
+      #   B. it runs its own pgTAP directory — `supabase/regrant-rehearsal/`,
+      #      deliberately NOT `supabase/tests/` — so the normal suite can never
+      #      be executed under the re-granted posture, by ordering accident or
+      #      otherwise;
+      #   C. it re-applies the revocation and re-asserts the denial before
+      #      finishing, so the job never ends on a widened database.
+      #
+      # WHAT IT PROVES: the committed rollback SQL applies and restores the
+      # versioned migration-chain privileges, such that writes refused by the
+      # normal suite succeed again.
+      #
+      # WHAT IT DOES NOT PROVE, and may not be cited as proving: live PostgREST
+      # schema-cache convergence, in-flight session behaviour, or an operational
+      # rollback against production. Those are observable only against a live
+      # project and are verified in the 2F.4 deployment session. "Rehearsed in
+      # CI" is truthful only with this scope attached.
+      - name: Rehearse the re-grant rollback (SQL-level only; not a live-ops rehearsal)
+        run: |
+          set -euo pipefail
+          echo "::group::A. Confirm the starting posture is post-revocation"
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -c "
+            do \$\$
+            begin
+              if pg_catalog.has_table_privilege('authenticated', 'public.tasks', 'update') then
+                raise exception 'rehearsal precondition failed: the stack is already re-granted, so every step above ran under the wrong posture';
+              end if;
+            end
+            \$\$;"
+          echo "starting posture confirmed: authenticated cannot write public.tasks"
+          echo "::endgroup::"
+
+          echo "::group::B. Apply the committed re-grant and prove the writes return"
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -f scripts/phase-2f-regrant-task-write-grants.sql
+          supabase test db --local supabase/regrant-rehearsal
+          echo "::endgroup::"
+
+          echo "::group::C. Restore the post-revocation posture before leaving"
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -c "
+            revoke insert, update, delete on public.tasks from authenticated;
+            revoke update, delete on public.reminders from authenticated;
+            do \$\$
+            begin
+              if pg_catalog.has_table_privilege('authenticated', 'public.tasks', 'update') then
+                raise exception 'rehearsal failed to restore the post-revocation posture';
+              end if;
+              if not pg_catalog.has_table_privilege('authenticated', 'public.reminders', 'insert') then
+                raise exception 'rehearsal disturbed the retained Option C reminder INSERT grant';
+              end if;
+            end
+            \$\$;"
+          echo "posture restored: revoked again, Option C reminder INSERT intact"
+          echo "::endgroup::"
 
       - name: Collect the Playwright report
         if: failure()
