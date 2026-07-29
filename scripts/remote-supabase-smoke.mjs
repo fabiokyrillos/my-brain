@@ -254,8 +254,23 @@ try {
   );
   assert(summary.allTimeCalls === 1 && summary.allTimeCostNanoUsd === 3_550_000, "Remote cost aggregate is inconsistent");
 
+  // Phase 2F Slice 2F.4 (2F-TESTMIG-006). This row is seeded through the
+  // service-role `admin` client because `202607300063` revoked `insert` on
+  // `public.tasks` from `authenticated`.
+  //
+  // READ THIS BEFORE TOUCHING IT: the task is not a spare fixture. It is the
+  // subject of the cross-owner composite-FK denial immediately below, which is a
+  // Phase-1 ownership invariant with nothing to do with Phase 2F. Deleting the
+  // "broken" insert would leave that assertion unreachable while the suite
+  // stayed green. It is re-pointed, never removed, and `user_id` is still
+  // `firstUser.id` so the relationship's owner is unchanged.
+  //
+  // `public.task_projects` was NOT revoked, so the insert that must fail is
+  // still issued by `first`'s own end-user client and still fails for exactly
+  // the original reason: the composite `(user_id, project_id)` foreign key
+  // refuses a project belonging to someone else.
   const task = dataOrThrow(
-    await first.from("tasks").insert({ user_id: firstUser.id, title: "Ownership smoke task" }).select("id").single(),
+    await admin.from("tasks").insert({ user_id: firstUser.id, title: "Ownership smoke task" }).select("id").single(),
     "create owned task",
   );
   const foreignProject = dataOrThrow(
@@ -268,6 +283,28 @@ try {
     project_id: foreignProject.id,
   });
   assert(crossRelationship.error?.code === "23503", "Cross-user relationship ownership was not denied");
+
+  // The compensating evidence 2F-REVOKE-004 names, added here because the
+  // revocation genuinely destroyed something and the replacement should be real
+  // rather than implied. **Write-side RLS on `public.tasks` is no longer
+  // reachable from any client role** — the grant check refuses before a policy
+  // is consulted — so `tasks_insert_own`/`_update_own`/`_delete_own` cannot be
+  // exercised from here, or from anywhere else a user can reach.
+  //
+  // What remains provable is read-side RLS, and it is asserted in both
+  // directions so it cannot pass vacuously: the owner must SEE the row (a zero
+  // count would satisfy the isolation half while proving nothing), and the other
+  // owner must NOT.
+  const ownerReadsOwnTask = dataOrThrow(
+    await first.from("tasks").select("id").eq("id", task.id),
+    "read own task",
+  );
+  assert(ownerReadsOwnTask.length === 1, "Owner could not read their own task, so the isolation check below would be vacuous");
+  const strangerReadsForeignTask = dataOrThrow(
+    await second.from("tasks").select("id").eq("id", task.id),
+    "read another owner's task",
+  );
+  assert(strangerReadsForeignTask.length === 0, "Task RLS leaked another user's row on the read side");
 
   const audit = dataOrThrow(
     await first.from("audit_logs").insert({

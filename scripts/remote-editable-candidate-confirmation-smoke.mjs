@@ -793,9 +793,22 @@ try {
   if (graphCycleTaskCountResult.error) throw new Error(`count tasks after v6 cycle rejection: ${graphCycleTaskCountResult.error.message}`);
   assert((graphCycleTaskCountResult.count ?? 0) === 0, "V6 cycle rejection was not atomic");
 
+  // Seeded through the service-role `admin` client (2F-TESTMIG-006). Phase 2F
+  // Slice 2F.4 revoked `insert` on `public.tasks` from `authenticated`
+  // (`202607300063`), so `otherOwner`'s end-user client can no longer write it.
+  //
+  // The invariant this fixture serves is untouched, and it is worth naming
+  // because it is the reason the row must still belong to the *other* owner:
+  // the assertion below is that `owner` cannot reference a task they do not own
+  // as a parent (`2C_INVALID_GRAPH_REFERENCE`). That denial is raised by
+  // `confirm_entry_task_candidates_v6` and reached through `owner`'s own
+  // end-user client, so the tenant boundary is still exercised end to end. Only
+  // the vehicle that creates the foreign row changed; `user_id` is still
+  // `otherOwner`'s, read from their own session rather than assumed.
+  const otherOwnerId = (await otherOwner.auth.getUser()).data.user.id;
   const otherOwnerTask = dataOrThrow(
-    await otherOwner.from("tasks").insert({
-      user_id: (await otherOwner.auth.getUser()).data.user.id,
+    await admin.from("tasks").insert({
+      user_id: otherOwnerId,
       title: `${fixturePrefix} other owner task`,
     }).select("id").single(),
     "create cross-owner task fixture",
