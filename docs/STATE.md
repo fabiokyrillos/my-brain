@@ -1,8 +1,15 @@
 # Project State
 
-Last updated: 2026-07-28 (Phase 2E — merged, deployed, validated and released)
+Last updated: 2026-07-29 (Phase 2F — Slice 2F.1 implemented on branch `codex/phase-2f-slice-1`)
 
 ## Current truth
+
+**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4** (68 requirements, 12 families, slices 2F.1–2F.6; exactly two migrations expected, neither in this slice). **Slice 2F.1 — Guardrails, decisions and preconditions — is implemented** on branch `codex/phase-2f-slice-1`: no migration, no deployment, no behaviour change.
+
+- **Two CI guards exist and were proven red-first** (`src/lib/supabase/sql-grammar-guard.test.ts`, `direct-write-guard.test.ts`): the plpgsql grammar-trap guard (the `pg_catalog.coalesce/nullif/greatest/least` lookup that cannot resolve under `search_path = ''`, and the `if … case … then` `42601` trap — each detected in a deliberately defective fixture before the fixture was removed), and the architecture regression gate holding the direct-writer inventory of `public.tasks`/`public.reminders` to exact allowlists (tasks: the two legacy writers pending 2F.2/2F.3, empty at 2F.4; reminders: the Option C exception, permanent). The chain scan found exactly the two known superseded historical `pg_catalog.greatest(` sites (`202607220041:1524`, `202607220044:1506`) and nothing else.
+- **Four ADRs recorded** (ADR-054 activity stays a task; ADR-055 the two-tier semantic-retrieval evidence standard with its 90-day expiry; ADR-056 phase-letter reconciliation — `PHASE_2_PLAN.md` §2F and `TODO.md` re-pointed; ADR-057 provenance deferred past 2F behind the executed-dry-run reopening gate).
+- **`effective_limit` row semantics pinned** (`supabase/tests/phase_2f_effective_limit.sql`, 2F-PRECOND-002): truncation returns exactly `effective_limit + 1` rows, a population at the limit returns no phantom probe row, a negative limit clamps up to one, and `effective_limit` is a query-scalar — executable only in CI's `database` job, since Docker remains unavailable on this workstation.
+- **The pre-code gate package is preserved and tracked** (2F-PRECOND-001): the writer inventory, reminder census, Gate 3 probe, the refuse-unless-disposable Gate 1 dry-run SQL, and `src/features/task-commands/work-surface-reuse.test.ts`, which now runs in every CI `app` job.
 
 **Phase 2E — Natural-Language Task Updates is RELEASED.** All eight slices — 2E.1 (Epic 2E-A) through 2E.8 (Epic 2E-H) — are implemented, reviewed, corrected, accepted, merged, deployed to the linked project and validated against it.
 
