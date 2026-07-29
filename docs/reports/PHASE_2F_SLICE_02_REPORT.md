@@ -35,7 +35,7 @@ The four Work-surface buttons stopped writing `public.tasks` directly and starte
 | 2F-ANALYTICS-003 (touched, owned by 2F.3) | the existing builders | Asserted here anyway: no payload contains the task title |
 | 2F-OWNERSHIP-001 | `loadTaskCandidates` | Three assertions, in order: the owner's own row **resolves** (non-vacuous), a foreign row **raises** rather than being filtered, and a stranger's id refuses. §5 records what is still owed in the deployment session |
 | 2F-OPERATIONS-001 | pending | Parity re-check before/after belongs to the deployment session (§5) |
-| 2F-OPERATIONS-002 | pending | CI on the exact merge SHA (§5) |
+| 2F-OPERATIONS-002 | CI run `30425313872` | All three jobs green on `836ced3`. **Owed again on the exact merge SHA** |
 
 ---
 
@@ -73,8 +73,9 @@ Two Phase 2E internals were **lifted, not copied**, so the invariant 2F.6 will a
 | `work-command.test.ts` | Local, 2026-07-29 | 27/27 |
 | `task-list.test.tsx` (jsdom a11y gate) | Local, 2026-07-29 | 23/23 |
 | `operations/actions.test.ts` (rewritten) | Local, 2026-07-29 | 16/16 |
-| pgTAP | CI `database` job | Not executed locally — Docker unavailable on this workstation; no local pgTAP result is claimed |
-| CI, all three jobs, exact SHA (2F-OPERATIONS-002) | **Pending** | Recorded on the PR when the run completes |
+| pgTAP + empty-DB migration chain + `db lint` + foundation e2e | CI `database` job, 2026-07-29 | **green** — not executed locally (Docker unavailable on this workstation), and no local pgTAP result is claimed |
+| `deno check` + `deno test` | CI `worker` job, 2026-07-29 | **green** — this slice touches no worker file |
+| CI, all three jobs, exact SHA (2F-OPERATIONS-002) | CI run **`30425313872`** on `836ced37a3a59c403b6a129c86c369a891515855`, 2026-07-29 | **all three successful.** `application` green confirms §7.1: the two `sql-reachability.test.ts` failures are this workstation's, not the slice's |
 | Authenticated journeys desktop+mobile, pt-BR+en | **Pending — deployment session** | `e2e/work-actions.spec.ts` written and credential-gated |
 | Two-owner disposable mutation probe | **Pending — deployment session** | 2F-OWNERSHIP-001's remote half |
 | Parity re-check before/after (2F-OPERATIONS-001) | **Pending — deployment session** | — |
@@ -86,7 +87,7 @@ Two Phase 2E internals were **lifted, not copied**, so the invariant 2F.6 will a
 
 ## 5. What is not yet proven, stated plainly
 
-The five pending rows in §4 are all deployment-session gates. Until they execute:
+The four remaining pending rows in §4 are all deployment-session gates. (CI executed: run `30425313872`, all three jobs green on `836ced3`; 2F-OPERATIONS-002 is owed once more on the exact merge SHA.) Until the deployment-session gates execute:
 
 - the acceptance items *"all four Work actions successfully routed through `apply_task_command`"*, *"click-time ownership and eligibility proof"*, *"reminder cancellation and non-interference"*, *"audit actor `'user'`"*, *"undo"* and *"`commandOrigin` `'work'` observed in emitted events"* are proven **against injected clients and by construction**, not against the deployed project;
 - the desktop and mobile authenticated journeys exist as a written, credential-gated spec that has not run.
