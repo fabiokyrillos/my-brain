@@ -79,6 +79,22 @@ insert into public.reminders (id, user_id, task_id, title, remind_at, status) va
 -- The entry and interpretation section 6 confirms through the deployed
 -- SECURITY DEFINER materialization family. The candidate carries a due date on
 -- purpose: that is what makes `create_due_task_reminder` fire.
+--
+-- The owner identity is established HERE, before the fixture call, and not at
+-- the `set local role authenticated` in section 3. `persist_entry_interpretation`
+-- is SECURITY DEFINER and derives its `current_user_id` from `auth.uid()`,
+-- raising `Authentication required` when the claim is absent -- so the fixture
+-- fails at parse-plan time with zero assertions run if the claim arrives later.
+-- Setting it while still running as the owning role is exactly what
+-- `phase_2c_slice_5_task_graph.sql:147-148` does for the same call. The role and
+-- the claim are independent: `set local role` changes who Postgres thinks is
+-- executing, `request.jwt.claims` changes who Supabase's `auth.uid()` reports,
+-- and section 3 re-asserts the same value when it switches role.
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"2f400001-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
 
 insert into public.entries (id, user_id, original_content, source, status, locale) values (
   '2f430001-0000-4000-8000-000000000001',
