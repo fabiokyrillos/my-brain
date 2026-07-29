@@ -77,6 +77,15 @@ const CONFIRMATION_MIGRATION =
 const CONFIRMATION_PGTAP = "supabase/tests/phase_2e_task_command_destructive.sql";
 const CREATION_MIGRATION =
   "supabase/migrations/202607270060_phase_2e_no_match_task_creation.sql";
+/**
+ * `create_task_command` alone moved. Phase 2F Slice 2F.3 dropped and recreated
+ * it with a trailing `p_created_by` default; its read-only preview and its
+ * confirmation issuer were deliberately left untouched in `202607270060`,
+ * because neither writes and neither has an origin to record. Pointing all three
+ * at the newer file would prove parity against a declaration it does not contain.
+ */
+const CREATION_APPLY_MIGRATION =
+  "supabase/migrations/202607290062_phase_2f_creation_origin.sql";
 const CREATION_PGTAP = "supabase/tests/phase_2e_task_command_creation.sql";
 const TYPES = "src/lib/supabase/database.types.ts";
 
@@ -146,7 +155,7 @@ const CREATION_CONFIRMATION: FunctionSpec = {
 
 const CREATION_APPLY: FunctionSpec = {
   fn: "create_task_command",
-  migration: CREATION_MIGRATION,
+  migration: CREATION_APPLY_MIGRATION,
   language: "plpgsql",
 };
 
@@ -172,8 +181,13 @@ function parseDeclarations(block: string): Declared[] {
 function parseMigration(spec: FunctionSpec): { args: Declared[]; returns: DeclaredReturns } {
   const sql = source(spec.migration);
   const match = sql.match(
+    // `or replace` is optional because a signature change cannot use it: Phase 2F
+    // Slice 2F.3 drops `create_task_command` and recreates it in the same
+    // transaction to add a trailing parameter, so its declaration is a bare
+    // `create function`. Every other function in this table is still replaced in
+    // place, and the anchor stays tight to `public.<fn>(`.
     new RegExp(
-      `create or replace function public\\.${spec.fn}\\(([\\s\\S]*?)\\)`
+      `create (?:or replace )?function public\\.${spec.fn}\\(([\\s\\S]*?)\\)`
       + `\\s*returns\\s+([\\s\\S]*?)\\s*language\\s+${spec.language}\\b`,
     ),
   );
@@ -480,20 +494,48 @@ for (const spec of [CREATION_PREVIEW, CREATION_CONFIRMATION, CREATION_APPLY]) {
       expect(generated.returns.tsType).toBe("Json");
     });
 
-    it("takes the identical six server-bound creation values in the identical order", () => {
-      expect(migration.args.map((arg) => arg.name)).toEqual([
-        "p_action",
-        "p_title_words",
-        "p_patch",
-        "p_observed_before",
-        "p_policy_version",
-        "p_operation_key",
-      ]);
+    // The six server-bound creation values are shared by all three RPCs and are
+    // ordered identically, because one payload builder produces them and the
+    // fingerprint hashes them. `create_task_command` carries one more — the
+    // Phase 2F origin — and it is **trailing**, which is what keeps every
+    // pre-existing six-argument call resolving against the recreated function.
+    const SHARED_CREATION_ARGS = [
+      "p_action",
+      "p_title_words",
+      "p_patch",
+      "p_observed_before",
+      "p_policy_version",
+      "p_operation_key",
+    ];
+
+    it("takes the shared server-bound creation values in the identical order", () => {
+      expect(migration.args.map((arg) => arg.name).slice(0, 6)).toEqual(SHARED_CREATION_ARGS);
+      if (spec.fn === "create_task_command") {
+        expect(migration.args.map((arg) => arg.name)).toEqual([
+          ...SHARED_CREATION_ARGS,
+          "p_created_by",
+        ]);
+      } else {
+        // Neither the preview nor the confirmation issuer writes, so neither has
+        // an origin to record. They were deliberately left at six.
+        expect(migration.args.map((arg) => arg.name)).toEqual(SHARED_CREATION_ARGS);
+      }
     });
 
-    it("defaults none of the binding and never lets the caller name an owner", () => {
-      expect(migration.args.filter((arg) => arg.hasDefault)).toEqual([]);
-      expect(generated.args.filter((arg) => arg.optional)).toEqual([]);
+    it("defaults only the trailing origin and never lets the caller name an owner", () => {
+      const defaulted = migration.args.filter((arg) => arg.hasDefault).map((arg) => arg.name);
+      const optional = generated.args.filter((arg) => arg.optional).map((arg) => arg.name);
+      if (spec.fn === "create_task_command") {
+        // Exactly one, and it must be the last: a defaulted argument anywhere
+        // else would make the positional calls that already exist resolve to a
+        // different parameter.
+        expect(defaulted).toEqual(["p_created_by"]);
+        expect(optional).toEqual(["p_created_by"]);
+        expect(migration.args[migration.args.length - 1].name).toBe("p_created_by");
+      } else {
+        expect(defaulted).toEqual([]);
+        expect(optional).toEqual([]);
+      }
       expect(migration.args.map((arg) => arg.name)).not.toContain("p_owner_id");
     });
 

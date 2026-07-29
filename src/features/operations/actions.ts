@@ -8,6 +8,11 @@ import { buildTaskCommandAppliedProperties } from "@/features/task-commands/anal
 import { TaskCommandApplyError } from "@/features/task-commands/apply";
 import { TaskCandidateQueryError } from "@/features/task-commands/candidates";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
+import {
+  createTaskCommand,
+  issueTaskCommandCreationConfirmation,
+} from "@/features/task-commands/creation";
+import { TASK_COMMAND_POLICY_VERSION } from "@/features/task-commands/taxonomy";
 import type { TaskCommandOutcome } from "@/features/task-commands/outcomes";
 import { WORK_SURFACE_ACTIONS } from "@/features/task-commands/taxonomy";
 import { WorkCommandInputError, applyWorkCommand } from "@/features/task-commands/work-command";
@@ -55,6 +60,65 @@ const createRecordCopy = {
   },
 } satisfies Record<Locale, CreateRecordCopy>;
 
+type ManualTaskCreation =
+  | { readonly status: "created" }
+  | { readonly status: "error"; readonly reason: keyof CreateRecordCopy };
+
+/**
+ * Manual task creation, through the validated creation contract (2F-CREATE-001).
+ *
+ * **This is an explicit creation request, not a no-match inference.** The user
+ * opened a form, typed a title and pressed a button; there is no command to
+ * parse, nothing to match against, and nothing to *offer*. It therefore builds a
+ * `manual` intent and never touches `decideInitialTaskCommandNoMatch`, whose
+ * whole job is deciding whether offering creation would be honest after a
+ * natural-language command failed to match. Asserting `creation_offered` about a
+ * command nobody typed would be a fabrication in the audit trail.
+ *
+ * Two round trips, in the order the contract requires: `create_task_command`
+ * refuses without a server-issued confirmation carrying the same request
+ * fingerprint (`2E_CONFIRMATION_REQUIRED`), so the confirmation is issued first
+ * from the identical payload. Both are keyed on one freshly minted operation
+ * key, which is what makes a double submission replay instead of creating twice.
+ */
+async function createTaskManually(input: {
+  readonly supabase: Awaited<ReturnType<typeof createClient>>;
+  readonly title: string;
+  readonly locale: Locale;
+}): Promise<ManualTaskCreation> {
+  const creation = {
+    intent: {
+      kind: "manual" as const,
+      title: input.title,
+      operationKey: crypto.randomUUID(),
+      policyVersion: TASK_COMMAND_POLICY_VERSION,
+    },
+    observedBefore: new Date().toISOString(),
+    locale: input.locale,
+  };
+
+  try {
+    const issued = await issueTaskCommandCreationConfirmation(input.supabase, creation);
+    if (issued.outcome !== "issued") return { status: "error", reason: "createFailed" };
+
+    // The one call in the product that asks for `'user'` provenance.
+    const created = await createTaskCommand(input.supabase, creation, "user");
+    if (created.outcome !== "applied") return { status: "error", reason: "createFailed" };
+    return { status: "created" };
+  } catch (error) {
+    // A title the contract cannot represent is a declared, localized refusal
+    // (2F-CREATE-003) — not a substring match on a driver message, and not a
+    // crash. Everything else is a precondition fault this surface cannot explain.
+    if (error instanceof TaskCommandApplyError && error.code === "creation_title_unrepresentable") {
+      return { status: "error", reason: "nameTooLong" };
+    }
+    if (error instanceof TaskCommandApplyError || error instanceof TaskCandidateQueryError) {
+      return { status: "error", reason: "createFailed" };
+    }
+    throw error;
+  }
+}
+
 export async function createRecord(
   _state: CreateRecordState,
   formData: FormData,
@@ -75,13 +139,18 @@ export async function createRecord(
 
   let error: { message: string } | null = null;
   if (parsed.data.kind === "task") {
-    ({ error } = await supabase.from("tasks").insert({
-      user_id: user.id,
+    // 2F-CREATE-001. The direct INSERT that lived here is deleted: manual
+    // creation now goes through the same validated, audited, undoable contract
+    // every other task write goes through, and persists `created_by = 'user'`
+    // (2F-CREATE-002) rather than a value only this call site knew about.
+    const created = await createTaskManually({
+      supabase,
       title: parsed.data.name,
-      status: "inbox",
-      confidence: 1,
-      created_by: "user",
-    }));
+      locale: parsed.data.locale,
+    });
+    if (created.status === "error") {
+      return { status: "error", message: copy[created.reason] };
+    }
   } else if (parsed.data.kind === "project") {
     ({ error } = await supabase.from("projects").insert({ user_id: user.id, name: parsed.data.name }));
   } else if (parsed.data.kind === "person") {

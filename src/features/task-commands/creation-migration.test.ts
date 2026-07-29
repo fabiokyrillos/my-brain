@@ -311,7 +311,11 @@ describe("Slice 2E.6 forward migration contract", () => {
     const assertions =
       pgtap.match(/^select (?:has_function|is|ok|has_trigger|col_is_null|results_eq)\(/gm) ?? [];
 
-    expect(plan).toBe(127);
+    // 127 at Slice 2E.6; 159 after Slice 2F.3 added the bare-creation section
+    // (26 assertions), the cross-owner additions (4) and the two signature pins
+    // the recreated seven-argument function needs. The literal is pinned rather
+    // than derived so that a *silently* shrinking suite fails here.
+    expect(plan).toBe(159);
     expect(assertions).toHaveLength(plan);
   });
 });

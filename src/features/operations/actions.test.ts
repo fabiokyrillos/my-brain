@@ -39,7 +39,15 @@ const operationKey = "6118fb25-2f80-432a-aa96-0e76d924862e";
 const observed = "2026-07-29T11:59:58.000Z";
 const title = "Enviar proposta";
 
-function taskClient() {
+/**
+ * The client `createRecord` sees.
+ *
+ * Since Slice 2F.3 the task branch no longer inserts: it issues a creation
+ * confirmation and calls `create_task_command`, so this double answers RPCs as
+ * well as table writes. `insert` is still exposed because the project, person
+ * and memory branches are untouched and must stay that way.
+ */
+function taskClient(options: { readonly createFails?: boolean } = {}) {
   const insert = vi.fn(async () => ({ error: null }));
   const from = vi.fn(() => ({
     insert,
@@ -47,12 +55,46 @@ function taskClient() {
     eq: vi.fn(function (this: unknown) { return this; }),
     maybeSingle: vi.fn(async () => ({ data: { timezone: "America/Sao_Paulo" }, error: null })),
   }));
+  const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+    if (fn === "issue_task_command_creation_confirmation") {
+      return {
+        data: {
+          confirmation_id: "71000003-1111-4111-8111-111111111111",
+          action: "create_task",
+          command_action: args.p_action,
+          request_fingerprint: "a".repeat(64),
+          status: "issued",
+          replayed: false,
+        },
+        error: null,
+      };
+    }
+    if (options.createFails) {
+      return { data: null, error: { message: "boom", code: "P0001", details: "" } };
+    }
+    return {
+      data: {
+        outcome: "applied",
+        task_id: taskId,
+        action: args.p_action,
+        undo_id: "44444444-4444-4444-8444-444444444444",
+        idempotent: false,
+        request_fingerprint: "a".repeat(64),
+        reminder_created_id: null,
+        undo_expires_at: "2026-07-30T12:00:00.000000+00",
+        creation_undone: false,
+      },
+      error: null,
+    };
+  });
   return {
     client: {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: userId } } })) },
       from,
+      rpc,
     },
     insert,
+    rpc,
   };
 }
 
@@ -168,11 +210,25 @@ function useWorkClient(options: Parameters<typeof workClient>[0] = {}) {
   return client;
 }
 
-describe("manual creation revalidation", () => {
+describe("2F-CREATE-001 — manual creation routes through the validated contract", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("revalidates canonical Work in both locales after manual task creation", async () => {
     const { client } = taskClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const state = await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "pt-BR", name: "Enviar proposta" }),
+    );
+
+    expect(state.status).toBe("success");
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
+    expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
+  });
+
+  it("issues a confirmation and creates, and never inserts into tasks", async () => {
+    const { client, insert, rpc } = taskClient();
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     await createRecord(
@@ -180,8 +236,99 @@ describe("manual creation revalidation", () => {
       form({ kind: "task", locale: "pt-BR", name: "Enviar proposta" }),
     );
 
-    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/work");
-    expect(revalidatePath).toHaveBeenCalledWith("/en/app/work");
+    expect(rpc.mock.calls.map(([fn]) => fn)).toEqual([
+      "issue_task_command_creation_confirmation",
+      "create_task_command",
+    ]);
+    // The direct INSERT is gone (2F-CREATE-001); the architecture gate proves
+    // the same thing statically, and this proves it at runtime.
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("sends the bare creation action, an empty patch and the user origin", async () => {
+    const { client, rpc } = taskClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "en", name: "Call the client" }),
+    );
+
+    const [, issueArgs] = rpc.mock.calls[0];
+    const [, createArgs] = rpc.mock.calls[1];
+    expect(issueArgs.p_action).toBe("create_title_only");
+    expect(issueArgs.p_patch).toEqual({});
+    expect(createArgs.p_action).toBe("create_title_only");
+    expect(createArgs.p_patch).toEqual({});
+    expect(createArgs.p_title_words).toEqual(["Call", "the", "client"]);
+    // 2F-CREATE-002: the one call in the product that asks for user provenance.
+    expect(createArgs.p_created_by).toBe("user");
+    // Both calls carry the same key, which is what makes creation idempotent.
+    expect(createArgs.p_operation_key).toBe(issueArgs.p_operation_key);
+  });
+
+  it("invents no qualifier value", async () => {
+    const { client, rpc } = taskClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "en", name: "Call the client" }),
+    );
+
+    const [, createArgs] = rpc.mock.calls[1];
+    expect(Object.keys(createArgs.p_patch as object)).toEqual([]);
+  });
+
+  it("renders a declared localized error when the contract refuses, not a substring match", async () => {
+    const { client } = taskClient({ createFails: true });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const state = await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "en", name: "Enviar proposta" }),
+    );
+
+    expect(state.status).toBe("error");
+    expect(state.message).toBe("We could not add this.");
+  });
+
+  it("refuses a title the creation contract cannot represent, in both locales", async () => {
+    const { client, rpc } = taskClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    // Within the form's own 240-character bound, but a single unbroken token
+    // longer than the 160 the contract allows per title word. This is the one
+    // title shape the validated path cannot represent, and it must refuse rather
+    // than crash or truncate.
+    const unrepresentable = "x".repeat(200);
+
+    const english = await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "en", name: unrepresentable }),
+    );
+    const portuguese = await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "task", locale: "pt-BR", name: unrepresentable }),
+    );
+
+    expect(english.status).toBe("error");
+    expect(english.message).toBe("Use at most 160 characters.");
+    expect(portuguese.message).toBe("Use no máximo 160 caracteres.");
+    // Refused before any round trip.
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("leaves the project, person and memory branches on their direct inserts", async () => {
+    const { client, insert, rpc } = taskClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await createRecord(
+      { status: "idle", message: "" },
+      form({ kind: "project", locale: "pt-BR", name: "Acme" }),
+    );
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 
