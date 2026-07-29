@@ -35,8 +35,10 @@ type Writer = { file: string; table: GuardedTable; op: DmlMethod };
 const TASKS_ALLOWLIST: readonly Writer[] = [
   // `createRecord`'s task branch — consolidated onto the creation contract in 2F.3.
   { file: "src/features/operations/actions.ts", table: "tasks", op: "insert" },
-  // `persistTaskStatus` — consolidated onto `apply_task_command` in 2F.2.
-  { file: "src/features/operations/actions.ts", table: "tasks", op: "update" },
+  // `persistTaskStatus`'s UPDATE was here until Phase 2F Slice 2F.2 deleted it
+  // (2F-SURFACE-013). The list is compared by exact equality, so this entry
+  // could not simply be left behind: an allowlist naming a writer that no longer
+  // exists fails just as hard as an unlisted writer.
 ];
 
 const REMINDERS_ALLOWLIST: readonly Writer[] = [

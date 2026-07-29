@@ -23,7 +23,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { eligibleStatusesFor } from "./matching";
-import { TASK_COMMAND_ACTIONS, type TaskCommandAction } from "./taxonomy";
+import {
+  TASK_COMMAND_ACTIONS,
+  WORK_SURFACE_ACTIONS,
+  WORK_ACTION_MAPPING as SHIPPED_WORK_ACTION_MAPPING,
+  actionPolicy,
+  type TaskCommandAction,
+} from "./taxonomy";
 
 /**
  * The four Work-surface buttons, and the taxonomy action each must become.
@@ -193,16 +199,84 @@ describe("Gate 3 — Work action mapping", () => {
     }
   });
 
-  it("the Work surface's current status vocabulary is not a superset the taxonomy can absorb", () => {
-    // `updateTaskStatus` accepts eight statuses including `cancelled`
-    // (`operations/actions.ts:122`), but `cancel_task` is destructive and
-    // requires a server-issued confirmation. F13's disposition question stated
-    // as an executable fact rather than a paragraph.
+  it("the Work surface's status vocabulary is no longer a superset the taxonomy cannot absorb", () => {
+    // **This assertion was inverted by Slice 2F.2, and the inversion is the
+    // point.** Until 2F.2 it read the eight-status `statusSchema` out of
+    // `operations/actions.ts` — including `cancelled` — and asserted that
+    // `set_status` could not absorb it: F13's disposition question, stated as an
+    // executable fact. 2F.2 deleted that schema (2F-SURFACE-012), so the surface
+    // no longer names a status at all; the destination is decided by
+    // `WORK_ACTION_MAPPING` and bounded by `set_status`'s `allowedTargetValues`.
+    // The gate now proves the *absence* rather than the mismatch, and it still
+    // reads real source rather than a restated claim.
     const source = readFileSync("src/features/operations/actions.ts", "utf8");
-    const statusEnum = /status: z\.enum\(\[([^\]]+)\]\)/.exec(source);
-    expect(statusEnum, "could not read the surface status enum").not.toBeNull();
-    const surfaceStatuses = [...statusEnum![1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
-    expect(surfaceStatuses).toContain("cancelled");
+    expect(source).not.toMatch(/status: z\.enum\(/);
+    // A quoted literal, not the bare word: the module's own comments explain why
+    // the status vocabulary was removed, and a prose mention of `cancelled` is
+    // not a code path to it.
+    expect(source).not.toMatch(/["']cancelled["']/);
     expect(eligibleStatusesFor("set_status")).not.toContain("cancelled");
+  });
+});
+
+/**
+ * 2F-SURFACE-002 — the shipped mapping is the mapping this gate pinned.
+ *
+ * `WORK_ACTION_MAPPING` above is deliberately **not** replaced by an import: it
+ * is this gate's independent expectation, written before the implementation
+ * existed. Asserting equality against the shipped constant is what makes it a
+ * gate rather than a tautology — an implementation that quietly re-pointed
+ * `resume_task` at `reopen_task` would fail here, where a shared import would
+ * have agreed with itself.
+ */
+describe("2F-SURFACE-002 — the shipped Work action mapping", () => {
+  it("equals the mapping this gate pinned, exactly", () => {
+    // The gate's literal writes "this action contributes no patch" as `null` and
+    // the shipped constant writes it as `{}` — the shipped form is what
+    // `validateTaskCommand`'s `patchSchema` accepts, and `null` would not parse.
+    // Normalizing that one representational difference is what keeps this a
+    // comparison of *mappings* rather than of spellings; the taxonomy targets and
+    // the patch contents are compared untouched.
+    const normalized = Object.fromEntries(
+      Object.entries(WORK_ACTION_MAPPING).map(([work, mapping]) => [
+        work,
+        { taxonomy: mapping.taxonomy, patch: mapping.patch ?? {} },
+      ]),
+    );
+    expect(SHIPPED_WORK_ACTION_MAPPING).toEqual(normalized);
+  });
+
+  it("covers every Work-surface action and invents none", () => {
+    expect(Object.keys(SHIPPED_WORK_ACTION_MAPPING).sort()).toEqual(
+      Object.keys(WORK_ACTION_MAPPING).sort(),
+    );
+    expect([...WORK_SURFACE_ACTIONS].sort()).toEqual(Object.keys(WORK_ACTION_MAPPING).sort());
+  });
+
+  it("lives beside the taxonomy, never inline in a component or a Server Action", () => {
+    // 2F-SURFACE-002 is a placement requirement as much as a content one: a
+    // mapping declared next to the four buttons is a mapping that gets edited to
+    // fit a rendering problem.
+    for (const file of [
+      "src/features/operations/task-list.tsx",
+      "src/features/operations/actions.ts",
+      "src/features/task-commands/work-command.ts",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source, `${file} redeclares the mapping`).not.toMatch(/wait_task:\s*\{/);
+      expect(source, `${file} redeclares the mapping`).not.toMatch(/taxonomy:\s*"/);
+    }
+  });
+
+  it("no Work verb can reach a destructive transition", () => {
+    // 2F-SURFACE-012's second clause, asserted rather than reviewed. `cancelled`
+    // is reachable only through `cancel_task`, which is destructive and requires
+    // a server-issued confirmation — and no Work verb maps to it.
+    for (const mapping of Object.values(SHIPPED_WORK_ACTION_MAPPING)) {
+      expect(actionPolicy(mapping.taxonomy).destructive).toBe(false);
+      expect(actionPolicy(mapping.taxonomy).requiresConfirmation).toBe(false);
+      expect(actionPolicy(mapping.taxonomy).targetStatus).not.toBe("cancelled");
+      expect(Object.values(mapping.patch)).not.toContain("cancelled");
+    }
   });
 });
