@@ -1630,6 +1630,13 @@ select ok(
   ),
   'tasks_created_by_check bounds the origin domain, so a third value cannot be staged'
 );
+-- Read as the owning role, not as `authenticated`. `authenticated` holds no
+-- USAGE on schema `private` — that is the posture the whole undo-handler design
+-- depends on — so resolving a `private.*` regprocedure under it raises
+-- `permission denied for schema private` before `pg_get_functiondef` is ever
+-- called. The role is restored immediately after, because everything below this
+-- point is owner-scoped behaviour again.
+reset role;
 select ok(
   position('not in (''user'', ''agent'')' in pg_get_functiondef(
     'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0
@@ -1637,6 +1644,12 @@ select ok(
     'private.undo_create_task_command(uuid, uuid)'::regprocedure)) > 0,
   'the creation-undo guard carries both the domain bound and the recorded-origin equality'
 );
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"71111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
 
 -- Other owner and unauthenticated -------------------------------------------
 
@@ -1647,14 +1660,21 @@ reset role;
 -- a subquery evaluated as the second owner would pass a NULL and prove only that
 -- `undo_operation(null)` raises — a vacuous check of the kind PRD 2F-OWNERSHIP
 -- exists to forbid.
-create temp table pgtap_2f3_owner_one_undo as
-select id
-from public.undo_operations
-where operation_key = 'taskcmd-v1:pgtap-2f3-bare';
+--
+-- Carried in a transaction-local GUC rather than a temp table: a temp table
+-- created here is owned by this role, and table privileges do not default to
+-- PUBLIC, so reading it back after `set local role authenticated` would raise
+-- `permission denied` — the same class of mistake as the `private` schema read
+-- above. A GUC needs no grant and is readable by any role in the session.
+select set_config(
+  'pgtap.phase_2f3_owner_one_undo',
+  (select id::text from public.undo_operations
+   where operation_key = 'taskcmd-v1:pgtap-2f3-bare'),
+  true
+);
 
-select is(
-  (select count(*)::integer from pgtap_2f3_owner_one_undo),
-  1,
+select ok(
+  nullif(current_setting('pgtap.phase_2f3_owner_one_undo', true), '') is not null,
   'the first owner undo row was captured, so the cross-owner refusal below is not vacuous'
 );
 
@@ -1672,7 +1692,7 @@ select is(
   'RLS discloses no manually created first-owner task to the second owner'
 );
 select is(
-  pg_temp.creation_undo((select id from pgtap_2f3_owner_one_undo)),
+  pg_temp.creation_undo(current_setting('pgtap.phase_2f3_owner_one_undo')::uuid),
   'P0002:Undo operation not found',
   'a second owner cannot undo the first owner manual creation'
 );
