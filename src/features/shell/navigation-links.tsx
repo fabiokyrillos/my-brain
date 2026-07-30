@@ -29,6 +29,8 @@ import {
   getLocaleSwitchHref,
   getNavigationHref,
   isNavigationActive,
+  mobileBarSlots,
+  mobileDemotedKeys,
   moreNavigationGroups,
   type NavigationKey,
   primaryNavigationKeys,
@@ -154,9 +156,21 @@ export function NavigationLinks({
     );
   };
 
-  const overflowActive = moreNavigationGroups
-    .flatMap((group) => group.items)
-    .some((key) => isNavigationActive(pathname, key));
+  /*
+   * `Mais` is active whenever the current destination lives behind it.
+   *
+   * On mobile that set is wider than on desktop: `mobileDemotedKeys` — today just
+   * Registros — is on the rail but not on the bar, so a user reading Registros on
+   * a phone must still see the disclosure that contains it marked active.
+   * Computing this per surface rather than once is the whole of what keeps the
+   * demotion from making a destination look unreachable while you are standing in
+   * it.
+   */
+  const overflowKeys = [
+    ...(mobile ? mobileDemotedKeys : []),
+    ...moreNavigationGroups.flatMap((group) => group.items),
+  ];
+  const overflowActive = overflowKeys.some((key) => isNavigationActive(pathname, key));
 
   const overflowGroups = moreNavigationGroups.map((group) => (
     <div
@@ -190,22 +204,54 @@ export function NavigationLinks({
     );
   }
 
+  /*
+   * The bar is rendered straight from `mobileBarSlots`, in order.
+   *
+   * Mapping the declared order rather than slicing `primaryNavigationKeys` around
+   * a hardcoded midpoint is what keeps DOM order, visual order, keyboard order
+   * and screen-reader order identical: there is one sequence, and the grid gives
+   * each entry one column in that sequence. The previous `slice(0,2)` / `slice(2)`
+   * split produced six children with the capture control third — which cannot be
+   * centred in six columns, and is why exact centring was gated (UX-14).
+   */
   return (
     <>
-      {primaryNavigationKeys.slice(0, 2).map((key) => renderLink(key, { compact: true }))}
-      {renderLink("capture", { capture: true })}
-      {primaryNavigationKeys.slice(2).map((key) => renderLink(key, { compact: true }))}
-      <NavigationOverflow variant="mobile-more" active={overflowActive} label={t.nav.more}>
-        {/*
-          First in the panel, spanning both columns. The brief's rule — reachable
-          without scrolling through unrelated product destinations — is a
-          placement decision, and putting the account block after five groups of
-          secondary links would have buried the only way to leave the product
-          under the things you do while inside it.
-        */}
-        {account ? <div className="mobile-nav-account">{account}</div> : null}
-        {overflowGroups}
-      </NavigationOverflow>
+      {mobileBarSlots.map((slot) =>
+        slot === "more" ? (
+          <NavigationOverflow
+            active={overflowActive}
+            key="more"
+            label={t.nav.more}
+            variant="mobile-more"
+          >
+            {/*
+              The account block is first and spans both columns: the way out of
+              the product must not sit below the things you do inside it.
+            */}
+            {account ? <div className="mobile-nav-account">{account}</div> : null}
+            {/*
+              Then the destinations the bar demoted, before the secondary groups.
+              Registros is a primary destination everywhere else, so inside `Mais`
+              it is the first product destination rather than one more item in
+              `Contexto` — and it needs no scrolling to reach.
+            */}
+            {mobileDemotedKeys.length ? (
+              <div
+                aria-label={t.navGroups.primary}
+                className="mobile-nav-group mobile-nav-demoted"
+                role="group"
+              >
+                <div className="nav-group-items">
+                  {mobileDemotedKeys.map((key) => renderLink(key, { closeMore: true }))}
+                </div>
+              </div>
+            ) : null}
+            {overflowGroups}
+          </NavigationOverflow>
+        ) : (
+          renderLink(slot, { compact: slot !== "capture", capture: slot === "capture" })
+        ),
+      )}
     </>
   );
 }

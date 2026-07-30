@@ -33,7 +33,7 @@ function extractPayloadEntryId(payload: unknown): string | null {
 // combination returns null rather than guessing a product state. The loader
 // must still surface the entry — the original is always preserved — so an
 // unmapped entry becomes an explicit "review this" item instead of vanishing
-// from the Caixa.
+// from Registros.
 function toFailClosedInboxItemView(
   entryId: string,
   title: string,

@@ -63,12 +63,18 @@ test.describe("authenticated converged navigation", () => {
         ? {
             navigation: testInfo.project.name === "mobile" ? "Navegação móvel" : "Navegação principal",
             primaryGroup: "Principal",
-            primary: ["Início", "Caixa", "Trabalho", "Brain"],
+            primary: ["Início", "Registros", "Trabalho", "Brain"],
+            // The three destinations the five-slot mobile bar carries beside
+            // capture and Mais (UX-14, DEC-1).
+            mobileBar: ["Início", "Trabalho", "Brain"],
+            mobileDemoted: "Registros",
+            capture: "Captura rápida",
             more: "Mais",
             groups: ["Contexto", "Reflexão", "Organização", "Transparência", "Preferências"],
             notification: "Notificações",
             switchLanguage: "Mudar idioma para inglês",
-            allSaved: "Tudo salvo",
+            allSaved: "Nada pendente. Tudo salvo.",
+            attentionSection: "Precisa de você",
             advanced: "IA avançada",
             costsLink: "Ver custos de IA",
             hiddenSettings: ["Resumo diário", "Nível de autonomia", "Privacidade padrão"],
@@ -90,12 +96,16 @@ test.describe("authenticated converged navigation", () => {
         : {
             navigation: testInfo.project.name === "mobile" ? "Mobile navigation" : "Main navigation",
             primaryGroup: "Primary",
-            primary: ["Home", "Inbox", "Work", "Brain"],
+            primary: ["Home", "Records", "Work", "Brain"],
+            mobileBar: ["Home", "Work", "Brain"],
+            mobileDemoted: "Records",
+            capture: "Quick capture",
             more: "More",
             groups: ["Context", "Reflection", "Organization", "Transparency", "Preferences"],
             notification: "Notifications",
             switchLanguage: "Switch language to Portuguese",
-            allSaved: "All saved",
+            allSaved: "Nothing pending. Everything is saved.",
+            attentionSection: "Needs you",
             advanced: "Advanced AI",
             costsLink: "View AI costs",
             hiddenSettings: ["Daily review", "Autonomy level", "Default privacy"],
@@ -116,23 +126,55 @@ test.describe("authenticated converged navigation", () => {
           };
 
       await page.goto(`/${locale}/app`);
-      await expect(page.getByText(labels.allSaved, { exact: true })).toBeVisible();
-      const attentionPanel = page.locator(".attention-panel");
-      await attentionPanel.scrollIntoViewIfNeeded();
-      await expect(attentionPanel).toBeVisible();
+      /*
+       * Home's own markup, as Slice C rebuilt it.
+       *
+       * These two assertions addressed the pre-Slice-C panel grid — the exact
+       * string "Tudo salvo" and a `.attention-panel` article — neither of which
+       * exists since Home became an attention surface. The spec was left asserting
+       * a page that had been replaced, and failed identically on `main` before this
+       * slice touched it. Repaired here because B2's acceptance requires this
+       * journey green, not because B2 changed Home.
+       */
+      await expect(page.getByRole("status").filter({ hasText: labels.allSaved })).toBeVisible();
+      const attentionSection = page.getByRole("region", { name: labels.attentionSection });
+      await attentionSection.scrollIntoViewIfNeeded();
+      await expect(attentionSection).toBeVisible();
       const navigation = page.getByRole("navigation", { name: labels.navigation });
       await expect(navigation).toBeVisible();
 
       if (testInfo.project.name === "mobile") {
-        for (const destination of labels.primary) {
+        /*
+         * The bar carries three destinations plus capture and Mais (UX-14, DEC-1).
+         *
+         * Registros is deliberately *not* on it: five slots with capture in the
+         * middle is what makes the button exactly centred, and Registros is an
+         * archive rather than an operational queue. It must therefore be hidden
+         * before the disclosure opens and present the moment it does — asserted in
+         * both directions, because "reachable" is the whole claim.
+         */
+        for (const destination of labels.mobileBar) {
           await expect(navigation.getByRole("link", { name: destination, exact: true })).toBeVisible();
         }
+        await expect(navigation.getByRole("link", { name: labels.capture, exact: true })).toBeVisible();
+        await expect(
+          navigation.getByRole("link", { name: labels.mobileDemoted, exact: true }),
+        ).toBeHidden();
+
         await navigation.getByText(labels.more, { exact: true }).click();
+        await expect(
+          navigation.getByRole("link", { name: labels.mobileDemoted, exact: true }),
+        ).toBeVisible();
       } else {
         const primary = navigation.getByRole("group", { name: labels.primaryGroup });
         for (const destination of labels.primary) {
           await expect(primary.getByRole("link", { name: destination, exact: true })).toBeVisible();
         }
+        // Slice B moved the rail's five secondary groups behind their own
+        // disclosure, so on desktop they are hidden until it is opened — exactly as
+        // on mobile. This branch never opened it, and the assertion below was
+        // unreachable behind an earlier stale expectation rather than passing.
+        await navigation.getByLabel(labels.more, { exact: true }).click();
       }
 
       for (const group of labels.groups) {
@@ -151,10 +193,19 @@ test.describe("authenticated converged navigation", () => {
             .filter((box) => box.width > 0 && box.height > 0)
             .map((box) => ({ width: box.width, height: box.height }))
         ));
-        const moreTarget = await navigation.locator("summary").boundingBox();
+        // Scoped by label, not by tag: since Slice D3 the overflow panel contains a
+        // second disclosure — the account surface — so a bare `summary` locator is
+        // a strict-mode violation rather than "the More button".
+        const moreTarget = await navigation.getByLabel(labels.more, { exact: true }).boundingBox();
         expect(touchTargets.every((target) => target.width >= 44 && target.height >= 44)).toBe(true);
         expect(moreTarget?.width).toBeGreaterThanOrEqual(44);
         expect(moreTarget?.height).toBeGreaterThanOrEqual(44);
+
+        // The account disclosure lives in this panel too, and is a touch target
+        // like any other.
+        const accountTarget = await navigation.locator(".account-menu > summary").boundingBox();
+        expect(accountTarget?.width).toBeGreaterThanOrEqual(44);
+        expect(accountTarget?.height).toBeGreaterThanOrEqual(44);
         for (const globalControl of [
           page.getByRole("link", { name: labels.switchLanguage }),
           page.getByRole("link", { name: labels.notification }),
@@ -183,10 +234,21 @@ test.describe("authenticated converged navigation", () => {
       await expect(page.getByText(labels.onDemandReview, { exact: true })).toBeVisible();
 
       await page.goto(`/${locale}/app/inbox?view=needs-you`);
-      await expect(
-        page.getByRole("navigation", { name: labels.navigation })
-          .getByRole("link", { name: labels.primary[1], exact: true }),
-      ).toHaveAttribute("aria-current", "page");
+      {
+        /*
+         * Registros is a rail destination on desktop and a `Mais` destination on
+         * mobile (UX-14, DEC-1), so "is it marked current" is asked differently on
+         * each surface — and on mobile the link is not exposed at all until the
+         * disclosure opens, which is the behaviour rather than a defect.
+         */
+        const currentNav = page.getByRole("navigation", { name: labels.navigation });
+        if (testInfo.project.name === "mobile") {
+          await currentNav.getByLabel(labels.more, { exact: true }).click();
+        }
+        await expect(
+          currentNav.getByRole("link", { name: labels.primary[1], exact: true }),
+        ).toHaveAttribute("aria-current", "page");
+      }
 
       await page.goto(`/${locale}/app/work?view=waiting`);
       await expect(
@@ -201,6 +263,43 @@ test.describe("authenticated converged navigation", () => {
         await summary.press("Escape");
         await expect(summary).toBeFocused();
         await expect(summary.locator("xpath=ancestor::details")).not.toHaveAttribute("open", "");
+
+        /*
+         * Standing inside a demoted destination (UX-14, DEC-1).
+         *
+         * The failure this prevents: a phone user reading Registros sees no active
+         * state anywhere, because the destination they are in was moved off the bar.
+         * `Mais` must carry it instead.
+         */
+        await page.goto(`/${locale}/app/inbox`);
+        const insideRegistros = page.getByRole("navigation", { name: labels.navigation });
+        const registrosSummary = insideRegistros.locator("summary").filter({ hasText: labels.more });
+        await expect(registrosSummary.locator("xpath=ancestor::details")).toHaveClass(/active/);
+
+        // And opening it from `Mais` closes the disclosure rather than leaving the
+        // panel over the page the user just asked for.
+        await page.goto(`/${locale}/app`);
+        const fresh = page.getByRole("navigation", { name: labels.navigation });
+        const freshSummary = fresh.locator("summary").filter({ hasText: labels.more });
+        await freshSummary.click();
+        const demotedLink = fresh.getByRole("link", { name: labels.mobileDemoted, exact: true });
+        await expect(demotedLink).toBeVisible();
+        await demotedLink.click();
+        await expect(page).toHaveURL(new RegExp(`/${locale}/app/inbox$`));
+        await expect(freshSummary.locator("xpath=ancestor::details")).not.toHaveAttribute("open", "");
+
+        // Labels must not overflow their column at either supported width. The bar
+        // is five equal columns, so a label wider than its slot would clip.
+        const overflowing = await fresh.evaluate((nav) => {
+          const slots = [...nav.children].filter((child) => !child.classList.contains("capture-fab"));
+          return slots
+            .map((slot) => ({
+              text: (slot.querySelector("summary") ?? slot).textContent?.trim() ?? "",
+              overflows: slot.scrollWidth > slot.clientWidth + 1,
+            }))
+            .filter((slot) => slot.overflows);
+        });
+        expect(overflowing, "a mobile navigation label overflows its slot").toEqual([]);
       }
     }
 

@@ -95,9 +95,9 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 
 | ID | Title | Cat. | Pri. | Reproduces | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels → DEC-1) |
+| UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels closed in B2) |
 | UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | **RESOLVED** |
-| UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | OPEN → B2 (DEC-1 approved: **Registros**) |
+| UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | **RESOLVED** (B2 — Registros / Records) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
 | UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | OPEN → F (DEC-2 approved: **ship it**) |
@@ -108,7 +108,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | OPEN |
 | UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | OPEN |
 | UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | OPEN |
-| UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring → B) |
+| UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring closed in B2) |
 | UX-15 | Panel list rows collapse the title to ~6–16 lines (`auto` meta column) | visual | **P0** | yes | **RESOLVED** |
 | UX-16 | Content width *shrinks* as the viewport grows (`padding: 5vw`) | responsive | **P0** | yes | **RESOLVED** |
 | UX-17 | Side rail clips its last nav item at 1440×900 | visual | P1 | yes | **RESOLVED** |
@@ -414,7 +414,14 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Contracts affected** — `messages.ts`, page copy, `foundation.spec.ts` (asserts
   Portuguese headings), `capabilities.ts` route key stays `inbox` so no URL changes.
 - **Slice** — B.
-- **Disposition** — **BLOCKED on DEC-1** (permanent navigation taxonomy — explicitly an owner gate).
+- **Disposition** — **RESOLVED** in Slice B2. `Registros` / `Records` across the nav label,
+  both page headings, the filter tabs' accessible name and the entry-detail back link. The
+  route key stays `inbox`, so **no URL changed** and every existing link still works. The
+  condition this entry set — "I will not rename without making the page's function match the
+  name" — was met before the rename: Slice C promoted the needs-you queue onto Home as the
+  attention surface, so what is left under this name really is the complete archive. The
+  page's own eyebrow already read `REGISTROS`/`RECORDS` from Slice B; the rename makes the
+  heading agree with it.
 
 ## UX-04 — Entry detail hides "what was created" behind interpretation vocabulary
 
@@ -838,6 +845,12 @@ things leave, which means inventing an archive action and a zero state;
 confirmed and failed records.
 Impact: nav label, page copy, `foundation.spec.ts`; URL stays `/app/inbox`.
 Reversible: yes, copy-level. Blocks: UX-03, and the labelling half of UX-01.
+**DECIDED 2026-07-30 — (a) Registros / Records**, shipped in Slice B2. The owner also took
+the taxonomy half the option list did not cover: the mobile bar carries **four** non-capture
+slots — Início · Trabalho · [Capturar] · Brain · Mais — and Registros moves into `Mais`,
+because an archive and consultation surface is not an operational queue and a five-slot bar
+is what lets the capture control sit exactly on the centre line. Desktop is unchanged.
+**DEC-1 is closed.**
 
 **DEC-2 — the assistant name** (UX-06).
 Options: (a) **ship the field and thread the actor name through**, keeping the product
@@ -1552,3 +1565,89 @@ operative value for the redirect and for RSC payloads, and it fails safe.
 journeys × desktop + Pixel 7, run against the linked live database **on the production
 build**, both locales, with two disposable accounts carrying distinct display names and
 fail-closed deletion.
+
+---
+
+# Slice B2 — Registros, and the FAB centring DEC-1 unblocked
+
+**Branch** `codex/ux-slice-b2-registros`, stacked on `main` after D3 merged.
+**Covers** UX-03, the labelling half of UX-01, and the FAB-centring remainder of UX-14 that
+Slice A recorded as gated. **Non-goals** — no URL change, no page-content change, no new
+destination, no backend contract touched. **Rollback boundary** — the rename is copy-level;
+reverting `mobileBarSlots` to include `inbox` and restoring `justify-content: space-evenly`
+puts the old bar back.
+
+### The rename
+
+`Caixa` → **Registros**, `Inbox` → **Records**, across the nav label, both page headings,
+the filter tabs' accessible name, the entry-detail back link, and one stale code comment.
+**The route key stays `inbox`**, so no URL changed and every existing link and bookmark still
+works — including `?view=needs-you`, which Slice C's Home links to.
+
+The condition UX-03 set on itself was met *before* the rename rather than by it: "I will not
+rename without making the page's function match the name." Slice C promoted the needs-you
+queue onto Home as the attention surface, so what remains under this name really is the
+complete archive it always was. The page's eyebrow already read `REGISTROS`/`RECORDS` from
+Slice B — the rename makes the heading agree with its own kicker.
+
+### The FAB centring, and why it needed a decision rather than a stylesheet
+
+Slice A resolved UX-14's ordering and safe-area halves and recorded the centring as gated,
+correctly: the bar carried six children with capture third, and **no distribution can put
+slot 3 of 6 on the centre line.** `space-evenly` makes it worse, not better — its gaps mean
+no child index coincides with 50% at any count. The layout-contract test therefore asserted
+the middle *third* and said in a comment that making it exact "means changing how many
+primary destinations the bar carries, which is Slice B's decision, not a stylesheet's".
+
+The owner took that decision (2026-07-30, closing DEC-1). The mobile bar is now five slots:
+
+| pt-BR | Início | Trabalho | **[Capturar]** | Brain | Mais |
+| --- | --- | --- | --- | --- | --- |
+| en | Home | Work | **[Capture]** | Brain | More |
+
+Four destinations, two each side of capture. Five equal grid columns put the **third
+column's** centre exactly on the bar's centre, so the button is centred by the layout's
+arithmetic — no absolute positioning over another slot, no sixth destination added to balance
+geometry, and no nudge. The contract test now asserts **within 2 px** at both 375×667 and
+412×915 instead of a third of the screen.
+
+`Registros` moved into `Mais`, because an archive and consultation surface is not an
+operational queue. It is the **first product destination** in the panel — after the account
+block D3 put there, before the five secondary groups — so it needs no scrolling, and
+`mobileDemotedKeys` derives it from `mobileBarSlots` rather than listing it twice. Desktop is
+untouched: the rail still carries all four primary destinations.
+
+### What makes the geometry hard to break again
+
+`mobileBarSlots` is one ordered list whose **length is the column count** and whose **middle
+element is the capture control**. A component test asserts both — odd length, capture at the
+midpoint, equal counts each side — so an edit that adds a sixth destination fails in the unit
+suite rather than silently decentring the button. The bar renders straight from that list, so
+DOM order, visual order, keyboard order and screen-reader order are one sequence; nothing
+sets `order`. The duplicate `display:flex; justify-content:space-around` in `globals.css` was
+removed, so one stylesheet owns the bar's layout instead of two fighting over it.
+
+### The active-state trap the demotion creates, and its guard
+
+A phone user reading Registros would see no active state anywhere, because the destination
+they are standing in is no longer on the bar. `Mais` therefore carries it: the overflow-active
+set is computed **per surface**, adding `mobileDemotedKeys` on mobile only, so the rail's own
+disclosure does not claim active for a destination it still shows as primary. Asserted in the
+unit suite and in the authenticated journey, on both surfaces.
+
+### One pre-existing failure repaired to get the required evidence
+
+`e2e/online-mobile-navigation.spec.ts` asserted `"Tudo salvo"` and a `.attention-panel`
+article — the **pre-Slice-C** Home. Slice C replaced that panel grid with the attention
+sections and this deployment-session spec was never updated, so it failed on `main` at the
+same locator before B2 touched anything (verified by stashing this slice and re-running).
+B2's acceptance requires this journey green, so the two stale assertions were repaired
+against Home's actual markup. It is not a B2 regression and is recorded here so it is not
+read as one.
+
+### Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm test` **2739/2741** (the two are the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts`) · `e2e/layout-contracts.spec.ts`
+10/10 including exact centring at both mobile viewports · authenticated navigation journey on
+desktop and Pixel 7, both locales.

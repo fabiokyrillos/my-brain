@@ -5,7 +5,18 @@ const messages = {
     nav: {
       home: "Início",
       today: "Hoje",
-      inbox: "Caixa",
+      /*
+       * `Registros`, not `Caixa` (UX-03, DEC-1).
+       *
+       * The route key stays `inbox`, so no URL changes and every existing link
+       * keeps working — what changes is only what the destination is *called*.
+       * "Caixa" borrowed a mailbox's name for an append-only archive: nothing
+       * ever leaves this list, there is no archive, no "done" and no zero state
+       * to reach, and its own subtitle already said "everything you entrusted to
+       * Brain". The to-organize queue people expected a mailbox to be is the
+       * `?view=needs-you` tab inside it, which Slice C promoted onto Home.
+       */
+      inbox: "Registros",
       work: "Trabalho",
       tasks: "Tarefas",
       waiting: "Aguardando",
@@ -42,7 +53,7 @@ const messages = {
     nav: {
       home: "Home",
       today: "Today",
-      inbox: "Inbox",
+      inbox: "Records",
       work: "Work",
       tasks: "Tasks",
       waiting: "Waiting",
