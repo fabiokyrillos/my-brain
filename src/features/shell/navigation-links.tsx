@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -34,6 +34,7 @@ import {
   primaryNavigationKeys,
   type VisibleNavigationKey,
 } from "./capabilities";
+import { useDismissableDisclosure } from "./use-dismissable-disclosure";
 
 const icons = {
   home: Home,
@@ -59,13 +60,6 @@ function closeMoreOnFollow(event: MouseEvent<HTMLAnchorElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
 }
 
-function closeMoreWithEscape(event: KeyboardEvent<HTMLDetailsElement>) {
-  if (event.key !== "Escape" || !event.currentTarget.open) return;
-  event.preventDefault();
-  event.currentTarget.open = false;
-  event.currentTarget.querySelector("summary")?.focus();
-}
-
 /**
  * The secondary destinations, behind one disclosure.
  *
@@ -74,9 +68,9 @@ function closeMoreWithEscape(event: KeyboardEvent<HTMLDetailsElement>) {
  * field `capabilities.ts` already declares was honoured on one surface and
  * ignored on the other (UX-01).
  *
- * Escape closes it and returns focus to the summary — native `<details>` does
- * neither. A pointer press anywhere outside closes it too, which is the gesture a
- * phone user reaches for first and the one this had no answer to (UX-23).
+ * The Escape and outside-press behaviours come from
+ * `useDismissableDisclosure`, which the account disclosure uses too — see that
+ * module for why each exists.
  */
 function NavigationOverflow({
   variant,
@@ -89,28 +83,10 @@ function NavigationOverflow({
   label: string;
   children: ReactNode;
 }) {
-  const details = useRef<HTMLDetailsElement | null>(null);
-
-  useEffect(() => {
-    function dismiss(event: PointerEvent) {
-      const element = details.current;
-      if (!element?.open) return;
-      if (event.target instanceof Node && element.contains(event.target)) return;
-      element.open = false;
-    }
-
-    // `pointerdown` rather than `click`: the panel must be gone before the tap
-    // resolves, or the press lands on whatever the panel was covering.
-    document.addEventListener("pointerdown", dismiss);
-    return () => document.removeEventListener("pointerdown", dismiss);
-  }, []);
+  const { ref, onKeyDown } = useDismissableDisclosure();
 
   return (
-    <details
-      className={`${variant}${active ? " active" : ""}`}
-      onKeyDown={closeMoreWithEscape}
-      ref={details}
-    >
+    <details className={`${variant}${active ? " active" : ""}`} onKeyDown={onKeyDown} ref={ref}>
       <summary aria-label={label}>
         <Menu size={20} aria-hidden="true" />
         <span>{label}</span>
