@@ -100,7 +100,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | **RESOLVED** (B2 — Registros / Records) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
-| UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | OPEN → F (DEC-2 approved: **ship it**) |
+| UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | **RESOLVED** (Slice F1 — field, accessor, Conversar/Talk) |
 | UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **RESOLVED** (Slice E — one composer) |
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | OPEN |
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | OPEN |
@@ -480,7 +480,9 @@ that measured clean and is recorded so it is not "fixed" without cause.
   `settings-contracts.ts`, `settings-payload.ts`, `capabilities.ts` (`identity_names`
   moves `future → operational`, `visible: true`), plus every copy module.
 - **Slice** — B (nav label) + F (the field and the accessor).
-- **Disposition** — **BLOCKED on DEC-2** (surface the name vs remove the column — a core mental-model and feature-removal decision).
+- **Disposition** — **RESOLVED** in Slice F1 under DEC-2 (a). The field ships, the actor name
+  is threaded through one accessor, and the chat destination is now `Conversar`/`Talk` so the
+  three referents no longer share a string.
 
 ## UX-07 — The Brain page stacks three competing AI input surfaces
 
@@ -1844,3 +1846,113 @@ Slice D3 validated it. Not a Slice E regression and not a product defect; record
 next reader who runs that spec locally does not chase it.
 
 - **UX-07 — RESOLVED.** One composer, no mode to choose, every other contract untouched.
+
+---
+
+# Slice F1 — the assistant's name (UX-06)
+
+**Branch** `codex/ux-slice-f1-assistant-name`, cut from the green Slice E merge SHA `967e6cc`.
+**Covers** UX-06 under DEC-2 (a). **Non-goals** — no migration, no schema change, no touching
+Projects or People (that is F2), and **no renaming of the product**. **Rollback boundary** —
+reverting the three getters to single-argument and restoring `chat: "Brain"` puts the old
+copy back; nothing else in this slice is load-bearing.
+
+**Slice F is split.** F1 is the name; F2 is Projects and People (UX-08, UX-09) under DEC-4.
+They share a slice letter in the plan and nothing else: one is a copy-and-settings change
+across 40 surfaces, the other adds validated update paths to two tables. Splitting them keeps
+each diff reviewable, which is how B/B2 and D1/D2/D3 were handled.
+
+## What the finding actually was
+
+Not "a setting exists and is ignored". `agent_preferences.agent_name` has existed since
+`202607160001` with a `Brain` default and a 1–60 character check; `save_profile_settings` has
+always accepted it, reading `p_preferences ->> 'agentName'`. What it never had was **an input
+and a consumer** — and `capabilities.ts:21` recorded exactly that, honestly, as
+`state: "future", consumerEvidence: []`.
+
+The consequence was the interesting part: with nothing able to change it, "Brain" hardened
+into a literal across the product for **three different referents at once** — the product
+(`My Brain`), the chat destination, and the assistant as an actor. A name the owner can change
+cannot also be a fixed place in the navigation, so all three had to be separated before the
+field could ship.
+
+## The three referents, after F1
+
+| Referent | Before | After |
+| --- | --- | --- |
+| **Product** | `My Brain` | unchanged — manifest, document title, brand mark, login page |
+| **Destination** | `Brain` | **`Conversar` / `Talk`** — the route key and URL are unchanged |
+| **Actor** | `Brain`, hardcoded | the configured name, read through one accessor |
+
+The login page keeps the product name rather than the actor's: there is no signed-in user
+there to have a preference, so an actor name would be a guess.
+
+## Two mechanisms, chosen for what they make impossible
+
+**`getAgentName()`** is `cache()`d, so the dozen unrelated Server Components that need the name
+issue **one** query between them. A prop threaded from a layout would have put a
+presentational value into every intermediate signature for the same deduplication. It never
+throws — the name decorates copy, and a failed preferences read must degrade to the default
+rather than take down a page whose content is elsewhere. A signed-out caller gets the default
+too, which is what the pre-auth surfaces want anyway.
+
+**`withAgentName()`** substitutes an `{agent}` token, so copy records keep the shape they had.
+The name sits several levels down in some of them (`provenance.origins.brain`,
+`attention.review_interpretation.description`), and a function per string would push the
+parameter through every intermediate type for one word. `home-copy.ts` already used this idiom
+for `{count}`.
+
+The safety is not in the token — it is in the **getters taking the name as a required
+argument**. That turned every remaining hardcoded surface into a build error, which is how the
+threading was driven: the compiler enumerated the call sites rather than a grep. The one hole
+the token design leaves — a `{agent}` that never reaches a getter — is closed by asserting no
+token survives in any getter's *output*, in both locales, plus the mirror assertion that a
+name reached the copy at all.
+
+## Threading shapes, chosen per site
+
+- **Server Components already doing I/O** call the accessor themselves (`HomeDashboard`,
+  `attention-projection`, `review-projection`'s loader, `interpretations/actions`, and the
+  five pages).
+- **Pure projections and presentational components** take it as a required parameter. They are
+  pure, and they must stay testable without a Supabase mock.
+- **Copy records** carry the token and their getter substitutes.
+
+`chat/actions.ts`'s `answerUnavailable` became `(agent: string) => string` rather than a token,
+because it is a single string built at the moment of failure, not a record.
+
+## Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm test` **2803/2805** (the two are the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts`, unchanged since B2) ·
+`npm run build` exit 0 · **15 new tests** in `agent-name.test.ts`, plus updated assertions in
+twelve suites.
+
+Journeys, **on the production build against the linked live database**: **70/70** across
+`online-assistant-name`, `online-assistant-composer`, `online-mobile-navigation`,
+`account-session`, `layout-contracts`, `foundation` and `task-command`, on desktop **and**
+Pixel 7. The new identity journey proves the separation rather than just the field: the name
+is settable and persists across a reload, the actor is renamed on two different surfaces, the
+destination is **not** renamed, and the product name still appears — read from the document
+title, because the brand mark lives in the rail and is off-screen on a phone. Disposable
+account deleted fail-closed; post-run sweep found **zero** residue.
+
+Migration parity unchanged at `202607300063`. No deployment. Phase 2G remains unstarted.
+
+### Tests that changed because they had codified the finding
+
+Twelve suites asserted the *old* behaviour and had to move. The one worth naming is
+`schema.test.ts`, which listed `agentName` among the fields the schema must **reject** as a
+forged control — correctly, at the time, precisely because no control existed to produce one.
+It is now accepted and bounded to the column's own check.
+
+### A local-only typecheck artifact, not a defect
+
+Running `tsc --noEmit` *after* `npm run build` reports two errors in the generated
+`.next/types/validator.ts` about `[locale]/app/layout.tsx`'s `params` typing. CI never sees
+them because it typechecks **before** building (`ci.yml:30` then `:32`), and deleting
+`.next/types` makes them vanish. Unrelated to this slice — recorded because it looks alarming
+locally and is worth fixing on its own terms someday.
+
+- **UX-06 — RESOLVED.** The field ships, the actor name is threaded through one accessor, and
+  the three referents are separate.
