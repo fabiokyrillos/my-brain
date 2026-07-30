@@ -50,6 +50,13 @@
  * obligation intact while serving its actual purpose — that the preserved proofs
  * cannot silently rot.
  *
+ * One predicate widened, and it is recorded rather than folded into "identical":
+ * `bound()` tested `task_id !== null` and now also excludes `undefined`. Against
+ * the deployed project that is a no-op — PostgREST renders SQL NULL as `null` and
+ * never as `undefined` — so no bucket can move. It exists for the injected rows
+ * the CI cases feed the predicates, where a missing key is the natural way to
+ * express an absent column.
+ *
  * Usage: `npm run test:remote:2f:census` (or `node scripts/phase-2f-reminder-census.mjs`)
  */
 

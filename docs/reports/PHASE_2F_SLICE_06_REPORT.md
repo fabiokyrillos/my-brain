@@ -139,17 +139,49 @@ A1–A15 of the definitive PRD §14. Verified by execution, not by reading:
 
 Point-in-time records were **re-labelled, never deleted**. Accepted slice reports are untouched.
 
-## 7. Local gates
+## 7. Executed gates
 
-| Gate | Result |
-|---|---|
-| `npm run lint` | clean |
-| `npm run typecheck` | clean |
-| `npm test` | see §9 — the two pre-existing Windows CRLF failures are retained and named |
-| `npm run build` | see §9 |
-| `npm run docs:phase-2f:traceability` | see §9 |
-| `npm run test:remote:2f:census` | executed clear (§4) |
-| `npm run test:remote:2f:cleanup` | see §9 |
+Every row is a command run in this session, with its actual result.
+
+### Local
+
+| Gate | Command | Result |
+|---|---|---|
+| Lint | `npm run lint` | **clean** |
+| Types | `npm run typecheck` | **clean** |
+| Unit + component | `npm test` | **2511 / 2513** — 135 files, 134 passed. The two failures are the pre-existing Windows CRLF cases in `sql-reachability.test.ts`, retained and named (§8). Baseline before this slice was 2423 / 2425 over 131 files, so the slice added exactly the 88 closeout cases in 4 files and broke nothing |
+| Closeout suites alone | `npx vitest run src/lib/closeout/` | **88 / 88** |
+| Build | `npm run build` | **compiled successfully** |
+| Worker types | `deno check` on both deployed entrypoints | **clean** (deno 2.9.4) |
+| Worker tests | `deno test` over `supabase/functions/**` | **46 / 46**, no network permissions |
+| Traceability | `npm run docs:phase-2f:traceability` | **68 requirements, 12 families, 68 delivered, 0 not delivered, 10 with a recorded note, 7 cross-cutting-only, 2 migrations, 41 §10 gate cells** |
+
+### Remote, executed in the order §15 X5 prescribes so no fixture can contaminate the stop-gate
+
+| # | Gate | Result |
+|---|---|---|
+| 1 | `npm run test:remote:2f:census` (before any fixture-minting run) | **stop-gate clear** — buckets 1 and 2 zero; 2026-07-30T02:39:48Z / 03:32:19Z |
+| 2 | `npm run test:remote:2f:cleanup` | **CLEAN — zero residue**, exit 0 |
+| 3 | `npm run test:remote:2f:funnel` | **32 / 32**, exit 0, every fixture owner proven deleted |
+| 4 | `npm run test:remote:2f:baseline` | **9 / 9**, exit 0 |
+| 5 | `npm run test:remote` (full remote suite) | **exit 0** — auth, atomic settings, RLS, ownership, heartbeat, AI ledger, aggregation, deployed file worker |
+| 6 | Authenticated journeys, desktop + mobile × pt-BR + en | **36 / 36 passed** (2.2 min) — `e2e/work-actions.spec.ts` and `e2e/manual-task-creation.spec.ts` through `scripts/online-playwright.mjs` against a freshly-served production build |
+| 7 | `npm run test:remote:2f:census` (after 3–6 minted fixtures) | **still clear** — buckets 1 and 2 zero |
+| 8 | `npm run test:remote:2f:cleanup` (after every run above) | **still CLEAN — zero residue**, 0 fixture-prefix survivors, 0 fixture storage objects |
+| 9 | Parity | `npx supabase migration list --linked` → **`202607300063`** before and after, no drift |
+
+**On the journeys (§10's 2F.6 cell).** Port 3000 was held by a Next.js server this session did not start, so reusing it — the local default — would have reported a Slice 2F.6 result while exercising unknown code. Slice 2F.2's acceptance hit the same hazard; the same resolution was used: a temporary Playwright config on port 3140 with `reuseExistingServer: false`, serving `npm run start`. The config was **deleted** afterwards and the working tree verified clean; the stale process was left untouched. These 36 also serve as the executed end-state regression proof that ADR-063's §10 correction leaves owing.
+
+### Self-verification performed after the review agents were interrupted
+
+Both independent implementation reviewers terminated mid-run on a platform session limit — an outage, not a repository blocker (§19 of the closeout charter names this case explicitly). The highest-risk checks they had queued were performed directly, and two produced real corrections:
+
+1. **The new pgTAP section 8 would have red CI if any of the nineteen tables lacked the exact foreign-key shape.** All nineteen were verified against the migration chain to carry `user_id uuid not null references auth.users(id) on delete cascade`; two initially appeared to differ and did not — `task_dependencies` declares it on a shared line (`202607160009:42`) and `task_command_confirmations` uses `create table if not exists` (`202607260059:213`). The assertion count was verified at 28 against `plan(28)`. The assertion was additionally reformulated to report **which** table failed rather than only that one did, because a count tells a CI reader nothing actionable.
+2. **Four drift tests used regex alternations a collateral failure could satisfy.** The generator accumulates every finding into one thrown message, so `toThrow(/A|B/)` can pass on B while A — the check under test — never fired. All four now assert the specific message of the check under test, and all 88 cases still pass, which is what proves each check actually fires.
+3. The verifier's write-freedom was confirmed by reading every route, not only by the source-grep case: the sole `auth.admin` call is `listUsers`, and there is no `deleteUser`, `createUser`, storage `upload`/`remove`, or POST anywhere in the file.
+4. The census refactor's "byte-identical selects" claim was checked by diffing string literals against `918ab23`'s version: the only added literal is `"id"`, from the new `.order("id", …)`. One predicate widening (`bound()` also excluding `undefined`) is recorded in the census docstring rather than folded into the identity claim — against PostgREST it is a no-op, and it exists for the injected rows the CI cases feed.
+
+The reviewers are re-run once execution is available; their findings and adjudication are recorded in the acceptance report.
 
 ## 8. Deliberately not done
 

@@ -186,7 +186,11 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
     patch(root, "docs/PHASE_2F_PRD.md", "- **2F-GUARD-003:**", "- (removed) 2F-GUARD-003:");
-    expect(() => buildPhase2fTraceability({ root })).toThrow(/declares 67 Phase 2F requirements|family 2F-GUARD declares 2/);
+    // Asserted on the inventory message specifically. The generator accumulates
+    // every finding into one thrown message, so an alternation could be satisfied
+    // by a collateral failure and prove nothing about the check under test.
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/declares 67 Phase 2F requirements; expected 68/);
   });
 
   it("fails when an ID is declared twice", async () => {
@@ -284,7 +288,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     rmSync(join(root, "docs/reports/PHASE_2F_SLICE_01_REPORT.md"));
     expect(() => buildPhase2fTraceability({ root }))
-      .toThrow(/slice 2F\.1 has no acceptance-bearing artifact|PHASE_2F_SLICE_01_REPORT\.md as evidence/);
+      .toThrow(/slice 2F\.1 has no acceptance-bearing artifact in docs\/reports\//);
   });
 
   it("accepts a slice whose only acceptance-bearing artifact is a REPORT, and one whose only one is an ACCEPTANCE", async () => {
@@ -365,7 +369,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     // Give slice 2F.6 a gate cell but strip the artifact that would name the session.
     rmSync(join(root, "docs/reports/PHASE_2F_SLICE_06_REPORT.md"));
     expect(() => buildPhase2fTraceability({ root }))
-      .toThrow(/slice 2F\.6 has no acceptance-bearing artifact|PHASE_2F_SLICE_06_REPORT\.md as evidence/);
+      .toThrow(/§10 marks gate [\s\S]*? executed \([^)]*\) for 2F\.6, which has no/);
   });
 
   it("fails when vitest.config.ts stops declaring literal include/exclude arrays", async () => {
@@ -381,7 +385,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(root, "docs/PHASE_2F_PRD.md", "- **2F-MEASURE-005:**", "- **2F-MEASURE-105:**");
     expect(() => buildPhase2fTraceability({ root }))
-      .toThrow(/STATUS_OVERRIDES names 2F-MEASURE-005|family 2F-MEASURE declares/);
+      .toThrow(/STATUS_OVERRIDES names 2F-MEASURE-005, which the PRD does not declare/);
   });
 });
 

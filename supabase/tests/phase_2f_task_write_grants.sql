@@ -444,10 +444,10 @@ with scanned(table_name) as (
     ('ai_usage_events'), ('task_command_confirmations'), ('product_events')
 ),
 cascading as (
-  select scanned.table_name
+  select distinct scanned.table_name
   from scanned
   join pg_catalog.pg_class relation
-    on relation.relname = scanned.table_name
+    on relation.relname::text = scanned.table_name
    and relation.relnamespace = 'public'::regnamespace
   join pg_catalog.pg_constraint constraint_row
     on constraint_row.conrelid = relation.oid
@@ -462,9 +462,15 @@ cascading as (
              and attribute.attname = 'user_id')
        ]::smallint[]
 )
+-- Reported as the list of offenders rather than as a count, so a CI failure names
+-- the table whose key moved instead of only saying that one did.
 select is(
-  (select count(distinct table_name)::integer from cascading),
-  (select count(*)::integer from scanned),
+  (select coalesce(
+            string_agg(scanned.table_name, ', ' order by scanned.table_name),
+            '')
+     from scanned
+    where scanned.table_name not in (select cascading.table_name from cascading)),
+  '',
   'every table the Phase 2F cleanup verifier scans still carries a validated user_id -> auth.users ON DELETE CASCADE, which is what makes its orphan count a foreign-key regression check rather than a residue measurement'
 );
 
