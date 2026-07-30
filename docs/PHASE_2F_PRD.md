@@ -1,6 +1,6 @@
 # Phase 2F PRD — One Write Path: Task-Domain Write Convergence and Measured Matching
 
-**Revision 4.2 (2026-07-29). Status: approved and in implementation.** Revision 4 is the governing document. **4.1** is a single narrowly-scoped correction to 2F-CREATE-002 (§6.5a). **4.2 corrects three factual errors** found by Slice 2F.4's mandatory pre-code inventory and authorized by the owner (decisions A1–A3): §12's privilege-provenance paragraph was wrong, §9's normative table was two rows short, and five `creation.sql` line anchors had drifted. Neither revision adds an epic, a slice, a requirement ID, a feature surface or any architecture. See §6.5a, §9, §12 and §14.
+**Revision 4.3 (2026-07-30). Status: approved; the phase is in closeout — Slices 2F.1–2F.5 merged, Slice 2F.6 on branch with its PR open.** Revision 4 is the governing document. **4.1** is a single narrowly-scoped correction to 2F-CREATE-002 (§6.5a). **4.2 corrects three factual errors** found by Slice 2F.4's mandatory pre-code inventory and authorized by the owner (decisions A1–A3): §12's privilege-provenance paragraph was wrong, §9's normative table was two rows short, and five `creation.sql` line anchors had drifted. **4.3 corrects three §10 gate-ledger cells** found by Slice 2F.6's whole-phase convergence sweep — including one that claimed an executed gate that never ran (§10, §14). **None of the three revisions** adds an epic, a slice, a requirement ID, a feature surface or any architecture. See §6.5a, §9, §10, §12 and §14.
 
 Normative evidence base: `docs/reports/PHASE_2F_PRE_CODE_GATE_REPORT.md` (executed gate package, verdict `PROVENANCE_DROPPED_BUT_CORE_READY`), `docs/reports/PHASE_2F_PRD_REV3_FINAL_REVIEW.md` (all findings resolved in this revision — see §14), `docs/PHASE_2F_PROPOSAL.md` Revision 2, and the five final owner decisions: (1) provenance out of the phase, (2) reminder reconciliation out of the phase, (3) reminder authoring is the Option C scoped exception, (4) title drift is permissive, (5) **manual task creation persists `created_by = 'user'`, audit actor `'user'`, and fully functional undo — the creation-contract and undo-handler change this requires belongs to Phase 2F** (resolves review blocker B1). Where this document and any earlier Phase 2F document disagree, this document governs; where this document and executed evidence disagree, the evidence governs and the document is defective.
 
@@ -261,10 +261,10 @@ No statement is mechanically re-roled to `service_role`; classifications 4, 5, 7
 | Gate | Executes in | 2F.1 | 2F.2 | 2F.3 | 2F.4 | 2F.5 | 2F.6 |
 |---|---|---|---|---|---|---|---|
 | lint / typecheck / Vitest / build · `deno check`+`test` | CI, exact merge SHA | ● | ● | ● | ● | ● | ● |
-| Empty-DB chain + full pgTAP + db lint | CI `database` | ● | ● | ● | ● | — | ● |
+| Empty-DB chain + full pgTAP + db lint | CI `database` | ● | ● | ● | ● | ● | ● |
 | Grammar-trap guard + architecture gate (allowlists per §2) | CI, from 2F.1 | ● proven | ● shrunk | ● shrunk | ● tasks-empty | ● | ● |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | CI, continuous | ● | ● | ● | ● | ● | ● |
-| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | ● regression | — | ● |
+| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | — (see 4.3-c) | — | ● |
 | Two-owner disposable probe (mutation / creation incl. user-origin undo) | Deployment session | — | ● | ● | — | — | — |
 | CI re-grant proof (revoke → re-grant → writes restored; **SQL-level only, not a live-ops rehearsal**) | CI, before 2F.4 deploy | — | — | — | ● cited | — | — |
 | Pre-revocation privilege assertion (denial non-vacuous) | CI `database`, 2F.4 | — | — | — | ● | — | — |
@@ -273,9 +273,19 @@ No statement is mechanically re-roled to `service_role`; classifications 4, 5, 7
 | End-to-end baseline + reader exclusion-mechanism proof | Deployed project / CI | — | — | — | — | ● | — |
 | **Census stop-gate** (buckets 1/2 blocking; bucket 7 informational) | 2F.6 closeout session | — | — | — | — | — | ● |
 | Traceability tamper runs + cleanup verifier | 2F.6, deployed project | — | — | — | — | — | ● |
-| Parity re-check before/after | Every **deploying** slice | — | ● | ● | ● | — | ● |
+| Parity re-check before/after | Every slice with a **deployed-project session** | — | ● | ● | ● | ● | ● |
 
-A cell counts only when executed; the slice report names the session (2F-PRECOND-003). 2F.1 deploys nothing, so it carries no parity cell.
+A cell counts only when executed; the slice report names the session (2F-PRECOND-003). 2F.1 deploys nothing and has no deployed-project session, so it carries no parity cell.
+
+**Revision 4.3 corrections to this matrix (Slice 2F.6's A14 sweep), recorded rather than silently applied.** The sweep exists because §10 is the phase's gate ledger and nothing before Slice 2F.6 cross-checked it against what the slice reports actually record.
+
+- **4.3-a — the `database` cell for 2F.5 was `—` and is now `●`.** Slice 2F.5 added three read-only pgTAP catalog assertions to `supabase/tests/product_events.sql` (`plan(23)` → `plan(26)`), which run in that job; its acceptance report §4 records the job reporting `product_events.sql … ok`. The cell understated the slice.
+- **4.3-b — the parity row's rule is restated, and 2F.5's cell corrected.** The row was labelled "every *deploying* slice" while already marking **2F.2**, which carried no migration. The operative rule is evidently "every slice with a session against the deployed project", under which 2F.5 — which verified parity `202607300063` before and after with `npx supabase migration list --linked` — earns the cell it was denied. No requirement changes: `2F-OPERATIONS-001` still binds deploying slices, and Slice 2F.6 reads its own cell as a closeout verification that parity is *unmoved*.
+- **4.3-c — the 2F.4 authenticated-journeys cell claimed an execution that never happened**, and is now `—`. `PHASE_2F_SLICE_04_ACCEPTANCE.md` §11 enumerates all sixteen acceptance gates and not one is a Playwright journey; the file's only browser mention is the CI job name. §10's own rule is that a cell counts only when executed, and `2F-PRECOND-003` forbids citing an unexecuted gate as evidence anywhere in the phase — so the cell is corrected rather than back-filled. What the slice *did* execute in place of a browser regression is stronger for its subject: 14/14 production-flow checks through PostgREST with a real end-user token, plus the full remote suite at exit 0 (`…_04_ACCEPTANCE.md` §5, §7). Slice 2F.6 executes its own journeys cell against merged `main`, which gives the phase an executed end-state journey proof that this correction leaves owing.
+
+**Slice 2F.6's own cells, stated with the same discipline.** Four of 2F.6's `●` cells sit on rows whose *Executes in* is a CI gate ("CI, exact merge SHA", "CI `database`", "CI, from 2F.1", "CI, continuous"). At the time this revision was written those gates had run **locally and on the branch-head CI run for PR #33**, not on a merge SHA that does not exist yet — so under §10's own footnote and ADR-063 they are **pending the merge-SHA run and confirmed in `PHASE_2F_SLICE_06_ACCEPTANCE.md`**, not back-filled here. The cells 2F.6 has already discharged by execution are the census stop-gate, the traceability and cleanup verifiers, the parity re-check, and the authenticated journeys (36/36 across the two Playwright projects). The reviewers raised this against an earlier draft that had left the distinction unstated, which is the same omission Revision 4.3-c corrects one row above.
+
+No requirement was added, removed, renumbered or rescoped by Revision 4.3; no epic, slice, feature surface or architecture changed. All three corrections were found by the closeout sweep the phase reserved for exactly this (`2F-OPERATIONS-006` + the whole-phase convergence audit), which is what that gate exists for.
 
 ## 11. Rollback evidence model
 
@@ -326,6 +336,7 @@ Three consequences, each affecting a gate's stated rationale rather than its req
 
 ## 14. Revision history
 
+- **Revision 4.3 (2026-07-30).** Three corrections to §10's gate ledger, found by Slice 2F.6's mandatory whole-phase convergence sweep (A14) and recorded in §10 rather than applied silently: the `database` cell for 2F.5 understated the slice (`—` → `●`); the parity row's stated rule contradicted its own 2F.2 cell and is restated, which earns 2F.5 the cell it was denied; and **2F.4's authenticated-journeys cell claimed an executed gate that appears in none of its sixteen acceptance gates** (`—`). The third is the one that mattered: §10's own rule and `2F-PRECOND-003` both forbid citing an unexecuted gate, and a closeout that had not swept the ledger cell by cell would have carried it into the final report. **No requirement was added, removed, renumbered or rescoped; no epic, slice, feature surface or architecture changed.** Slice 2F.6's definitive PRD (`docs/reports/PHASE_2F_SLICE_06_PRD.md` §26 M1, M2) carries the adjudication.
 - **Revision 1 (2026-07-28).** Initial draft (83 requirements, 13 families); included provenance, an Option B reminder contract, a reconciliation migration, and a render-witness surface design. Superseded before commit.
 - **Revision 2 (2026-07-28/29).** Interim alignment with proposal Revision 2 (F1–F5); never committed — the adversarial review and gate package ran against the proposal lineage instead.
 - **Revision 3 (2026-07-29).** First committed revision, written against the executed gate package and four owner decisions; absorbed F6–F13 and dispositioned the eleven pgTAP writes. Reviewed by `PHASE_2F_PRD_REV3_FINAL_REVIEW.md`: verdict `BLOCKED` on B1–B3, with M1–M5 and Mo1–Mo6.

@@ -46,7 +46,7 @@
 -- `phase_2e_task_command_matching.sql`.
 
 begin;
-select plan(27);
+select plan(28);
 
 set local timezone to 'UTC';
 
@@ -408,6 +408,70 @@ select is(
    where namespace.nspname = 'public' and procedure.proname = 'create_due_task_reminder'),
   false,
   'create_due_task_reminder is still SECURITY INVOKER, so section 6 proves the definer caller and not the trigger'
+);
+
+-- ---------------------------------------------------------------------------
+-- Section 8 — the cascades the Phase 2F cleanup verifier reasons from (1)
+-- ---------------------------------------------------------------------------
+--
+-- Added by Slice 2F.6 (2F-OPERATIONS-004), read-only, and here rather than in a
+-- new file because the closeout slice ships no new SQL artifact.
+--
+-- WHY IT EXISTS. `scripts/verify-phase-2f-cleanup.mjs` reports that an orphan row
+-- is *structurally impossible* in every table it scans, and therefore that its
+-- zero orphan count detects only a dropped or NOT VALID foreign key rather than
+-- measuring residue. It also proves `product_events` row absence after an
+-- owner's deletion as a composition — an asserted service_role refusal, plus
+-- zero surviving fixture owners, plus this cascade — because no credential this
+-- repository holds can read that table.
+--
+-- Both claims rest on `user_id references auth.users(id) on delete cascade`. Read
+-- from the catalog, that is a fact; written in a comment, it is prose. This
+-- assertion is what keeps the verifier's own account of itself true: dropping or
+-- weakening one of these keys reds CI instead of silently turning a closeout
+-- report into a claim.
+--
+-- `confdeltype = 'c'` is CASCADE; `convalidated` excludes a key added NOT VALID,
+-- which would enforce nothing for rows that already exist.
+
+reset role;
+with scanned(table_name) as (
+  values
+    ('entries'), ('entry_interpretations'), ('jobs'), ('attachments'),
+    ('pending_questions'), ('tasks'), ('projects'), ('contexts'), ('people'),
+    ('task_projects'), ('task_contexts'), ('task_people'), ('task_dependencies'),
+    ('entry_task_candidate_resolutions'), ('reminders'), ('undo_operations'),
+    ('ai_usage_events'), ('task_command_confirmations'), ('product_events')
+),
+cascading as (
+  select distinct scanned.table_name
+  from scanned
+  join pg_catalog.pg_class relation
+    on relation.relname::text = scanned.table_name
+   and relation.relnamespace = 'public'::regnamespace
+  join pg_catalog.pg_constraint constraint_row
+    on constraint_row.conrelid = relation.oid
+   and constraint_row.contype = 'f'
+   and constraint_row.confrelid = 'auth.users'::regclass
+   and constraint_row.confdeltype = 'c'
+   and constraint_row.convalidated
+   and constraint_row.conkey = array[
+         (select attribute.attnum
+            from pg_catalog.pg_attribute attribute
+           where attribute.attrelid = relation.oid
+             and attribute.attname = 'user_id')
+       ]::smallint[]
+)
+-- Reported as the list of offenders rather than as a count, so a CI failure names
+-- the table whose key moved instead of only saying that one did.
+select is(
+  (select coalesce(
+            string_agg(scanned.table_name, ', ' order by scanned.table_name),
+            '')
+     from scanned
+    where scanned.table_name not in (select cascading.table_name from cascading)),
+  '',
+  'every table the Phase 2F cleanup verifier scans still carries a validated user_id -> auth.users ON DELETE CASCADE, which is what makes its orphan count a foreign-key regression check rather than a residue measurement'
 );
 
 select * from finish();
