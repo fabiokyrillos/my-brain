@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { productEventNames } from "./contracts";
@@ -19,14 +21,12 @@ import { TASK_COMMAND_OUTCOMES } from "@/features/task-commands/outcomes";
  * arithmetic in two places, and ADR-055's own words are that "a threshold
  * computable two ways is decided twice".
  *
- * These cases are what make the `.mjs` a *mirror* of the TypeScript vocabularies
- * rather than a fourth copy of them (PRD §9). The four event **names** are read
- * out of `contracts.ts`; the category vocabularies cannot be — the shared parser
- * in `product-event-vocabulary.mjs` accepts only flat `export const X = [ … ] as
- * const` arrays and throws on a spread, and all four category lists are
- * non-exported `readonly T[]` with one spread among them. So they are restated
- * and held here by exact equality. That is a weaker guarantee than a read, and
- * it is labelled as one wherever it is relied on.
+ * Two vocabularies the reader *reads* (the four event names and the twelve
+ * outcome members) are checked here against the TypeScript originals to prove the
+ * read is complete. Three the reader *mirrors* — origins, apply routes, undo
+ * results, all declared on a single line, which the shared parser cannot take —
+ * are checked by exact equality, which is what makes them a mirror with a CI gate
+ * rather than a fourth copy.
  */
 
 type FunnelModule = typeof import("../../../scripts/phase-2f-command-funnel.mjs");
@@ -83,7 +83,9 @@ function applied(overrides: Partial<Row> & { properties?: Record<string, unknown
   };
 }
 
-function disambiguated(overrides: Partial<Row> & { properties?: Record<string, unknown> } = {}): Row {
+function disambiguated(
+  overrides: Partial<Row> & { properties?: Record<string, unknown> } = {},
+): Row {
   return {
     eventName: "task_command_disambiguated",
     createdAt: "2026-07-29T10:02:00.000Z",
@@ -127,7 +129,7 @@ async function aggregate(rows: readonly Row[], options: Record<string, unknown> 
 
 describe("the command-funnel reader's vocabularies", () => {
   it("reads the four event names out of the contracts module rather than restating them", async () => {
-    const { readCommandFunnelEventNames } = await load();
+    const { readCommandFunnelEventNames, COMMAND_FUNNEL_EVENT_NAMES } = await load();
     const read = readCommandFunnelEventNames(process.cwd());
 
     // Derived from the single source, in its declared order — so a fifth
@@ -140,23 +142,55 @@ describe("the command-funnel reader's vocabularies", () => {
       "task_command_applied",
       "task_command_undone",
     ]);
+    // The module-level constant resolves the repository root itself, which is how
+    // the runner reaches it with no argument.
+    expect(COMMAND_FUNNEL_EVENT_NAMES).toEqual(read);
   });
 
-  it("mirrors every category vocabulary by exact equality", async () => {
-    const funnel = await load();
+  it("reads the twelve outcome members out of outcomes.ts", async () => {
+    const { readCommandFunnelOutcomes, COMMAND_FUNNEL_OUTCOMES } = await load();
+    // The list with twelve chances to drift is read, not restated. A thirteenth
+    // member changes every distribution key, the refusal subset and the
+    // unreachable set together.
+    expect(readCommandFunnelOutcomes(process.cwd())).toEqual([...TASK_COMMAND_OUTCOMES]);
+    expect(COMMAND_FUNNEL_OUTCOMES).toEqual([...TASK_COMMAND_OUTCOMES]);
+  });
 
+  it("derives the previewed vocabulary from the read one by the same spread", async () => {
+    const { COMMAND_FUNNEL_PREVIEWED_OUTCOMES } = await load();
+    expect(COMMAND_FUNNEL_PREVIEWED_OUTCOMES).toEqual([...TASK_COMMAND_PREVIEWED_OUTCOMES]);
+  });
+
+  it("mirrors the three single-line vocabularies by exact equality", async () => {
+    const funnel = await load();
+    // `toEqual` on arrays is order-sensitive, so a reordering fails here too —
+    // not only an addition.
     expect(funnel.COMMAND_FUNNEL_ORIGINS).toEqual([...TASK_COMMAND_ORIGINS]);
-    expect(funnel.COMMAND_FUNNEL_PREVIEWED_OUTCOMES).toEqual([...TASK_COMMAND_PREVIEWED_OUTCOMES]);
-    expect(funnel.COMMAND_FUNNEL_OUTCOMES).toEqual([...TASK_COMMAND_OUTCOMES]);
     expect(funnel.COMMAND_FUNNEL_APPLY_ROUTES).toEqual([...TASK_COMMAND_APPLY_ROUTES]);
     expect(funnel.COMMAND_FUNNEL_UNDO_RESULTS).toEqual([...TASK_COMMAND_UNDO_RESULTS]);
   });
 
-  it("derives the refusal subset from the mirrored vocabulary and pins its membership", async () => {
+  it("cannot read the three mirrored lists, which is why they are mirrored", async () => {
+    const { parseProductEventVocabulary } = await import(
+      "../../../scripts/product-event-vocabulary.mjs"
+    );
+    const source = readFileSync("src/features/task-commands/analytics.ts", "utf8");
+    // The justification, held to the facts: the shared parser splits an array
+    // body by line and wants one quoted entry per line, and these three are
+    // declared on a single line. If a future edit made them multi-line this case
+    // fails, and the reader should switch to reading them.
+    for (const name of [
+      "TASK_COMMAND_ORIGINS",
+      "TASK_COMMAND_APPLY_ROUTES",
+      "TASK_COMMAND_UNDO_RESULTS",
+    ]) {
+      expect(() => parseProductEventVocabulary(source, name)).toThrow();
+    }
+  });
+
+  it("derives the refusal subset from the read vocabulary and pins its membership", async () => {
     const { COMMAND_FUNNEL_REFUSAL_OUTCOMES, COMMAND_FUNNEL_PREVIEWED_OUTCOMES } = await load();
 
-    // A subset, not a parallel list: adding a thirteenth outcome cannot make
-    // this pass while the refusal classification goes unconsidered.
     for (const outcome of COMMAND_FUNNEL_REFUSAL_OUTCOMES) {
       expect(COMMAND_FUNNEL_PREVIEWED_OUTCOMES).toContain(outcome);
     }
@@ -251,6 +285,7 @@ describe("aggregating the funnel", () => {
       .toEqual([...TASK_COMMAND_PREVIEWED_OUTCOMES].sort());
     expect(Object.values(report.outcomeDistribution).every((count) => count === 0)).toBe(true);
     expect(report.originSplit).toEqual({ chat: 0, work: 0 });
+    expect(report.policyVersions).toEqual({});
   });
 
   it("counts a qualifying preview round per origin and keeps the distribution summing to it", async () => {
@@ -286,15 +321,39 @@ describe("aggregating the funnel", () => {
     expect(report.rates.oneStep).toBe(1);
   });
 
-  it("excludes synthetic rows and reports how many it dropped", async () => {
+  it("reports unsupported refusals in the refusal classes rather than a contradictory zero", async () => {
+    const report = await aggregate([
+      previewed(),
+      previewed({ properties: { outcomeCategory: "unsupported", oneStep: false } }),
+      previewed({ properties: { outcomeCategory: "refused", oneStep: false } }),
+      previewed({ properties: { outcomeCategory: "rejected_stale", oneStep: false } }),
+    ]);
+
+    // The refusal breakdown is projected from `unsupportedRefusals` for that one
+    // member, so the report never says "one unsupported refusal" and "zero
+    // unsupported refusals" on two adjacent lines.
+    expect(report.unsupportedRefusals).toBe(1);
+    expect(report.refusalOutcomeClasses).toEqual({
+      unsupported: 1,
+      rejected_stale: 1,
+      rejected_conflict: 0,
+      refused: 1,
+    });
+  });
+
+  it("excludes synthetic rows inside the window and reports how many it dropped", async () => {
     const report = await aggregate([
       previewed(),
       previewed({ isSynthetic: true }),
       applied({ isSynthetic: true, properties: { applyRoute: "created" } }),
+      // Out of window *and* synthetic: counted once, in the window bucket, so the
+      // two exclusion counters partition the fetched rows instead of overlapping.
+      previewed({ isSynthetic: true, createdAt: "2020-01-01T00:00:00.000Z" }),
     ]);
 
     expect(report.qualifyingCommands).toBe(1);
     expect(report.excludedSynthetic).toBe(2);
+    expect(report.excludedOutOfWindow).toBe(1);
     expect(report.rates.noMatchToCreation).toBe(0);
   });
 
@@ -330,11 +389,13 @@ describe("aggregating the funnel", () => {
     expect(report.disambiguationsByOrigin).toEqual({ chat: 1, work: 0 });
   });
 
-  it("reconciles applies that had no preview round, per origin", async () => {
-    // The Work surface's direct-action buttons emit `task_command_applied`
-    // with no preceding `task_command_previewed` (`operations/actions.ts:386`),
-    // so the applied population is a superset of the previewed one and the
-    // difference has to be visible rather than silently inflating a rate.
+  it("reports the previewed and applied populations raw rather than their difference", async () => {
+    // The Work surface's direct-action buttons emit `task_command_applied` with
+    // no preceding `task_command_previewed` (`operations/actions.ts:386`), while a
+    // console intent can emit up to three preview rounds for one apply. Their
+    // difference is therefore not a measure — it can read zero while the
+    // direct-action path is in heavy use — so both populations are reported and
+    // the reader subtracts knowingly or not at all.
     const report = await aggregate([
       previewed({ properties: { commandOrigin: "work" } }),
       applied({ properties: { commandOrigin: "work" } }),
@@ -344,7 +405,20 @@ describe("aggregating the funnel", () => {
       applied(),
     ]);
 
-    expect(report.appliedWithoutPreview).toEqual({ chat: 0, work: 2 });
+    expect(report.previewedByOrigin).toEqual({ chat: 1, work: 1 });
+    expect(report.appliedByOrigin).toEqual({ chat: 1, work: 3 });
+  });
+
+  it("counts rows per policy version so a mid-window bump is visible", async () => {
+    const report = await aggregate([
+      previewed(),
+      previewed({ properties: { policyVersion: "2026-08-01.1" } }),
+      applied({ properties: { policyVersion: "2026-08-01.1" } }),
+    ]);
+
+    // A gate computed across two matchers is a weighted average, and one that
+    // cannot say so is not attributable to the rules that produced it.
+    expect(report.policyVersions).toEqual({ "2026-07-25.3": 1, "2026-08-01.1": 2 });
   });
 });
 
@@ -354,7 +428,7 @@ describe("the no-match rate, on ADR-055's final-outcome definition", () => {
     // `still_unmatched` or `creation_offered`. `creation_offered` is emitted at
     // preview time (`actions.ts:623`); a command that goes on to create emits
     // `applyRoute: 'created'` (`:981`) and its final outcome is `applied`.
-    // No command identifier exists to join on, but the correction is exact in
+    // No command identifier exists to join on, but the split is exact in
     // aggregate.
     const report = await aggregate([
       ...Array.from({ length: 4 }, () => previewed({
@@ -373,9 +447,10 @@ describe("the no-match rate, on ADR-055's final-outcome definition", () => {
     expect(report.rates.previewNoMatch).toBe(0.5);
     expect(report.rates.noMatchToCreation).toBe(0.2);
     expect(report.windowBoundarySkew).toBe(0);
+    expect(report.counts.creationsFromOffers).toBe(2);
   });
 
-  it("clamps at zero and reports the skew when a creation crossed the window boundary", async () => {
+  it("never lets a creation whose offer predates the window push a rate above one", async () => {
     const report = await aggregate([
       previewed({ properties: { outcomeCategory: "creation_offered", oneStep: false } }),
       previewed(),
@@ -384,10 +459,31 @@ describe("the no-match rate, on ADR-055's final-outcome definition", () => {
       applied({ properties: { applyRoute: "created" } }),
     ]);
 
-    // 0 still_unmatched + max(0, 1 − 3) = 0, never negative.
+    // One offer can have become at most one creation. The other two came from
+    // offers in an earlier window and are reported as skew, not counted into a
+    // rate whose denominator cannot contain them.
+    expect(report.counts.created).toBe(3);
+    expect(report.counts.creationsFromOffers).toBe(1);
+    expect(report.rates.noMatchToCreation).toBe(0.5);
     expect(report.rates.noMatch).toBe(0);
     expect(report.windowBoundarySkew).toBe(2);
-    expect(report.rates.noMatchToCreation).toBe(1.5);
+  });
+
+  it("does not count a replayed creation as a new one", async () => {
+    // A replay returned the original outcome and created nothing
+    // (`apply.ts:222-225`), so a double-submit must not move the gate.
+    const report = await aggregate([
+      previewed({ properties: { outcomeCategory: "creation_offered", oneStep: false } }),
+      previewed(),
+      applied({ properties: { applyRoute: "created" } }),
+      applied({ properties: { applyRoute: "created", replayed: true } }),
+    ]);
+
+    expect(report.counts.created).toBe(1);
+    expect(report.replayedCreations).toBe(1);
+    expect(report.rates.noMatchToCreation).toBe(0.5);
+    expect(report.rates.noMatch).toBe(0);
+    expect(report.windowBoundarySkew).toBe(0);
   });
 });
 
@@ -459,7 +555,7 @@ describe("failing loudly", () => {
     }])).rejects.toThrow(/task_command_teleported/);
   });
 
-  it("throws on a category outside the mirrored vocabulary, naming the source", async () => {
+  it("throws on a category outside the vocabulary, naming the source", async () => {
     await expect(aggregate([previewed({ properties: { outcomeCategory: "vibes" } })]))
       .rejects.toThrow(/outcomes\.ts/);
     await expect(aggregate([applied({ properties: { applyRoute: "teleport" } })]))
@@ -470,10 +566,19 @@ describe("failing loudly", () => {
       .rejects.toThrow(/analytics\.ts/);
   });
 
-  it("throws when a required property is missing", async () => {
-    const row = previewed();
-    delete (row.properties as Record<string, unknown>).oneStep;
-    await expect(aggregate([row])).rejects.toThrow(/oneStep/);
+  it("throws when any property it relies on is missing", async () => {
+    for (const [factory, property] of [
+      [previewed, "oneStep"],
+      [previewed, "requiresConfirmation"],
+      [previewed, "policyVersion"],
+      [applied, "replayed"],
+      [applied, "policyVersion"],
+      [undone, "policyVersion"],
+    ] as const) {
+      const row = factory();
+      delete (row.properties as Record<string, unknown>)[property];
+      await expect(aggregate([row])).rejects.toThrow(new RegExp(property));
+    }
   });
 
   it("throws on a missing or unusable time zone before aggregating anything", async () => {
@@ -516,7 +621,13 @@ describe("evaluating the evidence tiers", () => {
         properties: { outcomeCategory: outcome, oneStep: outcome === "previewed" },
       }));
     }
+    // Paired with an offer each, so the creations are attributable to the window
+    // rather than counted as boundary skew.
     for (let index = 0; index < (counts.created ?? 0); index += 1) {
+      rows.push(previewed({
+        createdAt: "2026-07-20T15:00:00.000Z",
+        properties: { outcomeCategory: "creation_offered", oneStep: false },
+      }));
       rows.push(applied({
         createdAt: "2026-07-20T15:00:00.000Z",
         properties: { applyRoute: "created" },
@@ -535,14 +646,35 @@ describe("evaluating the evidence tiers", () => {
     const { evaluation } = await tiers({ qualifying: 50, activeDays: 10, windowDays: 14 });
     expect(evaluation.spike.verdict).toBe("met");
     expect(evaluation.spike.thresholds.qualifyingCommands)
-      .toEqual({ required: 50, measured: 50, met: true });
+      .toEqual({ required: 50, measured: 50, met: true, comparison: "at_least" });
     expect(evaluation.spike.thresholds.activeDays)
-      .toEqual({ required: 10, measured: 10, met: true });
+      .toEqual({ required: 10, measured: 10, met: true, comparison: "at_least" });
     expect(evaluation.spike.thresholds.windowDays)
-      .toEqual({ required: 14, measured: 14, met: true });
+      .toEqual({ required: 14, measured: 14, met: true, comparison: "at_most" });
   });
 
-  it("reports the spike tier as not met one below any single threshold", async () => {
+  it("treats the observation window as a ceiling, not something to accumulate", async () => {
+    // ADR-055 says "50 qualifying commands / 10 distinct active days / a 14-day
+    // window". Fifty commands spread over a year is weaker evidence than fifty
+    // over a fortnight, so a longer window must not satisfy the tier — otherwise
+    // the reader's only authorizing verdict is reachable by waiting.
+    const long = await tiers({ qualifying: 50, activeDays: 10, windowDays: 365 });
+    expect(long.evaluation.spike.thresholds.windowDays.met).toBe(false);
+    expect(long.evaluation.spike.verdict).toBe("not_met");
+
+    // Shorter is stronger, so it passes.
+    const short = await tiers({ qualifying: 50, activeDays: 10, windowDays: 12 });
+    expect(short.evaluation.spike.thresholds.windowDays.met).toBe(true);
+    expect(short.evaluation.spike.verdict).toBe("met");
+
+    const planningLong = await tiers({
+      qualifying: 150, activeDays: 20, windowDays: 31, noMatch: 30,
+    });
+    expect(planningLong.evaluation.planning.thresholds.windowDays.met).toBe(false);
+    expect(planningLong.evaluation.planning.verdict).toBe("not_met");
+  });
+
+  it("reports the spike tier as not met one below either floor", async () => {
     const commands = await tiers({ qualifying: 49, activeDays: 10, windowDays: 14 });
     expect(commands.evaluation.spike.verdict).toBe("not_met");
     expect(commands.evaluation.spike.thresholds.qualifyingCommands.met).toBe(false);
@@ -550,10 +682,6 @@ describe("evaluating the evidence tiers", () => {
     const days = await tiers({ qualifying: 50, activeDays: 9, windowDays: 14 });
     expect(days.evaluation.spike.verdict).toBe("not_met");
     expect(days.evaluation.spike.thresholds.activeDays.met).toBe(false);
-
-    const window = await tiers({ qualifying: 50, activeDays: 10, windowDays: 13 });
-    expect(window.evaluation.spike.verdict).toBe("not_met");
-    expect(window.evaluation.spike.thresholds.windowDays.met).toBe(false);
   });
 
   it("can never report the planning tier as met, because distinct users are out of range", async () => {
@@ -581,19 +709,21 @@ describe("evaluating the evidence tiers", () => {
     const byNoMatch = await tiers({
       qualifying: 150, activeDays: 20, windowDays: 30, noMatch: 30,
     });
-    expect(byNoMatch.evaluation.planning.thresholds.rateGate.met).toBe(true);
+    expect(byNoMatch.evaluation.planning.thresholds.rateGate.branches)
+      .toEqual({ noMatch: true, noMatchToCreation: false });
 
-    // 15% no-match-to-creation, no still_unmatched. The created applies also
-    // exceed the offers, so the clamped final no-match rate is 0 — the gate
-    // must still pass on the second branch alone.
+    // Offers that all became creations: the no-match branch is 0 and the
+    // creation branch alone must carry the gate.
     const byCreation = await tiers({
-      qualifying: 150, activeDays: 20, windowDays: 30, created: 23,
+      qualifying: 150, activeDays: 20, windowDays: 30, created: 30,
     });
     expect(byCreation.report.rates.noMatch).toBe(0);
+    expect(byCreation.evaluation.planning.thresholds.rateGate.branches)
+      .toEqual({ noMatch: false, noMatchToCreation: true });
     expect(byCreation.evaluation.planning.thresholds.rateGate.met).toBe(true);
 
     const neither = await tiers({
-      qualifying: 150, activeDays: 20, windowDays: 30, noMatch: 29, created: 22,
+      qualifying: 200, activeDays: 20, windowDays: 30, noMatch: 30, created: 20,
     });
     expect(neither.evaluation.planning.thresholds.rateGate.met).toBe(false);
     expect(neither.evaluation.planning.verdict).toBe("not_met");
@@ -605,13 +735,19 @@ describe("evaluating the evidence tiers", () => {
     expect(evaluation.spike.verdict).toBe("not_met");
   });
 
-  it("decides the rate gate on exact integer arithmetic, not on a rounded rate", async () => {
+  it("decides the rate gate on exact integer arithmetic and shows the fraction", async () => {
     // 3/20 is exactly 0.15 and must pass; 2/20 must not. Reported rates are
-    // rounded for reading, so the comparison cannot be made on them.
-    const exact = await tiers({ qualifying: 20, activeDays: 20, windowDays: 30, created: 3 });
-    expect(exact.evaluation.planning.thresholds.rateGate.met).toBe(true);
-    const under = await tiers({ qualifying: 20, activeDays: 20, windowDays: 30, created: 2 });
-    expect(under.evaluation.planning.thresholds.rateGate.met).toBe(false);
+    // rounded for reading, so the comparison cannot be made on them — and the
+    // exact fraction travels with the verdict so nobody has to guess.
+    const exact = await tiers({ qualifying: 17, activeDays: 20, windowDays: 30, created: 3 });
+    expect(exact.report.qualifyingCommands).toBe(20);
+    expect(exact.evaluation.planning.thresholds.rateGate.branches.noMatchToCreation).toBe(true);
+    expect(exact.evaluation.planning.thresholds.rateGate.measured.exact.noMatchToCreation)
+      .toBe("3/20");
+
+    const under = await tiers({ qualifying: 18, activeDays: 20, windowDays: 30, created: 2 });
+    expect(under.report.qualifyingCommands).toBe(20);
+    expect(under.evaluation.planning.thresholds.rateGate.branches.noMatchToCreation).toBe(false);
   });
 });
 
@@ -648,15 +784,39 @@ describe("the expiry", () => {
 });
 
 describe("what the reader says about its own limits", () => {
-  it("declares the preview categories no deployed code path can emit", async () => {
+  it("derives the unreachable preview categories from the emitters, not from a frozen claim", async () => {
+    const { COMMAND_FUNNEL_REACHABILITY, COMMAND_FUNNEL_PREVIEWED_OUTCOMES } = await load();
+    const source = readFileSync("src/features/task-commands/actions.ts", "utf8");
+
+    // Every literal the emitter is handed, read out of the source. A future
+    // slice that adds `report("unsupported")` changes this set, and the
+    // assertion below then fails — which is the whole point: without reading the
+    // file, the reachability claim would be a constant asserting itself while
+    // the report told production a lie.
+    const literals = new Set(
+      [...source.matchAll(/\breport\(\s*"([a-z_]+)"\s*\)/gu)].map((match) => match[1]),
+    );
+    // The two dynamic sources: the preview's own disposition and the initial
+    // match outcome. Both are bounded by vocabularies whose members are all
+    // otherwise accounted for.
+    expect(source).toContain("report(preview.disposition)");
+
+    const dynamicallyReachable = new Set([
+      "previewed", "matched_requires_confirmation", "no_change", "rejected_stale", "refused",
+      "ambiguous", "ambiguous_overflow",
+    ]);
+    const unreachable = COMMAND_FUNNEL_PREVIEWED_OUTCOMES.filter(
+      (outcome) => !literals.has(outcome) && !dynamicallyReachable.has(outcome),
+    );
+
+    expect(COMMAND_FUNNEL_REACHABILITY.unreachablePreviewOutcomes).toEqual(unreachable);
+    expect([...COMMAND_FUNNEL_REACHABILITY.unreachablePreviewOutcomes])
+      .toEqual(["applied", "unsupported", "rejected_conflict"]);
+  });
+
+  it("states every other structural limit as data", async () => {
     const report = await aggregate([]);
 
-    // Verified against the emit sites: `unsupported` returns before `report`
-    // exists (`actions.ts:347-358`, `:719-726`; `report` is defined at `:400`),
-    // and no site passes `applied` or `rejected_conflict` to the preview event.
-    // A future emitter must come to this assertion and update the claim.
-    expect(report.reachability.unreachablePreviewOutcomes)
-      .toEqual(["applied", "unsupported", "rejected_conflict"]);
     expect(report.reachability.previewRoundsPerIntent).toEqual({ min: 1, max: 3 });
     expect(report.reachability.intentsWithNoPreviewEvent).toBe(true);
     expect(report.reachability.appliesWithoutPreview).toBe(true);
@@ -681,12 +841,16 @@ describe("what the reader says about its own limits", () => {
 
 describe("the credentialed lane stays out of CI", () => {
   it("excludes the remote pattern from the default Vitest configuration", async () => {
-    const { readFileSync } = await import("node:fs");
     const config = readFileSync("vitest.config.ts", "utf8");
     // ADR-059: the end-to-end baseline needs the real loader and the real
     // scorer against a deployed database, so it lives under `src/` where the
     // default `include` would otherwise sweep it into the `app` CI job and fail
     // it for want of credentials.
     expect(config).toContain("src/**/*.remote.test.ts");
+    // And the file that relies on the exclusion actually matches the pattern —
+    // a rename that broke the match would otherwise go unnoticed until CI.
+    const remote = "src/features/task-commands/end-to-end-match-baseline.remote.test.ts";
+    expect(remote.endsWith(".remote.test.ts")).toBe(true);
+    expect(readFileSync(remote, "utf8")).toContain("2F-MEASURE-007");
   });
 });

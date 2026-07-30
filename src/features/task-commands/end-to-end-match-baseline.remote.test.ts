@@ -19,24 +19,54 @@ import type { TaskCommandAction } from "./taxonomy";
  * scoring-layer one. This file is that measurement, and the two numbers are
  * published side by side with their scope labels — never subtracted.
  *
- * What makes it end-to-end is that none of the scoring inputs is hand-written:
- * the candidate rows come from the deployed `list_task_command_candidates`
- * through the real `loadTaskCandidates`, and the verdicts come from the real
+ * What makes it end-to-end is that no scoring input is hand-written: the
+ * candidate rows come from the deployed `list_task_command_candidates` through
+ * the real `loadTaskCandidates`, and the verdicts come from the real
  * `rankTaskCandidates`. The only hand-written things are the seeded tasks and the
  * typed commands, which is what a corpus is.
+ *
+ * The corpus is designed against the prefilter's tier ladder
+ * (`202607260059_phase_2e_destructive_confirmation.sql:2860-2876`), because a
+ * corpus that reaches only one tier measures only one weight:
+ *
+ *   - **tier 0** — the normalized title *is* the normalized hint (`exactTitle`,
+ *     the policy's strongest signal);
+ *   - **tier 1** — the hint appears in the title as complete contiguous words
+ *     (`titlePhrase`);
+ *   - **tier 2** — some lexical overlap only (`tokenOverlap`);
+ *   - excluded — an ineligible status, which never reaches the scorer at all.
+ *
+ * Reaching tier 0 requires the hint's words to be the title's words, stopwords
+ * included, which is why several seeded titles carry none. §"exercised signals"
+ * below records which weights this corpus does and does not move.
  *
  * Seeding uses the service-role client — the pattern
  * `scripts/remote-phase-2e-smoke.mjs:154-158` already uses, untouched by Slice
  * 2F.4's revocation, which revoked from `authenticated` only. Seeding is fixture
- * setup, not the contract under measurement: every measured step below runs
- * through the owner's own session, where `auth.uid()` scoping is real.
+ * setup, not the contract under measurement: every measured step runs through the
+ * owner's own session, where `auth.uid()` scoping is real.
  *
  * It creates no entries, so it never races the `pg_cron` interpretation drain.
  * Cleanup is fail-closed: a fixture that survives throws out of `afterAll`.
  */
 
-const NOW = "2026-07-29T15:00:00.000Z";
 const TIME_ZONE = "America/Sao_Paulo";
+
+/**
+ * The measurement instant, fixed once per run **after** the corpus is seeded.
+ *
+ * It cannot be a literal. Seeded rows take `created_at = now()` from the server,
+ * so a literal in the past silently clamps the recency signal out
+ * (`matching.ts:485-500` grants it only when the audited instant is at or before
+ * `now`), and the pinned rates would then depend on the hour the run happened.
+ * Deriving it from the seed keeps the clock relationship deterministic in the
+ * other direction: the instant is always after every row, on every run.
+ *
+ * Due dates are deliberately absent from the corpus. Temporal signals need a
+ * `temporalPhrase` hint, none of these commands carries one, and a fixed due date
+ * against a moving `now` would be the same accident in a different place.
+ */
+let now = "";
 
 type Credentials = {
   readonly url: string;
@@ -44,101 +74,134 @@ type Credentials = {
   readonly serviceRoleKey: string;
 };
 
-type Scenario = {
+type ScenarioSpec = {
   readonly id: string;
-  readonly command: ValidatedTaskCommand;
+  readonly tier: 0 | 1 | 2 | "excluded" | "none";
+  readonly action: TaskCommandAction;
+  readonly titleWords: readonly string[];
+  readonly patch?: Record<string, string>;
 };
 
 type SeedTask = {
   readonly title: string;
   readonly status: "todo" | "in_progress" | "waiting" | "completed" | "cancelled";
-  readonly dueAt?: string | null;
 };
 
-/**
- * The corpus, chosen against the risks the Phase 2E PRD names rather than
- * against happy paths: two identical titles, a word several rows share, an
- * ineligible status, a phrase match, and a command whose target does not exist.
- */
 const SEED_TASKS: readonly SeedTask[] = [
-  { title: "Send the quarterly report to Marina", status: "todo" },
-  { title: "Send the quarterly report to Marina", status: "todo" },
-  { title: "Call the dentist about the crown", status: "todo" },
-  { title: "Review the budget spreadsheet", status: "todo", dueAt: "2026-07-30T12:00:00.000Z" },
-  { title: "Archive the old invoices", status: "cancelled" },
-  { title: "Pay the electricity bill", status: "todo", dueAt: "2026-07-31T12:00:00.000Z" },
-  { title: "Draft the onboarding checklist", status: "in_progress" },
-  { title: "Prepare the offsite agenda", status: "waiting" },
+  // Stopword-free titles, so a word list can *be* the title (tier 0).
+  { title: "Renew passport", status: "todo" },
+  { title: "Send quarterly report", status: "todo" },
+  { title: "Send quarterly report", status: "todo" },
+  { title: "Pay electricity bill", status: "todo" },
+  { title: "Draft onboarding checklist", status: "in_progress" },
+  { title: "Prepare offsite agenda", status: "waiting" },
+  // Carries stopwords, so a contiguous fragment reaches tier 1 but not tier 0.
+  { title: "Review the budget spreadsheet", status: "todo" },
+  // Never eligible for `complete_task`, so it never reaches the scorer.
+  { title: "Archive old invoices", status: "cancelled" },
 ];
-
-function command(
-  id: string,
-  action: TaskCommandAction,
-  targetHints: Record<string, unknown>,
-  patch: Record<string, string> = {},
-): Scenario {
-  const result = validateTaskCommand(
-    { action, targetHints, patch, operationKey: crypto.randomUUID() },
-    { now: NOW, timeZone: TIME_ZONE },
-  );
-  if (result.status !== "ok") {
-    throw new Error(`corpus command ${id} is invalid: ${JSON.stringify(result)}`);
-  }
-  return { id, command: result.command };
-}
 
 /**
  * Two shapes the corpus has to respect, both of them the product's own rules.
  *
  * `targetHints` carries `titleWords`, never a title (`schema.ts:110-124`): the
- * model copies the user's words and the matcher decides which row they name, so
- * a corpus written with whole titles would be testing an input shape the product
- * does not accept. And a status-carrying action takes an **empty** patch — the
- * destination comes from the taxonomy, and passing it explicitly is
- * `forbidden_patch_field`. Only `set_status` and `rename_task` carry one.
+ * model copies the user's words and the matcher decides which row they name. And
+ * a status-carrying action takes an **empty** patch — the destination comes from
+ * the taxonomy, and passing it explicitly is `forbidden_patch_field`. Only
+ * `set_status` and `rename_task` carry one.
  */
-const CORPUS: readonly Scenario[] = [
-  // Words that name exactly one row.
-  command("exact-unique", "complete_task", { titleWords: ["call", "dentist", "crown"] }),
-  // Two rows carry these words verbatim: the ambiguity the PRD says must not
-  // resolve itself.
-  command("exact-duplicate", "complete_task",
-    { titleWords: ["send", "quarterly", "report", "marina"] }),
-  // A phrase out of the middle of one title.
-  command("phrase", "complete_task", { titleWords: ["budget", "spreadsheet"] }),
-  // One word that several rows share, which is what a weak overlap looks like.
-  command("weak-overlap", "complete_task", { titleWords: ["report"] }),
-  // Nothing in the corpus resembles this.
-  command("absent", "complete_task", { titleWords: ["renew", "passport"] }),
-  // Destructive: never one-step, whatever the match quality.
-  command("destructive-exact", "cancel_task", { titleWords: ["pay", "electricity", "bill"] }),
-  // Names a row whose status the action cannot act on.
-  command("ineligible-status", "complete_task", { titleWords: ["archive", "old", "invoices"] }),
-  // A row already in a non-initial state.
-  command("in-progress", "complete_task", { titleWords: ["draft", "onboarding", "checklist"] }),
-  // A status move where the destination comes from the patch rather than from
-  // the taxonomy.
-  command("waiting-set-status", "set_status", { titleWords: ["prepare", "offsite", "agenda"] },
-    { status: "todo" }),
-  // A rename, which carries a patch the matcher does not score on.
-  command("rename", "rename_task", { titleWords: ["review", "budget", "spreadsheet"] },
-    { title: "Review the annual budget spreadsheet" }),
+const CORPUS: readonly ScenarioSpec[] = [
+  // Tier 0, one row: the strongest signal, resolvable in one step.
+  { id: "exact-unique", tier: 0, action: "complete_task", titleWords: ["renew", "passport"] },
+  // Tier 0, two rows carrying the same title: a genuine tie above the confidence
+  // threshold, which is the ambiguity the PRD says must not resolve itself.
+  {
+    id: "exact-duplicate",
+    tier: 0,
+    action: "complete_task",
+    titleWords: ["send", "quarterly", "report"],
+  },
+  // Tier 1: a contiguous fragment of a title that carries stopwords.
+  { id: "phrase", tier: 1, action: "complete_task", titleWords: ["budget", "spreadsheet"] },
+  // Tier 2: one word that two rows share, scoring below the confidence threshold.
+  { id: "weak-overlap", tier: 2, action: "complete_task", titleWords: ["report"] },
+  // No connection at all.
+  { id: "absent", tier: "none", action: "complete_task", titleWords: ["kayak", "lessons"] },
+  // Tier 0 and destructive: matched well, and still never one-step.
+  {
+    id: "destructive-exact",
+    tier: 0,
+    action: "cancel_task",
+    titleWords: ["pay", "electricity", "bill"],
+  },
+  // Names a cancelled row, which the prefilter excludes before scoring.
+  {
+    id: "ineligible-status",
+    tier: "excluded",
+    action: "complete_task",
+    titleWords: ["archive", "old", "invoices"],
+  },
+  // Tier 0 on a row already in a non-initial state.
+  {
+    id: "in-progress",
+    tier: 0,
+    action: "complete_task",
+    titleWords: ["draft", "onboarding", "checklist"],
+  },
+  // Tier 0 where the destination comes from the patch rather than the taxonomy.
+  {
+    id: "waiting-set-status",
+    tier: 0,
+    action: "set_status",
+    titleWords: ["prepare", "offsite", "agenda"],
+    patch: { status: "todo" },
+  },
+  // Tier 0 including the title's stopwords, carrying a patch the matcher does
+  // not score on.
+  {
+    id: "rename",
+    tier: 0,
+    action: "rename_task",
+    titleWords: ["review", "the", "budget", "spreadsheet"],
+    patch: { title: "Review the annual budget spreadsheet" },
+  },
 ];
+
+function validate(spec: ScenarioSpec): ValidatedTaskCommand {
+  const result = validateTaskCommand(
+    {
+      action: spec.action,
+      targetHints: { titleWords: [...spec.titleWords] },
+      patch: spec.patch ?? {},
+      operationKey: crypto.randomUUID(),
+    },
+    { now, timeZone: TIME_ZONE },
+  );
+  if (result.status !== "ok") {
+    throw new Error(`corpus command ${spec.id} is invalid: ${JSON.stringify(result)}`);
+  }
+  return result.command;
+}
 
 function ratio(count: number, total: number): number {
   return Math.round((count / total) * 1000) / 1000;
 }
 
-let credentials: Credentials;
 let admin: SupabaseClient;
 let owner: SupabaseClient;
 let ownerId: string;
 
-const measured: { outcome: TaskMatchOutcome; oneStep: boolean; id: string }[] = [];
+const measured: {
+  id: string;
+  tier: ScenarioSpec["tier"];
+  outcome: TaskMatchOutcome;
+  oneStep: boolean;
+  candidates: number;
+}[] = [];
 
 beforeAll(async () => {
   const { getLinkedSupabaseCredentials } = await import("../../../scripts/linked-supabase.mjs");
-  credentials = getLinkedSupabaseCredentials() as Credentials;
+  const credentials = getLinkedSupabaseCredentials() as Credentials;
   const options = { auth: { autoRefreshToken: false, persistSession: false } };
   admin = createClient(credentials.url, credentials.serviceRoleKey, options);
 
@@ -165,28 +228,38 @@ beforeAll(async () => {
     user_id: ownerId,
     title: task.title,
     status: task.status,
-    due_at: task.dueAt ?? null,
-  }))).select("id");
-  if (seed.error) throw new Error(`seed baseline corpus (${seed.error.message})`);
-  if ((seed.data ?? []).length !== SEED_TASKS.length) {
+  }))).select("id, created_at");
+  if (seed.error) {
+    // The standing convention: a missing contract is "not deployed", not
+    // "broken". Vitest cannot exit 2, so the message carries the distinction.
+    if (seed.error.code === "42P01" || seed.error.code === "PGRST205") {
+      throw new Error(`NOT DEPLOYED: public.tasks is unreachable (${seed.error.message})`);
+    }
+    throw new Error(`seed baseline corpus (${seed.error.message})`);
+  }
+  const seeded = seed.data ?? [];
+  if (seeded.length !== SEED_TASKS.length) {
     throw new Error(`seed baseline corpus: expected ${SEED_TASKS.length} rows`);
   }
 
-  for (const scenario of CORPUS) {
-    const rows = await loadTaskCandidates({
-      client: owner,
-      command: scenario.command,
-      ownerId,
-      now: NOW,
+  // Fixed after the seed, from the newest seeded row, so every candidate is at or
+  // before the measurement instant on every run.
+  const newest = seeded
+    .map((row) => new Date(row.created_at as string).getTime())
+    .reduce((a, b) => Math.max(a, b), 0);
+  now = new Date(newest + 1000).toISOString();
+
+  for (const spec of CORPUS) {
+    const command = validate(spec);
+    const rows = await loadTaskCandidates({ client: owner, command, ownerId, now });
+    const result = rankTaskCandidates({ command, rows, ownerId, now, timeZone: TIME_ZONE });
+    measured.push({
+      id: spec.id,
+      tier: spec.tier,
+      outcome: result.outcome,
+      oneStep: result.oneStep,
+      candidates: result.candidates.length,
     });
-    const result = rankTaskCandidates({
-      command: scenario.command,
-      rows,
-      ownerId,
-      now: NOW,
-      timeZone: TIME_ZONE,
-    });
-    measured.push({ id: scenario.id, outcome: result.outcome, oneStep: result.oneStep });
   }
 });
 
@@ -208,7 +281,7 @@ afterAll(async () => {
 describe("the end-to-end match-quality baseline (2F-MEASURE-007)", () => {
   it("resolved every corpus command through the deployed candidate query", () => {
     expect(measured).toHaveLength(CORPUS.length);
-    expect(measured.map((entry) => entry.id)).toEqual(CORPUS.map((scenario) => scenario.id));
+    expect(measured.map((entry) => entry.id)).toEqual(CORPUS.map((spec) => spec.id));
   });
 
   it("measures the end-to-end baseline the slice report cites", () => {
@@ -236,21 +309,14 @@ describe("the end-to-end match-quality baseline (2F-MEASURE-007)", () => {
     // **scoring layer**. They are two scopes, published together and never
     // compared against each other (2E-MATCH-018's caveat, discharged by
     // measuring rather than by argument).
-    // The headline number is the **ambiguity rate**, and it is far higher end to
-    // end than the scoring-layer corpus suggested. That is the measurement doing
-    // its job: SQL's real prefilter and real token overlap put more rows in front
-    // of the scorer than a hand-written triple did, and shared words like
-    // "report" genuinely name two tasks in this corpus. It is also exactly why
-    // ADR-055 makes ambiguity **permanently non-authorizing** — a high ambiguity
-    // rate is a matcher observation, not evidence for semantic retrieval.
     expect(baseline).toEqual({
       scope: "end-to-end",
       policyVersion: "2026-07-25.3",
       scenarios: 10,
-      oneStep: 0.1,
+      oneStep: 0.5,
       matchedNeedsDeliberateness: 0,
-      confirmationRequired: 0,
-      ambiguous: 0.7,
+      confirmationRequired: 0.1,
+      ambiguous: 0.2,
       noMatch: 0.2,
     });
     // The five categories partition the corpus: no scenario is uncounted and
@@ -260,28 +326,65 @@ describe("the end-to-end match-quality baseline (2F-MEASURE-007)", () => {
     expect(covered).toBeCloseTo(1, 10);
   });
 
-  it("never one-step applies anything the user did not identify unambiguously", () => {
-    for (const entry of measured) {
-      if (!entry.oneStep) continue;
-      expect(entry.outcome).toBe("matched");
-    }
+  it("exercised every prefilter tier, so the rates are not one weight repeated", () => {
+    // A corpus that reaches a single tier measures a single weight and calls it a
+    // baseline. This is the assertion that keeps that from happening quietly.
+    const byTier = new Map<ScenarioSpec["tier"], number>();
+    for (const entry of measured) byTier.set(entry.tier, (byTier.get(entry.tier) ?? 0) + 1);
+    expect([...byTier.keys()].sort((a, b) => String(a).localeCompare(String(b))))
+      .toEqual([0, 1, 2, "excluded", "none"].sort((a, b) => String(a).localeCompare(String(b))));
+    // Six reach tier 0, and they are the reason `confirmationRequired` and the
+    // one-step rate are non-zero at all: at tier 2 every verdict collapses to
+    // `ambiguous` and the destructive and duplicate cases prove nothing.
+    expect(byTier.get(0)).toBe(6);
   });
 
-  it("resolves the duplicate-title scenario as ambiguous, end to end", () => {
+  it("resolves a tier-0 unique match in one step", () => {
+    const exact = measured.find((entry) => entry.id === "exact-unique");
+    expect(exact?.outcome).toBe("matched");
+    expect(exact?.oneStep).toBe(true);
+    expect(exact?.candidates).toBe(1);
+  });
+
+  it("refuses to resolve two rows that carry the same title", () => {
     // The scoring-layer corpus asserts this against a hand-written candidate
-    // set. Here SQL produced the set, so this is the first time the claim is
-    // proven against the real prefilter.
+    // set. Here SQL produced the set and both rows scored at the exact-title
+    // weight, so the tie is real rather than an artifact of a weak tier.
     const duplicate = measured.find((entry) => entry.id === "exact-duplicate");
     expect(duplicate?.outcome).toBe("ambiguous");
     expect(duplicate?.oneStep).toBe(false);
+    expect(duplicate?.candidates).toBe(2);
+  });
+
+  it("refuses one-step for a destructive action that matched at the top weight", () => {
+    // Non-vacuous only because the hint reaches tier 0: this scenario is refused
+    // for being destructive, not for having matched poorly.
+    const destructive = measured.find((entry) => entry.id === "destructive-exact");
+    expect(destructive?.outcome).toBe("matched_requires_confirmation");
+    expect(destructive?.oneStep).toBe(false);
   });
 
   it("finds nothing for a command whose target the corpus does not contain", () => {
     expect(measured.find((entry) => entry.id === "absent")?.outcome).toBe("unmatched");
+    expect(measured.find((entry) => entry.id === "absent")?.candidates).toBe(0);
   });
 
-  it("refuses one-step for a destructive action however well it matched", () => {
-    const destructive = measured.find((entry) => entry.id === "destructive-exact");
-    expect(destructive?.oneStep).toBe(false);
+  it("never surfaces a row whose status the action cannot act on", () => {
+    // The cancelled row is named exactly and still never reaches the scorer.
+    const ineligible = measured.find((entry) => entry.id === "ineligible-status");
+    expect(ineligible?.outcome).toBe("unmatched");
+    expect(ineligible?.candidates).toBe(0);
+  });
+
+  it("records which signals this corpus does not exercise", () => {
+    // Stated rather than implied. The corpus moves the three title weights and
+    // the status-eligibility filter; it carries no project, context, person or
+    // temporal hint and seeds no relations, so those weights are untested here
+    // and the rates above must not be read as covering them.
+    expect(CORPUS.every((spec) => spec.patch === undefined
+      || Object.keys(spec.patch).every((key) => key === "status" || key === "title"))).toBe(true);
+    for (const spec of CORPUS) {
+      expect(Object.keys({ titleWords: spec.titleWords })).toEqual(["titleWords"]);
+    }
   });
 });

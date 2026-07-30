@@ -36,14 +36,8 @@ select results_eq(
   'product-events owner reference cascades on owner deletion'
 );
 select has_index('public', 'product_events', 'product_events_synthetic_created_idx', 'synthetic traffic is findable for purge');
-select ok(
-  (select count(*) = 1 from pg_class c
-   join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relname = 'product_events'
-     and exists (
-       select 1 from pg_attribute a
-       where a.attrelid = c.oid and a.attname = 'is_synthetic' and a.attnotnull
-     )),
+select col_not_null(
+  'public', 'product_events', 'is_synthetic',
   'synthetic classification is non-null, so the funnel filter can never see an unknown'
 );
 select has_function('public', 'record_product_event', array['text','text','text','text','text','jsonb','text','uuid','uuid','uuid','boolean']);

@@ -86,23 +86,29 @@ Phase 2E shipped a complete task-command surface and, in Slice 2E.7, seventeen p
 **S5-R3 — `no_match`, on ADR-055's final-outcome definition.** ADR-055 defines `no_match` as a qualifying command whose **final outcome** is `still_unmatched` or `creation_offered`. `creation_offered` is emitted at **preview** time (`actions.ts:623`), and a command that goes on to create emits `task_command_applied` with `applyRoute: 'created'` (`:981`), making its final outcome `applied`. The allowlist carries no command identifier, so no per-row join exists — but the correction is exact at aggregate level:
 
 ```
-finalNoMatch      = stillUnmatched + max(0, creationOffered − created)
-noMatchRate       = finalNoMatch / qualifyingCommands
-previewNoMatchRate= (stillUnmatched + creationOffered) / qualifyingCommands   // diagnostic, non-authorizing
-windowBoundarySkew= max(0, created − creationOffered)                          // reported when nonzero
+creationsFromOffers = min(creationOffered, created)      // an offer becomes at most one creation
+finalNoMatch        = stillUnmatched + (creationOffered − creationsFromOffers)
+noMatchRate         = finalNoMatch / qualifyingCommands
+noMatchToCreation   = creationsFromOffers / qualifyingCommands
+previewNoMatchRate  = (stillUnmatched + creationOffered) / qualifyingCommands  // diagnostic only
+windowBoundarySkew  = created − creationsFromOffers      // creations whose offer predates the window
 ```
 
-`created > creationOffered` is only possible when a creation crosses the window boundary; the reader reports the skew rather than clamping silently. `noMatchRate` is the authorizing figure; `previewNoMatchRate` is reported for diagnosis and is listed in `nonAuthorizing`.
+The `min` is load-bearing in both directions. `creation_offered` splits exactly into offers that became creations and offers that did not, and the first term is bounded by the creations actually observed — so `finalNoMatch` can never go negative and `noMatchToCreation` can never exceed one. Creations beyond that bound came from offers in an earlier window; they are reported as `windowBoundarySkew` rather than allowed to push an authorizing rate above 100%. `noMatchRate` and `noMatchToCreation` are the authorizing figures; `previewNoMatchRate` is diagnostic and is listed in `nonAuthorizing`.
+
+**Replays are not creations.** `task_command_applied` carries `replayed`, and a replay returned the original outcome having created nothing (`apply.ts:222-225`). A double-submit must not move a gate, so replayed creations are counted in their own `replayedCreations` figure and excluded from `created`.
 
 **S5-R4 — Exclusion.** Rows with `is_synthetic = true` are excluded and counted in `excludedSynthetic`. Foreign owners' rows are excluded by RLS, never by predicate. **No email-pattern or name-pattern heuristic exists anywhere in the reader** (`2F-MEASURE-002` is explicit on this).
 
-**S5-R5 — `no-match-to-creation`.** `noMatchToCreationRate = |{applied : applyRoute = 'created'}| / qualifyingCommands` (E5, E6).
+**S5-R5 — `no-match-to-creation`.** `noMatchToCreationRate = creationsFromOffers / qualifyingCommands` (E5, E6). The numerator comes from `task_command_applied` and the denominator from `task_command_previewed`, which are different populations; S5-R3's `min` is what keeps the ratio inside its own denominator instead of letting an out-of-window creation report a rate above one.
 
-**S5-R6 — Active days.** The count of distinct calendar dates, in an **explicitly supplied** IANA time zone, carrying at least one qualifying command. The time zone is required with no default; the runner resolves it from `public.profiles.timezone` and **fails closed** when the row is absent. Production deliberately differs — `actions.ts:214-224` falls back to `America/Sao_Paulo` for a missing profile — because a command still has to run, while a *measurement* that silently picks a zone can inflate `activeDays` across a UTC−3 midnight and pass a gate by accident. The divergence is recorded so a non-zero exit is understood rather than debugged.
+**S5-R6 — Active days.** The count of distinct calendar dates, in an **explicitly supplied** IANA time zone, carrying at least one qualifying command. The time zone is required with no default; the runner resolves it from `public.profiles.timezone` and **fails closed** when the row is absent. There is deliberately **no** command-line override: a gate whose day-bucketing the caller can choose is not a gate. Production deliberately differs — `actions.ts:214-224` falls back to `America/Sao_Paulo` for a missing profile — because a command still has to run, while a *measurement* that silently picks a zone can inflate `activeDays` across a UTC−3 midnight and pass a gate by accident. The divergence is recorded so a non-zero exit is understood rather than debugged.
 
 **S5-R7 — Window.** `(windowEnd − windowDays, windowEnd]`: half-open at the start so no row is counted in two adjacent windows.
 
-**S5-R8 — Tier evaluation.** `evaluateEvidenceTiers(report)` returns, per tier, every threshold, its measured value, a per-threshold boolean, and a verdict from the closed vocabulary `not_met | met | met_pending_privileged_read`. The **spike tier** (50 qualifying commands / 10 active days / 14-day window) is fully computable and may return `met`. The **planning tier** (150 / 20 / 30-day window / ≥2 distinct real users, with `noMatchRate ≥ 0.20` **or** `noMatchToCreationRate ≥ 0.15`) reports `distinctUsers: null` and `privilegedReadRequired: true`; its verdict is **structurally unable to be `met`** — at most `met_pending_privileged_read`. The reader never infers `distinctUsers: 1` from its own owner-scoped range (`2F-MEASURE-004`).
+**S5-R8 — Tier evaluation.** `evaluateEvidenceTiers(report)` returns, per tier, every threshold, its measured value, the comparison it uses, a per-threshold boolean, and a verdict from the closed vocabulary `not_met | met | met_pending_privileged_read`.
+
+**`qualifyingCommands` and `activeDays` are floors; `windowDays` is a ceiling.** ADR-055 reads "50 qualifying commands / 10 distinct active days / a 14-day window": the window is the measurement *period*, not a quantity to accumulate. Fifty commands over a year is weaker evidence than fifty over a fortnight, so a longer window must **not** satisfy a tier — otherwise the reader's only authorizing verdict is reachable by waiting. Both directions are pinned by test. The **spike tier** (50 qualifying commands / 10 active days / 14-day window) is fully computable and may return `met`. The **planning tier** (150 / 20 / 30-day window / ≥2 distinct real users, with `noMatchRate ≥ 0.20` **or** `noMatchToCreationRate ≥ 0.15`) reports `distinctUsers: null` and `privilegedReadRequired: true`; its verdict is **structurally unable to be `met`** — at most `met_pending_privileged_read`. The reader never infers `distinctUsers: 1` from its own owner-scoped range (`2F-MEASURE-004`).
 
 **S5-R9 — Non-authorizing set, in the output.** ADR-055's five permanent non-authorizers (unsupported-refusal volume, adoption/command volume, one-step rate, ambiguity rate, latency) plus `previewNoMatchRate` are listed under `nonAuthorizing`, naming ADR-055 (`2F-MEASURE-005`).
 
@@ -119,7 +125,7 @@ windowBoundarySkew= max(0, created − creationOffered)                         
 | `task_command_applied` without a preceding previewed row | Work direct-action path | `operations/actions.ts:386` |
 | Work direct-action undo | **no event** | only emitter is `actions.ts:1070` |
 
-Consequence, stated rather than papered over: `qualifyingCommands` counts **qualifying preview rounds**, which over-counts intents by up to 3× on the disambiguation/clarification paths and under-counts on the failed-creation path; `appliedWithoutPreview` reconciles the applied population against the previewed one. `unsupportedRefusals` is structurally `0` against production data until an emitter exists, so `2F-MEASURE-005`'s "unsupported-command refusal volume" is **not measurable this phase** — the exclusion rule is implemented and unit-tested, and is vacuous against production. The acceptance report repeats all of this.
+Consequence, stated rather than papered over: `qualifyingCommands` counts **qualifying preview rounds**, which over-counts intents by up to 3× on the disambiguation/clarification paths and under-counts on the failed-creation path; The previewed and applied populations are therefore reported **raw and side by side** (`previewedByOrigin`, `appliedByOrigin`) rather than subtracted: a console intent can emit three preview rounds for one apply, so a difference can read zero while the Work direct-action path is in heavy use, and a measure that reads zero when the thing it measures is busy is worse than no measure. `unsupportedRefusals` is structurally `0` against production data until an emitter exists, so `2F-MEASURE-005`'s "unsupported-command refusal volume" is **not measurable this phase** — the exclusion rule is implemented and unit-tested, and is vacuous against production. The acceptance report repeats all of this.
 
 **S5-R12 — Refusal outcome classes.** `refusalOutcomeClasses` is the subset of `TASK_COMMAND_PREVIEWED_OUTCOMES` where the system understood the request and declined to complete it: **`unsupported`, `refused`, `rejected_stale`, `rejected_conflict`**. Excluded, with reasons: `still_unmatched`/`creation_offered` are *no-match* outcomes and are already S5-R3's set (double-classifying would make two measures move together); `ambiguous`/`ambiguous_overflow`/`clarification_requested`/`matched_requires_confirmation` are *unresolved*, not refused; `no_change` is a successful no-op; `applied`/`previewed` are successes. It is **derived in code** as a filter over the imported vocabulary, so the parity test (§18.7) still fails when a member is added.
 
@@ -164,7 +170,8 @@ Cross-owner denial is asserted **non-vacuously** per `2F-OWNERSHIP-001`: A's **p
 |---|---|---|
 | Event rows | `public.product_events` | authenticated select |
 | The four event names | `productEventNames` in `contracts.ts:117` | **read**, via the existing `readProductEventVocabulary` (E9) — never restated |
-| Outcome / origin / apply-route / undo-result vocabularies | `outcomes.ts`, `analytics.ts` (mirrored in `contracts.ts:22-58` and pinned by `contracts.test.ts`) | **mirrored, not read.** `product-event-vocabulary.mjs` parses only flat `export const X = [ … ] as const` arrays and throws on a spread (E9); these four are non-exported `readonly T[]` and one is a spread, so the parser cannot reach them. The aggregator restates them and is held to the imported TypeScript constants by **exact-equality** Vitest cases (§18.7). That is a mirror with a CI gate, materially weaker than a read, and it is labelled as such rather than presented as ADR-052's mechanism. The existing shared script is **not** modified, and `contracts.ts` is **not** re-shaped to suit a test. |
+| The twelve outcome members | `TASK_COMMAND_OUTCOMES` in `outcomes.ts:24-49` | **read**, through `parseProductEventVocabulary` — the list with twelve chances to drift is the one that must not be restated. `COMMAND_FUNNEL_PREVIEWED_OUTCOMES` is then derived from it by the same `[...outcomes, "previewed"]` spread `analytics.ts:121-124` uses, so it is derived from a read. |
+| Origins, apply routes, undo results | `TASK_COMMAND_ORIGINS` (`analytics.ts:95`), `TASK_COMMAND_APPLY_ROUTES` (`:108`), `TASK_COMMAND_UNDO_RESULTS` (`:230`) | **mirrored, not read** — and the reason is mechanical, not preferential. All three are `export const … as const`, but they are declared **on a single line**, and the shared parser splits an array body by newline and requires one quoted entry per line (`product-event-vocabulary.mjs:56-66`); it throws on all three. Extending that parser would change a module two other smokes depend on in order to serve this one. They are two, three and four members long, they are held to the TypeScript originals by **exact-equality** Vitest cases (§18.7), and a further case asserts the parser still cannot read them — so if a future edit makes them multi-line, the reader is told to switch to reading them. `contracts.ts` is **not** re-shaped to suit a test. |
 | Thresholds, the `no_match` member set, the non-authorizing set, the refusal subset, the 90-day horizon | declared **once** in the reader module | pinned by exact-equality Vitest assertions against ADR-055's nine numbers (§18.6) |
 | Match policy | `match-policy.ts` / `TASK_MATCH_POLICY_VERSION` | read by the end-to-end baseline; never restated |
 | Candidate rows | deployed `list_task_command_candidates` through the real `loadTaskCandidates` | E12 |
@@ -196,12 +203,14 @@ CommandFunnelReport = {
   outcomeDistribution:   { <every previewed-outcome member>: count },
   refusalOutcomeClasses: { unsupported, refused, rejected_stale, rejected_conflict },
   originSplit:           { chat, work },
+  previewedByOrigin:     { chat, work },   // the qualifying population
+  appliedByOrigin:       { chat, work },   // a *different* population; reported raw, never subtracted
   appliedRoutesByOrigin: { chat: {direct, confirmed, created}, work: {…} },
   undoResultsByOrigin:   { chat: {undone, unavailable, expired, refused}, work: {…} },
   disambiguationsByOrigin: { chat, work },
-  appliedWithoutPreview,        // applied count − previewed count, per origin, when positive
+  policyVersions:        { '<version>': count },
   rates: { noMatch, noMatchToCreation, oneStep, ambiguity, previewNoMatch },
-  windowBoundarySkew,
+  windowBoundarySkew, replayedCreations,
   reachability: { … S5-R11's table, as data … },
   nonAuthorizing: [ … ADR-055's five, plus previewNoMatch … ],
   distinctUsers: null, privilegedReadRequired: true,
@@ -209,17 +218,19 @@ CommandFunnelReport = {
 
 EvidenceTierEvaluation = {
   spike:    { verdict: 'not_met'|'met',
-              thresholds: { qualifyingCommands: {required: 50,  measured, met},
-                            activeDays:         {required: 10,  measured, met},
-                            windowDays:         {required: 14,  measured, met} } },
+              thresholds: { qualifyingCommands: {required: 50,  measured, met, comparison: 'at_least'},
+                            activeDays:         {required: 10,  measured, met, comparison: 'at_least'},
+                            windowDays:         {required: 14,  measured, met, comparison: 'at_most'} } },
   planning: { verdict: 'not_met'|'met_pending_privileged_read',
-              thresholds: { qualifyingCommands: {required: 150, measured, met},
-                            activeDays:         {required: 20,  measured, met},
-                            windowDays:         {required: 30,  measured, met},
+              thresholds: { qualifyingCommands: {required: 150, measured, met, comparison: 'at_least'},
+                            activeDays:         {required: 20,  measured, met, comparison: 'at_least'},
+                            windowDays:         {required: 30,  measured, met, comparison: 'at_most'},
                             distinctUsers:      {required: 2,   measured: null, met: null,
                                                  privilegedReadRequired: true},
                             rateGate:           {either: {noMatch: 0.20, noMatchToCreation: 0.15},
-                                                 measured, met} } },
+                                                 measured: {…, exact: {'n/d', 'n/d'}},
+                                                 branches: {noMatch, noMatchToCreation},
+                                                 met} } },
   expiry:   { goLive, expiresOn, horizonDays: 90 },
 }
 ```
@@ -236,12 +247,12 @@ Every category key is present with a zero value when unobserved, so a consumer n
 | `scripts/phase-2f-command-funnel-reader.mjs` | runner: credentials, session, paginated fetch, report printing, `--json`, `--proof` | Mirrors E11: preflight, disposable owners, `finally` cleanup asserted before exit 0, exit-2 vs exit-1. |
 | `src/features/product-analytics/command-funnel.test.ts` | Vitest: aggregator behaviour, exclusions, boundaries, empty state, threshold pinning, vocabulary parity by exact equality | Runs in CI's `app` job, so a vocabulary addition or a threshold edit fails there, not in a manual run nobody watches. |
 | `src/features/task-commands/end-to-end-match-baseline.remote.test.ts` | opt-in remote Vitest: the end-to-end baseline | The scorer is TypeScript; measuring end-to-end needs the **real** loader and **real** scorer against deployed SQL (E12). |
-| `supabase/tests/product_events.sql` (append) | pgTAP: the `product_events.user_id` FK's delete action is `cascade` | Makes exclusion mechanism (i) **proven schema truth** in CI rather than assumed (B4). One catalog assertion; no migration, no schema change. |
+| `supabase/tests/product_events.sql` (append) | pgTAP: the `product_events.user_id` FK's delete action is `cascade`; the synthetic index exists; `is_synthetic` is non-null | Makes exclusion mechanism (i) **proven schema truth** in CI rather than assumed (B4), and pins the two facts ADR-058's fourth mechanism rests on — a findable synthetic partial index and a column the filter can never see as unknown. Three read-only catalog assertions; no migration, no schema change. |
 | `vitest.remote.config.ts` + one `exclude` line in `vitest.config.ts` + npm scripts | wiring | Keeps the credentialed lane out of CI (E13) with no new dependency. |
 
 ## 12. Database implications
 
-**No migration.** No function, view, RPC, grant, policy, index, or type regeneration. `supabase/migrations/` is untouched and `src/lib/supabase/database.types.ts` is untouched. The only SQL added is **one read-only pgTAP catalog assertion** appended to the existing `supabase/tests/product_events.sql`; pgTAP files are tests, not schema, and `supabase db reset` applies the identical chain before and after. The phase's migration count stays at exactly two. Remote parity is `202607300063` before and after, and this slice carries **no parity cell** (§10) because it deploys nothing.
+**No migration.** No function, view, RPC, grant, policy, index, or type regeneration. `supabase/migrations/` is untouched and `src/lib/supabase/database.types.ts` is untouched. The only SQL added is **three read-only pgTAP catalog assertions** — the cascade delete action, the synthetic partial index, and `is_synthetic`'s not-null constraint — appended to the existing `supabase/tests/product_events.sql`; pgTAP files are tests, not schema, and `supabase db reset` applies the identical chain before and after. The phase's migration count stays at exactly two. Remote parity is `202607300063` before and after, and this slice carries **no parity cell** (§10) because it deploys nothing.
 
 ## 13. Application implications
 
@@ -259,10 +270,11 @@ Every category key is present with a zero value when unobserved, so a consumer n
 | Missing time zone / missing profile row | **Throws** / runner fails closed, before any aggregation (S5-R6). |
 | Invalid IANA time zone | **Throws** — surfaced from `Intl.DateTimeFormat`, not swallowed. |
 | `created > creationOffered` | `windowBoundarySkew` reported; `finalNoMatch` clamped at `0` with the skew visible (S5-R3). |
-| Credentials unavailable | Non-zero exit with a diagnostic containing no key material. |
-| Chain not deployed / RPC absent | Preflight exits **2**, distinguishable from an assertion failure. |
+| Malformed `--window-days` / `--window-end` / `--go-live` | **Throws a named diagnostic** before any value is derived from it, so a typo never surfaces as a bare `RangeError`. |
+| Credentials unavailable | Non-zero exit with a diagnostic containing no key material; credentials resolve inside the guarded path, not at module load. |
+| Chain not deployed / RPC absent | Exits **2**, distinguishable from an assertion failure — raised as a tagged **throw**, never a bare `process.exit`, so the cleanup block always runs. A mid-run schema-cache miss must not be able to leave fixtures behind. In the Vitest baseline lane, where the harness cannot exit 2, the same condition raises an error whose message begins `NOT DEPLOYED:`. |
 | Fixture survives cleanup | **Fails** (fail-closed, S5-R15). |
-| Fetch page size reached | Paginates to exhaustion and asserts exhaustion; never silently truncates. |
+| Fetch page size reached | **Keyset** pagination on `(created_at, id)`, walked to exhaustion. `created_at` is not unique, and `OFFSET` over a non-unique sort key can return a tied row twice or never; `id` is unique, so the composite key is total and exhaustion holds by construction rather than by assertion. |
 
 ## 15. Performance expectations
 
@@ -307,10 +319,13 @@ A manual, internal, single-owner measurement — not a request-path surface, so 
 5. Tier evaluation: at / one-below / one-above for **each of the nine** thresholds; the planning `or` proven in both branches; the planning verdict proven never `met`; `distinctUsers` proven never inferred.
 6. Pinning: one exact-equality assertion carrying ADR-055's nine numbers and the 90-day horizon.
 7. Vocabulary parity by **exact equality** against imported TypeScript: `TASK_COMMAND_PREVIEWED_OUTCOMES`, `TASK_COMMAND_APPLY_ROUTES`, `TASK_COMMAND_UNDO_RESULTS`, `TASK_COMMAND_ORIGINS`, and `productEventNames` **read** through `readProductEventVocabulary`; plus `refusalOutcomeClasses ⊂ TASK_COMMAND_PREVIEWED_OUTCOMES` with its exact membership pinned.
-8. `no_match` arithmetic: `finalNoMatch` correct when `created < creationOffered`, `= creationOffered`, and `> creationOffered` (skew reported, clamped, never negative); `previewNoMatchRate` present and listed non-authorizing.
+8. `no_match` arithmetic: `finalNoMatch` correct when `created < creationOffered`, `= creationOffered`, and `> creationOffered` (skew reported, never negative, and `noMatchToCreation` never above one); a replayed creation counted in `replayedCreations` and excluded from `created`; `previewNoMatchRate` present and listed non-authorizing.
+8b. The window is a **ceiling**: 50 commands over 10 active days in a 365-day window is `not_met`; the same counts in a 12-day window are `met`; a 31-day planning window is `not_met`.
+8c. `refusalOutcomeClasses.unsupported` equals `unsupportedRefusals` rather than the distribution's structural zero, so the report cannot contradict itself on two adjacent lines.
+8d. `policyVersions` counts rows per version, so a mid-window policy bump is visible instead of averaged away.
 9. Fail-loud: unknown event name, unknown category, missing property, missing/invalid time zone each throw with a message naming the source file.
 10. Expiry across a month boundary and a leap-adjacent date.
-11. Reachability block asserted to match the code's real emit sites, so a future emitter for `unsupported` makes this test fail and force the claim to be updated.
+11. Reachability: the test **reads** `src/features/task-commands/actions.ts`, extracts every `report("<literal>")` argument, and derives the unreachable set from what is absent — so a future slice that adds `report("unsupported")` fails this case and must update the claim. Asserting the frozen constant against itself would have proven nothing.
 12. Regression: `match-baseline.test.ts`'s pin untouched and green; `contracts.test.ts`, `analytics.test.ts`, `direct-write-guard.test.ts`, `sql-grammar-guard.test.ts`, `work-surface-reuse.test.ts` unchanged and green.
 
 **CI (`database` job):** the appended pgTAP assertion proves `product_events.user_id`'s FK delete action is `cascade` — exclusion mechanism (i) as schema truth. The rest of the suite and `supabase db lint` unchanged and green.
@@ -356,6 +371,8 @@ Complete when, and only when:
 3. The reader proof and the end-to-end baseline executed against the deployed project, transcripts recorded, fixtures proven gone.
 4. `docs/TODO.md:30` carries a concrete expiry date derived from go-live.
 5. `STATE.md`, `CHANGELOG.md`, `TODO.md`, `DECISIONS.md`, the slice report and the acceptance report updated; ADRs recorded for D4, D5 and D7.
+
+**Sequencing, because ADR-060 anchors go-live on a fact that does not exist until merge.** The merge date of the implementation PR is not knowable while that PR is open, so the concrete expiry date cannot be written inside it without guessing. This slice therefore follows the two-PR shape Slice 2F.4 already used (implementation PR #28, then acceptance PR #30): the implementation PR carries the reader, the tests, the pgTAP assertions and the slice report; the **acceptance** commit — written after the merge, when the date is a git fact — dates `docs/TODO.md:30` and records the merge SHA. `2F-OPERATIONS-006` verifies the dated entry at closeout, which is after both.
 6. Local `main` clean, synchronized with `origin/main`; remote parity still `202607300063`.
 
 ## 22. Explicit exclusion of Slice 2F.6
@@ -397,6 +414,31 @@ One independent adversarial review of the initial draft produced 23 findings (4 
 | **Mi1** — "'§145' is a line number" | **CONFIRMED** | Cited as §3 (lines 56–70) and line 145. |
 | **Mi2** — "D7 deserves an ADR" | **CONFIRMED** | D7 joins D4 and D5 as a recorded ADR (§21.5). |
 | **Mi3** — "tier verdict vocabulary has no shape in §10" | **CONFIRMED** | §10 now declares `EvidenceTierEvaluation`. |
+
+### 23.1 Second cycle — the implementation review
+
+An independent adversarial review of the implementation commit (`617da70`) produced 21 findings (5 MAJOR, 9 MODERATE, 7 MINOR/assorted). Every one was verified against the repository. Two were rejected or narrowed on evidence; the rest were fixed, and five changed behaviour rather than wording.
+
+| Finding | Verdict | Resolution |
+|---|---|---|
+| **F1** — `windowDays >= required` inverts ADR-055: 50 commands in a 365-day window read `met` | **CONFIRMED (MAJOR)** | The window is now a **ceiling** (`at_most`), and each threshold reports the comparison it used. Fifty commands over a year was reaching the reader's only authorizing verdict. Pinned in both directions (§18.8b). |
+| **F2** — `noMatchToCreation` divides an applied numerator by a previewed denominator; rate >1 and the gate passes on one command | **CONFIRMED (MAJOR)** | Fixed by `min(creationOffered, created)`: an offer becomes at most one creation, so the numerator is bounded by its own denominator's population and the excess is reported as `windowBoundarySkew`. The same `min` makes `finalNoMatch` and `noMatchToCreation` exactly complementary, which the previous `max(0, …)` form did not. |
+| **F3** — the reachability test asserted a frozen constant against itself | **CONFIRMED (MAJOR)** | The test now reads `actions.ts`, extracts every `report("<literal>")` argument and derives the unreachable set from what is absent. The old claim would have survived a future `report("unsupported")` while the report told production a lie. |
+| **F4** — `notDeployed()`'s `process.exit(2)` skips the `finally`, leaking fixture owners and non-synthetic rows | **CONFIRMED (MAJOR)** | Exit 2 is now a tagged `throw` mapped in the outer catch, so cleanup always runs. A transient schema-cache miss mid-run could have left two fixture users and fifteen non-synthetic rows in the deployed project behind an exit code that read "not deployed". |
+| **F5** — the end-to-end corpus was degenerate: nine of ten scenarios scored `0.22` for one uniform reason, two tests were vacuous, and the published interpretation was backwards | **CONFIRMED (MAJOR)** | The most valuable finding. Every hint was a non-contiguous subset of a title containing stopwords, so nothing reached the prefilter's tier 0 or 1 and `exactTitle` — the policy's strongest weight — was never exercised; the destructive and duplicate-title tests passed because *nothing matched*, not because of what they claimed to prove. K3 commits to redesigning the corpus rather than loosening the pin, so the corpus was rebuilt against the tier ladder (`202607260059:2860-2876`) with stopword-free titles: six scenarios now reach tier 0, one tier 1, one tier 2, one is status-excluded and one has no connection. The re-measured baseline is one-step `0.5`, needs-deliberateness `0`, confirmation-required `0.1`, ambiguous `0.2`, no-match `0.2` — and the destructive scenario now resolves `matched_requires_confirmation` from a tier-0 match, so it refuses one-step for being destructive rather than for having missed. A new case asserts every tier is exercised, and another records which weights the corpus does **not** move. |
+| **F6** — `replayed` applies counted as new creations | **CONFIRMED** | `replayed` is now validated and replayed creations are excluded from `created` and reported in `replayedCreations`. A double-submit could otherwise move the gate. |
+| **F7** — `refusalOutcomeClasses.unsupported` structurally `0` while `unsupportedRefusals` was positive | **CONFIRMED** | That member is now projected from its own counter, so the report cannot contradict itself on two adjacent printed lines. |
+| **F8** — `appliedWithoutPreview` compares incomparable populations and reads `0` when the path is busy; `qualifyingByOrigin` duplicates `originSplit` | **CONFIRMED** | The derived difference is gone. Both populations are reported raw (`previewedByOrigin`, `appliedByOrigin`) and the duplicate counter was deleted. A clamped subtraction whose value is indistinguishable from "unused" is not a measure. |
+| **F9** — `--time-zone` let the caller choose the bucketing that decides `activeDays` | **CONFIRMED** | The flag is removed. The zone comes from `profiles.timezone` or the run fails. |
+| **F10** — `OFFSET` paging over non-unique `created_at` can skip or duplicate rows; the promised exhaustion assertion did not exist | **CONFIRMED** | Replaced with keyset pagination on `(created_at, id)`. `id` is unique, so exhaustion holds by construction, and the false claim is gone from both the code and §14. |
+| **F11** — the mirror-versus-read justification was wrong for four of five vocabularies | **PARTIALLY CONFIRMED** | Verified by executing the parser against each list: `TASK_COMMAND_OUTCOMES` **is** readable and is now **read** — the twelve-member list was the one that mattered, and `COMMAND_FUNNEL_PREVIEWED_OUTCOMES` is derived from it by the same spread. The other three are **not** readable: they are single-line arrays, and the parser splits an array body by newline and requires one entry per line, so it throws on all three. The review's claim that four of five could be read is rejected on that evidence; its underlying point — that the justification was inaccurate — is accepted, and §9 now states the mechanical reason with a test that fails if a future edit makes them multi-line. |
+| **F12** — `policyVersion` discarded, so the gate silently mixes matcher generations | **CONFIRMED** | Validated per row and reported as `policyVersions`. |
+| **F13** — the pin was stable only because the measurement instant sat in the past, making the recency signal dead by clock accident | **CONFIRMED** | The instant is now derived from the newest seeded row, so the clock relationship is deterministic on every run rather than a function of the hour. Due dates were removed from the corpus for the same reason. |
+| **F14** — three pgTAP assertions where §11/§12 authorised one | **CONFIRMED** | §11 and §12 amended to three, with the two extras justified as ADR-058's own foundations; the hand-rolled not-null check replaced with pgTAP's `col_not_null`. |
+| **F15** — no documentation deliverables, and ADR-060's merge-date anchor cannot be satisfied inside the PR | **CONFIRMED** | The docs were a later increment and have landed. The anchor conflict is real and is resolved by sequencing rather than by amending ADR-060: §21 now records the two-PR shape Slice 2F.4 already used, with the concrete expiry date written in the acceptance commit, when the merge date is a git fact. |
+| **F16–F21** — rounded display beside an exact gate; midnight-guard asymmetry; 1 s clock margin; argument-validation order; overlapping exclusion counters; `--go-live` failing silently; credentials resolved at module load; a needless module-scope binding; the CI-exclusion guard being substring-only; the proof asserting a schema default as a contract | **CONFIRMED** | All fixed: the rate gate carries the exact fraction beside the rounded rate; the guard refuses only within thirty minutes of local midnight and permits a start just after it; the proof's window carries a 60 s skew margin; arguments are validated before anything derives from them, and a value-less flag throws; the window filter runs before the synthetic filter so the two exclusion counters partition the fetched rows; credentials resolve inside the guarded path; and the proof asserts a zone *resolves* rather than equals the column default. |
+
+**Did the second review introduce drift?** Two of its proposed fixes were not taken as offered. F11's "read four of five" is factually unavailable, as the executed parser check shows. F2's proposed fix — disable the second rate branch whenever skew is nonzero — would have made a legitimate in-window creation unmeasurable because an unrelated earlier offer existed; bounding the numerator by `min` achieves the same protection without discarding real evidence. Nothing accepted expands into Slice 2F.6.
 
 **Did the review introduce drift?** Three of its proposed fixes were narrowed or rejected on evidence: B4's "use a service-role read if the deployed project permits it" (rests on an unversioned grant), M2's "export the vocabularies `as const`" (production change to serve a test), and B2's "declare a deviation from ADR-055" (the definition is computable exactly, so no deviation is needed). No accepted recommendation expands into Slice 2F.6; the single new SQL artifact is a read-only pgTAP assertion serving `2F-MEASURE-002`, not `2F-OPERATIONS-*`.
 

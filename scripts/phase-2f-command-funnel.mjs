@@ -16,18 +16,27 @@
  * ways is decided twice". This repository carries no `tsx` or `ts-node`, so the
  * shared module is the one both can import.
  *
- * Read versus mirrored, stated precisely
- * --------------------------------------
- * The four event **names** are *read* out of `contracts.ts` through the existing
- * `product-event-vocabulary.mjs`, the mechanism ADR-052 established. The four
- * category vocabularies cannot be: that parser accepts only flat
- * `export const X = [ … ] as const` arrays and throws on a spread, and the
- * category lists are non-exported `readonly T[]` declarations with one spread
- * among them. So they are **restated below and held to the TypeScript
- * originals by exact-equality Vitest cases**. That is a mirror with a CI gate,
- * materially weaker than a read, and it is labelled as one rather than dressed
- * up as ADR-052's mechanism. Re-shaping `contracts.ts` so the parser could read
- * them would be a production change made to serve a test.
+ * What is read and what is mirrored, stated exactly
+ * -------------------------------------------------
+ * Two vocabularies are **read** out of TypeScript through the existing
+ * `product-event-vocabulary.mjs` parser — the mechanism ADR-052 established:
+ *
+ *   - the four `task_command_*` event names, from `contracts.ts`;
+ *   - `TASK_COMMAND_OUTCOMES`, the twelve outcome members, from `outcomes.ts`.
+ *
+ * The twelve are the list that actually drifts, so reading them matters most,
+ * and `COMMAND_FUNNEL_PREVIEWED_OUTCOMES` is derived from them by the same
+ * `[...outcomes, "previewed"]` spread `analytics.ts:121-124` uses — so it is
+ * derived from a read, not restated.
+ *
+ * Three lists are **mirrored**: origins, apply routes and undo results. Not by
+ * preference — the shared parser splits an array's body by line and requires one
+ * quoted entry per line, and all three are declared on a single line
+ * (`analytics.ts:95,108,230`), so it throws on them. Extending that parser would
+ * change a module two other smokes depend on in order to serve this one. They
+ * are two, three and four members long, they are held to the TypeScript
+ * originals by exact-equality Vitest cases, and the concession is recorded here
+ * rather than dressed up as a read.
  *
  * It fails loudly everywhere. A reader that shrugged at an unknown event name
  * would under-report the moment a fifth one ships; one that shrugged at an
@@ -35,51 +44,80 @@
  * gets spent on semantic retrieval.
  */
 
-import { readProductEventVocabulary } from "./product-event-vocabulary.mjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  parseProductEventVocabulary,
+  readProductEventVocabulary,
+} from "./product-event-vocabulary.mjs";
 
 /** The reader's own version, so a pasted number is traceable to its definition. */
-export const READER_VERSION = "2026-07-29.1";
+export const READER_VERSION = "2026-07-30.1";
 
 const ANALYTICS_SOURCE = "src/features/task-commands/analytics.ts";
 const OUTCOMES_SOURCE = "src/features/task-commands/outcomes.ts";
 
-/** Mirrors `TASK_COMMAND_ORIGINS`. */
+function repositoryRoot(explicit) {
+  return explicit ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+}
+
+/**
+ * The twelve outcome members, read from `outcomes.ts`.
+ *
+ * Read rather than restated because this is the list with twelve chances to
+ * drift. A thirteenth outcome added in TypeScript changes what this returns, and
+ * every distribution key, the refusal subset and the unreachable set move with
+ * it.
+ */
+export function readCommandFunnelOutcomes(root) {
+  const source = readFileSync(path.join(repositoryRoot(root), OUTCOMES_SOURCE), "utf8");
+  return parseProductEventVocabulary(source, "TASK_COMMAND_OUTCOMES");
+}
+
+/**
+ * The four `task_command_*` names, read from the contracts module.
+ *
+ * Derived by prefix rather than listed, so a fifth name added in TypeScript
+ * changes what this returns instead of being silently dropped from the funnel.
+ */
+export function readCommandFunnelEventNames(root) {
+  const { eventNames } = readProductEventVocabulary(repositoryRoot(root));
+  const names = eventNames.filter((name) => name.startsWith("task_command_"));
+  if (names.length === 0) {
+    throw new Error("contracts.ts declares no task_command_* product event names");
+  }
+  return names;
+}
+
+/** Mirrors `TASK_COMMAND_ORIGINS` (`analytics.ts:95`). */
 export const COMMAND_FUNNEL_ORIGINS = ["chat", "work"];
 
-/** Mirrors `TASK_COMMAND_OUTCOMES` — 2E-UX-001's twelve, in its declared order. */
-export const COMMAND_FUNNEL_OUTCOMES = [
-  "applied",
-  "no_change",
-  "ambiguous",
-  "ambiguous_overflow",
-  "matched_requires_confirmation",
-  "clarification_requested",
-  "still_unmatched",
-  "creation_offered",
-  "unsupported",
-  "rejected_stale",
-  "rejected_conflict",
-  "refused",
-];
-
-/** Mirrors `TASK_COMMAND_PREVIEWED_OUTCOMES` — the twelve plus `previewed`. */
-export const COMMAND_FUNNEL_PREVIEWED_OUTCOMES = [...COMMAND_FUNNEL_OUTCOMES, "previewed"];
-
-/** Mirrors `TASK_COMMAND_APPLY_ROUTES`. */
+/** Mirrors `TASK_COMMAND_APPLY_ROUTES` (`analytics.ts:108`). */
 export const COMMAND_FUNNEL_APPLY_ROUTES = ["direct", "confirmed", "created"];
 
-/** Mirrors `TASK_COMMAND_UNDO_RESULTS`. */
+/** Mirrors `TASK_COMMAND_UNDO_RESULTS` (`analytics.ts:230`). */
 export const COMMAND_FUNNEL_UNDO_RESULTS = ["undone", "unavailable", "expired", "refused"];
+
+/** Read from `outcomes.ts` — 2E-UX-001's twelve, in its declared order. */
+export const COMMAND_FUNNEL_OUTCOMES = readCommandFunnelOutcomes();
+
+/** The twelve plus `previewed`, by the same spread `analytics.ts:121-124` uses. */
+export const COMMAND_FUNNEL_PREVIEWED_OUTCOMES = [...COMMAND_FUNNEL_OUTCOMES, "previewed"];
+
+/** Read from `contracts.ts`. */
+export const COMMAND_FUNNEL_EVENT_NAMES = readCommandFunnelEventNames();
 
 /**
  * The refusal classes 2F-MEASURE-001 asks for: the categories where the system
  * understood the request and declined to complete it.
  *
- * Derived as a filter over the mirrored vocabulary rather than written as a
- * parallel list, so a thirteenth outcome cannot arrive without the parity case
- * noticing. `still_unmatched` and `creation_offered` are deliberately absent —
- * they are the no-match set below, and classifying them twice would make two
- * independent measures move together. `ambiguous`, `ambiguous_overflow`,
+ * Derived as a filter over the read vocabulary rather than written as a parallel
+ * list, so a thirteenth outcome cannot arrive without the parity case noticing.
+ * `still_unmatched` and `creation_offered` are deliberately absent — they are the
+ * no-match set below, and classifying them twice would make two independent
+ * measures move together. `ambiguous`, `ambiguous_overflow`,
  * `clarification_requested` and `matched_requires_confirmation` are unresolved
  * rather than refused; `no_change` is a successful no-op; `applied` and
  * `previewed` are successes.
@@ -91,7 +129,7 @@ export const COMMAND_FUNNEL_REFUSAL_OUTCOMES = COMMAND_FUNNEL_PREVIEWED_OUTCOMES
 /**
  * ADR-055's `no_match` members. The ADR says *final* outcome, which is why
  * `aggregateCommandFunnel` corrects the offered count by the created count
- * rather than counting preview dispositions — see the `noMatch` rate below.
+ * rather than counting preview dispositions.
  */
 export const COMMAND_FUNNEL_NO_MATCH_OUTCOMES = ["still_unmatched", "creation_offered"];
 
@@ -113,9 +151,18 @@ export const COMMAND_FUNNEL_NON_AUTHORIZING = [
 ];
 
 /**
- * ADR-055's thresholds. The rate gates carry an exact fraction beside the
- * decimal: the decimal is for reading, the fraction is what decides, so no
- * rounded rate ever stands between the evidence and the gate.
+ * ADR-055's thresholds.
+ *
+ * `qualifyingCommands` and `activeDays` are **floors** — more is stronger
+ * evidence. `windowDays` is a **ceiling**: ADR-055 says "50 qualifying commands
+ * / 10 distinct active days / a 14-day window", and the window is the
+ * measurement period, not something to accumulate. Fifty commands over a year is
+ * weaker evidence than fifty over a fortnight, so a longer window must not
+ * satisfy the tier.
+ *
+ * The rate gates carry an exact fraction beside the decimal: the decimal is for
+ * reading, the fraction is what decides, so no rounded rate ever stands between
+ * the evidence and the gate.
  */
 export const EVIDENCE_TIERS = {
   spike: { qualifyingCommands: 50, activeDays: 10, windowDays: 14 },
@@ -133,21 +180,28 @@ export const EVIDENCE_TIERS = {
 export const EXPIRY_HORIZON_DAYS = 90;
 
 /**
- * What the deployed emitters can and cannot produce, as data.
+ * Preview outcomes no deployed code path can emit.
  *
- * A measurement that reports a structurally-impossible zero as though it were
- * an observation is worse than no measurement. Every entry here was verified
- * against the emit sites in `src/features/task-commands/actions.ts` and
- * `src/features/operations/actions.ts`, and the Vitest parity case fails if a
- * future emitter makes one of these claims stale.
+ * Verified against every `report(...)` call site in
+ * `src/features/task-commands/actions.ts`, and re-verified on every CI run:
+ * `command-funnel.test.ts` reads that file and fails if a literal emitter for
+ * any of these appears. Without that read the claim would be a frozen constant
+ * asserting itself.
  */
 const UNREACHABLE_PREVIEW_OUTCOMES = ["applied", "unsupported", "rejected_conflict"];
+
+/**
+ * What the deployed emitters can and cannot produce, as data.
+ *
+ * A measurement that reports a structurally-impossible zero as though it were an
+ * observation is worse than no measurement.
+ */
 export const COMMAND_FUNNEL_REACHABILITY = Object.freeze({
   /**
    * Allowlisted on `task_command_previewed` and reachable from no code path:
    * both `unsupported` branches return before the emitter exists
-   * (`actions.ts:347-358` and `:719-726`; `report` is defined at `:400`), and
-   * no site passes `applied` or `rejected_conflict` to the preview event.
+   * (`actions.ts:347-358` and `:719-726`; `report` is defined at `:400`), and no
+   * site passes `applied` or `rejected_conflict` to the preview event.
    */
   unreachablePreviewOutcomes: Object.freeze(
     COMMAND_FUNNEL_PREVIEWED_OUTCOMES.filter((o) => UNREACHABLE_PREVIEW_OUTCOMES.includes(o)),
@@ -168,8 +222,11 @@ export const COMMAND_FUNNEL_REACHABILITY = Object.freeze({
   intentsWithNoPreviewEvent: true,
   /**
    * The Work surface's direct-action buttons apply without a preview round
-   * (`operations/actions.ts:386`), so the applied population is a superset of
-   * the previewed one. `appliedWithoutPreview` reports the difference.
+   * (`operations/actions.ts:386`), so the applied population is a superset of the
+   * previewed one. Both populations are reported raw — `previewedByOrigin` and
+   * `appliedByOrigin` — because their difference is not a clean measure: a
+   * console intent can emit up to three preview rounds for one apply, so a
+   * subtraction can read zero while direct-action applies are in heavy use.
    */
   appliesWithoutPreview: true,
   /** That same path has no undo event; the only emitter is `actions.ts:1070`. */
@@ -181,28 +238,6 @@ export const COMMAND_FUNNEL_REACHABILITY = Object.freeze({
    */
   unsupportedVolumeMeasurable: false,
 });
-
-/**
- * The four `task_command_*` names, read from the contracts module.
- *
- * Derived by prefix rather than listed, so a fifth name added in TypeScript
- * changes what this returns instead of being silently dropped from the funnel.
- */
-export function readCommandFunnelEventNames(repositoryRoot) {
-  const { eventNames } = readProductEventVocabulary(repositoryRoot);
-  const names = eventNames.filter((name) => name.startsWith("task_command_"));
-  if (names.length === 0) {
-    throw new Error("contracts.ts declares no task_command_* product event names");
-  }
-  return names;
-}
-
-const EVENT_NAMES = [
-  "task_command_previewed",
-  "task_command_disambiguated",
-  "task_command_applied",
-  "task_command_undone",
-];
 
 function zeroed(keys) {
   return Object.fromEntries(keys.map((key) => [key, 0]));
@@ -278,12 +313,23 @@ function requireBoolean(value, property) {
   return value;
 }
 
+function requireVersion(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("Event property policyVersion must be a non-empty string");
+  }
+  return value;
+}
+
 /**
  * The funnel, for one owner over one window.
  *
- * Single pass, no allocation per row beyond the counters, and every category
- * key present with a zero value so a consumer never has to tell "absent" from
- * "none" — and so a vocabulary member cannot quietly disappear from a report.
+ * Single pass, and every category key present with a zero value so a consumer
+ * never has to tell "absent" from "none" — and so a vocabulary member cannot
+ * quietly disappear from a report.
+ *
+ * The exclusion counters partition the rows they are reported against: the
+ * window filter runs first, so `excludedSynthetic` counts labelled rows *inside*
+ * the window and the two buckets never overlap.
  */
 export function aggregateCommandFunnel(input) {
   const rows = input?.rows ?? [];
@@ -297,12 +343,12 @@ export function aggregateCommandFunnel(input) {
 
   const outcomeDistribution = zeroed(COMMAND_FUNNEL_PREVIEWED_OUTCOMES);
   const originSplit = zeroed(COMMAND_FUNNEL_ORIGINS);
-  const qualifyingByOrigin = zeroed(COMMAND_FUNNEL_ORIGINS);
   const appliedByOrigin = zeroed(COMMAND_FUNNEL_ORIGINS);
   const appliedRoutesByOrigin = byOrigin(() => zeroed(COMMAND_FUNNEL_APPLY_ROUTES));
   const undoResultsByOrigin = byOrigin(() => zeroed(COMMAND_FUNNEL_UNDO_RESULTS));
   const disambiguationsByOrigin = zeroed(COMMAND_FUNNEL_ORIGINS);
   const activeDates = new Set();
+  const policyVersions = {};
 
   let qualifyingCommands = 0;
   let unsupportedRefusals = 0;
@@ -313,25 +359,24 @@ export function aggregateCommandFunnel(input) {
   let stillUnmatched = 0;
   let creationOffered = 0;
   let created = 0;
+  let replayedCreations = 0;
 
   for (const row of rows) {
     const eventName = row?.eventName;
-    if (!EVENT_NAMES.includes(eventName)) {
+    if (!COMMAND_FUNNEL_EVENT_NAMES.includes(eventName)) {
       throw new Error(
         `Unknown product event "${String(eventName)}" reached the funnel reader; `
-        + "the four names it aggregates are declared in "
+        + "the names it aggregates are declared in "
         + "src/features/product-analytics/contracts.ts",
       );
-    }
-    // The synthetic filter runs before the window filter so its count reports
-    // every labelled row the query returned, not only the recent ones.
-    if (row.isSynthetic === true) {
-      excludedSynthetic += 1;
-      continue;
     }
     const at = instantOf(row.createdAt, "createdAt");
     if (at.getTime() <= start.getTime() || at.getTime() > end.getTime()) {
       excludedOutOfWindow += 1;
+      continue;
+    }
+    if (row.isSynthetic === true) {
+      excludedSynthetic += 1;
       continue;
     }
 
@@ -342,6 +387,11 @@ export function aggregateCommandFunnel(input) {
       "commandOrigin",
       ANALYTICS_SOURCE,
     );
+    // Recorded per row rather than assumed uniform: a policy bump mid-window
+    // makes every rate a weighted average over two matchers, and a gate that
+    // cannot say so is not attributable to the rules that produced it.
+    const policyVersion = requireVersion(properties.policyVersion);
+    policyVersions[policyVersion] = (policyVersions[policyVersion] ?? 0) + 1;
 
     if (eventName === "task_command_previewed") {
       const outcome = requireMember(
@@ -351,12 +401,12 @@ export function aggregateCommandFunnel(input) {
         OUTCOMES_SOURCE,
       );
       const oneStep = requireBoolean(properties.oneStep, "oneStep");
+      requireBoolean(properties.requiresConfirmation, "requiresConfirmation");
       if (COMMAND_FUNNEL_EXCLUDED_OUTCOMES.includes(outcome)) {
         unsupportedRefusals += 1;
         continue;
       }
       qualifyingCommands += 1;
-      qualifyingByOrigin[origin] += 1;
       originSplit[origin] += 1;
       outcomeDistribution[outcome] += 1;
       activeDates.add(formatter.format(at));
@@ -380,9 +430,16 @@ export function aggregateCommandFunnel(input) {
         "applyRoute",
         ANALYTICS_SOURCE,
       );
+      // A replay returned the original outcome and created nothing
+      // (`apply.ts:222-225`), so counting it would let a double-submit move a
+      // gate. Counted separately instead of dropped.
+      const replayed = requireBoolean(properties.replayed, "replayed");
       appliedByOrigin[origin] += 1;
       appliedRoutesByOrigin[origin][route] += 1;
-      if (route === "created") created += 1;
+      if (route === "created") {
+        if (replayed) replayedCreations += 1;
+        else created += 1;
+      }
       continue;
     }
 
@@ -401,13 +458,18 @@ export function aggregateCommandFunnel(input) {
   }
 
   // ADR-055 defines `no_match` on the command's *final* outcome. An offer that
-  // became a creation ended `applied`, so it is not a no-match — and the two
-  // counts are joinable in aggregate even though no per-row key exists. When a
-  // creation's offer sat in an earlier window the difference goes negative;
-  // that is reported as skew rather than hidden by the clamp.
-  const offeredNotCreated = Math.max(0, creationOffered - created);
+  // became a creation ended `applied`, so it is not a no-match. There is no
+  // per-row key to join on, but the split is exact in aggregate:
+  //
+  //   creation_offered = (offers that became creations) + (offers that did not)
+  //
+  // and the first term is bounded by the creations actually observed. Creations
+  // beyond that came from offers in an earlier window; they are reported as skew
+  // rather than allowed to push a rate above one.
+  const creationsFromOffers = Math.min(creationOffered, created);
+  const offeredNotCreated = creationOffered - creationsFromOffers;
   const noMatchNumerator = stillUnmatched + offeredNotCreated;
-  const windowBoundarySkew = Math.max(0, created - creationOffered);
+  const windowBoundarySkew = created - creationsFromOffers;
 
   return {
     readerVersion: READER_VERSION,
@@ -425,25 +487,32 @@ export function aggregateCommandFunnel(input) {
     excludedSynthetic,
     excludedOutOfWindow,
     outcomeDistribution,
+    // `unsupported` is projected from its own counter, not from the
+    // distribution: the distribution partitions the *qualifying* population and
+    // `unsupported` is excluded from it, so reading it from there would report
+    // zero refusals in a window that had them.
     refusalOutcomeClasses: Object.fromEntries(
-      COMMAND_FUNNEL_REFUSAL_OUTCOMES.map((outcome) => [outcome, outcomeDistribution[outcome]]),
+      COMMAND_FUNNEL_REFUSAL_OUTCOMES.map((outcome) => [
+        outcome,
+        outcome === "unsupported" ? unsupportedRefusals : outcomeDistribution[outcome],
+      ]),
     ),
     originSplit,
+    previewedByOrigin: originSplit,
+    appliedByOrigin,
     appliedRoutesByOrigin,
     undoResultsByOrigin,
     disambiguationsByOrigin,
-    appliedWithoutPreview: Object.fromEntries(COMMAND_FUNNEL_ORIGINS.map((origin) => [
-      origin,
-      Math.max(0, appliedByOrigin[origin] - qualifyingByOrigin[origin]),
-    ])),
+    policyVersions,
     rates: {
       noMatch: rate(noMatchNumerator, qualifyingCommands),
-      noMatchToCreation: rate(created, qualifyingCommands),
+      noMatchToCreation: rate(creationsFromOffers, qualifyingCommands),
       oneStep: rate(oneStepCount, qualifyingCommands),
       ambiguity: rate(ambiguityCount, qualifyingCommands),
       previewNoMatch: rate(stillUnmatched + creationOffered, qualifyingCommands),
     },
     windowBoundarySkew,
+    replayedCreations,
     reachability: COMMAND_FUNNEL_REACHABILITY,
     nonAuthorizing: COMMAND_FUNNEL_NON_AUTHORIZING,
     // Out of an owner-scoped reader's range by construction (2F-MEASURE-004).
@@ -455,13 +524,20 @@ export function aggregateCommandFunnel(input) {
       stillUnmatched,
       creationOffered,
       created,
+      creationsFromOffers,
       noMatchNumerator,
     },
   };
 }
 
-function threshold(required, measured) {
-  return { required, measured, met: measured >= required };
+/** A floor: more of it is stronger evidence. */
+function atLeast(required, measured) {
+  return { required, measured, met: measured >= required, comparison: "at_least" };
+}
+
+/** A ceiling: a longer observation window is *weaker* evidence, not stronger. */
+function atMost(required, measured) {
+  return { required, measured, met: measured <= required, comparison: "at_most" };
 }
 
 /**
@@ -474,28 +550,32 @@ function threshold(required, measured) {
  */
 export function evaluateEvidenceTiers(report, options = {}) {
   const spike = {
-    qualifyingCommands: threshold(EVIDENCE_TIERS.spike.qualifyingCommands, report.qualifyingCommands),
-    activeDays: threshold(EVIDENCE_TIERS.spike.activeDays, report.activeDays),
-    windowDays: threshold(EVIDENCE_TIERS.spike.windowDays, report.window.days),
+    qualifyingCommands: atLeast(
+      EVIDENCE_TIERS.spike.qualifyingCommands,
+      report.qualifyingCommands,
+    ),
+    activeDays: atLeast(EVIDENCE_TIERS.spike.activeDays, report.activeDays),
+    windowDays: atMost(EVIDENCE_TIERS.spike.windowDays, report.window.days),
   };
 
-  const rateGate = meetsFraction(
+  const noMatchBranch = meetsFraction(
     report.counts.noMatchNumerator,
     report.qualifyingCommands,
     EVIDENCE_TIERS.planning.noMatchRate.fraction,
-  ) || meetsFraction(
-    report.counts.created,
+  );
+  const creationBranch = meetsFraction(
+    report.counts.creationsFromOffers,
     report.qualifyingCommands,
     EVIDENCE_TIERS.planning.noMatchToCreationRate.fraction,
   );
 
   const planning = {
-    qualifyingCommands: threshold(
+    qualifyingCommands: atLeast(
       EVIDENCE_TIERS.planning.qualifyingCommands,
       report.qualifyingCommands,
     ),
-    activeDays: threshold(EVIDENCE_TIERS.planning.activeDays, report.activeDays),
-    windowDays: threshold(EVIDENCE_TIERS.planning.windowDays, report.window.days),
+    activeDays: atLeast(EVIDENCE_TIERS.planning.activeDays, report.activeDays),
+    windowDays: atMost(EVIDENCE_TIERS.planning.windowDays, report.window.days),
     distinctUsers: {
       required: EVIDENCE_TIERS.planning.distinctUsers,
       measured: null,
@@ -507,11 +587,19 @@ export function evaluateEvidenceTiers(report, options = {}) {
         noMatch: EVIDENCE_TIERS.planning.noMatchRate.value,
         noMatchToCreation: EVIDENCE_TIERS.planning.noMatchToCreationRate.value,
       },
+      // Exact counts beside the rounded rates: the rates are for reading, and
+      // whoever reads "0.2 / 0.2, not met" deserves to see the fraction that
+      // decided it.
       measured: {
         noMatch: report.rates.noMatch,
         noMatchToCreation: report.rates.noMatchToCreation,
+        exact: {
+          noMatch: `${report.counts.noMatchNumerator}/${report.qualifyingCommands}`,
+          noMatchToCreation: `${report.counts.creationsFromOffers}/${report.qualifyingCommands}`,
+        },
       },
-      met: rateGate,
+      branches: { noMatch: noMatchBranch, noMatchToCreation: creationBranch },
+      met: noMatchBranch || creationBranch,
     },
   };
 

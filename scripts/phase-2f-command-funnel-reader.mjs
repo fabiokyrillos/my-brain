@@ -22,25 +22,43 @@
  * proves it cannot read events at all (PRD S5-S1, §18.14).
  *
  * Exit codes follow the standing remote-script convention: 0 pass, 1 assertion
- * failure, 2 "the deployed chain cannot answer this yet".
+ * failure, 2 "the deployed chain cannot answer this yet". Exit 2 is raised as a
+ * tagged **throw**, never as a bare `process.exit`, so the cleanup block always
+ * runs — a mid-run schema-cache miss must not be able to leave fixtures behind.
  */
 
 import { createClient } from "@supabase/supabase-js";
 import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
 import {
+  COMMAND_FUNNEL_EVENT_NAMES,
   aggregateCommandFunnel,
   evaluateEvidenceTiers,
-  readCommandFunnelEventNames,
 } from "./phase-2f-command-funnel.mjs";
 
 const DEFAULT_WINDOW_DAYS = 14;
 const PAGE_SIZE = 1000;
 const PROOF_APP_VERSION = "2f5-funnel-proof-1";
+const PROOF_ZONE = "America/Sao_Paulo";
+/** Client/server clock skew tolerance for the proof's window end. */
+const PROOF_WINDOW_MARGIN_MS = 60_000;
+
+class NotDeployed extends Error {
+  constructor(message) {
+    super(message);
+    this.exitCode = 2;
+  }
+}
 
 function argument(name) {
   const flag = `--${name}`;
   const index = process.argv.indexOf(flag);
-  if (index >= 0 && index + 1 < process.argv.length) return process.argv[index + 1];
+  if (index >= 0) {
+    const next = process.argv[index + 1];
+    if (next === undefined || next.startsWith("--")) {
+      throw new Error(`--${name} was given without a value`);
+    }
+    return next;
+  }
   const inline = process.argv.find((value) => value.startsWith(`${flag}=`));
   return inline ? inline.slice(flag.length + 1) : undefined;
 }
@@ -59,40 +77,42 @@ function dataOrThrow(result, label) {
   return result.data;
 }
 
-function notDeployed(message) {
-  console.error(`NOT DEPLOYED: ${message}`);
-  process.exit(2);
+function isMissingRelation(error) {
+  return error?.code === "42P01" || error?.code === "PGRST205";
 }
 
-const credentials = getLinkedSupabaseCredentials();
-const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
-const admin = createClient(credentials.url, credentials.serviceRoleKey, clientOptions);
-const eventNames = readCommandFunnelEventNames();
-
 /**
- * One owner's `task_command_*` rows, paginated to exhaustion.
+ * One owner's `task_command_*` rows, by keyset pagination.
  *
- * Exhaustion is asserted rather than assumed: a reader that stopped at a page
- * boundary would under-report a threshold, and under-reporting a gate is the
- * failure mode that looks like a passing run.
+ * Keyset rather than OFFSET, and ordered on `(created_at, id)` rather than
+ * `created_at` alone, because `created_at` is not unique
+ * (`202607170024_phase_2x_product_events.sql:50`) and Postgres gives no stable
+ * order for tied rows across separate statements. With OFFSET, a tie straddling
+ * a page boundary can return a row twice or not at all — and under-reporting a
+ * gate is the failure mode that looks like a passing run. `id` is unique, so the
+ * composite key is total and the walk is exhaustive by construction.
  */
 async function fetchOwnerRows(client, since) {
   const rows = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
+  let cursor = { createdAt: since, id: "00000000-0000-0000-0000-000000000000" };
+  let pages = 0;
+  for (;;) {
     const page = await client
       .from("product_events")
-      .select("event_name, created_at, is_synthetic, properties")
-      .in("event_name", eventNames)
-      .gt("created_at", since)
+      .select("id, event_name, created_at, is_synthetic, properties")
+      .in("event_name", COMMAND_FUNNEL_EVENT_NAMES)
+      .or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`)
       .order("created_at", { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
+      .order("id", { ascending: true })
+      .limit(PAGE_SIZE);
     if (page.error) {
-      if (page.error.code === "42P01" || page.error.code === "PGRST205") {
-        notDeployed(`public.product_events is not reachable: ${page.error.message}`);
+      if (isMissingRelation(page.error)) {
+        throw new NotDeployed(`public.product_events is not reachable: ${page.error.message}`);
       }
       throw new Error(`fetch product events (${page.error.code ?? "unknown"})`);
     }
     const batch = page.data ?? [];
+    pages += 1;
     for (const row of batch) {
       rows.push({
         eventName: row.event_name,
@@ -101,7 +121,9 @@ async function fetchOwnerRows(client, since) {
         properties: row.properties ?? {},
       });
     }
-    if (batch.length < PAGE_SIZE) return { rows, pages: offset / PAGE_SIZE + 1 };
+    if (batch.length < PAGE_SIZE) return { rows, pages };
+    const last = batch[batch.length - 1];
+    cursor = { createdAt: last.created_at, id: last.id };
   }
 }
 
@@ -112,6 +134,8 @@ async function fetchOwnerRows(client, since) {
  * (`task-commands/actions.ts:214-224`) because a command still has to run. A
  * measurement must not: bucketing `activeDays` in the wrong zone can split one
  * local day into two across a UTC−3 midnight, and that accident *passes* a gate.
+ * There is deliberately no `--time-zone` override — a gate whose bucketing the
+ * caller chooses is not a gate.
  */
 async function resolveTimeZone(client) {
   const profile = await client.from("profiles").select("timezone").maybeSingle();
@@ -134,29 +158,36 @@ function print(report, evaluation) {
   console.log(`Command funnel — reader ${report.readerVersion}, standard ${report.adr}`);
   console.log(`  window            ${report.window.start} .. ${report.window.end} (${report.window.days}d)`);
   console.log(`  time zone         ${report.timeZone}`);
-  console.log(`  counting unit     ${report.countingUnit}`);
+  console.log(`  counting unit     ${report.countingUnit} (1-3 rounds per intent; some intents emit none)`);
   console.log(`  qualifying        ${report.qualifyingCommands}`);
   console.log(`  active days       ${report.activeDays}`);
-  console.log(`  unsupported       ${report.unsupportedRefusals} (not measurable in production — see reachability)`);
+  console.log(`  unsupported       ${report.unsupportedRefusals} (volume not measurable in production — see reachability)`);
   console.log(`  excluded          ${report.excludedSynthetic} synthetic, ${report.excludedOutOfWindow} out of window`);
-  console.log(`  origin split      chat ${report.originSplit.chat}, work ${report.originSplit.work}`);
+  console.log(`  policy versions   ${JSON.stringify(report.policyVersions)}`);
+  console.log(`  previewed         ${JSON.stringify(report.previewedByOrigin)}`);
+  console.log(`  applied           ${JSON.stringify(report.appliedByOrigin)} (a superset: the Work direct-action path has no preview round)`);
   console.log(`  outcomes          ${JSON.stringify(report.outcomeDistribution)}`);
   console.log(`  refusal classes   ${JSON.stringify(report.refusalOutcomeClasses)}`);
-  console.log(`  applies           ${JSON.stringify(report.appliedRoutesByOrigin)}`);
+  console.log(`  apply routes      ${JSON.stringify(report.appliedRoutesByOrigin)}`);
   console.log(`  undos             ${JSON.stringify(report.undoResultsByOrigin)}`);
   console.log(`  disambiguations   ${JSON.stringify(report.disambiguationsByOrigin)}`);
-  console.log(`  applies w/o prev. ${JSON.stringify(report.appliedWithoutPreview)}`);
   console.log(`  rates             ${JSON.stringify(report.rates)}`);
   if (report.windowBoundarySkew > 0) {
-    console.log(`  boundary skew     ${report.windowBoundarySkew} creations whose offer predates the window`);
+    console.log(`  boundary skew     ${report.windowBoundarySkew} creation(s) whose offer predates the window`);
+  }
+  if (report.replayedCreations > 0) {
+    console.log(`  replayed          ${report.replayedCreations} creation replay(s), not counted as creations`);
   }
   console.log(`  non-authorizing   ${report.nonAuthorizing.join(", ")}`);
   console.log("");
   console.log(`  spike tier        ${evaluation.spike.verdict}`);
   for (const [name, entry] of Object.entries(evaluation.spike.thresholds)) {
-    console.log(`    ${name.padEnd(20)} ${entry.measured} / ${entry.required} ${entry.met ? "met" : "not met"}`);
+    const relation = entry.comparison === "at_most" ? "at most" : "at least";
+    console.log(`    ${name.padEnd(20)} ${entry.measured} (${relation} ${entry.required}) ${entry.met ? "met" : "not met"}`);
   }
   console.log(`  planning tier     ${evaluation.planning.verdict}`);
+  const gate = evaluation.planning.thresholds.rateGate;
+  console.log(`    rate gate            no-match ${gate.measured.exact.noMatch}, to-creation ${gate.measured.exact.noMatchToCreation} — ${gate.met ? "met" : "not met"}`);
   console.log(`    distinct users       out of an owner-scoped reader's range; privileged read required`);
   if (evaluation.expiry) {
     console.log(`  expiry            go-live ${evaluation.expiry.goLive} + ${evaluation.expiry.horizonDays}d = ${evaluation.expiry.expiresOn}`);
@@ -168,54 +199,72 @@ function print(report, evaluation) {
 // Owner read
 // ---------------------------------------------------------------------------
 
-async function runOwnerRead() {
+async function runOwnerRead(credentials, clientOptions) {
   const email = argument("email") ?? process.env.FUNNEL_OWNER_EMAIL;
   const password = argument("password") ?? process.env.FUNNEL_OWNER_PASSWORD;
   if (!email || !password) {
-    console.error(
+    throw new Error(
       "An owner read needs that owner's own credentials: --email and --password "
       + "(or FUNNEL_OWNER_EMAIL / FUNNEL_OWNER_PASSWORD). The reader is owner-scoped by "
       + "RLS and never reads events with the service-role key.",
     );
-    process.exit(1);
   }
+
+  // Arguments are validated before anything derived from them is computed, so a
+  // typo produces the named diagnostic rather than a bare RangeError from
+  // `Date`.
+  const rawWindowDays = argument("window-days") ?? String(DEFAULT_WINDOW_DAYS);
+  const windowDays = Number.parseInt(rawWindowDays, 10);
+  if (!Number.isInteger(windowDays) || windowDays <= 0) {
+    throw new Error(`--window-days must be a positive integer, received: ${rawWindowDays}`);
+  }
+  const rawWindowEnd = argument("window-end") ?? new Date().toISOString();
+  const windowEndMs = new Date(rawWindowEnd).getTime();
+  if (Number.isNaN(windowEndMs)) {
+    throw new Error(`--window-end must be a parseable instant, received: ${rawWindowEnd}`);
+  }
+  const goLive = argument("go-live") ?? null;
 
   const client = createClient(credentials.url, credentials.publishableKey, clientOptions);
   dataOrThrow(await client.auth.signInWithPassword({ email, password }), "sign in owner");
 
-  const windowDays = Number.parseInt(argument("window-days") ?? String(DEFAULT_WINDOW_DAYS), 10);
-  const windowEnd = argument("window-end") ?? new Date().toISOString();
-  const timeZone = argument("time-zone") ?? await resolveTimeZone(client);
-  const since = new Date(new Date(windowEnd).getTime() - windowDays * 86400000).toISOString();
+  try {
+    const timeZone = await resolveTimeZone(client);
+    const since = new Date(windowEndMs - windowDays * 86400000).toISOString();
+    const { rows, pages } = await fetchOwnerRows(client, since);
+    const report = aggregateCommandFunnel({
+      rows,
+      timeZone,
+      windowEnd: new Date(windowEndMs).toISOString(),
+      windowDays,
+    });
+    const evaluation = evaluateEvidenceTiers(report, { goLive });
 
-  const { rows, pages } = await fetchOwnerRows(client, since);
-  const report = aggregateCommandFunnel({ rows, timeZone, windowEnd, windowDays });
-  const evaluation = evaluateEvidenceTiers(report, { goLive: argument("go-live") ?? null });
-
-  if (!flag("json")) {
-    console.log(`Fetched ${rows.length} row(s) across ${pages} page(s).`);
+    if (!flag("json")) {
+      console.log(`Fetched ${rows.length} row(s) across ${pages} page(s).`);
+    }
+    print(report, evaluation);
+  } finally {
+    await client.auth.signOut();
   }
-  print(report, evaluation);
-  await client.auth.signOut();
 }
 
 // ---------------------------------------------------------------------------
 // The exclusion-mechanism proof
 // ---------------------------------------------------------------------------
 
-const PROOF_ZONE = "America/Sao_Paulo";
-
 /**
- * Refuse to run within five minutes of local midnight.
+ * Refuse to start without a full local day ahead of the run.
  *
  * Every fixture event's `created_at` is `now()` — `product_events` accepts no
  * direct insert, so the proof cannot choose its own timestamps — which makes
  * `activeDays` exactly 1 unless the run straddles local midnight. Rather than
- * loosen the assertion to `1 or 2`, which would stop proving anything, the run
- * refuses at the boundary and says why. Day bucketing itself is pure arithmetic
- * and is proven exactly in CI by `command-funnel.test.ts`.
+ * loosen the assertion to "1 or 2", which would stop proving anything, the run
+ * refuses when local midnight is within half an hour and says why. Starting just
+ * *after* midnight is fine and is not refused. Day bucketing itself is pure
+ * arithmetic and is proven exactly in CI by `command-funnel.test.ts`.
  */
-function refuseNearLocalMidnight() {
+function localMinutesIntoDay() {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: PROOF_ZONE,
     hour: "2-digit",
@@ -224,14 +273,17 @@ function refuseNearLocalMidnight() {
   }).formatToParts(new Date());
   const hour = Number(parts.find((part) => part.type === "hour")?.value);
   const minute = Number(parts.find((part) => part.type === "minute")?.value);
-  const minutesIntoDay = hour * 60 + minute;
-  if (minutesIntoDay < 5 || minutesIntoDay > 1435) {
-    console.error(
+  return { hour, minute, minutesIntoDay: hour * 60 + minute };
+}
+
+function refuseNearLocalMidnight() {
+  const { hour, minute, minutesIntoDay } = localMinutesIntoDay();
+  if (minutesIntoDay > 1410) {
+    throw new NotDeployed(
       `This proof pins activeDays to 1, and it is ${String(hour).padStart(2, "0")}:`
       + `${String(minute).padStart(2, "0")} in ${PROOF_ZONE} — a run straddling local `
-      + "midnight would split the corpus across two days. Re-run away from the boundary.",
+      + "midnight would split the corpus across two days. Re-run after midnight.",
     );
-    process.exit(2);
   }
 }
 
@@ -256,27 +308,24 @@ function previewedProperties(overrides) {
  * Chosen so every measure has a distinct expected value — no two counters share
  * a number that a transposition could hide — and so both exclusion classes are
  * exercised: one `unsupported` row (out of the denominator, counted separately)
- * and one synthetic row (dropped entirely).
+ * and one synthetic row (dropped entirely). The non-synthetic rows are the
+ * minimum the assertions require; they belong to a disposable owner and leave
+ * with it.
  */
 const OWNER_A_CORPUS = [
   { name: "task_command_previewed", properties: previewedProperties({}) },
   {
     name: "task_command_previewed",
-    properties: previewedProperties({ outcomeCategory: "ambiguous", oneStep: false, candidateCount: 3 }),
+    properties: previewedProperties({
+      outcomeCategory: "ambiguous", oneStep: false, candidateCount: 3,
+    }),
   },
-  {
-    name: "task_command_previewed",
-    properties: previewedProperties({ commandOrigin: "work" }),
-  },
+  { name: "task_command_previewed", properties: previewedProperties({ commandOrigin: "work" }) },
   {
     name: "task_command_previewed",
     properties: previewedProperties({ outcomeCategory: "unsupported", oneStep: false }),
   },
-  {
-    name: "task_command_previewed",
-    synthetic: true,
-    properties: previewedProperties({}),
-  },
+  { name: "task_command_previewed", synthetic: true, properties: previewedProperties({}) },
   {
     name: "task_command_previewed",
     properties: previewedProperties({ outcomeCategory: "still_unmatched", oneStep: false }),
@@ -309,6 +358,14 @@ const OWNER_A_CORPUS = [
     properties: {
       commandOrigin: "chat", outcomeCategory: "applied", applyRoute: "created",
       replayed: false, policyVersion: "2026-07-25.3",
+    },
+  },
+  // A replay of that creation: it created nothing, so the gate must not count it.
+  {
+    name: "task_command_applied",
+    properties: {
+      commandOrigin: "chat", outcomeCategory: "applied", applyRoute: "created",
+      replayed: true, policyVersion: "2026-07-25.3",
     },
   },
   {
@@ -351,7 +408,7 @@ async function emit(client, corpus) {
     });
     if (recorded.error) {
       if (recorded.error.code === "PGRST202") {
-        notDeployed(`record_product_event is absent: ${recorded.error.message}`);
+        throw new NotDeployed(`record_product_event is absent: ${recorded.error.message}`);
       }
       throw new Error(`record ${event.name} (${recorded.error.code ?? "unknown"})`);
     }
@@ -374,9 +431,10 @@ async function reportFor(client, windowEnd) {
   });
 }
 
-async function runProof() {
+async function runProof(credentials, clientOptions) {
   refuseNearLocalMidnight();
 
+  const admin = createClient(credentials.url, credentials.serviceRoleKey, clientOptions);
   const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   const password = `Phase-2F5-${crypto.randomUUID()}!`;
   const createdUsers = [];
@@ -405,19 +463,23 @@ async function runProof() {
   let cleanupProven = false;
   try {
     console.log("Phase 2F Slice 2F.5 — command-funnel exclusion-mechanism proof");
+    console.log("This mode writes disposable fixtures and deletes them; the reader itself writes nothing.");
     console.log("");
 
     const ownerA = await createOwner("a");
     const ownerB = await createOwner("b");
 
     // The owner's own profile time zone must exist before the reader will read.
+    // Asserted as resolvable rather than equal to a particular value: the column
+    // default is schema, not this slice's contract.
     const zoneA = await resolveTimeZone(ownerA.client);
-    assert(zoneA === PROOF_ZONE, "Fixture owner carries a resolvable profile time zone", zoneA);
+    assert(typeof zoneA === "string" && zoneA.length > 0,
+      "Fixture owner carries a resolvable profile time zone", zoneA);
 
     await emit(ownerA.client, OWNER_A_CORPUS);
     await emit(ownerB.client, OWNER_B_CORPUS);
 
-    const windowEnd = new Date(Date.now() + 1000).toISOString();
+    const windowEnd = new Date(Date.now() + PROOF_WINDOW_MARGIN_MS).toISOString();
     const reportA = await reportFor(ownerA.client, windowEnd);
     const reportB = await reportFor(ownerB.client, windowEnd);
 
@@ -427,10 +489,10 @@ async function runProof() {
       `saw ${reportA.qualifyingCommands}`);
     assert(reportB.qualifyingCommands === 2, "Owner B sees its own two qualifying rounds",
       `saw ${reportB.qualifyingCommands}`);
-    assert(reportA.originSplit.chat === 4 && reportA.originSplit.work === 2,
-      "Owner A's origin split is exact", JSON.stringify(reportA.originSplit));
-    assert(reportB.originSplit.chat === 1 && reportB.originSplit.work === 1,
-      "Owner B's origin split is exact", JSON.stringify(reportB.originSplit));
+    assert(reportA.previewedByOrigin.chat === 4 && reportA.previewedByOrigin.work === 2,
+      "Owner A's origin split is exact", JSON.stringify(reportA.previewedByOrigin));
+    assert(reportB.previewedByOrigin.chat === 1 && reportB.previewedByOrigin.work === 1,
+      "Owner B's origin split is exact", JSON.stringify(reportB.previewedByOrigin));
 
     // Isolation, in both directions. A's totals already exclude B's rows: any
     // leak would have made the exact counts above fail. This states it directly.
@@ -452,6 +514,9 @@ async function runProof() {
       `saw ${reportA.unsupportedRefusals}`);
     assert(reportA.outcomeDistribution.unsupported === 0,
       "The unsupported row is absent from the qualifying distribution");
+    assert(reportA.refusalOutcomeClasses.unsupported === 1,
+      "The refusal breakdown reports the unsupported refusal rather than a contradictory zero",
+      JSON.stringify(reportA.refusalOutcomeClasses));
     assert(reportA.excludedSynthetic === 1, "The synthetic row is excluded",
       `saw ${reportA.excludedSynthetic}`);
     assert(reportA.activeDays === 1, "Active days are bucketed in the owner's own zone",
@@ -466,14 +531,20 @@ async function runProof() {
       JSON.stringify(reportA.rates));
     assert(reportA.rates.noMatchToCreation === 0.167,
       "The no-match-to-creation rate is measured from applyRoute", JSON.stringify(reportA.rates));
+    assert(reportA.replayedCreations === 1 && reportA.counts.created === 1,
+      "A replayed creation is reported and not counted as a creation",
+      `created ${reportA.counts.created}, replayed ${reportA.replayedCreations}`);
     assert(reportA.windowBoundarySkew === 0, "No creation crossed the window boundary");
     assert(
       reportA.appliedRoutesByOrigin.chat.direct === 1
-        && reportA.appliedRoutesByOrigin.chat.created === 1
+        && reportA.appliedRoutesByOrigin.chat.created === 2
         && reportA.appliedRoutesByOrigin.work.direct === 1,
       "Applies are cross-tabulated by origin",
       JSON.stringify(reportA.appliedRoutesByOrigin),
     );
+    assert(reportA.appliedByOrigin.chat === 3 && reportA.appliedByOrigin.work === 1,
+      "The applied population is reported raw beside the previewed one",
+      JSON.stringify(reportA.appliedByOrigin));
     assert(
       reportA.undoResultsByOrigin.chat.undone === 1
         && reportA.undoResultsByOrigin.work.expired === 1,
@@ -482,6 +553,10 @@ async function runProof() {
     assert(reportA.disambiguationsByOrigin.chat === 1
       && reportA.disambiguationsByOrigin.work === 0,
       "Disambiguations are cross-tabulated by origin");
+    assert(Object.keys(reportA.policyVersions).length === 1
+      && reportA.policyVersions["2026-07-25.3"] === 14,
+      "Every counted row is attributed to the policy version that produced it",
+      JSON.stringify(reportA.policyVersions));
     assert(reportA.distinctUsers === null && reportA.privilegedReadRequired === true,
       "The distinct-user count is reported as out of range, never inferred as one");
 
@@ -512,10 +587,10 @@ async function runProof() {
 
     // Cascade. A's own positive count is already asserted above, so the
     // pre-condition is non-vacuous. Deletion is asserted, and re-authentication
-    // is proven to fail. The FK's delete action itself is proven as schema truth
-    // in CI (`supabase/tests/product_events.sql`) — no credential this
-    // repository holds can read an event row once its owner is gone, and that
-    // residual is recorded in the PRD rather than papered over.
+    // is proven to fail. The foreign key's delete action itself is proven as
+    // schema truth in CI (`supabase/tests/product_events.sql`) — no credential
+    // this repository holds can read an event row once its owner is gone, and
+    // that residual is recorded in the PRD rather than papered over.
     for (const client of sessions) await client.auth.signOut();
     for (const userId of createdUsers) {
       const removed = await admin.auth.admin.deleteUser(userId);
@@ -535,8 +610,7 @@ async function runProof() {
       const still = await admin.auth.admin.getUserById(userId);
       if (still.data?.user) survivors.push(userId);
     }
-    assert(survivors.length === 0, "No fixture owner survives the run",
-      survivors.join(", "));
+    assert(survivors.length === 0, "No fixture owner survives the run", survivors.join(", "));
     cleanupProven = true;
 
     console.log("");
@@ -545,37 +619,51 @@ async function runProof() {
       controls: [
         "owner-scoping", "cross-owner-isolation", "anonymous-denial", "service-role-denial",
         "synthetic-exclusion", "unsupported-exclusion", "final-outcome-no-match",
-        "origin-cross-tabulation", "distinct-user-out-of-range", "tier-evaluation",
-        "expiry", "cascade-deletion", "fail-closed-cleanup",
+        "replay-exclusion", "policy-version-attribution", "origin-cross-tabulation",
+        "distinct-user-out-of-range", "tier-evaluation", "expiry", "cascade-deletion",
+        "fail-closed-cleanup",
       ],
       ownerA: reportA,
-      ownerB: { qualifyingCommands: reportB.qualifyingCommands, originSplit: reportB.originSplit },
+      ownerB: {
+        qualifyingCommands: reportB.qualifyingCommands,
+        previewedByOrigin: reportB.previewedByOrigin,
+      },
       evaluation: evaluationA,
     }, null, 2));
   } finally {
     // Fail-closed: anything this run created and did not prove gone is a failure,
-    // not a warning. Deleting twice is harmless; leaving one behind is not.
+    // not a warning. Deleting twice is harmless; leaving one behind is not. This
+    // block runs even for an exit-2 condition, because exit 2 is a throw.
     if (!cleanupProven) {
-      let residue = 0;
+      const residue = [];
       for (const userId of createdUsers) {
         const removed = await admin.auth.admin.deleteUser(userId);
-        if (removed.error) {
-          residue += 1;
-          console.error(`Could not remove funnel fixture owner ${userId}: ${removed.error.message}`);
-        }
+        if (removed.error) residue.push(`${userId}: ${removed.error.message}`);
       }
-      if (residue > 0) {
-        console.error(`FAILED: ${residue} funnel fixture owner(s) survived the run`);
+      if (residue.length > 0) {
+        console.error(`FAILED: ${residue.length} funnel fixture owner(s) survived the run`);
+        for (const line of residue) console.error(`  ${line}`);
         process.exitCode = 1;
       }
     }
   }
 }
 
+async function main() {
+  // Resolved inside the guarded path so a credential failure produces the
+  // documented diagnostic rather than a raw stack trace. `linked-supabase.mjs`
+  // never puts key material in an error.
+  const credentials = getLinkedSupabaseCredentials();
+  const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
+  if (flag("proof")) await runProof(credentials, clientOptions);
+  else await runOwnerRead(credentials, clientOptions);
+}
+
 try {
-  if (flag("proof")) await runProof();
-  else await runOwnerRead();
+  await main();
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  const exitCode = error instanceof NotDeployed ? 2 : 1;
+  const label = exitCode === 2 ? "NOT DEPLOYED" : "ERROR";
+  console.error(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(process.exitCode === 1 ? 1 : exitCode);
 }
