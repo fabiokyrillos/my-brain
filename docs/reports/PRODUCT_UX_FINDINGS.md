@@ -102,8 +102,8 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
 | UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | **RESOLVED** (Slice F1 — field, accessor, Conversar/Talk) |
 | UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **RESOLVED** (Slice E — one composer) |
-| UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | OPEN |
-| UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | OPEN |
+| UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
+| UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
 | UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | OPEN |
 | UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | OPEN |
@@ -544,8 +544,10 @@ that measured clean and is recorded so it is not "fixed" without cause.
   a command path (only tasks were consolidated, in Slice 2F.4). Adding an *update*
   path is a new write surface for `projects`, so it must be a Server Action with Zod
   validation and an `audit_logs` row — matching the existing posture, not bypassing it.
-- **Slice** — F.
-- **Disposition** — OPEN (any schema change is DEC-4).
+- **Slice** — F2.
+- **Disposition** — **RESOLVED** in Slice F2. Existing columns and relations are surfaced and
+  editable through a validated, audited path; no column was added. Any *new* field stays a
+  DEC-4 question, now answerable against real use.
 
 ## UX-09 — People: create-by-name only; modelled relations unsurfaced
 
@@ -565,8 +567,10 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Proposed solution** — surface relationships, company, contexts and per-project
   roles; make `notes` editable; keep the memories block (already there) and label its
   provenance (UX-10).
-- **Slice** — F.
-- **Disposition** — OPEN (any schema change is DEC-4).
+- **Slice** — F2.
+- **Disposition** — **RESOLVED** in Slice F2. Existing columns and relations are surfaced and
+  editable through a validated, audited path; no column was added. Any *new* field stays a
+  DEC-4 question, now answerable against real use.
 
 ## UX-10 — Memories have no mental model, no provenance and no lifecycle
 
@@ -1956,3 +1960,106 @@ locally and is worth fixing on its own terms someday.
 
 - **UX-06 — RESOLVED.** The field ships, the actor name is threaded through one accessor, and
   the three referents are separate.
+
+---
+
+# Slice F2 — Projects and People (UX-08, UX-09)
+
+**Branch** `codex/ux-slice-f2-projects-people`, cut from the green Slice F1 merge SHA
+`66d2ae0`. **Covers** UX-08 and UX-09 under DEC-4. **Non-goals** — **no migration and no new
+column**, no organization creation, no relationship or context *editing*, and nothing about
+memories (Slice G). **Rollback boundary** — removing the `EntityEditForm` mount from the two
+detail pages restores the read-only surface; the new module is otherwise unreferenced.
+
+## What existed and was unreachable
+
+Every field this slice makes editable, and every relation it renders, was **already in the
+schema**. `createRecord` inserted `{user_id, name}` and that was the entire lifecycle.
+
+| Table | Column / relation | Before |
+| --- | --- | --- |
+| `projects` | `description`, `status`, `organization_id` | in the schema, never writable |
+| `people` | `notes`, `organization_id` | in the schema, never writable |
+| `person_projects` | `role` | **already fetched by both pages** and thrown away |
+| `person_relationships` | `relationship_type`, `description`, validity | modelled since `202607160009`, rendered nowhere |
+| `person_contexts` → `contexts.kind` | — | same |
+
+So "shared projects" said a project was shared and never what the person *does* on it, and
+the project's People list said someone was linked and never in what capacity.
+
+## The write path, and why it is not an RPC
+
+Plain RLS-scoped statements, matching the posture `createRecord` already uses for these two
+tables. `authenticated` still holds `update` on both (`202607160003:195`) — Phase 2F's
+revocation covered `tasks` and `reminders` only, deliberately — so **no migration is
+required**, and `audit_logs` already admits `'project'` and `'person'` as entity types
+(`202607160007:122`).
+
+Four properties carry it:
+
+**Ownership is proved twice.** RLS is the trust boundary; the `user_id` predicate on every
+statement is the belt to its braces. A policy loosened in a later migration would otherwise
+widen these writes silently.
+
+**The pre-state is read before the write, in the same scope.** An audit row recording only the
+result cannot answer "what did this change". The audit's *own* failure is logged and not
+surfaced: the change did happen, and reporting otherwise would invite a second save.
+
+**Every failure is a distinct sentence.** A duplicate name (`23505` on
+`projects_user_name_idx`) is a user mistake with an obvious next step; a vanished row is not;
+neither is an outage. Collapsing them is how someone retries what can never succeed.
+
+**Bounds are copied, not chosen.** 1–160 for both names, the four literals
+`projects_status_check` allows, and cleared text stored as `null` rather than `""` — because
+both pages fall back on `null` to render their placeholder.
+
+## Three defects only the live journey could find
+
+Recorded because each was invisible to a green unit suite, and two of them made the feature
+completely non-functional while every test passed.
+
+**`F2-M1` — the strict schema refused every save.** A Server Action's `FormData` carries
+`$ACTION_*` framework metadata, and both schemas are `.strict()`. `updateProfile` already
+filters these (`profile/actions.ts:18-20`); this module did not. Unit tests built their own
+`FormData` and never saw it.
+
+**`F2-M2` — a disabled control is not submitted.** The company `<select>` was disabled when
+the owner had no organizations, which is the obvious thing to do and is wrong: `organizationId`
+then vanished from the submission and the strict schema refused the *whole* save. The select
+is no longer disabled — with no organizations it holds one option anyway.
+
+**`F2-M3` — React 19 resets an uncontrolled form after an action.** So a refused save snapped
+the field back to the stored value, leaving an error message above an edit the owner could no
+longer see. The action now echoes its input back on the failures worth recovering and the
+fields default to it; the selects are keyed on their own default, because React applies
+`defaultValue` to a `<select>` only on mount.
+
+All three are now pinned by unit tests, written after the fact and named for what they guard.
+
+## Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm test` **2840/2842** (the two are the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts`, unchanged since B2) ·
+`npm run build` exit 0 · **37 new tests** across `schema`, `actions` and `entity-edit-form`.
+
+Journeys, **on the production build against the linked live database**: **76/76** across
+`online-entity-editing`, `online-assistant-name`, `online-assistant-composer`,
+`online-mobile-navigation`, `account-session`, `layout-contracts`, `foundation` and
+`task-command`, on desktop **and** Pixel 7. The new journey re-reads the page after every save,
+so a value rendered from React state rather than from the database would fail it. Disposable
+account deleted fail-closed — the cascade takes its projects, people and audit rows with it —
+and a post-run sweep found **zero** residue.
+
+Migration parity unchanged at `202607300063`. No deployment. Phase 2G remains unstarted.
+
+## What DEC-4 still holds back
+
+Nothing new persists. The fields the audit called *genuinely missing* — a project's explicit
+purpose, start/target dates and free-form notes; a person-level role distinct from
+`person_projects.role` — are untouched, and the decision on them is now ready to be taken
+against real use rather than in the abstract, which is what DEC-4 asked for.
+
+- **UX-08 — RESOLVED.** Name, description, status and company are editable; per-project roles
+  are shown. New fields remain a DEC-4 question.
+- **UX-09 — RESOLVED.** Name, notes and company are editable; relationships, contexts and
+  per-project roles are surfaced. A person-level role remains a DEC-4 question.

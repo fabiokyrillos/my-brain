@@ -1,21 +1,35 @@
 import { ArrowLeft, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { updateProject } from "@/features/entities/actions";
+import { getEntityCopy } from "@/features/entities/copy";
+import { EntityEditForm } from "@/features/entities/entity-edit-form";
+import { loadOrganizationOptions } from "@/features/entities/organizations";
+import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
+
+/** The column is `text` with a CHECK, so a value outside the four is a data fault, not a crash. */
+function asProjectStatus(value: string): ProjectStatus {
+  return (PROJECT_STATUSES as readonly string[]).includes(value) ? (value as ProjectStatus) : "active";
+}
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ locale: string; projectId: string }> }) {
   const { locale: candidate, projectId } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const pt = locale === "pt-BR";
+  const copy = getEntityCopy(locale);
   const { supabase } = await requireUser(locale);
-  const [projectResult, taskLinkResult, personLinkResult, entryLinkResult] = await Promise.all([
-    supabase.from("projects").select("id,name,description,status,created_at,updated_at").eq("id", projectId).maybeSingle(),
+  const [projectResult, taskLinkResult, personLinkResult, entryLinkResult, organizations] = await Promise.all([
+    // `organization_id` joins the projection here for the first time: the column
+    // has always existed and the page never read it (UX-08).
+    supabase.from("projects").select("id,name,description,status,organization_id,created_at,updated_at").eq("id", projectId).maybeSingle(),
     supabase.from("task_projects").select("task_id").eq("project_id", projectId).limit(100),
     supabase.from("person_projects").select("person_id,role,valid_from,valid_until").eq("project_id", projectId).is("valid_until", null).limit(100),
     supabase.from("entry_entities").select("entry_id").eq("entity_type", "project").eq("entity_id", projectId).limit(100),
+    loadOrganizationOptions(supabase),
   ]);
   const project = requireSupabaseData(projectResult, "load project");
   const taskLinks = requireSupabaseData(taskLinkResult, "load project tasks") ?? [];
@@ -35,5 +49,87 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const people = requireSupabaseData(peopleResult, "load related people") ?? [];
   const entries = requireSupabaseData(entryResult, "load project timeline") ?? [];
 
-  return <div className="content-page entity-detail"><Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{pt ? "Projetos" : "Projects"}</Link><header className="entity-hero"><FolderKanban size={28} /><div><p className="eyebrow">{project.status.toUpperCase()}</p><h1>{project.name}</h1><p>{project.description ?? (pt ? "Contexto construído a partir dos seus registros." : "Context built from your entries.")}</p></div></header><div className="entity-columns"><section><h2>{pt ? "Tarefas" : "Tasks"}</h2>{tasks.length ? <div className="mini-list">{tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{task.status}</span></article>)}</div> : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}</section><section><h2>{pt ? "Pessoas" : "People"}</h2>{people.length ? <div className="mini-list">{people.map((person) => <Link href={`/${locale}/app/people/${person.id}`} key={person.id}><strong>{person.name}</strong></Link>)}</div> : <p className="quiet-state">{pt ? "Nenhuma pessoa vinculada." : "No linked people."}</p>}</section></div><section className="entity-timeline"><h2>{pt ? "Linha do tempo" : "Timeline"}</h2>{entries.length ? <div className="timeline-list">{entries.map((entry) => <article key={entry.id}><span className="timeline-dot" /><div><Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link><small>{new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at))}{entry.is_retroactive ? ` · ${pt ? "adicionado depois" : "added later"}` : ""}</small></div></article>)}</div> : <p className="quiet-state">{pt ? "A linha do tempo começa na próxima menção." : "The timeline starts with the next mention."}</p>}</section></div>;
+  // `person_projects.role` was already being read by this page and never
+  // rendered (UX-08). Keyed by person so the People list can say what each one
+  // does here rather than only that they are linked.
+  const roleByPersonId = new Map(personLinks.map((link) => [link.person_id, link.role]));
+  const organizationName = organizations.find((item) => item.id === project.organization_id)?.name ?? null;
+  const status = asProjectStatus(project.status);
+
+  return (
+    <div className="content-page entity-detail">
+      <Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{pt ? "Projetos" : "Projects"}</Link>
+
+      <header className="entity-hero">
+        <FolderKanban size={28} />
+        <div>
+          <p className="eyebrow">{copy.statuses[status].toUpperCase()}</p>
+          <h1>{project.name}</h1>
+          <p>{project.description ?? (pt ? "Contexto construído a partir dos seus registros." : "Context built from your entries.")}</p>
+          <p className="entity-relation-line">
+            <span>{copy.company}</span>
+            <strong>{organizationName ?? copy.companyNone}</strong>
+          </p>
+        </div>
+      </header>
+
+      <EntityEditForm
+        action={updateProject}
+        fields={{
+          kind: "project",
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          status,
+          organizationId: project.organization_id,
+        }}
+        locale={locale}
+        organizations={organizations}
+      />
+
+      <div className="entity-columns">
+        <section>
+          <h2>{pt ? "Tarefas" : "Tasks"}</h2>
+          {tasks.length ? (
+            <div className="mini-list">
+              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{task.status}</span></article>)}
+            </div>
+          ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
+        </section>
+        <section>
+          <h2>{pt ? "Pessoas" : "People"}</h2>
+          {people.length ? (
+            <div className="mini-list">
+              {people.map((person) => (
+                <Link href={`/${locale}/app/people/${person.id}`} key={person.id}>
+                  <strong>{person.name}</strong>
+                  <span>{roleByPersonId.get(person.id) ?? copy.noRole}</span>
+                </Link>
+              ))}
+            </div>
+          ) : <p className="quiet-state">{pt ? "Nenhuma pessoa vinculada." : "No linked people."}</p>}
+        </section>
+      </div>
+
+      <section className="entity-timeline">
+        <h2>{pt ? "Linha do tempo" : "Timeline"}</h2>
+        {entries.length ? (
+          <div className="timeline-list">
+            {entries.map((entry) => (
+              <article key={entry.id}>
+                <span className="timeline-dot" />
+                <div>
+                  <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
+                  <small>
+                    {new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at))}
+                    {entry.is_retroactive ? ` · ${pt ? "adicionado depois" : "added later"}` : ""}
+                  </small>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <p className="quiet-state">{pt ? "A linha do tempo começa na próxima menção." : "The timeline starts with the next mention."}</p>}
+      </section>
+    </div>
+  );
 }

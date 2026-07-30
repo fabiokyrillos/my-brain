@@ -1,0 +1,174 @@
+/**
+ * The entity edit surface and the relations Slice F2 surfaces (UX-08, UX-09).
+ *
+ * Sized against `.settings-fields`, which is the product's existing form
+ * vocabulary — a second visual language for the same kind of control would make
+ * the two pages look like different products.
+ */
+
+.entity-edit {
+  margin: 0 0 26px;
+}
+
+.entity-edit-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid #bcc7d6;
+  border-radius: 11px;
+  background: white;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.entity-edit-open:hover {
+  background: var(--mist);
+}
+
+.entity-edit-form {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.06);
+}
+
+.entity-edit-form > label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.entity-edit-form input[type="text"],
+.entity-edit-form select,
+.entity-edit-form textarea {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #b9c5d5;
+  border-radius: 11px;
+  padding: 11px 13px;
+  background: white;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.entity-edit-form textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.entity-edit-form select:disabled {
+  background: var(--mist);
+  color: var(--ink-soft);
+}
+
+.entity-edit-hint {
+  display: block;
+  margin-top: -8px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.entity-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* 44px on every control here, as everywhere else that is touched on a phone. */
+.entity-edit-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 11px;
+  font-weight: 750;
+}
+
+.entity-edit-save {
+  background: var(--ink);
+  color: white;
+}
+
+.entity-edit-save:disabled {
+  opacity: 0.72;
+}
+
+.entity-edit-cancel {
+  background: white;
+  color: var(--ink);
+  border: 1px solid #bcc7d6;
+}
+
+.entity-edit-cancel:hover:not(:disabled) {
+  background: var(--mist);
+}
+
+.entity-edit-feedback {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.entity-edit-feedback.success {
+  margin-top: 10px;
+  color: #26714c;
+}
+
+.entity-edit-feedback.error {
+  color: #a33a32;
+}
+
+.entity-edit-form :focus-visible,
+.entity-edit-open:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* The company line in the hero: a fact about the entity, not a heading. */
+.entity-relation-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.entity-relation-line > span {
+  font: 650 9px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8290a4;
+}
+
+.entity-relation-line > strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* Roles and relationship types are owner content and can be long. */
+.entity-detail .mini-list span {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .entity-edit-form {
+    padding: 18px;
+  }
+
+  .entity-edit-actions > button {
+    flex: 1 1 100%;
+  }
+}
