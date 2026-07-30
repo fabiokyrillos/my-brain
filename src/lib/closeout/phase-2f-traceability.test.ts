@@ -431,6 +431,24 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
       .toThrow(/docs\/STATE\.md:\d+ says migration 202607290062 is undeployed/);
   });
 
+  it("keeps scanning the rest of a line whose only marker is an unrelated strikethrough", async () => {
+    // The exemption's first form tested the whole line for `~~`, so any struck note
+    // anywhere silenced every claim on that line. A guard that can be switched off
+    // by unrelated formatting is worse than no guard, because it reads as one.
+    const { buildPhase2fTraceability, stripHistoricalSpans } = await load();
+    expect(stripHistoricalSpans("Slice 2F.4 has not started. Also ~~a struck aside~~."))
+      .toContain("has not started");
+    const root = await makeFixtureRoot();
+    patch(
+      root,
+      "docs/STATE.md",
+      "Phase 2F is complete through Slice 2F.6.",
+      "Slice 2F.4 has not started. Also ~~a struck aside~~.",
+    );
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/asserts 2F\.4 is unfinished/);
+  });
+
   it("does not fire on a stale claim a supersession marker has labelled as history", async () => {
     // The counterpart, and the reason the marker convention exists: this
     // repository re-labels point-in-time narrative rather than deleting it, so a

@@ -154,7 +154,7 @@ Every row is a command run in this session, with its actual result.
 | Build | `npm run build` | **compiled successfully** |
 | Worker types | `deno check` on both deployed entrypoints | **clean** (deno 2.9.4) |
 | Worker tests | `deno test` over `supabase/functions/**` | **46 / 46**, no network permissions |
-| Traceability | `npm run docs:phase-2f:traceability` | **68 requirements, 12 families, 68 delivered, 0 not delivered, 10 with a recorded note, 7 cross-cutting-only, 2 migrations, 41 §10 gate cells** |
+| Traceability | `npm run docs:phase-2f:traceability` | **68 requirements, 12 families, 68 delivered, 0 not delivered, 11 with a recorded note, 7 cross-cutting-only, 2 migrations, 41 §10 gate cells** |
 
 ### Remote, executed in the order §15 X5 prescribes so no fixture can contaminate the stop-gate
 

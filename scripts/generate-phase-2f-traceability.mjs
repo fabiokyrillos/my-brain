@@ -853,7 +853,25 @@ export const HISTORICAL_SECTION_MARKER = /superseded|point-in-time|historical re
  * sentence inside the correction re-triggers the finding — the scan would be
  * punishing the very labelling it is meant to encourage.
  */
-export const HISTORICAL_LINE_MARKER = /~~|\bdischarged\b|\bsuperseded\b|\(original:/i;
+export const HISTORICAL_LINE_MARKER = /\bdischarged\b|\bsuperseded\b/i;
+
+/**
+ * Removes the spans a line has already labelled as history, so the rest of the
+ * line is still scanned.
+ *
+ * The first version of this exemption tested the whole line for `~~`, which meant
+ * **any** strikethrough anywhere silenced every claim on that line — a genuine
+ * "Slice 2F.4 has not started" could hide behind an unrelated struck note. The
+ * scan now strips only the struck span and the `(Original: …)` quotation a
+ * correction preserves, and keeps reading the remainder. `discharged` and
+ * `superseded` remain line-level, because those words label the line's own claim
+ * rather than a fragment of it.
+ */
+export function stripHistoricalSpans(text) {
+  return text
+    .replace(/~~[\s\S]*?~~/g, " ")
+    .replace(/\(original:[\s\S]*?\)\s*\*?$/i, " ");
+}
 
 /**
  * Splits a document into `## `/`### ` sections and flags the ones a supersession
@@ -897,6 +915,7 @@ export function findStatusContradictions(root, acceptedSlices, { phase = "Phase 
     const historical = partitionHistoricalSections(source);
     lines.forEach((text, index) => {
       if (historical[index] || HISTORICAL_LINE_MARKER.test(text)) return;
+      const scannable = stripHistoricalSpans(text);
       for (const subject of subjects) {
         const escaped = subject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         // Bounded to one sentence in either direction, and `[^.\n]` stops the
@@ -906,7 +925,7 @@ export function findStatusContradictions(root, acceptedSlices, { phase = "Phase 
           new RegExp(`${escaped}[^.\\n]{0,90}?\\b(?:${phrases})\\b`, "i"),
           new RegExp(`\\b(?:${phrases})\\b[^.\\n]{0,90}?${escaped}`, "i"),
         ];
-        if (patterns.some((pattern) => pattern.test(text))) {
+        if (patterns.some((pattern) => pattern.test(scannable))) {
           findings.push({ document: relative, line: index + 1, slice: subject, text: text.trim().slice(0, 200) });
           break;
         }
@@ -966,6 +985,7 @@ export function findStaleDeploymentClaims(root) {
     const historical = partitionHistoricalSections(source);
     source.split("\n").forEach((text, index) => {
       if (historical[index] || HISTORICAL_LINE_MARKER.test(text)) return;
+      const scannable = stripHistoricalSpans(text);
       for (const version of [...new Set([...text.matchAll(/\b(\d{12})\b/g)].map((m) => m[1]))]) {
         if (!applied.has(version)) continue;
         // A version that IS the chain head cannot be the subject of a stale
@@ -975,7 +995,7 @@ export function findStaleDeploymentClaims(root) {
           `(?:${phrases})[^.\\n]{0,90}?${version}|${version}[^.\\n]{0,90}?(?:${phrases})`,
           "i",
         );
-        if (near.test(text) && !isHead) {
+        if (near.test(scannable) && !isHead) {
           findings.push({ document: relative, line: index + 1, version, text: text.trim().slice(0, 200) });
           break;
         }
