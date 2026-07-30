@@ -50,6 +50,14 @@
 | `30520287006` | `486efbc` | all three success, first attempt |
 | **`30520514810`** | **`7e3e5f0` (merge)** | **all three success, first attempt** |
 
+## 3a. Acceptance-PR CI
+
+| Run | SHA | Result |
+|---|---|---|
+| `30521247006` | `9da4b71` | `database and journey` failed, then **success on all three** after re-running that job |
+
+**The failure was external and was proven so rather than assumed.** `next build` inside the `database` job could not fetch the JetBrains Mono webfont — `Error while requesting resource`, then `Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'`. Three things establish it as a runner-network flake: the **same run's** `application` job executed the identical `npm run build` and **succeeded**; this PR's diff touches only documentation, one generator evidence array and one test fixture inventory, none of it in the build graph; and the same build passed on every prior run on both branches. Recorded here because the alternative — calling a red job "unrelated" without evidence — is the habit this phase's closeout exists to break.
+
 ## 4. Post-merge verification — every gate re-executed from merged `main` content
 
 Run in the order the PRD prescribes (§15 X5), so no fixture-minting run can contaminate the stop-gate.
