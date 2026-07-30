@@ -10,6 +10,9 @@ import { sendChatMessage } from "./actions";
 // longer depends on a non-null assertion coupled to provider stripping
 // behaviour across the AIProvider portability seam.
 
+// `agent-identity` begins `import "server-only"`, which throws in this jsdom
+// environment. The name it resolves is not what these cases are about.
+vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: vi.fn(async () => "Brain") }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {

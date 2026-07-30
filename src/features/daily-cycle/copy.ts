@@ -4,6 +4,7 @@ import type {
   DailyCycleMessageKey,
   ProductState,
 } from "./contracts";
+import { withAgentName } from "@/lib/agent-name";
 
 export const dailyCycleLocales = ["pt-BR", "en"] as const;
 export type DailyCycleLocale = (typeof dailyCycleLocales)[number];
@@ -22,13 +23,13 @@ export const dailyCycleCopy = {
   "pt-BR": {
     productStates: {
       saved: { label: "Salvo", description: "Seu registro foi preservado." },
-      organizing: { label: "Organizando", description: "O Brain está organizando este registro." },
+      organizing: { label: "Organizando", description: "O {agent} está organizando este registro." },
       needs_attention: { label: "Precisa de você", description: "Há uma decisão que precisa da sua confirmação." },
       ready: { label: "Pronto", description: "Este registro foi organizado sem pendências atuais." },
       could_not_organize: { label: "Não consegui organizar", description: "O registro foi preservado e pode ser tentado novamente." },
     },
     attentionReasons: {
-      review_interpretation: { title: "Revise a interpretação", description: "Confirme ou ajuste o que o Brain entendeu." },
+      review_interpretation: { title: "Revise a interpretação", description: "Confirme ou ajuste o que o {agent} entendeu." },
       confirm_existing_candidates: { title: "Decida sobre as sugestões", description: "Escolha o destino de cada sugestão pendente." },
       answer_existing_question: { title: "Responda uma pergunta", description: "Uma informação precisa ser esclarecida para concluir a organização." },
       retry_processing: { title: "Tente organizar novamente", description: "O processamento não foi concluído e pode ser tentado de novo." },
@@ -72,13 +73,13 @@ export const dailyCycleCopy = {
   en: {
     productStates: {
       saved: { label: "Saved", description: "Your record was preserved." },
-      organizing: { label: "Organizing", description: "Brain is organizing this record." },
+      organizing: { label: "Organizing", description: "{agent} is organizing this record." },
       needs_attention: { label: "Needs your attention", description: "There is a decision that needs your confirmation." },
       ready: { label: "Ready", description: "This record was organized with no current pending decision." },
       could_not_organize: { label: "Could not organize", description: "The record was preserved and can be tried again." },
     },
     attentionReasons: {
-      review_interpretation: { title: "Review the interpretation", description: "Confirm or adjust what Brain understood." },
+      review_interpretation: { title: "Review the interpretation", description: "Confirm or adjust what {agent} understood." },
       confirm_existing_candidates: { title: "Resolve the suggestions", description: "Choose what should happen to each pending suggestion." },
       answer_existing_question: { title: "Answer a question", description: "One detail needs clarification before organization can finish." },
       retry_processing: { title: "Try organizing again", description: "Processing did not finish and can be tried again." },
@@ -121,6 +122,10 @@ export const dailyCycleCopy = {
   },
 } satisfies Record<DailyCycleLocale, DailyCycleCopy>;
 
-export function getDailyCycleCopy(locale: DailyCycleLocale): DailyCycleCopy {
-  return dailyCycleCopy[locale];
+/**
+ * @param agentName the assistant’s configured name (UX-06). Required, so the
+ * compiler finds every surface that would otherwise render a hardcoded one.
+ */
+export function getDailyCycleCopy(locale: DailyCycleLocale, agentName: string): DailyCycleCopy {
+  return withAgentName(dailyCycleCopy[locale], agentName);
 }

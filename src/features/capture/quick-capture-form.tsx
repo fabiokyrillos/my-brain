@@ -23,11 +23,13 @@ export function QuickCaptureForm({
   action,
   initialState = idleState,
   locale,
+  agentName,
   captureSource,
 }: {
   action: CaptureAction;
   initialState?: CaptureState;
   locale: "pt-BR" | "en";
+  agentName: string;
   captureSource: "home" | "capture_page";
 }) {
   const idempotencyKeyRef = useRef<string | null>(null);
@@ -89,7 +91,7 @@ export function QuickCaptureForm({
         {!online && <p className="capture-error" role="status">{pt ? "Você está offline. O texto permanece nesta tela, mas não será salvo no navegador por segurança." : "You are offline. The text stays on this screen but is not stored in the browser for security."}</p>}
         {state.status === "error" && <p id="capture-error" className="capture-error" role="alert">{state.message}</p>}
         <div className="capture-actions">
-          <span><Sparkles size={15} />{pt ? "O Brain organiza sem alterar o original" : "Brain organizes without changing the original"}</span>
+          <span><Sparkles size={15} />{pt ? `O ${agentName} organiza sem alterar o original` : `${agentName} organizes without changing the original`}</span>
           <button type="submit" disabled={pending || !online}>
             {pending ? <LoaderCircle className="spin" size={17} /> : null}
             {pending ? (pt ? "Salvando…" : "Saving…") : (pt ? "Registrar" : "Capture")}
@@ -97,7 +99,7 @@ export function QuickCaptureForm({
           </button>
         </div>
       </form>
-      {state.status === "success" && <CaptureReceiptView receipt={state.receipt} locale={locale} />}
+      {state.status === "success" && <CaptureReceiptView receipt={state.receipt} locale={locale} agentName={agentName} />}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { loadQuestionPreviews, type QuestionPreview } from "./question-preview-p
 import { QuestionPreviewPanels } from "./question-preview-panels";
 import { loadQuestionSurfacingDecision } from "./question-surfacing-data";
 import { actionablePendingQuestionFilter } from "./question-visibility";
+import { getAgentName } from "@/features/profile/agent-identity";
+import { withAgentName } from "@/lib/agent-name";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -28,7 +30,7 @@ const copy = {
     eyebrow: "PRECISA DE VOCÊ",
     proactiveTitle: "Perguntas para responder agora",
     pullTitle: "Perguntas pendentes",
-    intro: "Ambiguidades que o Brain preservou. Responda, adie ou descarte sem sair daqui.",
+    intro: "Ambiguidades que o {agent} preservou. Responda, adie ou descarte sem sair daqui.",
     quietNote: "No silêncio: sem nudges agora, mas suas perguntas continuam acessíveis.",
     reachableLink: (count: number) =>
       count === 1 ? "Você tem 1 pergunta pendente" : `Você tem ${count} perguntas pendentes`,
@@ -38,7 +40,7 @@ const copy = {
     eyebrow: "NEEDS YOU",
     proactiveTitle: "Questions to answer now",
     pullTitle: "Pending questions",
-    intro: "Ambiguities Brain preserved. Answer, defer, or dismiss without leaving this page.",
+    intro: "Ambiguities {agent} preserved. Answer, defer, or dismiss without leaving this page.",
     quietNote: "Quiet hours: no nudges right now, but your questions stay reachable.",
     reachableLink: (count: number) =>
       count === 1 ? "You have 1 pending question" : `You have ${count} pending questions`,
@@ -72,7 +74,7 @@ export async function ConversationalQuestions({
   mode: ConversationalQuestionsMode;
   limit?: number;
 }) {
-  const text = copy[locale];
+  const text = withAgentName(copy[locale], await getAgentName());
 
   // The surfacing decision and the actual rows are read in parallel; both use
   // the same `actionablePendingQuestionFilter`, so they agree on what is open.

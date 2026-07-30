@@ -37,10 +37,13 @@ export type AssistantComposerAction = (
 export function AssistantComposer({
   action,
   locale,
+  agentName,
   conversationId,
 }: {
   action: AssistantComposerAction;
   locale: Locale;
+  /** The assistant’s configured name (UX-06). Passed in, never read here: this is a client component. */
+  agentName: string;
   conversationId?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, idleAssistantComposerState);
@@ -93,7 +96,7 @@ export function AssistantComposer({
         {conversationId === undefined ? null : (
           <input name="conversationId" type="hidden" value={conversationId} />
         )}
-        <label htmlFor={fieldId}>{copy.inputLabel}</label>
+        <label htmlFor={fieldId}>{copy.inputLabel(agentName)}</label>
         <div className="assistant-composer-row">
           <textarea
             aria-describedby={hintId}
@@ -116,7 +119,7 @@ export function AssistantComposer({
 
       {state.notice === null ? null : (
         <div
-          aria-label={copy.resultRegionLabel}
+          aria-label={copy.resultRegionLabel(agentName)}
           className="assistant-composer-notice"
           data-route={state.route}
           ref={notice}

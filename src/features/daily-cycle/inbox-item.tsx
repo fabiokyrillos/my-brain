@@ -1,8 +1,8 @@
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import type { InboxItemView } from "./contracts";
 
-export function InboxItemRow({ item, locale }: { item: InboxItemView; locale: DailyCycleLocale }) {
-  const copy = getDailyCycleCopy(locale);
+export function InboxItemRow({ item, locale, agentName }: { item: InboxItemView; locale: DailyCycleLocale; agentName: string }) {
+  const copy = getDailyCycleCopy(locale, agentName);
   const stateCopy = copy.productStates[item.productState];
   const attentionCopy = item.attentionReason ? copy.attentionReasons[item.attentionReason] : null;
   const openHref = item.availableActions.find((action) => action.id === "open_entry")?.href ?? "#";

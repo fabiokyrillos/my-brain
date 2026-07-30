@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { RevisionActionState } from "./revision-editor";
 import { parseCorrectionFormData } from "./form-parser";
 import { buildCorrectionElementTrust } from "./trust-builders";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 const uuidSchema = z.string().uuid();
@@ -166,5 +167,5 @@ export async function reprocessEntry(
   });
 
   refreshEntry(locale.data, entryId.data);
-  return { status: "success", message: getDailyCycleCopy(locale.data).messages.reprocessing_queued };
+  return { status: "success", message: getDailyCycleCopy(locale.data, await getAgentName()).messages.reprocessing_queued };
 }

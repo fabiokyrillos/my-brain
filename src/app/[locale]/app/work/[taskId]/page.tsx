@@ -9,6 +9,7 @@ import { TaskDetailControls } from "@/features/task-commands/task-detail-control
 import { loadCandidateRelationOptions } from "@/features/tasks/relation-options";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 /**
  * The destination `open_task` never had.
@@ -39,6 +40,8 @@ export default async function TaskDetailPage({
   const locale = candidate;
   const { supabase, user } = await requireUser(locale);
 
+  const agentName = await getAgentName();
+
   const detail = await loadTaskDetailProjection(supabase, { taskId, userId: user.id, locale });
   // A task owned by someone else is indistinguishable from one that does not
   // exist, which is the only answer that does not confirm its existence.
@@ -56,7 +59,7 @@ export default async function TaskDetailPage({
     : { projects: [], contexts: [], people: [] };
 
   return (
-    <TaskDetailView
+    <TaskDetailView agentName={agentName}
       locale={locale}
       detail={detail}
       actions={

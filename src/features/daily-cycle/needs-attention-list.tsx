@@ -36,12 +36,14 @@ export function NeedsAttentionList({
   initialCursor,
   initialHasNext,
   locale,
+  agentName,
   loadMore,
 }: {
   initialItems: readonly NeedsAttentionItemView[];
   initialCursor: AttentionCursor | null;
   initialHasNext: boolean;
   locale: DailyCycleLocale;
+  agentName: string;
   loadMore: LoadMoreNeedsAttention;
 }) {
   const [items, setItems] = useState(initialItems);
@@ -69,7 +71,7 @@ export function NeedsAttentionList({
   return (
     <div className="list-stack needs-attention-list">
       <NeedsAttentionViewed surface="needs_attention" itemCount={items.length} locale={locale} />
-      {items.map((item) => <NeedsAttentionItemRow item={item} locale={locale} surface="needs_attention" key={item.key} />)}
+      {items.map((item) => <NeedsAttentionItemRow item={item} locale={locale} agentName={agentName} surface="needs_attention" key={item.key} />)}
       {error && <p role="alert" className="form-error needs-attention-error">{error}</p>}
       {hasNext && (
         <button

@@ -13,6 +13,7 @@ import { TEXT_MODEL_LABELS, type TextModelId } from "@/lib/ai/model-routing";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 type PriceRow = {
   id: string;
@@ -82,6 +83,8 @@ export default async function CostsPage({
   const locale = rawLocale;
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
+
+  const agentName = await getAgentName();
 
   const profileResult = await supabase
     .from("profiles")
@@ -221,8 +224,8 @@ export default async function CostsPage({
           </strong>
           <p>
             {pt
-              ? "Quando o Brain interpretar uma captura, responder no chat ou analisar um arquivo, o consumo aparecerá aqui."
-              : "When Brain interprets a capture, answers in chat, or analyzes a file, usage will appear here."}
+              ? `Quando o ${agentName} interpretar uma captura, responder no chat ou analisar um arquivo, o consumo aparecerá aqui.`
+              : `When ${agentName} interprets a capture, answers in chat, or analyzes a file, usage will appear here.`}
           </p>
           <Link href={`/${locale}/app/capture`}>
             {pt ? "Fazer uma captura" : "Capture something"}

@@ -5,6 +5,7 @@ import { attentionReasons, type AttentionReason, type NeedsAttentionItemView } f
 import { type DailyCycleLocale, getDailyCycleCopy } from "./copy";
 import { toNeedsAttentionItemView, type NeedsAttentionItemSource } from "./projection-mappers";
 import { attentionActionId } from "./review-projection";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 function isAttentionReason(value: string): value is AttentionReason {
   return (attentionReasons as readonly string[]).includes(value);
@@ -71,7 +72,7 @@ export async function loadAttentionProjection(
   const originalByEntryId = new Map(entries.map((entry) => [entry.id, entry.original_content]));
   const summaryByInterpretationId = new Map(interpretations.map((interpretation) => [interpretation.id, interpretation.summary]));
 
-  const copy = getDailyCycleCopy(locale);
+  const copy = getDailyCycleCopy(locale, await getAgentName());
 
   // A row the RPC just returned might, in principle, no longer resolve to a
   // hydratable original a few milliseconds later (case 11: resolved between

@@ -75,6 +75,7 @@ function RelationGroup({
 
 export function TaskDetailView({
   locale,
+  agentName,
   detail,
   actions,
   controls,
@@ -90,8 +91,9 @@ export function TaskDetailView({
    * off the first screen by the ways to change it.
    */
   controls?: ReactNode;
+  agentName: string;
 }) {
-  const copy = getTaskDetailCopy(locale);
+  const copy = getTaskDetailCopy(locale, agentName);
   const pt = locale === "pt-BR";
   const { task } = detail;
   const dateTime = (value: string) =>

@@ -33,6 +33,7 @@ describe("NeedsAttentionList", () => {
   it("renders every initial item", () => {
     render(
       <NeedsAttentionList
+      agentName="Brain"
         initialItems={[item(), item({ key: "entry-2:review_interpretation", entryId: "entry-2", title: "Revisar orçamento" })]}
         initialCursor={null}
         initialHasNext={false}
@@ -51,7 +52,7 @@ describe("NeedsAttentionList", () => {
 
   it("does not render a load-more control when there is no next page", () => {
     render(
-      <NeedsAttentionList initialItems={[item()]} initialCursor={null} initialHasNext={false} locale="pt-BR" loadMore={vi.fn()} />,
+      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={null} initialHasNext={false} locale="pt-BR" loadMore={vi.fn()} />,
     );
 
     expect(screen.queryByRole("button", { name: "Carregar mais" })).not.toBeInTheDocument();
@@ -67,7 +68,7 @@ describe("NeedsAttentionList", () => {
     }));
 
     render(
-      <NeedsAttentionList initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Carregar mais" }));
@@ -84,7 +85,7 @@ describe("NeedsAttentionList", () => {
     const loadMore: LoadMoreNeedsAttention = vi.fn(async (): Promise<Awaited<ReturnType<LoadMoreNeedsAttention>>> => ({ ok: false, code: "action_failed" }));
 
     render(
-      <NeedsAttentionList initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Carregar mais" }));
@@ -104,7 +105,7 @@ describe("NeedsAttentionList", () => {
     );
 
     render(
-      <NeedsAttentionList initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     const button = screen.getByRole("button", { name: /Carregar mais/ });
@@ -123,7 +124,7 @@ describe("NeedsAttentionList", () => {
     const loadMore: LoadMoreNeedsAttention = vi.fn(async (): Promise<Awaited<ReturnType<LoadMoreNeedsAttention>>> => ({ ok: false, code: "session_expired" }));
 
     render(
-      <NeedsAttentionList initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="en" loadMore={loadMore} />,
+      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="en" loadMore={loadMore} />,
     );
 
     expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();

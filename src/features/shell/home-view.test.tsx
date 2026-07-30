@@ -58,7 +58,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
 }
 
 function renderHome(view: HomeViewModel, locale: Locale = "pt-BR") {
-  return render(<HomeView locale={locale} view={view} capture={<div>captura</div>} />);
+  return render(<HomeView agentName="Brain" locale={locale} view={view} capture={<div>captura</div>} />);
 }
 
 describe("HomeView", () => {

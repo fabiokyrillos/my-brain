@@ -42,11 +42,14 @@ export type { WorkItemActionHandler };
 
 export function TaskList({
   action,
+  agentName,
   emptyHint,
   locale,
   tasks,
   timezone,
 }: {
+  /** The assistant’s configured name (UX-06), injected for the same reason the action is. */
+  agentName: string;
   /**
    * The Server Action, injected by the Server Component that mounts this — the
    * shape `QuickCaptureForm` and `CommandConsole` already use.
@@ -71,7 +74,7 @@ export function TaskList({
   return (
     <div className="list-stack">
       {tasks.map((task) => (
-        <TaskRow action={action} key={task.taskId} locale={locale} task={task} timezone={timezone} />
+        <TaskRow action={action} agentName={agentName} key={task.taskId} locale={locale} task={task} timezone={timezone} />
       ))}
     </div>
   );
@@ -79,11 +82,13 @@ export function TaskList({
 
 function TaskRow({
   action,
+  agentName,
   locale,
   task,
   timezone,
 }: {
   action: WorkItemActionHandler;
+  agentName: string;
   locale: Locale;
   task: WorkItemView;
   timezone: string;
@@ -101,7 +106,7 @@ function TaskRow({
       <div className="list-row-main">
         {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
         {task.description && <p>{task.description}</p>}
-        <small className="work-origin">{task.origin === "brain" ? (pt ? "Sugerida pelo Brain" : "Suggested by Brain") : (pt ? "Criada por você" : "Created by you")}</small>
+        <small className="work-origin">{task.origin === "brain" ? (pt ? `Sugerida pelo ${agentName}` : `Suggested by ${agentName}`) : (pt ? "Criada por você" : "Created by you")}</small>
         {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
           || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (
           <div className="work-relations">

@@ -4,12 +4,13 @@ import { recordNeedsAttentionItemOpened } from "@/features/product-analytics/int
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import type { NeedsAttentionItemView } from "./contracts";
 
-export function NeedsAttentionItemRow({ item, locale, surface }: {
+export function NeedsAttentionItemRow({ item, locale, agentName, surface }: {
   item: NeedsAttentionItemView;
   locale: DailyCycleLocale;
+  agentName: string;
   surface: "home" | "needs_attention";
 }) {
-  const copy = getDailyCycleCopy(locale);
+  const copy = getDailyCycleCopy(locale, agentName);
   const actionLabel = copy.actions[item.primaryAction.id];
   const timestamp = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(new Date(item.occurredAt));
 

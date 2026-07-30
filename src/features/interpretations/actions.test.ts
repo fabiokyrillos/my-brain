@@ -6,6 +6,9 @@ import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "./actions";
 
+// `agent-identity` begins `import "server-only"`, which throws in this jsdom
+// environment. The name it resolves is not what these cases are about.
+vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: vi.fn(async () => "Brain") }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));

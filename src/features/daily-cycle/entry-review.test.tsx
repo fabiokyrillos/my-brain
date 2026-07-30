@@ -47,7 +47,7 @@ const attentionItem: AttentionItemView = {
 
 describe("ReviewUnderstanding", () => {
   it("shows the understanding text as the primary heading and the product state as a status badge", () => {
-    render(<ReviewUnderstanding view={baseView()} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+    render(<ReviewUnderstanding agentName="Brain" view={baseView()} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
 
     expect(screen.getByRole("heading", { name: "Ligar para a Marina sobre o contrato do Atlas" })).toBeVisible();
     expect(screen.getByText("Pronto")).toBeVisible();
@@ -56,6 +56,7 @@ describe("ReviewUnderstanding", () => {
   it("renders the projection's human fields as a compact fact list", () => {
     render(
       <ReviewUnderstanding
+        agentName="Brain"
         view={baseView({ humanFields: [{ key: "occurredAt", label: "Data do acontecimento", value: "2026-07-18T09:00:00.000Z", editable: true }] })}
         locale="pt-BR"
         occurredAtLabel="18 de julho de 2026"
@@ -66,10 +67,10 @@ describe("ReviewUnderstanding", () => {
   });
 
   it("surfaces an inline organizing note only while the entry is organizing", () => {
-    const { rerender } = render(<ReviewUnderstanding view={baseView({ productState: "organizing" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+    const { rerender } = render(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "organizing" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
     expect(screen.getByText("O Brain está organizando este registro.")).toBeVisible();
 
-    rerender(<ReviewUnderstanding view={baseView({ productState: "ready" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+    rerender(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "ready" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
     expect(screen.queryByText("O Brain está organizando este registro.")).not.toBeInTheDocument();
   });
 });
@@ -170,6 +171,7 @@ describe("EntryReview", () => {
   it("renders the five decision-first blocks in order: understanding, attention, next actions, original, technical details", () => {
     render(
       <EntryReview
+      agentName="Brain"
         view={baseView({ attentionItems: [attentionItem], productState: "needs_attention" })}
         locale="pt-BR"
         occurredAtLabel="18 de julho de 2026"
@@ -199,6 +201,7 @@ describe("EntryReview", () => {
   it("omits the technical details slot entirely when there is nothing to show", () => {
     render(
       <EntryReview
+      agentName="Brain"
         view={baseView()}
         locale="pt-BR"
         occurredAtLabel="18 de julho de 2026"

@@ -22,7 +22,7 @@ describe("QuickCaptureForm", () => {
   it("submits a web entry with a generated idempotency key and the supplied capture source", async () => {
     const action = vi.fn<CaptureAction>(async () => ({ status: "success" as const, receipt }));
     const user = userEvent.setup();
-    render(<QuickCaptureForm action={action} locale="pt-BR" captureSource="home" />);
+    render(<QuickCaptureForm agentName="Brain" action={action} locale="pt-BR" captureSource="home" />);
 
     await user.type(screen.getByRole("textbox", { name: "Nova entrada" }), "Nova ideia");
     await user.click(screen.getByRole("button", { name: "Registrar" }));
@@ -44,6 +44,7 @@ describe("QuickCaptureForm", () => {
     const action = vi.fn(async () => ({ status: "error" as const, code: "validation_failed" as const, message: "Escreva algo para registrar." }));
     render(
       <QuickCaptureForm
+      agentName="Brain"
         action={action}
         initialState={{ status: "error", code: "validation_failed", message: "Escreva algo para registrar." }}
         locale="pt-BR"
@@ -57,7 +58,7 @@ describe("QuickCaptureForm", () => {
   it("shows the save receipt and clears the field for the next capture", async () => {
     const action = vi.fn(async () => ({ status: "success" as const, receipt }));
     const user = userEvent.setup();
-    render(<QuickCaptureForm action={action} locale="pt-BR" captureSource="home" />);
+    render(<QuickCaptureForm agentName="Brain" action={action} locale="pt-BR" captureSource="home" />);
 
     const textbox = screen.getByRole("textbox", { name: "Nova entrada" }) as HTMLTextAreaElement;
     await user.type(textbox, "Primeira captura");
@@ -71,7 +72,7 @@ describe("QuickCaptureForm", () => {
   it("rotates the idempotency key after a successful capture so consecutive entries do not collide", async () => {
     const action = vi.fn<CaptureAction>(async () => ({ status: "success" as const, receipt }));
     const user = userEvent.setup();
-    render(<QuickCaptureForm action={action} locale="pt-BR" captureSource="home" />);
+    render(<QuickCaptureForm agentName="Brain" action={action} locale="pt-BR" captureSource="home" />);
     const textbox = screen.getByRole("textbox", { name: "Nova entrada" });
 
     await user.type(textbox, "Primeira captura");
@@ -89,7 +90,7 @@ describe("QuickCaptureForm", () => {
 
   it("shows Saving… rather than Interpreting… while the atomic persist is pending", () => {
     const action = vi.fn(() => new Promise<never>(() => {}));
-    render(<QuickCaptureForm action={action} locale="en" captureSource="home" />);
+    render(<QuickCaptureForm agentName="Brain" action={action} locale="en" captureSource="home" />);
 
     expect(screen.queryByText("Interpreting…")).not.toBeInTheDocument();
   });

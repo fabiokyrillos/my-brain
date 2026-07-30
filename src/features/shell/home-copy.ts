@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/preferences";
+import { withAgentName } from "@/lib/agent-name";
 
 /**
  * Home's copy, as a typed feature module.
@@ -48,7 +49,7 @@ export const homeCopy = {
     sections: {
       attention: {
         title: "Precisa de você",
-        hint: "Decisões que o Brain não toma sozinho.",
+        hint: "Decisões que o {agent} não toma sozinho.",
         empty: "Nada precisa de você agora.",
       },
       today: {
@@ -86,7 +87,7 @@ export const homeCopy = {
     sections: {
       attention: {
         title: "Needs you",
-        hint: "Decisions Brain will not make on its own.",
+        hint: "Decisions {agent} will not make on its own.",
         empty: "Nothing needs you right now.",
       },
       today: {
@@ -115,8 +116,12 @@ export const homeCopy = {
   },
 } as const satisfies Record<Locale, HomeCopy>;
 
-export function getHomeCopy(locale: Locale): HomeCopy {
-  return homeCopy[locale];
+/**
+ * @param agentName the assistant’s configured name (UX-06). Required, so the
+ * compiler finds every surface that would otherwise render a hardcoded one.
+ */
+export function getHomeCopy(locale: Locale, agentName: string): HomeCopy {
+  return withAgentName(homeCopy[locale], agentName);
 }
 
 /** Substitutes the single `{count}` placeholder the plural strings carry. */
