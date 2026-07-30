@@ -77,11 +77,19 @@ export function TaskDetailView({
   locale,
   detail,
   actions,
+  controls,
 }: {
   locale: Locale;
   detail: TaskDetailProjection;
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
+  /**
+   * The field-edit controls (Slice D2), injected for the same reason and kept a
+   * separate slot rather than folded into `actions`: they sit below the facts
+   * they change, because the answer to "what is this task" must not be pushed
+   * off the first screen by the ways to change it.
+   */
+  controls?: ReactNode;
 }) {
   const copy = getTaskDetailCopy(locale);
   const pt = locale === "pt-BR";
@@ -136,6 +144,8 @@ export function TaskDetailView({
           {detail.cancelledAt ? <Field label={copy.fields.cancelled}>{dateTime(detail.cancelledAt)}</Field> : null}
         </dl>
       </section>
+
+      {controls}
 
       <section className="task-detail-section" aria-label={copy.sections.relations}>
         <h2>{copy.sections.relations}</h2>

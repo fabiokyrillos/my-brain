@@ -27,6 +27,19 @@ export type TaskProvenance = {
 
 export type TaskDetailProjection = {
   readonly task: WorkItemView;
+  /**
+   * The task's own `tasks.status`, alongside the projected `humanState`.
+   *
+   * Both, because they answer different questions and neither substitutes for
+   * the other. `humanState` is what a person reads and is deliberately lossy —
+   * `inbox` and `todo` both render as "not started", and there is no member for
+   * `cancelled` at all. `detailControlsFor` asks the taxonomy which actions a
+   * status admits, and that question can only be answered against the literal
+   * the eligibility table is written in. Reconstructing it from `humanState`
+   * would be guessing at exactly the point where a wrong guess offers a control
+   * the RPC will refuse.
+   */
+  readonly status: string;
   readonly timezone: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -151,6 +164,7 @@ export async function loadTaskDetailProjection(
 
   return {
     task,
+    status: row.status,
     timezone,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

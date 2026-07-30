@@ -33,6 +33,7 @@ function task(overrides: Partial<WorkItemView> = {}): WorkItemView {
 function detail(overrides: Partial<TaskDetailProjection> = {}): TaskDetailProjection {
   return {
     task: task(),
+    status: "todo",
     timezone: "America/Sao_Paulo",
     createdAt: "2026-07-20T10:00:00.000Z",
     updatedAt: "2026-07-29T14:00:00.000Z",
