@@ -135,7 +135,7 @@ export default async function EntryDetailPage({
 
   return (
     <div className="content-page entry-detail-page">
-      <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Caixa de entrada" : "Inbox"}</Link>
+      <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Registros" : "Records"}</Link>
 
       <EntryReview
         view={view}

@@ -258,7 +258,7 @@ describe("HomeDashboard", () => {
     expect(within(screen.getByRole("region", { name: "Needs you" })).queryByText("0")).toBeNull();
   });
 
-  it("links the Needs Attention panel to the Caixa needs-you filter, preserving locale", async () => {
+  it("links the Needs Attention panel to the Registros needs-you filter, preserving locale", async () => {
     setup({ attentionItems: [attentionItem()] });
 
     render(await HomeDashboard({ locale: "en" }));

@@ -16,7 +16,7 @@ import { isLocale } from "@/lib/preferences";
 function InboxViewTabs({ locale, active }: { locale: "pt-BR" | "en"; active: "all" | "needs-you" }) {
   const pt = locale === "pt-BR";
   return (
-    <nav className="inbox-view-tabs" aria-label={pt ? "Filtrar Caixa" : "Filter Inbox"}>
+    <nav className="inbox-view-tabs" aria-label={pt ? "Filtrar Registros" : "Filter Records"}>
       <Link href={`/${locale}/app/inbox`} aria-current={active === "all" ? "page" : undefined}>{pt ? "Todos" : "All"}</Link>
       <Link href={`/${locale}/app/inbox?view=needs-you`} aria-current={active === "needs-you" ? "page" : undefined}>{pt ? "Precisa de você" : "Needs you"}</Link>
     </nav>
@@ -46,7 +46,7 @@ export default async function InboxPage({
         <header className="list-header">
           <div>
             <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
-            <h1>{pt ? "Caixa de entrada" : "Inbox"}</h1>
+            <h1>{pt ? "Registros" : "Records"}</h1>
             <p>{pt ? "Tudo que você confiou ao Brain, com o original sempre preservado." : "Everything you entrusted to Brain, with the original always preserved."}</p>
           </div>
         </header>
@@ -78,7 +78,7 @@ export default async function InboxPage({
       <header className="list-header">
         <div>
           <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
-          <h1>{pt ? "Caixa de entrada" : "Inbox"}</h1>
+          <h1>{pt ? "Registros" : "Records"}</h1>
           <p>{pt ? "Tudo que você confiou ao Brain, com o original sempre preservado." : "Everything you entrusted to Brain, with the original always preserved."}</p>
         </div>
       </header>

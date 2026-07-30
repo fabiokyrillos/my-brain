@@ -40,7 +40,7 @@ const surfaces: Surface[] = [
     ],
   },
   {
-    label: "Inbox list page (Caixa)",
+    label: "Records list page (Registros)",
     filePath: "src/app/[locale]/app/inbox/page.tsx",
     forbidden: [
       /database\.types/i,
