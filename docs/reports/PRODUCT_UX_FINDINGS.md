@@ -80,7 +80,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | ID | Title | Cat. | Pri. | Reproduces | Disposition |
 | --- | --- | --- | --- | --- | --- |
 | UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels → DEC-1) |
-| UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | OPEN |
+| UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | **RESOLVED** |
 | UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | BLOCKED (DEC-1) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | OPEN |
@@ -96,10 +96,10 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-15 | Panel list rows collapse the title to ~6–16 lines (`auto` meta column) | visual | **P0** | yes | **RESOLVED** |
 | UX-16 | Content width *shrinks* as the viewport grows (`padding: 5vw`) | responsive | **P0** | yes | **RESOLVED** |
 | UX-17 | Side rail clips its last nav item at 1440×900 | visual | P1 | yes | **RESOLVED** |
-| UX-18 | Home panel kickers are hardcoded Portuguese in both locales | localization | P1 | yes | OPEN |
+| UX-18 | Home panel kickers are hardcoded Portuguese in both locales | localization | P1 | yes | **RESOLVED** |
 | UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | OPEN |
 | UX-20 | Rows styled as interactive are inert (`memories`, `reminders`) | usability | P1 | yes | **RESOLVED** (affordance) |
-| UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | DEFERRED → C |
+| UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | **RETAINED** (with evidence) |
 | UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN |
 | UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN |
 | UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
@@ -950,3 +950,167 @@ route. The harness is reproducible from the "How the audit was performed" sectio
 UX-14's exact FAB centring is **still gated**. Centring slot 3 of 6 is geometrically
 impossible; it needs the bar to carry an even number of non-capture items, which means
 demoting one primary destination — a taxonomy decision, i.e. DEC-1.
+
+---
+
+# Slice C — Home as an attention surface
+
+**Branch** `codex/ux-slice-c-home`, stacked on Slice B. **Covers** UX-02, UX-18; resolves
+UX-25's disposition. **Non-goals** — no new projection, no new route, no rename, no
+backend contract touched. **Rollback boundary** — `home-dashboard.tsx` is the only
+production consumer of `home-view.tsx` and `home-copy.ts`; deleting the two and restoring
+the previous component reverts the surface completely.
+
+### The page now answers the owner's five questions, in that order
+
+The previous Home was a `1.4fr 1fr` magazine grid of six fixed panels, numbered `01 / AGORA`
+through `06 / RECENTE`, in which the panel holding the most text was also the narrowest and
+`min-height: 392px` reserved a void for the panel that most often had nothing in it.
+
+| The owner's question | Where it is answered now |
+| --- | --- |
+| What requires action now? | `Precisa de você`, first section, and the status line under the greeting |
+| What does the Brain need from me? | same section — attention items and open questions are one queue, not two panels |
+| What is blocked? | `Aguardando outras pessoas`, rendered **only when the count is above zero** |
+| What can I act on immediately? | `Para hoje`, from the same Work `today` projection as before |
+| What changed recently? | `Registrado recentemente` |
+
+The `Estado agora` panel is gone. It restated the count the section below already carries,
+which is repetition without value; the same signal is now one sentence under the greeting.
+
+### Measured at 1440×900 and 412×915
+
+| | Desktop 1440×900 | Pixel 7 412×915 |
+| --- | --- | --- |
+| Status line (`2 itens precisam de você.`) | y=415 | y=280 |
+| **First attention item fully legible** | **y=884 — above the fold** | **y=806 — above the fold** |
+| `Precisa de você` section | y=717, 310 px tall | y=568, 410 px tall |
+| Home block height | 1981 px | 2157 px |
+| Sections rendered when everything is empty | 3 (attention, today, recent) | 3 |
+
+### Changes
+
+- `src/features/shell/home-view.tsx` — new. Home's presentation as a pure component over a
+  `HomeViewModel`, with **no data access**, which is what finally makes the layout
+  testable: the old component loaded four projections and built its markup in the same
+  function, so none of its visual behaviour had a test.
+- `src/features/shell/home-copy.ts` — new typed copy module in the canonical
+  `daily-cycle/copy.ts` shape (ADR-036). Home's copy moved out of `src/i18n/messages.ts`,
+  which stays the shell/navigation catalogue.
+- `src/features/shell/home-dashboard.tsx` — now only loads projections and builds the view
+  model.
+- `src/app/operations.css` — `.home-sections` / `.home-section`. Full-width stacked
+  sections with no `min-height`, so a section with nothing to say collapses to its heading
+  and one line.
+- `src/features/shell/operational-copy.test.ts` — the forbidden-promise audit now also
+  covers `home-copy.ts` and `home-view.tsx`. **Copy that leaves an audited file must not
+  leave the audit with it**, and moving strings out of `home-dashboard.tsx` would have
+  silently dropped them.
+- `src/features/shell/home-view.test.tsx` — 9 new tests: section order, empty state,
+  organizing state, truncated-count marker, English with no Portuguese leakage, and a
+  destination for every section that has content.
+
+### What I did to the existing Home tests, and why
+
+Eight of the sixteen assertions in `home-dashboard.test.tsx` failed. I classified each
+before touching it, because the standing instruction is not to preserve a design merely
+because a test encodes it:
+
+- **Thirteen were genuine contracts and all survive** — reads through the shared
+  projections rather than ad-hoc queries, localized product-state labels, never rendering a
+  raw internal state, honest organizing counts, the five-item bound on today's list, the
+  `+` suffix that marks a truncated queue, and the canonical destinations.
+- **Two encoded only the old markup**: a `.attention-count` CSS selector and an assertion
+  that the analytics marker was a DOM descendant of `.attention-panel`. The contract is
+  that the marker reports the count that was actually rendered — which is asserted directly
+  on the call — not where it sits in the tree. Rewritten to scope by accessible role.
+- **One asserted a `0` badge** next to a heading that already says nothing is waiting. That
+  is the repetition UX-02 is about, so the badge is gone and the test now asserts its
+  absence. The empty **sentence** is the contract, and it is still asserted.
+
+### UX-25 — the height, honestly
+
+Slice A recorded that Home grew ~24 % taller and named Slice C as the fix. **Slice C did
+not shorten it, and I am not closing the finding by renaming it.** Home is 1981 px at
+1440×900 against roughly 1400 px for the original grid.
+
+It is nonetheless **retained deliberately, with evidence**: the original was shorter only
+because it compressed a 94-character title into a 78 px column across ten lines. Full-width
+rows are legible and therefore taller. What the owner actually reported — "must scroll
+significantly to understand the page" — is addressed by ordering rather than by length:
+the state of the day and the first item that needs them are both legible above the fold at
+both viewports, where before the fold held the hero, the capture card and six panel
+headings. Total height is not the metric that improved; time-to-first-answer is.
+
+If the owner still wants the page shorter, the next lever is the hero — `clamp(42px,6vw,76px)`
+over three lines occupies 230 px before anything operational — and that is a deliberate
+identity choice I will not change unilaterally.
+
+### Gates
+
+`eslint` 0 · `tsc --noEmit` 0 · `vitest` 2535 passed with the same 2 pre-existing
+`sql-reachability.test.ts` failures · shell suite 44/44 · real-browser render at four
+viewports in both locales, plus the empty state.
+
+---
+
+# Slice D — plan and seam analysis (not yet implemented)
+
+Recorded before writing code because D is the only slice that touches the One Write Path,
+and the seam it must use is not the obvious one.
+
+### The seam
+
+`src/features/task-commands/work-command.ts` is the **id-authoritative** bridge from a UI
+click to `public.apply_task_command`. It resolves through the deployed
+`list_task_command_candidates`, selects the row **by id out of the whole result** rather
+than out of the ranked/floored/capped subset (2F-SURFACE-004), projects the nineteen-key
+pre-state, derives the canonical patch and applies — with **no new SQL, no new RPC and no
+migration**. A task-detail surface must go through this, not around it.
+
+The alternative that looks right and is wrong: composing a `TaskCommandIntent` and running
+it through the matcher. `schema.ts:104` states the reason — target hints are "deliberately
+incapable of naming a task: there is no id field, so the model cannot select the target
+even if it tries." That design is correct for untrusted model output and wrong for a
+detail page, which already knows the id; routing a known target through the ranker would
+refuse legitimate edits whenever the row scored below `minCandidateScore` or fell outside
+the top five.
+
+### What blocks reusing `applyWorkCommand` directly
+
+`resolveWorkCommand` builds its command from `WORK_ACTION_MAPPING[action].patch` — a
+**fixed** patch, which is why it serves exactly the four status verbs. Every remaining verb
+carries a *value* (a new title, a date, a priority, a relation ref). D therefore needs a
+generalised sibling that takes a caller-supplied, schema-validated patch through the same
+resolution and the same apply. That is a new TypeScript module, not new SQL.
+
+### The split, and why
+
+- **D1 — inspect (no new write path).** `/[locale]/app/work/[taskId]`: what you wrote
+  (via `source_entry_id`), current field values, relations as **links**, change history
+  from `audit_logs`, and the four status actions through the already-proven
+  `applyWorkItemAction`. Resolves UX-19 outright (`open_task` finally has a producer and a
+  destination), the inspect half of UX-05, and the task-row half of UX-20.
+- **D2 — structured field edits.** The generalised composer for `rename_task`,
+  `append_note`, `reschedule_due`, `clear_due`, `set_planned`, `set_priority`,
+  `assign_project`, `assign_context`, `assign_person`, `set_waiting_on`. `cancel_task` and
+  `restore_task` are **destructive** and must route through
+  `issue_task_command_confirmation` and the existing confirm dialog — they may not be
+  plain buttons.
+
+Splitting is not a way of shipping less. It keeps a slice that adds **zero** write surface
+separate from one that generalises the write path, so the first can be reviewed on its
+layout and the second on its contract.
+
+### To verify before writing D2
+
+1. Whether `patch.dueAt` accepts an absolute ISO instant or only a temporal phrase —
+   `schema.ts` resolves phrases through `resolveTemporalPhrase`, and a date picker supplies
+   an instant.
+2. `actionPolicy`'s allowed patch fields and `allowedTargetValues` per action, so no
+   control can offer a value the taxonomy would refuse (the mistake `set_status` +
+   `cancelled` exists to prevent).
+3. That `assign_*` relation refs resolve by owned-entity id and not by free text.
+
+Until D2 lands, UX-05 stays **partially open** with 11 verbs reachable only through the
+console — recorded as such, not closed.

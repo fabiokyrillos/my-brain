@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/auth/require-user";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
@@ -107,7 +107,7 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Atividade recente")).toBeInTheDocument();
+    expect(screen.getByText("Registrado recentemente")).toBeInTheDocument();
     expect(screen.getByText("Ligar para a Marina")).toBeInTheDocument();
     expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
     expect(screen.getByText("Pronto")).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Atividade recente")).toBeInTheDocument();
+    expect(screen.getByText("Registrado recentemente")).toBeInTheDocument();
     expect(screen.getByText(/Nada por aqui ainda/)).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Tudo salvo")).toBeInTheDocument();
+    expect(screen.getByText("Nada pendente. Tudo salvo.")).toBeInTheDocument();
     expect(screen.queryByText("Preferência de revisão")).not.toBeInTheDocument();
   });
 
@@ -147,7 +147,7 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "en" }));
 
-    expect(screen.getByText("2 records being organized")).toBeInTheDocument();
+    expect(screen.getByText("2 records are still being organized.")).toBeInTheDocument();
   });
 
   it("renders priority tasks from the shared Work today projection", async () => {
@@ -191,7 +191,7 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Seu dia começa aqui")).toBeInTheDocument();
+    expect(screen.getByText("Nenhum prazo exige sua atenção hoje.")).toBeInTheDocument();
   });
 
   it("shows the waiting count from the home supplemental projection, not a raw table query", async () => {
@@ -220,16 +220,20 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Precisa de você")).toBeInTheDocument();
-    expect(screen.getByText("Confirmar proposta do Atlas")).toBeInTheDocument();
-    expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
-    expect(screen.getByText("2", { selector: ".attention-count" })).toBeInTheDocument();
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    expect(within(attention).getByText("Confirmar proposta do Atlas")).toBeInTheDocument();
+    expect(within(attention).getByText("Revisar orçamento")).toBeInTheDocument();
+    expect(within(attention).getByText("2")).toBeInTheDocument();
     expect(NeedsAttentionViewed).toHaveBeenCalledWith(
       expect.objectContaining({ itemCount: 2, locale: "pt-BR", surface: "home" }),
       undefined,
     );
-    expect(screen.getByTestId("needs-attention-view-marker").closest(".attention-panel")).not.toBeNull();
-    expect(screen.getByText("2 itens precisam de você")).toBeInTheDocument();
+    // The marker's DOM proximity to a specific panel class is not the contract —
+    // reporting the count that was actually rendered is, and the call above is
+    // what proves it. The old assertion pinned it to `.attention-panel`, which
+    // the attention-first layout no longer has.
+    expect(screen.getByTestId("needs-attention-view-marker")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 itens precisam de você.");
   });
 
   it("shows a `+` suffix on the count when the queue has more items than the preview page", async () => {
@@ -237,7 +241,8 @@ describe("HomeDashboard", () => {
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("1+", { selector: ".attention-count" })).toBeInTheDocument();
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    expect(within(attention).getByText("1+")).toBeInTheDocument();
   });
 
   it("shows an empty state and zero count when the Needs Attention queue has no items", async () => {
@@ -246,7 +251,11 @@ describe("HomeDashboard", () => {
     render(await HomeDashboard({ locale: "en" }));
 
     expect(screen.getByText("Nothing needs you right now.")).toBeInTheDocument();
-    expect(screen.getByText("0", { selector: ".attention-count" })).toBeInTheDocument();
+    // The "0" badge is deliberately gone. A count exists to tell the user how much
+    // is waiting; rendering a zero next to a heading that already says nothing is
+    // waiting is the repetition UX-02 was about. The empty sentence is the
+    // contract, and it is asserted above.
+    expect(within(screen.getByRole("region", { name: "Needs you" })).queryByText("0")).toBeNull();
   });
 
   it("links the Needs Attention panel to the Caixa needs-you filter, preserving locale", async () => {
