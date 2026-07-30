@@ -181,7 +181,19 @@ Both independent implementation reviewers terminated mid-run on a platform sessi
 3. The verifier's write-freedom was confirmed by reading every route, not only by the source-grep case: the sole `auth.admin` call is `listUsers`, and there is no `deleteUser`, `createUser`, storage `upload`/`remove`, or POST anywhere in the file.
 4. The census refactor's "byte-identical selects" claim was checked by diffing string literals against `918ab23`'s version: the only added literal is `"id"`, from the new `.order("id", …)`. One predicate widening (`bound()` also excluding `undefined`) is recorded in the census docstring rather than folded into the identity claim — against PostgREST it is a no-op, and it exists for the injected rows the CI cases feed.
 
-The reviewers are re-run once execution is available; their findings and adjudication are recorded in the acceptance report.
+The reviewers were re-run once execution returned. **Both completed**, returning 40 findings between them — 5 blocking, 10 major, 15 moderate, 10 minor. Every one is adjudicated in the acceptance report; the accepted fixes landed in `b07b8c8`, `87aad77` and `af5239e`.
+
+### The final pre-merge review could not execute, and what was done instead
+
+`2F-OPERATIONS-003`'s review convergence requirement asks for a final independent pre-merge review. It was dispatched **five times** and terminated on a platform error every time — once on `401 OAuth access token has been revoked`, four times on `529 Overloaded`. That is a sustained outage in subagent dispatch, not a repository condition, and abandoning a closeout over it would be the wrong call; so its highest-value items were performed directly and are recorded here as self-verification rather than as an independent review. **This is a real gap in the review record and is stated as one.**
+
+What the direct pass checked, and what it found:
+
+1. **The matrix-equality case cannot pass on a stale matrix, and does not red CI for line endings.** Proven by execution on both platforms: it passes locally under `core.autocrlf=true` and in CI on an LF checkout (run `30519768789`, `application` green).
+2. **The `~~` exemption was abusable, and that is fixed.** A probe showed any strikethrough anywhere on a line exempted the whole line, so a genuine "Slice 2F.4 has not started" could hide behind an unrelated struck aside three clauses away. `stripHistoricalSpans` now removes only the struck span and the `(Original: …)` quotation and keeps scanning the remainder, with a regression case asserting exactly that. This was a real defect found and closed by the substitute pass.
+3. **The §10 subject tokens were measured rather than assumed.** Each session-row token was run against all six slices' acceptance artifacts. The authenticated-journeys token — the row where the phase's real defect lived — matches exactly the three slices marked and none of the other three. Four tokens are loose, matching four or five of six because their vocabulary is common across reports. The generator now says so about itself, and tightening the loose four was declined for a stated reason.
+4. **Scope and Phase 2G re-verified.** `git diff main..HEAD --stat` touches only `docs/`, `docs/reports/`, `package.json`, `scripts/`, `src/lib/closeout/` and `supabase/tests/` — no migration, no grant, no policy, no product code. The single `2G-` string in the diff is the negative-control fixture inside `phase-2f-traceability.test.ts` that proves the attribution guard fires; it exists nowhere else.
+5. **No premature completion claim survives.** A grep across `docs/` returns nothing outside `PHASE_2F_SLICE_05_PRD.md`, which is accepted history about a different slice.
 
 ## 8. Deliberately not done
 
