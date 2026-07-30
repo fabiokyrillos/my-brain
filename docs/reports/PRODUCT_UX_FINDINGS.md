@@ -3,7 +3,23 @@
 **Initiative** — Product UX/UI Remediation Loop (post-Phase 2F, pre-Phase 2G).
 **Opened** — 2026-07-30.
 **Baseline commit** — `0c13285` (`main`, clean tree at audit start).
-**Status** — Audit 1 complete. No remediation slice merged yet.
+**Status** — Slices A, B, C and D1 are **merged into `main`**. D2 in progress.
+
+### Integrated slices
+
+| Slice | PR | Merge commit | Branch (preserved) |
+| --- | --- | --- | --- |
+| A — responsive foundations | #35 | `4d8e3d2` | `codex/ux-slice-a-responsive-foundations` |
+| B — navigation and IA | #36 | `2c935f9` | `codex/ux-slice-b-navigation` |
+| C — Home attention surface | #37 | `35ae645` | `codex/ux-slice-c-home` |
+| D1 — task detail surface | #38 | `9302bc5` | `codex/ux-slice-d1-task-detail` |
+
+Merged in dependency order with the repository's normal merge-commit strategy — no squash,
+no rebase, thematic commits and branch history intact. Each stacked PR was retargeted to
+the updated `main` and its file list verified byte-identical before and after retargeting
+(#36 26 files, #37 29 files, #38 13 files), so no reviewed semantic diff changed. `main`'s
+own `push` CI was confirmed green after each merge before the next was taken:
+`4d8e3d2` run 30560113300, `2c935f9` run 30560498090, `35ae645` run 30560881120.
 
 This is the durable artifact for the initiative. Every finding keeps its ID for the
 life of the initiative and ends with exactly one disposition:
