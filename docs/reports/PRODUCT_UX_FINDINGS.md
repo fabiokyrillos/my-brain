@@ -101,7 +101,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
 | UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | OPEN → F (DEC-2 approved: **ship it**) |
-| UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **IN PROGRESS** (Slice E — DEC-3 (a)) |
+| UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **RESOLVED** (Slice E — one composer) |
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | OPEN |
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | OPEN |
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
@@ -508,15 +508,16 @@ that measured clean and is recorded so it is not "fixed" without cause.
   > **Corrected in Slice E (`E-M3`)** — "no new model call in the common case" is wrong.
   > The command parse is what *produces* the classification, so it must run first: a
   > knowledge question costs three provider calls where it costs two today. Only inputs
-  > over 4000 characters avoid it, and they do so contractually rather than heuristically.
+  > over 1000 characters avoid it, and they do so contractually rather than heuristically.
   > The rest of the proposal held up.
 - **Contracts affected** — none written; `runTaskCommand` and `sendChatMessage` are
   both consumed. Analytics: `task_command_applied.commandOrigin` currently admits only
   `['chat','work']` (`202607280061:434`) — a unified composer still reports `chat`, so
   no allowlist widens and **no migration is required**.
 - **Slice** — E.
-- **Disposition** — DEC-3 decided **(a) unified composer**; **IN PROGRESS in Slice E**.
-  Capture routing is carved out and deferred with a stated reason (`E-M5`).
+- **Disposition** — **RESOLVED** in Slice E under DEC-3 (a). One composer on both chat
+  routes; `ChatForm` deleted. Capture routing is carved out and deferred with a stated
+  reason (`E-M5`), and the memory branch proposes without persisting (DEC-5).
 
 ## UX-08 — Projects: create-by-name only, and no edit path at all
 
@@ -1708,10 +1709,18 @@ is wrong, and the correction matters. A knowledge question now costs **three** p
 the command parse must happen *before* anything knows the utterance was a question. There is
 no cheaper declared signal: the parse is what produces the classification.
 
-One bound is contractual rather than heuristic and is applied: `commandTextSchema` caps a
-command at **4000** characters (`actions.ts:168`) while chat accepts **12000**. Text longer
-than 4000 cannot be a task command *by contract*, so it skips the parse entirely. Everything
-shorter pays the extra call. Recorded as the measured price of DEC-3, not hidden.
+One bound is contractual rather than heuristic and is applied: the provider refuses anything
+past **1000** characters with `command_text_too_long` *before it is billed*
+(`MAX_COMMAND_TEXT_LENGTH`, `lib/ai/task-command-schema.ts:40,171`), while chat accepts
+**12000**. Longer text cannot be a task command, so the composer skips the parse entirely.
+Everything shorter pays the extra call. Recorded as the measured price of DEC-3, not hidden.
+
+> Corrected during implementation. The first cut of this slice read the bound off
+> `commandTextSchema`'s `.max(4000)` in `actions.ts` and declared a *new*
+> `MAX_COMMAND_TEXT_LENGTH` at that value — shadowing the real one, which already existed at
+> 1000 and is the cap the provider actually enforces. The 4000 is the outer guard against a
+> multi-megabyte form field, and its own comment says so. Using the real constant makes the
+> skip both correct and considerably wider.
 
 ### `E-M4` — there is no create verb, so "add a task" is refused, not offered
 
@@ -1756,7 +1765,7 @@ One `AssistantComposer` — a single multiline field — replaces `CommandConsol
 | --- | --- | --- |
 | any of the eight task-command intents | delegated verbatim to `runTaskCommand` | unchanged |
 | memory phrasing (deterministic, anchored, non-interrogative) | proposed next step, **persists nothing** | none |
-| > 4000 characters | knowledge answer | 2 |
+| longer than a command may be (1000 chars) | knowledge answer | 2 |
 | everything else → `not_a_task_command` | knowledge answer | 3 |
 | everything else → any other outcome | shown as itself — refused, unsupported, preview, confirm, choose, clarify, create | 1 |
 
@@ -1774,3 +1783,64 @@ a global assistant on Brain are different surfaces, and they already share one b
 contract with `origin` as a telemetry category rather than a behaviour switch
 (`command-console.tsx:3-21`). Removing it would take a capability away from Work to make a
 different page tidier.
+
+## The seam, and why it is a value rather than a `catch`
+
+Two additive changes carry the whole routing decision, and both are named so a later reader
+cannot mistake them for incidental:
+
+`TaskCommandConsoleState.unsupportedReason` is set at the two sites that produce a refusal and
+is `null` everywhere else — including at the provider-fault and invalid-output returns that sit
+immediately above one of them. The composer falls through on `not_a_task_command` **and on
+nothing else**, which the suite proves exhaustively against
+`TASK_COMMAND_UNSUPPORTED_REASONS` rather than against a hand-listed sample: a reason added
+later defaults to staying visible as unsupported.
+
+`TaskCommandResult` gained a `silent` prop, default `false`. The composer owns one polite live
+region for the whole surface because a turn can resolve on a route the command state knows
+nothing about; two regions would announce every command outcome twice.
+
+`ChatForm` was **deleted**. It was the second permanent field, and after the composer replaced
+it nothing rendered it — a consumer-less client component is the kind of residue this
+repository removes rather than keeps. `ChatState` moved to `chat/chat-state.ts`, because
+`sendChatMessage` still returns that shape.
+
+## What is deferred, and said out loud
+
+- **Capture routing** — blocked on a migration (`E-M5`). The composer never inserts an entry.
+- **Conversational memory creation** — DEC-5's confirmed contract is Slice G's. The composer
+  recognises the intent *before any provider call*, renders a proposal and a link, and there
+  is deliberately no path from it to `memories`. The authenticated journey asserts the
+  memories surface is still empty afterwards, in both locales and on both viewports.
+- **"Add a task"** — refused as `unsupported_action` and left visible (`E-M4`).
+- **`Brain` → `Conversar` / `Talk`** — *not* required for Slice E to be coherent, so the
+  permanent navigation copy is untouched. The page's own framing moved into the composer's
+  typed copy module, which removes this route's inline `pt ? … : …` ternaries and leaves the
+  rename a one-place change when the assistant-name work lands.
+
+## Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm test` **2787/2789** (the two are the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts`, unchanged from B2's baseline) ·
+`npm run build` exit 0 · new coverage: `memory-intent.test.ts` 9, `routing.test.ts` 10,
+`actions.test.ts` 18, `assistant-composer.test.tsx` 11 — **48 new tests**.
+
+Journeys, **on the production build against the linked live database**: 66/66 across
+`online-assistant-composer`, `online-mobile-navigation`, `account-session`,
+`layout-contracts`, `foundation` and `task-command`, on desktop **and** Pixel 7. The composer's
+own journey runs in both locales and covers structure, the 44 px touch targets, the empty-
+submission refusal, the proposed-memory route with its no-write assertion, and one live
+round proving a question still reaches its grounded answer through the fallthrough.
+Disposable accounts are deleted fail-closed; a post-run sweep of the live database found
+**zero** residue.
+
+### One pre-existing failure, characterized rather than inherited
+
+`account-session.spec.ts:270` asserts `cache-control: no-store` on a protected route and fails
+**against the dev server**, which emits `no-cache, must-revalidate`. Verified pre-existing by
+stashing this slice and reproducing it on untouched `main`, and verified harness-only by
+re-running the same spec on the **production build**, where it passes 13/13 — which is how
+Slice D3 validated it. Not a Slice E regression and not a product defect; recorded so the
+next reader who runs that spec locally does not chase it.
+
+- **UX-07 — RESOLVED.** One composer, no mode to choose, every other contract untouched.
