@@ -1,10 +1,10 @@
 # Project State
 
-Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and merged, remote parity `202607300063`, closeout artifacts executed)
+Last updated: 2026-07-30 (Phase 2F — Slices 2F.1–2F.5 accepted and merged; **Slice 2F.6 implemented and gate-verified on branch `codex/phase-2f-slice-6`, PR #33 open**; remote parity `202607300063`)
 
 ## Current truth
 
-**Phase 2F — One Write Path is COMPLETE**, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.3 (68 requirements, 12 families, slices 2F.1–2F.6, all six accepted and merged). **Both of the phase's two expected migrations are applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase added no third**: Slices 2F.5 and 2F.6 are read-only. The final accounting is `docs/reports/PHASE_2F_REPORT.md`, and every requirement is mapped individually in `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md`.
+**Phase 2F — One Write Path is in closeout**, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.3 (68 requirements, 12 families, slices 2F.1–2F.6). **Slices 2F.1–2F.5 are accepted and merged. Slice 2F.6 is implemented and gate-verified on branch `codex/phase-2f-slice-6` with PR #33 open** — its merge SHA, merge date and post-merge verification are not facts yet, and this file will not claim them until they are (the same discipline ADR-063 applies to §10's gate cells, and the same pre-merge wording Slice 2F.5 used). **Both of the phase's two expected migrations are applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase added no third**: Slices 2F.5 and 2F.6 are read-only. The accounting in progress is `docs/reports/PHASE_2F_REPORT.md`, and every requirement is mapped individually in `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md`.
 
 **No successor phase is authorized or started.** Phase 2G is named as a recommendation in `docs/PHASE_2F_PROPOSAL.md` and nowhere else: no PRD, no plan, no ADR, no requirement ID, no artifact. The closeout asserts this rather than assuming it, and the traceability generator fails closed if a non-`2F-` requirement is ever declared as Phase 2F work.
 
@@ -12,7 +12,7 @@ Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and
 
 **`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 
-### Slice 2F.6 — Convergence and closeout (accepted, merged)
+### Slice 2F.6 — Convergence and closeout (implemented and gate-verified on branch; PR #33 open)
 
 **No migration, no deployment, no production write of any kind.** Remote parity is `202607300063` before and after, verified both times with `npx supabase migration list --linked`. The slice delivers `2F-OPERATIONS-003` through `006`, the whole-phase convergence audit and the phase's acceptance record, governed by `docs/reports/PHASE_2F_SLICE_06_PRD.md`.
 
@@ -30,7 +30,7 @@ Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and
 
 ### Slice 2F.5 — Measurement reader and evidence gate (accepted, merged)
 
-**Merged as PR #31 → `2ae2606` on 2026-07-29; CI run `30506608871` green on all three jobs on the exact merge SHA. No migration; nothing deployed; remote parity unchanged at `202607300063`, verified before and after.** Acceptance record: `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
+**Merged as PR #31 → `2ae2606` on 2026-07-29; merge-SHA CI run `30506807423` green on all three jobs.** *(This line cited `30506608871` until Slice 2F.6's audit checked it: that run is at `da1d2f3`, the branch head, not the merge commit — the same misattribution class the audit corrected two paragraphs down.)* No migration; nothing deployed; remote parity unchanged at `202607300063`, verified before and after.** Acceptance record: `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
 
 **ADR-055's 90-day expiry is now dated: go-live 2026-07-29 (the merge date, ADR-060), expiry `2026-10-27`**, computed by `expiryDateFromGoLive` and carried in `docs/TODO.md` for `2F-OPERATIONS-006` to verify at closeout. Governed by `docs/reports/PHASE_2F_SLICE_05_PRD.md`; decisions ADR-058, ADR-059, ADR-060; implementation report `docs/reports/PHASE_2F_SLICE_05_REPORT.md`.
 
@@ -113,6 +113,12 @@ Accepted on `c7e03b3` with CI run `30422655547` green on all three jobs; merged 
 **121 of the phase's 122 requirements are delivered. One is not.** `2E-COMMAND-012` is reclassified to Phase 2F by recorded decision (ADR-053, PRD revision 4) — the versions exist as build constants and travel on the command session, but no column persists them, and adding one means `drop function` plus a full re-declaration of a ~1,460-line RPC or of `record_ai_usage`, which every AI path in the product shares. Residual risk: attributing a bad command to its prompt requires joining `ai_usage_events.created_at` to the deploy history rather than reading a column.
 
 `2E-OPERATIONS-003`, `2E-OPERATIONS-004` and `2E-OWNERSHIP-004`'s remote half **were** blocked on deployment authorization and are now delivered and proven remotely. `2E-MATCH-018` is **delivered with a scope note** — the measured baseline covers the scoring layer against declared SQL verdicts rather than end-to-end matching, so any Phase 2F comparison must use that scope or re-measure. The full accounting is `docs/reports/PHASE_2E_FINAL_REPORT.md`, and every requirement is individually mapped in `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md`.
+
+### Phase 2E slice narrative — point-in-time records, superseded by the Phase 2E summary above
+
+> Each paragraph below describes its slice **at the moment that slice closed**, and several were written before Phase 2E was deployed. They are deliberately not rewritten: they are the record of how the phase was built, and this repository's convention is to re-label superseded narrative rather than delete it. Read the summary above — and `## Current truth` at the top of this file — for what is true now. In particular, every "local only", "not applied to the linked project", "did not run", "blocked on deployment" and "has not been read" below was true when written and is false today: the whole chain `202607250055`–`202607280061` is applied, parity is `202607300063`, and the remote gates those paragraphs owed were executed and recorded in the Phase 2E summary above.
+>
+> Slice 2F.6's convergence audit added this label. It found that `## Current truth` contained five present-tense claims that deployed migrations were undeployed — the same class as the Slice 2F.4 leftover corrected in this same slice, one section higher. Both scans in `scripts/generate-phase-2f-traceability.mjs` now treat a section carrying a supersession marker as history and everything unmarked as a current claim, which is the fail-closed direction.
 
 **Slice 2E.8 closed the phase and its convergence audit found a real defect the seven slices before it had not.** `src/features/task-commands/vocabulary.ts` — the 61-entry bilingual status/priority term table — sat outside the versioning regime every other policy module lives inside. The `policy-lock.test.ts` case named *"pins the status and priority vocabularies"* actually digested `TASK_STATUSES`/`TASK_PRIORITIES`, the **closed database literals this module neither owns nor can change**, while the mappings it does own were digested by nothing. Re-pointing one entry — `bloqueada` from `blocked` to `deferred` — would have moved a user's task to a state they never named with the whole suite green. `TASK_VOCABULARY_VERSION` was orphaned and had already drifted a version behind while promising in its own docstring that it had not, and `vocabularyCoversEveryLiteral()` was exported and never called. All three are fixed, and the digest is sorted by code unit rather than `localeCompare` so an ICU update cannot move a pinned gate. See `docs/reports/PHASE_2E_SLICE_08_REPORT.md`.
 

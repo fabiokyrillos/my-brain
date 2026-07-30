@@ -195,12 +195,16 @@ export async function runReminderCensus({ log = console.log } = {}) {
   );
   const tasks = await fetchAll(admin, "tasks", "id,user_id,status,due_at");
 
+  // One clock for the whole report. `computeReminderBreakdowns` takes an injected
+  // `now` so the run is reproducible, and calling it without one computed
+  // `overdueLive` against a different instant than the `Executed:` line printed.
+  const executedAt = new Date();
   const buckets = computeReminderCensus(reminders, tasks);
-  const breakdowns = computeReminderBreakdowns(reminders);
+  const breakdowns = computeReminderBreakdowns(reminders, executedAt);
 
   log("# Gate 4 — reminder census (read-only)\n");
   log(`Project: ${credentials.url}`);
-  log(`Executed: ${new Date().toISOString()}`);
+  log(`Executed: ${executedAt.toISOString()}`);
   log(`Rows read: ${reminders.length} reminders, ${tasks.length} tasks. No writes issued.\n`);
 
   const width = Math.max(...Object.keys(buckets).map((key) => key.length));
@@ -246,7 +250,14 @@ export async function runReminderCensus({ log = console.log } = {}) {
     log("Clear: buckets 1 and 2 are both zero. Bucket 7 is reported informationally and does not block.");
   }
 
-  return { buckets, breakdowns, reconcilable, stopGate: stopGateTriggered(buckets), project: credentials.url };
+  return {
+    buckets,
+    breakdowns,
+    reconcilable,
+    stopGate: stopGateTriggered(buckets),
+    project: credentials.url,
+    executedAt: executedAt.toISOString(),
+  };
 }
 
 const invokedDirectly = process.argv[1]

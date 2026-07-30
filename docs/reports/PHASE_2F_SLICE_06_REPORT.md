@@ -4,7 +4,7 @@
 
 **Base:** `main` at `918ab2323815110785e2646153ea21654a265c87` (CI run `30507154042`, all three jobs `success`). **Branch:** `codex/phase-2f-slice-6`.
 
-**No migration. No deployment. No production write.** Remote parity `202607300063` before and after, verified both times with `npx supabase migration list --linked`. The only SQL added is one read-only pgTAP assertion inside a Phase 2F test file that already existed.
+**No migration. No deployment. No production write.** Remote parity `202607300063` before and after, verified both times with `npx supabase migration list --linked`. The only SQL added is **one** read-only pgTAP assertion — a single `is()` covering all nineteen scanned tables' cascades — inside a Phase 2F test file that already existed, taking `plan(27)` to `plan(28)`.
 
 ---
 
@@ -49,13 +49,13 @@ Verification only, write-free: no deletion, no fixture, no user. A CI case asser
 - the orphan scan is kept for the one regression it *can* detect — a dropped or `NOT VALID` key — and §8 of `phase_2f_task_write_grants.sql` now asserts all nineteen cascades in CI, so the impossibility is guarded rather than asserted in prose;
 - the **load-bearing detectors** are named: zero surviving fixture-prefix users in `auth.users`, zero fixture objects in the `user-files` bucket, and per-table read reachability;
 - the **storage scan** the Phase 2E verifier had — and the Slice 2F.6 draft had dropped — is back, with `remoteSmokeObjects > 0` in the exit condition. Storage is the one residue class no foreign key removes (`SECURITY.md` records it as a real category for this project);
-- eight tables are **deliberately not scanned**, each with its reason and cascade anchor written down, following the house pattern's habit rather than leaving silence that reads as oversight;
+- **twenty** tables are deliberately not scanned, each with its reason and cascade anchor written down — and a CI case enumerates every owner-scoped table in the migration chain and requires each to appear in exactly one of the two lists, so the exhaustiveness the written-down list implies is checked rather than assumed;
 - both posture-protected tables must **refuse** a `service_role` read, and a *successful* read fails the run — a widened grant, not a convenience;
 - `product_events` row absence after an owner's deletion is stated as **unreadable with any credential this repository holds**, proven instead as a composition (asserted refusal + zero surviving fixture owners + the CI-asserted cascade). No stronger claim is made.
 
 **Fixture prefixes are read off the minting scripts, not guessed.** `phase-2f5-funnel-`, `phase-2f5-baseline-`, `codex-2f3-` and **`phase2f-gate3-`** — which has no hyphen after `phase2f` and which a naive `phase-2f-` prefix would have missed entirely. A test derives that prefix from `scripts/phase-2f-gate3-exact-title-reuse.mjs` rather than restating it.
 
-**Deferrals are proven to have held** through PostgREST's OpenAPI definition — a GET reaching no function: `create_reminder` absent, `create_task_command_v2` absent, and `ai_usage_events` carrying no provenance column, checked as a pattern over the **live column set** rather than against a guessed name, because no provenance column name was ever declared (`DECISIONS.md:585`, `:636`). ADR-057's reopening gate is intact: script present, no transcript.
+**Deferrals are proven to have held** through PostgREST's OpenAPI definition — a GET reaching no function. `create_reminder` and `create_task_command_v2` are absent. The load-bearing provenance check is a **signature pin**: PostgREST publishes `record_ai_usage`'s exact argument names, and ADR-053 establishes that every route to persisted provenance runs through a signature change, so the observed unchanged ten arguments are real evidence the deferral held. A column-name pattern runs beside it and is labelled a **secondary heuristic** — an earlier draft had the heuristic standing in for the pin, which is the substitution the design review had already ordered against, and the reviewers caught it. ADR-057's reopening gate is intact: script present, no transcript.
 
 ## 4. The census, corrected before it could be trusted as a stop-gate
 
@@ -161,20 +161,20 @@ Every row is a command run in this session, with its actual result.
 | # | Gate | Result |
 |---|---|---|
 | 1 | `npm run test:remote:2f:census` (before any fixture-minting run) | **stop-gate clear** — buckets 1 and 2 zero; 2026-07-30T02:39:48Z / 03:32:19Z |
-| 2 | `npm run test:remote:2f:cleanup` | **CLEAN — zero residue**, exit 0 |
+| 2 | `npm run test:remote:2f:cleanup` | **CLEAN — zero residue**, exit 0. Project `ulvwzqlpsjyrnqzfxmck`, parity `202607300063`. Reported: 2 auth users / **0** fixture-prefix survivors over 20 prefixes; 6 storage objects / **0** fixture objects; seventeen tables read with per-table row counts and **0** orphans each; `task_command_confirmations` and `product_events` both `refused (asserted)`; `anon` denied `42501` on `tasks` and on `reminders`, each after a privileged positive control on the same table; `create_reminder` and `create_task_command_v2` absent; `record_ai_usage` **10 arguments, unchanged**; ADR-057 gate script present with 0 transcripts |
 | 3 | `npm run test:remote:2f:funnel` | **32 / 32**, exit 0, every fixture owner proven deleted |
 | 4 | `npm run test:remote:2f:baseline` | **9 / 9**, exit 0 |
 | 5 | `npm run test:remote` (full remote suite) | **exit 0** — auth, atomic settings, RLS, ownership, heartbeat, AI ledger, aggregation, deployed file worker |
-| 6 | Authenticated journeys, desktop + mobile × pt-BR + en | **36 / 36 passed** (2.2 min) — `e2e/work-actions.spec.ts` and `e2e/manual-task-creation.spec.ts` through `scripts/online-playwright.mjs` against a freshly-served production build |
-| 7 | `npm run test:remote:2f:census` (after 3–6 minted fixtures) | **still clear** — buckets 1 and 2 zero |
-| 8 | `npm run test:remote:2f:cleanup` (after every run above) | **still CLEAN — zero residue**, 0 fixture-prefix survivors, 0 fixture storage objects |
+| 6 | Authenticated journeys | **36 / 36 passed** (2.2 min) — `e2e/work-actions.spec.ts` and `e2e/manual-task-creation.spec.ts` through `scripts/online-playwright.mjs` against a freshly-served production build. Precisely: 18 tests × the two Playwright projects (Desktop Chrome, Pixel 7); of the 18, fourteen are locale-parameterised (seven scenarios × pt-BR/en) and four are locale-agnostic — so "desktop + mobile × pt-BR + en" describes the matrix where the specs parameterise locale, not a flat four-way product |
+| 7 | `npm run test:remote:2f:census` (after 3–6 minted fixtures) | **still clear** — buckets 1 and 2 zero, bucket 7 zero, 1 reminder total at status `sent`. A separate execution with its own bucket table, not a re-quotation of row 1; `SECURITY.md`'s Option C figures cite the **first** run, 2026-07-30T02:39:48Z |
+| 8 | `npm run test:remote:2f:cleanup` (after every run above) | **still CLEAN — zero residue**, 0 fixture-prefix survivors, 0 fixture storage objects. Same project and parity |
 | 9 | Parity | `npx supabase migration list --linked` → **`202607300063`** before and after, no drift |
 
 **On the journeys (§10's 2F.6 cell).** Port 3000 was held by a Next.js server this session did not start, so reusing it — the local default — would have reported a Slice 2F.6 result while exercising unknown code. Slice 2F.2's acceptance hit the same hazard; the same resolution was used: a temporary Playwright config on port 3140 with `reuseExistingServer: false`, serving `npm run start`. The config was **deleted** afterwards and the working tree verified clean; the stale process was left untouched. These 36 also serve as the executed end-state regression proof that ADR-063's §10 correction leaves owing.
 
 ### Self-verification performed after the review agents were interrupted
 
-Both independent implementation reviewers terminated mid-run on a platform session limit — an outage, not a repository blocker (§19 of the closeout charter names this case explicitly). The highest-risk checks they had queued were performed directly, and two produced real corrections:
+Both independent implementation reviewers terminated mid-run on a platform session limit. **No section of this slice's PRD covers a reviewer outage** — an earlier draft of this paragraph cited one, and the citation was wrong; the reviewers' own findings caught it. The substitution recorded here is therefore a closeout decision, not a clause: an outage in a review tool is not a repository blocker, so the highest-risk checks the reviewers had queued were performed directly, the reviewers were re-run once execution returned, and both their reports are adjudicated in the acceptance record. The highest-risk checks they had queued were performed directly, and two produced real corrections:
 
 1. **The new pgTAP section 8 would have red CI if any of the nineteen tables lacked the exact foreign-key shape.** All nineteen were verified against the migration chain to carry `user_id uuid not null references auth.users(id) on delete cascade`; two initially appeared to differ and did not — `task_dependencies` declares it on a shared line (`202607160009:42`) and `task_command_confirmations` uses `create table if not exists` (`202607260059:213`). The assertion count was verified at 28 against `plan(28)`. The assertion was additionally reformulated to report **which** table failed rather than only that one did, because a count tells a CI reader nothing actionable.
 2. **Four drift tests used regex alternations a collateral failure could satisfy.** The generator accumulates every finding into one thrown message, so `toThrow(/A|B/)` can pass on B while A — the check under test — never fired. All four now assert the specific message of the check under test, and all 88 cases still pass, which is what proves each check actually fires.

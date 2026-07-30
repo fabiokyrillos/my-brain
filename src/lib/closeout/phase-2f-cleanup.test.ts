@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -152,6 +152,42 @@ describe("2F-OPERATIONS-004: scope declarations", () => {
     }
   });
 
+  it("partitions every owner-scoped table in the chain into scanned or excused, with nothing left over", async () => {
+    // F15's stated purpose is that "silence reads as oversight and the next reader
+    // cannot tell which it is". A written-down exclusion list creates an
+    // impression of exhaustiveness it does not have unless something checks the
+    // union — so this enumerates the owner-scoped tables from the migration chain
+    // and requires each to appear in exactly one of the two lists. A new
+    // owner-scoped table reds the build until someone decides which it is.
+    const { SCANNED_TABLES, DELIBERATELY_NOT_SCANNED } = await load();
+    const dir = join(REPO, "supabase/migrations");
+    const ownerScoped = new Set<string>();
+    for (const file of readdirSync(dir).sort()) {
+      const lines = readFileSync(join(dir, file), "utf8").split(/\r?\n/);
+      let current: string | null = null;
+      lines.forEach((line) => {
+        const created = line.match(/create table (?:if not exists )?public\.([a-z_]+)/);
+        if (created) current = created[1];
+        if (current && /user_id uuid[^,]*references auth\.users\(id\)/.test(line)) {
+          ownerScoped.add(current);
+        }
+        if (line.trim() === ");") current = null;
+      });
+    }
+    expect(ownerScoped.size).toBeGreaterThan(30);
+
+    const scanned = new Set(SCANNED_TABLES);
+    const excused = new Set(Object.keys(DELIBERATELY_NOT_SCANNED));
+    const unaccounted = [...ownerScoped].filter((table) => !scanned.has(table) && !excused.has(table)).sort();
+    expect(
+      unaccounted,
+      "these owner-scoped tables are in neither the scanned list nor the excused list, so the verifier "
+      + "is silent about them and a reader cannot tell whether that is deliberate",
+    ).toEqual([]);
+    const both = [...ownerScoped].filter((table) => scanned.has(table) && excused.has(table));
+    expect(both, "a table cannot be both scanned and excused").toEqual([]);
+  });
+
   it("declares both posture-protected tables as scanned, so their refusal is asserted", async () => {
     const { SERVICE_ROLE_CANNOT_READ, SCANNED_TABLES } = await load();
     for (const table of Object.keys(SERVICE_ROLE_CANNOT_READ)) {
@@ -173,6 +209,30 @@ describe("2F-OPERATIONS-004: scope declarations", () => {
     expect(AI_USAGE_PROVENANCE_PATTERN.test("version_prompt")).toBe(true);
     expect(AI_USAGE_PROVENANCE_PATTERN.test("model")).toBe(false);
     expect(AI_USAGE_PROVENANCE_PATTERN.test("match_policy_version")).toBe(false);
+  });
+});
+
+describe("2F-OPERATIONS-004: the record_ai_usage signature pin (F21a)", () => {
+  it("pins the ten arguments ADR-057 says are unchanged through Phase 2F", async () => {
+    // The leg that cannot pass for the wrong reason. ADR-053 establishes that every
+    // route to persisted provenance runs through a function signature change, so an
+    // unchanged argument set is real evidence the deferral held — unlike a pattern
+    // over guessed column names, which the design review ordered replaced.
+    const { RECORD_AI_USAGE_ARGUMENTS } = await load();
+    expect(RECORD_AI_USAGE_ARGUMENTS).toHaveLength(10);
+    expect([...RECORD_AI_USAGE_ARGUMENTS].sort()).toEqual([...RECORD_AI_USAGE_ARGUMENTS]);
+    for (const name of RECORD_AI_USAGE_ARGUMENTS) expect(name).toMatch(/^p_[a-z_]+$/);
+    // And the pin matches the migration that declares the function.
+    const sql = readFileSync(join(REPO, "supabase/migrations/202607250055_phase_2e_task_command_ai_usage.sql"), "utf8");
+    for (const name of RECORD_AI_USAGE_ARGUMENTS) {
+      expect(sql, `${name} is pinned but the declaring migration does not mention it`).toContain(name);
+    }
+  });
+
+  it("keeps the column heuristic labelled as secondary rather than as the check", async () => {
+    const source = readFileSync(join(REPO, "scripts/verify-phase-2f-cleanup.mjs"), "utf8");
+    expect(source).toMatch(/secondary heuristic/i);
+    expect(source).toContain("RECORD_AI_USAGE_ARGUMENTS");
   });
 });
 

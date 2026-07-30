@@ -153,18 +153,24 @@ describe("2F-OPERATIONS-006: DATABASE.md and SECURITY.md match the chain", () =>
 });
 
 describe("2F-OPERATIONS-006: the plan and the backlog point at the governing revision", () => {
-  it("PHASE_2_PLAN.md cites the PRD revision the repository actually runs on", () => {
-    const plan = read("docs/PHASE_2_PLAN.md");
-    expect(plan).toContain("Revision 4.2");
-    expect(plan, "the plan still points at the superseded Revision 4").not.toMatch(
-      /PHASE_2F_PRD\.md` \(Revision 4\)/,
-    );
-  });
-
-  it("TODO.md cites the same revision, and does not contradict itself about it", () => {
-    const todo = read("docs/TODO.md");
-    expect(todo).toContain("Revision 4.2");
-    expect(todo).not.toMatch(/approved `docs\/PHASE_2F_PRD\.md` Revision 4 \(/);
+  it("PHASE_2_PLAN.md and TODO.md cite the revision the PRD's own header declares", () => {
+    // Derived, not hardcoded: ADR-056 exists because a backlog pointer that
+    // contradicted the executing phase is "exactly how a future session builds the
+    // wrong thing". A test naming a fixed revision goes stale the moment the PRD is
+    // revised, which is the same failure one level up.
+    const header = read("docs/PHASE_2F_PRD.md")
+      .split(/\r?\n/)
+      .find((line) => line.startsWith("**Revision "));
+    expect(header, "the PRD no longer opens with a bold revision line").toBeDefined();
+    const governing = header!.match(/\*\*Revision (\d+(?:\.\d+)?)/)?.[1];
+    expect(governing, "could not read the governing revision from the PRD header").toBeDefined();
+    for (const document of ["docs/PHASE_2_PLAN.md", "docs/TODO.md"]) {
+      expect(read(document), `${document} does not cite Revision ${governing}`)
+        .toContain(`Revision ${governing}`);
+    }
+    expect(read("docs/PHASE_2_PLAN.md"), "the plan still points at the superseded Revision 4")
+      .not.toMatch(/PHASE_2F_PRD\.md` \(Revision 4\)/);
+    expect(read("docs/TODO.md")).not.toMatch(/approved `docs\/PHASE_2F_PRD\.md` Revision 4 \(/);
   });
 
   it("TODO.md's active-milestone line names Phase 2F rather than Phase 2C", () => {

@@ -4,7 +4,7 @@
 
 Revision 1 was the initial draft. It was put through an independent adversarial design review that inspected the repository on its own and returned **20 findings — 3 BLOCKING, 4 MAJOR, 9 MODERATE, 5 MINOR** — of which **19 were confirmed and folded in and 1 was confirmed in substance but rejected in its framing**. The per-finding adjudication is §26. Two of the three blocking findings proved that Revision 1 specified checks that **could not run against the merged repository**; the third proved that the draft's only production write was unrequested scope that would have contaminated the phase's own stop-gate. Revision 1's `--posture` mode is **deleted**.
 
-Governing phase document: `docs/PHASE_2F_PRD.md` Revision 4.2 (68 requirements, 12 families, slices 2F.1–2F.6). This slice owns epic **2F-F**: `2F-OPERATIONS-003`…`006`, the whole-phase convergence audit, and the phase's closeout record.
+Governing phase document: `docs/PHASE_2F_PRD.md` **Revision 4.3** (68 requirements, 12 families, slices 2F.1–2F.6). This slice's own convergence sweep produced 4.3 from 4.2 — three §10 gate-ledger corrections, no requirement changed (§26 M1, M2). This slice owns epic **2F-F**: `2F-OPERATIONS-003`…`006`, the whole-phase convergence audit, and the phase's closeout record.
 
 Where this document and the phase PRD disagree, the phase PRD governs. Where either and executed repository evidence disagree, **the evidence governs and the document is defective** — the standing rule of this phase (`docs/PHASE_2F_PRD.md` §5).
 
@@ -385,7 +385,7 @@ The review inspected the repository independently and returned 20 findings plus 
 
 ## 27. Traceability matrix (declared)
 
-Ten columns, factored: per-requirement ID, description, owning or owed slice, an evidence key, status and deferred destination; the evidence keys expand below into authoritative source, implementation artifact, verification mechanism, CI/remote gate and acceptance evidence. `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md` is the **derived** artifact and carries all columns fully expanded for all 68 rows; a documentation-convergence case asserts the two agree on the ID set and on every status (T4).
+Ten columns, factored: per-requirement ID, description, owning or owed slice, an evidence key, status and deferred destination; the evidence keys expand below into authoritative source, implementation artifact, verification mechanism, CI/remote gate and acceptance evidence. `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md` is the **derived** artifact and carries all columns fully expanded for all 68 rows. The two are kept in agreement by the CI case that regenerates the matrix from the real repository and compares it byte-for-byte, plus the shared counting basis stated below; an earlier revision promised a PRD-to-matrix status-comparison case that was never written, and saying so is better than leaving the promise standing.
 
 ### 27.1 Evidence keys
 
@@ -481,4 +481,4 @@ Ten columns, factored: per-requirement ID, description, owning or owed slice, an
 | `2F-OPERATIONS-005` | scripts/phase-2f-reminder-census.mjs re-runs at 2F.6 closeout. A nonzero bucket 1 or 2 (l… | 2F.6 | E-CENSUS | complete (this slice) | — |
 | `2F-OPERATIONS-006` | Permanent documentation reconciled at closeout: STATE.md, CHANGELOG.md, TODO.md (the stal… | 2F.6 | E-DOCS | complete (this slice) | — |
 
-**Totals: 68 requirements, 12 families, 6 slices. 68 delivered; 0 undelivered; 3 carrying recorded partials or scope notes (`2F-MEASURE-005`, `2F-REVOKE-003`, `2F-REVOKE-004`); 2 computable-but-unmet by design (`2F-MEASURE-003`, `2F-MEASURE-004`).** `2E-COMMAND-012` is **not** a Phase 2F requirement and is not counted here — it is deferred past this phase by ADR-057.
+**Totals: 68 requirements, 12 families, 6 slices. 68 delivered; 0 undelivered; 11 carrying a recorded scope note, measurement partial or unmet-by-design tier.** Eleven is the count the generator reports and the basis used in every document: `2F-MEASURE-001`…`-006`, `2F-REVOKE-003`, `2F-REVOKE-004`, `2F-REMINDER-004`, `2F-PRECOND-003`, `2F-OPERATIONS-002`. Within it, one is a measurement partial (`2F-MEASURE-005`) and two are computable-but-unmet evidence tiers by design (`2F-MEASURE-003/004`). An earlier revision counted 3 here and 10 in the matrix, on two different bases and with no reconciliation — the reviewers caught it. `2E-COMMAND-012` is **not** a Phase 2F requirement and is not counted here — it is deferred past this phase by ADR-057.

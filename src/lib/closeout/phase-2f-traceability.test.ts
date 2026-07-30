@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -70,6 +70,20 @@ function touch(root: string, relative: string, content = "placeholder\n") {
   writeFileSync(target, content, "utf8");
 }
 
+/**
+ * Writes a placeholder only where nothing has been written yet.
+ *
+ * The derived pass below walks every declared artifact path, and several of those
+ * paths are files the fixture has already populated for real — the slice reports
+ * the §10 ledger check reads, and the migrations whose headers carry their slice.
+ * An unconditional write clobbered them with `placeholder`, which made eight
+ * genuine checks fail for one collateral reason and would have been "fixed" by
+ * weakening the checks.
+ */
+function touchIfAbsent(root: string, relative: string) {
+  if (!existsSync(join(root, relative))) touch(root, relative);
+}
+
 async function makeFixtureRoot(): Promise<string> {
   const { EVIDENCE_KEYS, EXPECTED_PHASE_2F_MIGRATIONS } = await load();
   const root = mkdtempSync(join(tmpdir(), "phase-2f-traceability-"));
@@ -82,23 +96,37 @@ async function makeFixtureRoot(): Promise<string> {
   }
   for (const [relative, content] of Object.entries(SYNTHETIC_STATE)) touch(root, relative, content);
 
+  // The real slice reports, copied rather than stubbed. The §10 ledger check reads
+  // them for each gate's subject, so a placeholder fixture would make every
+  // session cell fail for the same collateral reason — and a positive control
+  // built on content the checks cannot accept is not a control at all.
   for (const [ordinal, suffixes] of Object.entries(SLICE_ARTIFACTS)) {
     for (const suffix of suffixes) {
-      touch(root, `docs/reports/PHASE_2F_SLICE_${ordinal}_${suffix}.md`);
+      const relative = `docs/reports/PHASE_2F_SLICE_${ordinal}_${suffix}.md`;
+      const source = join(REPO, relative);
+      if (existsSync(source)) {
+        mkdirSync(dirname(join(root, relative)), { recursive: true });
+        cpSync(source, join(root, relative));
+      } else {
+        touch(root, relative);
+      }
     }
   }
-  for (const file of Object.keys(EXPECTED_PHASE_2F_MIGRATIONS)) {
-    touch(root, `supabase/migrations/${file}`);
+  // Migrations carry the header the attribution check reads — the fixture must
+  // reproduce the real convention, not a bare placeholder, or every case fails
+  // for the same collateral reason.
+  for (const [file, slice] of Object.entries(EXPECTED_PHASE_2F_MIGRATIONS)) {
+    touch(root, `supabase/migrations/${file}`, `-- Phase 2F Slice ${slice} — fixture.\n--\n-- body\n`);
   }
 
   // Derived from the generator's own declarations, so the fixture can never be
   // weaker than what the generator resolves.
   for (const evidence of Object.values(EVIDENCE_KEYS)) {
     for (const relative of [...evidence.artifacts, ...evidence.acceptance]) {
-      if (!COPIED.includes(relative) && !(relative in SYNTHETIC_STATE)) touch(root, relative);
+      if (!COPIED.includes(relative) && !(relative in SYNTHETIC_STATE)) touchIfAbsent(root, relative);
     }
     for (const gate of evidence.gates) {
-      if ("file" in gate && gate.file) touch(root, gate.file);
+      if ("file" in gate && gate.file) touchIfAbsent(root, gate.file);
     }
   }
   // pgTAP paths must sit under a directory ci.yml runs; the placeholders above
@@ -117,6 +145,41 @@ function patch(root: string, relative: string, from: string | RegExp, to: string
     .not.toBe(before);
   writeFileSync(path, after, "utf8");
 }
+
+describe("2F-OPERATIONS-003: the generator runs against the real repository in CI", () => {
+  /**
+   * The case that makes every other check in this file matter.
+   *
+   * Without it, all eleven guards run only against fixture roots, and no CI job
+   * invokes `npm run docs:phase-2f:traceability` — so deleting a cited artifact,
+   * excluding a suite from `vitest.config.ts`, renaming a workflow step or
+   * hand-editing the matrix would leave `npm test` and all three CI jobs green.
+   * The generator would have been exactly the thing it was written to prevent:
+   * a verifier committed and never executed against reality.
+   *
+   * Asserting the committed matrix equals a fresh render wires both halves at
+   * once — every check runs against the real tree, and T5's "generated, never
+   * hand-edited" becomes enforced rather than requested.
+   */
+  it("regenerates the committed matrix byte-for-byte from the real repository", async () => {
+    const { buildPhase2fTraceability, renderPhase2fTraceability, MATRIX_OUTPUT_PATH } = await load();
+    const rendered = renderPhase2fTraceability(buildPhase2fTraceability());
+    const committed = readFileSync(join(REPO, MATRIX_OUTPUT_PATH), "utf8").replace(/\r\n/g, "\n");
+    expect(
+      rendered,
+      "docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md is stale or hand-edited — run `npm run docs:phase-2f:traceability`",
+    ).toBe(committed);
+  });
+
+  it("finds no stale deployment claim in any current-state document", async () => {
+    // The second contradiction class: a document asserting that a migration in
+    // the applied chain is undeployed, or that parity sits at a version the chain
+    // has moved past. Two of this closeout's own findings were of this class, and
+    // the slice-status scan could not see either — neither sentence names a slice.
+    const { findStaleDeploymentClaims } = await load();
+    expect(findStaleDeploymentClaims(REPO)).toEqual([]);
+  });
+});
 
 describe("2F-OPERATIONS-003: the traceability generator passes on correct content", () => {
   it("builds a 68-row model from the real repository's PRD in a fixture root", async () => {
@@ -153,7 +216,8 @@ describe("2F-OPERATIONS-003: the traceability generator passes on correct conten
     for (const id of Object.keys(PERMITTED_FOREIGN_REFERENCES)) {
       expect(prd).toContain(id);
     }
-    expect(() => buildPhase2fTraceability({ root: roots[roots.length - 1] })).not.toThrow();
+    const root = await makeFixtureRoot();
+    expect(() => buildPhase2fTraceability({ root })).not.toThrow();
   });
 
   it("renders a byte-stable matrix across two runs of an unchanged repository", async () => {
@@ -348,19 +412,105 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(root, "docs/STATE.md", "Phase 2F is complete", "Slice 2F.4 has not started. Phase 2F is complete");
     expect(() => buildPhase2fTraceability({ root }))
-      .toThrow(/asserts 2F\.4 has not started, contradicting its acceptance artifact/);
+      .toThrow(/asserts 2F\.4 is unfinished, contradicting its acceptance artifact/);
   });
 
   it("fails on the intra-document leftover that survived beside a deployment record", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
+    // The archetype: a pre-deployment paragraph left standing beside a deployment
+    // record. `202607290062` is in the fixture's applied chain and is not its head,
+    // so calling it local-only is a claim the chain contradicts.
     patch(
       root,
       "docs/STATE.md",
       "Phase 2F is complete",
-      "Deployment-session gates are pending: the migration is not applied. Phase 2F is complete",
+      "Migration `202607290062` is local only and has not been applied. Phase 2F is complete",
     );
-    expect(() => buildPhase2fTraceability({ root })).toThrow(/the migration is not applied/);
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/docs\/STATE\.md:\d+ says migration 202607290062 is undeployed/);
+  });
+
+  it("does not fire on a stale claim a supersession marker has labelled as history", async () => {
+    // The counterpart, and the reason the marker convention exists: this
+    // repository re-labels point-in-time narrative rather than deleting it, so a
+    // scan that punished the labelling would push authors toward deletion.
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    patch(
+      root,
+      "docs/STATE.md",
+      "Phase 2F is complete through Slice 2F.6.",
+      "Phase 2F is complete through Slice 2F.6.\n\n## Old notes (point-in-time, superseded)\n\n"
+        + "Migration `202607290062` is local only and has not been applied.\n",
+    );
+    expect(() => buildPhase2fTraceability({ root })).not.toThrow();
+  });
+
+  it("fails when a section 10 session cell's subject appears in no acceptance record", async () => {
+    // The 2F.4 journeys defect, reproduced: a `●` on a *deployment session* row
+    // whose subject the owning slice's acceptance record never mentions. Revision 1
+    // of this check only asked whether the slice had some acceptance file, which
+    // 2F.4 did — four of them — so it would have passed the very cell it was
+    // added to catch.
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    // The exact cell Revision 4.3-c corrected, patched back to its false state:
+    // 2F.4's four acceptance-bearing artifacts mention no Playwright journey.
+    patch(
+      root,
+      "docs/PHASE_2F_PRD.md",
+      "| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | — (see 4.3-c) | — | ● |",
+      "| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | ● regression | — | ● |",
+    );
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/executed \(● regression\) for 2F\.4, but none of that slice's acceptance-bearing artifacts/);
+  });
+
+  it("fails when a section 10 row has no registered subject token", async () => {
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    patch(
+      root,
+      "docs/PHASE_2F_PRD.md",
+      "| Full existing remote suite | 2F.4 deployment session |",
+      "| Full existing remote suite, renamed | 2F.4 deployment session |",
+    );
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/for which no subject token is registered/);
+  });
+
+  it("fails when a migration's own header names a different slice than the attribution", async () => {
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    touch(
+      root,
+      "supabase/migrations/202607290062_phase_2f_creation_origin.sql",
+      "-- Phase 2F Slice 2F.5 — mis-attributed on purpose.\n--\n-- body\n",
+    );
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/declares itself Slice 2F\.5 but is attributed to 2F\.3/);
+  });
+
+  it("fails when a migration does not name its slice at all", async () => {
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    touch(root, "supabase/migrations/202607300063_phase_2f_task_grant_revocation.sql", "-- body only\n");
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/does not name its slice in its first three lines/);
+  });
+
+  it("fails when vitest.config.ts declares a second include array that could shadow the first", async () => {
+    const { buildPhase2fTraceability } = await load();
+    const root = await makeFixtureRoot();
+    patch(
+      root,
+      "vitest.config.ts",
+      "coverage: { provider: \"v8\", reporter: [\"text\", \"html\"] },",
+      "coverage: { provider: \"v8\", reporter: [\"text\"], include: [\"src/**\"], exclude: [\"src/x\"] },",
+    );
+    expect(() => buildPhase2fTraceability({ root }))
+      .toThrow(/declares 2 include and 2 exclude arrays/);
   });
 
   it("fails when a section 10 cell claims an executed gate for a slice with no session record", async () => {
@@ -377,7 +527,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(root, "vitest.config.ts", /include: \[[^\]]*\]/, "include: TEST_GLOBS");
     expect(() => buildPhase2fTraceability({ root }))
-      .toThrow(/no longer declares literal include\/exclude arrays/);
+      .toThrow(/declares 0 include and 1 exclude arrays/);
   });
 
   it("fails when a status override names an ID the PRD does not declare", async () => {

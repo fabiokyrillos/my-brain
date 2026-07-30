@@ -288,6 +288,21 @@ export const EVIDENCE_KEYS = Object.freeze({
       "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md",
     ],
   },
+  "E-MERGE-CI": {
+    source: "PRD §6.12",
+    artifacts: [".github/workflows/ci.yml", "docs/STATE.md"],
+    verification: "each slice's merge-commit CI run read off the exact merge SHA with `gh run view <id> --json headSha,conclusion,event` — the branch-head run at the same PR is a different SHA and does not satisfy the requirement",
+    gates: [
+      { kind: "ci-step", job: "app", step: "run: npm test" },
+      { kind: "ci-step", job: "database", step: "Run the pgTAP suite (post-revocation posture)" },
+    ],
+    acceptance: [
+      "docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md",
+      "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md",
+    ],
+  },
   "E-TRACE": {
     source: "PRD §6.12",
     artifacts: [
@@ -365,7 +380,41 @@ export const FAMILY_EVIDENCE = Object.freeze({
   "2F-OPERATIONS": "E-OPERATIONS",
 });
 
+/**
+ * The distinctive subject of each §10 gate row, as a pattern the owning slice's
+ * acceptance record must mention if that row's `●` is to stand.
+ *
+ * `null` means "no token can distinguish this row" and exempts it — used only for
+ * the always-on CI row, whose subject is every slice's whole build. Registering
+ * every row is mandatory: an unregistered row fails the run rather than silently
+ * skipping, so adding a §10 row forces a decision about how its cells are proven.
+ */
+export const GATE_SUBJECT_TOKENS = Object.freeze({
+  "lint / typecheck / Vitest / build · `deno check`+`test`": null,
+  "Empty-DB chain + full pgTAP + db lint": /pgTAP|database and journey|db lint|plan\(/i,
+  "Grammar-trap guard + architecture gate (allowlists per §2)": /allowlist|guard/i,
+  "Preserved Gate 3 static suite (`work-surface-reuse.test.ts`)": /work-surface-reuse|Gate 3|static suite/i,
+  // Deliberately NOT the bare word "journey": every acceptance report quotes the
+  // CI job name "database and journey", which would have matched — and did, until
+  // the drift case for this row caught it. A token that fires on boilerplate every
+  // report carries is a token that can never fail.
+  "Authenticated journeys desktop+mobile, pt-BR+en": /playwright|Pixel 7|authenticated journe|desktop \+ mobile/i,
+  "Two-owner disposable probe (mutation / creation incl. user-origin undo)": /two-owner|probe/i,
+  "CI re-grant proof (revoke → re-grant → writes restored; **SQL-level only, not a live-ops rehearsal**)": /re-grant|rehearsal/i,
+  "Pre-revocation privilege assertion (denial non-vacuous)": /non-vacuou|privilege|denial/i,
+  "Full existing remote suite": /remote suite|test:remote/i,
+  "Reminders UPDATE/DELETE determination (written)": /2F-REMINDER-003|determina/i,
+  "End-to-end baseline + reader exclusion-mechanism proof": /baseline|exclusion/i,
+  "**Census stop-gate** (buckets 1/2 blocking; bucket 7 informational)": /census|stop-gate/i,
+  "Traceability tamper runs + cleanup verifier": /traceabilit|cleanup verifier/i,
+  "Parity re-check before/after": /parity|paridade/i,
+});
+
 export const REQUIREMENT_EVIDENCE_OVERRIDES = Object.freeze({
+  // Without this the family key gives 2F-OPERATIONS-002 — "all three CI jobs
+  // green on the exact merge SHA" — a *parity session* as its gate cell, which is
+  // the wrong kind of evidence printed in the row that names the right one.
+  "2F-OPERATIONS-002": "E-MERGE-CI",
   "2F-OPERATIONS-003": "E-TRACE",
   "2F-OPERATIONS-004": "E-CLEAN",
   "2F-OPERATIONS-005": "E-CENSUS",
@@ -424,6 +473,11 @@ export const STATUS_OVERRIDES = Object.freeze({
     note: "the requirement asks for the dormancy to be recorded and deferred, not retired; DATABASE.md carries it and the undo handlers' snoozed branches stay covered so they remain falsifiable",
     destination: "retiring the `snoozed` literal — post-Phase-2F, requires a migration and proof that no row carries it",
   },
+  "2F-OPERATIONS-002": {
+    status: "partial",
+    note: "green on every implementation-PR merge SHA (8c59c1d/47c555e/48d6a83/c174f8f/2ae2606) and on three of four acceptance merges. **`6628b02` — PR #30, a documentation-only 2F.4 acceptance merge — has never had a green `application` job**: the original run failed on `question-answer-form.test.tsx:162` and this closeout's rerun failed on `task-candidate-form.test.tsx`, two different jsdom timing flakes already recorded in TODO.md. `edge worker` and `database and journey` were green in both runs and the commit changed no source, so no Phase 2F change is implicated — but the requirement says *every* slice PR and one merge SHA does not qualify",
+    destination: "the two flaky component tests in docs/TODO.md; neither reproduces on demand, and a fix without a reproduction is a guess",
+  },
   "2F-PRECOND-003": {
     status: "complete",
     note: "discharged by Slice 2F.6's A14 sweep of §10's gate ledger, which filed two dispositions: 2F.5's `database` cell was `—` although the slice added three pgTAP assertions, and 2F.4's authenticated-journeys cell claimed an execution its sixteen acceptance gates do not record",
@@ -431,7 +485,11 @@ export const STATUS_OVERRIDES = Object.freeze({
   },
 });
 
-/** Requirements this phase did **not** deliver. Empty, and the emptiness is checked. */
+/**
+ * Requirements this phase did **not** deliver. Empty — and unlike the comment
+ * this line used to carry, the emptiness is now actually checked below rather
+ * than merely asserted here.
+ */
 export const NOT_DELIVERED = Object.freeze({});
 
 // ---------------------------------------------------------------------------
@@ -608,11 +666,17 @@ export function readNpmScripts(root) {
  */
 export function readVitestScope(root) {
   const source = readFileSync(join(root, "vitest.config.ts"), "utf8");
-  const includeMatch = source.match(/include:\s*\[([^\]]*)\]/);
-  const excludeMatch = source.match(/exclude:\s*\[([^\]]*)\]/);
-  if (!includeMatch || !excludeMatch) {
-    throw new Error("vitest.config.ts no longer declares literal include/exclude arrays; the suite-level gate check cannot be trusted");
+  const includes = [...source.matchAll(/include:\s*\[([^\]]*)\]/g)];
+  const excludes = [...source.matchAll(/exclude:\s*\[([^\]]*)\]/g)];
+  if (includes.length !== 1 || excludes.length !== 1) {
+    throw new Error(
+      `vitest.config.ts declares ${includes.length} include and ${excludes.length} exclude arrays; `
+      + "the suite-level gate check reads one of each and cannot tell which governs `npm test` when "
+      + "another (a coverage list, say) shadows it",
+    );
   }
+  const [includeMatch] = includes;
+  const [excludeMatch] = excludes;
   const globs = (body) => [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
   return { include: globs(includeMatch[1]), exclude: globs(excludeMatch[1]) };
 }
@@ -703,7 +767,14 @@ export function readWorkflowSteps(root) {
  */
 export function readPgTapPaths(root) {
   const { workflow } = readWorkflowSteps(root);
-  const paths = [...workflow.matchAll(/supabase test db --local (\S+)/g)].map((m) => m[1]);
+  // Comments stripped first: a documented or commented-out invocation would
+  // otherwise register its path as one the workflow executes, which is the
+  // opposite of what this reader is for.
+  const executable = workflow
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*#.*$/, ""))
+    .join("\n");
+  const paths = [...executable.matchAll(/supabase test db --local (\S+)/g)].map((m) => m[1]);
   if (paths.length === 0) throw new Error("ci.yml runs no `supabase test db --local` step");
   return [...new Set(paths)];
 }
@@ -723,31 +794,191 @@ export const CURRENT_STATE_DOCUMENTS = Object.freeze([
   "docs/TODO.md",
   "docs/PHASE_2_PLAN.md",
   "docs/PHASE_2F_PRD.md",
+  // §13 requires both of these to state the *current* posture, and the closeout
+  // edited both, so a stale status in either is exactly the class this scan is for.
+  "docs/SECURITY.md",
+  "docs/DATABASE.md",
 ]);
 
-export function findStatusContradictions(root, acceptedSlices) {
+/**
+ * The vocabulary a document uses when it says a slice is not finished.
+ *
+ * Revision 1 of this scan matched only the literal shapes "not started" /
+ * "not begun" / "did not start", which an executed probe showed misses every
+ * other natural phrasing — "has not *been* started", "is not yet accepted",
+ * "remains outstanding", "is in progress", "awaits authorization", "was never
+ * executed", "is incomplete". A scan that catches one wording out of eight is a
+ * mechanism in name only, which is what `T4` exists to stop being.
+ */
+export const UNFINISHED_STATUS_PHRASES = Object.freeze([
+  "not (?:yet )?(?:been )?(?:started|begun|executed|run)",
+  "did not (?:start|run|execute)",
+  // Deliberately NOT "never ran/executed": that phrasing appears in legitimate
+  // narrative *about* a gate that was corrected, and it fired on this phase's own
+  // PRD §14 entry describing the 2F.4 journeys cell. "not been executed/run"
+  // above covers the assertion form without catching the description of one.
+  "not (?:yet )?(?:been )?(?:accepted|merged|delivered|applied|deployed)",
+  "in progress",
+  "awaits? (?:authorization|approval|a decision)",
+  "remains? (?:outstanding|pending|open|unstarted)",
+  "(?:is|are) (?:still )?(?:incomplete|unfinished|pending|outstanding)",
+  "has not (?:been )?(?:started|accepted|merged|deployed)",
+  "on (?:a |the )?branch, (?:not|no) (?:merged|pushed|pr)",
+]);
+
+/**
+ * Statements that assert an accepted slice — or the phase — is unfinished.
+ *
+ * Two shapes are matched: a slice identifier followed by an unfinished phrase
+ * within one sentence, and an unfinished phrase followed by a slice identifier.
+ * `subjects` carries the phase name as well as the slice ids, because a document
+ * can say "Phase 2F is incomplete" without naming a slice.
+ */
+/**
+ * The marker that takes a heading's section out of the scan.
+ *
+ * A repository this old necessarily carries point-in-time narrative — the
+ * project's own convention is to re-label it rather than delete it (F41). So the
+ * scan needs a way to tell "this paragraph is history" from "this paragraph is a
+ * stale current claim", and a keyword scan cannot infer that. The convention is
+ * an explicit marker in the section's heading or its first lines; anything
+ * unmarked is read as a current claim, which is the fail-closed direction.
+ */
+export const HISTORICAL_SECTION_MARKER = /superseded|point-in-time|historical record|append-only .*record/i;
+
+/**
+ * The same convention at line granularity, for the backlog's own idiom: a struck
+ * item (`~~…~~`), a dated discharge, or a preserved original quoted inside its
+ * own correction. Without this, correcting a stale line by *quoting* the stale
+ * sentence inside the correction re-triggers the finding — the scan would be
+ * punishing the very labelling it is meant to encourage.
+ */
+export const HISTORICAL_LINE_MARKER = /~~|\bdischarged\b|\bsuperseded\b|\(original:/i;
+
+/**
+ * Splits a document into `## `/`### ` sections and flags the ones a supersession
+ * marker covers. A marker in a section's heading or in its first six lines
+ * covers that section and — for a `## ` section — its nested `### ` children,
+ * because that is how `STATE.md`'s history block is actually written.
+ */
+export function partitionHistoricalSections(text) {
+  const lines = text.split("\n");
+  const covered = new Array(lines.length).fill(false);
+  let topLevelCovered = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const isTop = /^## /.test(line);
+    const isSub = /^### /.test(line);
+    if (isTop || isSub) {
+      const window = lines.slice(index, index + 7).join("\n");
+      const marked = HISTORICAL_SECTION_MARKER.test(window);
+      if (isTop) topLevelCovered = marked;
+      covered[index] = marked || (isSub && topLevelCovered);
+    } else {
+      covered[index] = index > 0 ? covered[index - 1] : false;
+    }
+  }
+  return covered;
+}
+
+export function findStatusContradictions(root, acceptedSlices, { phase = "Phase 2F" } = {}) {
   const findings = [];
+  const subjects = [...acceptedSlices, phase];
+  const phrases = UNFINISHED_STATUS_PHRASES.join("|");
+
   for (const relative of CURRENT_STATE_DOCUMENTS) {
     const path = join(root, relative);
     if (!existsSync(path)) {
       findings.push({ document: relative, line: 0, text: "document is missing" });
       continue;
     }
-    const lines = readFileSync(path, "utf8").split("\n");
+    const source = readFileSync(path, "utf8");
+    const lines = source.split("\n");
+    const historical = partitionHistoricalSections(source);
     lines.forEach((text, index) => {
-      for (const slice of acceptedSlices) {
-        const escaped = slice.replace(".", "\\.");
+      if (historical[index] || HISTORICAL_LINE_MARKER.test(text)) return;
+      for (const subject of subjects) {
+        const escaped = subject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // Bounded to one sentence in either direction, and `[^.\n]` stops the
+        // window crossing a full stop, so a nearby unrelated sentence cannot
+        // manufacture a match.
         const patterns = [
-          new RegExp(`${escaped}[^.\\n]{0,80}?(?:has |have )?not (?:yet )?(?:started|begun)`, "i"),
-          new RegExp(`${escaped}[^.\\n]{0,80}?did not start`, "i"),
-          new RegExp(`(?:slices?|slice)\\s+[^.\\n]{0,40}${escaped}[^.\\n]{0,40}(?:has |have )?not (?:yet )?started`, "i"),
+          new RegExp(`${escaped}[^.\\n]{0,90}?\\b(?:${phrases})\\b`, "i"),
+          new RegExp(`\\b(?:${phrases})\\b[^.\\n]{0,90}?${escaped}`, "i"),
         ];
         if (patterns.some((pattern) => pattern.test(text))) {
-          findings.push({ document: relative, line: index + 1, slice, text: text.trim().slice(0, 200) });
+          findings.push({ document: relative, line: index + 1, slice: subject, text: text.trim().slice(0, 200) });
+          break;
         }
       }
-      if (/the migration is not applied/i.test(text)) {
-        findings.push({ document: relative, line: index + 1, slice: "2F.4", text: text.trim().slice(0, 200) });
+    });
+  }
+  return findings;
+}
+
+/**
+ * Phrases a document uses to say a migration has not reached the deployed
+ * project. In Portuguese too, because `SECURITY.md` and `DATABASE.md` are
+ * written in it and both are §13 reconciliation targets.
+ */
+export const UNDEPLOYED_MIGRATION_PHRASES = Object.freeze([
+  "local only",
+  "local/branch only",
+  "local[- ]?only",
+  "branch[- ]?only",
+  "not (?:yet )?(?:been )?applied",
+  "not (?:yet )?(?:been )?deployed",
+  "does not exist in the linked project",
+  "n[ãa]o implantad[oa]",
+  "apenas local",
+  "local/branch apenas",
+  "permanece em",
+]);
+
+/**
+ * A second contradiction class the slice-status scan cannot see: a current-state
+ * document asserting that a migration **in the applied chain** is undeployed, or
+ * that parity sits at a version the chain has moved past.
+ *
+ * This is the class that produced two of the closeout's own findings — a
+ * `## Current truth` paragraph still calling `202607250056` local-only, and a
+ * `SECURITY.md` section still naming parity `202607250054` thirty-nine lines from
+ * the parity line the same slice corrected. Both were invisible to a scan keyed
+ * on slice ids, because neither sentence names a slice.
+ *
+ * Sections carrying `HISTORICAL_SECTION_MARKER` are exempt, on the same
+ * fail-closed convention: unmarked prose is read as a current claim.
+ */
+export function findStaleDeploymentClaims(root) {
+  const migrations = readdirSync(join(root, "supabase/migrations"))
+    .map((name) => name.slice(0, 12))
+    .filter((version) => /^\d{12}$/.test(version));
+  if (migrations.length === 0) throw new Error("supabase/migrations yielded no versioned files");
+  const head = migrations.slice().sort().at(-1);
+  const applied = new Set(migrations);
+  const phrases = UNDEPLOYED_MIGRATION_PHRASES.join("|");
+  const findings = [];
+
+  for (const relative of CURRENT_STATE_DOCUMENTS) {
+    const path = join(root, relative);
+    if (!existsSync(path)) continue;
+    const source = readFileSync(path, "utf8");
+    const historical = partitionHistoricalSections(source);
+    source.split("\n").forEach((text, index) => {
+      if (historical[index] || HISTORICAL_LINE_MARKER.test(text)) return;
+      for (const version of [...new Set([...text.matchAll(/\b(\d{12})\b/g)].map((m) => m[1]))]) {
+        if (!applied.has(version)) continue;
+        // A version that IS the chain head cannot be the subject of a stale
+        // parity claim, so only versions the chain has moved past are suspect.
+        const isHead = version === head;
+        const near = new RegExp(
+          `(?:${phrases})[^.\\n]{0,90}?${version}|${version}[^.\\n]{0,90}?(?:${phrases})`,
+          "i",
+        );
+        if (near.test(text) && !isHead) {
+          findings.push({ document: relative, line: index + 1, version, text: text.trim().slice(0, 200) });
+          break;
+        }
       }
     });
   }
@@ -836,8 +1067,34 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
       + "changes what this phase did to the database.",
     );
   }
+  // Attribution derived, not declared. Revision 1 of this check compared
+  // EXPECTED_PHASE_2F_MIGRATIONS against SLICES — two constants in this file — so
+  // re-attributing a migration to the wrong slice produced no failure and
+  // silently rewrote the matrix's "Owning slice" column. The external source is
+  // each slice's own acceptance-bearing artifact, which names the migration it
+  // applied; exactly one slice must claim each migration, and it must be the one
+  // declared here.
+  // The external source is each migration's own header line, which names the
+  // slice that wrote it — `-- Phase 2F Slice 2F.3 — manual task-creation
+  // convergence.` A slice-report prose scan was tried first and is too weak:
+  // a later slice's parity line names the migration it moved *from*, so both
+  // migrations resolved to two claimants. The header is unambiguous, lives in the
+  // artifact being attributed, and cannot drift from it.
   for (const [file, slice] of Object.entries(EXPECTED_PHASE_2F_MIGRATIONS)) {
     if (!SLICES.includes(slice)) fail(`migration ${file} is attributed to unknown slice ${slice}`);
+    const path = join(root, "supabase/migrations", file);
+    if (!existsSync(path)) continue; // already reported by the inventory check above
+    const header = readFileSync(path, "utf8").split(/\r?\n/).slice(0, 3).join("\n");
+    const declared = header.match(/Phase 2F Slice (2F\.\d)/);
+    if (!declared) {
+      fail(
+        `migration ${file} does not name its slice in its first three lines, so its attribution to `
+        + `${slice} has no source outside this generator. Every Phase 2F migration opens with `
+        + "`-- Phase 2F Slice 2F.N — …`.",
+      );
+    } else if (declared[1] !== slice) {
+      fail(`migration ${file} declares itself Slice ${declared[1]} but is attributed to ${slice}`);
+    }
   }
 
   // ---- ADR coverage (F6) ----
@@ -944,11 +1201,28 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
   for (const id of Object.keys(NOT_DELIVERED)) {
     if (!seen.has(id)) fail(`NOT_DELIVERED names ${id}, which the PRD does not declare`);
   }
+  // The emptiness the declaration claims, checked. Phase 2F delivered all 68; if
+  // a future edit records a non-delivery here it must also update the phase
+  // report's headline count, so this refuses to pass silently.
+  if (Object.keys(NOT_DELIVERED).length > 0) {
+    fail(
+      `NOT_DELIVERED holds ${Object.keys(NOT_DELIVERED).length} entr(y|ies), but Phase 2F closed with `
+      + "68 of 68 delivered. Either the phase report's count is stale or this map is.",
+    );
+  }
 
   // ---- §10 gate ledger (F11) ----
   const gateMatrix = parseGateMatrix(prd);
   const ledger = [];
   for (const row of gateMatrix) {
+    const subject = GATE_SUBJECT_TOKENS[row.gate];
+    if (subject === undefined) {
+      fail(
+        `§10 declares gate ${JSON.stringify(row.gate)}, for which no subject token is registered. `
+        + "Every ledger row needs one, or its ● cells cannot be checked against the session that ran them.",
+      );
+      continue;
+    }
     for (const slice of SLICES) {
       const cell = row.cells[slice];
       if (!cell || !cell.includes("●")) continue;
@@ -958,8 +1232,41 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
           `§10 marks gate ${JSON.stringify(row.gate)} executed (${cell}) for ${slice}, which has no `
           + "acceptance-bearing artifact to name the session it ran in (2F-PRECOND-003)",
         );
+        continue;
       }
-      ledger.push({ gate: row.gate, slice, cell, artifacts: bearing });
+      // The check that has teeth. Revision 1 stopped at "the slice has some
+      // acceptance file", which is a strict subset of the artifact-resolution
+      // check and therefore never fired alone — and, decisively, would NOT have
+      // caught the defect it was added for: Slice 2F.4 has four acceptance-bearing
+      // artifacts and its journeys cell was still false.
+      //
+      // Which cells need a named session is **derived from §10's own "Executes in"
+      // column**, not hand-declared. A row that executes in CI is proven by that
+      // slice's merge-SHA CI run, so demanding its subject appear in an acceptance
+      // narrative would fail on correct content — the continuous static-suite row
+      // is the clearest case. A row that executes in a *session* has no other
+      // witness than the record of that session, which is precisely what
+      // 2F-PRECOND-003 requires and where the 2F.4 defect lived.
+      //
+      // What this proves and what it does not: a keyword present is weaker than "a
+      // session named". It catches a cell whose subject appears nowhere in the
+      // record — exactly the 2F.4 case — and cannot catch one mentioned only in
+      // passing. That limit is stated rather than papered over, and A14's human
+      // sweep remains the stronger instrument.
+      const provenByCi = /\bCI\b/.test(row.executesIn);
+      const ordinal = String(Number(slice.split(".")[1])).padStart(2, "0");
+      const named = provenByCi || subject === null || bearing.some((suffix) => {
+        const path = join(root, `docs/reports/PHASE_2F_SLICE_${ordinal}_${suffix}.md`);
+        return existsSync(path) && subject.test(readFileSync(path, "utf8"));
+      });
+      if (!named) {
+        fail(
+          `§10 marks gate ${JSON.stringify(row.gate)} executed (${cell}) for ${slice}, but none of that `
+          + `slice's acceptance-bearing artifacts (${bearing.join(", ")}) mentions its subject. `
+          + "2F-PRECOND-003: an unexecuted gate may not be cited as evidence anywhere in the phase.",
+        );
+      }
+      ledger.push({ gate: row.gate, slice, cell, artifacts: bearing, subjectNamed: named });
     }
   }
 
@@ -967,8 +1274,15 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
   const contradictions = findStatusContradictions(root, acceptedSlices);
   for (const finding of contradictions) {
     fail(
-      `${finding.document}:${finding.line} asserts ${finding.slice ?? "a slice"} has not started, `
+      `${finding.document}:${finding.line} asserts ${finding.slice ?? "a slice"} is unfinished, `
       + `contradicting its acceptance artifact: ${JSON.stringify(finding.text)}`,
+    );
+  }
+  const staleDeployments = findStaleDeploymentClaims(root);
+  for (const finding of staleDeployments) {
+    fail(
+      `${finding.document}:${finding.line} says migration ${finding.version} is undeployed or that parity `
+      + `sits there, but it is in the applied chain: ${JSON.stringify(finding.text)}`,
     );
   }
 
@@ -1088,7 +1402,7 @@ export function renderPhase2fTraceability(model) {
     lines.push(
       `| \`${row.id}\` | ${cell(row.description)} | ${cell(row.evidence.source)}`
       + ` | ${cell(row.slice)} | ${cell(row.evidence.artifacts.map((a) => `\`${a}\``).join("; "))}`
-      + ` | ${cell(row.verificationOverride ?? row.evidence.verification)} | ${cell(gates)}`
+      + ` | ${cell(row.evidence.verification)} | ${cell(gates)}`
       + ` | ${cell(row.evidence.acceptance.map((a) => `\`${a}\``).join("; "))}`
       + ` | ${cell(row.status)} | ${cell(trailer)} |`,
     );

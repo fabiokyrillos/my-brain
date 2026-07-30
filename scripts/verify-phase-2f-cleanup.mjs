@@ -154,8 +154,20 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   memories: "no Phase 2F proof writes it; cascades at 202607160006:5",
   entry_embeddings: "no Phase 2F proof writes it; cascades at 202607160006:28",
   conversations: "no Phase 2F proof writes it; cascades at 202607160006:42",
+  conversation_messages: "chat-only, no Phase 2F proof writes it; cascades at 202607160006:54",
   profiles: "identity row created by handle_new_user, not an independent fixture; cascades at 202607160001:8",
   agent_preferences: "same; cascades at 202607160001:18",
+  organizations: "no Phase 2F proof writes it; cascades at 202607160003:14",
+  entry_entities: "polymorphic entry link, written only by the interpretation worker; cascades at 202607160003:90",
+  summaries: "review-generation output, no Phase 2F proof writes it; cascades at 202607160007:82",
+  entity_attachments: "polymorphic attachment link, no Phase 2F proof writes it; cascades at 202607160007:120",
+  person_relationships: "Phase 1 knowledge graph, untouched by this phase; cascades at 202607160009:7",
+  person_contexts: "same; cascades at 202607160009:15",
+  person_projects: "same; cascades at 202607160009:21",
+  tags: "no Phase 2F proof writes it; cascades at 202607160009:49",
+  entity_tags: "polymorphic tag link, no Phase 2F proof writes it; cascades at 202607160009:54",
+  attachment_interpretations: "attachment worker output, no Phase 2F proof writes it; cascades at 202607160012:3",
+  entity_aliases: "Phase 2B alias store, no Phase 2F proof writes it; cascades at 202607170020:118",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */
@@ -174,7 +186,38 @@ export const RPCS_THAT_MUST_NOT_EXIST = Object.freeze({
     "2F-CREATE-002: the creation contract was extended by drop-and-recreate under the same name, never versioned — a _v2 would leave two live creation write paths",
 });
 
-/** Columns that must NOT exist on `ai_usage_events`, because provenance is deferred (ADR-057). */
+/**
+ * `record_ai_usage`'s argument set, which ADR-057 says is unchanged through Phase
+ * 2F ("`record_ai_usage`'s signature is unchanged through Phase 2F (PRD §12)").
+ *
+ * This is the leg the definitive PRD's F21(a) requires and the design review
+ * ordered *in place of* a guessed column name: no provenance column name was ever
+ * declared anywhere, so asserting the absence of one would pass for the wrong
+ * reason. PostgREST's OpenAPI body schema publishes the exact parameter names, so
+ * the signature can be pinned by observation rather than by guesswork — and
+ * closing `2E-COMMAND-012` necessarily changes this set, because ADR-053
+ * establishes that every route to persisted provenance runs through a function
+ * signature change.
+ */
+export const RECORD_AI_USAGE_ARGUMENTS = Object.freeze([
+  "p_cached_input_tokens",
+  "p_input_tokens",
+  "p_model",
+  "p_operation",
+  "p_output_tokens",
+  "p_provider_request_id",
+  "p_reasoning_tokens",
+  "p_source_id",
+  "p_source_type",
+  "p_user_id",
+]);
+
+/**
+ * A secondary heuristic over `ai_usage_events`'s live column set, kept beside the
+ * signature pin and **labelled as a heuristic**: a provenance column could be
+ * named anything, so this catches the plausible names and is not the check F21
+ * rests on.
+ */
 export const AI_USAGE_PROVENANCE_PATTERN = /(prompt|strategy).*version|version.*(prompt|strategy)/i;
 
 const PRIVILEGE_DENIED = new Set(["42501", "PGRST301", "PGRST302"]);
@@ -240,9 +283,18 @@ export async function readOpenApiSchema(url, serviceRoleKey) {
   }
   const spec = await response.json();
   const definitions = spec.definitions ?? {};
-  const paths = Object.keys(spec.paths ?? {});
+  const paths = spec.paths ?? {};
+  const rpcArguments = {};
+  for (const [path, methods] of Object.entries(paths)) {
+    if (!path.startsWith("/rpc/")) continue;
+    const body = (methods?.post?.parameters ?? []).find((parameter) => parameter?.in === "body");
+    if (body?.schema?.properties) {
+      rpcArguments[path.slice("/rpc/".length)] = Object.keys(body.schema.properties).sort();
+    }
+  }
   return {
-    rpcNames: new Set(paths.filter((p) => p.startsWith("/rpc/")).map((p) => p.slice("/rpc/".length))),
+    rpcNames: new Set(Object.keys(paths).filter((p) => p.startsWith("/rpc/")).map((p) => p.slice("/rpc/".length))),
+    rpcArguments,
     columnsByTable: Object.fromEntries(
       Object.entries(definitions).map(([table, def]) => [table, Object.keys(def.properties ?? {})]),
     ),
@@ -295,11 +347,31 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Every external helper below is wrapped, because throwing out of this function
+  // discards the whole report — the per-table row counts, the posture results and
+  // every `fail()` already recorded — after the work that produced them has
+  // already completed. F25 requires the summary to name every checked category
+  // and B1 requires unknown state to be a *reported* failure, not a stack trace.
+  // Errors are also sanitised rather than re-raised: an error object's properties
+  // can carry a live service-role key (`scripts/linked-supabase.mjs:60-70`).
+  const sanitise = (error) => {
+    const code = error?.code ?? error?.name ?? "unknown";
+    const message = String(error?.message ?? "").slice(0, 200);
+    return message ? `${code} — ${message}` : code;
+  };
+
   // ---- fixture users: detector 1 ----
-  const users = await listAllUsers(admin);
+  let users = [];
+  let usersRead = true;
+  try {
+    users = await listAllUsers(admin);
+  } catch (error) {
+    usersRead = false;
+    fail(`auth.users could not be listed (${sanitise(error)}), so the load-bearing fixture-user detector did not run`);
+  }
   const disposableUsers = findDisposableUsers(users);
   const knownUserIds = new Set(users.map((user) => user.id));
-  if (users.length === 0) {
+  if (usersRead && users.length === 0) {
     fail("auth.users reported zero users. A project with no users cannot be the deployed project; refusing to report a clean result against a credential that reaches nothing.");
   }
   if (disposableUsers.length > 0) {
@@ -386,7 +458,12 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
   }
 
   // ---- storage: detector 2 ----
-  const storage = await scanStorage(admin);
+  let storage = { objects: null, fixtures: null };
+  try {
+    storage = await scanStorage(admin);
+  } catch (error) {
+    fail(`the user-files storage scan did not complete (${sanitise(error)}), so detector 2 did not run`);
+  }
   if (storage.fixtures > 0) {
     fail(
       `${storage.fixtures} fixture storage object(s) remain in the user-files bucket. Storage is the one `
@@ -395,7 +472,12 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
   }
 
   // ---- deferrals held ----
-  const schema = await readOpenApiSchema(credentials.url, credentials.serviceRoleKey);
+  let schema = { rpcNames: new Set(), rpcArguments: {}, columnsByTable: {} };
+  try {
+    schema = await readOpenApiSchema(credentials.url, credentials.serviceRoleKey);
+  } catch (error) {
+    fail(`PostgREST's schema could not be read (${sanitise(error)}), so no deferral check ran`);
+  }
   const absentRpcs = {};
   for (const [name, reason] of Object.entries(RPCS_THAT_MUST_NOT_EXIST)) {
     const present = schema.rpcNames.has(name);
@@ -409,10 +491,33 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
     fail("PostgREST does not expose create_task_command, which the deployed Phase 2F contract requires — the absence assertions above cannot be trusted against a schema this different.");
   }
 
+  // F21(a) — the signature pin, which is the leg that cannot pass for the wrong
+  // reason. Closing 2E-COMMAND-012 necessarily changes this argument set (ADR-053:
+  // every route to persisted provenance runs through a function signature change),
+  // so an unchanged set is real evidence that the deferral held.
+  const recordAiUsageArguments = schema.rpcArguments.record_ai_usage;
+  if (!recordAiUsageArguments) {
+    fail(
+      "PostgREST published no body schema for /rpc/record_ai_usage, so its signature could not be "
+      + "observed and ADR-057's deferral cannot be confirmed by this run.",
+    );
+  } else {
+    const expected = [...RECORD_AI_USAGE_ARGUMENTS].sort();
+    if (recordAiUsageArguments.join(",") !== expected.join(",")) {
+      const added = recordAiUsageArguments.filter((name) => !expected.includes(name));
+      const removed = expected.filter((name) => !recordAiUsageArguments.includes(name));
+      fail(
+        `record_ai_usage's signature changed — added [${added.join(", ")}], removed [${removed.join(", ")}]. `
+        + "ADR-057 defers AI provenance past Phase 2F and states this signature is unchanged through it; "
+        + "any change here means either provenance landed or the closeout's account of it is stale.",
+      );
+    }
+  }
+
   const aiUsageColumns = schema.columnsByTable.ai_usage_events;
   let provenanceColumns = [];
   if (!aiUsageColumns) {
-    fail("PostgREST's definition for ai_usage_events is missing, so ADR-057's deferral cannot be observed.");
+    fail("PostgREST's definition for ai_usage_events is missing, so the secondary column heuristic cannot run.");
   } else {
     provenanceColumns = aiUsageColumns.filter((column) => AI_USAGE_PROVENANCE_PATTERN.test(column));
     if (provenanceColumns.length > 0) {
@@ -446,6 +551,7 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
     storageObjects: storage.objects,
     fixtureStorageObjects: storage.fixtures,
     absentRpcs,
+    recordAiUsageArgumentCount: recordAiUsageArguments ? recordAiUsageArguments.length : null,
     aiUsageProvenanceColumns: provenanceColumns,
     provenanceReopeningGate: {
       scriptPresent: reopeningGate.scriptPresent,
@@ -495,7 +601,10 @@ export async function verifyPhase2fCleanup({ root = REPOSITORY_ROOT, log = conso
   for (const [name, state] of Object.entries(report.absentRpcs)) {
     log(`  rpc ${name}: ${state}`);
   }
-  log(`  ai_usage_events provenance columns: ${provenanceColumns.length === 0 ? "none (asserted over the live column set)" : provenanceColumns.join(", ")}`);
+  log(`  record_ai_usage signature: ${recordAiUsageArguments
+    ? `${recordAiUsageArguments.length} arguments, unchanged (asserted against ADR-057's stated posture)`
+    : "UNREADABLE"}`);
+  log(`  ai_usage_events provenance columns (secondary heuristic): ${provenanceColumns.length === 0 ? "none" : provenanceColumns.join(", ")}`);
   log(`  ADR-057 reopening gate: script ${reopeningGate.scriptPresent ? "present" : "MISSING"}, transcripts ${reopeningGate.transcripts.length}`);
 
   log("\n## What this run cannot observe\n");
