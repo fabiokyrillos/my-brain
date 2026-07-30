@@ -1,18 +1,20 @@
 # Project State
 
-Last updated: 2026-07-29 (Phase 2F — Slices 2F.1 through 2F.4 accepted and deployed; Slice 2F.5 implemented, remote-validated and awaiting merge; remote parity `202607300063`; Slice 2F.6 not started)
+Last updated: 2026-07-29 (Phase 2F — Slices 2F.1 through 2F.5 accepted and merged; 2F.5 added no migration, so remote parity stays `202607300063`; Slice 2F.6 not started)
 
 ## Current truth
 
-**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.2** (68 requirements, 12 families, slices 2F.1–2F.6). **Both of the phase's two expected migrations are now applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase adds no third**: Slice 2F.5 is read-only. Slice 2F.6 (closeout) remains.
+**Phase 2F — One Write Path is in implementation, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.2** (68 requirements, 12 families, slices 2F.1–2F.6). **Both of the phase's two expected migrations are now applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase added no third**: Slice 2F.5 is read-only. **Only Slice 2F.6 (closeout) remains.**
 
 **Remote migration parity is `202607300063`.** Slice 2F.4's deployment moved it from `202607290062` on 2026-07-29; local head is identical and there is no drift.
 
 **`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 
-### Slice 2F.5 — Measurement reader and evidence gate (implemented, remote-validated)
+### Slice 2F.5 — Measurement reader and evidence gate (accepted, merged)
 
-**No migration; nothing deployed; remote parity unchanged at `202607300063`.** Governed by `docs/reports/PHASE_2F_SLICE_05_PRD.md`; decisions ADR-058, ADR-059, ADR-060; implementation report `docs/reports/PHASE_2F_SLICE_05_REPORT.md`.
+**Merged as PR #31 → `2ae2606` on 2026-07-29; CI run `30506608871` green on all three jobs on the exact merge SHA. No migration; nothing deployed; remote parity unchanged at `202607300063`, verified before and after.** Acceptance record: `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
+
+**ADR-055's 90-day expiry is now dated: go-live 2026-07-29 (the merge date, ADR-060), expiry `2026-10-27`**, computed by `expiryDateFromGoLive` and carried in `docs/TODO.md` for `2F-OPERATIONS-006` to verify at closeout. Governed by `docs/reports/PHASE_2F_SLICE_05_PRD.md`; decisions ADR-058, ADR-059, ADR-060; implementation report `docs/reports/PHASE_2F_SLICE_05_REPORT.md`.
 
 **ADR-055's evidence gate is now computable.** `scripts/phase-2f-command-funnel.mjs` aggregates the already-emitted `task_command_*` events into owner-scoped, content-free measures and evaluates both tiers. The reader also reports, per tier, whether the window it was run at could satisfy that tier at all: a 14-day window admits at most 15 distinct local dates, so the planning tier's 20 active days is unreachable there for a reason that has nothing to do with the data, and each tier must be read at its own window. The spike tier (50 qualifying commands / 10 active days / a 14-day window) can return `met`; the planning tier **structurally cannot** — `distinctUsers` is out of an owner-scoped reader's range, reported as `null` with `privilegedReadRequired`, so its best verdict is `met_pending_privileged_read`. `windowDays` is a **ceiling**, not a floor: fifty commands spread over a year is weaker evidence than fifty over a fortnight, and the gate refuses it. The rate gates are decided by integer multiplication against declared fractions, so no rounded rate stands between the evidence and the gate and a zero denominator can never satisfy one.
 

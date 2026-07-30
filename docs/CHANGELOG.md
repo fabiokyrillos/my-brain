@@ -3,6 +3,14 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-29 — Phase 2F Slice 2F.5 accepted and merged
+
+Merged as PR #31 → `2ae2606`; merge-SHA CI run `30506608871` green on all three jobs. **No migration, so nothing was deployed and remote parity stays `202607300063`** — verified with `npx supabase migration list --linked` before and after.
+
+**ADR-055's expiry is dated.** Go-live is 2026-07-29, the merge date ADR-060 anchors on (`git show -s --format=%cs 2ae2606`), and the expiry is **2026-10-27** — computed by `expiryDateFromGoLive` rather than written by hand, and carried in `docs/TODO.md` for `2F-OPERATIONS-006` to verify at closeout. The slice needed two pull requests for exactly this reason: the merge date is not a fact while the implementation PR is open.
+
+Four independent adversarial review cycles are recorded in the PRD (§23, §23.1, §23.2, §23.3). The third found a blocking defect CI could not see — the end-to-end corpus never reached prefilter tier 2, and the case that was supposed to guarantee tier coverage asserted its own hand-written label. The fourth verified that fix in each of its six sub-checks and found five more accuracy defects. Zero fixture residue in the deployed project, proven by an independent probe. See `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
+
 ## 2026-07-29 — Phase 2F Slice 2F.5: the command-funnel reader and the end-to-end match baseline (no migration)
 
 Implemented on branch `codex/phase-2f-slice-5` under `docs/reports/PHASE_2F_SLICE_05_PRD.md`. **No migration, no RPC, no view, no grant, no policy, no new product event, no allowlist change, no production module change, no UI, no i18n key.** `src/` gained exactly two test files. Remote parity is unchanged at `202607300063`.
