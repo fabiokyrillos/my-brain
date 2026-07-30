@@ -388,6 +388,28 @@ export const FAMILY_EVIDENCE = Object.freeze({
  * the always-on CI row, whose subject is every slice's whole build. Registering
  * every row is mandatory: an unregistered row fails the run rather than silently
  * skipping, so adding a §10 row forces a decision about how its cells are proven.
+ *
+ * How discriminating each token actually is, measured rather than asserted
+ * ----------------------------------------------------------------------
+ * Running every session-row token against all six slices' acceptance-bearing
+ * artifacts gives this, and it is recorded because a screen whose reach is unstated
+ * invites more confidence than it earns:
+ *
+ *   - authenticated journeys → matches exactly the three slices marked (2F.2, 2F.3,
+ *     2F.6) and **not** 2F.1/2F.4/2F.5. This is the row where the phase's real
+ *     defect lived, and the token is tight enough to have caught it;
+ *   - reminders UPDATE/DELETE determination → matches 2, close to its 1 marked cell;
+ *   - parity re-check → matches exactly the five marked;
+ *   - two-owner probe (4), census stop-gate (4), traceability + cleanup (5) and
+ *     full remote suite (5) are **loose**: their vocabulary is common enough across
+ *     acceptance reports that a false `●` on a slice whose report merely mentions
+ *     the word would pass.
+ *
+ * So this is a **screen, strongest exactly where it needed to be**, not a proof
+ * that a session happened. Tightening the loose four was considered and declined:
+ * the failure mode that actually bit this slice twice was a guard too strict for
+ * correct content, and A14's human cell-by-cell sweep remains the stronger
+ * instrument by design (definitive Slice 2F.6 PRD §14).
  */
 export const GATE_SUBJECT_TOKENS = Object.freeze({
   "lint / typecheck / Vitest / build · `deno check`+`test`": null,
