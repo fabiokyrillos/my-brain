@@ -79,7 +79,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 
 | ID | Title | Cat. | Pri. | Reproduces | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | OPEN |
+| UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels → DEC-1) |
 | UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | OPEN |
 | UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | BLOCKED (DEC-1) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
@@ -95,14 +95,14 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring → B) |
 | UX-15 | Panel list rows collapse the title to ~6–16 lines (`auto` meta column) | visual | **P0** | yes | **RESOLVED** |
 | UX-16 | Content width *shrinks* as the viewport grows (`padding: 5vw`) | responsive | **P0** | yes | **RESOLVED** |
-| UX-17 | Side rail clips its last nav item at 1440×900 | visual | P1 | yes | OPEN → B |
+| UX-17 | Side rail clips its last nav item at 1440×900 | visual | P1 | yes | **RESOLVED** |
 | UX-18 | Home panel kickers are hardcoded Portuguese in both locales | localization | P1 | yes | OPEN |
 | UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | OPEN |
 | UX-20 | Rows styled as interactive are inert (`memories`, `reminders`) | usability | P1 | yes | **RESOLVED** (affordance) |
 | UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | DEFERRED → C |
 | UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN |
 | UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN |
-| UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | OPEN |
+| UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
 | UX-24 | Touch targets ≥44px — **does not reproduce**; retained as verified-good | — | — | **no** | RETAINED |
 
 Owner findings map to IDs 1:1 in order: owner 1→UX-01 … owner 14→UX-14.
@@ -875,3 +875,78 @@ would have meant redesigning Home under a stylesheet-only change.
 UX-14's exact FAB centring needs the bar to carry an odd number of slots, which is a
 navigation-taxonomy question (Slice B). The spec currently asserts the middle third and
 will be tightened to dead centre when B decides the primary count.
+
+---
+
+# Slice B — navigation and information architecture
+
+**Branch** `codex/ux-slice-b-navigation`, stacked on Slice A. **Covers** UX-01, UX-17, UX-23.
+**Non-goals** — no rename (DEC-1), no page-content change, no route added or removed, no
+change to which destinations exist. **Backend impact** — none. **Rollback boundary** —
+reverting `navigation-links.tsx` and the `.side-more` block restores the previous rail
+exactly; four component tests fail loudly if that happens.
+
+### What changed, and why it is not a taxonomy decision
+
+`capabilities.ts:71-88` has always declared a `primary | more | global | context-only`
+visibility for every destination. Mobile honoured it; the desktop rail did not, mapping
+`primaryNavigationKeys` **and** all of `moreNavigationGroups` inline. So the rail was not
+expressing a different design — it was ignoring the one already in the repository. This
+slice makes desktop honour the same field, which is why it does not need DEC-1: it changes
+**where** destinations render, never **which** exist or what they are called.
+
+The two surfaces now share one `NavigationOverflow` component, so the disclosure's
+behaviour is written once instead of twice.
+
+### Result, measured in the real app with the real fonts
+
+| | Before | After |
+| --- | --- | --- |
+| Desktop rail, nothing expanded | **15 links** (`Início … Configurações`) | **6** — the four primary, capture, and `Mais` |
+| `Configurações` at 1440×900 | **not visible at all**, below the rail's fold | visible; nothing below the fold |
+| Desktop rail expanded | n/a | 15 links; the rail scrolls (943 px of content in 780 px), which is now a deliberate act rather than the default state |
+| Mobile bar, nothing expanded | 6 slots | 6 slots (unchanged) |
+| Dismiss the panel by tapping outside | **no** on both surfaces | **yes** on both |
+| Escape closes and returns focus to the summary | mobile only | both surfaces |
+
+### Changes
+
+- `src/features/shell/navigation-links.tsx` — new `NavigationOverflow`, used by both
+  surfaces. Adds outside-`pointerdown` dismissal (UX-23; `pointerdown` rather than `click`
+  so the panel is gone before the tap resolves, instead of the press landing on whatever
+  the panel covered). Desktop renders the primary group, capture, then the disclosure.
+- `src/app/mobile-navigation.css` — `.side-more` / `.side-more-menu`. Expands inline
+  rather than as a floating panel: the rail is already the scroll container, so an
+  absolutely positioned overlay would have to escape it and handle its own collisions for
+  no gain.
+- `src/features/shell/app-shell.test.tsx` — four new tests; three failed before the change.
+
+### A change made and then reverted, recorded because the reasoning matters
+
+I first made the panel `scrollIntoView` on open, so the last three destinations would not
+sit below the rail's fold. The screenshot showed why that was wrong: it scrolled the four
+**primary** links off the top, so expanding `Mais` cost the user their main navigation. It
+was reverted. A rail that scrolls after the user deliberately expands it is ordinary; the
+defect in UX-17 was that it scrolled on the **default** view, and that is fixed.
+
+### Gates
+
+`eslint` 0 · `tsc --noEmit` 0 · `next build` passes (and no longer emits a `ux-harness`
+route — see below) · `vitest` 2526 passed with the same 2 pre-existing
+`sql-reachability.test.ts` failures · `playwright foundation + layout-contracts` 26/26 on
+desktop and mobile · real-browser check of both surfaces at 1440×900 and 375×667 for
+visible-when-closed, reachable-when-open, outside dismissal, Escape and focus return.
+
+### Note on the audit harness
+
+`src/app/[locale]/ux-harness/` is **not committed**. It was restored locally to take these
+screenshots and removed again: `next build` lists it as a route in the production manifest
+even though it `notFound()`s in production, and audit tooling should not appear in the
+shipped route table. The durable guard is `e2e/layout-contracts.spec.ts`, which needs no
+route. The harness is reproducible from the "How the audit was performed" section above.
+
+### Still open after this slice
+
+UX-14's exact FAB centring is **still gated**. Centring slot 3 of 6 is geometrically
+impossible; it needs the bar to carry an even number of non-capture items, which means
+demoting one primary destination — a taxonomy decision, i.e. DEC-1.

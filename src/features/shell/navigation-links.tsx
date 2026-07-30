@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent, MouseEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -55,15 +55,69 @@ const icons = {
   jobs: Wrench,
 } as const satisfies Record<NavigationKey, typeof Home>;
 
-function closeMobileMore(event: MouseEvent<HTMLAnchorElement>) {
+function closeMoreOnFollow(event: MouseEvent<HTMLAnchorElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
 }
 
-function closeMobileMoreWithEscape(event: KeyboardEvent<HTMLDetailsElement>) {
+function closeMoreWithEscape(event: KeyboardEvent<HTMLDetailsElement>) {
   if (event.key !== "Escape" || !event.currentTarget.open) return;
   event.preventDefault();
   event.currentTarget.open = false;
   event.currentTarget.querySelector("summary")?.focus();
+}
+
+/**
+ * The secondary destinations, behind one disclosure.
+ *
+ * Shared by both surfaces rather than written twice: the rail used to render all
+ * five groups inline while the bar hid them behind `Mais`, so the `visibility`
+ * field `capabilities.ts` already declares was honoured on one surface and
+ * ignored on the other (UX-01).
+ *
+ * Escape closes it and returns focus to the summary — native `<details>` does
+ * neither. A pointer press anywhere outside closes it too, which is the gesture a
+ * phone user reaches for first and the one this had no answer to (UX-23).
+ */
+function NavigationOverflow({
+  variant,
+  active,
+  label,
+  children,
+}: {
+  variant: "side-more" | "mobile-more";
+  active: boolean;
+  label: string;
+  children: ReactNode;
+}) {
+  const details = useRef<HTMLDetailsElement | null>(null);
+
+  useEffect(() => {
+    function dismiss(event: PointerEvent) {
+      const element = details.current;
+      if (!element?.open) return;
+      if (event.target instanceof Node && element.contains(event.target)) return;
+      element.open = false;
+    }
+
+    // `pointerdown` rather than `click`: the panel must be gone before the tap
+    // resolves, or the press lands on whatever the panel was covering.
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
+
+  return (
+    <details
+      className={`${variant}${active ? " active" : ""}`}
+      onKeyDown={closeMoreWithEscape}
+      ref={details}
+    >
+      <summary aria-label={label}>
+        <Menu size={20} aria-hidden="true" />
+        <span>{label}</span>
+      </summary>
+      <div className={`${variant}-menu`}>{children}</div>
+    </details>
+  );
 }
 
 export function LocaleSwitchLink({ locale }: { locale: Locale }) {
@@ -109,13 +163,33 @@ export function NavigationLinks({
         className={className}
         aria-current={active ? "page" : undefined}
         aria-label={options.capture ? t.nav.capture : undefined}
-        onClick={options.closeMore ? closeMobileMore : undefined}
+        onClick={options.closeMore ? closeMoreOnFollow : undefined}
       >
         <Icon size={options.capture ? 24 : options.compact ? 20 : 18} aria-hidden="true" />
         <span>{t.nav[key]}</span>
       </Link>
     );
   };
+
+  const overflowActive = moreNavigationGroups
+    .flatMap((group) => group.items)
+    .some((key) => isNavigationActive(pathname, key));
+
+  const overflowGroups = moreNavigationGroups.map((group) => (
+    <div
+      className={mobile ? "mobile-nav-group" : "nav-group"}
+      role="group"
+      aria-label={t.navGroups[group.key]}
+      key={group.key}
+    >
+      <span className={mobile ? "mobile-nav-group-label" : "nav-group-label"} aria-hidden="true">
+        {t.navGroups[group.key]}
+      </span>
+      <div className="nav-group-items">
+        {group.items.map((key) => renderLink(key, { closeMore: true }))}
+      </div>
+    </div>
+  ));
 
   if (!mobile) {
     return (
@@ -126,53 +200,21 @@ export function NavigationLinks({
           </div>
         </div>
         {renderLink("capture", { capture: true })}
-        {moreNavigationGroups.map((group) => (
-          <div className="nav-group" role="group" aria-label={t.navGroups[group.key]} key={group.key}>
-            <span className="nav-group-label" aria-hidden="true">{t.navGroups[group.key]}</span>
-            <div className="nav-group-items">
-              {group.items.map((key) => renderLink(key))}
-            </div>
-          </div>
-        ))}
+        <NavigationOverflow variant="side-more" active={overflowActive} label={t.nav.more}>
+          {overflowGroups}
+        </NavigationOverflow>
       </>
     );
   }
-
-  const overflowActive = moreNavigationGroups
-    .flatMap((group) => group.items)
-    .some((key) => isNavigationActive(pathname, key));
 
   return (
     <>
       {primaryNavigationKeys.slice(0, 2).map((key) => renderLink(key, { compact: true }))}
       {renderLink("capture", { capture: true })}
       {primaryNavigationKeys.slice(2).map((key) => renderLink(key, { compact: true }))}
-      <details
-        className={`mobile-more${overflowActive ? " active" : ""}`}
-        onKeyDown={closeMobileMoreWithEscape}
-      >
-        <summary aria-label={t.nav.more}>
-          <Menu size={20} aria-hidden="true" />
-          <span>{t.nav.more}</span>
-        </summary>
-        <div className="mobile-more-menu">
-          {moreNavigationGroups.map((group) => (
-            <div
-              className="mobile-nav-group"
-              role="group"
-              aria-label={t.navGroups[group.key]}
-              key={group.key}
-            >
-              <span className="mobile-nav-group-label" aria-hidden="true">
-                {t.navGroups[group.key]}
-              </span>
-              <div className="nav-group-items">
-                {group.items.map((key) => renderLink(key, { closeMore: true }))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </details>
+      <NavigationOverflow variant="mobile-more" active={overflowActive} label={t.nav.more}>
+        {overflowGroups}
+      </NavigationOverflow>
     </>
   );
 }

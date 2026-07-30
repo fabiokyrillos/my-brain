@@ -66,6 +66,63 @@
   justify-content: flex-end;
 }
 
+/*
+ * The desktop overflow disclosure (UX-01).
+ *
+ * The rail used to render all five secondary groups inline — fourteen product
+ * concepts before the user had captured anything, and enough height that
+ * "Configurações" fell below the fold at 1440x900 with only a thin scrollbar to
+ * hint at it (UX-17). It now shows the four primary destinations and capture,
+ * and everything else lives behind this, mirroring the mobile `Mais`.
+ *
+ * It expands inline rather than as a floating panel: the rail is already the
+ * scroll container, so an absolutely positioned overlay would have to escape it
+ * and manage its own collision handling for no gain.
+ */
+.side-more {
+  margin-top: 14px;
+}
+
+.side-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.side-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.side-more > summary:hover,
+.side-more.active > summary {
+  background: var(--mist);
+  color: var(--ink);
+}
+
+.side-more.active > summary {
+  color: var(--blue);
+}
+
+.side-more > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.side-more-menu {
+  display: grid;
+  gap: 14px;
+  padding: 10px 0 4px;
+}
+
 @media (max-width: 760px) {
   .bottom-nav {
     display: flex;
