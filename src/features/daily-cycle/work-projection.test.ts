@@ -196,7 +196,14 @@ describe("loadWorkProjection", () => {
         intentionalNoDue: false,
         humanState: "waiting_on_someone",
         origin: "brain",
-        availableActions: [{ id: "complete_task" }, { id: "resume_task" }],
+        // `open_task` leads every list now: it was declared in contracts.ts and
+        // localized from the start, but nothing produced it and no route could
+        // satisfy it (UX-19). This projection is the producer.
+        availableActions: [
+          { id: "open_task", href: "/en/app/work/task-001" },
+          { id: "complete_task" },
+          { id: "resume_task" },
+        ],
         projects: [],
         contexts: [],
         people: [],
@@ -209,7 +216,10 @@ describe("loadWorkProjection", () => {
         intentionalNoDue: false,
         humanState: "completed",
         origin: "you",
-        availableActions: [{ id: "reopen_task" }],
+        availableActions: [
+          { id: "open_task", href: "/en/app/work/task-002" },
+          { id: "reopen_task" },
+        ],
         projects: [],
         contexts: [],
         people: [],
@@ -248,7 +258,11 @@ describe("loadWorkProjection", () => {
         noDueReason: "Someday, not now",
         humanState: "not_started",
         origin: "you",
-        availableActions: [{ id: "complete_task" }, { id: "wait_task" }],
+        availableActions: [
+          { id: "open_task", href: "/en/app/work/task-001" },
+          { id: "complete_task" },
+          { id: "wait_task" },
+        ],
         projects: [],
         contexts: [],
         people: [],

@@ -89,10 +89,26 @@ function startOfNextLocalDay(now: Date, timezone: string) {
   );
 }
 
-function availableActions(status: string): readonly ProjectionActionSource[] {
-  if (status === "completed") return [{ id: "reopen_task" }];
-  if (status === "waiting") return [{ id: "complete_task" }, { id: "resume_task" }];
-  return [{ id: "complete_task" }, { id: "wait_task" }];
+/**
+ * `open_task` leads, and every other action follows it.
+ *
+ * The action was declared in `contracts.ts` and localized in `copy.ts` from the
+ * beginning, but **nothing ever produced it and no route could satisfy it**
+ * (UX-19): the contract anticipated a task detail view that was never built.
+ * This is the producer, and `/work/[taskId]` is the destination.
+ *
+ * It is not a `WorkSurfaceAction`, so `task-list.tsx` filters it out of the
+ * button row — it addresses the row itself, not a state transition.
+ */
+function availableActions(status: string, detailHref: string): readonly ProjectionActionSource[] {
+  const open: ProjectionActionSource = { id: "open_task", href: detailHref };
+  if (status === "completed") return [open, { id: "reopen_task" }];
+  if (status === "waiting") return [open, { id: "complete_task" }, { id: "resume_task" }];
+  return [open, { id: "complete_task" }, { id: "wait_task" }];
+}
+
+export function taskDetailHref(locale: Locale, taskId: string): string {
+  return `/${locale}/app/work/${taskId}`;
 }
 
 export async function loadWorkProjection(
@@ -157,7 +173,7 @@ export async function loadWorkProjection(
       noDueReason: row.no_due_reason,
       status: row.status,
       createdBy: row.created_by,
-      availableActions: availableActions(row.status),
+      availableActions: availableActions(row.status, taskDetailHref(options.locale, row.id)),
       projects: relations?.projects,
       contexts: relations?.contexts,
       people: relations?.people,
@@ -171,7 +187,7 @@ export async function loadWorkProjection(
   return { items, hasNext, timezone };
 }
 
-type TaskRelations = {
+export type TaskRelations = {
   readonly projects: readonly { id: string; label: string }[];
   readonly contexts: readonly { id: string; label: string }[];
   readonly people: readonly { id: string; label: string }[];
@@ -184,7 +200,7 @@ type TaskRelations = {
 // task IDs actually returned by the page's own query are ever looked up,
 // mirroring the two-step flat-select join pattern already used by the
 // projects/people detail pages (no Supabase embedded-resource select syntax).
-async function loadTaskRelations(
+export async function loadTaskRelations(
   supabase: SupabaseClient,
   userId: string,
   pageRows: readonly Pick<TaskRow, "id" | "parent_task_id">[],

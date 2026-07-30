@@ -10,6 +10,37 @@ a.list-row:hover{border-color:#b1bfd2;box-shadow:0 8px 24px rgba(23,40,70,.05)}
    `minmax(0,1fr)` track again — the mechanism behind UX-15. */
 .list-meta{display:flex;align-items:center;flex-wrap:wrap;min-width:0;gap:9px;color:var(--ink-soft);font:600 10px var(--font-jetbrains)}.status-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 8px;background:var(--mist);font-size:9px;text-transform:uppercase;letter-spacing:.04em}.status-badge.failed{background:#fff0ee;color:#9b2d24}.status-badge.interpreted,.status-badge.completed{background:#eaf8f0;color:#26714c}.empty-list{display:grid;place-items:center;text-align:center;min-height:330px;border:1px dashed #cbd5e2;border-radius:18px;color:var(--ink-soft);padding:40px}.empty-list svg{margin-bottom:12px;color:#9dabc0}.empty-list strong{color:var(--ink);font:500 24px var(--font-newsreader)}.empty-list p{font-size:12px;max-width:380px;line-height:1.6}.row-actions{display:flex;gap:7px}.row-action{border:1px solid #c7d1df;background:white;border-radius:8px;padding:7px 9px;color:var(--ink);font-size:10px;font-weight:700}.row-action:hover{background:var(--mist)}.inline-create{display:flex;gap:8px}.inline-create input{min-width:240px;border:1px solid #b9c5d5;border-radius:10px;padding:10px 12px}.inline-create button{border:0;border-radius:10px;background:var(--ink);color:white;padding:10px 13px;font-weight:750}.inline-create-feedback{font-size:11px}.dashboard-task-list{display:grid;gap:0;margin-top:24px}.dashboard-task{display:flex;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--line)}.dashboard-task strong{min-width:0;font-size:13px}.dashboard-task span{white-space:nowrap;font:600 9px var(--font-jetbrains);color:var(--ink-soft)}
 
+/* Task detail (Slice D1) — the destination `open_task` never had. */
+.task-detail-page{max-width:900px}
+.task-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:24px}
+.task-detail-header>.status-badge{flex:none;white-space:nowrap}
+.task-detail-header h1{font:500 clamp(30px,4vw,44px)/1.1 var(--font-newsreader);letter-spacing:-.035em;margin:8px 0 10px}
+.task-description{color:var(--ink-soft);line-height:1.6;margin:0;max-width:640px}
+.task-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0 0 22px}
+.task-detail-actions .row-actions{display:flex;flex-wrap:wrap;gap:8px}
+.task-detail-actions .row-action{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:9px 14px}
+.task-detail-section{border-top:1px solid var(--line);padding:22px 0}
+.task-detail-section h2{font-size:15px;letter-spacing:-.01em;margin:0 0 16px}
+.task-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin:0}
+.task-field dt{color:var(--ink-soft);font:650 10px var(--font-jetbrains);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+.task-field dd{margin:0;font-size:14px}
+.task-relations{display:grid;gap:14px;margin:0}
+.task-relation-group dt{color:var(--ink-soft);font:650 10px var(--font-jetbrains);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
+.task-relation-group dd{display:flex;flex-wrap:wrap;gap:7px;margin:0}
+.task-relation{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid #c7d1df;border-radius:999px;background:white;color:var(--ink);font-size:12px}
+.task-relation:hover{border-color:var(--blue);color:var(--blue)}
+.task-relation-plain{color:var(--ink-soft);background:var(--mist);border-style:dashed}
+.task-provenance{margin:12px 0;padding:16px 18px;border-left:3px solid var(--blue);background:var(--mist);color:var(--ink-soft);font:400 16px/1.7 var(--font-newsreader);white-space:pre-wrap}
+.task-history{list-style:none;display:grid;gap:0;margin:0;padding:0}
+.task-history li{border-left:2px solid #d8e1ed;margin-left:6px;padding:0 0 18px 18px;position:relative}
+.task-history li:before{content:"";position:absolute;left:-5px;top:5px;width:8px;height:8px;border-radius:50%;background:#b6c2d2}
+.task-history strong{display:block;font-size:13px}
+.task-history p{margin:4px 0 0;color:var(--ink-soft);font-size:12px;line-height:1.55}
+.task-history time{display:block;margin-top:4px;color:var(--ink-soft);font:600 9px var(--font-jetbrains)}
+.work-title-link strong{color:var(--ink)}
+.work-title-link:hover strong{color:var(--blue);text-decoration:underline}
+@media(max-width:600px){.task-detail-header{flex-direction:column;gap:12px}.task-fields{grid-template-columns:1fr}.task-detail-actions .row-action{flex:1;justify-content:center}}
+
 /*
  * Home, as an operational surface (UX-02).
  *

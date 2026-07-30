@@ -81,11 +81,11 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | --- | --- | --- | --- | --- | --- |
 | UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels → DEC-1) |
 | UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | **RESOLVED** |
-| UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | BLOCKED (DEC-1) |
+| UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | OPEN → B2 (DEC-1 approved: **Registros**) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | OPEN |
-| UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | BLOCKED (DEC-2) |
-| UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | BLOCKED (DEC-3) |
+| UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | OPEN → F (DEC-2 approved: **ship it**) |
+| UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | OPEN → E (DEC-3 approved: **unified**) |
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | OPEN |
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | OPEN |
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
@@ -100,6 +100,9 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | OPEN |
 | UX-20 | Rows styled as interactive are inert (`memories`, `reminders`) | usability | P1 | yes | **RESOLVED** (affordance) |
 | UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | **RETAINED** (with evidence) |
+| UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | OPEN → D3 |
+| UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | OPEN → G |
+| UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | RETAINED (not rendered) |
 | UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN |
 | UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN |
 | UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
@@ -705,11 +708,59 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Disposition** — **RETAINED** (verified good). Recorded so later slices must keep
   it true; the four-viewport check stays in the evidence script as a regression guard.
 
+## UX-26 — No logout or account switch exists anywhere in the product
+
+- **Owner observation** — "The application has no visible logout or account-switch action. The owner currently cannot leave the active session to sign in with another account."
+- **Route** — global; the shell (`app-shell.tsx`) and `/[locale]/app/settings`.
+- **Category** — missing lifecycle action (P0: the user cannot leave a state they can enter).
+- **Reproduction** — signed in against the real application and swept **all 16 authenticated
+  routes**, matching every `<a>`, `<button>` and `<summary>` against
+  `/\bsair\b|logout|sign ?out|encerrar sess|trocar conta|switch account/i`.
+- **Evidence** — **0 of 16 routes** offer any way to end the session:
+  `app`, `inbox`, `work`, `chat`, `projects`, `people`, `memories`, `files`, `reviews`,
+  `questions`, `reminders`, `history`, `costs`, `notifications`, `settings`, `capture`.
+  The sweep's screenshots are **deliberately not committed**: they are frames of a live
+  signed-in session, and the measurement above is the evidence that matters. The sweep is
+  reproducible from the description in this entry.
+- **Root cause (`M1`)** — the auth feature shipped sign-in, sign-up, recovery and reset
+  (`src/features/auth/actions.ts`) and **never a sign-out**. There is no
+  `supabase.auth.signOut()` call anywhere in `src/`. The shell's top bar carries only the
+  locale switch and a notifications link; there is no account menu on either surface, and
+  the rail's profile chip (`.profile-chip` in `globals.css:14`) is styled but never
+  rendered. `src/proxy.ts` redirects an unauthenticated visitor to login, so an expired
+  session already lands correctly — what is missing is the deliberate exit.
+- **Proposed solution** — an account menu anchored in the top bar on desktop and reachable
+  from the mobile `Mais` overflow, holding the signed-in identity and a sign-out action:
+  a Server Action calling `supabase.auth.signOut()`, then `redirect` to
+  `/${locale}/auth/login`. A `<form>`-submitted button rather than a link, so it cannot be
+  triggered by prefetch or by a crawler following an href.
+- **Contracts affected** — none written. Adds one Server Action; session cookies are
+  cleared by the Supabase SSR client the proxy already uses.
+- **Required behaviours to cover** — desktop placement · mobile placement · session
+  termination · redirect after logout · keyboard reachability and focus · screen-reader
+  naming · already-expired session (must not error) · signing in as a different account
+  afterwards · authenticated E2E for logout **and** the subsequent login.
+- **Slice** — **D3**, scheduled before final authenticated acceptance per the owner's
+  instruction.
+- **Disposition** — OPEN.
+
 ---
 
 ## Blockers
 
-**BLOCK-1 — no authenticated session available.**
+**BLOCK-1 — RESOLVED (2026-07-30).** A dedicated confirmed test account was supplied by the
+owner. The existing authenticated harness had **no variable names for a pre-existing
+account** — `e2e/online-auth.spec.ts` and `e2e/online-mobile-navigation.spec.ts` mint
+throwaway users through the Supabase admin API with `ONLINE_SUPABASE_SERVICE_ROLE_KEY`, and
+`scripts/online-playwright.mjs` supplies that from the Supabase CLI link rather than from
+`.env.local`. Two new names were therefore introduced, following the harness's own
+`ONLINE_AUTH_TEST_*` convention: **`ONLINE_AUTH_TEST_EMAIL`** and
+**`ONLINE_AUTH_TEST_PASSWORD`**, held only in `.env.local`, which `.gitignore:37` (`.env*`)
+excludes and which is confirmed untracked. No service-role key was needed or requested.
+Sign-in verified against the running application. The values appear in no tracked file, no
+report, no screenshot and no PR.
+
+**BLOCK-1 (historical) — no authenticated session available.**
 `.env.local` has no `SUPABASE_SERVICE_ROLE_KEY`, and `signUp` ends at
 `check-email`, so no session can be established locally. Consequence: the audit
 photographed the real components and real CSS through the harness, but not the real
@@ -1102,15 +1153,136 @@ Splitting is not a way of shipping less. It keeps a slice that adds **zero** wri
 separate from one that generalises the write path, so the first can be reviewed on its
 layout and the second on its contract.
 
-### To verify before writing D2
+### Verification completed before writing D2 — all three answered
 
-1. Whether `patch.dueAt` accepts an absolute ISO instant or only a temporal phrase —
-   `schema.ts` resolves phrases through `resolveTemporalPhrase`, and a date picker supplies
-   an instant.
-2. `actionPolicy`'s allowed patch fields and `allowedTargetValues` per action, so no
-   control can offer a value the taxonomy would refuse (the mistake `set_status` +
-   `cancelled` exists to prevent).
-3. That `assign_*` relation refs resolve by owned-entity id and not by free text.
+**1. `dueAt` — a date picker works, an instant does not.**
+`resolveTemporalPhrase` **explicitly refuses a complete ISO instant**
+(`temporal.ts:368`), and the comment states why: 2E-COMMAND-016 says the instant is never
+model-supplied, and a raw timestamp let a model "pin a Sao Paulo user to a Tokyo offset".
+For a moment this looked like an integrity-contract conflict, because a date picker was
+assumed to supply an instant. **It is not one.** The lexicon carries an `explicit_date`
+rule (`temporal.ts:283`) matching `ISO_DATE` — `YYYY-MM-DD`, exactly what
+`<input type="date">` emits — and resolves it *in the caller's own timezone* through
+`resolveLocal(..., context.timeZone)`. So the contract already anticipated this control:
+the picker sends a calendar date, the lexicon owns the instant, and **no schema change, no
+version bump and no migration is needed**. One bound to respect: `explicit_date` refuses a
+date more than `MAX_RELATIVE_DAYS` = **730 days** from today, so the picker must clamp to
+±2 years or it will produce `needs_clarification`.
+
+**2. The action policies, read off `taxonomy.ts` — 15 policies.**
+
+| action | patch field(s) | required | allowed values | destructive |
+| --- | --- | --- | --- | --- |
+| `complete_task`, `reopen_task`, `clear_due`, `restore_task` | — | — | — | no |
+| `cancel_task` | — | — | — | **yes** |
+| `set_status` | `status` | `status` | `ACTIVE_ONLY` (the six non-terminal statuses) | no |
+| `set_priority` | `priority` | `priority` | `TASK_PRIORITIES` (low/medium/high/urgent) | no |
+| `rename_task` | `title` | `title` | — | no |
+| `append_note` | `note` | `note` | — | no |
+| `reschedule_due` | `dueAt` | `dueAt` | — | no |
+| `set_planned` | `plannedAt` | `plannedAt` | — | no |
+| `assign_project` | `projectRef` | `projectRef` | — | no |
+| `assign_context` | `contextRef` | `contextRef` | — | no |
+| `assign_person` / `set_waiting_on` | `personRef` | `personRef` | — | no |
+
+`set_status`'s allowed set is `ACTIVE_ONLY`, which is what structurally prevents it from
+delivering a cancellation without the confirmation `cancel_task` requires. **Only
+`cancel_task` is destructive**, so it alone routes through
+`issue_task_command_confirmation` and the existing confirm dialog; the other ten may be
+direct controls.
+
+**3. Relation refs resolve server-side against owned entities.**
+`projectRef`/`contextRef`/`personRef` are bounded strings, resolved in SQL by
+`public.resolve_owned_entity_exact` and turned into a `resolvedId`
+(`preview.ts:291`). A `<select>` listing the user's own projects and submitting the exact
+name therefore resolves correctly, with ownership proven in the database rather than
+asserted by the client — and there is no path for the UI to smuggle an id.
+
+**Conclusion: D2 needs no owner decision, no migration and no contract change.** It is a
+new TypeScript module generalising `work-command.ts`'s fixed patch to a caller-supplied,
+schema-validated one, plus controls whose values the table above bounds.
 
 Until D2 lands, UX-05 stays **partially open** with 11 verbs reachable only through the
 console — recorded as such, not closed.
+
+---
+
+# Slice D1 — the task detail surface
+
+**Branch** `codex/ux-slice-d1-task-detail`, stacked on Slice C. **Covers** UX-19 (fully),
+the inspect half of UX-05, the task-row half of UX-20. **Non-goals** — no field editing,
+no new command verbs, **no new write path**. **Rollback boundary** — deleting the route,
+the projection, the view and the copy module reverts the surface; `work-projection.ts`
+returns to emitting three actions instead of four.
+
+### First slice verified against the real database
+
+BLOCK-1 was resolved before this slice, so D1 was built and checked against the running
+application with a real account and real rows, not only against fixtures. That mattered
+twice — see "what running it found" below.
+
+### What it does
+
+`/[locale]/app/work/[taskId]` shows, in this order: what the task is (title, description,
+state), the actions it admits, its fields, its relations **as links**, where it came from,
+and everything recorded about it.
+
+- **UX-19 is fully resolved.** `open_task` was declared in `contracts.ts` and localized in
+  `copy.ts` from the beginning, but no projection produced it and no route could satisfy
+  it. `work-projection.ts` is now the producer and this route is the destination.
+- **Relations are links.** On the Work list a task's project is an inert
+  `<span class="status-badge">`; here it opens the project. A **context** deliberately
+  renders as plain text, because contexts have no page — a control that leads nowhere must
+  not look like one that does (UX-20).
+- **History is sentences.** `audit_logs.action_type` is mapped through a closed copy
+  vocabulary with a neutral fallback, never `replaceAll("_", " ")`.
+
+### No new write path, and how that is guaranteed
+
+The status controls are the **same component** the Work list renders. `WorkItemActions` was
+extracted from `task-list.tsx` and is now mounted by both surfaces, so the operation-key
+discipline (2F-SURFACE-006), the idempotency handling and the outcome rendering
+(2F-SURFACE-011) exist once rather than twice. Both mounts resolve through
+`list_task_command_candidates` and apply through `apply_task_command`.
+
+### What running it against the real database found
+
+Two defects that fixtures could not have shown:
+
+1. **The history vocabulary was wrong.** The first copy map was written from the *taxonomy*
+   verbs — `set_priority`, `complete_task` — which is what the command contract uses and
+   **not** what reaches `audit_logs`. The migrations actually write `task_created`,
+   `task_updated`, `task_command_created`, `task_command_applied`, `tasks_confirmed`,
+   `confirm_entry_tasks`, `confirm_entry_task_candidates` and `operation_undone`. A real
+   history row rendered as the neutral fallback. Fixed, and
+   `task-detail-view.test.tsx` now **reads the migrations** and fails if any action type
+   written against a task has no copy in either locale, so the two vocabularies cannot
+   drift apart again.
+2. **UX-28 — `audit_logs.reason` is English prose written by SQL** ("Task created", "User
+   created a task directly"). Rendering it puts untranslated text in front of a Portuguese
+   reader. It is **not rendered**: for a task, every value it can hold only restates the
+   action the localized sentence already names. Localizing it would mean changing what the
+   RPCs write, which is a schema-level decision this surface may not take.
+   **Disposition — RETAINED**, with the reason deliberately unrendered.
+
+A measurement of my own was also wrong and is worth recording: an automated scan reported
+`not_started` leaking into the page. It was inside the RSC flight payload in a `<script>`,
+because the scan read `document.body.textContent`. **No raw enum reaches the user.** The
+scan was the defect, not the code.
+
+### UX-27 — one creation, two history entries
+
+A manually created task produces **two** audit rows: the `tasks_audit_changes` trigger
+writes `task_created`, and `create_task_command` writes `task_command_created`. The history
+therefore shows "Você criou a tarefa" twice, seconds apart. That is a truthful rendering of
+what the audit log contains, so the surface is not hiding it. Whether the *log* should
+record one creation twice is a question for the history slice.
+**Disposition — OPEN, destination Slice G.**
+
+### Gates
+
+`eslint` 0 · `tsc --noEmit` 0 · daily-cycle + operations + shell suites 283/283 ·
+12 new component tests including the migration-backed vocabulary guard · verified end to
+end against the real application at 1440×900 and 375×667: four sections in order, the two
+eligible actions, real history rendered as sentences, no horizontal overflow on either
+viewport.
