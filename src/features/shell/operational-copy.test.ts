@@ -5,6 +5,11 @@ import { dailyCycleCopy } from "@/features/daily-cycle/copy";
 
 const auditedVisibleSurfaces = [
   "src/features/shell/home-dashboard.tsx",
+  // Home's copy and markup moved out of `home-dashboard.tsx` in the UX
+  // remediation's Slice C. The audit follows them: copy that leaves an audited
+  // file must not leave the audit with it.
+  "src/features/shell/home-copy.ts",
+  "src/features/shell/home-view.tsx",
   "src/features/profile/settings-form.tsx",
   "src/app/[locale]/app/settings/page.tsx",
   "src/app/[locale]/app/reviews/page.tsx",
