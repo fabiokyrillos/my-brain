@@ -33,11 +33,14 @@
     "test:remote:2e:cleanup": "node scripts/verify-phase-2e-cleanup.mjs",
     "test:remote:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs --proof",
     "test:remote:2f:baseline": "vitest run --config vitest.remote.config.ts",
+    "test:remote:2f:census": "node scripts/phase-2f-reminder-census.mjs",
+    "test:remote:2f:cleanup": "node scripts/verify-phase-2f-cleanup.mjs",
     "measure:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs",
     "docs:phase-2x:traceability": "node scripts/generate-phase-2x-traceability.mjs",
     "docs:phase-2c:traceability": "node scripts/generate-phase-2c-traceability.mjs",
     "docs:phase-2d:traceability": "node scripts/generate-phase-2d-traceability.mjs",
     "docs:phase-2e:traceability": "node scripts/generate-phase-2e-traceability.mjs",
+    "docs:phase-2f:traceability": "node scripts/generate-phase-2f-traceability.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {
