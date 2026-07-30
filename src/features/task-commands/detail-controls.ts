@@ -12,6 +12,7 @@
  * the right shape, and one whose values are bounded cannot render as free text.
  */
 
+import type { TaskCommandPatch } from "./schema";
 import {
   TASK_COMMAND_ACTIONS,
   actionPolicy,
@@ -70,7 +71,17 @@ const RENDERED_ELSEWHERE: readonly TaskCommandAction[] = [
   "set_status",
 ];
 
-function controlFor(action: TaskCommandAction): DetailControl | null {
+/**
+ * The shape of one action's control, independent of any task.
+ *
+ * Exported because the *shape* and the *eligibility* are separate questions and
+ * the Server Action needs only the first: it is handed an action name and must
+ * know which field to fill and how to bound the value, before it has read any
+ * row. Eligibility is then re-decided against the resolved row by
+ * `resolveDetailCommand`, which is the only place that has a status to decide
+ * it against.
+ */
+export function detailControlFor(action: TaskCommandAction): DetailControl | null {
   const policy = actionPolicy(action);
   // A control fills exactly one field. An action requiring more than one would
   // need a composite control, and none exists in the taxonomy today — returning
@@ -111,7 +122,7 @@ export function detailControlsFor(status: string): readonly DetailControl[] {
   return TASK_COMMAND_ACTIONS.flatMap((action) => {
     if (RENDERED_ELSEWHERE.includes(action)) return [];
     if (!isEligibleStatus(action, status)) return [];
-    const control = controlFor(action);
+    const control = detailControlFor(action);
     return control ? [control] : [];
   });
 }
@@ -137,10 +148,89 @@ export function dateBounds(today: Date): { readonly min: string; readonly max: s
 }
 
 /** `YYYY-MM-DD`, the one temporal shape the lexicon accepts from a control. */
-const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Whether the three numbers name a day that exists.
+ *
+ * `explicit_date` builds a `WallTime` straight from the capture groups and never
+ * asks, so `2026-02-31` resolves — as March 3rd. A date input cannot emit one,
+ * but a hand-made POST can, and silently rescheduling a task to a day the user
+ * did not name is worse than refusing.
+ */
+function isRealCalendarDay(match: RegExpExecArray): boolean {
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
 
 export function isSubmittableDate(value: string, today: Date): boolean {
-  if (!CALENDAR_DATE.test(value)) return false;
+  const match = CALENDAR_DATE.exec(value);
+  if (match === null || !isRealCalendarDay(match)) return false;
   const bounds = dateBounds(today);
   return value >= bounds.min && value <= bounds.max;
+}
+
+/**
+ * Why a submitted value could not become a patch.
+ *
+ * Each is a *declared refusal with its own localized sentence*, never a thrown
+ * error: these values come from a person filling in a control, so "that date is
+ * outside the two years we can schedule" is an ordinary thing to be told. The
+ * four are kept distinct because they call for four different corrections.
+ */
+export type DetailValueRefusal =
+  /** A control that fills a field was submitted with nothing in it. */
+  | "missing_value"
+  /** Not `YYYY-MM-DD`, or a day that does not exist. */
+  | "date_invalid"
+  /** A real date, outside the lexicon's ±730-day window. */
+  | "date_out_of_range"
+  /** A choice the policy's `allowedTargetValues` does not contain. */
+  | "value_not_allowed";
+
+export type DetailPatchResult =
+  | { readonly status: "ok"; readonly patch: TaskCommandPatch }
+  | { readonly status: "refused"; readonly reason: DetailValueRefusal };
+
+/**
+ * Turns one submitted value into the single-field patch its control declares.
+ *
+ * **Not a second opinion on `validateTaskCommand`, which remains the gate.** It
+ * exists so the two failures a *control* can produce — an empty required field
+ * and a date the picker's own bounds exclude — carry a sentence naming the
+ * control, rather than arriving at the schema as a generic
+ * `missing_patch_field` or, worse, as an unexplained `needs_clarification` from
+ * the temporal lexicon. Everything it lets through is validated again.
+ */
+export function buildDetailPatch(
+  control: DetailControl,
+  value: string | undefined,
+  today: Date,
+): DetailPatchResult {
+  // An `immediate` control fills nothing, so a value arriving with one is
+  // discarded rather than refused: `clear_due` means the same thing whatever
+  // the form carried alongside it.
+  if (control.field === null) return { status: "ok", patch: {} };
+
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") return { status: "refused", reason: "missing_value" };
+
+  if (control.kind === "date") {
+    const match = CALENDAR_DATE.exec(trimmed);
+    if (match === null || !isRealCalendarDay(match)) {
+      return { status: "refused", reason: "date_invalid" };
+    }
+    if (!isSubmittableDate(trimmed, today)) {
+      return { status: "refused", reason: "date_out_of_range" };
+    }
+  }
+
+  // The closed set comes from the policy through the control, so an action that
+  // gains bounded values later is enforced here without a line changing.
+  if (control.choices !== null && !control.choices.includes(trimmed)) {
+    return { status: "refused", reason: "value_not_allowed" };
+  }
+
+  return { status: "ok", patch: { [control.field]: trimmed } };
 }

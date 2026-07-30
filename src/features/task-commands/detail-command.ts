@@ -46,7 +46,7 @@ import {
 } from "./apply";
 import { loadTaskCandidates, type TaskCandidateQueryClient } from "./candidates";
 import { toTaskPreState, type TaskCandidateRow, type TaskPreState } from "./matching";
-import { buildCanonicalPatch } from "./preview";
+import { buildCanonicalPatch, resolveRelationReference } from "./preview";
 import {
   validateTaskCommand,
   type TaskCommandPatch,
@@ -71,7 +71,18 @@ export type DetailCommandRefusal =
   /** The action, or the value for it, is outside what the taxonomy permits. */
   | { readonly kind: "unsupported"; readonly reason: TaskCommandUnsupportedReason; readonly field?: string }
   /** A temporal value the lexicon could not resolve — out of range, or not a date. */
-  | { readonly kind: "needs_clarification"; readonly field: string };
+  | { readonly kind: "needs_clarification"; readonly field: string }
+  /**
+   * The relation the action writes names no single owned entity.
+   *
+   * `resolve_owned_entity_exact` runs inside `list_task_command_candidates` and
+   * returns null both when nothing matches and when more than one does. The
+   * detail page's pickers are built from the caller's own entities, so this is
+   * reachable mainly when the entity was renamed or deleted in another tab, or
+   * when two of them share a name — and in every case the honest answer is that
+   * we could not tell which one was meant, not a silent write of nothing.
+   */
+  | { readonly kind: "relation_unresolved" };
 
 export type DetailCommandResolution =
   | {
@@ -146,15 +157,32 @@ export async function resolveDetailCommand(
     return { status: "refused", refusal: { kind: "ineligible" } };
   }
 
+  // The relation the action writes, resolved **in SQL** against the caller's own
+  // entities and carried back on the row. `work-command.ts` passes a hardcoded
+  // `null` here and is right to: no Work verb writes a relation. Four detail
+  // verbs do, and a null would build a canonical patch with no `projectId`,
+  // `contextId` or `personId` in it at all — so the RPC would receive a patch
+  // asking for nothing, report `no_change`, and the user would be told their
+  // edit made no difference when in fact it was never sent.
+  const relation = resolveRelationReference(command.action, row);
+  if (relation.status === "unresolved") {
+    return { status: "refused", refusal: { kind: "relation_unresolved" } };
+  }
+
   const preState = toTaskPreState(row);
   return {
     status: "resolved",
     command,
     row,
     preState,
-    // The database's own instant, cross-joined onto every row by the `refs` CTE.
+    // The instant this resolution ran against, echoed back on every row by the
+    // query's `refs` CTE. One observation, one instant.
     observedBefore: row.observedBefore,
-    canonicalPatch: buildCanonicalPatch({ command, pre: preState, resolvedId: null }),
+    canonicalPatch: buildCanonicalPatch({
+      command,
+      pre: preState,
+      resolvedId: relation.status === "resolved" ? relation.entityId : null,
+    }),
   };
 }
 
