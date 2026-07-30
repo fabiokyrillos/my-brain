@@ -17,6 +17,7 @@ describe("loadSettingsFormValues", () => {
   it("owner-scopes both queries and returns only visible operational values", async () => {
     const profile = queryStub({ data: { timezone: "America/Belem" }, error: null });
     const preferences = queryStub({ data: {
+      agent_name: "Ada",
       personality: "analytical",
       tone: "professional",
       quiet_start: "23:00:00",
@@ -38,6 +39,7 @@ describe("loadSettingsFormValues", () => {
     expect(preferences.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(values).toEqual({
       timezone: "America/Belem",
+      agentName: "Ada",
       personality: "analytical",
       tone: "professional",
       quietStart: "23:00",

@@ -111,7 +111,7 @@ describe("navigation capabilities", () => {
       { key: "response_style", state: "operational", visible: true },
       { key: "quiet_hours", state: "operational", visible: true },
       { key: "ai_routing", state: "advanced", visible: true },
-      { key: "identity_names", state: "future", visible: false },
+      { key: "identity_names", state: "operational", visible: true },
       { key: "locale_preference", state: "future", visible: false },
       { key: "scheduled_reviews", state: "future", visible: false },
       { key: "autonomy", state: "future", visible: false },

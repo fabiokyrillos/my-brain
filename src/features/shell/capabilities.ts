@@ -18,7 +18,11 @@ export const capabilityRegistry = [
   { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true },
   { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true },
   { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true },
-  { key: "identity_names", state: "future", surface: "settings", consumerEvidence: [], visible: false },
+  // Slice F1 gave it an input and consumers, so it stops being `future`. The
+  // evidence is the accessor plus the surfaces that read through it — this row
+  // is the honest record of that, and it was honest before, when it said the
+  // column had no consumer at all.
+  { key: "identity_names", state: "operational", surface: "settings", consumerEvidence: ["profile/agent-identity", "assistant/copy", "daily-cycle/copy", "shell/home-copy"], visible: true },
   { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false },
   { key: "scheduled_reviews", state: "future", surface: "settings", consumerEvidence: [], visible: false },
   { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false },

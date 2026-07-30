@@ -5,6 +5,7 @@ import { SettingsForm, type ProfileFormAction } from "./settings-form";
 
 const values = {
   timezone: "America/Sao_Paulo",
+  agentName: "Brain",
   personality: "proactive" as const,
   tone: "direct" as const,
   quietStart: "22:30",
@@ -81,6 +82,7 @@ describe("SettingsForm", () => {
 
     const formData = action.mock.calls[0][1] as FormData;
     expect([...formData.keys()].sort()).toEqual([
+      "agentName",
       "aiProfile",
       "chatModel",
       "extractionModel",

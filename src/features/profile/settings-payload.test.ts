@@ -4,6 +4,7 @@ import { buildSettingsPayload, type SettingsPersistenceSnapshot } from "./settin
 
 const input: ProfileInput = {
   locale: "pt-BR",
+  agentName: "Brain",
   timezone: "America/Sao_Paulo",
   personality: "warm",
   tone: "natural",
@@ -44,7 +45,7 @@ describe("buildSettingsPayload", () => {
     const payload = buildSettingsPayload(input, snapshot);
     expect(payload.profile).toEqual({ displayName: "Fabin", locale: "en", timezone: "America/Sao_Paulo" });
     expect(payload.preferences).toMatchObject({
-      agentName: "Brain local",
+      agentName: "Brain",
       followUpIntensity: "calm",
       dailyReviewTime: "21:30",
       autonomyLevel: "suggestive",
