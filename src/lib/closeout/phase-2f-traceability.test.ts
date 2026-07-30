@@ -61,7 +61,7 @@ const SLICE_ARTIFACTS: Record<string, string[]> = {
   "03": ["ACCEPTANCE", "PLAN"],
   "04": ["ACCEPTANCE", "BLAST_RADIUS", "PLAN", "REPORT"],
   "05": ["ACCEPTANCE", "PRD", "REPORT"],
-  "06": ["PRD", "REPORT"],
+  "06": ["ACCEPTANCE", "PRD", "REPORT"],
 };
 
 function touch(root: string, relative: string, content = "placeholder\n") {
@@ -534,8 +534,11 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
   it("fails when a section 10 cell claims an executed gate for a slice with no session record", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    // Give slice 2F.6 a gate cell but strip the artifact that would name the session.
+    // Strip every acceptance-bearing artifact for 2F.6, which §10 marks on four
+    // rows. Both must go: the slice has a report and an acceptance record, and the
+    // check asks whether *any* bearing artifact exists.
     rmSync(join(root, "docs/reports/PHASE_2F_SLICE_06_REPORT.md"));
+    rmSync(join(root, "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md"));
     expect(() => buildPhase2fTraceability({ root }))
       .toThrow(/§10 marks gate [\s\S]*? executed \([^)]*\) for 2F\.6, which has no/);
   });

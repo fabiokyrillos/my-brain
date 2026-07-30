@@ -314,12 +314,14 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "suite", file: "src/lib/closeout/phase-2f-traceability.test.ts" },
       { kind: "npm", script: "docs:phase-2f:traceability" },
     ],
-    // Slice 2F.6's acceptance record cannot exist while its implementation PR is
-    // open — merge SHA, merge date and post-merge results are not facts yet — so
-    // the implementation PR cites the implementation report and the acceptance PR
-    // adds the acceptance record beside it. The same two-PR shape Slices 2F.4 and
-    // 2F.5 used, for the same reason.
-    acceptance: ["docs/reports/PHASE_2F_SLICE_06_REPORT.md"],
+    // Both, now that both exist. The implementation PR could cite only the report,
+    // because merge SHA, merge date and post-merge results are not facts while that
+    // PR is open; the acceptance PR adds the acceptance record beside it. The same
+    // two-PR shape Slices 2F.4 and 2F.5 used, for the same reason.
+    acceptance: [
+      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+    ],
   },
   "E-CLEAN": {
     source: "PRD §6.12; Slice 2F.5 PRD §22 handover",
@@ -333,7 +335,10 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "pgtap", file: "supabase/tests/phase_2f_task_write_grants.sql" },
       { kind: "npm", script: "test:remote:2f:cleanup" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_06_REPORT.md"],
+    acceptance: [
+      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+    ],
   },
   "E-CENSUS": {
     source: "PRD §6.12; owner decision 2",
@@ -343,7 +348,10 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "suite", file: "src/lib/closeout/phase-2f-census.test.ts" },
       { kind: "npm", script: "test:remote:2f:census" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_06_REPORT.md"],
+    acceptance: [
+      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+    ],
   },
   "E-DOCS": {
     source: "PRD §6.12",
@@ -360,7 +368,10 @@ export const EVIDENCE_KEYS = Object.freeze({
     ],
     verification: "documentation-convergence cases that read the documents they assert about, including the dated expiry recomputed from go-live and the cross-document status contradiction scan",
     gates: [{ kind: "suite", file: "src/lib/closeout/phase-2f-documentation.test.ts" }],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_06_REPORT.md"],
+    acceptance: [
+      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+    ],
   },
 });
 

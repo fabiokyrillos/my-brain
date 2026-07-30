@@ -1,10 +1,10 @@
 # Phase 2F — One Write Path: final phase report
 
-**Verdict: closeout complete on branch; the phase closes when Slice 2F.6 merges.** Six slices, 68 requirements, two migrations, one removed write-path family, one documented exception, and a measurement instrument that makes the next expensive decision decidable on data. Governed by `docs/PHASE_2F_PRD.md` Revision 4.3.
+**Verdict: complete.** Six slices, 68 requirements, two migrations, one removed write-path family, one documented exception, and a measurement instrument that makes the next expensive decision decidable on data. Governed by `docs/PHASE_2F_PRD.md` Revision 4.3.
 
-Slices 2F.1–2F.5 are accepted and merged. Slice 2F.6 is implemented and gate-verified on branch `codex/phase-2f-slice-6` with PR #33 open, so **this report does not yet claim a merge SHA, a merge date, a post-merge verification or a clean synchronized `main`** — none of those is a fact while the PR is open, and the acceptance record is where they land. Writing them earlier is the mistake this very closeout had to correct one slice upstream, in `STATE.md`'s Slice 2F.4 section.
+All six slices are accepted and merged. Slice 2F.6 merged as **PR #33 → `7e3e5f0`** on 2026-07-30, with **merge-SHA CI run `30520514810` green on all three jobs on the first attempt**, and every closeout gate re-executed from merged `main` content. `main` is clean and synchronized with `origin`; parity is `202607300063` before and after. The per-gate ledger is `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` §4.
 
-Post-merge facts for Slice 2F.6 — its merge SHA, merge date and post-merge verification — are recorded in `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md`, because they do not exist while the implementation PR is open. Everything below is executed evidence at the time of writing.
+This report claimed none of those facts until they existed — the discipline ADR-063 states for §10's gate cells, applied to the report about them.
 
 ---
 
@@ -170,11 +170,11 @@ Each is a scope the next reader must carry forward, not a gap being minimised.
 
 The verifier's scope is stated exactly rather than rounded: **zero orphans across the seventeen orphan-scanned tables**, plus **two asserted `service_role` refusals** on the posture-protected pair (`task_command_confirmations`, `product_events`) which are scanned for that refusal and never for orphans, plus zero fixture-prefix users, zero fixture objects in `user-files`, and the deferred-object absences including `record_ai_usage`'s unchanged ten-argument signature. Saying "zero residue across nineteen tables" would contradict this report's own §8 — `product_events` row absence is **unreadable** with any credential this repository holds.
 
-**Owed post-merge, and not claimed here:** re-execution of every required remote check from merged `main` content (`R3`), and the clean-and-synchronized `main` statement. Both land in `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md`.
+**Re-executed post-merge from merged `main` content** (`R3`), all green: census stop-gate clear, cleanup verifier CLEAN with zero residue, traceability regenerating content-identically, funnel proof 32/32, end-to-end baseline 9/9, full remote suite exit 0, and a second census-plus-cleanup pass after the fixture-minting runs — still clear, still CLEAN. `main` is clean and synchronized at `7e3e5f0`; parity `202607300063`. The per-gate ledger is `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` §4.
 
 ## 14. Final repository state
 
-- `main` clean and synchronized with `origin` — **verified in the acceptance record, not here**: PR #33 is open at the time of writing.
+- `main` clean and synchronized with `origin` at `7e3e5f0` — verified after the merge.
 - Remote migration parity `202607300063`, no drift.
 - Two Phase 2F migrations, both applied; no third.
 - `tasks` direct-write allowlist empty; `reminders` allowlist holds exactly the Option C exception.
@@ -187,4 +187,4 @@ The deployed project runs the full chain through `202607300063`. `authenticated`
 
 ## 16. Final closeout verdict
 
-**Phase 2F's work is complete and its closeout is verified on branch; the phase closes on the Slice 2F.6 merge.** Every requirement is delivered or explicitly and traceably deferred; every completed claim rests on an executed gate; every partial is still labelled partial; every deferral still has a destination. The phase's own closeout found three inaccurate cells in its gate ledger, a misattributed CI citation, an unrecorded flaky test and one intra-document contradiction — and filed all of them rather than smoothing any, which is what a convergence audit is for. The two properties the phase set out to establish now hold mechanically rather than by assertion: **one validated write path for `public.tasks`**, and **one bounded, documented exception on `public.reminders`** — with a fail-closed guard that reds the build if either becomes false.
+**Phase 2F is complete.** Every requirement is delivered or explicitly and traceably deferred; every completed claim rests on an executed gate; every partial is still labelled partial; every deferral still has a destination. The phase's own closeout found three inaccurate cells in its gate ledger, a misattributed CI citation, an unrecorded flaky test and one intra-document contradiction — and filed all of them rather than smoothing any, which is what a convergence audit is for. The two properties the phase set out to establish now hold mechanically rather than by assertion: **one validated write path for `public.tasks`**, and **one bounded, documented exception on `public.reminders`** — with a fail-closed guard that reds the build if either becomes false.

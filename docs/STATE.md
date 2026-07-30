@@ -1,10 +1,10 @@
 # Project State
 
-Last updated: 2026-07-30 (Phase 2F — Slices 2F.1–2F.5 accepted and merged; **Slice 2F.6 implemented and gate-verified on branch `codex/phase-2f-slice-6`, PR #33 open**; remote parity `202607300063`)
+Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and merged, remote parity `202607300063`, closeout gates re-executed from merged `main`)
 
 ## Current truth
 
-**Phase 2F — One Write Path is in closeout**, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.3 (68 requirements, 12 families, slices 2F.1–2F.6). **Slices 2F.1–2F.5 are accepted and merged. Slice 2F.6 is implemented and gate-verified on branch `codex/phase-2f-slice-6` with PR #33 open** — its merge SHA, merge date and post-merge verification are not facts yet, and this file will not claim them until they are (the same discipline ADR-063 applies to §10's gate cells, and the same pre-merge wording Slice 2F.5 used). **Both of the phase's two expected migrations are applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase added no third**: Slices 2F.5 and 2F.6 are read-only. The accounting in progress is `docs/reports/PHASE_2F_REPORT.md`, and every requirement is mapped individually in `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md`.
+**Phase 2F — One Write Path is COMPLETE**, governed by the approved `docs/PHASE_2F_PRD.md` Revision 4.3 (68 requirements, 12 families, slices 2F.1–2F.6, all six accepted and merged). Slice 2F.6 merged as **PR #33 → `7e3e5f0`** on 2026-07-30, with **merge-SHA CI run `30520514810` green on all three jobs on the first attempt**, and every closeout gate re-executed from merged `main` content: census stop-gate clear, cleanup verifier CLEAN with zero residue, funnel proof 32/32, end-to-end baseline 9/9, full remote suite exit 0, traceability matrix regenerating content-identically. Parity `202607300063` before and after. **Both of the phase's two expected migrations are applied** — 2F.3's creation contract and 2F.4's revocation, and **the phase added no third**: Slices 2F.5 and 2F.6 are read-only. The final accounting is `docs/reports/PHASE_2F_REPORT.md`, and every requirement is mapped individually in `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md`.
 
 **No successor phase is authorized or started.** Phase 2G is named as a recommendation in `docs/PHASE_2F_PROPOSAL.md` and nowhere else: no PRD, no plan, no ADR, no requirement ID, no artifact. The closeout asserts this rather than assuming it, and the traceability generator fails closed if a non-`2F-` requirement is ever declared as Phase 2F work.
 
@@ -12,7 +12,7 @@ Last updated: 2026-07-30 (Phase 2F — Slices 2F.1–2F.5 accepted and merged; *
 
 **`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 
-### Slice 2F.6 — Convergence and closeout (implemented and gate-verified on branch; PR #33 open)
+### Slice 2F.6 — Convergence and closeout (accepted, merged)
 
 **No migration, no deployment, no production write of any kind.** Remote parity is `202607300063` before and after, verified both times with `npx supabase migration list --linked`. The slice delivers `2F-OPERATIONS-003` through `006`, the whole-phase convergence audit and the phase's acceptance record, governed by `docs/reports/PHASE_2F_SLICE_06_PRD.md`.
 
