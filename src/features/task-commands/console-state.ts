@@ -15,6 +15,7 @@
 import type { TaskCommandCreationPreview } from "./creation";
 import type { TaskDisambiguationView } from "./disambiguation";
 import type { TaskCommandPreview } from "./preview";
+import type { TaskCommandUnsupportedReason } from "./taxonomy";
 
 /**
  * Which control the surface should render.
@@ -85,6 +86,21 @@ export type TaskCommandConsoleState = {
   readonly retryable: boolean;
   /** True when nothing further can be done with this command. */
   readonly terminal: boolean;
+  /**
+   * Why the command was refused as unsupported, as a value rather than as prose.
+   *
+   * `reason` above is already localized — `copy.unsupportedReasons[…]` — so a
+   * caller that needed to branch on *which* refusal this is would be matching
+   * translated sentences. The unified composer needs exactly that branch: it
+   * falls through to the knowledge answer on `not_a_task_command` and on
+   * nothing else, so the condition has to come from the closed vocabulary the
+   * model answered with.
+   *
+   * `null` on every other state, including the two failure kinds that sit next
+   * to this one in `startTaskCommand` — a provider fault and invalid model
+   * output are *not* refusals and must never be read as one.
+   */
+  readonly unsupportedReason: TaskCommandUnsupportedReason | null;
 };
 
 export const idleTaskCommandState: TaskCommandConsoleState = {
@@ -101,4 +117,5 @@ export const idleTaskCommandState: TaskCommandConsoleState = {
   control: "none",
   retryable: false,
   terminal: false,
+  unsupportedReason: null,
 };

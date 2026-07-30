@@ -329,8 +329,12 @@ test.describe("converged daily journey — capture, review, and confirmation", (
 
   test("Brain chat answers grounded in the captured entry", async () => {
     await page.goto("/pt-BR/app/chat");
-    await page.getByRole("textbox", { name: "Pergunte ao Brain" }).fill("Com quem conversei sobre o projeto Atlas?");
-    await page.getByRole("button", { name: "Enviar pergunta" }).click();
+    // Slice E: one composer, so the question goes into the same field a command
+    // would. It reaches the grounded answer through the declared
+    // `not_a_task_command` fallthrough rather than through a separate form.
+    await page.getByRole("textbox", { name: "O que você quer dizer ao Brain?" })
+      .fill("Com quem conversei sobre o projeto Atlas?");
+    await page.getByRole("button", { name: "Enviar" }).click();
     await expect(page).toHaveURL(/\/pt-BR\/app\/chat\/[0-9a-f-]+$/, { timeout: 120_000 });
     await expect(page.locator(".chat-message.assistant")).toContainText("Marina");
     await expect(page.getByRole("link", { name: /Marina.*Atlas/i })).toBeVisible();

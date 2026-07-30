@@ -166,12 +166,24 @@ export function TaskCommandResult({
   formAction,
   locale,
   origin,
+  silent = false,
 }: {
   state: TaskCommandConsoleState;
   pending: boolean;
   formAction: (formData: FormData) => void;
   locale: Locale;
   origin: "chat" | "work";
+  /**
+   * Suppress this component's own live region because the host already owns one.
+   *
+   * The unified composer needs it: a turn there can resolve on a route the
+   * command state knows nothing about — a proposed memory, a failed answer —
+   * so the announcement has to be made one level up. With both regions live,
+   * every command outcome would be announced twice, which is worse for a screen
+   * reader user than either alone. Defaults to `false`, so the console and the
+   * recovery surface keep announcing for themselves.
+   */
+  silent?: boolean;
 }) {
   const copy = getTaskCommandCopy(locale);
   const result = useRef<HTMLDivElement | null>(null);
@@ -213,15 +225,17 @@ export function TaskCommandResult({
         a round is in flight — that a model call is happening. `aria-busy` is
         what tells a screen reader the region is mid-update rather than empty.
       */}
-      <div
-        aria-atomic="true"
-        aria-busy={pending}
-        aria-live="polite"
-        className="sr-only"
-        role="status"
-      >
-        {pending ? copy.console.pendingAnnouncement : state.announcement}
-      </div>
+      {silent ? null : (
+        <div
+          aria-atomic="true"
+          aria-busy={pending}
+          aria-live="polite"
+          className="sr-only"
+          role="status"
+        >
+          {pending ? copy.console.pendingAnnouncement : state.announcement}
+        </div>
+      )}
 
       {state.status === "idle" ? null : (
         <div

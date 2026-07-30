@@ -59,10 +59,13 @@
   color: var(--ink);
 }
 
-/* 44px on every control, including inside the dialog. */
+/* 44px on every control, including inside the dialog and the unified composer.
+   `TaskCommandResult` renders unscoped classes but its buttons are sized by the
+   host, so a host missing from this list silently loses the touch target. */
 .task-command-console button,
 .task-command-dialog button,
-.task-command-recovery button {
+.task-command-recovery button,
+.assistant-composer button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -104,7 +107,8 @@
  */
 .task-command-result:focus-visible,
 .task-command-dialog :focus-visible,
-.task-command-console :focus-visible {
+.task-command-console :focus-visible,
+.assistant-composer :focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }

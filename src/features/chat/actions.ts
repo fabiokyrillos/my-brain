@@ -8,7 +8,7 @@ import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
-import type { ChatState } from "./chat-form";
+import type { ChatState } from "./chat-state";
 
 const chatInputSchema = z.object({
   question: z.string().trim().min(1).max(12000),

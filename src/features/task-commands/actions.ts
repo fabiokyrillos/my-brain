@@ -84,6 +84,7 @@ import { TaskMatchInputError, rankTaskCandidates } from "./matching";
 import type { TaskCommandOutcome } from "./outcomes";
 import { TaskPreviewInputError, buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
 import { MAX_HINT_LENGTH, MAX_TITLE_WORDS } from "./schema";
+import { TASK_COMMAND_UNSUPPORTED_REASONS } from "./taxonomy";
 import {
   createTaskCommandSession,
   deriveBaseTaskCommand,
@@ -345,6 +346,8 @@ async function runCommandRound(
   const { copy, timeZone, locale } = context;
   const derived = deriveTaskCommand(session, timeZone);
   if (derived.status === "unsupported") {
+    const declared = TASK_COMMAND_UNSUPPORTED_REASONS.find((reason) => reason === derived.reason)
+      ?? null;
     return {
       session,
       state: resolved({
@@ -353,6 +356,11 @@ async function runCommandRound(
         reason:
           copy.unsupportedReasons[derived.reason as keyof typeof copy.unsupportedReasons]
           ?? copy.outcomes.unsupported.description,
+        // Narrowed through the declared list rather than cast, for the same
+        // reason the sentence above falls back: this reason reaches here from
+        // the deterministic validator, and a value outside the vocabulary must
+        // stay unreadable rather than become a routing decision.
+        unsupportedReason: declared,
         terminal: true,
       }),
     };
@@ -721,6 +729,12 @@ export async function startTaskCommand(
       heading: copy.outcomes.unsupported.title,
       detail: copy.outcomes.unsupported.description,
       reason: copy.unsupportedReasons[normalized.reason],
+      // Carried as a value, not only as the localized sentence above, so the
+      // unified composer can fall through on `not_a_task_command` without
+      // matching translated prose. The two returns before this one — a provider
+      // fault and invalid model output — deliberately leave it null: neither is
+      // a refusal, and neither may be read as one.
+      unsupportedReason: normalized.reason,
       terminal: true,
     });
   }
