@@ -182,6 +182,22 @@ export type InterpretationTechnicalDetailsView = {
   provenance: SerializableRecord;
 };
 
+/**
+ * The states a task can be *shown* in, in the user's own terms.
+ *
+ * `cancelled` was missing until Slice D2, and its absence was not a filter —
+ * every list projection excludes cancelled tasks **in SQL** (`work-projection.ts`
+ * filters it on all three branches). What the gap actually did was make
+ * `toWorkItemView` return null for a cancelled row, so `loadTaskDetailProjection`
+ * returned null and `/[locale]/app/work/[taskId]` answered **404 for every
+ * cancelled task**. That made `restore_task` — the one verb the taxonomy admits
+ * on a cancelled task — unreachable from the surface that offers it, and left a
+ * user who had just cancelled a task from the detail page on a page that 404s on
+ * its next load.
+ *
+ * Adding the member cannot surface a cancelled task in any list, because the
+ * mapper's null was never the mechanism keeping them out.
+ */
 export const workItemHumanStates = [
   "not_started",
   "in_progress",
@@ -189,6 +205,7 @@ export const workItemHumanStates = [
   "blocked",
   "deferred",
   "completed",
+  "cancelled",
 ] as const;
 
 export type WorkItemHumanState = (typeof workItemHumanStates)[number];

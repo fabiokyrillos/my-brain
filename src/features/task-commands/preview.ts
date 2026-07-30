@@ -359,8 +359,14 @@ export function buildTaskCommandPreview(input: TaskCommandPreviewInput): TaskCom
  * The three ref columns are query-scalar, so the row carries whichever one the
  * command asked SQL to resolve; an action that writes no relation asks for none
  * and this returns `none`.
+ *
+ * Exported for `detail-command.ts`, which needs the same answer for the same
+ * reason and must not re-derive it: `resolve_owned_entity_exact` runs in SQL
+ * under the authoritative normalizer, and a second mapping from action to ref
+ * column in TypeScript is the divergence `normalizer-divergence.test.ts` exists
+ * to forbid across this directory.
  */
-function resolveRelationReference(
+export function resolveRelationReference(
   action: TaskCommandAction,
   row: TaskCandidateRow,
 ): { status: "none" } | { status: "resolved"; entityId: string } | { status: "unresolved" } {

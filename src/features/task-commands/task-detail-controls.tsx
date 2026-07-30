@@ -1,0 +1,351 @@
+"use client";
+
+/**
+ * Slice D2 — the eleven command verbs the task detail surface can offer, as
+ * controls.
+ *
+ * Before this, `apply_task_command` served fifteen actions and the product
+ * reached four of them by click; the other eleven existed only behind a
+ * natural-language console (UX-05). Nothing here widens the write path: every
+ * control submits to `applyTaskDetailCommand`, which resolves through
+ * `list_task_command_candidates` and applies through `apply_task_command` —
+ * the same two RPCs a Work click has used since Phase 2F.
+ *
+ * **The controls are not written here.** They arrive already derived from the
+ * taxonomy by `detailControlsFor(status)`, which is what stops this component
+ * offering a button whose only possible outcome is a refusal (2F-SURFACE-009).
+ * This file decides how a `date` looks, not which verbs exist.
+ *
+ * **The destructive verb never renders its dialog first.** `cancel_task` sends
+ * `request_cancel`, the server resolves the row and issues the confirmation
+ * against *that* observation, and only then does the dialog open — carrying the
+ * operation key and instant the digest was derived from. Opening the dialog
+ * client-side and issuing at Confirm time would bind the token to whatever the
+ * form said afterwards, which is the failure 2E-DESTRUCTIVE-003 names.
+ */
+
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Locale } from "@/lib/preferences";
+
+import { ConfirmDialog } from "./confirm-dialog";
+import {
+  idleTaskDetailCommandState,
+  type TaskDetailCommandState,
+} from "./detail-action-state";
+import { getTaskDetailControlsCopy } from "./detail-controls-copy";
+import type { DetailControl, DetailRelationKind } from "./detail-controls";
+import { MAX_NOTE_LENGTH, MAX_TITLE_LENGTH } from "./schema";
+import type { TaskCommandAction, TaskCommandPatchField } from "./taxonomy";
+
+export type TaskDetailRelationOption = { readonly id: string; readonly label: string };
+
+/** The caller's own entities, by the relation kind a control asks for. */
+export type TaskDetailRelationOptions = Readonly<
+  Record<DetailRelationKind, readonly TaskDetailRelationOption[]>
+>;
+
+export type TaskDetailCommandHandler = (
+  state: TaskDetailCommandState,
+  formData: FormData,
+) => Promise<TaskDetailCommandState>;
+
+/** The ±730-day window, computed server-side so hydration cannot disagree. */
+export type TaskDetailDateBounds = { readonly min: string; readonly max: string };
+
+/** A note is long-form; every other free-text field is a single line. */
+const LONG_FIELDS: readonly TaskCommandPatchField[] = ["note"];
+
+const MAX_LENGTH_BY_FIELD: Partial<Record<TaskCommandPatchField, number>> = {
+  title: MAX_TITLE_LENGTH,
+  note: MAX_NOTE_LENGTH,
+};
+
+export function TaskDetailControls({
+  action,
+  locale,
+  taskId,
+  title,
+  controls,
+  relationOptions,
+  dateBounds,
+}: {
+  action: TaskDetailCommandHandler;
+  locale: Locale;
+  taskId: string;
+  /** The rendered title. A resolution query hint only, never a gate. */
+  title: string;
+  controls: readonly DetailControl[];
+  relationOptions: TaskDetailRelationOptions;
+  dateBounds: TaskDetailDateBounds;
+}) {
+  const copy = getTaskDetailControlsCopy(locale);
+  const router = useRouter();
+  const result = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * The operation keys, one per action (2F-SURFACE-006).
+   *
+   * Held in a ref and minted lazily — **never in the render body**, where every
+   * re-render would re-mint: `useActionState`'s pending→settled transition is a
+   * re-render, and StrictMode double-renders in development.
+   *
+   * Scoped per action rather than per surface because one key carrying two
+   * different request fingerprints is refused with `2E_IDEMPOTENCY_MISMATCH`.
+   * The pair of calls a cancellation takes deliberately shares one key: the
+   * confirmation is stored against `(user, operation key)` and the apply
+   * resolves it by the same pair, so a second key would leave the issued row
+   * unreachable.
+   */
+  const keys = useRef<Map<TaskCommandAction, string>>(new Map());
+
+  /**
+   * Whether the user dismissed the prompt the current round returned.
+   *
+   * Needed because `useActionState` state changes only by dispatching, so
+   * "awaiting confirmation" cannot be cleared by closing the dialog — and
+   * `router.refresh()` re-fetches the server tree while leaving client state
+   * exactly as it was, so a dialog closed that way would immediately re-render
+   * open. Cleared by the next dispatch, in `submit` below.
+   */
+  const [dismissed, setDismissed] = useState(false);
+
+  function operationKeyFor(id: TaskCommandAction): string {
+    const existing = keys.current.get(id);
+    if (existing !== undefined) return existing;
+    const minted = crypto.randomUUID();
+    keys.current.set(id, minted);
+    return minted;
+  }
+
+  async function submit(
+    state: TaskDetailCommandState,
+    formData: FormData,
+  ): Promise<TaskDetailCommandState> {
+    const clicked = formData.get("action");
+    if (typeof clicked !== "string") return state;
+    const commandAction = clicked as TaskCommandAction;
+    // Carried at submit time and **never rendered into markup**: a hidden input
+    // holding a client-minted uuid would not match the value the server
+    // rendered, and React would report a hydration mismatch.
+    formData.set("operationKey", operationKeyFor(commandAction));
+    // A new dispatch is what un-dismisses the prompt, rather than the arrival of
+    // a new state object: two consecutive rounds can settle at equal states, and
+    // keying this on the state's identity would leave the prompt suppressed for
+    // a user who changed their mind twice.
+    setDismissed(false);
+    const next = await action(state, formData);
+    // Rotated after every **terminal** outcome. `awaiting_confirmation` is not
+    // one — the key it issued a confirmation against is the key the Confirm
+    // call has to spend.
+    if (next.status !== "idle" && next.status !== "awaiting_confirmation") {
+      keys.current.delete(commandAction);
+    }
+    return next;
+  }
+
+  const [state, formAction, pending] = useActionState(submit, idleTaskDetailCommandState);
+
+  // Focus lands on the outcome after every settled round, so a keyboard or
+  // screen-reader user is told what happened. Deliberately not while a
+  // confirmation is open: the dialog moves focus into itself, and stealing it
+  // back would trap the user outside the prompt they are being asked about.
+  useEffect(() => {
+    if (state.status !== "idle" && state.status !== "awaiting_confirmation") {
+      result.current?.focus();
+    }
+  }, [state]);
+
+  const pendingConfirmation =
+    state.status === "awaiting_confirmation" && !dismissed ? state.pending : null;
+
+  /**
+   * Abandons the issued confirmation rather than holding it open.
+   *
+   * The key is rotated, so asking to cancel again is a *new* request with a new
+   * confirmation bound to a fresh observation. Reusing it would re-issue against
+   * the same key — idempotent, and therefore bound to the instant of the
+   * observation the user already walked away from.
+   *
+   * The abandoned row is left where it is. It is unconsumed, `apply_task_command`
+   * is the only thing that can spend it, and it can only be spent by a request
+   * whose seven values hash to the digest it stores — so an unspent confirmation
+   * authorizes nothing.
+   */
+  function dismissConfirmation() {
+    if (state.pending !== null) keys.current.delete(state.pending.action);
+    setDismissed(true);
+  }
+
+  function hiddenFields(commandAction: TaskCommandAction, intent: string) {
+    return (
+      <>
+        <input type="hidden" name="intent" value={intent} />
+        <input type="hidden" name="taskId" value={taskId} />
+        <input type="hidden" name="locale" value={locale} />
+        <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="action" value={commandAction} />
+      </>
+    );
+  }
+
+  return (
+    <section aria-label={copy.sectionTitle} className="task-detail-section task-detail-controls">
+      <h2>{copy.sectionTitle}</h2>
+      <p className="quiet-state">{copy.sectionHint}</p>
+
+      {/*
+        One polite live region, announcing the pending phrase while a round is in
+        flight and the outcome once it settles. `aria-busy` is what tells a
+        screen reader the region is mid-update rather than empty.
+      */}
+      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
+        {pending ? copy.pendingAnnouncement : state.announcement}
+      </div>
+
+      <ul className="task-control-list">
+        {controls.map((control) => {
+          const label = copy.actions[control.action];
+          const inputId = `task-control-${control.action}`;
+          const intent = control.destructive ? "request_cancel" : "apply";
+          const options = control.relation === null ? null : relationOptions[control.relation];
+          // A relation control with nothing to point at is stated rather than
+          // rendered as an empty `<select>` the user can only fail to use.
+          const empty = options !== null && options.length === 0;
+
+          return (
+            <li className="task-control" key={control.action}>
+              <form action={formAction}>
+                {hiddenFields(control.action, intent)}
+
+                {control.field === null ? null : (
+                  <label htmlFor={inputId}>{copy.fields[control.field]}</label>
+                )}
+
+                {control.kind === "text" && control.field !== null ? (
+                  LONG_FIELDS.includes(control.field) ? (
+                    <textarea
+                      id={inputId}
+                      maxLength={MAX_LENGTH_BY_FIELD[control.field]}
+                      name="value"
+                      rows={3}
+                    />
+                  ) : (
+                    <input
+                      id={inputId}
+                      maxLength={MAX_LENGTH_BY_FIELD[control.field]}
+                      name="value"
+                      type="text"
+                    />
+                  )
+                ) : null}
+
+                {control.kind === "date" ? (
+                  // `type="date"` emits `YYYY-MM-DD`, which is exactly the one
+                  // temporal shape `explicit_date` resolves — and it resolves it
+                  // in the caller's own zone, so the control never sends an
+                  // instant. The bounds mirror the lexicon's ±730 days, so a
+                  // date it would decline cannot be picked in the first place.
+                  <input
+                    id={inputId}
+                    max={dateBounds.max}
+                    min={dateBounds.min}
+                    name="value"
+                    type="date"
+                  />
+                ) : null}
+
+                {control.kind === "choice" && control.choices !== null ? (
+                  <select defaultValue="" id={inputId} name="value">
+                    <option disabled value="">{copy.choosePlaceholder}</option>
+                    {control.choices.map((choice) => (
+                      <option key={choice} value={choice}>
+                        {copy.choices[choice as keyof typeof copy.choices] ?? choice}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+
+                {control.kind === "relation" && options !== null && control.relation !== null ? (
+                  empty ? (
+                    <p className="quiet-state">{copy.relationEmpty[control.relation]}</p>
+                  ) : (
+                    // The **name** is submitted, never the id. It is resolved by
+                    // `resolve_owned_entity_exact` inside the candidate query,
+                    // so ownership is proven in the database rather than
+                    // asserted by this form — and there is no path for the UI to
+                    // smuggle an id it was not given.
+                    <select defaultValue="" id={inputId} name="value">
+                      <option disabled value="">{copy.choosePlaceholder}</option>
+                      {options.map((option) => (
+                        <option key={option.id} value={option.label}>{option.label}</option>
+                      ))}
+                    </select>
+                  )
+                ) : null}
+
+                <button
+                  className={control.destructive ? "row-action row-action-destructive" : "row-action"}
+                  disabled={pending || empty}
+                  type="submit"
+                >
+                  {control.field === null || control.destructive ? label : copy.submit}
+                </button>
+
+                {control.field === null || control.destructive ? null : (
+                  <span className="task-control-name">{label}</span>
+                )}
+              </form>
+            </li>
+          );
+        })}
+      </ul>
+
+      <ConfirmDialog
+        cancelLabel={copy.confirm.cancel}
+        description={copy.confirm.description}
+        onClose={dismissConfirmation}
+        open={pendingConfirmation !== null}
+        title={copy.confirm.title}
+      >
+        {pendingConfirmation === null ? null : (
+          <form action={formAction}>
+            {hiddenFields(pendingConfirmation.action, "confirm_cancel")}
+            {/*
+              The instant the confirmation's digest was derived from. Sent back
+              unchanged because `task_command_fingerprint` hashes it alongside
+              the pre-state: a second instant derives a different digest, and
+              the database refuses a cancellation the user genuinely confirmed.
+            */}
+            <input type="hidden" name="observedBefore" value={pendingConfirmation.observedBefore} />
+            <p className="task-control-target">{pendingConfirmation.title}</p>
+            <button className="row-action row-action-destructive" disabled={pending} type="submit">
+              {copy.confirm.submit}
+            </button>
+          </form>
+        )}
+      </ConfirmDialog>
+
+      {state.status === "idle" || state.status === "awaiting_confirmation" ? null : (
+        <div
+          aria-label={copy.resultRegionLabel}
+          className="work-action-result"
+          ref={result}
+          // A named landmark rather than a bare `div`: a screen-reader user can
+          // navigate back to the answer after moving away from it.
+          role="region"
+          tabIndex={-1}
+        >
+          <strong>{state.heading}</strong>
+          <p>{state.detail}</p>
+          {state.reason === null ? null : <p className="task-control-reason">{state.reason}</p>}
+          {state.refreshable && (
+            <button className="row-action" onClick={() => router.refresh()} type="button">
+              {copy.refresh}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

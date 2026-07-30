@@ -3,7 +3,23 @@
 **Initiative** — Product UX/UI Remediation Loop (post-Phase 2F, pre-Phase 2G).
 **Opened** — 2026-07-30.
 **Baseline commit** — `0c13285` (`main`, clean tree at audit start).
-**Status** — Audit 1 complete. No remediation slice merged yet.
+**Status** — Slices A, B, C and D1 are **merged into `main`**. D2 in progress.
+
+### Integrated slices
+
+| Slice | PR | Merge commit | Branch (preserved) |
+| --- | --- | --- | --- |
+| A — responsive foundations | #35 | `4d8e3d2` | `codex/ux-slice-a-responsive-foundations` |
+| B — navigation and IA | #36 | `2c935f9` | `codex/ux-slice-b-navigation` |
+| C — Home attention surface | #37 | `35ae645` | `codex/ux-slice-c-home` |
+| D1 — task detail surface | #38 | `9302bc5` | `codex/ux-slice-d1-task-detail` |
+
+Merged in dependency order with the repository's normal merge-commit strategy — no squash,
+no rebase, thematic commits and branch history intact. Each stacked PR was retargeted to
+the updated `main` and its file list verified byte-identical before and after retargeting
+(#36 26 files, #37 29 files, #38 13 files), so no reviewed semantic diff changed. `main`'s
+own `push` CI was confirmed green after each merge before the next was taken:
+`4d8e3d2` run 30560113300, `2c935f9` run 30560498090, `35ae645` run 30560881120.
 
 This is the durable artifact for the initiative. Every finding keeps its ID for the
 life of the initiative and ends with exactly one disposition:
@@ -83,7 +99,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | **RESOLVED** |
 | UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | OPEN → B2 (DEC-1 approved: **Registros**) |
 | UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
-| UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | OPEN |
+| UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
 | UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | OPEN → F (DEC-2 approved: **ship it**) |
 | UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | OPEN → E (DEC-3 approved: **unified**) |
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | OPEN |
@@ -103,6 +119,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | OPEN → D3 |
 | UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | OPEN → G |
 | UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | RETAINED (not rendered) |
+| UX-29 | Every cancelled task's detail page answered 404 | missing-lifecycle | **P0** | yes | **RESOLVED** (D2) |
 | UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN |
 | UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN |
 | UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
@@ -252,11 +269,28 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Contracts affected** — `apply_task_command` (consumed, not modified);
   `TASK_COMMAND_POLICY_VERSION` unchanged; `task_command_applied` analytics gains
   no new property (`commandOrigin` already admits `'work'`).
-- **Slice** — D.
+- **Slice** — D1 (inspect) and D2 (edit).
 - **Validation** — pgTAP already covers the RPC. New: component tests per control,
   a Playwright journey (desktop + mobile, both locales) that opens a task, edits the
   due date, changes priority, reassigns a project and undoes each.
-- **Disposition** — OPEN.
+- **Disposition** — **RESOLVED** across D1 and D2.
+  - D1 gave the task a page: provenance, current values, relations as links, history as
+    sentences, and the four status verbs through the already-proven
+    `applyWorkItemAction`.
+  - D2 made the remaining eleven verbs controls. All fifteen taxonomy actions are now
+    reachable by click; none reaches the database by a new route. `detail-command.ts`
+    generalises `work-command.ts`'s **fixed** patch to a caller-supplied,
+    schema-validated one and keeps every property of the seam — id-authoritative
+    selection out of the whole resolution result, the nineteen-key pre-state and the
+    observation instant from one read, and the apply through
+    `public.apply_task_command`. **No SQL, no RPC, no migration, no direct task
+    write, and `TASK_COMMAND_POLICY_VERSION` unchanged.**
+  - The control set is **derived from `actionPolicy` and the task's status**, never
+    hand-written, so a button whose only possible outcome is a refusal cannot be
+    rendered (2F-SURFACE-009). `cancel_task` is the one destructive verb and routes
+    through `issue_task_command_confirmation`; `set_status`'s `allowedTargetValues`
+    is what structurally closes the unconfirmed route to `cancelled`.
+  - See "Slice D2 — structured field edits" below for what running it found.
 
 ## UX-11 — Pending-question resolution has no visible after-state
 
@@ -1203,7 +1237,8 @@ new TypeScript module generalising `work-command.ts`'s fixed patch to a caller-s
 schema-validated one, plus controls whose values the table above bounds.
 
 Until D2 lands, UX-05 stays **partially open** with 11 verbs reachable only through the
-console — recorded as such, not closed.
+console — recorded as such, not closed. *(D2 has since landed; the three answers above all
+held when the controls were written against them, with one correction recorded below.)*
 
 ---
 
@@ -1286,3 +1321,135 @@ record one creation twice is a question for the history slice.
 end against the real application at 1440×900 and 375×667: four sections in order, the two
 eligible actions, real history rendered as sentences, no horizontal overflow on either
 viewport.
+
+---
+
+# Slice D2 — structured field edits
+
+**Branch** `codex/ux-slice-d2-task-commands`, stacked on `main` after D1 merged.
+**Covers** the edit half of UX-05 — the eleven taxonomy verbs that were reachable only by
+typing a sentence into the console. **Non-goals** — no new command verbs, no new write
+path, no schema change, no policy-version bump. **Rollback boundary** — deleting
+`detail-actions.ts`, `detail-controls*.ts`, `task-detail-controls.tsx` and the route's
+`controls` prop reverts the surface to D1's read-only page; `detail-command.ts` becomes
+consumer-less contract again.
+
+### What it adds, and what it deliberately reuses
+
+| New | Reused unchanged |
+| --- | --- |
+| `detail-controls.ts` — the control set, **derived** from `actionPolicy` + status | `list_task_command_candidates` (resolution) |
+| `detail-controls-copy.ts` — labels, value labels, the four control refusals, the dialog | `apply_task_command` (the One Write Path) |
+| `detail-actions.ts` — the Server Action, three intents | `issue_task_command_confirmation` (destructive gate) |
+| `detail-action-state.ts` — the client-safe rendered state | `validateTaskCommand`, `loadTaskCandidates`, `toTaskPreState`, `buildCanonicalPatch`, `applyTaskCommand` |
+| `task-detail-controls.tsx` — the controls, and the existing `ConfirmDialog` | `confirm-dialog.tsx`, `copy.ts`'s outcome/failure/validation vocabularies |
+
+**Zero SQL, zero RPC, zero migration.** `TASK_COMMAND_POLICY_VERSION` is untouched, so no
+stored fingerprint and no unexpired confirmation is invalidated.
+
+### The controls are derived, not written
+
+`detailControlsFor(status)` walks `TASK_COMMAND_ACTIONS`, drops what
+`isEligibleStatus` refuses, and gives each survivor a shape read off its policy: no patch
+field → a button; a bounded `targetValueField` → a closed `<select>`; a temporal field → a
+date picker; a relation field → a picker over the caller's own entities; otherwise text.
+A hand-written list would be a second copy of taxonomy knowledge, and its failure mode is
+the one the whole contract exists to prevent — offering a control whose only possible
+outcome is a refusal (2F-SURFACE-009). A sixteenth action appears automatically with the
+right shape, and `detail-controls-copy.ts` is an **exhaustive record over the taxonomy's
+own vocabularies**, so it cannot appear without a label in either locale.
+
+The four status verbs the shared `WorkItemActions` already renders are excluded by name:
+two routes to one transition on one screen is duplication, not redundancy.
+
+### The destructive verb takes two calls, and that is the point
+
+`cancel_task` sends `request_cancel`; the server resolves the row, issues the confirmation
+against **that** observation, and returns the operation key and instant it was bound to.
+Only then does the dialog open. Confirming sends `confirm_cancel` with the same key and the
+same instant.
+
+The instant has to travel because `public.task_command_fingerprint` hashes
+`observedBefore` alongside the pre-state, so a fresh instant on the second call derives a
+digest matching no issued row and the database refuses a cancellation the user genuinely
+confirmed. Issuing at Confirm time instead would bind the token to whatever the form said
+afterwards — which is exactly what 2E-DESTRUCTIVE-003 forbids, and what the console's own
+`actions.ts` records as the reason its confirmation is minted at render time.
+
+The carried instant is **not** authorization and is not trusted: a forged one matches no
+issued row. It is nevertheless bounded server-side (`ISO`, not in the future, at most 15
+minutes old), because `observedBefore` is written into the audit trail as the moment the
+task was read, and a caller-chosen value there would be a recorded untruth.
+
+Dismissing the prompt abandons the confirmation and **rotates the operation key**, so
+asking again is a new request against a fresh observation. The abandoned row stays
+unconsumed; only `apply_task_command` can spend it, and only against a request whose seven
+values hash to the digest it stores.
+
+### Two defects the handed-off contract layer carried, found by writing the caller
+
+1. **`resolvedId: null` would have silently dropped every relation.**
+   `detail-command.ts` copied `work-command.ts`'s `buildCanonicalPatch({ …, resolvedId:
+   null })`, which is correct there — no Work verb writes a relation. Four detail verbs do,
+   and with a null the canonical patch contains no `projectId`, `contextId` or `personId`
+   at all: the RPC receives a patch asking for nothing, answers `no_change`, and the user is
+   told their edit made no difference when it was never sent. Fixed by exporting
+   `resolveRelationReference` from `preview.ts` — **one definition, two readers**, rather
+   than a second action→ref-column mapping in TypeScript, which is the divergence
+   `normalizer-divergence.test.ts` forbids across that directory. A reference that resolves
+   to nothing (renamed elsewhere, deleted, or two entities sharing a name) is now the
+   declared refusal `relation_unresolved`, rendered with the sentence `copy.refusals`
+   has held since Slice 2E.4.
+2. **`isSubmittableDate` accepted days that do not exist.** `explicit_date` builds a
+   `WallTime` straight from the capture groups and never asks, so `2026-02-31` resolved — as
+   March 3rd. A date input cannot emit one; a hand-made POST can, and silently rescheduling
+   a task to a day the user did not name is worse than refusing. The control now refuses
+   it, and still accepts `2028-02-29` while refusing `2027-02-29`.
+
+A third thing was found in the component rather than the contract: the dialog's dismiss
+path called `router.refresh()`, which re-fetches the server tree and leaves client state
+untouched — so the dialog closed and immediately re-rendered open. `useActionState` state
+changes only by dispatching, so dismissal is now local state cleared by the next dispatch.
+
+### UX-29 — every cancelled task's detail page answered 404
+
+**Found by running D2 against the live database, and it is a D1 defect that D2 makes
+reachable.** `workItemHumanStates` had no `cancelled` member, so
+`toWorkItemHumanState("cancelled")` returned null, `toWorkItemView` returned null,
+`loadTaskDetailProjection` returned null and the route called `notFound()`. The
+consequences compound:
+
+- `restore_task` is the **only** action the taxonomy admits on a cancelled task, and the
+  page that offers it could not be opened;
+- a user who cancelled a task from the detail page — the flow D2 adds — was left on a page
+  that 404s on its next load.
+
+The missing member was **not** what kept cancelled tasks out of the lists. Every branch of
+`work-projection.ts` excludes them in SQL (`.not("status","in","(completed,cancelled)")`,
+`.eq("status","waiting")`, `.neq("status","cancelled")`), and the detail route is the only
+other caller of `toWorkItemView` — so adding it cannot surface a cancelled task anywhere it
+was not already meant to appear. The three copy maps that index the vocabulary were found
+by the compiler, not by search, because all three are exhaustive records.
+
+**Disposition — RESOLVED.** Covered by the live journey "a cancelled task offers
+restoration and nothing else", which opens the page, asserts that `restore_task` is the
+only control offered, restores, and reads `status` and `cancelled_at` back from the
+database.
+
+### Correction to the pre-D2 verification note above
+
+The note says `observedBefore` is "the database's own instant, cross-joined onto every row
+by the `refs` CTE". It is cross-joined by that CTE, but the value is
+`coalesce(p_observed_before, now())` — i.e. **the instant the caller injected**, echoed
+back. That distinction is what makes the two-call confirmation flow possible at all, and
+the comment in `detail-command.ts` now says so.
+
+### Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `detail-command.test.ts` 38 · `detail-controls.test.ts` 25
+(was 13) · `detail-actions.test.ts` 32 · `task-detail-controls.test.tsx` 26 · task-commands
++ daily-cycle + operations suites 1594/1596, the two failures being the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts` that fail identically with this
+branch's work stashed (they pass in CI on Linux) · `e2e/task-detail-commands.spec.ts`
+17 tests × desktop + mobile = 34 executions, run against the linked live database in both
+locales.

@@ -3,6 +3,7 @@ import { QuickCaptureForm } from "@/features/capture/quick-capture-form";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
+import type { WorkItemHumanState } from "@/features/daily-cycle/contracts";
 import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { requireUser } from "@/lib/auth/require-user";
@@ -22,6 +23,7 @@ const humanStateLabels = {
     blocked: "Bloqueada",
     deferred: "Adiada",
     completed: "Concluída",
+    cancelled: "Cancelada",
   },
   en: {
     not_started: "Not started",
@@ -30,8 +32,9 @@ const humanStateLabels = {
     blocked: "Blocked",
     deferred: "Deferred",
     completed: "Completed",
+    cancelled: "Cancelled",
   },
-} as const;
+} as const satisfies Record<Locale, Record<WorkItemHumanState, string>>;
 
 /**
  * Home's data access. Presentation lives in `home-view.tsx`.
