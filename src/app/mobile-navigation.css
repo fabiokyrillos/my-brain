@@ -123,6 +123,132 @@
   padding: 10px 0 4px;
 }
 
+/*
+ * The account and session disclosure (UX-26).
+ *
+ * One rule set for both mounts, because there is one component. `.rail-footer`
+ * already carried `margin-top:auto` in `globals.css` before this slice — the foot
+ * of the rail was reserved for exactly this and nothing rendered there.
+ *
+ * The summary is a 44px target with a visible focus ring, and it opens *upward*
+ * on the rail so the panel never needs the rail to scroll to be usable.
+ */
+.rail-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.account-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.account-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-menu > summary:hover,
+.account-menu[open] > summary {
+  background: var(--mist);
+}
+
+.account-menu > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--blue-wash);
+  color: var(--blue);
+}
+
+.account-summary-text {
+  display: grid;
+  min-width: 0;
+}
+
+.account-summary-text small {
+  color: var(--ink-soft);
+  font: 650 9px var(--font-jetbrains);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The display name is user text of unbounded length; it truncates rather than
+   widening the rail or wrapping into the panel below it. */
+.account-summary-text strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-panel {
+  display: grid;
+  gap: 3px;
+  padding: 6px 0 2px;
+}
+
+.account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.account-menu-item:hover {
+  background: var(--mist);
+  color: var(--ink);
+}
+
+.account-menu-item:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.account-sign-out {
+  color: #9b2d24;
+}
+
+.account-sign-out:hover {
+  background: #fff5f3;
+  color: #9b2d24;
+}
+
+.account-sign-out:disabled {
+  opacity: 0.6;
+}
+
+.account-menu-error {
+  margin: 4px 0 0;
+  padding: 0 12px;
+  color: #9b2d24;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @media (max-width: 760px) {
   .bottom-nav {
     display: flex;
@@ -206,5 +332,29 @@
     min-height: 48px;
     padding: 9px 10px;
     font-size: 11px;
+  }
+
+  /*
+   * The account block spans both columns and sits first, so it is the panel's
+   * top row and is reachable without scrolling past the secondary destinations.
+   * The panel's own `max-height` plus `overflow-y` means "first" is what makes
+   * that true on a short viewport.
+   */
+  .mobile-nav-account {
+    grid-column: 1 / -1;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .account-menu-overflow > summary {
+    flex-direction: row;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  /* The overflow panel is already a floating card; a nested one would read as a
+     second layer over it, so the account panel stays inline. */
+  .account-menu-overflow .account-menu-item {
+    font-size: 12px;
   }
 }

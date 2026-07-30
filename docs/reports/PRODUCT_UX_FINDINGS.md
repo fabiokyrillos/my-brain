@@ -116,7 +116,9 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | OPEN |
 | UX-20 | Rows styled as interactive are inert (`memories`, `reminders`) | usability | P1 | yes | **RESOLVED** (affordance) |
 | UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | **RETAINED** (with evidence) |
-| UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | OPEN → D3 |
+| UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
+| UX-30 | A revoked-but-unexpired session becomes an infinite redirect loop | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
+| UX-31 | Signing out left the shell restorable by browser Back | usability | P1 | yes | **RESOLVED** (D3) |
 | UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | OPEN → G |
 | UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | RETAINED (not rendered) |
 | UX-29 | Every cancelled task's detail page answered 404 | missing-lifecycle | **P0** | yes | **RESOLVED** (D2) |
@@ -776,7 +778,22 @@ that measured clean and is recorded so it is not "fixed" without cause.
   afterwards · authenticated E2E for logout **and** the subsequent login.
 - **Slice** — **D3**, scheduled before final authenticated acceptance per the owner's
   instruction.
-- **Disposition** — OPEN.
+- **Disposition** — **RESOLVED**. One account disclosure, mounted twice: the desktop rail
+  foot (the `.rail-footer`/`.profile-chip` area this entry noted was styled and never
+  rendered) and the top of the mobile overflow panel. It names the active account by
+  **display name only**, reaches Settings as the destination it already is, and holds the
+  sign-out control — so no new permanent navigation destination was added. Sign-out is a
+  Server Action calling the deployed `supabase.auth.signOut()`, then redirecting to the
+  localized login route with a localized confirmation. **No migration, no SQL, no auth RPC,
+  and no service-role key in production code.**
+
+  The proposed placement in this entry was the *top bar*; it ships in the **rail foot**
+  instead, because the top bar holds two global affordances at 70px and an account
+  disclosure opening downward from there would overlay page content, while the rail foot was
+  already reserved and lets the panel open upward over navigation the user is not reading.
+
+  See "Slice D3 — the account and session surface" below for the two defects running it
+  found, one of which made the product unusable for up to an hour at a time.
 
 ---
 
@@ -1453,3 +1470,85 @@ Windows-CRLF regex reads in `sql-reachability.test.ts` that fail identically wit
 branch's work stashed (they pass in CI on Linux) · `e2e/task-detail-commands.spec.ts`
 17 tests × desktop + mobile = 34 executions, run against the linked live database in both
 locales.
+
+---
+
+# Slice D3 — the account and session surface
+
+**Branch** `codex/ux-slice-d3-account-session`, stacked on `main` after D2 merged.
+**Covers** UX-26, and UX-30 / UX-31 which running it exposed. **Non-goals** — no new
+navigation destination, no account *editing* (Settings already owns that), no migration, no
+auth RPC. **Rollback boundary** — deleting `account-menu.tsx`, `account-copy.ts`,
+`account-identity.ts`, the `signOut` action and the shell's two mounts reverts the surface;
+the `proxy.ts` changes are independently valuable and would be kept.
+
+### What ships
+
+| New | Reused unchanged |
+| --- | --- |
+| `account-menu.tsx` — the disclosure, one component, two mounts | `supabase.auth.signOut()` (already called by `updatePassword`) |
+| `account-copy.ts` — typed copy for both locales | the login page's `?message=` banner |
+| `account-identity.ts` — display-name resolution, server-only | `/[locale]/app/settings` as an existing destination |
+| `sign-out-state.ts` — the client-safe rendered state | `confirm-dialog`-era focus discipline, via the shared hook |
+| `use-dismissable-disclosure.ts` — **extracted** from `NavigationOverflow` | `proxy.ts`'s existing redirect rules |
+
+**Zero migration, zero SQL, zero RPC, zero service-role usage in production code.**
+
+### The identity rule
+
+The surface renders `profiles.display_name`, falling back to
+`user_metadata.display_name`, then to a neutral localized label — and **never an email
+address or a user id**. Two reasons, and the second is the load-bearing one: a display name
+already answers "which account am I in" well enough to switch accounts, and an email would
+put a credential-adjacent identifier into every screenshot, bug report and test artifact
+that ever captures the shell. A component test and a live journey both assert the rendered
+tree contains no `@` and no uuid.
+
+### Placement, and why not the top bar
+
+The finding proposed the top bar. It ships in the **rail foot** instead: the top bar is 70px
+holding two global affordances, and a disclosure opening downward from there would overlay
+page content, while `.rail-footer` was already styled-and-unrendered and lets the panel open
+upward over navigation the user is not reading. On mobile the block is the **first** child of
+the overflow panel, spanning both columns — that panel scrolls at 65vh, so "first" is what
+makes "reachable without scrolling past product destinations" true rather than aspirational.
+
+### Two defects running it found, one severe
+
+**UX-30 — a revoked-but-unexpired session was an infinite redirect loop.** `proxy.ts`
+verifies the JWT **locally** (`getClaims`, deliberately no network call per request) while
+`requireUser` verifies it **over the network** (`getUser`). A token revoked while still
+unexpired passes the first and fails the second, so the page redirected to login, the
+proxy's auth-route rule redirected back into the app, and the browser gave up with
+`ERR_TOO_MANY_REDIRECTS`. **For the whole remaining lifetime of the access token the product
+was unusable and could not even be signed out of** — which is precisely the state
+requirement 5 is about. Fixed by confirming with the provider **only on the auth-route
+branch** — scoped to four low-traffic routes, and only when a claim is actually present, so
+the hot path stays local-only — and by *clearing* the cookies when the two disagree rather
+than ignoring them, so the stale session stops passing local verification on the next
+request too. `requireUser` could not do this itself: `lib/supabase/server.ts` swallows
+cookie writes, because a Server Component may not set them during render.
+
+**UX-31 — Back restored the authenticated shell after sign-out.** Pressing Back returned the
+fully rendered shell with the account surface still naming the account that had just left.
+The mechanism is `Cache-Control: no-store`, which makes a document ineligible for the
+back/forward cache. Two things are now true and both are asserted: `proxy.ts` sets it on
+every in-app response and on the refusal redirect, and the journey asserts the header it
+depends on rather than only the behaviour.
+
+**A real difference between the two servers, recorded because it will bite again.**
+`next dev` **replaces** the response's `Cache-Control` with `no-cache, must-revalidate`,
+dropping `no-store`; `next start` includes `no-store` in its dynamic-rendering default. So
+the Back journey passes against the production build and fails against the dev server, and
+the spec says so at the top along with the command to run it. The middleware header is
+therefore defence-in-depth on page documents rather than the operative value — it is the
+operative value for the redirect and for RSC payloads, and it fails safe.
+
+### Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm run build` exit 0 · new coverage: `proxy.test.ts` 13
+(the file had none — the boundary was covered only by browser journeys), `sign-out.test.ts`
+8, `account-menu.test.tsx` 18, `app-shell.test.tsx` +7 · `e2e/account-session.spec.ts` 13
+journeys × desktop + Pixel 7, run against the linked live database **on the production
+build**, both locales, with two disposable accounts carrying distinct display names and
+fail-closed deletion.

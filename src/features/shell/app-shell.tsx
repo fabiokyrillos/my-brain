@@ -1,12 +1,36 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { signOut } from "@/features/auth/actions";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
+import { AccountMenu } from "./account-menu";
+import type { AccountIdentity } from "./account-identity";
 import { LocaleSwitchLink, NavigationLinks } from "./navigation-links";
 
-export function AppShell({ locale, children }: { locale: Locale; children: React.ReactNode }) {
+/**
+ * Pure presentation over the shell's two navigations and its account surface.
+ *
+ * `identity` is a **prop, not a read**. The layout resolves it, so this component
+ * keeps no data access and its jsdom gate needs no Supabase double — the
+ * discipline `docs/ENGINEERING_STANDARDS.md` states as "components coordinate
+ * rendering and interaction only".
+ */
+export function AppShell({
+  locale,
+  identity = null,
+  children,
+}: {
+  locale: Locale;
+  identity?: AccountIdentity | null;
+  children: React.ReactNode;
+}) {
   const t = getMessages(locale);
+  // One element, mounted twice. See `account-menu.tsx` for why the two surfaces
+  // may not have separate session models.
+  const account = (variant: "rail" | "overflow") => (
+    <AccountMenu identity={identity} locale={locale} signOut={signOut} variant={variant} />
+  );
 
   return (
     <div className="app-frame">
@@ -18,6 +42,12 @@ export function AppShell({ locale, children }: { locale: Locale; children: React
         <nav aria-label={t.shell.mainNavigation} className="side-nav">
           <NavigationLinks locale={locale} />
         </nav>
+        {/*
+          The rail foot, which `globals.css` has styled as `.rail-footer` since
+          before this slice and which nothing rendered — the account surface is
+          what it was reserved for (UX-26).
+        */}
+        <div className="rail-footer">{account("rail")}</div>
       </aside>
       <div className="main-stage">
         <header className="top-bar">
@@ -37,7 +67,13 @@ export function AppShell({ locale, children }: { locale: Locale; children: React
         <main>{children}</main>
       </div>
       <nav aria-label={t.shell.mobileNavigation} className="bottom-nav">
-        <NavigationLinks locale={locale} mobile />
+        {/*
+          Injected into the overflow panel rather than added as a sixth bar item:
+          the bar holds four destinations and capture, and it is placed *first*
+          inside the panel so it is reachable without scrolling past the secondary
+          product destinations.
+        */}
+        <NavigationLinks account={account("overflow")} locale={locale} mobile />
       </nav>
     </div>
   );

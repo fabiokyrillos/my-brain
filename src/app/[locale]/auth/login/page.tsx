@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
+import { accountCopy } from "@/features/shell/account-copy";
 import { isLocale } from "@/lib/preferences";
 
 const successMessages = {
@@ -16,6 +17,12 @@ const successMessages = {
   "password-updated": {
     "pt-BR": "Senha atualizada. Entre novamente.",
     en: "Password updated. Sign in again.",
+  },
+  // Reused from the account surface's own copy module rather than restated, so
+  // the sentence a user reads after signing out is the one that module owns.
+  "signed-out": {
+    "pt-BR": accountCopy["pt-BR"].signedOut,
+    en: accountCopy.en.signedOut,
   },
 } as const;
 

@@ -163,6 +163,98 @@ describe("AppShell", () => {
     ]);
   });
 
+  /**
+   * Slice D3 — UX-26. Before it, none of the sixteen authenticated routes had a
+   * sign-out action or an account surface: the only way to leave was to clear
+   * cookies by hand.
+   */
+  describe("the account and session surface", () => {
+    const identity = { displayName: "Marina Duarte" };
+
+    it("is reachable on both surfaces, from one component", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+      // Two mounts, so a phone user and a desktop user have the same way out —
+      // and both are the same component, so neither can end a session the other
+      // does not.
+      const controls = screen.getAllByRole("button", { name: "Sair da conta" });
+      expect(controls).toHaveLength(2);
+      expect(document.querySelectorAll(".account-menu-rail")).toHaveLength(1);
+      expect(document.querySelectorAll(".account-menu-overflow")).toHaveLength(1);
+    });
+
+    it("sits in the rail foot on desktop, not among the navigation destinations", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+      const railAccount = document.querySelector(".side-rail > .rail-footer > .account-menu-rail");
+      expect(railAccount).toBeTruthy();
+      // 2F-era rule for this initiative: no new permanent primary destination.
+      const navigation = screen.getByRole("navigation", { name: "Navegação principal" });
+      expect(navigation.contains(railAccount)).toBe(false);
+      expect(within(navigation).queryByRole("button", { name: "Sair da conta" })).toBeNull();
+    });
+
+    it("is the first thing in the mobile overflow panel, before the secondary destinations", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+      const panel = mobile.querySelector(":scope > details > .mobile-more-menu")!;
+
+      // Placement is the requirement: reachable without scrolling past product
+      // destinations, on a panel that scrolls at 65vh.
+      expect(panel.firstElementChild).toHaveClass("mobile-nav-account");
+    });
+
+    it("adds no navigation destination, and reaches Settings as the route it already is", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+      const settings = screen.getAllByRole("link", { name: "Configurações" });
+      // Two from the account panels plus the two existing More disclosures.
+      expect(settings.length).toBeGreaterThanOrEqual(2);
+      for (const link of settings) expect(link).toHaveAttribute("href", "/pt-BR/app/settings");
+    });
+
+    it("names the active account on both surfaces", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      expect(screen.getAllByText("Marina Duarte")).toHaveLength(2);
+      expect(screen.getAllByLabelText("Sua conta: Marina Duarte")).toHaveLength(2);
+    });
+
+    it("still renders the way out when there is no identity to name", () => {
+      render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      expect(screen.getAllByRole("button", { name: "Sair da conta" })).toHaveLength(2);
+      expect(screen.getAllByText("Sua conta")).toHaveLength(2);
+    });
+
+    it("closes one nested layer per Escape, keeping focus on a control that is still there", () => {
+      // The mobile account block lives inside the overflow panel. Before
+      // `stopPropagation`, one Escape closed both — so the summary the inner
+      // handler had just focused was hidden by the time the press finished, and
+      // focus was lost. Caught by the live Pixel 7 run, pinned here.
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+      const overflow = mobile.querySelector(":scope > details") as HTMLDetailsElement;
+      const account = mobile.querySelector(".account-menu") as HTMLDetailsElement;
+
+      overflow.open = true;
+      account.open = true;
+      fireEvent.keyDown(account, { key: "Escape" });
+
+      expect(account.open).toBe(false);
+      expect(overflow.open, "one Escape must not collapse the layer above it").toBe(true);
+      expect(document.activeElement).toBe(account.querySelector("summary"));
+
+      // A second Escape then closes the layer above.
+      fireEvent.keyDown(overflow, { key: "Escape" });
+      expect(overflow.open).toBe(false);
+    });
+
+    it("localizes both mounts in English", () => {
+      render(<AppShell identity={identity} locale="en"><div>Content</div></AppShell>);
+      expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(2);
+      expect(screen.getAllByText("Signed in as")).toHaveLength(2);
+    });
+  });
+
   it("localizes the hierarchy and preserves English destinations", () => {
     render(<AppShell locale="en"><div>Content</div></AppShell>);
     const desktopNavigation = screen.getByRole("navigation", { name: "Main navigation" });
