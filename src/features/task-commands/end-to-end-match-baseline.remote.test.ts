@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadTaskCandidates } from "./candidates";
-import { TASK_MATCH_POLICY_VERSION } from "./match-policy";
+import { TASK_MATCH_POLICY_VERSION, TASK_MATCH_PREFILTER_TIERS } from "./match-policy";
 import { rankTaskCandidates, type TaskMatchOutcome } from "./matching";
 import { validateTaskCommand, type ValidatedTaskCommand } from "./schema";
 import type { TaskCommandAction } from "./taxonomy";
@@ -31,10 +31,13 @@ import type { TaskCommandAction } from "./taxonomy";
  *
  *   - **tier 0** — the normalized title *is* the normalized hint (`exactTitle`,
  *     the policy's strongest signal);
- *   - **tier 1** — the hint appears in the title as complete contiguous words
- *     (`titlePhrase`);
- *   - **tier 2** — some lexical overlap only (`tokenOverlap`);
- *   - excluded — an ineligible status, which never reaches the scorer at all.
+ *   - **tier 1** — the whole hint appears in the title as complete **contiguous**
+ *     words, three characters or more (`titlePhrase`) — including a single word;
+ *   - **tier 2** — the words are present but not contiguous, so only lexical
+ *     overlap remains (`tokenOverlap`), which is the rung a semantic signal would
+ *     plausibly help;
+ *   - excluded — an ineligible status, which never reaches the scorer at all;
+ *   - unconnected — no lexical or relational link, filtered before scoring.
  *
  * Reaching tier 0 requires the hint's words to be the title's words, stopwords
  * included, which is why several seeded titles carry none. §"exercised signals"
@@ -123,8 +126,23 @@ const CORPUS: readonly ScenarioSpec[] = [
   },
   // Tier 1: a contiguous fragment of a title that carries stopwords.
   { id: "phrase", tier: 1, action: "complete_task", titleWords: ["budget", "spreadsheet"] },
-  // Tier 2: one word that two rows share, scoring below the confidence threshold.
-  { id: "weak-overlap", tier: 2, action: "complete_task", titleWords: ["report"] },
+  // Also tier 1, not 2: a single word of three characters or more that appears as
+  // a complete word in a title reaches the phrase rung of the ladder
+  // (`202607260059:2864-2868`). It scores *above* the confidence threshold and is
+  // ambiguous only because two rows tie on it — which is a different thing from
+  // scoring low, and mislabelling it was how the first version of this corpus
+  // claimed a tier it never visited.
+  { id: "phrase-single-word", tier: 1, action: "complete_task", titleWords: ["report"] },
+  // Tier 2, genuinely: the words are present but **not contiguous**, so the
+  // phrase rung fails and only lexical overlap remains. This is the rung where a
+  // semantic signal would plausibly help, so a baseline that skipped it would
+  // skip the case ADR-055 exists to ask about.
+  {
+    id: "partial-overlap",
+    tier: 2,
+    action: "complete_task",
+    titleWords: ["review", "spreadsheet"],
+  },
   // No connection at all.
   { id: "absent", tier: "none", action: "complete_task", titleWords: ["kayak", "lessons"] },
   // Tier 0 and destructive: matched well, and still never one-step.
@@ -193,7 +211,10 @@ let ownerId: string;
 
 const measured: {
   id: string;
-  tier: ScenarioSpec["tier"];
+  /** What the corpus *claims*. Never asserted against itself — see `tiers`. */
+  declaredTier: ScenarioSpec["tier"];
+  /** What SQL actually assigned, read off the rows the deployed query returned. */
+  tiers: readonly number[];
   outcome: TaskMatchOutcome;
   oneStep: boolean;
   candidates: number;
@@ -255,7 +276,9 @@ beforeAll(async () => {
     const result = rankTaskCandidates({ command, rows, ownerId, now, timeZone: TIME_ZONE });
     measured.push({
       id: spec.id,
-      tier: spec.tier,
+      declaredTier: spec.tier,
+      // The authoritative value, from the rows SQL returned — not the annotation.
+      tiers: rows.map((row) => row.prefilterTier),
       outcome: result.outcome,
       oneStep: result.oneStep,
       candidates: result.candidates.length,
@@ -312,31 +335,57 @@ describe("the end-to-end match-quality baseline (2F-MEASURE-007)", () => {
     expect(baseline).toEqual({
       scope: "end-to-end",
       policyVersion: "2026-07-25.3",
-      scenarios: 10,
-      oneStep: 0.5,
+      scenarios: 11,
+      oneStep: 0.455,
       matchedNeedsDeliberateness: 0,
-      confirmationRequired: 0.1,
-      ambiguous: 0.2,
-      noMatch: 0.2,
+      confirmationRequired: 0.091,
+      ambiguous: 0.273,
+      noMatch: 0.182,
     });
-    // The five categories partition the corpus: no scenario is uncounted and
-    // none is counted twice.
-    const covered = baseline.oneStep + baseline.matchedNeedsDeliberateness
-      + baseline.confirmationRequired + baseline.ambiguous + baseline.noMatch;
-    expect(covered).toBeCloseTo(1, 10);
+    // The five categories partition the corpus: no scenario is uncounted and none
+    // is counted twice. Asserted on **counts**, not on the rounded rates — with a
+    // scenario count that does not divide cleanly the rates cannot sum to exactly
+    // one, and loosening a tolerance to accommodate that would be weakening the
+    // check rather than stating it.
+    const counted = measured.filter((entry) => entry.oneStep).length
+      + measured.filter((entry) => entry.outcome === "matched" && !entry.oneStep).length
+      + measured.filter((entry) => entry.outcome === "matched_requires_confirmation").length
+      + measured.filter((entry) =>
+        entry.outcome === "ambiguous" || entry.outcome === "ambiguous_overflow").length
+      + measured.filter((entry) => entry.outcome === "unmatched").length;
+    expect(counted).toBe(total);
   });
 
-  it("exercised every prefilter tier, so the rates are not one weight repeated", () => {
+  it("exercised every scoring tier, measured from SQL rather than from the annotation", () => {
     // A corpus that reaches a single tier measures a single weight and calls it a
-    // baseline. This is the assertion that keeps that from happening quietly.
-    const byTier = new Map<ScenarioSpec["tier"], number>();
-    for (const entry of measured) byTier.set(entry.tier, (byTier.get(entry.tier) ?? 0) + 1);
-    expect([...byTier.keys()].sort((a, b) => String(a).localeCompare(String(b))))
-      .toEqual([0, 1, 2, "excluded", "none"].sort((a, b) => String(a).localeCompare(String(b))));
-    // Six reach tier 0, and they are the reason `confirmationRequired` and the
-    // one-step rate are non-zero at all: at tier 2 every verdict collapses to
-    // `ambiguous` and the destructive and duplicate cases prove nothing.
-    expect(byTier.get(0)).toBe(6);
+    // baseline. The first version of this case asserted the hand-written `tier`
+    // annotation against a hand-written list, which is the same defect wearing a
+    // guard's uniform: it passed while the corpus never visited tier 2 and one
+    // scenario was mislabelled. `prefilterTier` comes off the rows the deployed
+    // query returned, so this now measures the thing it claims to.
+    const observed = new Set(measured.flatMap((entry) => entry.tiers));
+    expect([...observed].sort()).toEqual([
+      TASK_MATCH_PREFILTER_TIERS.exactTitle,
+      TASK_MATCH_PREFILTER_TIERS.titlePhrase,
+      TASK_MATCH_PREFILTER_TIERS.connected,
+    ].sort());
+
+    // And the declared annotations agree with SQL, scenario by scenario — the
+    // check that would have caught the mislabelling.
+    for (const entry of measured) {
+      if (entry.declaredTier === "excluded" || entry.declaredTier === "none") {
+        expect(entry.tiers).toEqual([]);
+        continue;
+      }
+      expect(entry.tiers.length).toBeGreaterThan(0);
+      expect(Math.min(...entry.tiers)).toBe(entry.declaredTier);
+    }
+
+    // Six scenarios reach tier 0, and they are the reason `confirmationRequired`
+    // and the one-step rate are non-zero at all: below tier 0 the destructive and
+    // duplicate cases would be refused for having matched poorly, proving nothing.
+    const tierZero = measured.filter((entry) => entry.declaredTier === 0);
+    expect(tierZero).toHaveLength(6);
   });
 
   it("resolves a tier-0 unique match in one step", () => {

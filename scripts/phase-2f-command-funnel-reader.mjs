@@ -185,10 +185,21 @@ function print(report, evaluation) {
     const relation = entry.comparison === "at_most" ? "at most" : "at least";
     console.log(`    ${name.padEnd(20)} ${entry.measured} (${relation} ${entry.required}) ${entry.met ? "met" : "not met"}`);
   }
+  if (!evaluation.spike.window.compatible) {
+    console.log(`    window               NOT READABLE at this window — ${evaluation.spike.window.reason}`);
+  }
   console.log(`  planning tier     ${evaluation.planning.verdict}`);
   const gate = evaluation.planning.thresholds.rateGate;
   console.log(`    rate gate            no-match ${gate.measured.exact.noMatch}, to-creation ${gate.measured.exact.noMatchToCreation} — ${gate.met ? "met" : "not met"}`);
   console.log(`    distinct users       out of an owner-scoped reader's range; privileged read required`);
+  if (!evaluation.planning.window.compatible) {
+    console.log(`    window               NOT READABLE at this window — ${evaluation.planning.window.reason}`);
+  }
+  // The two tiers want different windows and one report carries one window, so a
+  // single run can positively evaluate at most one of them. Said plainly, because
+  // "not_met" for a structural reason reads exactly like "not_met" for a
+  // data reason.
+  console.log(`    note                 each tier must be read at its own window (--window-days 14 for spike, 30 for planning)`);
   if (evaluation.expiry) {
     console.log(`  expiry            go-live ${evaluation.expiry.goLive} + ${evaluation.expiry.horizonDays}d = ${evaluation.expiry.expiresOn}`);
   }

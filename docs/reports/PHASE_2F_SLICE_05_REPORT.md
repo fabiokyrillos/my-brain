@@ -14,7 +14,7 @@
 |---|---|
 | `scripts/phase-2f-command-funnel.mjs` | The reader: aggregator, evidence-tier evaluator, expiry arithmetic, thresholds, refusal subset, reachability facts. One implementation, reachable from both Vitest and the Node runner. |
 | `scripts/phase-2f-command-funnel-reader.mjs` | The runner: an owner read that writes nothing, and a `--proof` mode that writes disposable fixtures and deletes them. |
-| `src/features/product-analytics/command-funnel.test.ts` | 47 cases in CI's `app` job: aggregator behaviour, exclusions, boundaries, tiers, expiry, vocabulary read/mirror parity, reachability derived from the emitters. |
+| `src/features/product-analytics/command-funnel.test.ts` | 50 cases in CI's `app` job: aggregator behaviour, exclusions, boundaries, tiers, expiry, vocabulary read/mirror parity, reachability derived from the emitters. |
 | `src/features/task-commands/end-to-end-match-baseline.remote.test.ts` | The end-to-end baseline (2F-MEASURE-007), against the deployed contract, using the real loader and the real scorer. |
 | `vitest.remote.config.ts` + one `exclude` line | The credentialed lane, kept out of CI (ADR-059). |
 | `supabase/tests/product_events.sql` (+3 assertions) | The cascade delete action, the synthetic partial index, and `is_synthetic`'s not-null constraint, as schema truth in CI. |
@@ -66,20 +66,26 @@ ADR-058 adds `is_synthetic` as a **fourth** mechanism and classifies it as hygie
 
 ## 5. The end-to-end match baseline (2F-MEASURE-007)
 
-Measured against the deployed project with disposable fixtures, through the **real** `loadTaskCandidates` against the deployed `list_task_command_candidates` and the **real** `rankTaskCandidates`. Ten scenarios, policy `2026-07-25.3`.
+Measured against the deployed project with disposable fixtures, through the **real** `loadTaskCandidates` against the deployed `list_task_command_candidates` and the **real** `rankTaskCandidates`. Eleven scenarios, policy `2026-07-25.3`.
 
 | Measure | **End-to-end** (this slice) | Scoring layer (2E-MATCH-018, retained) |
 |---|---|---|
-| Scenarios | 10 | 14 |
-| One-step apply | **0.5** | 0.429 |
+| Scenarios | 11 | 14 |
+| One-step apply | **0.455** | 0.429 |
 | Matched, needs deliberateness | 0 | 0.071 |
-| Confirmation required | **0.1** | 0.071 |
-| Ambiguous (incl. overflow) | **0.2** | 0.214 |
-| No match | **0.2** | 0.214 |
+| Confirmation required | **0.091** | 0.071 |
+| Ambiguous (incl. overflow) | **0.273** | 0.214 |
+| No match | **0.182** | 0.214 |
 
 **These are two scopes and they are never compared.** The Phase 2E numbers measure the scoring layer against hand-written `prefilterTier`/`tokenOverlap`/`queryTokenCount` triples; these measure the whole path with the triples SQL actually produced. `PHASE_2E_FINAL_REPORT.md` prohibits cross-scope comparison, and the near-agreement above is a coincidence of two differently-composed corpora, not a validation of either. Quoting one against the other is forbidden wherever either appears.
 
-**The corpus is designed against the prefilter's tier ladder**, which is the correction that made this measurement worth anything. A first attempt wrote every hint as a non-contiguous subset of a title containing stopwords; nothing reached tier 0 or 1, every scenario scored `0.22`, and `exactTitle` — the policy's strongest weight — was never exercised. Worse, two assertions passed vacuously: the destructive scenario refused one-step because **nothing matched**, not because `cancel_task` is destructive, and the duplicate-title scenario was ambiguous for the same weak reason a single copy would have been. The rebuilt corpus uses stopword-free titles so six scenarios reach tier 0, one tier 1, one tier 2, one is excluded by status, and one has no connection at all. A case asserts every tier is exercised.
+**The corpus is designed against the prefilter's tier ladder**, and it took two corrections to make that true rather than claimed.
+
+The first attempt wrote every hint as a non-contiguous subset of a title containing stopwords: nothing reached tier 0 or 1, every scenario scored `0.22`, and `exactTitle` — the policy's strongest weight — was never exercised. Two assertions passed vacuously as a result: the destructive scenario refused one-step because **nothing matched**, not because `cancel_task` is destructive, and the duplicate-title scenario was ambiguous for the same weak reason a single copy would have been. Stopword-free titles fixed that.
+
+The second correction is subtler and was caught by the final review. The scenario labelled *tier 2* — a single hint word `["report"]` — actually reaches **tier 1**: the ladder's phrase rung accepts any hint of three characters or more that appears in the title as complete words (`202607260059:2864-2868`), so `' send quarterly report ' LIKE '% report %'` matches. It scores `0.62`, *above* the confidence threshold, and is ambiguous only because two rows tie on it. So the corpus reached tiers 0 and 1 and **never visited tier 2** — while the case that was supposed to guarantee coverage grouped on the hand-written `tier` annotation and passed anyway. That is the same defect class wearing a guard's uniform.
+
+Both halves are now fixed. `prefilterTier` is read off the rows the deployed query returned, the coverage case asserts the **measured** tier set, and each scenario's annotation is checked against SQL — the assertion that would have caught the mislabelling. And a genuine tier-2 scenario was added rather than the claim being narrowed: `["review","spreadsheet"]` against *"Review the budget spreadsheet"* is present but non-contiguous, so the phrase rung fails and only lexical overlap remains. That is the rung where a semantic signal would plausibly help, which makes it the one an evidence gate for semantic retrieval should least like to skip. The corpus is now six scenarios at tier 0, two at tier 1, one at tier 2, one status-excluded and one unconnected — re-measured and re-pinned, stable across three runs.
 
 **Signals this corpus does not move, stated so the rates are not over-read:** no command carries a project, context, person or temporal hint, and no relations are seeded, so `referenced_project`, `referenced_context`, `referenced_person` and both temporal-proximity weights are untested here. The measurement instant is derived from the newest seeded row rather than fixed as a literal, so the recency signal's relationship to the corpus is deterministic on every run instead of depending on the hour the run happened.
 
@@ -94,14 +100,20 @@ Measured against the deployed project with disposable fixtures, through the **re
 | `deno check` both entrypoints | clean |
 | `deno test supabase/functions/` | 46 / 46 |
 | `npm run test:remote:2f:funnel` | **32 / 32 assertions, exit 0**, fixtures proven gone |
-| `npm run test:remote:2f:baseline` | **9 / 9, exit 0**, stable across three independent runs |
+| `npm run test:remote:2f:baseline` | **9 / 9, exit 0**, stable across three independent runs at the final corpus |
 | CI, all three jobs on the merge SHA | recorded in the acceptance report |
 
 The funnel proof's controls: owner-scoping, cross-owner isolation, anonymous denial, **service-role denial**, synthetic exclusion, unsupported exclusion, final-outcome no-match, replay exclusion, policy-version attribution, origin cross-tabulation, distinct-user out-of-range, tier evaluation, expiry, cascade deletion, fail-closed cleanup.
 
 ## 7. Review cycles
 
-Two independent adversarial reviews, both recorded in the PRD (§23, §23.1). The design review produced 23 findings; 22 were confirmed and folded in, one BLOCKING claim was rejected on evidence. The implementation review produced 21; 19 were confirmed and fixed, two were narrowed or rejected on executed evidence. Five implementation findings changed behaviour rather than wording: the window-as-ceiling inversion, the unbounded creation rate, the self-asserting reachability test, the exit-2 path that skipped cleanup, and the degenerate corpus.
+Three independent adversarial reviews, all recorded in the PRD (§23, §23.1, §23.2).
+
+- **Design review** — 23 findings; 22 confirmed and folded in, one BLOCKING claim rejected on evidence.
+- **Implementation review** — 21 findings; 19 confirmed and fixed, two narrowed or rejected on executed evidence. Five changed behaviour: the window-as-ceiling inversion, the unbounded creation rate, the self-asserting reachability test, the exit-2 path that skipped cleanup, and the degenerate corpus.
+- **Final pre-merge review** — 10 findings, one BLOCKING. All ten confirmed and fixed. The blocking one is above: the tier-coverage guard asserted its own annotation, and the corpus never reached tier 2.
+
+Across the three cycles the recurring lesson is the same, and it is worth stating because it is the lesson of this slice: **a guard that reads its own input proves nothing.** The reachability block asserted a frozen constant against itself; the tier-coverage case grouped on a hand-written label; the pagination comment claimed an exhaustion assertion that did not exist. Each was fixed by making the check read the thing it is about — the emitter source, the SQL-assigned tier, a total sort key.
 
 ## 8. The two failing tests, and why they are not this slice's
 
@@ -123,5 +135,5 @@ Absent, unmodified, unbegun: `scripts/generate-phase-2f-traceability.mjs` (2F-OP
 2. `qualifyingCommands` counts preview rounds, not intents, in both error directions (§3).
 3. Undo results and the applied population mix two funnels whose difference is not a clean measure; both are reported raw.
 4. Event-row absence after an owner's deletion is unreadable with any credential this repository holds; the cascade is proven at the schema level instead (§4).
-5. The end-to-end corpus exercises the three title weights and the status filter, not the relational or temporal ones (§5).
+5. The end-to-end corpus exercises all three title-tier weights and the status filter, but **not** the relational (`referenced_project`/`context`/`person`) or temporal-proximity ones: no command carries such a hint and no relations are seeded. Stated in the test itself so the rates are not over-read (§5).
 6. The real owner's funnel is expected to be **empty**: Phase 2E's own evidence is that zero real commands have been typed. The reader's value this phase is that the gate is computable and its thresholds are pinned, not that it has data to report.

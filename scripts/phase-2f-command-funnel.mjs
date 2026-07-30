@@ -73,7 +73,15 @@ function repositoryRoot(explicit) {
  */
 export function readCommandFunnelOutcomes(root) {
   const source = readFileSync(path.join(repositoryRoot(root), OUTCOMES_SOURCE), "utf8");
-  return parseProductEventVocabulary(source, "TASK_COMMAND_OUTCOMES");
+  try {
+    return parseProductEventVocabulary(source, "TASK_COMMAND_OUTCOMES");
+  } catch (error) {
+    // The shared parser names `contracts.ts` in its messages because that is the
+    // only file it was written for. Re-thrown against the file actually read, so
+    // a drift in `outcomes.ts` does not send the reader to the wrong module.
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(detail.replace("src/features/product-analytics/contracts.ts", OUTCOMES_SOURCE));
+  }
 }
 
 /**
@@ -142,12 +150,12 @@ export const COMMAND_FUNNEL_EXCLUDED_OUTCOMES = ["unsupported"];
  * cannot mistake volume, ease or latency for evidence.
  */
 export const COMMAND_FUNNEL_NON_AUTHORIZING = [
-  "unsupportedRefusalVolume",
-  "commandVolume",
-  "oneStepRate",
-  "ambiguityRate",
+  "unsupportedRefusals",
+  "qualifyingCommands",
+  "rates.oneStep",
+  "rates.ambiguity",
   "latency",
-  "previewNoMatchRate",
+  "rates.previewNoMatch",
 ];
 
 /**
@@ -375,7 +383,11 @@ export function aggregateCommandFunnel(input) {
       excludedOutOfWindow += 1;
       continue;
     }
-    if (row.isSynthetic === true) {
+    // Required, not merely inspected. `null` or `"true"` treated as "not
+    // synthetic" would count disposable traffic into the gate, and this is the
+    // one input a non-database caller could get wrong — the column itself is now
+    // proven non-null in pgTAP.
+    if (requireBoolean(row.isSynthetic, "isSynthetic")) {
       excludedSynthetic += 1;
       continue;
     }
@@ -412,8 +424,10 @@ export function aggregateCommandFunnel(input) {
       activeDates.add(formatter.format(at));
       if (oneStep) oneStepCount += 1;
       if (outcome === "ambiguous" || outcome === "ambiguous_overflow") ambiguityCount += 1;
-      if (outcome === "still_unmatched") stillUnmatched += 1;
-      if (outcome === "creation_offered") creationOffered += 1;
+      // Driven off the declared member set rather than restated literals, so
+      // editing `COMMAND_FUNNEL_NO_MATCH_OUTCOMES` actually changes the measure.
+      if (outcome === COMMAND_FUNNEL_NO_MATCH_OUTCOMES[0]) stillUnmatched += 1;
+      if (outcome === COMMAND_FUNNEL_NO_MATCH_OUTCOMES[1]) creationOffered += 1;
       continue;
     }
 
@@ -497,7 +511,6 @@ export function aggregateCommandFunnel(input) {
         outcome === "unsupported" ? unsupportedRefusals : outcomeDistribution[outcome],
       ]),
     ),
-    originSplit,
     previewedByOrigin: originSplit,
     appliedByOrigin,
     appliedRoutesByOrigin,
@@ -538,6 +551,30 @@ function atLeast(required, measured) {
 /** A ceiling: a longer observation window is *weaker* evidence, not stronger. */
 function atMost(required, measured) {
   return { required, measured, met: measured <= required, comparison: "at_most" };
+}
+
+/**
+ * Whether this window could satisfy this tier at all, regardless of the data.
+ *
+ * The two tiers want different windows, and one report carries one window, so a
+ * single invocation can positively evaluate at most one of them. At the reader's
+ * default 14 days the planning tier is unreachable a second way that has nothing
+ * to do with `distinctUsers`: a 14-day window admits at most 15 distinct local
+ * dates, so `activeDays >= 20` cannot hold. Reported rather than left for an
+ * operator to misread as "the volume or the rate gate failed".
+ */
+function windowCompatibility(tier, windowDays) {
+  const tooShortForActiveDays = windowDays + 1 < tier.activeDays;
+  const tooLong = windowDays > tier.windowDays;
+  return {
+    compatible: !tooShortForActiveDays && !tooLong,
+    reason: tooShortForActiveDays
+      ? `a ${windowDays}-day window admits at most ${windowDays + 1} distinct local dates, `
+        + `below this tier's ${tier.activeDays}`
+      : tooLong
+        ? `a ${windowDays}-day window exceeds this tier's ${tier.windowDays}-day ceiling`
+        : null,
+  };
 }
 
 /**
@@ -613,9 +650,11 @@ export function evaluateEvidenceTiers(report, options = {}) {
   return {
     spike: {
       verdict: Object.values(spike).every((entry) => entry.met) ? "met" : "not_met",
+      window: windowCompatibility(EVIDENCE_TIERS.spike, report.window.days),
       thresholds: spike,
     },
     planning: {
+      window: windowCompatibility(EVIDENCE_TIERS.planning, report.window.days),
       // No branch returns `met`. At one user the tier authorizes nothing beyond
       // the spike, and the privileged read is the only thing that can change
       // that — performed at evaluation time, not by this reader.

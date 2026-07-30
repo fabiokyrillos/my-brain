@@ -9,7 +9,10 @@ import {
   TASK_COMMAND_PREVIEWED_OUTCOMES,
   TASK_COMMAND_UNDO_RESULTS,
 } from "@/features/task-commands/analytics";
-import { TASK_COMMAND_OUTCOMES } from "@/features/task-commands/outcomes";
+import {
+  TASK_COMMAND_OUTCOMES,
+  TASK_COMMAND_PREVIEW_DISPOSITIONS,
+} from "@/features/task-commands/outcomes";
 
 /**
  * Phase 2F Slice 2F.5 — the command-funnel reader (PRD 2F-MEASURE-001…006).
@@ -253,14 +256,27 @@ describe("the evidence thresholds", () => {
 
   it("names ADR-055's five permanent non-authorizers plus the diagnostic rate", async () => {
     const { COMMAND_FUNNEL_NON_AUTHORIZING } = await load();
+    // Named as the report's own key paths, so a consumer can cross-reference
+    // them mechanically instead of guessing which field a prose name meant.
+    // `latency` is the exception and has no key: nothing here measures it, and
+    // ADR-055 names it precisely so nobody later decides that it authorizes.
     expect(COMMAND_FUNNEL_NON_AUTHORIZING).toEqual([
-      "unsupportedRefusalVolume",
-      "commandVolume",
-      "oneStepRate",
-      "ambiguityRate",
+      "unsupportedRefusals",
+      "qualifyingCommands",
+      "rates.oneStep",
+      "rates.ambiguity",
       "latency",
-      "previewNoMatchRate",
+      "rates.previewNoMatch",
     ]);
+    const report = await aggregate([]);
+    for (const key of COMMAND_FUNNEL_NON_AUTHORIZING) {
+      if (key === "latency") continue;
+      const resolved = key.split(".").reduce<unknown>(
+        (node, part) => (node as Record<string, unknown>)[part],
+        report as unknown,
+      );
+      expect(resolved, `${key} is not a real report key`).toBeDefined();
+    }
   });
 });
 
@@ -284,7 +300,7 @@ describe("aggregating the funnel", () => {
     expect(Object.keys(report.outcomeDistribution).sort())
       .toEqual([...TASK_COMMAND_PREVIEWED_OUTCOMES].sort());
     expect(Object.values(report.outcomeDistribution).every((count) => count === 0)).toBe(true);
-    expect(report.originSplit).toEqual({ chat: 0, work: 0 });
+    expect(report.previewedByOrigin).toEqual({ chat: 0, work: 0 });
     expect(report.policyVersions).toEqual({});
   });
 
@@ -296,7 +312,7 @@ describe("aggregating the funnel", () => {
     ]);
 
     expect(report.qualifyingCommands).toBe(3);
-    expect(report.originSplit).toEqual({ chat: 2, work: 1 });
+    expect(report.previewedByOrigin).toEqual({ chat: 2, work: 1 });
     expect(report.outcomeDistribution.previewed).toBe(2);
     expect(report.outcomeDistribution.ambiguous).toBe(1);
     // The invariant that makes the distribution readable: it partitions the
@@ -674,6 +690,47 @@ describe("evaluating the evidence tiers", () => {
     expect(planningLong.evaluation.planning.verdict).toBe("not_met");
   });
 
+  it("reports the spike tier as met one above either floor", async () => {
+    // Floors, so more is stronger: one above must still be met. Without this the
+    // suite pins only the boundary and one side of it.
+    const commands = await tiers({ qualifying: 51, activeDays: 10, windowDays: 14 });
+    expect(commands.evaluation.spike.verdict).toBe("met");
+    const days = await tiers({ qualifying: 50, activeDays: 11, windowDays: 14 });
+    expect(days.evaluation.spike.verdict).toBe("met");
+  });
+
+  it("reports the planning tier as not met one below either floor", async () => {
+    const commands = await tiers({
+      qualifying: 149, activeDays: 20, windowDays: 30, noMatch: 30,
+    });
+    expect(commands.evaluation.planning.thresholds.qualifyingCommands.met).toBe(false);
+    expect(commands.evaluation.planning.verdict).toBe("not_met");
+
+    const days = await tiers({
+      qualifying: 150, activeDays: 19, windowDays: 30, noMatch: 30,
+    });
+    expect(days.evaluation.planning.thresholds.activeDays.met).toBe(false);
+    expect(days.evaluation.planning.verdict).toBe("not_met");
+  });
+
+  it("says when a window cannot satisfy a tier at all, whatever the data", async () => {
+    // The two tiers want different windows and one report carries one window, so
+    // a single run can positively evaluate at most one of them. At the reader's
+    // 14-day default the planning tier is unreachable for a second reason that has
+    // nothing to do with `distinctUsers`: 14 days admit at most 15 distinct local
+    // dates, below its 20. Reported, because a structural `not_met` reads exactly
+    // like a data `not_met`.
+    const short = await tiers({ qualifying: 200, activeDays: 10, windowDays: 14, noMatch: 60 });
+    expect(short.evaluation.spike.window.compatible).toBe(true);
+    expect(short.evaluation.planning.window.compatible).toBe(false);
+    expect(short.evaluation.planning.window.reason).toMatch(/distinct local dates/);
+
+    const long = await tiers({ qualifying: 200, activeDays: 20, windowDays: 30, noMatch: 60 });
+    expect(long.evaluation.planning.window.compatible).toBe(true);
+    expect(long.evaluation.spike.window.compatible).toBe(false);
+    expect(long.evaluation.spike.window.reason).toMatch(/exceeds this tier/);
+  });
+
   it("reports the spike tier as not met one below either floor", async () => {
     const commands = await tiers({ qualifying: 49, activeDays: 10, windowDays: 14 });
     expect(commands.evaluation.spike.verdict).toBe("not_met");
@@ -801,9 +858,15 @@ describe("what the reader says about its own limits", () => {
     // otherwise accounted for.
     expect(source).toContain("report(preview.disposition)");
 
-    const dynamicallyReachable = new Set([
-      "previewed", "matched_requires_confirmation", "no_change", "rejected_stale", "refused",
-      "ambiguous", "ambiguous_overflow",
+    // Imported, not restated. `report(preview.disposition)` emits whatever
+    // `TASK_COMMAND_PREVIEW_DISPOSITIONS` contains, so a future slice that adds a
+    // member there starts emitting it — and a frozen copy here would let the
+    // reachability claim go stale without anything failing.
+    const dynamicallyReachable = new Set<string>([
+      ...TASK_COMMAND_PREVIEW_DISPOSITIONS,
+      // The two the initial round reports directly (`actions.ts:411`).
+      "ambiguous",
+      "ambiguous_overflow",
     ]);
     const unreachable = COMMAND_FUNNEL_PREVIEWED_OUTCOMES.filter(
       (outcome) => !literals.has(outcome) && !dynamicallyReachable.has(outcome),
