@@ -25,6 +25,10 @@ const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   blocked: { pt: "Bloqueada", en: "Blocked" },
   deferred: { pt: "Adiada", en: "Deferred" },
   completed: { pt: "Concluída", en: "Completed" },
+  // Unreachable through this component — every Work query excludes cancelled rows
+  // in SQL — but the record is exhaustive over the vocabulary on purpose, so a
+  // state can never reach a reader with no word for it.
+  cancelled: { pt: "Cancelada", en: "Cancelled" },
 };
 
 const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {

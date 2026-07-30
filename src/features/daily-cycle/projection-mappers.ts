@@ -90,6 +90,11 @@ const workItemStatesByInternalStatus = {
   blocked: "blocked",
   deferred: "deferred",
   completed: "completed",
+  // Present so a cancelled task projects at all. Every list query excludes
+  // cancelled rows in SQL, so this adds no row to any list; what it fixes is the
+  // task detail route, which returned null and answered 404 for the one status
+  // whose only admissible action lives on that page.
+  cancelled: "cancelled",
 } as const satisfies Record<string, WorkItemHumanState>;
 
 function isRecord(value: unknown): value is UnknownRecord {

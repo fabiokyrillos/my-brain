@@ -20,6 +20,7 @@ const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   blocked: { pt: "Bloqueada", en: "Blocked" },
   deferred: { pt: "Adiada", en: "Deferred" },
   completed: { pt: "Concluída", en: "Completed" },
+  cancelled: { pt: "Cancelada", en: "Cancelled" },
 };
 
 const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
