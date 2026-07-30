@@ -7,6 +7,11 @@
 @import "./files.css";
 @import "./costs.css";
 @import "./task-commands.css";
+/* After task-commands.css: the composer hosts `TaskCommandResult`, and the two
+   rules that reach into it there are extended by selector rather than overridden
+   by order — but a later import keeps the composer's own box winning if that
+   ever changes. */
+@import "./assistant.css";
 
 :root { --ink:#14233b; --ink-soft:#526078; --blue:#315cff; --blue-wash:#eef2ff; --mist:#f4f7fb; --paper:#fbfcfe; --line:#dce3ed; --signal:#f0a431; --white:#fff;
   /* The page gutter. Clamped rather than a bare `5vw`: every page box is also

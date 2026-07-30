@@ -1,0 +1,213 @@
+/**
+ * The unified composer (Slice E, UX-07).
+ *
+ * It replaces `.chat-form`, which was one of two permanent primary fields on
+ * these routes. The sticky behaviour and the mobile clearance are inherited from
+ * that rule rather than reinvented — a composer that scrolled away inside a long
+ * thread would be a regression, and the fixed bottom bar still owns the bottom
+ * of a phone screen.
+ */
+
+.assistant-composer {
+  display: block;
+  margin: 0 0 28px;
+}
+
+.assistant-composer-form {
+  position: relative;
+  border: 1px solid #b8c4d4;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.07);
+  overflow: hidden;
+}
+
+.assistant-composer-form > label {
+  display: block;
+  padding: 14px 20px 0;
+  font: 750 12px var(--font-jetbrains);
+  color: var(--ink-soft);
+}
+
+.assistant-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 6px 14px 12px 20px;
+}
+
+.assistant-composer-row > textarea {
+  flex: 1 1 auto;
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  max-height: 40vh;
+  border: 0;
+  resize: vertical;
+  padding: 10px 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.assistant-composer-row > textarea:focus {
+  outline: 0;
+}
+
+.assistant-composer-row > textarea::placeholder {
+  color: #8793a5;
+}
+
+.assistant-composer-submit {
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--ink);
+  color: white;
+  font-weight: 750;
+}
+
+.assistant-composer-submit:disabled {
+  opacity: 0.72;
+}
+
+.assistant-composer-hint {
+  margin: 0;
+  padding: 9px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--mist);
+  color: var(--ink-soft);
+  font: 600 10px var(--font-jetbrains);
+  letter-spacing: 0.03em;
+}
+
+/* The outcome of a turn the command pipeline did not render: a proposed memory,
+   a failed answer, a malformed submission. Deliberately the same visual weight
+   as `.task-command-result`, because to the user they are one kind of thing —
+   the assistant answering — and only the route behind them differs. */
+.assistant-composer-notice {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+}
+
+.assistant-composer-notice h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.assistant-composer-notice > p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* "What you wrote" is kept visually distinct from "what I understood", which is
+   the distinction the whole surface is built to make legible. */
+.assistant-composer-echo {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.assistant-composer-echo > span {
+  font: 650 9px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8290a4;
+}
+
+.assistant-composer-echo > q {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.assistant-composer-next {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 11px 16px;
+  border: 1px solid #bcc7d6;
+  border-radius: 11px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.assistant-composer-next:hover {
+  background: var(--mist);
+}
+
+/**
+ * Proactive questions, demoted on the chat surface only.
+ *
+ * The panel keeps its blue frame on `/app/questions` and on Registros, where the
+ * user arrived *to answer* and the emphasis is earned. On the chat page it now
+ * sits below a primary composer, and a blue-washed box with its own text inputs
+ * directly under one would be a second thing asking to be typed into — which is
+ * the whole problem UX-07 exists to remove. Scoped by host page rather than by a
+ * component prop: nothing about the questions themselves changed, only where
+ * they are and what else is on the page with them.
+ */
+.chat-page .conversational-questions {
+  border-color: var(--line);
+  background: white;
+}
+
+.chat-page .conversational-questions-header .eyebrow {
+  color: var(--ink-soft);
+}
+
+.chat-page .conversational-questions .question-card {
+  background: var(--mist);
+}
+
+.chat-page .question-answer-form input {
+  background: white;
+}
+
+/* Inside a thread the composer stays reachable without scrolling back down. */
+.chat-thread > .assistant-composer {
+  position: sticky;
+  bottom: 20px;
+  z-index: 5;
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  /* Clear of the fixed bottom bar and of the device inset below it. */
+  .chat-thread > .assistant-composer {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .assistant-composer-row {
+    flex-wrap: wrap;
+    padding: 6px 16px 12px;
+  }
+
+  .assistant-composer-row > textarea {
+    flex-basis: 100%;
+    min-height: 76px;
+  }
+
+  .assistant-composer-submit {
+    width: 100%;
+  }
+
+  .assistant-composer-form > label {
+    padding: 12px 16px 0;
+  }
+
+  .assistant-composer-hint {
+    padding: 9px 16px;
+  }
+}
