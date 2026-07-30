@@ -3,6 +3,20 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-30 — Phase 2F — One Write Path is COMPLETE
+
+Slice 2F.6 merged as **PR #33 → `7e3e5f0`**; **merge-SHA CI run `30520514810` green on all three jobs on the first attempt**. No migration, so nothing was deployed and remote parity stays **`202607300063`** — verified before and after. `main` is clean and synchronized with `origin`.
+
+**Every closeout gate re-executed from merged `main` content:** census stop-gate clear (buckets 1 and 2 zero), cleanup verifier CLEAN with zero residue across 17 orphan-scanned tables plus two asserted `service_role` refusals, traceability matrix regenerating content-identically, funnel proof 32/32, end-to-end baseline 9/9, full remote suite exit 0 — then census and cleanup again after the fixture-minting runs, both still clear.
+
+**The phase closes at 68 of 68 requirements delivered, eleven carrying a recorded note, and one operational partial.** `2F-OPERATIONS-002` is partial: reading every Phase 2F merge commit's CI directly found nine of ten green — one only after this closeout re-ran a run the workflow's own concurrency group had cancelled — and one, `6628b02`, a documentation-only acceptance merge, that never went green across two runs on two different pre-existing component flakes. The requirement says every slice PR's merge SHA, so the ledger says partial rather than complete.
+
+**`public.tasks` has exactly one validated write path in both the application and the database**, and `public.reminders` carries one bounded documented exception — both now held by a guard that reds the build if either becomes false. See `docs/reports/PHASE_2F_REPORT.md` and `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md`.
+
+**Three deferrals proven to have held**, not assumed: no `create_reminder` RPC, no `_v2` of `create_task_command`, and `record_ai_usage` still at its ten unchanged arguments — the last read from PostgREST's published signature, because ADR-053 establishes that every route to persisted provenance runs through a signature change. ADR-057's reopening gate is intact.
+
+**C1 is re-raised, not implemented**, discharging the commitment `PHASE_2F_PROPOSAL.md:218` placed on this closeout. Distributed rate limiting and spend caps remain the architecture review's only open Critical; Phase 2F added no AI spend path. **Phase 2G is not started.**
+
 ## 2026-07-30 — Phase 2F Slice 2F.6: convergence and closeout (no migration, no deployment, no production write)
 
 Implemented on branch `codex/phase-2f-slice-6` under `docs/reports/PHASE_2F_SLICE_06_PRD.md`. Delivers `2F-OPERATIONS-003` through `006`, the whole-phase convergence audit and the phase's closeout record. **No migration, no RPC, no view, no grant, no policy, no trigger, no product module, no UI, no i18n key, and no write to any environment.** Remote parity `202607300063` before and after. The only SQL added is read-only pgTAP assertions inside a Phase 2F test file that already existed.

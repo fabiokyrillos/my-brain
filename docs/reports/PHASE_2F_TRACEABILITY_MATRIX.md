@@ -103,10 +103,10 @@ Unlike the four generators before it, this one resolves what it declares rather 
 | `2F-ANALYTICS-003` | All payloads and the funnel reader remain content-free: no task or reminder titles, no user text. | PRD §6.11 | cross-cutting: 2F.3 | `src/features/task-commands/analytics.ts`; `src/features/product-analytics/contracts.ts` | commandOrigin 'work' was already allowlisted, so no migration exists; the content-free import guard and the bounded-vocabulary parity cases run in CI | CI `app` → `src/features/task-commands/analytics.test.ts`; CI `app` → `src/features/product-analytics/contracts.test.ts` | `docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md` | complete | — |
 | `2F-OPERATIONS-001` | Every deploying slice re-verifies remote migration parity immediately before and after, recorded in `STATE.md`. | PRD §6.12 | cross-cutting: 2F.2 / 2F.3 / 2F.4 | `docs/STATE.md`; `docs/CHANGELOG.md` | parity recorded before and after every deploying slice by `npx supabase migration list --linked`; CI conclusions read off the exact merge SHA with `gh run view` | 2F.4 deployment session (parity 202607290062 → 202607300063) | `docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md` | complete | — |
 | `2F-OPERATIONS-002` | All three CI jobs green on the exact merge SHA of every slice PR. | PRD §6.12 | cross-cutting: 2F.1 / 2F.2 / 2F.3 / 2F.4 / 2F.5 | `.github/workflows/ci.yml`; `docs/STATE.md` | each slice's merge-commit CI run read off the exact merge SHA with `gh run view <id> --json headSha,conclusion,event` — the branch-head run at the same PR is a different SHA and does not satisfy the requirement | CI `app` → "run: npm test"; CI `database` → "Run the pgTAP suite (post-revocation posture)" | `docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`; `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md` | partial | green on every implementation-PR merge SHA (8c59c1d/47c555e/48d6a83/c174f8f/2ae2606) and on three of four acceptance merges. **`6628b02` — PR #30, a documentation-only 2F.4 acceptance merge — has never had a green `application` job**: the original run failed on `question-answer-form.test.tsx:162` and this closeout's rerun failed on `task-candidate-form.test.tsx`, two different jsdom timing flakes already recorded in TODO.md. `edge worker` and `database and journey` were green in both runs and the commit changed no source, so no Phase 2F change is implicated — but the requirement says *every* slice PR and one merge SHA does not qualify — **Destination:** the two flaky component tests in docs/TODO.md; neither reproduces on demand, and a fix without a reproduction is a guess |
-| `2F-OPERATIONS-003` | The phase ships a fail-closed traceability generator and matrix over this PRD's **68-requirement** inventory, tamper-proven. | PRD §6.12 | 2F.6 | `scripts/generate-phase-2f-traceability.mjs`; `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md` | fixture-root drift runs, one per declared failure class, each with a positive control proving the guard passes on correct content | CI `app` → `src/lib/closeout/phase-2f-traceability.test.ts`; `npm run docs:phase-2f:traceability` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md` | complete | — |
-| `2F-OPERATIONS-004` | A cleanup verifier proves zero fixture residue across every table the phase's probes touch, executed against the deployed project. | PRD §6.12; Slice 2F.5 PRD §22 handover | 2F.6 | `scripts/verify-phase-2f-cleanup.mjs`; `supabase/tests/phase_2f_task_write_grants.sql` | the orphan predicate is an exported pure function proven over injected rows including a known orphan; the live run reports per-table row counts, scans user-files storage, asserts the two service-role refusals, and asserts the deferred objects absent | CI `app` → `src/lib/closeout/phase-2f-cleanup.test.ts`; CI `database` → `supabase/tests/phase_2f_task_write_grants.sql`; `npm run test:remote:2f:cleanup` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md` | complete | — |
-| `2F-OPERATIONS-005` | `scripts/phase-2f-reminder-census.mjs` re-runs at 2F.6 closeout. A nonzero **bucket 1 or 2** (live reminder on a terminal task; live task-bound reminder on a null-due task) is a **stop-gate**: closeout halts and a new owner decision is required; no automatic migration is authorized by the finding. **Bucket 7 (live independent reminders) is reported informationally with the closeout record and does not block** — a nonzero value there is the Option C exception in normal use. | PRD §6.12; owner decision 2 | 2F.6 | `scripts/phase-2f-reminder-census.mjs` | bucket predicates extracted as pure functions and covered in CI; a case asserts the file still issues no write; paging carries a total order on the primary key with exhaustion asserted | CI `app` → `src/lib/closeout/phase-2f-census.test.ts`; `npm run test:remote:2f:census` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md` | complete | — |
-| `2F-OPERATIONS-006` | Permanent documentation reconciled at closeout: `STATE.md`, `CHANGELOG.md`, `TODO.md` (the stale Phase-2F line; the provenance deferral entry; **the dated 2F-MEASURE-006 expiry entry, verified present**; discharged 2E-era items), `DECISIONS.md` (the four ADRs), `SECURITY.md` (task closure + reminder exception + UPDATE/DELETE determination), `DATABASE.md` (grants; the `snoozed` dormancy note), `PHASE_2_PLAN.md` (per 2F-DECISION-003). | PRD §6.12 | 2F.6 | `docs/STATE.md`; `docs/TODO.md`; `docs/CHANGELOG.md`; `docs/DECISIONS.md`; `docs/SECURITY.md`; `docs/DATABASE.md`; `docs/PHASE_2_PLAN.md`; `docs/PHASE_2F_PRD.md`; `docs/reports/PHASE_2F_REPORT.md` | documentation-convergence cases that read the documents they assert about, including the dated expiry recomputed from go-live and the cross-document status contradiction scan | CI `app` → `src/lib/closeout/phase-2f-documentation.test.ts` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md` | complete | — |
+| `2F-OPERATIONS-003` | The phase ships a fail-closed traceability generator and matrix over this PRD's **68-requirement** inventory, tamper-proven. | PRD §6.12 | 2F.6 | `scripts/generate-phase-2f-traceability.mjs`; `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md` | fixture-root drift runs, one per declared failure class, each with a positive control proving the guard passes on correct content | CI `app` → `src/lib/closeout/phase-2f-traceability.test.ts`; `npm run docs:phase-2f:traceability` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md`; `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` | complete | — |
+| `2F-OPERATIONS-004` | A cleanup verifier proves zero fixture residue across every table the phase's probes touch, executed against the deployed project. | PRD §6.12; Slice 2F.5 PRD §22 handover | 2F.6 | `scripts/verify-phase-2f-cleanup.mjs`; `supabase/tests/phase_2f_task_write_grants.sql` | the orphan predicate is an exported pure function proven over injected rows including a known orphan; the live run reports per-table row counts, scans user-files storage, asserts the two service-role refusals, and asserts the deferred objects absent | CI `app` → `src/lib/closeout/phase-2f-cleanup.test.ts`; CI `database` → `supabase/tests/phase_2f_task_write_grants.sql`; `npm run test:remote:2f:cleanup` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md`; `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` | complete | — |
+| `2F-OPERATIONS-005` | `scripts/phase-2f-reminder-census.mjs` re-runs at 2F.6 closeout. A nonzero **bucket 1 or 2** (live reminder on a terminal task; live task-bound reminder on a null-due task) is a **stop-gate**: closeout halts and a new owner decision is required; no automatic migration is authorized by the finding. **Bucket 7 (live independent reminders) is reported informationally with the closeout record and does not block** — a nonzero value there is the Option C exception in normal use. | PRD §6.12; owner decision 2 | 2F.6 | `scripts/phase-2f-reminder-census.mjs` | bucket predicates extracted as pure functions and covered in CI; a case asserts the file still issues no write; paging carries a total order on the primary key with exhaustion asserted | CI `app` → `src/lib/closeout/phase-2f-census.test.ts`; `npm run test:remote:2f:census` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md`; `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` | complete | — |
+| `2F-OPERATIONS-006` | Permanent documentation reconciled at closeout: `STATE.md`, `CHANGELOG.md`, `TODO.md` (the stale Phase-2F line; the provenance deferral entry; **the dated 2F-MEASURE-006 expiry entry, verified present**; discharged 2E-era items), `DECISIONS.md` (the four ADRs), `SECURITY.md` (task closure + reminder exception + UPDATE/DELETE determination), `DATABASE.md` (grants; the `snoozed` dormancy note), `PHASE_2_PLAN.md` (per 2F-DECISION-003). | PRD §6.12 | 2F.6 | `docs/STATE.md`; `docs/TODO.md`; `docs/CHANGELOG.md`; `docs/DECISIONS.md`; `docs/SECURITY.md`; `docs/DATABASE.md`; `docs/PHASE_2_PLAN.md`; `docs/PHASE_2F_PRD.md`; `docs/reports/PHASE_2F_REPORT.md` | documentation-convergence cases that read the documents they assert about, including the dated expiry recomputed from go-live and the cross-document status contradiction scan | CI `app` → `src/lib/closeout/phase-2f-documentation.test.ts` | `docs/reports/PHASE_2F_SLICE_06_REPORT.md`; `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md` | complete | — |
 
 ## Cross-cutting-only requirements
 
@@ -144,7 +144,7 @@ acceptance-bearing artifact per slice, not a particular filename.
 | 2F.3 | ACCEPTANCE, PLAN |
 | 2F.4 | ACCEPTANCE, BLAST_RADIUS, PLAN, REPORT |
 | 2F.5 | ACCEPTANCE, PRD, REPORT |
-| 2F.6 | PRD, REPORT |
+| 2F.6 | ACCEPTANCE, PRD, REPORT |
 
 ## §10 gate ledger
 
@@ -158,28 +158,28 @@ name the session it ran in (`2F-PRECOND-003`); a cell whose slice has no such ar
 | lint / typecheck / Vitest / build · `deno check`+`test` | 2F.3 | ● | ACCEPTANCE |
 | lint / typecheck / Vitest / build · `deno check`+`test` | 2F.4 | ● | ACCEPTANCE, REPORT |
 | lint / typecheck / Vitest / build · `deno check`+`test` | 2F.5 | ● | ACCEPTANCE, REPORT |
-| lint / typecheck / Vitest / build · `deno check`+`test` | 2F.6 | ● | REPORT |
+| lint / typecheck / Vitest / build · `deno check`+`test` | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Empty-DB chain + full pgTAP + db lint | 2F.1 | ● | REPORT |
 | Empty-DB chain + full pgTAP + db lint | 2F.2 | ● | ACCEPTANCE, REPORT |
 | Empty-DB chain + full pgTAP + db lint | 2F.3 | ● | ACCEPTANCE |
 | Empty-DB chain + full pgTAP + db lint | 2F.4 | ● | ACCEPTANCE, REPORT |
 | Empty-DB chain + full pgTAP + db lint | 2F.5 | ● | ACCEPTANCE, REPORT |
-| Empty-DB chain + full pgTAP + db lint | 2F.6 | ● | REPORT |
+| Empty-DB chain + full pgTAP + db lint | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Grammar-trap guard + architecture gate (allowlists per §2) | 2F.1 | ● proven | REPORT |
 | Grammar-trap guard + architecture gate (allowlists per §2) | 2F.2 | ● shrunk | ACCEPTANCE, REPORT |
 | Grammar-trap guard + architecture gate (allowlists per §2) | 2F.3 | ● shrunk | ACCEPTANCE |
 | Grammar-trap guard + architecture gate (allowlists per §2) | 2F.4 | ● tasks-empty | ACCEPTANCE, REPORT |
 | Grammar-trap guard + architecture gate (allowlists per §2) | 2F.5 | ● | ACCEPTANCE, REPORT |
-| Grammar-trap guard + architecture gate (allowlists per §2) | 2F.6 | ● | REPORT |
+| Grammar-trap guard + architecture gate (allowlists per §2) | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.1 | ● | REPORT |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.2 | ● | ACCEPTANCE, REPORT |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.3 | ● | ACCEPTANCE |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.4 | ● | ACCEPTANCE, REPORT |
 | Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.5 | ● | ACCEPTANCE, REPORT |
-| Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.6 | ● | REPORT |
+| Preserved Gate 3 static suite (`work-surface-reuse.test.ts`) | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Authenticated journeys desktop+mobile, pt-BR+en | 2F.2 | ● | ACCEPTANCE, REPORT |
 | Authenticated journeys desktop+mobile, pt-BR+en | 2F.3 | ● | ACCEPTANCE |
-| Authenticated journeys desktop+mobile, pt-BR+en | 2F.6 | ● | REPORT |
+| Authenticated journeys desktop+mobile, pt-BR+en | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Two-owner disposable probe (mutation / creation incl. user-origin undo) | 2F.2 | ● | ACCEPTANCE, REPORT |
 | Two-owner disposable probe (mutation / creation incl. user-origin undo) | 2F.3 | ● | ACCEPTANCE |
 | CI re-grant proof (revoke → re-grant → writes restored; **SQL-level only, not a live-ops rehearsal**) | 2F.4 | ● cited | ACCEPTANCE, REPORT |
@@ -187,13 +187,13 @@ name the session it ran in (`2F-PRECOND-003`); a cell whose slice has no such ar
 | Full existing remote suite | 2F.4 | ● | ACCEPTANCE, REPORT |
 | Reminders UPDATE/DELETE determination (written) | 2F.4 | ● | ACCEPTANCE, REPORT |
 | End-to-end baseline + reader exclusion-mechanism proof | 2F.5 | ● | ACCEPTANCE, REPORT |
-| **Census stop-gate** (buckets 1/2 blocking; bucket 7 informational) | 2F.6 | ● | REPORT |
-| Traceability tamper runs + cleanup verifier | 2F.6 | ● | REPORT |
+| **Census stop-gate** (buckets 1/2 blocking; bucket 7 informational) | 2F.6 | ● | ACCEPTANCE, REPORT |
+| Traceability tamper runs + cleanup verifier | 2F.6 | ● | ACCEPTANCE, REPORT |
 | Parity re-check before/after | 2F.2 | ● | ACCEPTANCE, REPORT |
 | Parity re-check before/after | 2F.3 | ● | ACCEPTANCE |
 | Parity re-check before/after | 2F.4 | ● | ACCEPTANCE, REPORT |
 | Parity re-check before/after | 2F.5 | ● | ACCEPTANCE, REPORT |
-| Parity re-check before/after | 2F.6 | ● | REPORT |
+| Parity re-check before/after | 2F.6 | ● | ACCEPTANCE, REPORT |
 
 ## Regeneration
 
