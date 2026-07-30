@@ -115,9 +115,16 @@ export function LocaleSwitchLink({ locale }: { locale: Locale }) {
 export function NavigationLinks({
   locale,
   mobile = false,
+  account,
 }: {
   locale: Locale;
   mobile?: boolean;
+  /**
+   * The account disclosure, injected by the shell so this module holds no Server
+   * Action. Rendered only on the mobile surface, where the overflow panel is the
+   * account area; the desktop rail mounts it in its own foot.
+   */
+  account?: ReactNode;
 }) {
   const pathname = usePathname() ?? `/${locale}/app`;
   const t = getMessages(locale);
@@ -189,6 +196,14 @@ export function NavigationLinks({
       {renderLink("capture", { capture: true })}
       {primaryNavigationKeys.slice(2).map((key) => renderLink(key, { compact: true }))}
       <NavigationOverflow variant="mobile-more" active={overflowActive} label={t.nav.more}>
+        {/*
+          First in the panel, spanning both columns. The brief's rule — reachable
+          without scrolling through unrelated product destinations — is a
+          placement decision, and putting the account block after five groups of
+          secondary links would have buried the only way to leave the product
+          under the things you do while inside it.
+        */}
+        {account ? <div className="mobile-nav-account">{account}</div> : null}
         {overflowGroups}
       </NavigationOverflow>
     </>
