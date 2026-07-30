@@ -1051,3 +1051,66 @@ identity choice I will not change unilaterally.
 `eslint` 0 · `tsc --noEmit` 0 · `vitest` 2535 passed with the same 2 pre-existing
 `sql-reachability.test.ts` failures · shell suite 44/44 · real-browser render at four
 viewports in both locales, plus the empty state.
+
+---
+
+# Slice D — plan and seam analysis (not yet implemented)
+
+Recorded before writing code because D is the only slice that touches the One Write Path,
+and the seam it must use is not the obvious one.
+
+### The seam
+
+`src/features/task-commands/work-command.ts` is the **id-authoritative** bridge from a UI
+click to `public.apply_task_command`. It resolves through the deployed
+`list_task_command_candidates`, selects the row **by id out of the whole result** rather
+than out of the ranked/floored/capped subset (2F-SURFACE-004), projects the nineteen-key
+pre-state, derives the canonical patch and applies — with **no new SQL, no new RPC and no
+migration**. A task-detail surface must go through this, not around it.
+
+The alternative that looks right and is wrong: composing a `TaskCommandIntent` and running
+it through the matcher. `schema.ts:104` states the reason — target hints are "deliberately
+incapable of naming a task: there is no id field, so the model cannot select the target
+even if it tries." That design is correct for untrusted model output and wrong for a
+detail page, which already knows the id; routing a known target through the ranker would
+refuse legitimate edits whenever the row scored below `minCandidateScore` or fell outside
+the top five.
+
+### What blocks reusing `applyWorkCommand` directly
+
+`resolveWorkCommand` builds its command from `WORK_ACTION_MAPPING[action].patch` — a
+**fixed** patch, which is why it serves exactly the four status verbs. Every remaining verb
+carries a *value* (a new title, a date, a priority, a relation ref). D therefore needs a
+generalised sibling that takes a caller-supplied, schema-validated patch through the same
+resolution and the same apply. That is a new TypeScript module, not new SQL.
+
+### The split, and why
+
+- **D1 — inspect (no new write path).** `/[locale]/app/work/[taskId]`: what you wrote
+  (via `source_entry_id`), current field values, relations as **links**, change history
+  from `audit_logs`, and the four status actions through the already-proven
+  `applyWorkItemAction`. Resolves UX-19 outright (`open_task` finally has a producer and a
+  destination), the inspect half of UX-05, and the task-row half of UX-20.
+- **D2 — structured field edits.** The generalised composer for `rename_task`,
+  `append_note`, `reschedule_due`, `clear_due`, `set_planned`, `set_priority`,
+  `assign_project`, `assign_context`, `assign_person`, `set_waiting_on`. `cancel_task` and
+  `restore_task` are **destructive** and must route through
+  `issue_task_command_confirmation` and the existing confirm dialog — they may not be
+  plain buttons.
+
+Splitting is not a way of shipping less. It keeps a slice that adds **zero** write surface
+separate from one that generalises the write path, so the first can be reviewed on its
+layout and the second on its contract.
+
+### To verify before writing D2
+
+1. Whether `patch.dueAt` accepts an absolute ISO instant or only a temporal phrase —
+   `schema.ts` resolves phrases through `resolveTemporalPhrase`, and a date picker supplies
+   an instant.
+2. `actionPolicy`'s allowed patch fields and `allowedTargetValues` per action, so no
+   control can offer a value the taxonomy would refuse (the mistake `set_status` +
+   `cancelled` exists to prevent).
+3. That `assign_*` relation refs resolve by owned-entity id and not by free text.
+
+Until D2 lands, UX-05 stays **partially open** with 11 verbs reachable only through the
+console — recorded as such, not closed.
