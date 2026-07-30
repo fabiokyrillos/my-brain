@@ -20,6 +20,7 @@ import type {
 } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import { resolveDailyCycleLifecycle, type DailyCycleLifecycleInput } from "./lifecycle";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -61,6 +62,7 @@ export type EntryReviewProjection = {
 
 export type EntryReviewProjectionInput = {
   entryId: string;
+  agentName: string;
   originalContent: string;
   errorMessage: string | null;
   entryOccurredAt: string;
@@ -148,7 +150,7 @@ export function attentionActionId(reason: AttentionReason): DailyCycleAction {
 
 export function toEntryReviewProjection(input: EntryReviewProjectionInput): EntryReviewProjection {
   const { productState, attentionReason } = resolveDailyCycleLifecycle(input.lifecycle);
-  const copy = getDailyCycleCopy(input.locale);
+  const copy = getDailyCycleCopy(input.locale, input.agentName);
   const current = input.current;
 
   const availableActions: AvailableAction[] = [];
@@ -328,6 +330,7 @@ export async function loadEntryReviewProjection(
 
   return toEntryReviewProjection({
     entryId,
+    agentName: await getAgentName(),
     originalContent: data.entry.original_content,
     errorMessage: data.entry.processing_error,
     entryOccurredAt: data.entry.occurred_at,

@@ -14,6 +14,7 @@ import { getInterpretationCopy } from "@/features/interpretations/copy";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 export default async function EntryDetailPage({
   params,
@@ -25,6 +26,8 @@ export default async function EntryDetailPage({
   const locale = rawLocale;
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
+
+  const agentName = await getAgentName();
 
   const review = await loadEntryReviewProjection(supabase, {
     entryId,
@@ -137,7 +140,7 @@ export default async function EntryDetailPage({
     <div className="content-page entry-detail-page">
       <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Registros" : "Records"}</Link>
 
-      <EntryReview
+      <EntryReview agentName={agentName}
         view={view}
         locale={locale}
         occurredAtLabel={occurredAtLabel}

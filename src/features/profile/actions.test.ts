@@ -17,6 +17,7 @@ function operationalFormData() {
   const formData = new FormData();
   for (const [key, value] of Object.entries({
     locale: "en",
+    agentName: "Ada",
     timezone: "America/New_York",
     personality: "analytical",
     tone: "professional",

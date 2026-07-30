@@ -13,6 +13,11 @@ const textModel = z.enum(["gpt-5.6-terra", "gpt-5.6-luna", "gpt-5-mini"]);
 
 export const profileSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),
+  // Bounded to match `agent_preferences_agent_name_check` exactly (1–60 after
+  // trimming). A looser bound here would turn a typo into a database error the
+  // form could not explain; a tighter one would refuse a name the column
+  // accepts.
+  agentName: z.string().trim().min(1).max(60),
   timezone: ianaTimezone,
   personality: z.enum(["direct", "proactive", "warm", "analytical"]),
   tone: z.enum(["direct", "informal", "natural", "professional"]),

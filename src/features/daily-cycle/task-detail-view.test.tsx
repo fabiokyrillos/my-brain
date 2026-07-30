@@ -53,7 +53,7 @@ function detail(overrides: Partial<TaskDetailProjection> = {}): TaskDetailProjec
 }
 
 function renderDetail(value: TaskDetailProjection, locale: Locale = "pt-BR") {
-  return render(<TaskDetailView locale={locale} detail={value} actions={<button type="button">Concluir</button>} />);
+  return render(<TaskDetailView agentName="Brain" locale={locale} detail={value} actions={<button type="button">Concluir</button>} />);
 }
 
 describe("TaskDetailView", () => {

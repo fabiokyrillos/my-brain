@@ -9,14 +9,16 @@ const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "res
 export function ReviewUnderstanding({
   view,
   locale,
+  agentName,
   occurredAtLabel,
 }: {
   view: InterpretationReviewView;
   locale: DailyCycleLocale;
+  agentName: string;
   occurredAtLabel: string;
 }) {
   const pt = locale === "pt-BR";
-  const statusCopy = getDailyCycleCopy(locale).productStates[view.productState];
+  const statusCopy = getDailyCycleCopy(locale, agentName).productStates[view.productState];
 
   return (
     <header className="entry-heading review-understanding">
@@ -152,6 +154,7 @@ export type EntryReviewSlots = {
 export function EntryReview({
   view,
   locale,
+  agentName,
   occurredAtLabel,
   originalDefaultOpen = false,
   slots,
@@ -159,13 +162,14 @@ export function EntryReview({
   view: InterpretationReviewView;
   locale: DailyCycleLocale;
   occurredAtLabel: string;
+  agentName: string;
   originalDefaultOpen?: boolean;
   slots: EntryReviewSlots;
 }) {
   return (
     <div className="entry-review">
       <InterpretationReviewViewed entryId={view.entryId} locale={locale} />
-      <ReviewUnderstanding view={view} locale={locale} occurredAtLabel={occurredAtLabel} />
+      <ReviewUnderstanding view={view} locale={locale} agentName={agentName} occurredAtLabel={occurredAtLabel} />
       <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
         {slots.attentionAction}
       </ReviewAttention>

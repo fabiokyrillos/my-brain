@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import type { ChatState } from "./chat-state";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 const chatInputSchema = z.object({
   question: z.string().trim().min(1).max(12000),
@@ -23,7 +24,7 @@ type ChatCopy = {
   conversationNotFound: string;
   conversationNotStarted: string;
   questionNotSaved: string;
-  answerUnavailable: string;
+  answerUnavailable: (agent: string) => string;
 };
 
 // Canonical localization mechanism (ADR-036): one typed copy record per
@@ -38,7 +39,7 @@ const chatCopy = {
     conversationNotFound: "Conversa não encontrada.",
     conversationNotStarted: "Não foi possível iniciar a conversa.",
     questionNotSaved: "Não foi possível salvar sua pergunta.",
-    answerUnavailable: "O Brain não conseguiu responder agora. Sua pergunta ficou salva.",
+    answerUnavailable: (agent: string) => `O ${agent} não conseguiu responder agora. Sua pergunta ficou salva.`,
   },
   en: {
     invalidQuestion: "Write a valid question.",
@@ -47,7 +48,7 @@ const chatCopy = {
     conversationNotFound: "Conversation not found.",
     conversationNotStarted: "We could not start the conversation.",
     questionNotSaved: "We could not save your question.",
-    answerUnavailable: "The Brain could not answer right now. Your question was saved.",
+    answerUnavailable: (agent: string) => `${agent} could not answer right now. Your question was saved.`,
   },
 } satisfies Record<Locale, ChatCopy>;
 
@@ -183,7 +184,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     requireSupabaseSuccess(auditInsert, "record chat audit");
   } catch (error) {
     console.error("Grounded chat failed", error instanceof Error ? error.message : "unknown error");
-    return { status: "error", message: copy.answerUnavailable };
+    return { status: "error", message: copy.answerUnavailable(await getAgentName()) };
   }
 
   revalidatePath(`/${parsed.data.locale}/app/chat/${conversationId}`);

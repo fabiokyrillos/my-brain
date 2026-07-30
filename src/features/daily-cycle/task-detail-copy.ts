@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/preferences";
+import { withAgentName } from "@/lib/agent-name";
 
 /**
  * The task detail surface's copy, including the vocabularies that used to reach
@@ -76,7 +77,7 @@ const ptBR: TaskDetailCopy = {
     completed: "Concluída em",
     cancelled: "Cancelada em",
   },
-  origins: { you: "Criada por você", brain: "Sugerida pelo Brain e confirmada por você" },
+  origins: { you: "Criada por você", brain: "Sugerida pelo {agent} e confirmada por você" },
   relations: {
     projects: "Projetos",
     contexts: "Contextos",
@@ -93,7 +94,7 @@ const ptBR: TaskDetailCopy = {
   },
   history: {
     empty: "Nenhuma alteração registrada ainda.",
-    actors: { you: "Você", brain: "O Brain", system: "O sistema" },
+    actors: { you: "Você", brain: "O {agent}", system: "O sistema" },
     actions: {
       task_created: "criou a tarefa",
       task_updated: "mudou a tarefa",
@@ -131,7 +132,7 @@ const en: TaskDetailCopy = {
     completed: "Completed",
     cancelled: "Cancelled",
   },
-  origins: { you: "Created by you", brain: "Suggested by Brain and confirmed by you" },
+  origins: { you: "Created by you", brain: "Suggested by {agent} and confirmed by you" },
   relations: {
     projects: "Projects",
     contexts: "Contexts",
@@ -148,7 +149,7 @@ const en: TaskDetailCopy = {
   },
   history: {
     empty: "No changes recorded yet.",
-    actors: { you: "You", brain: "Brain", system: "The system" },
+    actors: { you: "You", brain: "{agent}", system: "The system" },
     actions: {
       task_created: "created the task",
       task_updated: "changed the task",
@@ -167,8 +168,12 @@ const en: TaskDetailCopy = {
 
 export const taskDetailCopy = { "pt-BR": ptBR, en } as const satisfies Record<Locale, TaskDetailCopy>;
 
-export function getTaskDetailCopy(locale: Locale): TaskDetailCopy {
-  return taskDetailCopy[locale];
+/**
+ * @param agentName the assistant’s configured name (UX-06). Required, so the
+ * compiler finds every surface that would otherwise render a hardcoded one.
+ */
+export function getTaskDetailCopy(locale: Locale, agentName: string): TaskDetailCopy {
+  return withAgentName(taskDetailCopy[locale], agentName);
 }
 
 /** The sentence for one audit row, never the raw `action_type`. */

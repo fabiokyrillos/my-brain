@@ -93,13 +93,15 @@ export function HomeView({
   locale,
   view,
   capture,
+  agentName,
 }: {
   locale: Locale;
   view: HomeViewModel;
   /** The capture form, injected so this component stays free of Server Actions. */
   capture: ReactNode;
+  agentName: string;
 }) {
-  const copy = getHomeCopy(locale);
+  const copy = getHomeCopy(locale, agentName);
   const { sections } = copy;
 
   return (
@@ -132,7 +134,7 @@ export function HomeView({
           {view.attention.length ? (
             <div className="home-list">
               {view.attention.map((item) => (
-                <NeedsAttentionItemRow item={item} key={item.key} locale={locale} surface="home" />
+                <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" />
               ))}
             </div>
           ) : (
@@ -211,7 +213,7 @@ export function HomeView({
           {view.recent.length ? (
             <div className="home-list">
               {view.recent.map((item) => (
-                <InboxItemRow item={item} key={item.entryId} locale={locale} />
+                <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} />
               ))}
             </div>
           ) : (

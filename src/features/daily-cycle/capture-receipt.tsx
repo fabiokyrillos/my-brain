@@ -4,11 +4,13 @@ import type { CaptureReceipt } from "./contracts";
 export function CaptureReceiptView({
   receipt,
   locale,
+  agentName,
 }: {
   receipt: CaptureReceipt;
   locale: DailyCycleLocale;
+  agentName: string;
 }) {
-  const copy = getDailyCycleCopy(locale);
+  const copy = getDailyCycleCopy(locale, agentName);
 
   return (
     <div className="capture-receipt" role="status">

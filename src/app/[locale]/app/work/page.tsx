@@ -4,6 +4,7 @@ import { WorkView } from "@/features/daily-cycle/work-view";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 export default async function WorkPage({
   params,
@@ -19,6 +20,8 @@ export default async function WorkPage({
   const view = parseWorkView(query.view);
   const page = parsePage(query.page);
   const { supabase, user } = await requireUser(locale);
+
+  const agentName = await getAgentName();
   const projection = await loadWorkProjection(supabase, {
     userId: user.id,
     locale,
@@ -26,7 +29,7 @@ export default async function WorkPage({
     page,
   });
 
-  return <WorkView
+  return <WorkView agentName={agentName}
     locale={locale}
     timezone={projection.timezone}
     view={view}

@@ -43,7 +43,10 @@ export function buildSettingsPayload(input: ProfileInput, snapshot: SettingsPers
       timezone: input.timezone,
     },
     preferences: {
-      agentName: current?.agent_name ?? "Brain",
+      // Submitted, no longer passed through. Until Slice F1 the form rendered
+      // no input for this, so the only safe thing to send was whatever was
+      // already stored — which is exactly why the column never changed.
+      agentName: input.agentName,
       followUpIntensity: current?.follow_up_intensity ?? "balanced",
       dailyReviewTime: shortTime(current?.daily_review_time, "22:00"),
       personality: input.personality,

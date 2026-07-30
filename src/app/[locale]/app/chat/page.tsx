@@ -5,6 +5,7 @@ import { ConversationalQuestions } from "@/features/agent/conversational-questio
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
@@ -17,6 +18,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
   const locale = candidate;
   const pt = locale === "pt-BR";
   const copy = getAssistantCopy(locale);
+  const agentName = await getAgentName();
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
@@ -28,7 +30,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
       <header className="list-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
+          <h1>{copy.title(agentName)}</h1>
           <p>{copy.description}</p>
         </div>
       </header>
@@ -38,7 +40,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         whole of UX-07's fix: one field, no mode to choose, and nothing above it
         competing for the first thing the user types into.
       */}
-      <AssistantComposer action={runAssistantTurn} locale={locale} />
+      <AssistantComposer action={runAssistantTurn} agentName={agentName} locale={locale} />
 
       {/*
         Proactive questions stay — they are the agent's own open loops and

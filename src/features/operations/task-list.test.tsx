@@ -92,6 +92,7 @@ function renderList(props: Partial<Parameters<typeof TaskList>[0]> = {}, result?
   const view = render(
     <TaskList
       action={action}
+      agentName="Brain"
       emptyHint="Nada por aqui"
       locale="pt-BR"
       tasks={[workItem()]}
@@ -109,6 +110,7 @@ describe("2F-SURFACE-009 — availability follows taxonomy eligibility", () => {
     render(
       <TaskList
         action={handler().action}
+        agentName="Brain"
         emptyHint="Nada"
         locale="en"
         tasks={[workItem({ humanState: "completed", availableActions: [{ id: "reopen_task" }] })]}
@@ -125,6 +127,7 @@ describe("2F-SURFACE-009 — availability follows taxonomy eligibility", () => {
     render(
       <TaskList
         action={handler().action}
+        agentName="Brain"
         emptyHint="Nada"
         locale="en"
         tasks={[workItem({
@@ -143,6 +146,7 @@ describe("2F-SURFACE-009 — availability follows taxonomy eligibility", () => {
     render(
       <TaskList
         action={handler().action}
+        agentName="Brain"
         emptyHint="Nada"
         locale="en"
         tasks={[workItem({ availableActions: [{ id: "open_entry" }] as never })]}
@@ -155,13 +159,13 @@ describe("2F-SURFACE-009 — availability follows taxonomy eligibility", () => {
 
   it("localizes every button label in both locales", () => {
     const { rerender } = render(
-      <TaskList action={handler().action} emptyHint="x" locale="pt-BR" tasks={[workItem()]} timezone="UTC" />,
+      <TaskList action={handler().action} agentName="Brain" emptyHint="x" locale="pt-BR" tasks={[workItem()]} timezone="UTC" />,
     );
     expect(screen.getByRole("button", { name: /Concluir/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Aguardar/ })).toBeInTheDocument();
 
     rerender(
-      <TaskList action={handler().action} emptyHint="x" locale="en" tasks={[workItem()]} timezone="UTC" />,
+      <TaskList action={handler().action} agentName="Brain" emptyHint="x" locale="en" tasks={[workItem()]} timezone="UTC" />,
     );
     expect(screen.getByRole("button", { name: /Complete/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Wait/ })).toBeInTheDocument();
@@ -221,6 +225,7 @@ describe("2F-SURFACE-006 — the operation key lifecycle", () => {
     const { action, seen } = handler(idleWorkItemActionState);
     render(
       <TaskList
+        agentName="Brain"
         action={action}
         emptyHint="x"
         locale="pt-BR"
@@ -391,7 +396,7 @@ describe("2F-SURFACE-010 — keyboard, focus and announcements", () => {
     const user = userEvent.setup();
     const { action } = handler(refused());
     render(
-      <TaskList action={action} emptyHint="x" locale="en" tasks={[workItem()]} timezone="UTC" />,
+      <TaskList action={action} agentName="Brain" emptyHint="x" locale="en" tasks={[workItem()]} timezone="UTC" />,
     );
 
     await user.click(screen.getByRole("button", { name: /Complete/ }));
@@ -404,6 +409,7 @@ describe("2F-SURFACE-010 — keyboard, focus and announcements", () => {
     const { action } = handler();
     render(
       <TaskList
+        agentName="Brain"
         action={action}
         emptyHint="x"
         locale="pt-BR"

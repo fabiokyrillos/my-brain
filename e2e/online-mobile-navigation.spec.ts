@@ -63,10 +63,10 @@ test.describe("authenticated converged navigation", () => {
         ? {
             navigation: testInfo.project.name === "mobile" ? "Navegação móvel" : "Navegação principal",
             primaryGroup: "Principal",
-            primary: ["Início", "Registros", "Trabalho", "Brain"],
+            primary: ["Início", "Registros", "Trabalho", "Conversar"],
             // The three destinations the five-slot mobile bar carries beside
             // capture and Mais (UX-14, DEC-1).
-            mobileBar: ["Início", "Trabalho", "Brain"],
+            mobileBar: ["Início", "Trabalho", "Conversar"],
             mobileDemoted: "Registros",
             capture: "Captura rápida",
             more: "Mais",
@@ -96,8 +96,8 @@ test.describe("authenticated converged navigation", () => {
         : {
             navigation: testInfo.project.name === "mobile" ? "Mobile navigation" : "Main navigation",
             primaryGroup: "Primary",
-            primary: ["Home", "Records", "Work", "Brain"],
-            mobileBar: ["Home", "Work", "Brain"],
+            primary: ["Home", "Records", "Work", "Talk"],
+            mobileBar: ["Home", "Work", "Talk"],
             mobileDemoted: "Records",
             capture: "Quick capture",
             more: "More",

@@ -38,6 +38,7 @@ function baseInput(overrides: Partial<EntryReviewProjectionInput> = {}): EntryRe
   const current = revision();
   return {
     entryId: "entry-1",
+    agentName: "Brain",
     originalContent: "Ligar para a Marina sobre o contrato do Atlas amanhã de manhã.",
     errorMessage: null,
     entryOccurredAt: "2026-07-18T09:00:00.000Z",

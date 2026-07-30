@@ -12,6 +12,7 @@ import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 function InboxViewTabs({ locale, active }: { locale: "pt-BR" | "en"; active: "all" | "needs-you" }) {
   const pt = locale === "pt-BR";
@@ -38,6 +39,8 @@ export default async function InboxPage({
   const view = resolvedSearchParams.view === "needs-you" ? "needs-you" : "all";
   const { supabase, user } = await requireUser(locale);
 
+  const agentName = await getAgentName();
+
   if (view === "needs-you") {
     const projection = await loadAttentionProjection(supabase, { locale });
 
@@ -47,13 +50,13 @@ export default async function InboxPage({
           <div>
             <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
             <h1>{pt ? "Registros" : "Records"}</h1>
-            <p>{pt ? "Tudo que você confiou ao Brain, com o original sempre preservado." : "Everything you entrusted to Brain, with the original always preserved."}</p>
+            <p>{pt ? `Tudo que você confiou ao ${agentName}, com o original sempre preservado.` : "Everything you entrusted to Brain, with the original always preserved."}</p>
           </div>
         </header>
         <InboxViewTabs locale={locale} active="needs-you" />
         <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="pull" limit={5} />
         {projection.items.length ? (
-          <NeedsAttentionList
+          <NeedsAttentionList agentName={agentName}
             initialItems={projection.items}
             initialCursor={projection.nextCursor}
             initialHasNext={projection.hasNext}
@@ -79,13 +82,13 @@ export default async function InboxPage({
         <div>
           <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
           <h1>{pt ? "Registros" : "Records"}</h1>
-          <p>{pt ? "Tudo que você confiou ao Brain, com o original sempre preservado." : "Everything you entrusted to Brain, with the original always preserved."}</p>
+          <p>{pt ? `Tudo que você confiou ao ${agentName}, com o original sempre preservado.` : "Everything you entrusted to Brain, with the original always preserved."}</p>
         </div>
       </header>
       <InboxViewTabs locale={locale} active="all" />
       {projection.items.length ? (
         <div className="list-stack">
-          {projection.items.map((item) => <InboxItemRow item={item} key={item.entryId} locale={locale} />)}
+          {projection.items.map((item) => <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} />)}
         </div>
       ) : (
         <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Nenhum registro ainda" : "No entries yet"}</strong><p>{pt ? "Use a captura rápida para registrar algo sem interromper seu fluxo." : "Use quick capture to save something without breaking your flow."}</p></div>

@@ -12,16 +12,16 @@ import type { Locale } from "@/lib/preferences";
 type AssistantCopy = {
   /** The page's own framing, which the composer replaces three headers with. */
   readonly eyebrow: string;
-  readonly title: string;
+  readonly title: (agent: string) => string;
   readonly description: string;
   /** The single field. */
-  readonly inputLabel: string;
+  readonly inputLabel: (agent: string) => string;
   readonly inputPlaceholder: string;
   readonly submit: string;
   readonly pending: string;
   readonly submitHint: string;
   readonly pendingAnnouncement: string;
-  readonly resultRegionLabel: string;
+  readonly resultRegionLabel: (agent: string) => string;
   /** What the user wrote, shown above an outcome that does not repeat it. */
   readonly echoLabel: string;
   /** The proposed-memory route. */
@@ -42,17 +42,17 @@ type AssistantCopy = {
 export const assistantCopy = {
   "pt-BR": {
     eyebrow: "CONVERSA COM CONTEXTO",
-    title: "Fale com o Brain",
+    title: (agent) => `Fale com o ${agent}`,
     description:
       "Pergunte, mude uma tarefa ou diga o que quer guardar — no mesmo lugar. Você não precisa escolher o tipo antes de escrever.",
-    inputLabel: "O que você quer dizer ao Brain?",
+    inputLabel: (agent) => `O que você quer dizer ao ${agent}?`,
     inputPlaceholder:
       "ex.: o que combinei com Marina? · mude a prioridade da tarefa do relatório · lembre disso sempre",
     submit: "Enviar",
     pending: "Pensando…",
     submitHint: "Enter envia · Shift+Enter quebra a linha",
     pendingAnnouncement: "Interpretando o que você escreveu.",
-    resultRegionLabel: "Resposta do Brain",
+    resultRegionLabel: (agent) => `Resposta do ${agent}`,
     echoLabel: "Você escreveu",
     memoryHeading: "Isso parece algo para guardar como memória",
     memoryDetail:
@@ -68,17 +68,17 @@ export const assistantCopy = {
   },
   en: {
     eyebrow: "CONTEXTUAL CHAT",
-    title: "Talk to Brain",
+    title: (agent) => `Talk to ${agent}`,
     description:
       "Ask, change a task, or say what you want kept — all in one place. You do not have to pick a type before you write.",
-    inputLabel: "What do you want to tell Brain?",
+    inputLabel: (agent) => `What do you want to tell ${agent}?`,
     inputPlaceholder:
       "e.g. what did I agree with Marina? · change the priority of the report task · remember this always",
     submit: "Send",
     pending: "Thinking…",
     submitHint: "Enter sends · Shift+Enter adds a line",
     pendingAnnouncement: "Interpreting what you wrote.",
-    resultRegionLabel: "Brain's response",
+    resultRegionLabel: (agent) => `${agent}’s response`,
     echoLabel: "You wrote",
     memoryHeading: "That looks like something to keep as a memory",
     memoryDetail:

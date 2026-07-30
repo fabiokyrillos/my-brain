@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 import { deriveHomeOperationalStatus } from "./capabilities";
 import { HomeView, type HomeTaskView, type HomeViewModel } from "./home-view";
+import { getAgentName } from "@/features/profile/agent-identity";
 
 const RECENT_ACTIVITY_LIMIT = 4;
 const NEEDS_ATTENTION_HOME_LIMIT = 3;
@@ -45,6 +46,7 @@ const humanStateLabels = {
  */
 export async function HomeDashboard({ locale }: { locale: Locale }) {
   const { supabase, user } = await requireUser(locale);
+  const agentName = await getAgentName();
   const [workProjection, supplemental, inboxProjection, attentionProjection] = await Promise.all([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
@@ -98,9 +100,10 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
         locale={locale}
       />
       <HomeView
+        agentName={agentName}
         locale={locale}
         view={view}
-        capture={<QuickCaptureForm action={captureEntry} locale={locale} captureSource="home" />}
+        capture={<QuickCaptureForm action={captureEntry} agentName={agentName} locale={locale} captureSource="home" />}
       />
     </>
   );

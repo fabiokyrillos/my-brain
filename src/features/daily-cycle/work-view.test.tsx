@@ -16,6 +16,7 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
 
 type WorkViewModule = {
   WorkView?: (props: {
+    agentName: string;
     locale: "pt-BR" | "en";
     timezone: string;
     view: "today" | "all" | "waiting";
@@ -34,6 +35,7 @@ function renderWork(overrides: Partial<Parameters<NonNullable<WorkViewModule["Wo
   expect(workViewModule.WorkView).toBeTypeOf("function");
   const WorkView = workViewModule.WorkView!;
   return render(<WorkView
+    agentName="Brain"
     locale="en"
     timezone="America/Sao_Paulo"
     view="all"
