@@ -250,15 +250,25 @@
 }
 
 @media (max-width: 760px) {
+  /*
+   * Five equal columns, one per `mobileBarSlots` entry (UX-14).
+   *
+   * A grid rather than `justify-content: space-evenly`, because even spacing is
+   * not centring: with six flex children the capture control sat third of six and
+   * its centre fell left of the bar's, and `space-evenly`'s gaps meant no child
+   * index coincided with 50% at all. Five equal columns put the **third column's**
+   * centre exactly on the bar's centre, and `capture` is the third slot — so the
+   * button is centred by the layout's arithmetic rather than by a nudge, at every
+   * width, with no absolute positioning over another slot.
+   *
+   * `order` is never set: DOM order is visual order is focus order.
+   */
   .bottom-nav {
-    display: flex;
-    justify-content: space-evenly;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    justify-items: center;
     overflow: visible;
-  }
-
-  .bottom-nav > a,
-  .bottom-nav > .mobile-more {
-    order: initial;
   }
 
   .bottom-nav > a:not(.capture-fab),

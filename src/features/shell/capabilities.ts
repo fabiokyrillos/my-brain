@@ -113,6 +113,44 @@ export const primaryNavigationKeys = navigationCapabilities
   )
   .map((capability) => capability.key);
 
+/**
+ * The mobile bottom bar, as an ordered slot list (UX-14, DEC-1).
+ *
+ * **The list's length is the bar's column count and its middle element is the
+ * capture control.** That is what makes exact centring a structural property
+ * rather than a measurement that happens to come out right: five equal columns
+ * put the third column's centre on the viewport's centre, and `capture` is the
+ * third slot. `mobile-bar-centring.test.ts` pins both halves — odd length, and
+ * `capture` at the midpoint — so a future edit that adds a sixth destination to
+ * balance geometry fails instead of quietly decentring the button.
+ *
+ * Why these four destinations, and why `inbox` is not among them (owner decision,
+ * 2026-07-30): Início is the attention and orientation surface, Trabalho is the
+ * primary execution surface, Capturar is the central global action, Brain is the
+ * primary assistant surface, and Mais is the overflow and account surface.
+ * Registros is a complete archive and consultation surface rather than an
+ * operational queue, so on a five-slot bar it belongs in overflow. Desktop is
+ * unchanged: it still carries all four primary destinations.
+ */
+export const mobileBarSlots = ["home", "work", "capture", "chat", "more"] as const;
+
+export type MobileBarSlot = (typeof mobileBarSlots)[number];
+
+/** The index whose column centre coincides with the viewport centre. */
+export const mobileBarCentreIndex = (mobileBarSlots.length - 1) / 2;
+
+/**
+ * Primary destinations the mobile bar does not carry, in their declared order.
+ *
+ * Derived rather than listed, so the mobile overflow follows the bar
+ * automatically: change `mobileBarSlots` and whatever it drops appears here, and
+ * therefore in the overflow panel, without a second edit that could be forgotten.
+ */
+export const mobileDemotedKeys = primaryNavigationKeys.filter(
+  (key): key is Exclude<PrimaryNavigationCapability["key"], MobileBarSlot> =>
+    !(mobileBarSlots as readonly string[]).includes(key),
+);
+
 const moreNavigationGroupKeys = [
   "context",
   "reflection",

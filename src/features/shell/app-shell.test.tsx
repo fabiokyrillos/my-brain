@@ -1,8 +1,27 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { usePathname } from "next/navigation";
 import { AppShell } from "./app-shell";
+import { mobileBarCentreIndex, mobileBarSlots, mobileDemotedKeys } from "./capabilities";
 
-afterEach(cleanup);
+/**
+ * The route is mocked rather than left to fall through.
+ *
+ * `NavigationLinks` reads `usePathname()` and falls back to `/{locale}/app` when
+ * it is absent, which is why these tests passed without a router before. The
+ * active-state assertions need to *choose* a route — and one of them is the whole
+ * point of demoting Registros: a phone user standing in it must still see the
+ * disclosure that now contains it marked active.
+ */
+vi.mock("next/navigation", () => ({
+  usePathname: vi.fn(() => "/pt-BR/app"),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+});
 
 describe("AppShell", () => {
   it("exposes the converged primary hierarchy and global actions in Portuguese", () => {
@@ -13,7 +32,7 @@ describe("AppShell", () => {
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Início",
-      "Caixa",
+      "Registros",
       "Trabalho",
       "Brain",
     ]);
@@ -39,7 +58,7 @@ describe("AppShell", () => {
       desktopNavigation.querySelectorAll(":scope > .nav-group-primary a, :scope > .capture-fab"),
     ).map((link) => link.textContent);
 
-    expect(alwaysVisible).toEqual(["Início", "Caixa", "Trabalho", "Brain", "Captura rápida"]);
+    expect(alwaysVisible).toEqual(["Início", "Registros", "Trabalho", "Brain", "Captura rápida"]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
         (summary) => summary.textContent,
@@ -153,14 +172,87 @@ describe("AppShell", () => {
       mobileNavigation.querySelectorAll(":scope > a, :scope > details > summary"),
     ).map((control) => control.textContent);
 
+    /*
+     * Five slots, capture in the middle (UX-14, DEC-1).
+     *
+     * The bar used to carry six controls with capture third, which cannot be
+     * centred in an even number of columns — the reason exact centring was gated.
+     * Registros moved into `Mais` so the bar carries four destinations, two each
+     * side of the capture control.
+     *
+     * DOM order is asserted here and *is* the visual order, because the grid
+     * assigns columns in source order and nothing sets `order`.
+     */
     expect(topLevelControls).toEqual([
       "Início",
-      "Caixa",
-      "Captura rápida",
       "Trabalho",
+      "Captura rápida",
       "Brain",
       "Mais",
     ]);
+  });
+
+  it("centres the capture control by putting it in the middle slot", () => {
+    // Geometry as a structural property rather than a measurement: an odd number
+    // of equal columns with capture at the midpoint. The pixel assertion lives in
+    // `e2e/layout-contracts.spec.ts`, which can measure; this is what makes that
+    // measurement true by construction.
+    expect(mobileBarSlots).toHaveLength(5);
+    expect(mobileBarSlots.length % 2).toBe(1);
+    expect(mobileBarSlots[mobileBarCentreIndex]).toBe("capture");
+    expect(mobileBarSlots.slice(0, mobileBarCentreIndex)).toHaveLength(
+      mobileBarSlots.slice(mobileBarCentreIndex + 1).length,
+    );
+  });
+
+  it("keeps Registros reachable as the first product destination inside Mais", () => {
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    const panel = mobile.querySelector(":scope > details > .mobile-more-menu")!;
+
+    // Two requirements meet here and both hold. The account block leads the panel
+    // (Slice D3: the way out must not sit below what you do inside), and Registros
+    // is the first **product destination** after it — demoted, not buried. It is a
+    // primary destination everywhere else, so it leads the destinations rather
+    // than joining a secondary group, and needs no scrolling to reach.
+    expect(panel.firstElementChild).toHaveClass("mobile-nav-account");
+
+    const destinations = Array.from(panel.querySelectorAll(":scope > :not(.mobile-nav-account) a"));
+    expect(destinations[0]).toHaveAttribute("href", "/pt-BR/app/inbox");
+    expect(destinations[0]).toHaveTextContent("Registros");
+    expect(mobileDemotedKeys).toEqual(["inbox"]);
+  });
+
+  it("marks Mais active while the user is inside the destination it now contains", () => {
+    // The failure this prevents: a phone user reading Registros sees no active
+    // state anywhere, because the destination they are standing in was demoted
+    // out of the bar.
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox");
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    expect(mobile.querySelector(":scope > details")).toHaveClass("active");
+    // And the link inside it is the current page.
+    expect(mobile.querySelector('a[href="/pt-BR/app/inbox"]')).toHaveAttribute("aria-current", "page");
+
+    // Desktop is unchanged: Registros is still a primary rail destination, so the
+    // rail's own More disclosure must *not* claim the active state.
+    const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
+    expect(desktop.querySelector(":scope > details")).not.toHaveClass("active");
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  });
+
+  it("closes the disclosure when a demoted destination is followed", () => {
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    const details = mobile.querySelector(":scope > details") as HTMLDetailsElement;
+    details.open = true;
+
+    const registros = mobile.querySelector('a[href="/pt-BR/app/inbox"]') as HTMLAnchorElement;
+    fireEvent.click(registros);
+
+    // Otherwise the panel stays open over the page the user just navigated to.
+    expect(details.open).toBe(false);
   });
 
   /**
@@ -262,7 +354,7 @@ describe("AppShell", () => {
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Home",
-      "Inbox",
+      "Records",
       "Work",
       "Brain",
     ]);

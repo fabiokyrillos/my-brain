@@ -50,7 +50,15 @@ const LONG_TITLE =
 const ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"></svg>';
 
 /** Mirrors `src/features/shell/navigation-links.tsx` — primary keys, capture, then groups. */
-const PRIMARY = ["Início", "Caixa", "Trabalho", "Brain"] as const;
+const PRIMARY = ["Início", "Registros", "Trabalho", "Brain"] as const;
+/**
+ * The mobile bar, mirroring `mobileBarSlots` (UX-14, DEC-1).
+ *
+ * Five slots with capture in the middle. Registros is not here: it moved into
+ * `Mais` so the bar carries an even number of destinations, which is what makes
+ * exact centring possible at all.
+ */
+const MOBILE_BAR = ["Início", "Trabalho", "Captura rápida", "Brain", "Mais"] as const;
 const GROUPS = [
   ["Contexto", ["Projetos", "Pessoas", "Memórias", "Arquivos"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
@@ -79,15 +87,22 @@ function sideNav() {
  * primary keys, the capture link, the remaining primary keys, then `Mais`.
  */
 function bottomNav() {
-  const head = PRIMARY.slice(0, 2).map((label) => navLink(label, "mobile-primary-link")).join("");
-  const tail = PRIMARY.slice(2).map((label) => navLink(label, "mobile-primary-link")).join("");
   const groups = GROUPS.map(
     ([label, items]) =>
       `<div class="mobile-nav-group" role="group" aria-label="${label}"><span class="mobile-nav-group-label" aria-hidden="true">${label}</span><div class="nav-group-items">${items
         .map((item) => navLink(item))
         .join("")}</div></div>`,
   ).join("");
-  return `${head}${navLink("Captura rápida", "capture-fab")}${tail}<details class="mobile-more"><summary aria-label="Mais">${ICON}<span>Mais</span></summary><div class="mobile-more-menu">${groups}</div></details>`;
+  // Registros leads the panel's destinations: demoted off the bar, not buried.
+  const demoted = `<div class="mobile-nav-group mobile-nav-demoted" role="group" aria-label="Principal"><div class="nav-group-items">${navLink("Registros")}</div></div>`;
+  const more = `<details class="mobile-more"><summary aria-label="Mais">${ICON}<span>Mais</span></summary><div class="mobile-more-menu">${demoted}${groups}</div></details>`;
+  // Built from the declared slot order, so the fixture cannot drift from the
+  // component's own sequence without this list changing too.
+  return MOBILE_BAR.map((label) =>
+    label === "Mais"
+      ? more
+      : navLink(label, label === "Captura rápida" ? "capture-fab" : "mobile-primary-link"),
+  ).join("");
 }
 
 /** Mirrors `src/features/daily-cycle/needs-attention-item.tsx`. */
@@ -227,7 +242,12 @@ test.describe("mobile bottom navigation", () => {
         const nav = document.querySelector(".bottom-nav")!;
         const items = [...nav.children].map((element) => {
           const rect = element.getBoundingClientRect();
-          return { label: (element.textContent ?? "").trim().split(/\s+/)[0], left: rect.left, right: rect.right };
+          // A disclosure is named by its summary, not by its whole subtree: the
+          // panel's text is concatenated without whitespace, so reading
+          // `element.textContent` labelled the `Mais` slot with every destination
+          // inside it.
+          const named = element.querySelector("summary") ?? element;
+          return { label: (named.textContent ?? "").trim().split(/\s+/)[0], left: rect.left, right: rect.right };
         });
         const fab = nav.querySelector(".capture-fab")!.getBoundingClientRect();
         return {
@@ -238,17 +258,24 @@ test.describe("mobile bottom navigation", () => {
         };
       });
 
-      expect(measured.visualOrder, "flex order rearranged the navigation").toEqual(measured.domOrder);
-      // The middle third rather than dead centre: with six slots the capture link
-      // sits third, and no distribution can put slot 3 of 6 exactly on the centre
-      // line. Making it exact means changing how many primary destinations the bar
-      // carries, which is Slice B's decision, not a stylesheet's.
-      const viewportWidth = measured.viewportCentre * 2;
+      expect(measured.visualOrder, "grid order rearranged the navigation").toEqual(measured.domOrder);
+      expect(measured.domOrder).toEqual([...MOBILE_BAR].map((label) => label.split(/\s+/)[0]));
+
+      /*
+       * Dead centre, within 2px (UX-14, closed by DEC-1).
+       *
+       * This assertion used to allow the middle *third*, because with six slots the
+       * capture control sat third of six and no distribution can put slot 3 of 6 on
+       * the centre line — making it exact required deciding how many destinations
+       * the bar carries, which a stylesheet may not decide. That decision is taken:
+       * five slots, capture in the middle, Registros in `Mais`. Five equal grid
+       * columns put the third column's centre on the bar's centre, so the tolerance
+       * is now sub-pixel rounding rather than a third of the screen.
+       */
       expect(
-        measured.fabCentre,
-        `capture button sits ${Math.round(measured.fabCentre)}px into a ${viewportWidth}px bar`,
-      ).toBeGreaterThan(viewportWidth / 3);
-      expect(measured.fabCentre).toBeLessThan((viewportWidth * 2) / 3);
+        Math.abs(measured.fabCentre - measured.viewportCentre),
+        `capture centre is ${measured.fabCentre.toFixed(1)}px, viewport centre is ${measured.viewportCentre}px`,
+      ).toBeLessThanOrEqual(2);
     });
   }
 
