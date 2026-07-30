@@ -77,10 +77,12 @@ export function readCommandFunnelOutcomes(root) {
     return parseProductEventVocabulary(source, "TASK_COMMAND_OUTCOMES");
   } catch (error) {
     // The shared parser names `contracts.ts` in its messages because that is the
-    // only file it was written for. Re-thrown against the file actually read, so
-    // a drift in `outcomes.ts` does not send the reader to the wrong module.
+    // only file it was written for. The message is **rebuilt** rather than
+    // string-replaced: a `.replace()` keyed on that module's private path
+    // constant would silently stop matching if the constant were renamed, and
+    // then point at the wrong file again with nothing to notice.
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(detail.replace("src/features/product-analytics/contracts.ts", OUTCOMES_SOURCE));
+    throw new Error(`${OUTCOMES_SOURCE} does not declare a readable TASK_COMMAND_OUTCOMES: ${detail}`);
   }
 }
 
@@ -140,6 +142,20 @@ export const COMMAND_FUNNEL_REFUSAL_OUTCOMES = COMMAND_FUNNEL_PREVIEWED_OUTCOMES
  * rather than counting preview dispositions.
  */
 export const COMMAND_FUNNEL_NO_MATCH_OUTCOMES = ["still_unmatched", "creation_offered"];
+
+/**
+ * The same two members, keyed by what they mean.
+ *
+ * The aggregator counts them separately and they feed *different* halves of the
+ * planning rate gate, so binding them to array positions would let a reorder of
+ * the list above swap the two counters while every test still passed.
+ */
+const NO_MATCH = { stillUnmatched: "still_unmatched", creationOffered: "creation_offered" };
+for (const member of Object.values(NO_MATCH)) {
+  if (!COMMAND_FUNNEL_NO_MATCH_OUTCOMES.includes(member)) {
+    throw new Error(`no-match member "${member}" is not in COMMAND_FUNNEL_NO_MATCH_OUTCOMES`);
+  }
+}
 
 /** Excluded from every denominator (ADR-055; 2F-MEASURE-002). */
 export const COMMAND_FUNNEL_EXCLUDED_OUTCOMES = ["unsupported"];
@@ -424,10 +440,11 @@ export function aggregateCommandFunnel(input) {
       activeDates.add(formatter.format(at));
       if (oneStep) oneStepCount += 1;
       if (outcome === "ambiguous" || outcome === "ambiguous_overflow") ambiguityCount += 1;
-      // Driven off the declared member set rather than restated literals, so
-      // editing `COMMAND_FUNNEL_NO_MATCH_OUTCOMES` actually changes the measure.
-      if (outcome === COMMAND_FUNNEL_NO_MATCH_OUTCOMES[0]) stillUnmatched += 1;
-      if (outcome === COMMAND_FUNNEL_NO_MATCH_OUTCOMES[1]) creationOffered += 1;
+      // Keyed by meaning, not by position: these two feed different halves of the
+      // planning rate gate, so a reorder of the declared list must not be able to
+      // swap them.
+      if (outcome === NO_MATCH.stillUnmatched) stillUnmatched += 1;
+      if (outcome === NO_MATCH.creationOffered) creationOffered += 1;
       continue;
     }
 

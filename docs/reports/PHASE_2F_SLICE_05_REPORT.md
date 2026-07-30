@@ -14,7 +14,7 @@
 |---|---|
 | `scripts/phase-2f-command-funnel.mjs` | The reader: aggregator, evidence-tier evaluator, expiry arithmetic, thresholds, refusal subset, reachability facts. One implementation, reachable from both Vitest and the Node runner. |
 | `scripts/phase-2f-command-funnel-reader.mjs` | The runner: an owner read that writes nothing, and a `--proof` mode that writes disposable fixtures and deletes them. |
-| `src/features/product-analytics/command-funnel.test.ts` | 50 cases in CI's `app` job: aggregator behaviour, exclusions, boundaries, tiers, expiry, vocabulary read/mirror parity, reachability derived from the emitters. |
+| `src/features/product-analytics/command-funnel.test.ts` | 52 cases in CI's `app` job: aggregator behaviour, exclusions, boundaries, tiers, expiry, vocabulary read/mirror parity, reachability derived from the emitters. |
 | `src/features/task-commands/end-to-end-match-baseline.remote.test.ts` | The end-to-end baseline (2F-MEASURE-007), against the deployed contract, using the real loader and the real scorer. |
 | `vitest.remote.config.ts` + one `exclude` line | The credentialed lane, kept out of CI (ADR-059). |
 | `supabase/tests/product_events.sql` (+3 assertions) | The cascade delete action, the synthetic partial index, and `is_synthetic`'s not-null constraint, as schema truth in CI. |
@@ -95,7 +95,7 @@ Both halves are now fixed. `prefilterTier` is read off the rows the deployed que
 |---|---|
 | `npm run lint` | clean |
 | `npm run typecheck` | clean |
-| `npm test` | **2418 / 2420** — the two failures are pre-existing and Windows-only (§8) |
+| `npm test` | **2423 / 2425** — the two failures are pre-existing and Windows-only (§8) |
 | `npm run build` | compiled successfully |
 | `deno check` both entrypoints | clean |
 | `deno test supabase/functions/` | 46 / 46 |
@@ -107,11 +107,12 @@ The funnel proof's controls: owner-scoping, cross-owner isolation, anonymous den
 
 ## 7. Review cycles
 
-Three independent adversarial reviews, all recorded in the PRD (§23, §23.1, §23.2).
+Four independent adversarial reviews, all recorded in the PRD (§23, §23.1, §23.2, §23.3).
 
 - **Design review** — 23 findings; 22 confirmed and folded in, one BLOCKING claim rejected on evidence.
 - **Implementation review** — 21 findings; 19 confirmed and fixed, two narrowed or rejected on executed evidence. Five changed behaviour: the window-as-ceiling inversion, the unbounded creation rate, the self-asserting reachability test, the exit-2 path that skipped cleanup, and the degenerate corpus.
 - **Final pre-merge review** — 10 findings, one BLOCKING. All ten confirmed and fixed. The blocking one is above: the tier-coverage guard asserted its own annotation, and the corpus never reached tier 2.
+- **Verification of the fix commit** — because every prior cycle had found a defect in the previous cycle's fix, the fix itself was verified before merge. All ten fixes confirmed genuine; five non-blocking findings (stale published totals, a deleted field still named in the PRD's normative list, two untested fixes, positional indexing that bound meaning to array order, and a date) fixed in turn.
 
 Across the three cycles the recurring lesson is the same, and it is worth stating because it is the lesson of this slice: **a guard that reads its own input proves nothing.** The reachability block asserted a frozen constant against itself; the tier-coverage case grouped on a hand-written label; the pagination comment claimed an exhaustion assertion that did not exist. Each was fixed by making the check read the thing it is about — the emitter source, the SQL-assigned tier, a total sort key.
 

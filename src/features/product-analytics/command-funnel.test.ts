@@ -612,6 +612,45 @@ describe("failing loudly", () => {
   it("throws on a non-positive window", async () => {
     await expect(aggregate([], { windowDays: 0 })).rejects.toThrow(/windowDays/);
   });
+
+  it("requires `isSynthetic` rather than treating an unknown as not synthetic", async () => {
+    // The one input a non-database caller could get wrong. `null` or `"true"`
+    // silently read as "not synthetic" would count disposable traffic into the
+    // gate — the column is proven non-null in pgTAP, but the module contract is
+    // not the column.
+    for (const value of [null, undefined, "true", 1]) {
+      const row = previewed();
+      (row as Record<string, unknown>).isSynthetic = value;
+      await expect(aggregate([row])).rejects.toThrow(/isSynthetic/);
+    }
+  });
+
+  it("names the file it actually read when the outcome vocabulary is unreadable", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const { readCommandFunnelOutcomes } = await load();
+
+    // The shared parser's messages name `contracts.ts`, because that is the only
+    // file it was written for. This proves the reader rebuilds the message against
+    // the file it read — the branch that would otherwise send a future maintainer
+    // to the wrong module.
+    const root = mkdtempSync(path.join(tmpdir(), "funnel-outcomes-"));
+    const dir = path.join(root, "src", "features", "task-commands");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, "outcomes.ts"),
+      "export const TASK_COMMAND_OUTCOMES = [...SOMETHING_ELSE] as const;\n",
+      "utf8",
+    );
+
+    // Leads with the file that was read. The parser's own message is kept after
+    // the colon as provenance — it says *what* was unparseable, which is worth
+    // more than a message with no attribution at all — but it can no longer be
+    // the first thing a maintainer sees.
+    expect(() => readCommandFunnelOutcomes(root))
+      .toThrow(/^src\/features\/task-commands\/outcomes\.ts does not declare a readable/);
+  });
 });
 
 describe("evaluating the evidence tiers", () => {

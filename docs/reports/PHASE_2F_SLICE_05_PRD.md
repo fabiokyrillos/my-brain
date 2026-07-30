@@ -79,7 +79,7 @@ Phase 2E shipped a complete task-command surface and, in Slice 2E.7, seventeen p
 
 ## 6. Functional requirements
 
-**S5-R1 — Measures.** For one owner over one window: `qualifyingCommands`, `activeDays`, `windowDays`, `outcomeDistribution` (every `TASK_COMMAND_PREVIEWED_OUTCOMES` member, zeros included), `refusalOutcomeClasses` (S5-R12), `noMatchRate`, `noMatchToCreationRate`, `originSplit`, `appliedRoutesByOrigin`, `undoResultsByOrigin`, `disambiguationsByOrigin`, `oneStepRate`, `ambiguityRate`, `unsupportedRefusals`, `excludedSynthetic`, `appliedWithoutPreview`, `reachability`, `nonAuthorizing`.
+**S5-R1 — Measures.** For one owner over one window: `qualifyingCommands`, `activeDays`, `windowDays`, `outcomeDistribution` (every `TASK_COMMAND_PREVIEWED_OUTCOMES` member, zeros included), `refusalOutcomeClasses` (S5-R12), `noMatchRate`, `noMatchToCreationRate`, `previewedByOrigin`, `appliedByOrigin`, `appliedRoutesByOrigin`, `undoResultsByOrigin`, `disambiguationsByOrigin`, `oneStepRate`, `ambiguityRate`, `unsupportedRefusals`, `excludedSynthetic`, `appliedWithoutPreview`, `reachability`, `nonAuthorizing`.
 
 **S5-R2 — Qualifying command.** One qualifying command is one `task_command_previewed` row that survives S5-R4 and whose `outcomeCategory ≠ 'unsupported'`. `unsupported` rows are counted as `unsupportedRefusals` and excluded from **every** denominator (ADR-055; `2F-MEASURE-002`). The unit is a **qualifying preview round**, not a user intent — see S5-R11.
 
@@ -202,7 +202,6 @@ CommandFunnelReport = {
   qualifyingCommands, activeDays, unsupportedRefusals, excludedSynthetic,
   outcomeDistribution:   { <every previewed-outcome member>: count },
   refusalOutcomeClasses: { unsupported, refused, rejected_stale, rejected_conflict },
-  originSplit:           { chat, work },
   previewedByOrigin:     { chat, work },   // the qualifying population
   appliedByOrigin:       { chat, work },   // a *different* population; reported raw, never subtracted
   appliedRoutesByOrigin: { chat: {direct, confirmed, created}, work: {…} },
@@ -454,6 +453,20 @@ An independent review of PR #31 at `3e17664` produced 10 findings, one **BLOCKIN
 | **R8** — `readCommandFunnelOutcomes` reads `outcomes.ts` through a parser whose messages hard-code `contracts.ts` | **CONFIRMED** | Re-thrown against the file actually read, without touching the shared script two other smokes depend on. |
 | **R9** — §18.5 overstates the boundary coverage the suite delivers | **CONFIRMED** | Fixed by adding the cases rather than narrowing the claim: one-above for both spike floors, one-below for both planning floors, and the window-compatibility case. |
 | **R10** — assorted staleness | **CONFIRMED** | `COMMAND_FUNNEL_NON_AUTHORIZING` now names the report's own key paths so a consumer can cross-reference them mechanically; the CHANGELOG date matches the ADRs. **Handover, not fixed here:** `docs/PHASE_2F_PRD.md` §10 marks the `database` cell `—` for 2F.5, which this slice's three pgTAP assertions make stale. Correcting the phase PRD is `2F-OPERATIONS-006`'s reconciliation, so it is recorded for Slice 2F.6 rather than edited now; A13 states the cell 2F.5 carries in fact. |
+
+### 23.3 Fourth cycle — verification of the fix commit
+
+Because each cycle had found a defect in the previous cycle's fix, the fix commit `b2fa232` was itself put through a focused verification before merge. It confirmed **all ten** fixes as genuine — including the blocking tier-coverage fix in each of its six sub-checks — and returned MERGE with five non-blocking findings, all of which were then fixed.
+
+| Finding | Verdict | Resolution |
+|---|---|---|
+| **D1** — the published Vitest totals (`2418 / 2420`) were contradicted by the same commit that raised the case count | **CONFIRMED** | Corrected. An acceptance verifier re-running `npm test` would have got a different number from the two evidence tables and had no way to reconcile them. Now `2423 / 2425` with 52 funnel cases. |
+| **D2** — §6 S5-R1 and the §10 shape sketch still named `originSplit`, the field R4 removed | **CONFIRMED** | Struck from both. The code side was already clean, but leaving a deleted field in the normative measure list — directly above its replacement, still showing the duplicate-under-two-keys defect — is exactly the doc/code drift this slice exists to prevent. |
+| **D3** — two of the ten fixes shipped without tests, and the re-throw could silently no-op | **CONFIRMED** | The `isSynthetic` guard and the unreadable-vocabulary branch now have cases. The re-throw no longer does string surgery on the shared parser's message: it **rebuilds** the message leading with the file actually read, because a `.replace()` keyed on that module's private path constant would stop matching if the constant were renamed and would then point at the wrong file again with nothing to notice. The parser's own words are kept after the colon as provenance — they say *what* was unparseable — and the test asserts the message *leads* with the correct file. |
+| **D4** — `COMMAND_FUNNEL_NO_MATCH_OUTCOMES[0]` / `[1]` bound meaning to array order | **CONFIRMED** | The two counters feed different halves of the planning rate gate, so a reorder plus a mechanical update of the pinned literal could have swapped them with the suite still green. Now keyed by meaning, with a load-time check that both members are in the declared list. |
+| **D5** — `STATE.md` still dated `2026-07-30` after the CHANGELOG heading moved to `2026-07-29` | **CONFIRMED** | Corrected. |
+
+The verification also recorded several properties as independently reproduced rather than trusted: `prefilterTier` is SQL-authoritative (parsed off the RPC row, never derived client-side); the lexicographic `.sort()` in the tier assertion is harmless because the domain is single-digit and tier 3 is unreachable once a hint exists; `Math.min` is the stronger choice over "contains" because the best tier reached is the one that drives the verdict; `partial-overlap` is the only seeded row with any token overlap for its hint, so it returns `tiers === [2]`; the five outcome buckets are a true partition of `TASK_MATCH_OUTCOMES` with `oneStep` set only on the `matched` branch; and the eleven-scenario pin reproduces deterministically at 5 / 0 / 1 / 3 / 2.
 
 **What this cycle says about the slice.** All three reviews converged on one failure mode, and it is worth naming because the slice's product *is* accurate measurement: **a check that reads its own input proves nothing.** The reachability block asserted a frozen constant against itself; the tier-coverage case grouped on a hand-written label while the real value sat unused on the row; the pagination comment promised an exhaustion assertion that was never written. Each is now fixed by making the check read the thing it is about — the emitter source, the SQL-assigned tier, a total sort key. CI was green through every one of them.
 

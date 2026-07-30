@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-07-30 (Phase 2F — Slices 2F.1 through 2F.4 accepted and deployed; Slice 2F.5 implemented, remote-validated and awaiting merge; remote parity `202607300063`; Slice 2F.6 not started)
+Last updated: 2026-07-29 (Phase 2F — Slices 2F.1 through 2F.4 accepted and deployed; Slice 2F.5 implemented, remote-validated and awaiting merge; remote parity `202607300063`; Slice 2F.6 not started)
 
 ## Current truth
 
