@@ -12,14 +12,11 @@
  * happened.
  */
 
-import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Clock3, Inbox, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
-import { isWorkSurfaceAction, type WorkSurfaceAction } from "@/features/task-commands/taxonomy";
 import type { Locale } from "@/lib/preferences";
-import { idleWorkItemActionState, type WorkItemActionState } from "./work-action-state";
-import { getWorkActionsCopy } from "./work-actions-copy";
+import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   not_started: { pt: "Não iniciada", en: "Not started" },
@@ -37,17 +34,7 @@ const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
   urgent: { pt: "Urgente", en: "Urgent" },
 };
 
-const actionIcon: Record<WorkSurfaceAction, typeof Check> = {
-  complete_task: Check,
-  wait_task: Clock3,
-  resume_task: Clock3,
-  reopen_task: RotateCcw,
-};
-
-export type WorkItemActionHandler = (
-  state: WorkItemActionState,
-  formData: FormData,
-) => Promise<WorkItemActionState>;
+export type { WorkItemActionHandler };
 
 export function TaskList({
   action,
@@ -98,64 +85,17 @@ function TaskRow({
   timezone: string;
 }) {
   const pt = locale === "pt-BR";
-  const copy = getWorkActionsCopy(locale);
-  const router = useRouter();
-  const result = useRef<HTMLDivElement | null>(null);
-
-  /**
-   * The operation keys, one per **(row, action)** pair (2F-SURFACE-006).
-   *
-   * Held in a ref and minted lazily, exactly as `quick-capture-form.tsx:33-40`
-   * mints its idempotency key — **never in the render body**, where every
-   * re-render would re-mint: `useActionState`'s pending→settled transition is a
-   * re-render, and StrictMode double-renders in development.
-   *
-   * Scoped per action rather than per row because one key carrying two different
-   * request fingerprints is refused with `2E_IDEMPOTENCY_MISMATCH` — a
-   * legitimate second action on the same row would fail for a reason the user
-   * cannot see or act on.
-   */
-  const keys = useRef<Map<WorkSurfaceAction, string>>(new Map());
-  function operationKeyFor(id: WorkSurfaceAction): string {
-    const existing = keys.current.get(id);
-    if (existing !== undefined) return existing;
-    const minted = crypto.randomUUID();
-    keys.current.set(id, minted);
-    return minted;
-  }
-
-  async function submit(state: WorkItemActionState, formData: FormData): Promise<WorkItemActionState> {
-    const clicked = formData.get("action");
-    if (!isWorkSurfaceAction(clicked)) return state;
-    // Carried into the request at submit time and **never rendered into
-    // markup**: a hidden input holding a client-minted uuid would not match the
-    // value the server rendered, and React would report a hydration mismatch on
-    // every row.
-    formData.set("operationKey", operationKeyFor(clicked));
-    const next = await action(state, formData);
-    // Rotated after **every** terminal outcome, not only success. A refused
-    // apply raises inside `apply_task_command`, which aborts the transaction and
-    // rolls back the operation-key reservation — so no key is ever burned by a
-    // refusal and reuse would also be safe. Rotating unconditionally is the
-    // simpler invariant to hold.
-    if (next.status !== "idle") keys.current.delete(clicked);
-    return next;
-  }
-
-  const [state, formAction, pending] = useActionState(submit, idleWorkItemActionState);
-
-  // Focus lands on the outcome after every round, so a keyboard or screen-reader
-  // user is told what happened instead of being left on a button whose label no
-  // longer describes the row. `tabIndex={-1}` makes the region programmatically
-  // focusable without adding it to the tab order — `command-console.tsx:192-198`.
-  useEffect(() => {
-    if (state.status !== "idle") result.current?.focus();
-  }, [state]);
+  // The producer of `open_task` is `work-projection.ts`; this is its consumer.
+  // Before Slice D1 the row was an <article> with no way in, so a task could be
+  // acted on in four fixed ways and never inspected (UX-05, UX-19). The title is
+  // the link rather than the row, because the row contains the action forms and
+  // a <form> inside an <a> is not valid markup.
+  const openHref = task.availableActions.find((available) => available.id === "open_task")?.href;
 
   return (
     <article className="list-row">
       <div className="list-row-main">
-        <strong>{task.title}</strong>
+        {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
         {task.description && <p>{task.description}</p>}
         <small className="work-origin">{task.origin === "brain" ? (pt ? "Sugerida pelo Brain" : "Suggested by Brain") : (pt ? "Criada por você" : "Created by you")}</small>
         {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
@@ -201,64 +141,7 @@ function TaskRow({
         )}
         {task.noDueReason && <small>{task.noDueReason}</small>}
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
-
-        {/*
-          One polite live region per row, announcing the pending phrase while a
-          round is in flight and the outcome once it settles. `aria-busy` is what
-          tells a screen reader the region is mid-update rather than empty —
-          `command-console.tsx:216-224`.
-        */}
-        <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-          {pending ? copy.pendingAnnouncement : state.announcement}
-        </div>
-
-        <div className="row-actions">
-          {task.availableActions.flatMap((available) => {
-            // 2F-SURFACE-009: the projection derives availability from the task's
-            // status and the taxonomy decides eligibility for that status; a
-            // button rendered outside its declared eligible statuses would be
-            // offering a refusal.
-            if (!isWorkSurfaceAction(available.id)) return [];
-            const Icon = actionIcon[available.id];
-            // One form per action, all sharing this row's single
-            // `useActionState`. Every field the action reads is a hidden input,
-            // so nothing depends on which element submitted — **except the
-            // operation key, which is never rendered** and is set on the
-            // FormData at submit time instead.
-            return [
-              <form action={formAction} key={available.id}>
-                <input type="hidden" name="taskId" value={task.taskId} />
-                <input type="hidden" name="locale" value={locale} />
-                <input type="hidden" name="title" value={task.title} />
-                <input type="hidden" name="action" value={available.id} />
-                <button className="row-action" disabled={pending} type="submit">
-                  <Icon size={13} /> {copy.actions[available.id]}
-                </button>
-              </form>,
-            ];
-          })}
-        </div>
-
-        {state.status === "idle" ? null : (
-          <div
-            aria-label={copy.resultRegionLabel}
-            className="work-action-result"
-            ref={result}
-            // A named landmark rather than a bare `div`: a screen-reader user can
-            // navigate back to the answer after moving away from it.
-            role="region"
-            tabIndex={-1}
-          >
-            <strong>{state.heading}</strong>
-            <p>{state.detail}</p>
-            {state.title === null ? null : <p className="work-action-title">{state.title}</p>}
-            {state.refreshable && (
-              <button className="row-action" onClick={() => router.refresh()} type="button">
-                {copy.refresh}
-              </button>
-            )}
-          </div>
-        )}
+        <WorkItemActions action={action} locale={locale} task={task} />
       </div>
     </article>
   );
