@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(26);
 
 select has_table('public', 'product_events', 'private product-events ledger exists');
 select has_column('public', 'product_events', 'user_id', 'ledger event has an owner');
@@ -14,6 +14,38 @@ select ok(
 select policies_are('public', 'product_events', array['product_events_select_own']);
 select has_index('public', 'product_events', 'product_events_user_created_idx', 'owner timeline index exists');
 select has_index('public', 'product_events', 'product_events_user_name_created_idx', 'owner funnel index exists');
+
+-- Phase 2F Slice 2F.5 (PRD 2F-MEASURE-002, ADR-058). The funnel reader's first
+-- exclusion mechanism is "a smoke-created user takes its events with it when the
+-- cleanup deletes them", which is a claim about this foreign key's delete
+-- action. It was previously only asserted in prose. No credential this
+-- repository holds can read an event row once its owner is gone -- `revoke all
+-- ... from service_role` means even the service-role key cannot look -- so the
+-- remote proof can show the *owner* is deleted and nothing more. This is where
+-- the other half is proven: the cascade is schema truth, checked on the chain CI
+-- applies from empty.
+select results_eq(
+  $$ select confdeltype::text from pg_constraint
+     where conrelid = 'public.product_events'::regclass
+       and contype = 'f'
+       and conkey = array[(
+         select attnum from pg_attribute
+         where attrelid = 'public.product_events'::regclass and attname = 'user_id'
+       )]::smallint[] $$,
+  $$ values ('c'::text) $$,
+  'product-events owner reference cascades on owner deletion'
+);
+select has_index('public', 'product_events', 'product_events_synthetic_created_idx', 'synthetic traffic is findable for purge');
+select ok(
+  (select count(*) = 1 from pg_class c
+   join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'product_events'
+     and exists (
+       select 1 from pg_attribute a
+       where a.attrelid = c.oid and a.attname = 'is_synthetic' and a.attnotnull
+     )),
+  'synthetic classification is non-null, so the funnel filter can never see an unknown'
+);
 select has_function('public', 'record_product_event', array['text','text','text','text','text','jsonb','text','uuid','uuid','uuid','boolean']);
 select has_function('public', 'record_product_event_for_user', array['uuid','text','text','text','text','text','jsonb','text','uuid','uuid','uuid','boolean']);
 select results_eq(
