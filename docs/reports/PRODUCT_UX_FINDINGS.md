@@ -1153,15 +1153,54 @@ Splitting is not a way of shipping less. It keeps a slice that adds **zero** wri
 separate from one that generalises the write path, so the first can be reviewed on its
 layout and the second on its contract.
 
-### To verify before writing D2
+### Verification completed before writing D2 — all three answered
 
-1. Whether `patch.dueAt` accepts an absolute ISO instant or only a temporal phrase —
-   `schema.ts` resolves phrases through `resolveTemporalPhrase`, and a date picker supplies
-   an instant.
-2. `actionPolicy`'s allowed patch fields and `allowedTargetValues` per action, so no
-   control can offer a value the taxonomy would refuse (the mistake `set_status` +
-   `cancelled` exists to prevent).
-3. That `assign_*` relation refs resolve by owned-entity id and not by free text.
+**1. `dueAt` — a date picker works, an instant does not.**
+`resolveTemporalPhrase` **explicitly refuses a complete ISO instant**
+(`temporal.ts:368`), and the comment states why: 2E-COMMAND-016 says the instant is never
+model-supplied, and a raw timestamp let a model "pin a Sao Paulo user to a Tokyo offset".
+For a moment this looked like an integrity-contract conflict, because a date picker was
+assumed to supply an instant. **It is not one.** The lexicon carries an `explicit_date`
+rule (`temporal.ts:283`) matching `ISO_DATE` — `YYYY-MM-DD`, exactly what
+`<input type="date">` emits — and resolves it *in the caller's own timezone* through
+`resolveLocal(..., context.timeZone)`. So the contract already anticipated this control:
+the picker sends a calendar date, the lexicon owns the instant, and **no schema change, no
+version bump and no migration is needed**. One bound to respect: `explicit_date` refuses a
+date more than `MAX_RELATIVE_DAYS` = **730 days** from today, so the picker must clamp to
+±2 years or it will produce `needs_clarification`.
+
+**2. The action policies, read off `taxonomy.ts` — 15 policies.**
+
+| action | patch field(s) | required | allowed values | destructive |
+| --- | --- | --- | --- | --- |
+| `complete_task`, `reopen_task`, `clear_due`, `restore_task` | — | — | — | no |
+| `cancel_task` | — | — | — | **yes** |
+| `set_status` | `status` | `status` | `ACTIVE_ONLY` (the six non-terminal statuses) | no |
+| `set_priority` | `priority` | `priority` | `TASK_PRIORITIES` (low/medium/high/urgent) | no |
+| `rename_task` | `title` | `title` | — | no |
+| `append_note` | `note` | `note` | — | no |
+| `reschedule_due` | `dueAt` | `dueAt` | — | no |
+| `set_planned` | `plannedAt` | `plannedAt` | — | no |
+| `assign_project` | `projectRef` | `projectRef` | — | no |
+| `assign_context` | `contextRef` | `contextRef` | — | no |
+| `assign_person` / `set_waiting_on` | `personRef` | `personRef` | — | no |
+
+`set_status`'s allowed set is `ACTIVE_ONLY`, which is what structurally prevents it from
+delivering a cancellation without the confirmation `cancel_task` requires. **Only
+`cancel_task` is destructive**, so it alone routes through
+`issue_task_command_confirmation` and the existing confirm dialog; the other ten may be
+direct controls.
+
+**3. Relation refs resolve server-side against owned entities.**
+`projectRef`/`contextRef`/`personRef` are bounded strings, resolved in SQL by
+`public.resolve_owned_entity_exact` and turned into a `resolvedId`
+(`preview.ts:291`). A `<select>` listing the user's own projects and submitting the exact
+name therefore resolves correctly, with ownership proven in the database rather than
+asserted by the client — and there is no path for the UI to smuggle an id.
+
+**Conclusion: D2 needs no owner decision, no migration and no contract change.** It is a
+new TypeScript module generalising `work-command.ts`'s fixed patch to a caller-supplied,
+schema-validated one, plus controls whose values the table above bounds.
 
 Until D2 lands, UX-05 stays **partially open** with 11 verbs reachable only through the
 console — recorded as such, not closed.
