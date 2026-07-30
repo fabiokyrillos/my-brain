@@ -50,7 +50,7 @@ const LONG_TITLE =
 const ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"></svg>';
 
 /** Mirrors `src/features/shell/navigation-links.tsx` — primary keys, capture, then groups. */
-const PRIMARY = ["Início", "Registros", "Trabalho", "Brain"] as const;
+const PRIMARY = ["Início", "Registros", "Trabalho", "Conversar"] as const;
 /**
  * The mobile bar, mirroring `mobileBarSlots` (UX-14, DEC-1).
  *
@@ -58,7 +58,7 @@ const PRIMARY = ["Início", "Registros", "Trabalho", "Brain"] as const;
  * `Mais` so the bar carries an even number of destinations, which is what makes
  * exact centring possible at all.
  */
-const MOBILE_BAR = ["Início", "Trabalho", "Captura rápida", "Brain", "Mais"] as const;
+const MOBILE_BAR = ["Início", "Trabalho", "Captura rápida", "Conversar", "Mais"] as const;
 const GROUPS = [
   ["Contexto", ["Projetos", "Pessoas", "Memórias", "Arquivos"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],

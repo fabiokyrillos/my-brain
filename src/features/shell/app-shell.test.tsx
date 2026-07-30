@@ -34,7 +34,7 @@ describe("AppShell", () => {
       "Início",
       "Registros",
       "Trabalho",
-      "Brain",
+      "Conversar",
     ]);
     expect(screen.getAllByRole("link", { name: "Captura rápida" })).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute(
@@ -58,7 +58,7 @@ describe("AppShell", () => {
       desktopNavigation.querySelectorAll(":scope > .nav-group-primary a, :scope > .capture-fab"),
     ).map((link) => link.textContent);
 
-    expect(alwaysVisible).toEqual(["Início", "Registros", "Trabalho", "Brain", "Captura rápida"]);
+    expect(alwaysVisible).toEqual(["Início", "Registros", "Trabalho", "Conversar", "Captura rápida"]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
         (summary) => summary.textContent,
@@ -187,7 +187,7 @@ describe("AppShell", () => {
       "Início",
       "Trabalho",
       "Captura rápida",
-      "Brain",
+      "Conversar",
       "Mais",
     ]);
   });
@@ -356,7 +356,7 @@ describe("AppShell", () => {
       "Home",
       "Records",
       "Work",
-      "Brain",
+      "Talk",
     ]);
     expect(within(desktopNavigation).getByRole("link", { name: "Work" })).toHaveAttribute(
       "href",

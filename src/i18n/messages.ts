@@ -24,7 +24,17 @@ const messages = {
       people: "Pessoas",
       reminders: "Lembretes",
       questions: "Perguntas pendentes",
-      chat: "Brain",
+      /*
+       * `Conversar`, not `Brain` (UX-06, DEC-2).
+       *
+       * The route key stays `chat` and the URL is unchanged. What changes is
+       * that this destination stops being named after the assistant: "Brain"
+       * was doing three jobs at once — the product (`My Brain`), this nav
+       * label, and the assistant as an actor — and a name the owner can now
+       * change in Settings cannot also be a fixed place in the navigation.
+       * A destination is a place, so it gets a verb.
+       */
+      chat: "Conversar",
       memories: "Memórias",
       reviews: "Revisões",
       files: "Arquivos",
@@ -61,7 +71,7 @@ const messages = {
       people: "People",
       reminders: "Reminders",
       questions: "Pending questions",
-      chat: "Brain",
+      chat: "Talk",
       memories: "Memories",
       reviews: "Reviews",
       files: "Files",
