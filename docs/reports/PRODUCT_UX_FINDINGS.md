@@ -3,9 +3,12 @@
 **Initiative** — Product UX/UI Remediation Loop (post-Phase 2F, pre-Phase 2G).
 **Opened** — 2026-07-30.
 **Baseline commit** — `0c13285` (`main`, clean tree at audit start).
-**Status** — Slices A, B, C and D1 are **merged into `main`**. D2 in progress.
+**Status** — Slices A through G2 are **merged into `main`**. G3 in progress.
 
 ### Integrated slices
+
+Every merge SHA below was confirmed green on all three CI jobs — application,
+edge worker, and database and journey — before the next slice was cut from it.
 
 | Slice | PR | Merge commit | Branch (preserved) |
 | --- | --- | --- | --- |
@@ -13,6 +16,14 @@
 | B — navigation and IA | #36 | `2c935f9` | `codex/ux-slice-b-navigation` |
 | C — Home attention surface | #37 | `35ae645` | `codex/ux-slice-c-home` |
 | D1 — task detail surface | #38 | `9302bc5` | `codex/ux-slice-d1-task-detail` |
+| D2 — structured task commands | #39 | `4e97519` | `codex/ux-slice-d2-task-commands` |
+| D3 — logout and account switching | #40 | `cf2bcb5` | `codex/ux-slice-d3-account-session` |
+| B2 — Registros, FAB centring | #41 | `9d7f98f` | `codex/ux-slice-b2-registros` |
+| E — the unified composer | #42 | `967e6cc` | `codex/ux-slice-e-unified-composer` |
+| F1 — the assistant's name | #43 | `66d2ae0` | `codex/ux-slice-f1-assistant-name` |
+| F2 — Projects and People | #44 | `558ecdd` | `codex/ux-slice-f2-projects-people` |
+| G1 — the question after-state | #45 | `974c072` | `codex/ux-slice-g1-question-outcome` |
+| G2 — the reminder gate (record only) | #46 | `0548e2c` | `codex/ux-slice-g2-gate` |
 
 Merged in dependency order with the repository's normal merge-commit strategy — no squash,
 no rebase, thematic commits and branch history intact. Each stacked PR was retargeted to
@@ -104,7 +115,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **RESOLVED** (Slice E — one composer) |
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
-| UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
+| UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | **RESOLVED** (Slice G3 — incl. DEC-5) |
 | UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | **RESOLVED** (Slice G1) |
 | UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | **BLOCKED on DEC-6** (grant posture) |
 | UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | OPEN |
@@ -607,8 +618,11 @@ that measured clean and is recorded so it is not "fixed" without cause.
   choosable at creation instead of silently defaulting to `fact`/1.0; (4) archive via
   `valid_until` rather than delete; (5) state where it is used. All of that is UI over
   existing columns. The conversational path is separate (DEC-5).
-- **Slice** — G.
-- **Disposition** — OPEN; the conversational-memory path is BLOCKED on DEC-5.
+- **Slice** — G3.
+- **Disposition** — **RESOLVED** (Slice G3). Both halves shipped, including the
+  conversational path — see the Slice G3 section for the correction to the
+  paragraph above, which assumed DEC-5 required a new AI→domain write contract
+  and was wrong about the only architecture it considered.
 
 ## UX-12 — Reminders expose create only; snooze/cancel/edit are modelled but unreachable
 
@@ -2253,3 +2267,128 @@ grant constraint.
 - **UX-12 — BLOCKED on DEC-6.** Not a UI problem: `authenticated` holds no `update` on
   `public.reminders`, by a deliberate Phase 2F determination that the parity-head migration
   asserts at deploy time.
+
+---
+
+# Slice G3 — what a memory is, where it came from, and when it stops (UX-10, DEC-5)
+
+**Branch** `codex/ux-slice-g3-memories`, cut from the green G2 merge SHA `0548e2c` (run
+`30593990646`, all three jobs green). **Covers** UX-10 and completes **DEC-5**. **Non-goals** —
+no migration, no RPC, no grant change, no new AI→domain write contract, and no physical delete.
+
+## The precondition, checked before anything was written
+
+UX-12 is blocked because Phase 2F revoked `authenticated`'s `update` and `delete` on
+`public.reminders`. The first question for this slice was whether `memories` sits under the same
+posture. It does not, and the evidence is direct:
+
+- `202607160006_chat_memory.sql:69-79` enables **and forces** RLS on `memories`, creates four
+  own-row policies (select/insert/update/delete), and grants all four to `authenticated`.
+- `202607300063_phase_2f_task_grant_revocation.sql:90-92` revokes on `tasks` and `reminders`
+  **only** — the comment at `:98` records that scope deliberately.
+- `audit_logs.action_type` and `entity_type` are plain `text` (`202607160003:131-132`); only
+  `actor` carries a CHECK, and it already admits `'user'`.
+
+Every column this slice needed was already reachable, so the whole slice is application code.
+**Migration parity is unchanged at `202607300063`, verified before and after.**
+
+## The audit's one wrong assumption, corrected
+
+The original UX-10 entry concluded that a conversational "lembre disso sempre" required extending
+*either* the extraction schema *or* the task-command taxonomy, and that since both are validated
+AI→domain write contracts, DEC-5 could not be closed without one.
+
+That surveyed two architectures and missed the third, which is the one that shipped:
+**deterministic recognition → proposal → explicit owner confirmation → ordinary authenticated
+write.** No model participates. `looksLikeMemoryIntent` (Slice E) and `buildMemoryProposal` (this
+slice) are pure string functions; the stored content is the owner's own sentence with the
+imperative opener removed; and the write is the same RLS-scoped INSERT `createRecord` has always
+used for this table. There is no AI decision to validate because there is no AI decision.
+
+DEC-5's requirement — a proposed memory requiring confirmation before persistence, and no silent
+direct write — is therefore met **without** a new contract, RPC, grant or migration. The gate the
+audit raised was real; the constraint it inferred was not.
+
+## What shipped
+
+**A memory now has a lifecycle.** `valid_from`/`valid_until` have existed since the table was
+created and nothing had ever read them. `lifecycle.ts` derives three states — `scheduled`,
+`active`, `archived` — because a memory that is not yet true and one that is no longer true are
+different things to tell the owner. The clock is a parameter, never `Date.now()`, so the boundary
+cases are tested rather than flaky at midnight.
+
+**Archive is not delete.** `authenticated` holds `delete` on this table, so the absence of a
+delete path is a product decision rather than a limit: the provenance the detail page exists to
+show lives on the row, and destroying it to express "this stopped being true" would be the wrong
+trade. Archiving stamps `valid_until`; the row stays intact and auditable.
+
+**Archiving actually changes what the assistant does.** `match_internal_knowledge` selects
+memories on `embedding is not null` alone (`202607160006:116-117`) and has never read either
+validity column, so an archived memory kept being retrieved and quoted. Teaching the RPC would
+mean a migration this slice is not authorized to make, so the filter is applied at its one
+consumer, `chat/actions.ts`. It shares `isMemoryInForce` with the badge on the page, so the two
+provably cannot drift, and it **fails closed**: a memory whose validity cannot be read is dropped
+from the sources, because staying silent about one fact is recoverable in a way that quoting a
+retracted one back at the owner is not.
+
+**The detail surface is the first place these columns have ever been readable.**
+`source_entry_id`, `person_id`, `project_id`, `sensitivity`, `valid_from` and `valid_until` were
+unreachable from anywhere in the product. Provenance distinguishes three cases rather than two: a
+live source entry is a link, a `source_entry_id` whose row did not load is a dangling reference
+the page admits to, and `null` means the owner created it. Since `source_entry_id` is
+`on delete set null`, a memory from a deleted entry is genuinely indistinguishable from a
+hand-written one — the page does not pretend otherwise.
+
+**Two other findings close on the list.** UX-20's memory rows were `<article>` elements styled as
+interactive with nothing to activate; there is a destination now, so they are links. UX-21's
+memory half is closed: the page kept ten Portuguese kind labels in an untyped module-scope record
+and rendered `kind.replaceAll("_", " ")` — the raw database enum, spaced — to English readers.
+
+**`confidence` is no longer rendered.** It was the row's only metadata. Every hand-written memory
+stores `1`, so the list read "100%" beside every memory the owner had written — a number that
+looked like a judgement on their own statement and could not be acted on. It is not offered on
+create or edit either; the column keeps its default for the extraction path that populates it
+meaningfully. What replaces it is the fact that actually varies: whether the assistant may use
+the memory at all.
+
+## Two defects this slice found in itself, and fixed
+
+- **A screen-reader naming bug, surfaced by the authenticated journey.** React renders a
+  `<textarea>`'s value as a **child text node**, so a wrapping `<label>` made the field's
+  accessible name the label *plus the entire memory text*. Both textareas now carry an explicit
+  `aria-label`, which wins over the computed name while the visible label still focuses the
+  control. The same latent shape exists in `entity-edit-form.tsx`'s description field; it is
+  recorded here and left for a separate change rather than widened into this slice.
+- **A tense bug, surfaced by the captured evidence.** The validity row read "Valeu até" / "Was
+  valid until" — past tense — on memories currently in force. Now neutral.
+
+One subtlety is encoded as a test because getting it wrong would store the opposite of what the
+owner said: a trailing "sempre" is dropped only after a **demonstrative** opener ("Lembre disso
+sempre: X", where the word says how often to remember). After a **complementizer** ("Lembre que
+sempre uso o mesmo banco") it belongs to the fact and is kept.
+
+## Gates
+
+- `npm run lint` clean; `npx tsc --noEmit` clean; `npm run build` succeeds with both
+  `/[locale]/app/memories` and `/[locale]/app/memories/[memoryId]` registered.
+- `npm test` — **2906 passed**, 2 failed. Both failures are the pre-existing Windows CRLF
+  fragility in `sql-reachability.test.ts` recorded under repository hygiene: this slice touched no
+  SQL and no migration, `git status` confirms neither that test nor the migration is in its
+  changeset, and Linux CI checks out LF and stays green.
+- **Authenticated journeys — `e2e/online-memories.spec.ts`, 6 tests × desktop and mobile,
+  12/12 green.** They prove the writes rather than the forms: every assertion after a save
+  re-reads the page, so a value rendered from React state would fail. Covered: manual creation,
+  detail inspection, provenance, editing content/kind/importance, a person relation and its
+  navigation, archive, restore, both locales, the DEC-5 proposal, confirmation, cancellation,
+  duplicate submission, and a 44px touch target on mobile.
+- **Visual evidence** — `docs/reports/ux-evidence/slice-g3/`, 24 frames: list, detail and proposal
+  at **1440×900, 1920×1080, 375×667 and 412×915**, in **pt-BR and en**. All content is synthetic;
+  no real memory of the owner's appears in any frame.
+- **Zero residue** — disposable accounts deleted fail-closed by `afterAll`, and a live sweep of
+  the linked project afterwards returned **0 fixture accounts and 0 fixture-shaped memory rows**.
+
+## Still open after this slice
+
+UX-04, UX-13 (G4), UX-19, UX-21's non-memory surfaces, UX-22, UX-27. UX-12 remains **BLOCKED on
+DEC-6**, untouched: this slice introduced no reminder write, and the composer's memory branch
+cannot reach `reminders`.

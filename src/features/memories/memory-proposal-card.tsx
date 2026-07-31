@@ -93,7 +93,11 @@ export function MemoryProposalCard({
 
       <label htmlFor={`${fieldId}-content`}>
         {copy.contentLabel}
+        {/* `aria-label` for the reason `memory-edit-form.tsx` records: React
+            renders the value as a child text node, so the wrapping label would
+            otherwise name this field "Memória" plus the whole proposed text. */}
         <textarea
+          aria-label={copy.contentLabel}
           defaultValue={content}
           disabled={pending}
           id={`${fieldId}-content`}

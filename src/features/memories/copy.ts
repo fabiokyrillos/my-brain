@@ -124,7 +124,10 @@ const copy = {
     archiveExplainer:
       "Arquivar encerra a validade e tira a memória das respostas. Nada é apagado: o texto e a origem continuam aqui.",
     validFrom: "Vale desde",
-    validUntil: "Valeu até",
+    // Neutral tense on purpose. The same row is rendered for a memory that is
+    // still in force, and "Valeu até" would state in the past tense something
+    // that is currently true.
+    validUntil: "Vale até",
     validAlways: "Sem prazo",
 
     provenance: "Origem",
@@ -206,7 +209,9 @@ const copy = {
     archiveExplainer:
       "Archiving ends the validity and takes the memory out of answers. Nothing is deleted: the text and its origin stay here.",
     validFrom: "Valid from",
-    validUntil: "Was valid until",
+    // Neutral tense: this row also renders for a memory still in force, where
+    // "Was valid until" would put a currently-true fact in the past.
+    validUntil: "Valid until",
     validAlways: "No end date",
 
     provenance: "Origin",

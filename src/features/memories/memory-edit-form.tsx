@@ -158,7 +158,18 @@ export function MemoryEditForm({
 
         <label htmlFor={`${fieldId}-content`}>
           {copy.contentLabel}
+          {/*
+            `aria-label` rather than relying on the wrapping label alone.
+
+            React renders a textarea's value as a **child text node**, so the
+            enclosing label's text content becomes "Memória" followed by the
+            entire memory — and that concatenation is what a screen reader
+            announces as the field's *name*. An explicit label wins over the
+            computed one, so the field is announced as "Memória" and the visible
+            label still focuses it on click.
+          */}
           <textarea
+            aria-label={copy.contentLabel}
             defaultValue={restored("content") ?? fields.content}
             disabled={pending}
             id={`${fieldId}-content`}
