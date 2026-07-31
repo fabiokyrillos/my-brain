@@ -3,6 +3,24 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-31 — EGC.1: organizations and contexts get the write path they never had
+
+**No migration, no column, no grant, no policy, no RPC, no provider call.** Parity stays `202607310064`. `authenticated` still holds `SELECT` only on `public.tasks` and `SELECT` + `INSERT` on `public.reminders`; the direct-write guard's `tasks` allowlist is still empty.
+
+**Both tables were fully writable and completely unreachable for fifteen days.** `202607160003` created them with forced RLS, four own-row policies and full `authenticated` CRUD; the only writer of any kind was `persist_entry_interpretation` (`202607160005`). A company therefore appeared in the owner's data because a capture had mentioned it, and the Company selector on Person and Project could report "no company recorded yet" while owning no way to make one — `EG-04`, a dead end presented as a choice.
+
+**Added:** four routes (`/app/organizations` and `/app/contexts`, each with a detail page); `createOrganization`, `updateOrganization`, `createContext`, `updateContext` and `createOrganizationForSubject`; `loadOrganizations`, `loadContexts` and `loadContextOptions`; both destinations in the `context` navigation group with `nested: true`; both entity types plus four action types in the History vocabulary, linkable from a history row and resolvable to a name; and create-and-select on the Company selector — rendered as a **sibling** of the edit form, because HTML forbids nested forms and the browser's recovery would submit the edit action with a stray field.
+
+**Two loaders with deliberately opposite failure contracts.** A list page *is* its rows, so it throws rather than render an empty state it did not measure. An options list is one optional control on somebody else's page, so it degrades to empty. Both directions are tested, because getting the pair backwards stays invisible until the day a query fails.
+
+**The adversarial review found thirteen defects; all thirteen were fixed.** Three were BLOCKERs in the new pgTAP suite, none reachable locally (no Docker), each of which would have made the `database` job red on its first run: a data-modifying `WITH` attached to a scalar sub-SELECT, which Postgres refuses at *parse* time and which would have aborted the transaction rather than failing an assertion; and two scalar subqueries over `pg_constraint` that would have raised `21000`, because `person_contexts`, `task_contexts`, `people` and `projects` each carry **two** foreign keys to the parent — the inline one from `202607160009`/`202607160003` and the composite ownership key `202607170016` added. One was a real audit defect: the create-and-assign path overwrote an existing company with no `before_state`, in the one write in the module that could silently discard a relation.
+
+**One fix is older than this slice.** Cancel-after-a-refusal permanently killed the reopen control on all three forms, including the Project and Person edit forms shipped in Phase 2F: guarding the whole `open` expression with `dismissed !== state` meant the reopen click set `openedFor` to the very state object `dismissed` already held, so the form stayed shut and, being unrendered, could never receive a state that would unstick it. **The Edit button was dead until a page reload.** Two tests stopped exactly one click short of catching it; both now click the extra time.
+
+**Removed:** `EntityEditState.createdId`. It had no consumer anywhere, and the comment justifying it described a mechanism that does not exist — what actually selects a newly created company is `revalidatePath` re-rendering the server component with the stored `organization_id`, which remounts the `<select>` through its `key`. That is the stronger mechanism, since a value that never reached storage cannot appear selected.
+
+**Verification:** lint 0, typecheck 0, build exit 0, Vitest 3249 passed, locale ternaries **266** (the G-0.4 baseline exactly), `online-entity-graph.spec.ts` 8/8 and `online-route-audit.spec.ts` 18/18 against the deployed environment on desktop and Pixel 7 in both locales. Two `sql-reachability.test.ts` assertions fail on this Windows checkout and fail identically on `main`, whose CI is green — the CRLF fragility Slice H diagnosed, left to repository maintenance rather than mixed into a feature branch. Full record: `docs/reports/EGC_SLICE_01_ACCEPTANCE.md`.
+
 ## 2026-07-31 — Documentation and gates: hosted signup closed, A13 corrected, two initiatives authorized
 
 **No product source, no migration, no grant, no policy, no RPC.** Migration parity stays `202607310064` on both sides. The product UX ledger is untouched: 35 findings, 30 RESOLVED, 4 RETAINED, 1 DEFERRED.
