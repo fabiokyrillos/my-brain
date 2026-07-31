@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RELATIONSHIP_TYPES } from "./relationship-vocabulary";
+
 /**
  * The validated shape of an entity edit (UX-08, UX-09).
  *
@@ -127,6 +129,105 @@ export type OrganizationCreateInput = z.infer<typeof organizationCreateSchema>;
 export type OrganizationUpdateInput = z.infer<typeof organizationUpdateSchema>;
 export type ContextCreateInput = z.infer<typeof contextCreateSchema>;
 export type ContextUpdateInput = z.infer<typeof contextUpdateSchema>;
+
+/**
+ * The relationship and association write shapes (EGC-REL, EGC-ASSOC).
+ *
+ * **Three of these bounds are product ceilings, not column mirrors, and saying
+ * so is the point.** `person_relationships.relationship_type` is bare `text`
+ * with no CHECK — deliberately, per EGC-REL-002, so an extraction-written value
+ * is a rendering fallback rather than an insert failure. `description` and
+ * `person_projects.role` are bare `text` too. So `relationshipDescription`'s 500
+ * and `projectRole`'s 120 are decisions about what a person should be asked to
+ * type into a one-line field, and the enum below is narrower than the database:
+ * the *form* only offers the vocabulary, while the *column* still accepts
+ * whatever the pipeline writes.
+ *
+ * That asymmetry is intentional and is the reason EGC-REL-006 exists.
+ */
+const relationshipDescription = z
+  .string()
+  .trim()
+  .max(500)
+  .transform((value) => (value === "" ? null : value));
+
+/**
+ * `person_projects.role` — free text, **not** a closed vocabulary (EGC-ASSOC-004).
+ *
+ * The asymmetry with `relationship_type` is deliberate and is recorded here so a
+ * later reviewer does not "harmonize" them. A relationship type is a
+ * product-owned taxonomy: the product decides that `spouse` and `sibling` are
+ * the categories, and it owes each one a translated term. A role on a project is
+ * the owner's own domain vocabulary — "revisora do contrato", "sponsor",
+ * "second reader" — which no product taxonomy could enumerate and which must not
+ * be translated, because it is the owner's words about their own work.
+ */
+const projectRole = z
+  .string()
+  .trim()
+  .max(120)
+  .transform((value) => (value === "" ? null : value));
+
+export const relationshipCreateSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  relationshipType: z.enum(RELATIONSHIP_TYPES),
+  description: relationshipDescription,
+}).strict();
+
+export const relationshipUpdateSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  relationshipId: z.string().uuid(),
+  personId: z.string().uuid(),
+  relationshipType: z.enum(RELATIONSHIP_TYPES),
+  description: relationshipDescription,
+}).strict();
+
+/** Ending is not deleting (EGC-REL-007): it sets `valid_until`, nothing more. */
+export const relationshipEndSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  relationshipId: z.string().uuid(),
+  personId: z.string().uuid(),
+}).strict();
+
+export const personContextSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  contextId: z.string().uuid(),
+}).strict();
+
+export const personContextEndSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  contextId: z.string().uuid(),
+}).strict();
+
+/**
+ * One shape for both directions (EGC-ASSOC-003).
+ *
+ * The Person surface and the Project surface associate the same row, so they
+ * submit the same fields. `origin` says which page the owner was on — it steers
+ * revalidation and the audit reason, and **nothing else**: it can never select a
+ * different table, a different predicate or a different write.
+ */
+export const personProjectSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  role: projectRole,
+  origin: z.enum(["person", "project"]),
+}).strict();
+
+export const personProjectEndSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  origin: z.enum(["person", "project"]),
+}).strict();
+
+export type RelationshipCreateInput = z.infer<typeof relationshipCreateSchema>;
+export type RelationshipUpdateInput = z.infer<typeof relationshipUpdateSchema>;
+export type PersonProjectInput = z.infer<typeof personProjectSchema>;
 
 export const projectUpdateSchema = z.object({
   projectId: z.string().uuid(),

@@ -1,5 +1,5 @@
-import { readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -61,6 +61,112 @@ describe("EGC-INVARIANT-001: Entity Graph Completion adds no migration", () => {
     expect(versions.length).toBeGreaterThan(60);
     expect(versions).toContain(AUTHORIZED_MIGRATION_HEAD);
     expect(versions).toEqual([...versions].sort());
+  });
+});
+
+/**
+ * Every `.ts`/`.tsx` under `src/`, excluding tests.
+ *
+ * Tests are excluded because a test *names* a table in a stub and would count as
+ * a writer under any textual rule, which would make the inventory below unable
+ * to distinguish a second write path from its own coverage.
+ */
+function sourceFiles(directory = join(REPO, "src")): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(directory)) {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) {
+      found.push(...sourceFiles(path));
+      continue;
+    }
+    if (!/\.tsx?$/.test(entry) || /\.test\.tsx?$/.test(entry)) continue;
+    found.push(path);
+  }
+  return found;
+}
+
+/**
+ * The modules that reach a write method through `.from("<table>")`.
+ *
+ * The window is deliberately generous — a PostgREST write is
+ * `.from(t).insert(…)` or `.from(t).update(…)`, sometimes with an intervening
+ * newline and indentation — and the reads this repository performs
+ * (`.select(...).eq(...).maybeSingle()`) never contain one of these tokens, so a
+ * generous window over-reports nothing in practice. Over-reporting would be the
+ * safe direction anyway: it fails the exact-set assertion and asks a human.
+ */
+function writersOf(table: string): string[] {
+  const writers = new Set<string>();
+  const anchor = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
+
+  for (const path of sourceFiles()) {
+    const source = readFileSync(path, "utf8");
+    for (const match of source.matchAll(anchor)) {
+      const window = source.slice(match.index ?? 0, (match.index ?? 0) + 260);
+      if (/\.(insert|update|upsert|delete)\s*\(/.test(window)) {
+        writers.add(relative(REPO, path).replace(/\\/g, "/"));
+      }
+    }
+  }
+  return [...writers].sort();
+}
+
+/**
+ * EGC-ASSOC-003 and PRD risk R3: one application writer per relationship table.
+ *
+ * Asserted as an **exact set in both directions**, which is the part that
+ * matters. "The expected module is among the writers" would pass with a second
+ * path beside it — and a second path is precisely how a soft-end contract
+ * acquires a hard delete on the surface that forgot about it. The Person page
+ * and the Project page associate the same row, so the temptation to give each
+ * its own writer is real and the PRD names it as a medium-likelihood risk.
+ */
+describe("EGC-ASSOC-003: one application writer per relationship table", () => {
+  const expected: Readonly<Record<string, string>> = {
+    person_relationships: "src/features/entities/relationships.ts",
+    person_contexts: "src/features/entities/associations.ts",
+    person_projects: "src/features/entities/associations.ts",
+  };
+
+  for (const [table, module] of Object.entries(expected)) {
+    it(`is written by ${module} and by nothing else: ${table}`, () => {
+      expect(
+        writersOf(table),
+        `${table} has more than one application write path, or has moved. `
+          + "EGC-ASSOC-003 requires exactly one contract per table: the Person and "
+          + "Project surfaces both call the same module, and neither owns a private "
+          + "path. If this is a deliberate move, update the expectation here in the "
+          + "same commit.",
+      ).toEqual([module]);
+    });
+  }
+
+  it("detects a writer at all, so the assertion above is not vacuous", () => {
+    // If the anchor regex ever stopped matching — a rename, a formatting change,
+    // a different client shape — every assertion above would pass with an empty
+    // set and the invariant would be silently unguarded. This is the control.
+    expect(writersOf("person_relationships").length).toBe(1);
+    expect(writersOf("organizations")).toContain("src/features/entities/actions.ts");
+  });
+
+  it("has no delete path on any of the three, because ending is not deleting", () => {
+    // EGC-DEC-2 and EGC-REL-007. Soft-end is the contract: `valid_until` is set
+    // and the row survives, which is what lets the product still hold "we were
+    // married until 2019". A `.delete()` anywhere on these tables would make
+    // that contract a suggestion.
+    for (const table of Object.keys(expected)) {
+      const anchor = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
+      for (const path of sourceFiles()) {
+        const source = readFileSync(path, "utf8");
+        for (const match of source.matchAll(anchor)) {
+          const window = source.slice(match.index ?? 0, (match.index ?? 0) + 260);
+          expect(
+            /\.delete\s*\(/.test(window),
+            `${relative(REPO, path)} deletes from ${table}`,
+          ).toBe(false);
+        }
+      }
+    }
   });
 });
 
