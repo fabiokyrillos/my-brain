@@ -1,3 +1,5 @@
+import { toReminderStatus } from "@/features/reminders/lifecycle";
+
 import type { HistoryChangeField, HistoryCopy } from "./copy";
 import { HISTORY_CHANGE_FIELDS } from "./copy";
 import { HISTORY_SUBJECT_ROUTES } from "./subject-route";
@@ -78,7 +80,7 @@ export type HistoryEvent = {
 };
 
 const TEXT_FIELDS = new Set<HistoryChangeField>(["title", "description", "content", "name"]);
-const DATE_FIELDS = new Set<HistoryChangeField>(["due_at", "planned_at"]);
+const DATE_FIELDS = new Set<HistoryChangeField>(["due_at", "planned_at", "remind_at"]);
 const MAX_VALUE_LENGTH = 80;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -117,6 +119,10 @@ function formatValue(
     if (entityType === "project") {
       const status = asProjectStatus(value);
       return status === null ? null : copy.projectStatuses[status];
+    }
+    if (entityType === "reminder") {
+      const status = toReminderStatus(String(value));
+      return status === null ? null : copy.reminderStatuses[status];
     }
     return null;
   }

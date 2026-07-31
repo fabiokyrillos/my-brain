@@ -68,6 +68,7 @@ const SUBJECT_SOURCES: Readonly<
   project: { table: "projects", column: "name" },
   person: { table: "people", column: "name" },
   conversation: { table: "conversations", column: "title" },
+  reminder: { table: "reminders", column: "title" },
 };
 
 export type HistoryPage = {
