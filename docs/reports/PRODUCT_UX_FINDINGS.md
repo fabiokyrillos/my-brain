@@ -118,7 +118,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | **RESOLVED** (Slice G3 — incl. DEC-5) |
 | UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | **RESOLVED** (Slice G1) |
 | UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | **BLOCKED on DEC-6** (grant posture) |
-| UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | OPEN |
+| UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | **RESOLVED** (Slice G4) |
 | UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring closed in B2) |
 | UX-15 | Panel list rows collapse the title to ~6–16 lines (`auto` meta column) | visual | **P0** | yes | **RESOLVED** |
 | UX-16 | Content width *shrinks* as the viewport grows (`padding: 5vw`) | responsive | **P0** | yes | **RESOLVED** |
@@ -130,11 +130,11 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
 | UX-30 | A revoked-but-unexpired session becomes an infinite redirect loop | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
 | UX-31 | Signing out left the shell restorable by browser Back | usability | P1 | yes | **RESOLVED** (D3) |
-| UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | OPEN → G |
-| UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | RETAINED (not rendered) |
+| UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | **PARTIAL** (G4 — reads distinctly; root fix needs a migration, **DEFERRED**) |
+| UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | **RESOLVED** (Slice G4 — was mis-dispositioned; History *did* render it) |
 | UX-29 | Every cancelled task's detail page answered 404 | missing-lifecycle | **P0** | yes | **RESOLVED** (D2) |
-| UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN |
-| UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN |
+| UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN (History closed in G4; see scope note) |
+| UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN (History closed in G4; 333 → 328) |
 | UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
 | UX-24 | Touch targets ≥44px — **does not reproduce**; retained as verified-good | — | — | **no** | RETAINED |
 
@@ -2392,3 +2392,236 @@ sempre uso o mesmo banco") it belongs to the fact and is kept.
 UX-04, UX-13 (G4), UX-19, UX-21's non-memory surfaces, UX-22, UX-27. UX-12 remains **BLOCKED on
 DEC-6**, untouched: this slice introduced no reminder write, and the composer's memory branch
 cannot reach `reminders`.
+
+---
+
+# Slice G4 — history (UX-13, UX-28, UX-27, and the History half of UX-21/UX-22)
+
+**Branch** `codex/ux-slice-g4-history`, cut from the green Slice G3 merge SHA `e6df3a4`.
+**Covers** UX-13 in full, UX-28 (re-dispositioned — see below), UX-27 (presentation; root
+fix deferred with evidence), and the History surface's share of UX-21 and UX-22.
+**Non-goals** — no migration, no RPC, no SQL, no grant change, no new AI decision contract,
+no write path of any kind. **Rollback boundary** — deleting `src/features/history/` and
+`src/app/history.css` and reverting `history/page.tsx` restores the previous surface;
+`src/lib/zoned-day.ts` becomes consumer-less.
+
+## What the route was
+
+One line of code. It selected six columns, ordered by date, paginated, and rendered
+`action_type.replaceAll("_", " ")` as the heading, `audit_logs.reason` as the body, and
+`actor · entity_type · date` beneath. A pt-BR reader saw:
+
+```
+task updated
+Task state changed
+user · task · 30 de jul. de 2026 21:14
+```
+
+Four values straight out of the database, three of them raw tokens and one of them English
+prose authored in SQL. No search, no filter, and no link to the object any row was about.
+
+## UX-28 was mis-dispositioned, and the correction is the honest part
+
+The ledger recorded UX-28 as **RETAINED (not rendered)**. That was true of the *task detail*
+surface, which deliberately omits `reason` (Slice D1). It was **false of History**, which
+rendered `item.reason` directly at `history/page.tsx:20`. The finding was live, not
+hypothetical, and the disposition had been carried forward from the wrong surface.
+
+The fix is not to translate `reason`. Every value any writer in this build can produce was
+read and compared against the localized sentence that now replaces it — `Task created`,
+`Task state changed`, `User confirmed task candidates from an interpreted entry`,
+`User executed the stored compensating operation`, `Grounded answer generated from internal
+knowledge`, `Owner edited the project from its detail page`, `Owner archived the memory,
+ending its validity`, and the rest. **Not one carries a fact the sentence does not.** So the
+answer to "when does `reason` add distinct context" is *never, for any writer that exists
+today*, and rendering it would be exposing internal wording solely because it exists.
+
+`reason` is therefore **not selected and not rendered**. `vocabulary.test.ts` asserts that no
+module under `src/features/history/`, and not the route itself, so much as mentions the
+column, so the conclusion cannot rot silently. A future writer with a genuinely informative
+`reason` fails that test rather than inheriting this decision. **UX-28 — RESOLVED.**
+
+## The vocabularies are closed sets, derived from every writer that exists
+
+`audit_logs.action_type` and `entity_type` are bare `text` with **no CHECK constraint**; only
+`actor` is constrained (`check (actor in ('user','agent','system'))`, `202607160003:134`). So
+the vocabulary was read off the writers rather than off the schema: **87
+`insert into public.audit_logs` statements** across the migrations, parsed by pairing each
+column list with its value list positionally, plus the four TypeScript writers
+(`chat/actions.ts`, `entities/actions.ts` ×2, `memories/actions.ts`).
+
+That yields **27 action types, 9 entity types, 3 actors**, each with a sentence in both
+locales, plus `tasks.status` (8), `projects.status` (4) and `manual_priority` (4) for the
+values that appear inside `before_state`/`after_state`. `vocabulary.test.ts` re-derives the
+action and entity sets from the migrations on every run and fails if a writer appears with no
+copy — the same guard `task-detail-view.test.tsx` applies to the task subset, widened to all
+nine entity types.
+
+Nothing unrecognised is ever printed. An unknown action type takes a neutral sentence, an
+unknown actor folds to `system`, and a status value belonging to neither vocabulary is
+**dropped from the description** rather than rendered raw (UX-21).
+
+## UX-27 — investigated, and it is not a defect in the log
+
+The two writers, precisely:
+
+1. **`audit_task_change()`**, the `AFTER INSERT OR UPDATE` trigger on `public.tasks`
+   (`202607160014:30`, redefined at `202607260058:321`). On insert it writes `task_created`
+   with the row's initial state; on update it writes `task_updated` with a column-level
+   before/after over ten watched columns, taking its actor from `app.audit_actor`.
+2. **The RPC that performed the operation**, writing its own row naming it —
+   `task_command_created`, `task_command_applied`, or `tasks_confirmed`.
+
+Answering the questions as asked:
+
+- **Different semantic meaning?** Yes. One is a row-level state change, the other a
+  higher-level user operation.
+- **Distinct action types?** Yes, in every pair.
+- **One entity/action family or several?** **Only tasks.** `public.tasks` is the sole table
+  with an audit trigger; no other entity type doubles.
+- **A stable shared identity?** **No.** `audit_logs` has no operation key and no correlation
+  column. `created_at` is identical because `now()` is the transaction timestamp — but that is
+  an inference about transaction boundaries, not a stored identity, and grouping on it would
+  be exactly the timestamp heuristic this slice was told not to use.
+- **Does the root fix need SQL?** **Yes** — a correlation column, which is a migration.
+
+`202607260058:1552-1558` states the pairing outright: one row "names the operation and carries
+the whole before/after payload", the other is "what every other writer of `public.tasks`
+already produces". The duplication is intentional at the log level.
+
+**What G4 did.** The first draft of the copy map gave `task_created` and `task_command_created`
+the same verb, which reproduced UX-27 exactly — the live journey caught the identical sentence
+twice on the page. They now read at the two altitudes they occupy: *"Você criou a tarefa “X”"*
+(the operation) and *"Você adicionou a tarefa “X” à lista"* (the task entering the list).
+`task_updated` and `task_command_applied` are separated the same way. A test asserts **no two
+action types render the same sentence for the same subject**, so this cannot regress.
+
+No row is hidden and no row is deduplicated. **UX-27 — PARTIAL.** Collapsing the pair into one
+visual operation needs a shared operation key on `audit_logs`; that is a migration and is
+outside this slice's read-only authorization. **Smallest safe change, for a future authorized
+slice:** add a nullable `operation_id uuid` to `audit_logs`, have each RPC stamp it on its own
+row and — via a transaction-local setting the trigger reads, the mechanism `app.audit_actor`
+already establishes — on the trigger's row too, then group on it. Additive, nullable, no
+backfill, and every existing row keeps rendering exactly as it does now.
+
+## The query — every filter runs in Postgres
+
+No migration was added, and none was needed. The predicates were chosen to land on the two
+indexes that already exist (`202607160003:141-142`):
+
+| filter | predicate | index |
+| --- | --- | --- |
+| date range | `created_at >= …` / `< …` | `audit_logs_user_created_idx (user_id, created_at desc)` |
+| item type | `entity_type = …` | `audit_logs_user_entity_idx (user_id, entity_type, entity_id)` |
+| one item | `entity_type` + `entity_id` | the same index, both keys |
+| who | `actor = …` | filter after the index scan; 3 distinct values |
+| action | `action_type in (…)` | filter after the index scan; ≤27 values |
+
+`actor` and `action_type` get no index. Both are low-cardinality equality predicates applied
+to a range the leading index has already narrowed to one user, and the unfiltered ordering is
+the indexed one — the plan is the same index scan either way, with a filter step. An index to
+save that step would be a migration for convenience, which was explicitly ruled out.
+
+**Nothing is filtered in the browser.** Pagination composes with every filter: the filter set
+is carried into `PaginationLinks`, and `page` is deliberately dropped when filters change, so
+applying a filter returns to page 1 rather than stranding the reader on page 4 of a one-page
+result.
+
+**Free-text search is deliberately absent, and this is the report on why.** `reason` is the
+only free-text column, and this slice stops rendering it — searching a field the reader cannot
+see returns rows with no visible reason for matching. The genuinely useful text axis is the
+subject's own title, which lives in six other tables and cannot be reached from one indexed
+query. Structured filters cover the questions this surface is actually asked. If text search
+is wanted later, the honest cost is a `pg_trgm` GIN index on `reason` (or a generated
+`tsvector`) — a migration — plus a decision about what a match *means* when the matched text
+is not displayed. **No query-plan evidence is offered for an index, because no index is
+proposed and the read-only implementation is not insufficient.**
+
+## Subject links are a typed route map, and existence is proven
+
+`HISTORY_SUBJECT_ROUTES` answers for all nine entity types — six route builders and three
+`null`s — and the compiler requires an answer, so a new entity type cannot be silently
+unlinkable. `subject-route.test.ts` checks each of the six against the **App Router tree on
+disk**, so a link cannot promise a page that does not exist.
+
+| entity type | route | |
+| --- | --- | --- |
+| `task` | `/[locale]/app/work/[taskId]` | linked |
+| `entry` | `/[locale]/app/inbox/[entryId]` | linked |
+| `memory` | `/[locale]/app/memories/[memoryId]` | linked |
+| `project` | `/[locale]/app/projects/[projectId]` | linked |
+| `person` | `/[locale]/app/people/[personId]` | linked |
+| `conversation` | `/[locale]/app/chat/[conversationId]` | linked |
+| `entry_interpretation` | — | `entity_id` is the interpretation, not the entry |
+| `entry_task_candidate_resolution` | — | a resolution row, not an object with a page |
+| `pending_question` | — | `/app/questions` is a list; no detail route exists |
+
+Being linkable is necessary but not sufficient: the subject's name is loaded in a
+`user_id`-scoped query (at most six, one per entity type present on the page, each an indexed
+`in (…)` over one page of ids). A row that does not come back renders the localized
+*"Este item não está mais disponível."* with **no link at all** — a distinction between "this
+kind has no page" and "this object is gone" that the first draft got wrong and the tests now
+pin.
+
+## UX-21 and UX-22 — scope, truthfully
+
+Both remain **OPEN**; G4 closes only History's share.
+
+- **UX-21.** History rendered four raw values and now renders none. The non-History surfaces
+  the finding names are untouched and still open.
+- **UX-22.** Inline locale ternaries across `src/` (non-test): **333 before, 328 after**,
+  measured on both trees. The five removed are exactly the History page's; the count did not
+  increase and no new ternary was introduced. All History copy goes through
+  `features/history/copy.ts`.
+
+## Gates
+
+- `npm run lint` clean · `npx tsc --noEmit` clean · `npm run build` succeeds.
+- `npm test` — **2985 passed**, 2 failed. Both failures are the pre-existing Windows CRLF
+  fragility in `sql-reachability.test.ts`: verified by stashing this slice's changes and
+  re-running on clean `main`, where they reproduce identically. This slice touches no SQL and
+  no migration; Linux CI checks out LF and stays green.
+- **72 new unit and component tests** across vocabulary, filters, event description, subject
+  routes, the list and the filter form, plus 12 for `zoned-day`.
+- **Authenticated journeys — `e2e/online-history.spec.ts`, 8 tests × desktop and mobile,
+  16/16 green.** Every audit row read is produced by *using the product* (a task through the
+  form, a project edited through its detail page); nothing inserts into `audit_logs` directly.
+  Covered: default history, each filter alone, combined filters, date boundaries in the
+  owner's own timezone, malformed parameters, no-results, a deleted subject, ownership
+  isolation between two accounts, keyboard operation, accessible names, both locales, and a
+  44 px touch target.
+- **Visual evidence** — `docs/reports/ux-evidence/slice-g4/`, 24 frames: list, filtered and
+  empty at **1440×900, 1920×1080, 375×667 and 412×915**, in **pt-BR and en**. Measured
+  horizontal overflow: **0 px at all four viewports in both locales**. All content synthetic.
+- **Zero residue** — the journeys' accounts are deleted fail-closed by `afterAll`, and the
+  screenshot harness deletes its account in a `finally`.
+
+## Three defects this slice found in its own work
+
+1. **A deleted subject would have rendered a link to a 404.** The first draft decided
+   linkability from the entity type alone. The event model now carries
+   `resolved | unavailable | no-route`, and the view links only what was loaded.
+2. **The subject link was a 16.5 px touch target on mobile.** Found by the mobile journey
+   asserting 44 px, not by eye. It becomes a real target inside the mobile breakpoint only,
+   because a button-shaped "Abrir" on every row would be noise on a pointer device.
+3. **pt-BR needed a gendered article inside the change sentence** ("alterou **a** prioridade",
+   "**o** prazo") but a bare noun as a list label. Caught by the tests before it shipped; the
+   field vocabulary now carries both forms.
+
+## One known cosmetic limitation
+
+`<input type="date">` renders its placeholder and picker in the **browser's** locale, not the
+page's, so a pt-BR page on an en-US browser shows `mm/dd/yyyy`. This is user-agent behaviour,
+not a copy defect; changing it would mean replacing the native picker with a custom control,
+which costs more accessibility than it buys. Recorded rather than hidden.
+
+## Still open after this slice
+
+UX-04, UX-19, UX-21's non-History surfaces, UX-22's remaining 328 ternaries, and UX-27's root
+fix. UX-12 remains **BLOCKED on DEC-6**, untouched — this slice introduced no reminder write.
+
+**One ledger inconsistency is recorded rather than fixed here, because it is outside G4's
+scope:** the summary table lists **UX-19** as OPEN, while the Slice D1 record states "UX-19 is
+fully resolved" (`open_task` gained a producer and a route). One of the two is wrong. G4 did
+not touch that surface and does not adjudicate it, but it should be settled before the next
+slice quotes an open count.
