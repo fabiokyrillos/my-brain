@@ -4,13 +4,11 @@
 **Period** — 2026-07-30 to 2026-07-31.
 **Durable source of truth** — [`PRODUCT_UX_FINDINGS.md`](./PRODUCT_UX_FINDINGS.md).
 
-**Status — Slice H implemented and PR-ready (PR #50), not yet integrated.**
-Every finding has exactly one final disposition; no finding is OPEN, PARTIAL,
-ambiguous, duplicated, or contradictory between the summary table and its detail
-record. **The initiative is not COMPLETE until PR #50 is merged and CI is green
-on the exact merge SHA** — §10 records that transition and is the only place that
-may declare it. The dispositions below are final regardless; what is pending is
-integration, not adjudication.
+**Status — COMPLETE.** Slice H merged as `864d39c` (PR #50) with CI green on all
+three jobs at the exact merge SHA. Every finding has exactly one final
+disposition; no finding is OPEN, PARTIAL, ambiguous, duplicated, or
+contradictory between the summary table and its detail record. §10 carries the
+integration record.
 
 This report separates four things that are easy to blur together and expensive
 to confuse: **product work completed**, **retained limitations**, **deferred
@@ -420,23 +418,42 @@ Everything here is settled and does not depend on integration.
 
 ---
 
-## 10. Statement of completion (post-merge only)
+## 10. Statement of completion
 
-**This section is the single place the initiative may be declared COMPLETE, and
-it may only be filled in after PR #50 is merged and CI is green on the exact
-merge SHA.** Until every row below carries a real value, the initiative is
-*implemented and PR-ready*, not complete.
+**The Product UX/UI Remediation Loop is COMPLETE**, integrated on 2026-07-31.
 
 | | |
 | --- | --- |
 | Slice H PR | **#50** |
-| PR-head CI run | *pending* |
-| Merge SHA | *pending* |
-| Merge-SHA CI run | *pending* |
-| `application` job | *pending* |
-| `database and journey` job | *pending* |
-| `edge worker` job | *pending* |
-| Final `main` HEAD | *pending* |
-| Parity after merge | *pending* |
-| Fixture residue after merge | *pending* |
-| **Initiative status** | **NOT COMPLETE — awaiting integration** |
+| PR-head CI run | **30648536108** at `07ba74e` — all three jobs green |
+| Merge strategy | merge commit; nine thematic commits and the branch preserved |
+| **Merge SHA** | **`864d39ce347059ae1c7ba6909e0db437a14998b2`** |
+| **Merge-SHA CI run** | **30648854282 — all three jobs green** |
+| `application` (lint, types, unit, build) | ✅ 3m05s |
+| `database and journey` (migrations, pgTAP, db lint, foundation e2e) | ✅ 3m53s |
+| `edge worker` (deno types, deno tests) | ✅ 14s |
+| **Final `main` HEAD** | **`864d39c`** |
+| Branch preserved at | `origin/codex/ux-slice-h-closeout` → `07ba74e` |
+| Working tree | clean |
+| Parity after merge | **`202607310064`** — local, remote and applied-at identical, no drift |
+| Fixture residue after merge | **zero** — 0 accounts, 0 `snoozed`, 0 non-null `snoozed_until`, 0 fixture rows |
+| Changed files | 37 non-evidence + 67 evidence = **104** |
+| Migration / SQL / RPC / grant changes | **none** |
+
+**Final dispositions — 35 findings:**
+
+| Disposition | Count |
+| --- | --- |
+| RESOLVED | **30** |
+| RETAINED with evidence | **4** |
+| DEFERRED to a named destination | **1** |
+| BLOCKED | **0** |
+| OPEN / PARTIAL | **0** |
+
+**All 8 P0 findings are RESOLVED.**
+
+**Phase 2G remains recommended and is not authorized or started.** §8 ranks it
+with the evidence for each item; nothing there has begun. Three items are named
+as repository maintenance rather than product scope: the UX-22 localization
+sweep, the `.gitattributes` CRLF fix, and a scheduled whole-authenticated-set
+journey run.
