@@ -14,6 +14,7 @@ const reprocessAction = vi.fn(async () => ({ status: "success" as const, message
 afterEach(cleanup);
 
 const props = {
+  agentName: "Brain",
   correctionAction,
   undoAction,
   reprocessAction,
@@ -43,7 +44,7 @@ describe("InterpretationRevisionEditor", () => {
     expect(screen.getByText("Resumo original")).toBeVisible();
     expect(screen.queryByRole("textbox", { name: "Resumo" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Corrigir interpretação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" }));
 
     expect(screen.getByRole("textbox", { name: "Resumo" })).toHaveValue("Resumo original");
     expect(screen.getByRole("checkbox", { name: /Nota sobre pessoa/ })).toBeChecked();
@@ -57,7 +58,7 @@ describe("InterpretationRevisionEditor", () => {
 
   it("supports dates, classifications, cancellation, undo, and bounded reprocessing controls", () => {
     render(<InterpretationRevisionEditor {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "Corrigir interpretação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" }));
 
     expect(screen.getByLabelText("Data identificada 1")).toHaveValue("2026-07-18");
     fireEvent.click(screen.getByRole("button", { name: "Adicionar data" }));
@@ -74,6 +75,6 @@ describe("InterpretationRevisionEditor", () => {
     render(<InterpretationRevisionEditor {...props} showSummary={false} />);
 
     expect(screen.queryByText("Resumo original")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Corrigir interpretação" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" })).toBeVisible();
   });
 });
