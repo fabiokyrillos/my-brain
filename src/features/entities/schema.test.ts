@@ -7,10 +7,15 @@ import {
   CONTEXT_KINDS,
   organizationCreateSchema,
   organizationUpdateSchema,
+  personContextSchema,
+  personProjectSchema,
   personUpdateSchema,
+  relationshipCreateSchema,
+  relationshipEndSchema,
   projectUpdateSchema,
   PROJECT_STATUSES,
 } from "./schema";
+import { RELATIONSHIP_TYPES } from "./relationship-vocabulary";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const PERSON_ID = "22222222-2222-4222-8222-222222222222";
@@ -193,6 +198,83 @@ describe("the context schemas", () => {
   it("requires a uuid on the update schema", () => {
     expect(contextUpdateSchema.safeParse({ ...create(), contextId: "nope" }).success).toBe(false);
     expect(contextUpdateSchema.safeParse({ ...create(), contextId: CONTEXT_ID }).success).toBe(true);
+  });
+});
+
+describe("the relationship and association schemas", () => {
+  const PERSON = "55555555-5555-4555-8555-555555555555";
+  const PROJECT = "66666666-6666-4666-8666-666666666666";
+
+  const relationship = (overrides: Record<string, unknown> = {}) => ({
+    locale: "pt-BR",
+    personId: PERSON,
+    relationshipType: "spouse",
+    description: "",
+    ...overrides,
+  });
+
+  it("accepts every vocabulary member and refuses anything outside it", () => {
+    // The **form** offers only the vocabulary; the **column** still accepts
+    // whatever the extraction pipeline writes, because it carries no CHECK
+    // (EGC-REL-002). That asymmetry is deliberate and is why EGC-REL-006 exists.
+    for (const type of RELATIONSHIP_TYPES) {
+      expect(relationshipCreateSchema.safeParse(relationship({ relationshipType: type })).success, type).toBe(true);
+    }
+    expect(relationshipCreateSchema.safeParse(relationship({ relationshipType: "godparent" })).success).toBe(false);
+    expect(relationshipCreateSchema.safeParse(relationship({ relationshipType: "" })).success).toBe(false);
+  });
+
+  it("bounds the note at 500 and normalizes an empty one to null", () => {
+    expect(relationshipCreateSchema.safeParse(relationship({ description: "x".repeat(500) })).success).toBe(true);
+    expect(relationshipCreateSchema.safeParse(relationship({ description: "x".repeat(501) })).success).toBe(false);
+
+    const parsed = relationshipCreateSchema.safeParse(relationship({ description: "   " }));
+    expect(parsed.success && parsed.data.description).toBeNull();
+  });
+
+  it("refuses an unknown field on every relationship shape", () => {
+    expect(relationshipCreateSchema.safeParse(relationship({ userId: "someone" })).success).toBe(false);
+    expect(relationshipCreateSchema.safeParse(relationship({ confidence: "0.2" })).success).toBe(false);
+    // `related_person_id` is never submitted: EGC-REL-001 says a null there
+    // means "related to the owner", and this slice authors nothing else.
+    expect(relationshipCreateSchema.safeParse(relationship({ relatedPersonId: PERSON })).success).toBe(false);
+  });
+
+  it("requires uuids on the end shape, so a forged id is a refusal", () => {
+    expect(relationshipEndSchema.safeParse({ locale: "en", relationshipId: "nope", personId: PERSON }).success).toBe(false);
+    expect(relationshipEndSchema.safeParse({ locale: "en", relationshipId: PROJECT, personId: PERSON }).success).toBe(true);
+  });
+
+  it("bounds a project role at 120 and normalizes an empty one to null", () => {
+    // EGC-ASSOC-004: free text, not a closed vocabulary and never localized —
+    // it is the owner's own words about their own work.
+    const association = (role: string) => ({
+      locale: "en" as const,
+      personId: PERSON,
+      projectId: PROJECT,
+      role,
+      origin: "person" as const,
+    });
+
+    expect(personProjectSchema.safeParse(association("x".repeat(120))).success).toBe(true);
+    expect(personProjectSchema.safeParse(association("x".repeat(121))).success).toBe(false);
+
+    const parsed = personProjectSchema.safeParse(association(" "));
+    expect(parsed.success && parsed.data.role).toBeNull();
+  });
+
+  it("accepts only the two origins, since origin steers revalidation and nothing else", () => {
+    const base = { locale: "en", personId: PERSON, projectId: PROJECT, role: "" };
+    expect(personProjectSchema.safeParse({ ...base, origin: "person" }).success).toBe(true);
+    expect(personProjectSchema.safeParse({ ...base, origin: "project" }).success).toBe(true);
+    expect(personProjectSchema.safeParse({ ...base, origin: "admin" }).success).toBe(false);
+  });
+
+  it("keeps origin out of the context association, which has no second surface", () => {
+    const base = { locale: "en", personId: PERSON, contextId: PROJECT };
+    expect(personContextSchema.safeParse(base).success).toBe(true);
+    expect(personContextSchema.safeParse({ ...base, origin: "person" }).success).toBe(false);
+    expect(personContextSchema.safeParse({ ...base, role: "x" }).success).toBe(false);
   });
 });
 
