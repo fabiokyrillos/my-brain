@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-07-31 (Phase 2F complete; the product UX/UI remediation is running between phases — Slice G5 added migration `202607310064`, moving remote parity off the Phase 2F head)
+Last updated: 2026-07-31 (Phase 2F complete; **the product UX/UI remediation is complete through its closeout, Slice H** — parity remains `202607310064`, which Slice G5 set)
 
 ## Current truth
 
@@ -10,7 +10,13 @@ Last updated: 2026-07-31 (Phase 2F complete; the product UX/UI remediation is ru
 
 **Remote migration parity is `202607310064`.** Slice 2F.4's deployment moved it to `202607300063` on 2026-07-29, and that was the Phase 2F head; the UX remediation's **Slice G5** moved it to `202607310064` on 2026-07-31 by adding the reminder lifecycle command boundary (UX-12, DEC-6, DEC-7 — ADR-060 and ADR-061). Local head is identical and there is no drift. Phase 2F's own claim that the phase applied exactly two migrations is unaffected: `202607310064` is **not** Phase 2F work, and the traceability generator's "no third Phase 2F migration" rule reads the phase's own inventory rather than the directory's length.
 
-**The product UX/UI remediation is the active work, and it is not a phase.** It is governed by `docs/reports/PRODUCT_UX_FINDINGS.md`, runs in lettered slices (A–H), and has been merging into `main` since 2026-07-29. Slices A–G5 are merged. **No successor phase is authorized or started** — Phase 2G remains a recommendation in `docs/PHASE_2F_PROPOSAL.md` and nowhere else, and Slice H's closeout is to *recommend* its scope, not to begin it.
+**The product UX/UI remediation is COMPLETE, and it was not a phase.** It was governed by `docs/reports/PRODUCT_UX_FINDINGS.md`, ran in sixteen lettered slices (A, B, C, D1–D3, B2, E, F1, F2, G1–G5, H) merged into `main` between 2026-07-29 and 2026-07-31, and closed out in **Slice H**. Its final accounting is `docs/reports/PRODUCT_UX_CLOSEOUT.md`.
+
+**34 findings, every one with exactly one final disposition: 29 RESOLVED, 4 RETAINED with evidence, 1 DEFERRED to a named destination. Zero BLOCKED, zero OPEN, zero PARTIAL. All 8 P0 findings are RESOLVED.** The four retained limitations are decisions with recorded evidence rather than deferrals (UX-24 does not reproduce; UX-25 is Home's height, accepted in Slice C; UX-27's two audit rows are two genuinely distinct events; UX-33 is user-agent date-placeholder behaviour the page cannot influence). The single deferred item is **UX-22** — 266 inline locale ternaries across 34 files — with a destination named (*localization maintenance*), an exact count and a per-file list in the closeout report.
+
+**Slice H added no migration, no SQL, no RPC and no grant change.** Parity is `202607310064` on both sides, unchanged by H. `authenticated` still holds `SELECT` and `INSERT` only on `public.reminders`, and `SELECT` only on `public.tasks`.
+
+**No successor phase is authorized or started.** Slice H's job was to *recommend* Phase 2G's scope, and it does so in §8 of the closeout report — ranked, with the evidence for each item. Nothing there is authorized. Two items are explicitly **not** product scope and are named as repository maintenance instead: the UX-22 localization sweep, and a `.gitattributes` fix for the Windows-only CRLF test fragility diagnosed in H (`core.autocrlf = true`, no `.gitattributes`, against test patterns anchored on bare `\n`; Linux CI is green and is the proof).
 
 **`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 

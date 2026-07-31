@@ -734,3 +734,39 @@ Worse than a missing branch: **the two halves of the Phase 2E/2F reminder contra
 **Rejected: dropping snooze as a distinct operation.** DEC-6 named it explicitly.
 
 **Consequences.** Snooze and reschedule perform the same physical write. They remain separate product actions, distinguished by command name, accepted input shape (bounded relative preset from `now()` versus an explicit absolute instant), validation, audit `action_type` and UI affordance — which is the shape DEC-7 requires. The word "snooze" no longer means "enters the `snoozed` state", and the CHECK member stays dormant and unretired: **2F-REMINDER-004 is untouched, and the closeout census keeps measuring zero.** The `snoozed` status is still modelled in the surface's state machine — as a state that accepts nothing and renders an honest label — so a legacy row would fail closed rather than crash a lookup.
+
+## ADR-064 - Cross-feature object state gets one shared typed vocabulary, and the per-feature modules stay
+
+**Date:** 2026-07-31. **Context:** UX-21 (Slice H), and the three slices that closed part of it before.
+
+UX-21 named nine surfaces rendering a stored enum as a label. Slices G3, G4 and G5 closed Memories, History and Reminders by giving each **feature** its own typed `copy.ts`, which is the shape `docs/ENGINEERING_STANDARDS.md` names as canonical. Eleven sites survived all three, and re-auditing them found they share a property the earlier fixes did not address: every one is **one feature rendering another feature's state** — a task's status on a person's page, a memory's kind beside a person, an attachment's status on Files. A vocabulary rendered by four features has no feature that owns it, which is exactly why no feature-scoped slice picked it up.
+
+**Decision.** `src/features/vocabulary/copy.ts` holds the object-state vocabularies rendered across feature boundaries: task status, project status, context kind, memory kind, attachment status, job status, job type, entity type. It holds **only** closed sets a `check` constraint already defines, one label per member per locale, typed `Record<Union, string>`. It contains no sentences, no page copy and no behaviour. Every lookup returns `null` for a value outside its own constraint and the caller renders a sentence; the module never falls back to the stored value.
+
+**Rejected: folding the existing feature modules into it.** `history/copy.ts` and `memories/copy.ts` ship, are covered by 72 and 40+ tests respectively, and their labels are tuned to their own register. Rewriting them to consume a shared module would put G3's and G4's green suites at risk to remove a duplication that a test can pin instead. Seventeen tests assert the overlapping labels are **identical** to the modules that already own them, so two homes cannot mean two answers, and changing a label in one place fails the build.
+
+**Rejected: a runtime fallback to `replaceAll("_", " ")`.** That is the mechanism the finding was raised about. It produces `recurring info` and `professional context`, which are neither Portuguese nor English.
+
+**Consequences.** One documented exception survives and is argued rather than omitted: `public.jobs.type` has **no** `check` constraint — deliberately, so a new worker can ship without a migration — so an unknown type falls back to its identifier on `/app/jobs`, a route whose own subtitle calls itself a private technical queue. A `Record<Union, string>` makes an unlabelled member a compile error, so a future enum value cannot reach a screen unlabelled the way these did.
+
+## ADR-065 - An inherited finding is measured before it is fixed
+
+**Date:** 2026-07-31. **Context:** Slice H's accessibility carryover, and UX-32.
+
+Slice G3 fixed an accessible-name defect in its own memory textareas and recorded the same shape as latent in `entity-edit-form.tsx`, attributing it to React rendering a textarea's value as a child text node so that a wrapping `<label>` absorbs the value into the field's **name**. Slice H inherited it as a fix to apply.
+
+Applying it would have been three lines. Measuring it first — in Chromium's own AX tree over CDP, in Playwright's `toHaveAccessibleName`, and in the `dom-accessibility-api` the component tests use — showed the shape computes **correctly in all three**: a label that both associates by `for`/`id` and wraps its control is the case the accname algorithm is explicit about. The stated mechanism was wrong, and the fix would have been three lines of `aria-label` justified by a comment nobody could later verify.
+
+**Decision.** A finding inherited across a slice boundary is reproduced before it is fixed, and the measurement is recorded whether it confirms the finding or not. Where it does not reproduce, the disposition is RETAINED with the evidence, not RESOLVED with a fix.
+
+**Consequences.** Probing the neighbouring shapes found the one that does pollute a name — a label wrapping its control **plus other content** — and found three live instances of it in Settings, including the assistant-name field Slice F1 had just added. A defect that was never looked for was found by declining to fix one that was never verified. The cost is one probe script; the alternative was a fix that would have been carried forward as settled fact.
+
+## ADR-066 - Closeout evidence comes from an assertion run over the whole route inventory, not from review
+
+**Date:** 2026-07-31. **Context:** Slice H's route re-audit, and UX-34.
+
+Fifteen slices reviewed this product at four viewports in two locales. Slice H's sweep — the same invariants, expressed as assertions and run over the current route inventory rather than the audit's — found on its first pass that the notifications bell, a navigation link rendered on **every page in the product**, never marked itself as the current destination.
+
+**Decision.** Closeout evidence for a UX initiative is an executable sweep over the route inventory read from the filesystem, asserting the invariants the initiative established: route answers, zero horizontal overflow, exactly one `<h1>`, navigation present and marking the current destination, account surface reachable, no stored enum in visible text, no inert row carrying an interactive affordance, and 44 px touch targets on phone viewports. Exceptions are named individually in the spec with the reason, not accommodated by weakening an assertion.
+
+**Consequences.** The sweep has exactly one named exception — `/app/jobs`, which `capabilities.ts` declares `context-only` and the type system excludes from `VisibleNavigationKey`, so nothing could mark it. Reading the inventory from `src/app/[locale]/app` rather than from the original audit mattered: five routes that did not exist at audit 1 were audited here for the first time. The cost is 168 page loads against a live database per run, which is why it is a closeout instrument rather than a per-PR gate.
