@@ -209,3 +209,26 @@ DEC-7 decidiu que o adiamento visível ao dono é **movimento de `remind_at` com
 ### Auditoria
 
 Cada transição grava uma linha em `public.audit_logs` com `entity_type = 'reminder'`, `entity_id` do lembrete, `actor = 'user'`, `before_state`/`after_state` dos quatro escalares, e um `action_type` que **nomeia o comando** (`reminder_snoozed`, `reminder_rescheduled`, `reminder_cancelled`, `reminder_restored`, `reminder_edited`). A compensação grava `reminder_command_undone` com `actor = 'system'`. `reason` continua em prosa inglesa e continua **não renderizado** — a superfície de Histórico deriva a frase localizada de `action_type`/`entity_type` desde a Slice G4 (UX-28).
+
+## Signup hospedado fechado e verificado (2026-07-31)
+
+**`disable_signup: true` no projeto vinculado `ulvwzqlpsjyrnqzfxmck`.** Nenhuma migration, grant, policy ou função mudou; a alteração é de configuração de Auth no painel, e este registro a **verifica**, não a executa.
+
+- **Prova:** três leituras com cache-busting mais uma tentativa de cadastro que retornou `422` com `error_code: signup_disabled` e o cabeçalho `sb-project-ref: ulvwzqlpsjyrnqzfxmck`.
+- **O controle positivo é o que torna a prova válida:** o mesmo domínio havia criado um usuário com sucesso dois minutos antes, então a recusa é atribuível à política de cadastro e não à validação de endereço.
+- **Falso-positivo registrado, não escondido:** a primeira sonda usou um endereço `.invalid` e recebeu `400` com corpo vazio — indistinguível de uma recusa, e na verdade `email_address_invalid`, avaliado **antes** da política de cadastro (o mesmo comportamento já registrado na linha sobre o domínio E2E reservado). Aceitá-lo teria declarado o portão verde com o cadastro aberto. **Regra adotada:** uma recusa só é prova quando a resposta é atribuível à política de cadastro, a partir de um domínio que o provedor comprovadamente aceita.
+- **Não mudou nada além disso:** o documento público de settings foi comparado campo a campo antes e depois — `mailer_autoconfirm`, `anonymous_users`, os 23 provedores externos, SAML, passkeys e SMS permanecem idênticos. Exatamente um campo mudou.
+- **Sign-in continua funcional** (token emitido para um usuário existente) e a contagem de usuários não mudou por causa do teste.
+- **Nenhuma credencial da Management API foi acessada ou extraída.** `supabase config push` foi recusado por publicar o `config.toml` local inteiro — que define `enable_signup = true` e URLs de redirecionamento de localhost.
+
+Evidência completa: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+
+**Isto não é mitigação de BYOK e não substitui o endurecimento de cadastro.** O cadastro público permanece bloqueado por BYOK mais os controles de infraestrutura; três pré-requisitos não existem: exclusão de conta, suspensão administrativa, e termos/política de privacidade (ADR-068).
+
+### Conta de teste abandonada removida da produção
+
+Uma conta gerada em 2026-07-16, confirmada, usada por três minutos e nunca mais acessada, foi removida com autorização do dono. Ela acumulava **358 linhas em `heartbeat_runs`** — uma por hora — que é exatamente o crescimento citado acima quando o encerramento da Fase 2F **recusou** criar um usuário de fixture em produção.
+
+**O detector anterior não a via, e isso é o achado.** Dois artefatos de aceitação (`PHASE_2F_SLICE_06_ACCEPTANCE.md:99`, `PHASE_2F_SLICE_05_ACCEPTANCE.md:155`) rodaram um detector de 20 prefixos de fixture e a classificaram como **usuário real** — corretamente pela própria regra, já que nenhum criador de fixture deste repositório gera aquele prefixo. **O proxy era mais estreito que a propriedade**, a mesma classe de achado que o ADR-067 corrige no guarda A13.
+
+A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro pré-exclusão não nomeava (`audit_logs`, `entry_interpretations`), encontradas por ampliar a varredura. `public.product_events` é ilegível para `service_role` **por desenho** — a mesma recusa asserida na Slice 2F.6 — então a ausência ali é provada como composição declarada, e nenhuma afirmação mais forte é feita. Restam duas contas reais. Evidência: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.

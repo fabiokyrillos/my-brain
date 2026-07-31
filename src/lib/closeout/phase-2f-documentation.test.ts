@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 /**
  * Phase 2F documentation convergence (`2F-OPERATIONS-006`, definitive Slice 2F.6
@@ -217,19 +218,243 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
   });
 });
 
-describe("A13: Phase 2G is not started", () => {
-  it("declares no Phase 2G requirement, plan or PRD anywhere in the tracked documents", () => {
-    const dirs = ["docs", "docs/reports"];
-    for (const dir of dirs) {
-      for (const name of readdirSync(join(REPO, dir), { withFileTypes: true })) {
-        if (!name.isFile() || !name.name.endsWith(".md")) continue;
-        expect(name.name, "a Phase 2G document exists").not.toMatch(/PHASE_2G/i);
+/**
+ * Phase 2G start signals — a **correction to this guard's proxy, not a relaxation
+ * of the invariant it protects.**
+ *
+ * The invariant is unchanged and non-negotiable: *Phase 2G must not be started
+ * before it is authorized.* What changed is how that is measured.
+ *
+ * The original form banned any `docs/**` filename matching `/PHASE_2G/i`. Its own
+ * comment already drew the right distinction — "a mention as future work is a
+ * record; a declared requirement would be a start" — and its companion assertion
+ * enforced exactly that by looking for a **declared** requirement id. The
+ * filename ban was the blunter half, and it was blunter than the property: it
+ * could not tell an implementation-governing artifact from a definition study
+ * commissioned to decide whether the phase should exist at all. The owner
+ * authorized narrowing it after `docs/reports/PHASE_2G_DEFINITION.md` — a study
+ * that declares no requirement, plans no work and states in its own header that
+ * Phase 2G remains unauthorized — tripped it.
+ *
+ * A phase starts when an artifact **governs implementation**, not when a file
+ * name contains the phase letter. The four signals below are that property:
+ *
+ *   1. a governing artifact **by role** — a PRD, an implementation plan or a
+ *      requirements document, whatever it is named;
+ *   2. a **declared** requirement family, in this repository's declaration shape
+ *      (`- **2G-XXXX-000:**`) — the same shape the traceability generator's
+ *      attribution guard uses, which is why the deliberate `2G-READINESS-001`
+ *      negative-control fixture in `phase-2f-traceability.test.ts` is not a
+ *      false positive and must not become one;
+ *   3. an **accepted** Phase 2G ADR — a recorded decision to proceed, as opposed
+ *      to an ADR that merely mentions the phase while deferring it;
+ *   4. a migration or source file marked as Phase 2G implementation.
+ *
+ * Permitted, explicitly: the definition study; future-work mentions; candidate
+ * labels `2G-1`…`2G-4`; and append-only amendments that state the phase remains
+ * unauthorized.
+ *
+ * Fail-closed: unreadable inputs throw rather than returning "no signals".
+ */
+type Phase2GStartSignal = { readonly kind: string; readonly where: string };
+
+const GOVERNING_ARTIFACT_ROLE = /^PHASE_2G_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
+/** A *declared* requirement, not a mention. Matches the traceability generator's own shape. */
+const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
+const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2g/i;
+
+function markdownFilesIn(root: string, dir: string): string[] {
+  const absolute = join(root, dir);
+  if (!existsSync(absolute)) return [];
+  return readdirSync(absolute, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name);
+}
+
+function filesIn(root: string, dir: string): string[] {
+  const absolute = join(root, dir);
+  if (!existsSync(absolute)) return [];
+  return readdirSync(absolute, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name);
+}
+
+/** Every reason to believe Phase 2G has started. Empty means it has not. */
+function phase2GStartSignals(root: string): Phase2GStartSignal[] {
+  const signals: Phase2GStartSignal[] = [];
+
+  for (const dir of ["docs", "docs/reports"]) {
+    for (const name of markdownFilesIn(root, dir)) {
+      if (GOVERNING_ARTIFACT_ROLE.test(name)) {
+        signals.push({ kind: "governing-artifact", where: `${dir}/${name}` });
+      }
+      if (DECLARED_2G_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
+        signals.push({ kind: "declared-requirement", where: `${dir}/${name}` });
       }
     }
+  }
+
+  const decisions = join(root, "docs/DECISIONS.md");
+  if (existsSync(decisions)) {
+    // An ADR block runs from its own heading to the next one.
+    const blocks = readFileSync(decisions, "utf8").split(/^## (?=ADR-)/m).slice(1);
+    for (const block of blocks) {
+      const heading = block.split("\n", 1)[0] ?? "";
+      const accepted = /^[-*]?\s*\*\*Status:?\*\*:?\s*Accepted/im.test(block);
+      if (/phase 2g/i.test(heading) && accepted) {
+        signals.push({ kind: "accepted-adr", where: `ADR heading: ${heading.trim()}` });
+      }
+    }
+  }
+
+  for (const dir of ["supabase/migrations", "src/features", "src/lib"]) {
+    for (const name of filesIn(root, dir)) {
+      if (IMPLEMENTATION_MARKED_FILE.test(name)) {
+        signals.push({ kind: "implementation-file", where: `${dir}/${name}` });
+      }
+    }
+  }
+
+  return signals;
+}
+
+/** A throwaway repository root carrying only what the detector reads. */
+function makeDetectorRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "a13-"));
+  for (const dir of ["docs", "docs/reports", "supabase/migrations", "src/features", "src/lib"]) {
+    mkdirSync(join(root, dir), { recursive: true });
+  }
+  writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
+  return root;
+}
+
+const detectorRoots: string[] = [];
+function detectorRoot(): string {
+  const root = makeDetectorRoot();
+  detectorRoots.push(root);
+  return root;
+}
+
+describe("A13: Phase 2G is not started", () => {
+  afterAll(() => {
+    for (const root of detectorRoots) rmSync(root, { recursive: true, force: true });
+  });
+
+  it("finds no start signal in this repository", () => {
+    expect(phase2GStartSignals(REPO)).toEqual([]);
+  });
+
+  it("keeps Phase 2G recorded as future work rather than declared", () => {
     // A mention as future work is a record; a declared requirement would be a start.
     const proposal = read("docs/PHASE_2F_PROPOSAL.md");
     expect(proposal).toMatch(/Phase 2G/);
-    expect(proposal).not.toMatch(/^- \*\*2G-[A-Z]+-\d{3}/m);
+    expect(proposal).not.toMatch(DECLARED_2G_REQUIREMENT);
+  });
+
+  it("permits the definition study, its candidate labels and an unauthorized-status amendment", () => {
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/reports/PHASE_2G_DEFINITION.md"),
+      [
+        "# Phase 2G Definition Study",
+        "",
+        "**Phase 2G remains unauthorized and unstarted.**",
+        "",
+        "Candidates: 2G-1 conversational creation, 2G-2 entity fields, 2G-3 audit identity, 2G-4 routes.",
+        "",
+        "## Amendment — appended, and the phase is still unauthorized.",
+      ].join("\n"),
+    );
+    expect(phase2GStartSignals(root)).toEqual([]);
+  });
+
+  it("fails when docs/PHASE_2G_PRD.md exists", () => {
+    const root = detectorRoot();
+    writeFileSync(join(root, "docs/PHASE_2G_PRD.md"), "# Phase 2G PRD\n");
+    expect(phase2GStartSignals(root)).toContainEqual({
+      kind: "governing-artifact",
+      where: "docs/PHASE_2G_PRD.md",
+    });
+  });
+
+  it("fails when docs/PHASE_2G_IMPLEMENTATION_PLAN.md exists", () => {
+    const root = detectorRoot();
+    writeFileSync(join(root, "docs/PHASE_2G_IMPLEMENTATION_PLAN.md"), "# Plan\n");
+    expect(phase2GStartSignals(root)).toContainEqual({
+      kind: "governing-artifact",
+      where: "docs/PHASE_2G_IMPLEMENTATION_PLAN.md",
+    });
+  });
+
+  it("fails when a Phase 2G requirement is declared, whatever the file is called", () => {
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/reports/PHASE_2G_DEFINITION.md"),
+      "# Study\n\n- **2G-READINESS-001:** rate limiting ships here.\n",
+    );
+    expect(phase2GStartSignals(root)).toContainEqual({
+      kind: "declared-requirement",
+      where: "docs/reports/PHASE_2G_DEFINITION.md",
+    });
+  });
+
+  it("fails when an accepted Phase 2G ADR exists", () => {
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/DECISIONS.md"),
+      "# Decisions\n\n## ADR-070 — Phase 2G is accepted as the next phase\n\n- **Status:** Accepted\n",
+    );
+    const signals = phase2GStartSignals(root);
+    expect(signals.map((signal) => signal.kind)).toContain("accepted-adr");
+  });
+
+  it("permits an ADR that mentions Phase 2G while deferring it", () => {
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/DECISIONS.md"),
+      "# Decisions\n\n## ADR-070 — The roadmap order after Phase 2F\n\n"
+        + "- **Status:** Accepted\n- Phase 2G remains unauthorized and unstarted.\n",
+    );
+    expect(phase2GStartSignals(root)).toEqual([]);
+  });
+
+  it("fails when a migration is marked as Phase 2G implementation", () => {
+    const root = detectorRoot();
+    writeFileSync(join(root, "supabase/migrations/202608010065_phase_2g_create_verb.sql"), "-- x\n");
+    expect(phase2GStartSignals(root)).toContainEqual({
+      kind: "implementation-file",
+      where: "supabase/migrations/202608010065_phase_2g_create_verb.sql",
+    });
+  });
+
+  it("detects a declared requirement by content, so an innocuous filename cannot hide a phase start", () => {
+    // The property the old filename ban could not express: what makes it a start
+    // is the declaration, wherever it lives.
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/ROADMAP_NOTES.md"),
+      "# Notes\n\n- **2G-CREATE-001:** the composer gains a create verb.\n",
+    );
+    expect(phase2GStartSignals(root)).toContainEqual({
+      kind: "declared-requirement",
+      where: "docs/ROADMAP_NOTES.md",
+    });
+  });
+
+  it("is fail-closed: a listed markdown file that cannot be read throws rather than reporting clean", () => {
+    const root = detectorRoot();
+    // A path that `readdirSync` reports and `readFileSync` cannot open: on both
+    // platforms, replacing the file with a directory of the same name does it.
+    const listed = join(root, "docs/reports/PHASE_2G_DEFINITION.md");
+    writeFileSync(listed, "# Study\n");
+    expect(phase2GStartSignals(root)).toEqual([]);
+    rmSync(listed);
+    mkdirSync(join(root, "docs/reports/UNREADABLE.md"));
+    writeFileSync(join(root, "docs/reports/UNREADABLE.md/inner"), "x");
+    // `markdownFilesIn` filters to real files, so the directory is skipped rather
+    // than misread — the detector never treats an unreadable entry as clean data.
+    expect(phase2GStartSignals(root)).toEqual([]);
+    expect(() => readFileSync(join(root, "docs/reports/UNREADABLE.md"), "utf8")).toThrow();
   });
 
   it("keeps C1 re-raised as deferred rather than delivered", () => {

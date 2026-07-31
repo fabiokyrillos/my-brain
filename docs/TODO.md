@@ -5,6 +5,17 @@ Active milestone: **Phase 2F — One Write Path is complete.** All six slices (2
 
 Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`; decisions move to `DECISIONS.md`; the current snapshot stays in `STATE.md`.
 
+## Authorization state (2026-07-31)
+
+- [x] **G-0.5 — hosted signup closed and verified.** `disable_signup: true`; a signup attempt with a provider-accepted address returns `422 signup_disabled`. Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+- [x] **Abandoned production test account removed**, owner-authorized, full cascade verified across 16 readable tables. Two real accounts remain. Evidence: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
+- [ ] **Entity Graph Completion — AUTHORIZED, implementation not started.** `docs/ENTITY_GRAPH_COMPLETION_PRD.md` + `..._IMPLEMENTATION_PLAN.md`. EGC.1 Organizations and Contexts → EGC.2 Person Relationships and Associations → EGC.3 Convergence and Closeout. **Zero migrations** is a hard invariant with a CI gate on the migration-chain head.
+- [ ] **BYOK — design APPROVED, implementation not started.** `docs/BYOK_PRD.md` + `..._IMPLEMENTATION_PLAN.md`, on `docs/reports/BYOK_SECURITY_DEFINITION.md`. Runs **after** Entity Graph Completion. Four migrations budgeted; none written.
+- [ ] **Phase 2G — UNAUTHORIZED and unstarted.** `docs/reports/PHASE_2G_DEFINITION.md` is a definition study only: no PRD, no plan, no accepted ADR, no declared requirement, no code. Its position in the roadmap is **after** BYOK implementation (ADR-068).
+- [ ] **Public signup — BLOCKED.** Gated on BYOK implementation plus signup hardening. Three prerequisites do not exist at all: **account deletion**, **admin suspension**, **terms and privacy policy**.
+
+The product UX/UI remediation ledger is unchanged by this entry: 35 findings, 30 RESOLVED, 4 RETAINED, 1 DEFERRED. Migration parity remains `202607310064`.
+
 ## Active milestone — Phase 2
 
 - [x] Adopt permanent engineering standards in `ENGINEERING_STANDARDS.md`.

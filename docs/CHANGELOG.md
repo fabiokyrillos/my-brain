@@ -3,6 +3,25 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-31 — Documentation and gates: hosted signup closed, A13 corrected, two initiatives authorized
+
+**No product source, no migration, no grant, no policy, no RPC.** Migration parity stays `202607310064` on both sides. The product UX ledger is untouched: 35 findings, 30 RESOLVED, 4 RETAINED, 1 DEFERRED.
+
+**Hosted signup is disabled and verified (G-0.5).** `disable_signup: true` on `ulvwzqlpsjyrnqzfxmck`, proven by three cache-busted reads plus a signup attempt returning `422 signup_disabled`. **The positive control is the point:** the same address domain had successfully created a user two minutes earlier, which excludes provider address validation as the cause of the refusal. An earlier probe using a `.invalid` address returned `400` with an empty body — indistinguishable from a refusal, and in fact `email_address_invalid` evaluated *before* signup policy. Accepting it would have reported the gate green while signup was open. The method rule now recorded: a refusal is proof only when the response is attributable to signup policy, from a domain the provider is observed to accept. Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+
+**A13's phase-start guard was corrected — a fix to its proxy, not a relaxation of its invariant.** `phase-2f-documentation.test.ts` banned any `docs/**` filename matching `/PHASE_2G/i`. Its own comment already drew the right line ("a mention as future work is a record; a declared requirement would be a start"), and its companion assertion enforced exactly that; the filename ban was the blunter half and could not tell an implementation-governing artifact from a definition study commissioned to decide whether the phase should exist. It now detects four signals — a governing artifact **by role**, a **declared** requirement family in this repository's declaration shape, an **accepted** Phase 2G ADR, and an implementation-marked migration or source file — with **eight executed mutation cases** proving each fires and that the definition study, candidate labels `2G-1`…`2G-4`, future-work mentions and unauthorized-status amendments all pass. The deliberate `2G-READINESS-001` negative-control fixture in `phase-2f-traceability.test.ts` remains a non-match, by using the same declaration shape that test relies on. See ADR-067.
+
+**Entity Graph Completion is authorized; implementation has not started.** Nine owner-observed findings (EG-01…EG-09) recorded in `docs/reports/ENTITY_GRAPH_FINDINGS.md`: the Person page reads four relationship surfaces — relationship to owner, contexts, tasks, projects — from tables `authenticated` can already fully write under forced RLS with composite-FK ownership proof, and **no write surface exists for any of them**; `public.person_relationships` has never been written by anything. The requested lifecycle needs **zero migrations, zero grants and zero new privileged boundaries**.
+
+**BYOK design is approved; implementation has not started.** `docs/reports/BYOK_SECURITY_DEFINITION.md` plus PRD and plan. The project key is read in exactly two places and is already a parameter downstream in both, so BYOK is a credential-resolution change at two injection points. The study states plainly what no storage choice can provide: the unattended `pg_cron` drain requires the operator's worker to decrypt user keys, so four specific security claims are forbidden in copy.
+
+**Phase 2G remains unauthorized and unstarted.** Public signup remains blocked on BYOK plus signup hardening, three of whose prerequisites do not exist: account deletion, admin suspension, terms and privacy policy.
+
+**One production account removed** as abandoned test residue, owner-authorized. Full cascade verified across 16 readable tables — including two (`audit_logs`, `entry_interpretations`) the pre-deletion record had not named, found by widening the sweep. `product_events` is unreadable to `service_role` **by design**, so its absence is proven as a declared composition rather than claimed. It had accumulated **358 `heartbeat_runs` rows**, one per hour since 2026-07-16 — exactly the growth `SECURITY.md:171` cited when Phase 2F's closeout refused to mint a fixture user in production. Two real accounts remain. Evidence: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
+
+**G-0.4 baseline re-measured, not inherited:** 266 locale ternaries across 34 files, confirming the closeout's figure. `docs/reports/EGC_G04_LOCALE_TERNARY_BASELINE.md`.
+
+
 ## 2026-07-31 — Slice H — the product UX remediation's closeout (UX-04, UX-21, UX-22, UX-27, UX-32, UX-33, UX-34, UX-35)
 
 **Merged as PR #50, merge SHA `864d39c`, merge-SHA CI run `30648854282` green on all three jobs. The product UX/UI remediation is COMPLETE.** Final: **35 findings — 30 RESOLVED, 4 RETAINED with evidence, 1 DEFERRED, 0 BLOCKED, 0 OPEN, 0 PARTIAL, all 8 P0 RESOLVED.**
