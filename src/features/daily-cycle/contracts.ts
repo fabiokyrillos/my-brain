@@ -168,6 +168,53 @@ export type InterpretationReviewView = {
   hasTechnicalDetails: boolean;
 };
 
+/**
+ * What exists *because of* an entry (UX-04).
+ *
+ * The audit found the entry page could not answer "what was created?": confirmed
+ * tasks appeared only as a transient success message on the candidate form, and
+ * the people, projects and contexts the interpretation detected sat behind a
+ * disclosure named "technical details" — which is where model ids and trust
+ * scores belong, not where the owner's own relationships do.
+ *
+ * These are **read-only** shapes over rows that already exist. Every family is a
+ * plain foreign key back to the entry (`tasks.source_entry_id`,
+ * `reminders.entry_id`, `memories.source_entry_id`, `entry_entities.entry_id`),
+ * so no write contract, projection rewrite or migration is involved in reading
+ * them back.
+ */
+export const entryOutcomeFamilies = ["task", "reminder", "memory", "entity"] as const;
+
+export type EntryOutcomeFamily = (typeof entryOutcomeFamilies)[number];
+
+export type EntryOutcomeItem = {
+  readonly key: string;
+  readonly family: EntryOutcomeFamily;
+  /** The row's own words — a task title, a memory's text, a person's name. */
+  readonly title: string;
+  /** One localized line of context: a due date, a state, a relationship kind. */
+  readonly detail: string | null;
+  /**
+   * Where the owner can go to inspect it, or `null` when no route exists for
+   * this object. A `null` here renders as plain text, never as a dead link —
+   * the UX-20 rule that what looks actionable must be actionable.
+   */
+  readonly href: string | null;
+};
+
+export type EntryOutcomeGroup = {
+  readonly family: EntryOutcomeFamily;
+  readonly heading: string;
+  readonly items: readonly EntryOutcomeItem[];
+};
+
+export type EntryOutcomeView = {
+  readonly entryId: string;
+  readonly groups: readonly EntryOutcomeGroup[];
+  /** True when nothing was created, so the section can say so rather than vanish. */
+  readonly isEmpty: boolean;
+};
+
 export type InterpretationTechnicalDetailsView = {
   entryId: string;
   versions: readonly { id: string; version: number; createdAt: string }[];

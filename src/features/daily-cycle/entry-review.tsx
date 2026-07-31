@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
-import type { AttentionItemView, AttentionReason, CandidateOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
+import type { AttentionItemView, AttentionReason, CandidateOutcomeView, EntryOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 
 const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "resolve_consistency"];
@@ -95,21 +96,100 @@ export function ReviewNextActions({ locale, children }: { locale: DailyCycleLoca
   );
 }
 
+/**
+ * What the owner wrote, always open (UX-04).
+ *
+ * The audit's first question of this page is "what did I write?", and the
+ * answer was behind a `<details>` labelled "Ver registro original" — collapsed
+ * unless the interpretation had failed, i.e. shown by default only when there
+ * was nothing else to show. The owner's own words are the record; the
+ * interpretation is a reading of them. This now sits directly under the heading
+ * and cannot be collapsed away.
+ */
 export function OriginalRecord({
   original,
   locale,
-  defaultOpen = false,
 }: {
   original: OriginalEntryView;
   locale: DailyCycleLocale;
-  defaultOpen?: boolean;
 }) {
   const pt = locale === "pt-BR";
   return (
-    <details className="original-entry review-original" open={defaultOpen}>
-      <summary><Quote size={17} aria-hidden="true" />{pt ? "Ver registro original" : "View original entry"}</summary>
-      <p>{original.content}</p>
-    </details>
+    <section className="original-entry review-original" aria-labelledby="review-original-title">
+      <div className="section-heading">
+        <Quote size={17} aria-hidden="true" />
+        <div>
+          <h2 id="review-original-title">{pt ? "O que você escreveu" : "What you wrote"}</h2>
+          <p>{pt ? "Preservado exatamente como foi registrado." : "Preserved exactly as it was recorded."}</p>
+        </div>
+      </div>
+      <p className="review-original-content">{original.content}</p>
+    </section>
+  );
+}
+
+/**
+ * What now exists because of this entry (UX-04).
+ *
+ * Reads only. Every row here was created by an action the owner already took —
+ * confirming a candidate, answering a question, letting the interpretation link
+ * an entity — and this is the page's standing account of it, not the transient
+ * success message the candidate form used to show and then forget.
+ *
+ * An item links when a route can actually receive it and renders as plain text
+ * when none exists, which is UX-20's rule rather than a styling choice.
+ */
+export function EntryOutcomes({
+  outcomes,
+  locale,
+}: {
+  outcomes: EntryOutcomeView;
+  locale: DailyCycleLocale;
+}) {
+  const pt = locale === "pt-BR";
+
+  return (
+    <section className="entry-outcomes" aria-labelledby="entry-outcomes-title">
+      <div className="section-heading">
+        <span aria-hidden="true">◆</span>
+        <div>
+          <h2 id="entry-outcomes-title">{pt ? "O que passou a existir" : "What now exists"}</h2>
+          <p>
+            {pt
+              ? "Tudo que este registro criou ou reconheceu, com onde inspecionar."
+              : "Everything this record created or recognized, and where to inspect it."}
+          </p>
+        </div>
+      </div>
+
+      {outcomes.isEmpty ? (
+        /* Said rather than hidden: "nothing was created" is an answer to the
+           owner's question, and an absent section is not. */
+        <p className="entry-outcomes-empty">
+          {pt
+            ? "Nada foi criado a partir deste registro. Ele permanece salvo como referência."
+            : "Nothing was created from this record. It stays saved as reference."}
+        </p>
+      ) : (
+        outcomes.groups.map((group) => (
+          <div className="entry-outcome-group" key={group.family}>
+            <h3>{group.heading}</h3>
+            <ul>
+              {group.items.map((item) => (
+                <li key={item.key}>
+                  {item.href === null ? (
+                    <span className="entry-outcome-title">{item.title}</span>
+                  ) : (
+                    <Link className="entry-outcome-title" href={item.href}>{item.title}</Link>
+                  )}
+                  {item.detail === null ? null : <span className="entry-outcome-detail">{item.detail}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
+    </section>
   );
 }
 
@@ -151,31 +231,58 @@ export type EntryReviewSlots = {
   technicalDetails?: ReactNode;
 };
 
+/**
+ * The order is the finding (UX-04).
+ *
+ * The audit measured this page against seven owner questions and found it
+ * organised around the *interpretation object* instead: the model's paraphrase
+ * was the `<h1>`, the owner's own words were collapsed behind a disclosure, the
+ * objects the entry created existed only as a success message that disappeared,
+ * and the people and projects it recognized were filed under "technical
+ * details" beside model ids and trust scores.
+ *
+ * It now runs in the order the questions are asked:
+ *
+ * 1. **what did I write** — `OriginalRecord`, open, no click
+ * 2. **what did it understand** — the heading and its facts
+ * 3. **what still needs me** — attention, then the actions that resolve it
+ * 4. **what now exists** — tasks, reminders, memories and recognized entities,
+ *    each linked to where it can be inspected
+ * 5. **what happened before** — previous decisions on this record
+ * 6. **how it was decided** — model, scores and trust policy, behind the
+ *    disclosure, which is what that disclosure is for
+ *
+ * The heading keeps the `<h1>` because a page needs one and the understanding
+ * is what names this record in every list that points here; what changed is
+ * that it is no longer the only thing above the fold.
+ */
 export function EntryReview({
   view,
+  outcomes,
   locale,
   agentName,
   occurredAtLabel,
-  originalDefaultOpen = false,
   slots,
 }: {
   view: InterpretationReviewView;
+  /** Omitted only by callers that have no database to read — the projection is required in the app. */
+  outcomes?: EntryOutcomeView;
   locale: DailyCycleLocale;
   occurredAtLabel: string;
   agentName: string;
-  originalDefaultOpen?: boolean;
   slots: EntryReviewSlots;
 }) {
   return (
     <div className="entry-review">
       <InterpretationReviewViewed entryId={view.entryId} locale={locale} />
       <ReviewUnderstanding view={view} locale={locale} agentName={agentName} occurredAtLabel={occurredAtLabel} />
+      <OriginalRecord original={view.original} locale={locale} />
       <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
         {slots.attentionAction}
       </ReviewAttention>
       <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
+      {outcomes === undefined ? null : <EntryOutcomes outcomes={outcomes} locale={locale} />}
       <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} />
-      <OriginalRecord original={view.original} locale={locale} defaultOpen={originalDefaultOpen} />
       {slots.technicalDetails}
     </div>
   );
