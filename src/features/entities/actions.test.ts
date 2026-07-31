@@ -243,9 +243,10 @@ const CONTEXT_ID = "55555555-5555-4555-8555-555555555555";
  * A table that is inserted into and read back, which `tableStub` cannot model.
  *
  * `tableStub` resolves `insert` to a bare `{error}` because the two update
- * actions never read their insert back. The four creating actions do — they need
- * the generated `id` for `createdId` and for the audit row — so the chain has to
- * survive `.insert(…).select(…).maybeSingle()`.
+ * actions never read their insert back. The creating actions do — they need the
+ * generated `id` for the audit row and, in the create-and-assign path, for the
+ * assignment itself — so the chain has to survive
+ * `.insert(…).select(…).maybeSingle()`.
  */
 function insertStub(result: Result) {
   const stub: Record<string, unknown> = {};
@@ -256,10 +257,9 @@ function insertStub(result: Result) {
 }
 
 describe("createOrganization", () => {
-  it("stamps the caller's id on the row and returns what it created", async () => {
-    // `createdId` is what the create-and-select affordance selects without
-    // re-querying, so an action that succeeded without one would leave the
-    // selector showing the old value over a row that exists.
+  it("stamps the caller's id on the row and audits the generated id", async () => {
+    // `user_id` comes from `requireUser`, never from the form. A row that took
+    // its owner from submitted data would be forgeable in one field.
     const organizations = insertStub({
       data: { id: ORGANIZATION_ID, name: "Acme", description: "Cliente" },
       error: null,
@@ -273,7 +273,6 @@ describe("createOrganization", () => {
     );
 
     expect(result.status).toBe("success");
-    expect(result.createdId).toBe(ORGANIZATION_ID);
     expect(organizations.inserted).toMatchObject({ user_id: USER_ID, name: "Acme", description: "Cliente" });
     expect(audit.mock.calls[0]![0]).toMatchObject({
       user_id: USER_ID,
@@ -481,7 +480,6 @@ describe("createOrganizationForSubject", () => {
     );
 
     expect(result.status).toBe("success");
-    expect(result.createdId).toBe(ORGANIZATION_ID);
     expect(result.message).toBe("Empresa criada e vinculada.");
     expect(people.updated).toMatchObject({ organization_id: ORGANIZATION_ID });
     expect(people.eqCalls).toContainEqual(["user_id", USER_ID]);
@@ -507,6 +505,49 @@ describe("createOrganizationForSubject", () => {
 
     expect(result.status).toBe("error");
     expect(result.message).toBe("The company was created but not linked. Select it from the list.");
+  });
+
+  it("records the company it replaced, not only the one it set", async () => {
+    // The assignment can *overwrite*: a person already linked to Acme who gets a
+    // new company created here loses that link. An audit row carrying only the
+    // result could not say what was lost, which is the question the row exists
+    // for — and this was the one write in the module without a pre-read.
+    const organizations = insertStub({ data: { id: ORGANIZATION_ID, name: "Beta" }, error: null });
+    const people = tableStub(
+      { data: { organization_id: "99999999-9999-4999-8999-999999999999" }, error: null },
+      { data: { id: PERSON_ID }, error: null },
+    );
+    const { supabase, audit } = subjectClient(organizations, people, "people");
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    await createOrganizationForSubject(
+      idleEntityEditState,
+      form({ locale: "pt-BR", name: "Beta", description: "", subject: "person", subjectId: PERSON_ID }),
+    );
+
+    expect(audit.mock.calls[1]![0]).toMatchObject({
+      before_state: { organization_id: "99999999-9999-4999-8999-999999999999" },
+      after_state: { organization_id: ORGANIZATION_ID },
+    });
+  });
+
+  it("refuses a subjectId that is not a uuid before creating anything", async () => {
+    // The ordering is the point: this action performs two writes and does not
+    // undo the first. A `subjectId` that only PostgREST would refuse used to
+    // leave a persisted organization the owner never asked for, reported as a
+    // partial success.
+    const organizations = insertStub({ data: { id: ORGANIZATION_ID, name: "Acme" }, error: null });
+    const people = tableStub({ data: null, error: null }, { data: null, error: null });
+    const { supabase } = subjectClient(organizations, people, "people");
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await createOrganizationForSubject(
+      idleEntityEditState,
+      form({ locale: "pt-BR", name: "Acme", description: "", subject: "person", subjectId: "" }),
+    );
+
+    expect(result.status).toBe("error");
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it("refuses a forged subject before touching the database", async () => {

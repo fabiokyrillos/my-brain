@@ -137,7 +137,13 @@ const copy = {
     linkedTasksEmpty: "Nenhuma tarefa vinculada.",
     addCompanyInline: "Criar nova empresa",
     newCompanyName: "Nome da nova empresa",
-    cancelInline: "Cancelar",
+    /*
+     * Distinct from `cancel` on purpose. Both controls are on screen at the
+     * same time — the inline create only exists while the edit form is open —
+     * and two buttons reading "Cancelar" would give a screen-reader user two
+     * identical names for two different scopes.
+     */
+    cancelInline: "Cancelar nova empresa",
     noDescription: "Sem descrição.",
   },
   en: {
@@ -203,7 +209,7 @@ const copy = {
     linkedTasksEmpty: "No linked tasks.",
     addCompanyInline: "Create a new company",
     newCompanyName: "New company name",
-    cancelInline: "Cancel",
+    cancelInline: "Cancel new company",
     noDescription: "No description.",
   },
 } satisfies Record<Locale, EntityCopy>;

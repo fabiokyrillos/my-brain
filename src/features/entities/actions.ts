@@ -31,6 +31,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { requireUser } from "@/lib/auth/require-user";
 import { resolveLocale, type Locale } from "@/lib/preferences";
@@ -45,6 +46,9 @@ import {
   personUpdateSchema,
   projectUpdateSchema,
 } from "./schema";
+
+/** The routing id `createOrganizationForSubject` assigns to, held to the same bar as every other. */
+const subjectIdSchema = z.string().uuid();
 
 /**
  * A unique-index violation, told apart from every other write failure.
@@ -271,7 +275,7 @@ export async function createOrganization(
   if (audit.error) console.error("Organization create audit failed", audit.error.message);
 
   revalidatePath(`/${parsed.data.locale}/app/organizations`);
-  return { status: "success", message: getEntityCopy(locale).created, createdId: created.id };
+  return { status: "success", message: getEntityCopy(locale).created };
 }
 
 export async function updateOrganization(
@@ -358,7 +362,7 @@ export async function createContext(
   if (audit.error) console.error("Context create audit failed", audit.error.message);
 
   revalidatePath(`/${parsed.data.locale}/app/contexts`);
-  return { status: "success", message: getEntityCopy(locale).created, createdId: created.id };
+  return { status: "success", message: getEntityCopy(locale).created };
 }
 
 export async function updateContext(
@@ -432,9 +436,20 @@ export async function createOrganizationForSubject(
 ): Promise<EntityEditState> {
   const locale = resolveLocale(formData.get("locale"));
 
+  // Both routing fields are validated **before** the organization is created,
+  // and that ordering is the point: this action performs two writes, and the
+  // first one is not undone if the second cannot run. A `subjectId` that is not
+  // a uuid would have left a persisted organization the owner never asked for,
+  // reported as a partial success, because `.eq("id", "")` fails at PostgREST
+  // rather than at the schema. Every other id in this module goes through
+  // `z.string().uuid()`; these two had been the exception.
   const subject = formData.get("subject");
   const subjectId = formData.get("subjectId");
-  if ((subject !== "person" && subject !== "project") || typeof subjectId !== "string") {
+  if (
+    (subject !== "person" && subject !== "project") ||
+    typeof subjectId !== "string" ||
+    !subjectIdSchema.safeParse(subjectId).success
+  ) {
     return failed(locale, "invalidInput");
   }
 
@@ -471,6 +486,20 @@ export async function createOrganizationForSubject(
   if (createAudit.error) console.error("Organization create audit failed", createAudit.error.message);
 
   const table = subject === "person" ? "people" : "projects";
+
+  // Read before write, exactly as the other four actions do. **This assignment
+  // can overwrite an existing company**: a person already linked to Acme who
+  // gets a new company created here loses that link, and an audit row carrying
+  // only the result could not say what was lost. That is the question the row
+  // exists for, and this was the one write in the module that could not answer
+  // it.
+  const before = await supabase
+    .from(table)
+    .select("organization_id")
+    .eq("id", subjectId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   const { data: linked, error: linkError } = await supabase
     .from(table)
     .update({ organization_id: created.id, updated_at: new Date().toISOString() })
@@ -489,6 +518,10 @@ export async function createOrganizationForSubject(
     entity_type: subject,
     entity_id: subjectId,
     actor: "user",
+    // Null when the pre-read itself failed, which is honest: the write happened
+    // and the prior value is unknown, which is a different thing from there
+    // having been none.
+    before_state: before.data ?? null,
     after_state: { organization_id: created.id },
     reason: "Owner assigned a newly created organization",
   });
@@ -496,5 +529,5 @@ export async function createOrganizationForSubject(
 
   revalidatePath(`/${parsed.data.locale}/app/organizations`);
   revalidatePath(`/${parsed.data.locale}/app/${subject === "person" ? "people" : "projects"}/${subjectId}`);
-  return { status: "success", message: getEntityCopy(locale).createdAndLinked, createdId: created.id };
+  return { status: "success", message: getEntityCopy(locale).createdAndLinked };
 }

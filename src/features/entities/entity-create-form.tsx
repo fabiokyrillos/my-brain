@@ -51,10 +51,15 @@ export function EntityCreateForm({
    * closes the form on its own with no effect resetting it. A refusal keeps it
    * open, because there is a name to fix and closing would discard it;
    * `dismissed` is what lets Cancel still work in that case.
+   *
+   * `dismissed` guards only the error clause. Guarding the whole expression
+   * would make Cancel-after-a-refusal permanent — the reopen click sets
+   * `openedFor` to the very state object `dismissed` already holds, so the form
+   * would stay shut with no way for a new state to arrive and unstick it.
    */
   const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
   const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
-  const open = dismissed !== state && (openedFor === state || state.status === "error");
+  const open = openedFor === state || (state.status === "error" && dismissed !== state);
 
   /** What the last refused round submitted — React 19 resets the form otherwise. */
   const restored = (field: string): string | undefined => state.submitted?.[field];

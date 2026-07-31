@@ -138,7 +138,10 @@ test.describe("the entity graph's own surfaces", () => {
   });
 
   test("a context carries its kind through creation, listing and correction, in English", async ({ page }) => {
-    const name = `Personal ${crypto.randomUUID().slice(0, 8)}`;
+    // The name deliberately shares no word with any kind label. Naming it
+    // "Personal <uuid>" made the badge assertion below vacuous — the row's own
+    // name satisfied it, so the test passed with the badge absent entirely.
+    const name = `Ctx ${crypto.randomUUID().slice(0, 8)}`;
 
     await signIn(page, "en");
     await page.goto("/en/app/contexts");
@@ -152,10 +155,12 @@ test.describe("the entity graph's own surfaces", () => {
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });
 
     // UX-21: the kind is a localized word on the list, never the stored token.
+    // Scoped to the badge, so the row's own text cannot satisfy it, and the
+    // stored token is matched exactly — `personal` is what the column holds.
     await page.reload();
     const row = page.getByRole("link", { name: new RegExp(name) });
-    await expect(row).toContainText("Personal");
-    await expect(row).not.toContainText("personal_");
+    const badge = row.locator(".status-badge");
+    await expect(badge).toHaveText("Personal");
     await row.click();
 
     await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
@@ -232,13 +237,24 @@ test.describe("the entity graph's own surfaces", () => {
     // `nested: true` is what keeps the parent highlighted on a detail page.
     // Without it the highlight would clear the moment an owner opened a row —
     // the navigation saying "you are nowhere" halfway through a journey.
+    //
+    // The company is created **here** rather than reused. `fullyParallel` gives
+    // each worker its own disposable account, so depending on another test's
+    // rows meant this assertion silently skipped whenever it landed in a worker
+    // that had not run gate A4 — a green test that had proven nothing.
+    const company = `Nav ${crypto.randomUUID().slice(0, 8)}`;
     await page.goto("/pt-BR/app/organizations");
-    const firstCompany = page.locator("a.list-row").first();
-    if (await firstCompany.count()) {
-      await firstCompany.click();
-      await expect(
-        page.locator('[aria-current="page"][href="/pt-BR/app/organizations"]').first(),
-      ).toBeAttached();
-    }
+    await page.getByRole("button", { name: "Nova empresa" }).click();
+    await page.getByLabel("Nome").fill(company);
+    await page.getByRole("button", { name: "Criar empresa" }).click();
+
+    const row = page.getByRole("link", { name: new RegExp(company) });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.click();
+
+    await expect(page.getByRole("heading", { name: company, level: 1 })).toBeVisible();
+    await expect(
+      page.locator('[aria-current="page"][href="/pt-BR/app/organizations"]').first(),
+    ).toBeAttached();
   });
 });

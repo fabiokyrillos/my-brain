@@ -20,7 +20,6 @@ const idle: EntityEditState = { status: "idle", message: "" };
 const created: EntityEditState = {
   status: "success",
   message: "Criado.",
-  createdId: "33333333-3333-4333-8333-333333333333",
 };
 
 function resolvesTo(state: EntityEditState) {
@@ -147,5 +146,29 @@ describe("EntityCreateForm", () => {
 
     expect(screen.getByRole("button", { name: "Nova empresa" })).toBeVisible();
     expect(screen.queryByLabelText("Nome")).toBeNull();
+  });
+
+  it("can be reopened after Cancel, which the first openness derivation made impossible", async () => {
+    // The defect this pins: guarding the whole `open` expression with
+    // `dismissed !== state` made Cancel-after-a-refusal permanent. Reopening set
+    // `openedFor` to the very state object `dismissed` already held, so the form
+    // stayed shut — and since it was not rendered, no new state could ever
+    // arrive to unstick it. The control was dead until a page reload.
+    //
+    // The previous test stops one click short of this, which is exactly how the
+    // defect survived its own test.
+    const refused: EntityEditState = { status: "error", message: "Revise os campos.", submitted: { name: "" } };
+    render(<EntityCreateForm action={resolvesTo(refused)} kind="organization" locale="pt-BR" />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.type(screen.getByLabelText("Nome"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByLabelText("Nome")).toBeNull());
+
+    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+
+    expect(screen.getByLabelText("Nome")).toBeVisible();
   });
 });

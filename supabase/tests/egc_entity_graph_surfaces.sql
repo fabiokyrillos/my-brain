@@ -30,7 +30,7 @@
 -- `phase_2f_task_write_grants.sql`.
 
 begin;
-select plan(26);
+select plan(27);
 
 set local timezone to 'UTC';
 
@@ -234,13 +234,17 @@ select is(
 -- `user_id` predicate on top of RLS; this proves the policy refuses the write
 -- even with that predicate removed, which is what makes the predicate a belt to
 -- RLS braces rather than the only control.
+-- The CTE is attached to the **statement**, not to a scalar sub-SELECT.
+-- Postgres refuses a data-modifying WITH anywhere but the top level (`0A000`),
+-- and that refusal is a parse error rather than a failing assertion: it would
+-- abort the transaction and take every remaining assertion with it.
+with attempted as (
+  update public.organizations set name = 'Hijacked'
+   where id = 'e6c10002-0000-4000-8000-000000000002'
+   returning 1
+)
 select is(
-  (with attempted as (
-     update public.organizations set name = 'Hijacked'
-      where id = 'e6c10002-0000-4000-8000-000000000002'
-      returning 1
-   )
-   select count(*)::integer from attempted),
+  (select count(*)::integer from attempted),
   0,
   'an UPDATE aimed at the stranger organization with no user_id predicate changes nothing -- RLS is the boundary'
 );
@@ -325,39 +329,67 @@ select ok(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 6 -- EGC-DEC-1: why no delete control was shipped (3)
+-- Section 6 -- EGC-DEC-1: why no delete control was shipped (4)
 -- ---------------------------------------------------------------------------
 --
 -- The PRD keeps deletion out of this initiative rather than ship a destructive
 -- control over a cascade. That reasoning is only true while the cascades are
 -- real, so it is read from the catalog instead of asserted in prose.
--- `confdeltype`: 'c' is CASCADE, 'n' is SET NULL.
+-- `confdeltype`: 'c' is CASCADE, 'n' is SET NULL, 'a' is NO ACTION.
+--
+-- **Each of these tables carries TWO foreign keys to the same parent**, and the
+-- first draft of this section did not: `202607160009` declared the inline
+-- single-column key with its ON DELETE behaviour, and `202607170016:79-103`
+-- then added the composite `(user_id, context_id)` ownership key, which takes
+-- the default NO ACTION. A scalar subquery over `pg_constraint` therefore
+-- returns two rows and raises `21000` rather than failing an assertion. So the
+-- claim is written as an existence test, which is also the claim EGC-DEC-1
+-- actually rests on: *a* cascade exists, and it would fire.
 
-select is(
-  (select confdeltype::text from pg_catalog.pg_constraint
-    where conrelid = 'public.person_contexts'::regclass
-      and contype = 'f'
-      and confrelid = 'public.contexts'::regclass),
-  'c',
-  'person_contexts still cascades from contexts, so a delete control would silently destroy associations'
+select ok(
+  exists (
+    select 1 from pg_catalog.pg_constraint
+     where conrelid = 'public.person_contexts'::regclass
+       and contype = 'f'
+       and confrelid = 'public.contexts'::regclass
+       and confdeltype = 'c'
+  ),
+  'a cascading foreign key still runs from contexts to person_contexts, so a delete control would silently destroy associations'
 );
 
-select is(
-  (select confdeltype::text from pg_catalog.pg_constraint
-    where conrelid = 'public.task_contexts'::regclass
-      and contype = 'f'
-      and confrelid = 'public.contexts'::regclass),
-  'c',
-  'task_contexts cascades from contexts too, which is the second half of the EGC-DEC-1 reasoning'
+select ok(
+  exists (
+    select 1 from pg_catalog.pg_constraint
+     where conrelid = 'public.task_contexts'::regclass
+       and contype = 'f'
+       and confrelid = 'public.contexts'::regclass
+       and confdeltype = 'c'
+  ),
+  'and one runs from contexts to task_contexts too, which is the second half of the EGC-DEC-1 reasoning'
 );
 
+-- The other half of the decision, and a different shape of claim. Deleting an
+-- organization would destroy nothing -- but it would silently unlink every
+-- person and project pointing at it, which is still a change this slice does
+-- not make. Asserted in both directions: no cascade anywhere, and the SET NULL
+-- keys provably present so the zero is not vacuous.
 select is(
-  (select string_agg(distinct confdeltype::text, ',') from pg_catalog.pg_constraint
+  (select count(*)::integer from pg_catalog.pg_constraint
     where contype = 'f'
       and confrelid = 'public.organizations'::regclass
+      and confdeltype = 'c'),
+  0,
+  'nothing cascades from organizations, so no organization delete could destroy a row'
+);
+
+select is(
+  (select count(*)::integer from pg_catalog.pg_constraint
+    where contype = 'f'
+      and confrelid = 'public.organizations'::regclass
+      and confdeltype = 'n'
       and conrelid in ('public.people'::regclass, 'public.projects'::regclass)),
-  'n',
-  'people and projects only SET NULL from organizations, so an organization delete would quietly unlink rather than destroy -- still a change this slice does not make'
+  2,
+  'both people and projects SET NULL from organizations, so a delete would quietly unlink them -- which is why EGC-DEC-1 ships no delete control'
 );
 
 select * from finish();

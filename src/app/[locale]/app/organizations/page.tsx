@@ -20,9 +20,11 @@ import { isLocale } from "@/lib/preferences";
  * report emptiness with no way to act on it (`EG-04`).
  *
  * **Every sentence here comes from the typed copy module** (EGC-SURFACE-002).
- * The older list pages carry inline `pt ? … : …` ternaries; this one adds none,
+ * The older list pages still carry inline locale ternaries; this one adds none,
  * because the G-0.4 baseline is a ceiling and new surfaces are where the count
- * would otherwise grow.
+ * would otherwise grow. The ceiling is measured by a text search, so this
+ * paragraph deliberately does not spell the pattern out — a comment that
+ * quoted it would raise the count it claims to hold.
  */
 export default async function OrganizationsPage({
   params,

@@ -149,6 +149,26 @@ describe("EntityEditForm", () => {
     await waitFor(() => expect(screen.queryByLabelText("Nome")).toBeNull());
   });
 
+  it("reopens after that cancel, instead of leaving a dead Edit button", async () => {
+    // The regression this guards is the mirror image of the one above, and it
+    // survived that test by exactly one click: guarding the whole `open`
+    // expression with `dismissed !== state` meant reopening set `openedFor` to
+    // the same state object `dismissed` already held. The form stayed shut, and
+    // because it was not rendered no new state could arrive to unstick it — the
+    // Edit control was dead until a page reload.
+    const action = resolvesTo(duplicate);
+    render(<EntityEditForm action={action} fields={projectFields} locale="pt-BR" organizations={[ACME]} />);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByLabelText("Nome")).toBeNull());
+
+    await open();
+
+    expect(screen.getByLabelText("Nome")).toBeVisible();
+  });
+
   it("explains an empty company list without disabling the control", async () => {
     // Disabling it is the obvious thing and is wrong: a disabled control is not
     // submitted, so `organizationId` would be absent from the FormData and the
@@ -347,7 +367,6 @@ describe("create-and-select on the company selector", () => {
   const created: EntityEditState = {
     status: "success",
     message: "Empresa criada e vinculada.",
-    createdId: ACME.id,
   };
 
   it("appears for a person and a project, as a sibling form rather than a nested one", async () => {

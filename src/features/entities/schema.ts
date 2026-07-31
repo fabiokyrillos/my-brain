@@ -22,6 +22,14 @@ const entityName = z.string().trim().min(1).max(160);
  * sentence. Storing an empty string instead would leave a row that is neither
  * absent nor present: the placeholder would stop appearing and nothing would
  * take its place.
+ *
+ * **The `4000` is the one bound in this module that is not a column
+ * constraint.** Every free-text column this covers — including
+ * `organizations.description` and `contexts.description`, which the EGC.1
+ * schemas reuse it for — is bare `text` with no CHECK. It is a deliberate
+ * product ceiling on a field the owner types into, not a mirror of anything,
+ * and it is named here so the module's opening claim stays accurate rather than
+ * approximately true.
  */
 const optionalText = z
   .string()

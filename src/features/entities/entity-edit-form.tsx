@@ -129,10 +129,19 @@ export function EntityEditForm({
    * something to fix, and closing would discard what they typed. `dismissed` is
    * what lets Cancel still work in that second case — without it, an error would
    * hold the form open against the user.
+   *
+   * **`dismissed` guards only the error clause**, and that placement is a bug
+   * fix rather than a detail. Guarding the whole expression made Cancel-after-a-
+   * refusal permanent: `openedFor` would be set to the current error state on
+   * the next click, but `dismissed !== state` was already false for that same
+   * object, so the form stayed shut and no new state could ever arrive to
+   * unstick it. The Edit control was dead until a page reload. An explicit
+   * request to open now always wins; dismissal only cancels the *automatic*
+   * opening that an error would otherwise force.
    */
   const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
   const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
-  const open = dismissed !== state && (openedFor === state || state.status === "error");
+  const open = openedFor === state || (state.status === "error" && dismissed !== state);
 
   /**
    * What the last refused round submitted, if anything.
@@ -370,10 +379,11 @@ function InlineOrganizationCreate({
   const fieldId = useId();
   const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
   const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
-  // The same derivation the edit form records: a success closes because the
-  // selector above has already re-rendered with the new company selected; an
-  // error stays open because there is a name to fix.
-  const open = dismissed !== state && (openedFor === state || state.status === "error");
+  // The same derivation the edit form records, including why `dismissed` guards
+  // only the error clause: a success closes because the selector above has
+  // already re-rendered with the new company selected; an error stays open
+  // because there is a name to fix; and an explicit reopen always wins.
+  const open = openedFor === state || (state.status === "error" && dismissed !== state);
 
   if (!open) {
     return (
