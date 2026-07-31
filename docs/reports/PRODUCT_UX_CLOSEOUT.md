@@ -149,12 +149,61 @@ Sixteen slices, sixteen PRs, every branch preserved.
 | **Authenticated journeys** | `e2e/online-*.spec.ts`, run against the deployed Supabase project on `desktop` and `mobile` |
 | **Route re-audit** | `e2e/online-route-audit.spec.ts` — 168 measured page loads |
 | **UX-04 journey** | `e2e/online-entry-outcomes.spec.ts` — 10/10 (5 desktop, 5 mobile) |
+| **Final aggregate** | all 11 authenticated suites, serialized — **114 passed, 0 failed, 2 skipped** (see §4.1) |
 | **Accessibility** | Chromium AX tree over CDP, Playwright accname, and `dom-accessibility-api`, all three recorded in the Slice H ledger section |
 | **UX-33** | `ux-evidence/slice-h/date-placeholder__browser-{en-US,pt-BR,de-DE}.png` |
 | **Prior slices** | `ux-evidence/{baseline,slice-a,slice-b,slice-c,slice-d1,slice-g3,slice-g4}/` |
 
 All captured content is synthetic. No real account identity, credential, or
-owner data appears in any evidence file, report or PR.
+owner data appears in any evidence file, report or PR — asserted mechanically
+rather than by inspection: the route sweep scans the rendered text of every
+captured page for email patterns, UUIDs and the harness's own fixture markers,
+and fails if any appears. `account-identity.ts` is explicit that the account
+surface renders a display name and **never** an email or a user id; that
+assertion is what holds it to it, on all 168 loads.
+
+### 4.1 The final aggregate — 114 passed, 0 failed, 2 skipped
+
+The first aggregate of every authenticated suite reported **92 passed, 7
+failed**, and that number is not the closeout's result. Four of those failures
+were a real defect (UX-35), now fixed. The other three were the hosted Supabase
+project answering `?error=invalid-credentials` for accounts the same run had
+minted seconds earlier — auth rate-limiting under ~50 sign-ins in three minutes.
+
+**The rate limit was removed rather than excused.** Running the aggregate
+serialized (`--workers=1`) spreads the sign-ins far enough apart to stay under
+the provider's limit, and the whole set then passes:
+
+| | |
+| --- | --- |
+| Suites | 11 (all authenticated journeys, including both Slice H additions) |
+| Tests | 116 |
+| **Passed** | **114** |
+| **Failed** | **0** |
+| Skipped | 2 — one declared external limitation, one by design |
+| Wall clock | 17.1 min, serialized |
+
+**Zero failures are causally related to anything, because there are zero
+failures.** No case was excluded, no assertion was weakened, and no
+authentication behaviour was relaxed to obtain green — the excluded-case
+machinery drafted for this closeout was **deleted unused**, because its
+precondition ("the hosted provider prevents one combined all-green run") turned
+out to be false, and shipping a declared mechanism with no consumer is the exact
+defect UX-19 and UX-35 record.
+
+**The two skips, classified.** Both are the same test — *"creates an account
+through the validated signup journey"* — once per project:
+
+| Project | Condition | Why it is deterministic |
+| --- | --- | --- |
+| `desktop` | `ONLINE_AUTH_TEST_EMAIL_DOMAIN` is unset | A **configuration** predicate evaluated before the test runs, declared at `online-auth.spec.ts:118` with its reason. It cannot be reached by a failing product path: provider signup email delivery needs a routable domain the repository deliberately does not carry. |
+| `mobile` | `testInfo.project.name === "mobile"` | A **design** predicate declared at `online-auth.spec.ts:112`: provider email delivery is exercised once, and mobile form access is covered by the navigation suite. |
+
+Both predates Slice H, both are visible in the spec rather than inferred from a
+result, and neither can mask a regression: a skip that depends on configuration
+or project name can never be produced by broken product code. That is what makes
+the classification trustworthy — it is read from the harness, not interpreted
+from a failure.
 
 ---
 
@@ -180,6 +229,19 @@ owner data appears in any evidence file, report or PR.
   Phase 2F's revocation and Slice G5's boundary both stand. Every user-owned
   table keeps forced RLS. No `SECURITY DEFINER` function was added, altered or
   re-granted. The probe account was deleted in a `finally`.
+- **Zero residue — measured after every journey had finished, not during.** The
+  first census ran while the route sweep was still in flight and reported one
+  surviving fixture account; that was the sweep's own live account, and re-running
+  the census once nothing was in flight returned zero. Recorded because a census
+  that races the thing it measures is worth less than one that admits it did:
+
+  | Measure | Result |
+  | --- | --- |
+  | Surviving fixture accounts (14 harness prefixes, all auth pages) | **0** |
+  | `reminders` at `status = 'snoozed'` | **0** |
+  | `reminders` with non-null `snoozed_until` | **0** |
+  | Fixture-shaped `entries` | **0** |
+  | Fixture-shaped `tasks` | **0** |
 - **Zero residue.** Every authenticated journey mints its own account and
   deletes it fail-closed in `afterAll`; the ownership-isolation case deletes its
   second account in a `finally`. Account deletion cascades to every seeded row.
@@ -326,8 +388,10 @@ project rather than of the code. It should be a **scheduled or pre-merge-queue
 run**, with its results read rather than re-run until green.
 
 **Cost of not having it:** UX-35 was live for three slices. **Cost of having it:**
-one 3½-minute run, plus the discipline to treat a rate-limit failure as a
-harness result rather than as a product one.
+one serialized ~17-minute run. Serialization is the whole mitigation — the
+parallel run trips the provider's auth rate limit and the serialized one does
+not, which is why this is a scheduled instrument rather than a per-PR gate, and
+why it needs no exclusion rule to be read as green.
 
 ### What Phase 2G should not inherit
 

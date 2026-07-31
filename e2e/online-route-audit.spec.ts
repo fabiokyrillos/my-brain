@@ -110,6 +110,7 @@ type RouteReport = {
   activeNav: boolean;
   accountReachable: boolean;
   rawEnums: string[];
+  identityLeaks: string[];
   inertHoverRows: number;
   smallTargets: number;
   status: number;
@@ -164,6 +165,27 @@ async function auditPage(page: Page, route: string, locale: string, viewport: st
         document.querySelector(".account-menu .account-sign-out") !== null
         && document.querySelector(".account-menu > summary") !== null,
       rawEnums,
+      /**
+       * Evidence hygiene, asserted on the DOM the screenshots were taken from.
+       *
+       * The closeout claims every captured frame is synthetic and contains no
+       * account identity, email, user id or credential. Eyeballing 67 PNGs is
+       * not a proof and OCR is not a gate, so the claim is made where it is
+       * mechanically checkable: the rendered text of the exact pages that were
+       * captured. `account-identity.ts` is explicit that it renders a display
+       * name and never an email or a user id — this is what holds it to that.
+       */
+      identityLeaks: (() => {
+        const visible = document.body.innerText ?? "";
+        const leaks: string[] = [];
+        const email = visible.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+        if (email) leaks.push(`email:${email[0]}`);
+        const uuid = visible.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i);
+        if (uuid) leaks.push(`uuid:${uuid[0]}`);
+        // The harness's own fixture markers, which must never reach a frame.
+        if (/codex-h-audit|E2e!/.test(visible)) leaks.push("fixture-credential-or-account");
+        return leaks;
+      })(),
       inertHoverRows,
       smallTargets,
     };
@@ -282,6 +304,16 @@ test.describe("Slice H — authenticated route re-audit", () => {
     expect(
       tiny.map((report) => `${describe(report)} = ${report.smallTargets} targets`),
       "touch targets clear 44px (UX-24)",
+    ).toEqual([]);
+
+    /**
+     * The closeout's evidence-hygiene claim, made where it can be checked. Every
+     * frame captured by this sweep comes from a page that passed this.
+     */
+    const leaking = reports.filter((report) => report.identityLeaks.length > 0);
+    expect(
+      leaking.map((report) => `${describe(report)}: ${report.identityLeaks.join(", ")}`),
+      "no account identity, email, user id or credential is rendered",
     ).toEqual([]);
   });
 });

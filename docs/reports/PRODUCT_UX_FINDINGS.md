@@ -3222,23 +3222,41 @@ authenticated suite together is a closeout instrument this initiative did not
 have until its last slice, and it should have had from B. That is recorded in the
 Phase 2G recommendation as a maintenance item rather than left as a lesson.
 
-## Three journey failures that were the harness, not the product
+## Three journey failures that were the harness, and were then removed
 
 The same all-suites run produced three further failures, all in the `mobile`
 project, all with the identical cause: `?error=invalid-credentials` at sign-in,
 against accounts the same run had just minted successfully.
-
 `online-entity-editing.spec.ts:142`, `online-history.spec.ts:226` and
-`account-session.spec.ts:287` mint and sign in roughly fifty accounts inside
-three minutes when the suites run together, which is Supabase auth rate-limiting
-rather than a product defect. Each passes in isolation, and each passed in its
-own slice's gate — G4 recorded 16/16 and G5 24/24.
+`account-session.spec.ts:287` — Supabase auth rate-limiting, provoked by roughly
+fifty sign-ins inside three minutes when the suites run together.
 
-Recorded rather than quietly re-run, because "92 passed, 7 failed" is the honest
-headline and a closeout that reported only the re-run would be hiding how its
-evidence was produced. The rate limit is a property of the shared project, not of
-the code, and it is the reason the all-suites run is a closeout instrument rather
-than a CI gate.
+**They are not excused in the final evidence; the condition that caused them is
+gone.** Running the aggregate serialized (`--workers=1`) spreads the sign-ins far
+enough apart to stay under the provider's limit, and the whole set then passes:
+**116 tests, 114 passed, 0 failed, 2 skipped**, 17.1 minutes.
+
+The first run's "92 passed, 7 failed" is recorded above rather than deleted,
+because how the evidence was produced is part of the evidence — but it is *not*
+the closeout's result. The result is the green one, obtained by removing the
+provider condition rather than by classifying around it, with no case excluded,
+no assertion weakened and no authentication behaviour relaxed.
+
+The exclusion machinery drafted for this closeout — a closed condition list and a
+predicate requiring both a provider signal and a pass in isolation — was
+**deleted unused**, because its precondition turned out to be false and shipping
+a declared mechanism with no consumer is precisely the defect UX-19 and UX-35
+record. The rule it encoded survives as prose in §4.1 of the closeout report,
+which is where a rule with no caller belongs.
+
+**The two skips are classified rather than counted as passes.** Both are the same
+test — *"creates an account through the validated signup journey"*, once per
+project. Desktop skips because `ONLINE_AUTH_TEST_EMAIL_DOMAIN` is unset
+(`online-auth.spec.ts:118`); mobile skips by design (`:112`), since provider email
+delivery is exercised once and mobile form access is covered elsewhere. Both
+predate Slice H, both are declared in the spec, and neither can mask a
+regression: a skip predicated on configuration or project name cannot be produced
+by broken product code.
 
 ## The route inventory, re-audited live
 
