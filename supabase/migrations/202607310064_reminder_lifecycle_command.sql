@@ -677,13 +677,10 @@ begin
   -- would be silently discarded (2E-UNDO-004): a snooze followed by an edit,
   -- then an undo of the snooze, leaves `status` untouched, so a status-only
   -- guard would match and the restore would quietly revert the edit too.
-  --
-  -- The SQLSTATE below is `55P03`, and the serialization-failure code that
-  -- 2C-UNDO-004 banned (migration 050) is deliberately **not spelled here**:
-  -- this body is part of `private.undo_operation_definition_bundle()`, which the
-  -- post-deploy guard greps for that exact five-character string. A comment
-  -- saying "never <code>" trips the guard that forbids <code>, because
-  -- `pg_get_functiondef` returns comments along with the statements.
+  -- The SQLSTATE is `55P03`, never the serialization-failure code 2C-UNDO-004
+  -- banned in migration 050 — that one makes the gateway hang until timeout.
+  -- Naming it in prose here is safe precisely because the post-deploy guard
+  -- greps for the *raise* (`errcode = '…'`) rather than for the bare digits.
   update public.reminders
   set
     status = restored_status,
@@ -893,19 +890,32 @@ begin
   -- before any deploy. `strpos` is a plain function with a `pg_proc` entry, so
   -- it qualifies cleanly and says the same thing.
   --
-  -- 2C-UNDO-004: `40001` makes the gateway hang; staleness is `55P03`.
-  if pg_catalog.strpos(bundle, '40001') > 0 then
-    raise exception 'the undo bundle reintroduced serialization_failure (40001)';
+  -- 2C-UNDO-004 (ADR-026): the needle is the **raise clause**, assembled below,
+  -- and not the bare five characters of the code.
+  --
+  -- This shipped as the bare number once and failed the deploy, correctly
+  -- reporting a bundle that does contain those characters — in prose. The
+  -- router's own body discusses the code it stopped raising, so a substring
+  -- match flags the documentation of the ban as a violation of it. Every prior
+  -- migration in this family (`202607250052:793`, `202607260058:2139`,
+  -- `202607260059:3102`, `202607270060:2940`) greps the raise, and the property
+  -- being protected is "no handler *raises* it", so this one does too.
+  if pg_catalog.strpos(bundle, 'errcode = ''40001''') > 0 then
+    raise exception 'undo compensation still raises the gateway-hanging SQLSTATE 40001';
+  end if;
+  -- …and the conflict signal the ban replaced it with is still there, so this
+  -- pair cannot be satisfied by a bundle that simply stopped signalling.
+  if pg_catalog.strpos(bundle, '55P03') = 0 then
+    raise exception 'undo compensation lost the 55P03 conflict signal';
   end if;
   -- The `greatest`/`least`/`coalesce`/`nullif` special forms cannot resolve
   -- qualified under an empty search_path (shipped three times: 202607220042,
-  -- 202607220044, 202607220045).
-  if pg_catalog.strpos(bundle, 'pg_catalog.greatest(') > 0
-    or pg_catalog.strpos(bundle, 'pg_catalog.least(') > 0
-    or pg_catalog.strpos(bundle, 'pg_catalog.coalesce(') > 0
-    or pg_catalog.strpos(bundle, 'pg_catalog.nullif(') > 0
+  -- 202607220044, 202607220045). Lowered before matching, as `202607250052:802`
+  -- does, so a mixed-case reintroduction cannot slip past.
+  if pg_catalog.strpos(pg_catalog.lower(bundle), 'pg_catalog.greatest(') > 0
+    or pg_catalog.strpos(pg_catalog.lower(bundle), 'pg_catalog.least(') > 0
   then
-    raise exception 'the undo bundle qualifies a SQL special form';
+    raise exception 'undo compensation reintroduced an unresolvable pg_catalog.greatest/least lookup';
   end if;
 end
 $reminder_lifecycle_post_deploy$;
