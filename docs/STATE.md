@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-07-31 (Phase 2F complete; **the product UX/UI remediation is implemented through Slice H and PR-ready — PR #50, not yet merged** — parity remains `202607310064`, which Slice G5 set)
+Last updated: 2026-07-31 (Phase 2F complete; **the product UX/UI remediation is COMPLETE** — Slice H merged as `864d39c`, merge-SHA CI green; parity remains `202607310064`, which Slice G5 set)
 
 ## Current truth
 
@@ -10,9 +10,7 @@ Last updated: 2026-07-31 (Phase 2F complete; **the product UX/UI remediation is 
 
 **Remote migration parity is `202607310064`.** Slice 2F.4's deployment moved it to `202607300063` on 2026-07-29, and that was the Phase 2F head; the UX remediation's **Slice G5** moved it to `202607310064` on 2026-07-31 by adding the reminder lifecycle command boundary (UX-12, DEC-6, DEC-7 — ADR-060 and ADR-061). Local head is identical and there is no drift. Phase 2F's own claim that the phase applied exactly two migrations is unaffected: `202607310064` is **not** Phase 2F work, and the traceability generator's "no third Phase 2F migration" rule reads the phase's own inventory rather than the directory's length.
 
-**The product UX/UI remediation is IMPLEMENTED THROUGH SLICE H AND PR-READY. It is not yet integrated, and it is not yet complete.** Slices A through G5 are merged into `main`; **Slice H is open as PR #50 on `codex/ux-slice-h-closeout` and has not been merged.** The initiative may be declared COMPLETE only once H is merged *and* CI is green on the exact merge SHA — this section is rewritten at that point and not before. Its accounting is `docs/reports/PRODUCT_UX_CLOSEOUT.md`; the durable ledger is `docs/reports/PRODUCT_UX_FINDINGS.md`.
-
-It was governed by the findings ledger, ran in sixteen lettered slices (A, B, C, D1–D3, B2, E, F1, F2, G1–G5, H), and merged into `main` between 2026-07-29 and 2026-07-31 for everything through G5.
+**The product UX/UI remediation is COMPLETE, and it was not a phase.** It was governed by `docs/reports/PRODUCT_UX_FINDINGS.md`, ran in sixteen lettered slices (A, B, C, D1–D3, B2, E, F1, F2, G1–G5, H), and merged into `main` between 2026-07-29 and 2026-07-31. **Slice H closed it as PR #50, merge SHA `864d39c`, with merge-SHA CI run `30648854282` green on all three jobs.** Final `main` HEAD: **`864d39c`**. Its accounting is `docs/reports/PRODUCT_UX_CLOSEOUT.md` §10.
 
 **35 findings, every one with exactly one final disposition: 30 RESOLVED, 4 RETAINED with evidence, 1 DEFERRED to a named destination. Zero BLOCKED, zero OPEN, zero PARTIAL. All 8 P0 findings are RESOLVED.** The four retained limitations are decisions with recorded evidence rather than deferrals (UX-24 does not reproduce; UX-25 is Home's height, accepted in Slice C; UX-27's two audit rows are two genuinely distinct events; UX-33 is user-agent date-placeholder behaviour the page cannot influence). The single deferred item is **UX-22** — 266 inline locale ternaries across 34 files — with a destination named (**localization maintenance**), an exact count and a per-file list in `docs/TODO.md` and the closeout report.
 
