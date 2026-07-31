@@ -31,8 +31,16 @@ const strings = {
     submit: "Enviar",
     hint: "Enter envia · Shift+Enter quebra a linha",
     memoryText: "Lembre disso sempre: eu reviso faturas às sextas",
-    memoryHeading: "Isso parece algo para guardar como memória",
+    // What the product renders (`memories/copy.ts` → `proposalHeading`), which
+    // stopped being Slice E's string when G3 added the confirm-before-remember
+    // step. See the note on the assertion below.
+    memoryHeading: "Quer que eu guarde isto?",
     memoryNextStep: "Criar essa memória em Memórias",
+    proposalContentLabel: "Memória",
+    proposalContent: "eu reviso faturas às sextas",
+    proposalKindLabel: "Tipo",
+    proposalConfirm: "Guardar memória",
+    proposalDiscard: "Descartar",
     echoLabel: "Você escreveu",
     emptyHeading: "Escreva algo primeiro",
     memoriesPath: "/pt-BR/app/memories",
@@ -48,8 +56,13 @@ const strings = {
     submit: "Send",
     hint: "Enter sends · Shift+Enter adds a line",
     memoryText: "Remember this always: I review invoices on Fridays",
-    memoryHeading: "That looks like something to keep as a memory",
+    memoryHeading: "Want me to keep this?",
     memoryNextStep: "Create this memory in Memories",
+    proposalContentLabel: "Memory",
+    proposalContent: "I review invoices on Fridays",
+    proposalKindLabel: "Type",
+    proposalConfirm: "Keep memory",
+    proposalDiscard: "Discard",
     echoLabel: "You wrote",
     emptyHeading: "Write something first",
     memoriesPath: "/en/app/memories",
@@ -151,13 +164,38 @@ test.describe("the unified composer", () => {
       const notice = page.locator(".assistant-composer-notice");
       await expect(notice).toBeVisible({ timeout: 30_000 });
       await expect(notice).toHaveAttribute("data-route", "memory_intent");
+      /**
+       * This assertion had been red since Slice G3 and nobody had run it (UX-35).
+       *
+       * Slice E wrote it against `assistant/copy.ts`'s `memoryHeading`. G3 added
+       * the confirm-before-remember step and moved the rendered heading to
+       * `memories/copy.ts`'s `proposalHeading` — "Quer que eu guarde isto?" —
+       * without updating the journey that asserts it. G4 and G5 each ran only
+       * their own online specs, so four slices passed with this red.
+       *
+       * `assistant/copy.ts`'s `memoryHeading` is deleted in the same change: a
+       * declared, localized string with no consumer is exactly UX-19's defect,
+       * and leaving it would let this diverge again.
+       */
       await expect(notice.getByRole("heading", { name: text.memoryHeading })).toBeVisible();
       await expect(notice.getByText(text.echoLabel)).toBeVisible();
-      const nextStep = notice.getByRole("link", { name: text.memoryNextStep });
-      await expect(nextStep).toHaveAttribute("href", text.memoriesPath);
+
+      /**
+       * G3 replaced Slice E's "go to Memories" link with the confirm control
+       * DEC-5 required, and `actions.ts:161` sets `nextStep: null` whenever
+       * there is a proposal to show — the link now appears only on the opener
+       * with nothing after it, where there is no memory to offer. Asserting the
+       * card is asserting the product; asserting the link was asserting Slice E.
+       */
+      await expect(notice.getByRole("textbox", { name: text.proposalContentLabel }))
+        .toHaveValue(text.proposalContent);
+      await expect(notice.getByRole("combobox", { name: text.proposalKindLabel })).toBeVisible();
+      await expect(notice.getByRole("button", { name: text.proposalConfirm })).toBeVisible();
+      await expect(notice.getByRole("button", { name: text.proposalDiscard })).toBeVisible();
 
       // Nothing was written. The memories surface still renders its empty state
-      // for this account, which is the whole of DEC-5's guarantee for Slice E.
+      // for this account, which is the whole of DEC-5's guarantee: reaching the
+      // proposal has stored nothing, and only the confirm control can.
       await page.goto(text.memoriesPath);
       await expect(page.locator(".list-row")).toHaveCount(0);
       await expect(page.getByText(text.emptyMemories)).toBeVisible();

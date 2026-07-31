@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { LoaderCircle, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import type { InterpretationPatch } from "./schema";
+import { entityTypeLabel } from "@/features/vocabulary/copy";
 import {
   conceptLabels,
   conceptOptions,
@@ -258,7 +259,9 @@ export function InterpretationRevisionEditor({
                       value={JSON.stringify({ entityType: entity.entityType, entityId: entity.entityId, mention: entity.name, confidence: 1 })}
                       defaultChecked={selectedEntities.has(key)}
                     />
-                    <span>{entity.name} <small>{entity.entityType}</small></span>
+                    {/* The type is the owner's word for the thing — "Pessoa",
+                        "Projeto" — not the column's (UX-21). */}
+                    <span>{entity.name} <small>{entityTypeLabel(locale, entity.entityType) ?? entity.entityType}</small></span>
                   </label>
                 );
               })}

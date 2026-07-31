@@ -6,6 +6,7 @@ import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema";
+import { getVocabularyCopy, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -21,6 +22,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const locale = candidate;
   const pt = locale === "pt-BR";
   const copy = getEntityCopy(locale);
+  const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
   const [projectResult, taskLinkResult, personLinkResult, entryLinkResult, organizations] = await Promise.all([
     // `organization_id` joins the projection here for the first time: the column
@@ -92,7 +94,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <h2>{pt ? "Tarefas" : "Tasks"}</h2>
           {tasks.length ? (
             <div className="mini-list">
-              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{task.status}</span></article>)}
+              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span></article>)}
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
         </section>

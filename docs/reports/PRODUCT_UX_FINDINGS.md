@@ -109,7 +109,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-01 | Navigation exposes 14 concepts before the workflow is understood | IA | P1 | yes | **RESOLVED** (labels closed in B2) |
 | UX-02 | Home is editorial, not operational; large voids beside compressed content | IA | P1 | yes | **RESOLVED** |
 | UX-03 | "Caixa" names a mailbox; the page is a full record list | IA | P1 | yes | **RESOLVED** (B2 — Registros / Records) |
-| UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | OPEN |
+| UX-04 | Entry detail hides "what was created" behind interpretation vocabulary | interaction-model | P1 | yes | **RESOLVED** (Slice H — outcome section, reordered page) |
 | UX-05 | Tasks are not inspectable or editable; 11 of 15 domain verbs unreachable | missing-lifecycle | **P0** | yes | **RESOLVED** (D1 inspect + D2 edit) |
 | UX-06 | Assistant name is persisted but has no field and no consumer | usability | P1 | yes | **RESOLVED** (Slice F1 — field, accessor, Conversar/Talk) |
 | UX-07 | Brain page stacks three competing AI input surfaces | interaction-model | P1 | yes | **RESOLVED** (Slice E — one composer) |
@@ -124,23 +124,34 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-16 | Content width *shrinks* as the viewport grows (`padding: 5vw`) | responsive | **P0** | yes | **RESOLVED** |
 | UX-17 | Side rail clips its last nav item at 1440×900 | visual | P1 | yes | **RESOLVED** |
 | UX-18 | Home panel kickers are hardcoded Portuguese in both locales | localization | P1 | yes | **RESOLVED** |
-| UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | OPEN |
+| UX-19 | `open_task` is a declared, localized action with no producer and no route | interaction-model | P1 | yes | **RESOLVED** (Slice D1 — row corrected in H) |
 | UX-20 | Rows styled as interactive are inert (`memories`, `reminders`) | usability | P1 | yes | **RESOLVED** (affordance) |
 | UX-25 | Home grew ~24 % taller as a consequence of the UX-15 fix | visual | P1 | n/a | **RETAINED** (with evidence) |
 | UX-26 | No logout or account switch exists anywhere in the product | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
 | UX-30 | A revoked-but-unexpired session becomes an infinite redirect loop | missing-lifecycle | **P0** | yes | **RESOLVED** (D3) |
 | UX-31 | Signing out left the shell restorable by browser Back | usability | P1 | yes | **RESOLVED** (D3) |
-| UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | **PARTIAL** (G4 — reads distinctly; root fix needs a migration, **DEFERRED**) |
+| UX-27 | One task creation writes two audit rows, so history shows it twice | usability | P2 | yes | **RETAINED** (with evidence — two distinct events, read distinctly since G4) |
 | UX-28 | `audit_logs.reason` is English prose written by SQL | localization | P1 | yes | **RESOLVED** (Slice G4 — was mis-dispositioned; History *did* render it) |
 | UX-29 | Every cancelled task's detail page answered 404 | missing-lifecycle | **P0** | yes | **RESOLVED** (D2) |
-| UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | OPEN (History closed in G4; see scope note) |
-| UX-22 | 305 inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | OPEN (History closed in G4; 333 → 328) |
+| UX-21 | Raw database enum values rendered as user-facing labels | localization | P1 | yes | **RESOLVED** (Slice H — shared vocabulary; one documented exception) |
+| UX-22 | Inline locale ternaries bypass the mandated copy-module mechanism | localization | P1 | yes | **DEFERRED** → *localization maintenance* (288 → 268; 34 files listed in H) |
 | UX-23 | `Mais` overlay cannot be dismissed by tapping outside it | usability | P1 | yes | **RESOLVED** |
 | UX-24 | Touch targets ≥44px — **does not reproduce**; retained as verified-good | — | — | **no** | RETAINED |
+| UX-32 | A hint nested in a `<label>` becomes part of the field's accessible name | accessibility | P1 | yes | **RESOLVED** (Slice H — three sites in Settings) |
+| UX-33 | `<input type="date">` renders its placeholder in the browser's locale | localization | P2 | yes | **RETAINED** (with evidence — user-agent behaviour) |
+| UX-34 | The notifications bell never marks itself as the current page | accessibility | P1 | yes | **RESOLVED** (Slice H — found by the route sweep) |
+| UX-35 | The composer's memory journey had been red since G3, and nobody ran it | usability | P1 | yes | **RESOLVED** (Slice H — spec repaired, dead copy deleted) |
 
 Owner findings map to IDs 1:1 in order: owner 1→UX-01 … owner 14→UX-14.
 UX-15…UX-23 were discovered during this audit. UX-24 is an owner-listed concern
 that measured clean and is recorded so it is not "fixed" without cause.
+UX-25…UX-31 were raised by the slices that found them. UX-32 through UX-35 were
+raised by Slice H's re-audit: see *Slice H* for how each was measured.
+
+**Every detail record below states the disposition the finding was opened with.**
+Slice H reconciled all 35 against repository truth; where a detail record still
+reads `OPEN`, a **Reconciled in H** line beneath it carries the current
+disposition and the slice that closed it. The table above is the current state.
 
 ---
 
@@ -192,6 +203,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   120-character title; assert title ≥ 28 chars/line in every container; add a
   regression test asserting the computed grid of `.panel .list-row`.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice A. Container queries replaced the `auto` meta column; the four-viewport measurement is in the slice record and is re-run by `layout-contracts.spec.ts`.
 
 ## UX-16 — Usable content width shrinks as the viewport grows
 
@@ -214,6 +226,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Validation** — assert content width is monotonically non-decreasing across
   375 → 412 → 1440 → 1920.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice A. `padding: 5vw` became a gutter that stops growing; measured overflow is 0 px at all four viewports, re-measured in H.
 
 ## UX-14 — Mobile capture button is mis-ordered and off-centre; no safe-area inset
 
@@ -248,6 +261,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Validation** — assert visual order equals DOM order and `|fabCentre − viewportCentre| ≤ 2 px`
   at both mobile viewports; assert the nav's padding resolves through `env()`.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** across Slice A (safe-area inset and order) and Slice B2 (exact centring, which needed DEC-1's five-slot bar).
 
 ## UX-05 — Tasks are not inspectable or editable; 11 of 15 domain verbs are unreachable
 
@@ -375,6 +389,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   every route in the registry stays reachable; keyboard traversal and focus return
   verified; screenshots at four viewports.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice B2. The labelling half closed with DEC-1; the mobile bar carries four non-capture slots and Registros moved into `Mais`.
 
 ## UX-02 — Home is editorial rather than operational
 
@@ -402,6 +417,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Validation** — above-the-fold content at 1440×900 and 375×667 answers "what needs
   me now"; empty / loading / error / long-content / both-locale renders captured.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice C. Home answers the owner's five questions in order; the height cost is recorded separately as UX-25.
 
 ## UX-03 — "Caixa" names a mailbox; the page is the full record list
 
@@ -471,6 +487,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   (read-only); no write path touched.
 - **Slice** — D.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice H. The page runs in the order the owner's questions are asked, the original is open, and a read-only outcome projection lists every task, reminder, memory and recognized entity the entry produced — linked where a route exists.
 
 ## UX-06 — The assistant name is persisted but has no field and no consumer
 
@@ -688,6 +705,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   schema, so the first cut filters on already-indexed columns.
 - **Slice** — G.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice G4. Filters, search, subject links and a typed vocabulary; 72 unit tests and 16 authenticated journey assertions.
 
 ## UX-17 — The side rail clips its last nav item at 1440×900
 
@@ -701,6 +719,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   items), but recorded separately so it is verified separately at 1440×900 — the most
   common laptop height.
 - **Slice** — A (guard) / B (structural fix). **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice B. The rail no longer clips its last item at 1440×900; re-measured in H at all four viewports.
 
 ## UX-18 — Home panel kickers are hardcoded Portuguese in both locales
 
@@ -711,6 +730,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Category** — localization problem. Resolved by UX-02 removing the kickers, but
   recorded so the English render is explicitly re-verified.
 - **Slice** — C. **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice C. The kickers come from the daily-cycle copy module in both locales.
 
 ## UX-19 — `open_task` is a declared, localized action with no producer and no route
 
@@ -724,6 +744,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   the projections start emitting it. If DEC on UX-05 went the other way, the action and
   its copy would be deleted rather than left dangling.
 - **Slice** — D. **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice D1, and this is the row the ledger got wrong. `work-projection.ts` emits `open_task`, `/app/work/[taskId]` satisfies it and `task-list.tsx` consumes it — verified in code, then in H's live journey, where a created task's link resolves to its detail page. The summary table said OPEN until H corrected it; G4 flagged the contradiction rather than adjudicating it, which is why it survived four slices.
 
 ## UX-20 — Rows styled as interactive are inert
 
@@ -738,6 +759,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Proposed solution** — either give the row a destination (UX-05, UX-10, UX-12) or
   remove the hover affordance. No placeholder controls.
 - **Slice** — A (affordance audit) then D/F/G (destinations). **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice A (affordance) with destinations added by D1, F2, G3 and G5. H's sweep asserts no `.list-row` carries the hover affordance without being, or containing, something real to act on.
 
 ## UX-21 — Raw database enum values rendered as user-facing labels
 
@@ -756,6 +778,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   tests so a new enum value cannot ship unlabelled.
 - **Slice** — A (mechanical, low risk) with the vocabularies each slice touches.
 - **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice H. G4 closed History; H closed the rest through one shared `features/vocabulary/copy.ts`. One documented exception remains — `jobs.type`, whose column has no `check` constraint — plus the evidence-vocabulary fallbacks inside the technical-details disclosure.
 
 ## UX-22 — 305 inline locale ternaries bypass the mandated copy mechanism
 
@@ -771,6 +794,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
   remediation slice converts the copy in the files it already touches, and a guard
   test caps the count so it can only go down. Report the count each slice.
 - **Slice** — every slice, with the counter as the gate. **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **DEFERRED** to a named localization-maintenance slice. Recounted in H with a reproducible method: **288 at the pre-remediation base, 268 now**, across 34 non-test files. The absolute figures quoted in earlier slices (305, 333, 328) do not reproduce and are corrected in H's record; the deltas they reported were right.
 
 ## UX-23 — The `Mais` overlay cannot be dismissed by tapping outside it
 
@@ -782,6 +806,7 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Category** — usability / accessibility problem. Focus is returned to the summary
   on `Escape`, which is correct and should be preserved.
 - **Slice** — B (or H if UX-01 replaces the overlay entirely). **Disposition** — OPEN.
+- **Reconciled in H (2026-07-31)** — **RESOLVED** in Slice B. The overlay takes an outside click and keeps the `Escape` focus return.
 
 ## UX-24 — Touch targets: does not reproduce
 
@@ -902,6 +927,7 @@ Options: (a) **ship the field and thread the actor name through**, keeping the p
 a migration); (c) leave it dormant and document it as deliberately unshipped.
 Impact: `settings-form`, `settings-contracts`, `capabilities.ts`, all copy modules.
 Reversible: (a) and (c) yes; (b) no. Blocks: UX-06.
+**DECIDED — (a)**, shipped in Slice F1. **DEC-2 is closed.**
 
 **DEC-3 — one composer or two** (UX-07).
 Options: (a) **unified composer** that tries the command path and falls through to the
@@ -911,6 +937,8 @@ destructive-confirmation dialog — *recommended*, no new write path, no migrati
 override toggle.
 Impact: `/app/chat`, `/app/work` mounts; no contract written.
 Reversible: yes. Blocks: UX-07 and Slice E.
+**DECIDED — (a)**, shipped in Slice E, with capture routing explicitly deferred
+(`E-M5`). **DEC-3 is closed.**
 
 **DEC-4 — schema changes for projects and people** (UX-08, UX-09).
 Only after the existing columns are surfaced. Candidates: project purpose/dates/notes;
@@ -2838,3 +2866,440 @@ announcing. The action state now lives above the list, with one live region on t
   the repository. The two read-only halves G2 deliberately withheld — the linked task/record
   link, and a localized status instead of the raw enum — ship here with the lifecycle they were
   waiting for.
+
+---
+
+# Slice H — closeout. The ledger reconciled, UX-04 answered, and what is honestly left
+
+**Branch** `codex/ux-slice-h-closeout` · **PR #50** · the final remediation slice.
+**Status — implemented and PR-ready; not yet merged.** Every disposition below is
+final and does not depend on integration; the initiative itself is declared
+COMPLETE only in §10 of `PRODUCT_UX_CLOSEOUT.md`, after CI is green on the exact
+merge SHA.
+**Covers** the ledger reconciliation, UX-04, UX-21's remainder, UX-22's final
+disposition, UX-27's final disposition, the accessibility carryover, the native
+date-input limitation, the full authenticated route re-audit, and the closeout
+report. **Non-goals** — no new domain capability, no schema change, no
+migration, no new write path, no redesign.
+
+## First: the ledger did not agree with itself
+
+The instruction for H was to rebuild the inventory from this file rather than
+trust its summary. That was the right instruction, because the two disagreed in
+fifteen places.
+
+- **33 finding IDs**, each appearing **exactly once** in the summary table. No
+  duplicates, no gaps across `UX-01`…`UX-33`. (31 before H; H added two.)
+- **Fourteen detail records still read `Disposition — OPEN`** while the summary
+  called the same finding RESOLVED — UX-01, UX-02, UX-04, UX-13, UX-14, UX-15,
+  UX-16, UX-17, UX-18, UX-19, UX-20, UX-21, UX-22 and UX-23. Nothing was wrong
+  with the *work*; each slice updated the table and left the record it was
+  closing frozen at the moment it was opened. Rather than rewrite fourteen
+  records and lose what they originally said, each now carries a **Reconciled in
+  H** line beneath its original disposition.
+- **UX-19 was the one real contradiction**, and G4 flagged it without
+  adjudicating it. Repository truth settles it: `work-projection.ts` emits
+  `open_task`, `/app/work/[taskId]` receives it, `task-list.tsx` renders it.
+  Slice **D1** resolved it and the table was never updated. It is **RESOLVED**,
+  and H's live journey follows a created task's link to its detail page to prove
+  the destination is real rather than merely declared.
+- **UX-30 and UX-31 have no headed detail record**; both are documented inside
+  the Slice D3 section. Recorded here rather than manufactured, because a
+  heading would not add a fact.
+
+## UX-04 — the page now answers the questions it was measured against
+
+The audit asked seven things of `/app/inbox/[entryId]`. Re-measured at the top
+of H against `entry-review.tsx:172-179`, the composition was **unchanged since
+audit 1** — so the finding was not stale and the work was still owed.
+
+| The owner asks | Before H | After H |
+| --- | --- | --- |
+| What did I write? | collapsed `<details>`, open only when interpretation failed | open section, second block, no click |
+| What did it understand? | the `<h1>` | the `<h1>`, no longer the only thing above the fold |
+| What was created? | **nowhere** — a success message that vanished | a standing, linked list of every task, reminder and memory |
+| Who/what was detected? | inside "technical details" | in the record, linked to people and projects |
+| What is still open? | present | present, unchanged |
+| What happened after? | present | present, unchanged |
+| What can I inspect? | present | present, plus every created object |
+
+`entry-outcome-projection.ts` is the whole implementation and it **only reads**.
+Each family hangs off a foreign key that predates this initiative —
+`tasks.source_entry_id`, `reminders.entry_id`, `memories.source_entry_id`,
+`entry_entities.entry_id` — so there is no write contract, no new column and no
+migration. RLS remains the only authorization, and the projection adds no
+`user_id` predicate of its own precisely so it cannot be mistaken for the
+boundary.
+
+Two refusals are load-bearing. It **does not link what it cannot open**: an
+organization and a context have no detail route, and `entry_entities` keeps its
+row after an entity is deleted, so both degrade to plain text rather than to a
+link that 404s — the mistake G4 caught in itself with deleted history subjects.
+And it **does not disappear when nothing was created**: "nothing was created
+from this record" is an answer the owner asked for, and an absent section is not
+one.
+
+Technical details keeps its entity list. The names are no longer *only* there,
+which was the finding; the confidence beside them is evidence about a decision,
+which is what that disclosure is for.
+
+## UX-21 — RESOLVED, with one exception stated rather than hidden
+
+Re-audited across the **current** route inventory, not audit 1's. Eleven sites
+still rendered a stored enum, and the shape of every one was the same: **one
+feature rendering another feature's state**, which is why none of them had an
+obvious owner and all of them survived G3, G4 and G5.
+
+| Where | What leaked |
+| --- | --- |
+| `projects/page.tsx`, `projects/[projectId]` | `project.status`, `task.status` |
+| `people/[personId]` | `context.kind`, `task.status`, `memory.kind` |
+| `files/page.tsx` | `attachment.status` |
+| `jobs/page.tsx` | `job.type`, `job.status` |
+| `task-commands/command-console.tsx` | `candidate.status` (×2) |
+| `interpretations/revision-editor.tsx` | `entity.entityType` |
+
+`features/vocabulary/copy.ts` is the shared home. It holds only closed sets a
+`check` constraint already defines, one label per member per locale, typed as
+`Record<Union, string>` so an unlabelled member is a **compile** error.
+`replaceAll("_", " ")` does not appear in it. It does not replace the modules
+that already own a vocabulary — 17 tests pin the overlaps to `history/copy.ts`,
+`memories/copy.ts` and `entities/copy.ts`, so two homes cannot mean two answers.
+
+**The documented exception.** `public.jobs.type` has **no** `check` constraint —
+by design, so a new worker can ship without a migration. The two known types are
+labelled and anything else falls back to the raw identifier, on `/app/jobs`,
+whose own subtitle calls itself a *private technical queue*. Hiding an unknown
+worker behind "Other" would be worse for the only person who reads that page.
+Separately, `technical-details.tsx` falls back to the raw value for the evidence
+and trust-override vocabularies, which are produced by the model rather than
+constrained by a column, and which sit behind the disclosure named "technical
+details". Both are exceptions by argument, not by omission.
+
+## UX-22 — DEFERRED, with the number corrected
+
+The instruction was to recount with the audit's own method. Doing so found that
+**the numbers this ledger has been quoting do not reproduce.**
+
+Method, stated so it can be re-run: `git grep -oE '\bpt \?' <ref> -- src/`,
+excluding `*.test.ts(x)`. Measured at every slice merge:
+
+| Ref | Count |
+| --- | --- |
+| `0c13285` — pre-remediation base | **288** |
+| A `4d8e3d2` · B `2c935f9` | 288 |
+| C `35ae645` | 283 |
+| D1 `9302bc5` · D2 · D3 · B2 | 285 |
+| E `967e6cc` | 280 |
+| F1 `66d2ae0` | 282 |
+| F2 `558ecdd` | 283 |
+| G1 `974c072` · G2 `0548e2c` | 285 |
+| G3 `e6df3a4` | 278 |
+| G4 `cea24c8` | 273 |
+| G5 `3fd0bb9` | 268 |
+| **H** | **266** |
+
+The audit reported 305 and G4 reported "333 before, 328 after". The **deltas**
+G4 quoted were exactly right — five removed, all of them History's — but the
+absolute figures are 55 higher than this method produces, and no variant of the
+method reproduces them. They are corrected here rather than repeated.
+
+Two honest consequences. First, the count **did rise inside four slices** (D1 +2,
+F1 +2, F2 +1, G1 +2) even though it fell across the initiative; "it can only go
+down" was a rule the slices did not always keep, and saying so is worth more
+than the rule. Second, H itself added two in `entry-review.tsx` and then removed
+them — the UX-04 sections' copy lives in `getEntryReviewSectionCopy(locale)`,
+which is why H ends at 266 rather than 269.
+
+**Disposition — DEFERRED, destination *localization maintenance*.** Not RETAINED:
+the 266 that remain are overwhelmingly user-facing copy, so calling them trivial
+would be false. Not RESOLVED: converting them is a 34-file sweep with no
+behavioural test to protect it, which is exactly the change this initiative was
+told not to open. The exact per-file inventory is in the closeout report, so the
+maintenance slice starts from a list rather than from a grep.
+
+## UX-27 — RETAINED, with evidence
+
+G4 investigated it and H adds nothing to the investigation, because the
+investigation was complete. Restated:
+
+- **two writers** — the `AFTER INSERT OR UPDATE` trigger on `public.tasks`, and
+  the RPC that performed the operation;
+- **distinct action types in every pair** —
+  `task_created`/`task_command_created`, `task_updated`/`task_command_applied`;
+- **tasks only** — no other entity type doubles;
+- **no shared identity** — `audit_logs` has no correlation column, and matching
+  on `created_at` is a transaction-boundary inference, not a stored fact;
+- **the migration history states the pairing is intentional**
+  (`202607260058:1552-1558`).
+
+The two rows are not a duplicate; they are one row-level state change and one
+user-level operation, and since G4 they read as two different sentences at two
+altitudes, with a test forbidding any two action types from rendering the same
+sentence for the same subject.
+
+**Disposition — RETAINED with evidence.** The condition H sets for RETAINED is
+met exactly: both rows represent meaningfully distinct events and History
+communicates that. Collapsing the pair into one visual operation would need a
+nullable `operation_id` on `audit_logs` — additive, no backfill, every existing
+row rendering unchanged — and that is recorded as a **Phase 2G candidate**, not
+as a defect left open. No row is hidden and nothing is grouped by timestamp or
+similar text.
+
+## UX-32 — a hint nested in a label becomes part of the field's name
+
+**New in H, and found by disproving the finding H inherited.**
+
+The carryover was the `entity-edit-form.tsx` textarea G3 recorded as a latent
+copy of a bug it had just fixed in its own memory forms: React renders a
+textarea's value as a child text node, so a wrapping `<label>` was said to make
+the stored text part of the field's accessible **name**.
+
+Measured rather than inherited, in three independent implementations —
+**Chromium's own AX tree over CDP**, **Playwright's `toHaveAccessibleName`**, and
+the **`dom-accessibility-api`** the component tests use — that shape computes
+correctly in all three. A label that both associates by `for`/`id` and wraps its
+control is the case the algorithm is explicit about: the element being named
+does not contribute its own value. **There was nothing there to fix.**
+
+Probing the neighbouring shapes found the one that does break, and found it live:
+
+| Shape | Chromium's computed name |
+| --- | --- |
+| label wraps control, has value | `"Memória"` ✓ |
+| label wraps control, no `for` | `"Memória"` ✓ |
+| label associates elsewhere, control merely nested | `"Memória texto guardado"` ✗ |
+| **label wraps control *plus other content*** | **`"Memóriaaté 4000"` ✗** |
+| **label wraps *two* controls** | **`"Memória extra"` ✗** |
+
+Three live instances of the fourth shape, all in Settings, all with a `<small>`
+hint inside the label:
+
+1. the **assistant-name** field UX-06 added — announced as *"Nome do assistente
+   Como o assistente se chama nas telas e nas respostas. O produto continua
+   sendo My Brain"*;
+2. the **timezone** select, which carried an `aria-label` that hid the symptom
+   and silently cost the hint instead — announced to nobody;
+3. every **AI routing row**, same shape, same `aria-label`, same lost hint.
+
+All three now put the hint outside the label and link it with
+`aria-describedby`, the pattern `entity-edit-form.tsx` already documents in its
+organization field. The name is the label; the hint is a description; both are
+announced. The entity form keeps a regression test on its computed name so its
+shape cannot drift into a broken one.
+
+**Category** accessibility · **Priority** P1 · **Disposition — RESOLVED.**
+
+## UX-33 — the native date placeholder follows the browser, not the page
+
+G4 recorded this as a cosmetic limitation. H reproduced it and found the
+mechanism is narrower than described, which strengthens the argument for
+retaining it rather than weakening it.
+
+Chromium launched with three different **UI languages**, same page, `lang="pt-BR"`
+throughout:
+
+| Browser UI language | Placeholder | Submitted value |
+| --- | --- | --- |
+| `en-US` | `mm/dd/yyyy` | `2026-08-15` |
+| `pt-BR` | `dd/mm/yyyy` | `2026-08-15` |
+| `de-DE` | `dd.mm.yyyy` | `2026-08-15` |
+
+Evidence: `ux-evidence/slice-h/date-placeholder__browser-*.png`.
+
+Setting the browsing context's locale — `navigator.language` and
+`Accept-Language` — changed **nothing**; only the browser's own UI language did.
+The page therefore has no mechanism to influence it at all, and:
+
+- **the submitted value is ISO `yyyy-mm-dd` in every case**, so parsing, storage
+  and timezone behaviour are untouched. This is presentation only and is not to
+  be confused with date parsing, which G4 tested separately in the owner's own
+  zone;
+- **the visible label is localized** by the page in both locales;
+- replacing the native control with a custom picker would trade a keyboard- and
+  screen-reader-complete widget for one this initiative would have to build and
+  maintain, in order to change a placeholder.
+
+**Category** localization · **Priority** P2 · **Disposition — RETAINED with
+evidence.**
+
+## Windows CRLF test fragility — diagnosed, and deliberately not fixed here
+
+`sql-reachability.test.ts` fails two assertions on Windows and passes on Linux
+CI. H established the mechanism precisely rather than repeating "line endings":
+
+- `core.autocrlf` is **`true`** and there is **no `.gitattributes`**, so the
+  working copy of `202607260059_phase_2e_destructive_confirmation.sql` holds
+  **3256 CRLF pairs and zero bare LF**;
+- the two failing assertions match **multi-line literals anchored on bare `\n`**
+  — `indexOf("\n  select\n    r.id,")` and `/\n\s*order by\n(...)/`. A single
+  `\n` still matches inside `\r\n`; a pattern needing **two** consecutive
+  LF-anchored lines cannot;
+- Linux CI checks the file out with LF, so both pass there — the `database` job
+  is the proof, on every PR.
+
+**Proposed fix, for a separate maintenance PR:** add `.gitattributes` with
+`*.sql text eol=lf`. It is **not** in this slice's diff. The H instruction only
+permits mixing it in if the closeout evidence could not otherwise be trusted,
+and it can be: the mechanism is proven, the two failing assertions are
+enumerated by name, and PR CI runs the same two tests green on Linux.
+
+## UX-34 — the one navigation link that never said where you were
+
+**New in H, and found by the sweep rather than by eye.**
+
+The route re-audit asserts on every one of its 168 page loads that navigation
+marks the current destination — the rule UX-01 established and the rail and the
+mobile bar have kept since Slice B2. Its first run failed on **two** routes, in
+both locales, at all four viewports. They are not the same case.
+
+- **`/app/notifications` — a real defect.** The bell in the top bar is a
+  navigation link rendered on **every page in the product**, and `app-shell.tsx`
+  rendered it as a plain `<Link>` with no notion of the current path. A screen
+  reader announced the identical "Notificações, link" whether the owner was
+  standing on that page or anywhere else. It now carries `aria-current="page"`
+  and a filled bell when it is the destination. It moved into
+  `navigation-links.tsx` to get it, because knowing "am I there" needs the
+  pathname and `AppShell` is deliberately a server component that reads nothing.
+- **`/app/jobs` — correct by design.** `capabilities.ts:92` declares it
+  `visibility: "context-only"`, and `VisibleNavigationKey` excludes it at the
+  **type** level. It is a private technical queue reached by URL, not a
+  destination the owner navigates to, so there is nothing that could mark it.
+  The sweep now names it as its single documented exception rather than
+  loosening the rule for everyone.
+
+**Category** accessibility · **Priority** P1 · **Disposition — RESOLVED.**
+
+This is the finding that most justifies the sweep existing. Fourteen slices of
+manual review, four viewports and two locales never noticed it; an assertion run
+168 times found it on the first pass.
+
+## UX-35 — an authenticated journey had been red since G3, and nobody ran it
+
+**New in H, and the most uncomfortable finding in the closeout.**
+
+Running *all* the authenticated suites together — which no slice had done, since
+each ran only its own — produced four consistent failures in
+`online-assistant-composer.spec.ts`, in both projects and both locales. They
+were not flaky and they were not caused by H, which touches nothing in
+`src/features/assistant`, `src/features/memories` or `src/features/agent`.
+
+The chain, from repository truth:
+
+- Slice **E** wrote the journey against `assistant/copy.ts`'s `memoryHeading` —
+  *"Isso parece algo para guardar como memória"*.
+- Slice **G3** added the confirm-before-remember step DEC-5 required and moved
+  the rendered heading to `memories/copy.ts`'s `proposalHeading` — *"Quer que eu
+  guarde isto?"* — putting the memory vocabulary with the feature that owns it,
+  which was right. `actions.ts:159,166` reads it in both branches.
+- The journey was **not** updated, and `assistant/copy.ts`'s `memoryHeading` and
+  `memoryDetail` became **declared, localized strings with no consumer** — UX-19's
+  defect, reintroduced in miniature three slices after UX-19 was raised.
+- **G4 and G5 each ran only their own online specs**, so the red survived two
+  more slices and two more closeout claims.
+
+**And the heading was only the first of two.** Repairing it revealed the next
+assertion was stale for the same reason: Slice E's journey expects a *"Criar essa
+memória em Memórias"* link, and `actions.ts:161` sets `nextStep: null` whenever
+there is a proposal to show. G3 replaced the link with the **confirm control**
+DEC-5 required; the link survives only on the opener with nothing after it, where
+there is no memory to offer. The journey was asserting Slice E's design against
+Slice G3's product, twice in four lines.
+
+**What H changed.** The journey asserts what the product renders — the proposal's
+content in its textarea, its kind select, and its confirm and discard controls —
+and still ends by proving the memories list is empty, which is the whole of
+DEC-5's guarantee. The two dead strings are deleted rather than kept "in case",
+so the type stops describing a surface that does not exist and the pair cannot
+diverge again; `memoryNextStep` is live on the empty-opener branch and stays.
+
+**Category** usability · **Priority** P1 · **Disposition — RESOLVED.**
+
+**The lesson is about the gate, not the string.** A per-slice journey gate proves
+the slice; it cannot prove the product, and it will not notice when a slice
+correctly improves a surface another slice's journey still asserts. Running every
+authenticated suite together is a closeout instrument this initiative did not
+have until its last slice, and it should have had from B. That is recorded in the
+Phase 2G recommendation as a maintenance item rather than left as a lesson.
+
+## Three journey failures that were the harness, and were then removed
+
+The same all-suites run produced three further failures, all in the `mobile`
+project, all with the identical cause: `?error=invalid-credentials` at sign-in,
+against accounts the same run had just minted successfully.
+`online-entity-editing.spec.ts:142`, `online-history.spec.ts:226` and
+`account-session.spec.ts:287` — Supabase auth rate-limiting, provoked by roughly
+fifty sign-ins inside three minutes when the suites run together.
+
+**They are not excused in the final evidence; the condition that caused them is
+gone.** Running the aggregate serialized (`--workers=1`) spreads the sign-ins far
+enough apart to stay under the provider's limit, and the whole set then passes:
+**116 tests, 114 passed, 0 failed, 2 skipped**, 17.1 minutes.
+
+The first run's "92 passed, 7 failed" is recorded above rather than deleted,
+because how the evidence was produced is part of the evidence — but it is *not*
+the closeout's result. The result is the green one, obtained by removing the
+provider condition rather than by classifying around it, with no case excluded,
+no assertion weakened and no authentication behaviour relaxed.
+
+The exclusion machinery drafted for this closeout — a closed condition list and a
+predicate requiring both a provider signal and a pass in isolation — was
+**deleted unused**, because its precondition turned out to be false and shipping
+a declared mechanism with no consumer is precisely the defect UX-19 and UX-35
+record. The rule it encoded survives as prose in §4.1 of the closeout report,
+which is where a rule with no caller belongs.
+
+**The two skips are classified rather than counted as passes.** Both are the same
+test — *"creates an account through the validated signup journey"*, once per
+project. Desktop skips because `ONLINE_AUTH_TEST_EMAIL_DOMAIN` is unset
+(`online-auth.spec.ts:118`); mobile skips by design (`:112`), since provider email
+delivery is exercised once and mobile form access is covered elsewhere. Both
+predate Slice H, both are declared in the spec, and neither can mask a
+regression: a skip predicated on configuration or project name cannot be produced
+by broken product code.
+
+## The route inventory, re-audited live
+
+`e2e/online-route-audit.spec.ts` walks the **current** inventory — read from
+`src/app/[locale]/app`, which is five routes wider than audit 1's list — as a
+signed-in owner, at **1440×900, 1920×1080, 375×667 and 412×915**, in **pt-BR and
+en**: 21 static routes × 4 viewports × 2 locales = **168 measured page loads**.
+Every load asserts: the route answers; **zero** horizontal overflow; exactly one
+`<h1>`; navigation present and marking where the owner is; the account surface
+reachable (UX-26); **no** stored enum in the visible text (UX-21); no
+`.list-row` carrying the interactive affordance while holding nothing to act on
+(UX-20); and, on the two phone viewports, no interactive target under 44 px
+(UX-24).
+
+Routes added since audit 1, and therefore audited here for the first time:
+`/app/work/[taskId]`, `/app/work/cancelled`, `/app/memories/[memoryId]`,
+`/app/projects/[projectId]` and `/app/people/[personId]`.
+
+**Result: 9/9 green — 168/168 loads, every invariant.** Zero horizontal overflow
+at every viewport in both locales, one `<h1>` everywhere, navigation marking the
+destination on every route that has one, the account disclosure present on every
+page, no stored enum anywhere in the visible text, no inert row carrying the
+interactive affordance, and no sub-44px target on either phone viewport.
+
+**The sweep also found a defect in itself, which is recorded rather than quietly
+corrected.** Its first account-reachability check read `body.innerText` for
+"sair" or "account" — which measures whether a page happens to use those words,
+not whether the owner can sign out. The account surface is a **collapsed**
+`<details>`, and `innerText` omits everything a closed disclosure contains, so
+the check failed on 160 of 168 loads and passed on the eight whose page copy
+coincidentally contained the word. It now asserts the disclosure and its
+sign-out control structurally. A check that reports a real failure for a fake
+reason is worse than no check, and a closeout that hid the correction would be
+asking to be trusted rather than read.
+
+## Gates
+
+- `npm run lint` clean · `npx tsc --noEmit` clean · `npm run build` succeeds.
+- **UX-22 counter: 268 → 266.** It did not increase.
+- **No migration, no SQL, no RPC and no grant change.** `authenticated` keeps
+  exactly the privileges Phase 2F and Slice G5 left it; migration parity stays
+  **202607310064** on both sides.
+- **Zero residue** — every journey account is deleted fail-closed in `afterAll`,
+  and the ownership-isolation case deletes its second account in a `finally`.
+- All content in every captured frame is synthetic. No real account identity, no
+  credentials and no owner data appears in any evidence file.

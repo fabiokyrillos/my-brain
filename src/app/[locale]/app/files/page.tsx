@@ -6,6 +6,7 @@ import {
 } from "@/features/agent/actions";
 import { JobRetryForm, UploadForm } from "@/features/agent/forms";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
@@ -285,7 +286,8 @@ export default async function FilesPage({
                 </div>
                 <div className="list-meta">
                   <span className={`status-badge ${file.status}`}>
-                    {file.status}
+                    {attachmentStatusLabel(locale, file.status) ??
+                      getVocabularyCopy(locale).unknownState}
                   </span>
                   {file.url && (
                     <a

@@ -3,6 +3,30 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-07-31 — Slice H — the product UX remediation's closeout (UX-04, UX-21, UX-22, UX-27, UX-32, UX-33, UX-34, UX-35)
+
+**Status: implemented and PR-ready as PR #50; not yet merged.** The initiative is declared COMPLETE only in §10 of `docs/reports/PRODUCT_UX_CLOSEOUT.md`, after CI is green on the exact merge SHA. Final adjudication regardless of integration: **35 findings — 30 RESOLVED, 4 RETAINED with evidence, 1 DEFERRED, 0 BLOCKED, 0 OPEN, 0 PARTIAL, all 8 P0 RESOLVED.**
+
+**No migration, no SQL, no RPC and no grant change.** Migration parity stays `202607310064` on both sides. `authenticated` keeps exactly the privileges Phase 2F and Slice G5 left it, including `SELECT` and `INSERT` only on `public.reminders`.
+
+**The ledger did not agree with itself, and that was the first finding.** Fourteen detail records in `PRODUCT_UX_FINDINGS.md` still read `Disposition — OPEN` while the summary table called the same finding RESOLVED — each slice updated the table and left the record it closed frozen at the moment it was opened. Each now carries a **Reconciled in H** line rather than being rewritten, so what the finding originally said survives beside what became of it. **UX-19 was the one real contradiction:** Slice D1 resolved it — `work-projection.ts` emits `open_task`, `/app/work/[taskId]` receives it, `task-list.tsx` renders it — and the table was never updated. Slice G4 flagged the disagreement without adjudicating it.
+
+**UX-04 — the entry page now answers the seven questions it was measured against.** Re-measured at the top of H, `entry-review.tsx` was **unchanged since audit 1**, so the finding was live. The page ran in the interpretation object's order; it now runs in the owner's: what you wrote (open, no click) → what it understood → what still needs you → what you can do → **what now exists** → what you decided before → how it was decided. `entry-outcome-projection.ts` implements the new section and **only reads**: every family hangs off a foreign key that predates this initiative — `tasks.source_entry_id`, `reminders.entry_id`, `memories.source_entry_id`, `entry_entities.entry_id` — so there is no write contract, no new column and no migration. It refuses to link what it cannot open (organizations and contexts have no route; `entry_entities` outlives a deleted entity), and it refuses to disappear when nothing was created, because "nothing was created" is an answer the owner asked for.
+
+**UX-21 — RESOLVED, through one shared vocabulary and one argued exception.** The eleven surviving sites all had the same shape: one feature rendering *another feature's* state, which is why no feature-scoped slice picked them up (ADR-064). `features/vocabulary/copy.ts` holds only closed sets a `check` constraint defines, typed so an unlabelled member is a compile error, with seventeen tests pinning its labels identical to `history/copy.ts`, `memories/copy.ts` and `entities/copy.ts`. The exception is `public.jobs.type`, which has no `check` constraint by design.
+
+**UX-22 — DEFERRED, and the number this ledger has been quoting was wrong.** Recounted with a stated, re-runnable method at every slice merge: **288 at the pre-remediation base, 266 now.** The audit's 305 and G4's "333 → 328" do not reproduce, though G4's *delta* was exact. The count also rose inside four slices (D1 +2, F1 +2, F2 +1, G1 +2), which is recorded rather than smoothed over.
+
+**UX-32 — a defect found by declining to fix one that was never verified.** The inherited `entity-edit-form.tsx` textarea finding does **not** reproduce in Chromium's AX tree, Playwright's accname, or `dom-accessibility-api` (ADR-065). Probing the neighbouring shapes found the one that does — a label wrapping its control **plus other content** — live in three Settings fields, including the assistant-name field Slice F1 added, announced as its label plus its entire hint. All three now use `aria-describedby`.
+
+**UX-34 — found by an assertion run 168 times, not by review.** The notifications bell is a navigation link on every page and never marked itself current; fifteen slices of manual review at four viewports in two locales had not noticed (ADR-066). `/app/jobs` failed the same assertion and is correct by design — `capabilities.ts` declares it `context-only` and the type system excludes it from `VisibleNavigationKey` — so it is the sweep's single named exception.
+
+**UX-33 — retained, with the mechanism narrowed.** `<input type="date">` follows the **browser's UI language**, not the page's: `mm/dd/yyyy`, `dd/mm/yyyy` and `dd.mm.yyyy` for `en-US`, `pt-BR` and `de-DE`, with `navigator.language` and `Accept-Language` having no effect at all. The submitted value is ISO in every case, so parsing and timezone behaviour are untouched.
+
+**Windows CRLF fragility — diagnosed, deliberately not fixed here.** `core.autocrlf = true` with no `.gitattributes` leaves the working copy of `202607260059` with 3256 CRLF pairs and zero bare LF, against two test patterns that need consecutive LF-anchored lines. `*.sql text eol=lf` is proposed for a **separate maintenance PR**.
+
+**Closeout artifacts** — `docs/reports/PRODUCT_UX_CLOSEOUT.md` (counts, slice/PR/merge table, before/after IA, known limitations, deferred debt, Phase 2G recommendation) and `docs/reports/ux-evidence/slice-h/`.
+
 ## 2026-07-31 — Slice G5 — the reminder lifecycle command boundary (UX-12, DEC-6, DEC-7)
 
 **Migration `202607310064`, moving remote parity from `202607300063`.** The first migration outside a numbered phase, and the first write path this remediation has added: `public.apply_reminder_command_v1` plus its registered compensation handler `private.undo_apply_reminder_command_v1`. **No grant was widened, no policy was created or dropped, and no existing function was replaced.**

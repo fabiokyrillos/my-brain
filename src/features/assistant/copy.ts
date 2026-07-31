@@ -24,9 +24,18 @@ type AssistantCopy = {
   readonly resultRegionLabel: (agent: string) => string;
   /** What the user wrote, shown above an outcome that does not repeat it. */
   readonly echoLabel: string;
-  /** The proposed-memory route. */
-  readonly memoryHeading: string;
-  readonly memoryDetail: string;
+  /**
+   * The proposed-memory route.
+   *
+   * Only the link label lives here. Slice G3 added the confirm-before-remember
+   * step and moved the heading and the detail to `memories/copy.ts` —
+   * `proposalHeading`, `proposalDetail`, `proposalEmpty` — so the memory
+   * vocabulary sits with the feature that owns it. The two strings that used to
+   * be here were left declared with no consumer for three slices, which is
+   * UX-19's defect in miniature, and the journey that still asserted one of them
+   * was red for the same three (UX-35). They are deleted rather than kept "in
+   * case", so the type stops describing a surface that does not exist.
+   */
   readonly memoryNextStep: string;
   /** The knowledge answer failed. */
   readonly knowledgeFailedHeading: string;
@@ -54,9 +63,6 @@ export const assistantCopy = {
     pendingAnnouncement: "Interpretando o que você escreveu.",
     resultRegionLabel: (agent) => `Resposta do ${agent}`,
     echoLabel: "Você escreveu",
-    memoryHeading: "Isso parece algo para guardar como memória",
-    memoryDetail:
-      "Entendi como um pedido para lembrar disso sempre. Ainda não salvei nada: memórias criadas por conversa precisam de uma confirmação que ainda não existe.",
     memoryNextStep: "Criar essa memória em Memórias",
     knowledgeFailedHeading: "Não consegui responder agora",
     emptyHeading: "Escreva algo primeiro",
@@ -80,9 +86,6 @@ export const assistantCopy = {
     pendingAnnouncement: "Interpreting what you wrote.",
     resultRegionLabel: (agent) => `${agent}’s response`,
     echoLabel: "You wrote",
-    memoryHeading: "That looks like something to keep as a memory",
-    memoryDetail:
-      "I read it as a request to remember this. Nothing has been saved: memories created from a conversation need a confirmation step that does not exist yet.",
     memoryNextStep: "Create this memory in Memories",
     knowledgeFailedHeading: "I could not answer right now",
     emptyHeading: "Write something first",

@@ -242,6 +242,28 @@ describe("AppShell", () => {
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
   });
 
+  /**
+   * UX-34. The bell is a navigation link on every page in the product and was
+   * the one that never said when the owner had arrived at it — the same
+   * "navigation marks where you are" rule the rail and the bar already keep.
+   * Found by Slice H's route sweep, which asserts it on all 168 page loads.
+   */
+  it("marks the notifications bell as the current page while the owner is on it", () => {
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/notifications");
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+    expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute("aria-current", "page");
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  });
+
+  it("leaves the bell unmarked everywhere else, so it does not claim a page it is not", () => {
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox");
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+    expect(screen.getByRole("link", { name: "Notificações" })).not.toHaveAttribute("aria-current");
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  });
+
   it("closes the disclosure when a demoted destination is followed", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });

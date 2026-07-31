@@ -105,4 +105,41 @@ describe("SettingsForm", () => {
     render(<SettingsForm action={action} initialState={{ status: "success", message: "Preferences saved." }} locale="en" values={values} />);
     expect(screen.getByRole("status")).toHaveTextContent("Preferences saved.");
   });
+
+  /**
+   * A hint nested inside a `<label>` becomes part of the control's accessible
+   * **name**, not its description — the label's whole subtree is the name.
+   *
+   * Slice H measured which label shapes actually pollute a name (Chromium's AX
+   * tree, Playwright and `dom-accessibility-api` agree): a label that wraps its
+   * control and nothing else is fine, and a label that wraps its control *plus*
+   * other content is not. This form already knew that in two places —
+   * `ai-route` and `timezone` both carry an explicit `aria-label` for exactly
+   * this reason — but the assistant-name field UX-06 added did not, so a screen
+   * reader announced it as "Nome do assistente Como o assistente se chama nas
+   * telas e nas respostas. O produto continua sendo My Brain."
+   *
+   * `aria-describedby` is what a hint is for, and it is what the field now uses.
+   */
+  it("names the assistant-name field after its label, with the hint as a description", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="pt-BR" values={values} />);
+
+    const field = screen.getByRole("textbox", { name: "Nome do assistente" });
+    expect(field).toHaveValue("Brain");
+
+    const describedBy = field.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy!)?.textContent).toContain("Como o assistente se chama");
+  });
+
+  it("keeps every labelled control's name free of the hint that describes it", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="en" values={values} />);
+
+    // The three fields whose labels carry a `<small>` hint. Each must be
+    // findable by its own label alone, which fails the moment the hint joins it.
+    expect(screen.getByRole("combobox", { name: "Time zone" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Assistant name" })).toBeVisible();
+  });
 });

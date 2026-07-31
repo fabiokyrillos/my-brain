@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import type { InterpretationTechnicalDetailsView } from "@/features/daily-cycle/contracts";
 import { EntryReview } from "@/features/daily-cycle/entry-review";
+import { loadEntryOutcomeProjection } from "@/features/daily-cycle/entry-outcome-projection";
 import { loadEntryReviewProjection } from "@/features/daily-cycle/review-projection";
 import { TechnicalDetails } from "@/features/daily-cycle/technical-details";
 import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
@@ -58,6 +59,14 @@ export default async function EntryDetailPage({
     correctionUndoId,
     relationOptions,
   } = review;
+
+  /**
+   * What the entry produced (UX-04). Read after the review projection because it
+   * needs the owner's timezone from it, and read unconditionally: "nothing was
+   * created" is an answer the page owes the owner, so the section says it rather
+   * than disappearing.
+   */
+  const outcomes = await loadEntryOutcomeProjection(supabase, { entryId, locale, timezone });
 
   const canRetry = view.availableActions.some((action) => action.id === "retry_processing");
   const canCorrect = view.availableActions.some((action) => action.id === "correct_interpretation");
@@ -142,9 +151,9 @@ export default async function EntryDetailPage({
 
       <EntryReview agentName={agentName}
         view={view}
+        outcomes={outcomes}
         locale={locale}
         occurredAtLabel={occurredAtLabel}
-        originalDefaultOpen={!editableCurrent}
         slots={{
           attentionAction: canRetry
             ? <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />
