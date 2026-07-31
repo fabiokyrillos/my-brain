@@ -3,7 +3,7 @@ import Link from "next/link";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
 import type { AttentionItemView, AttentionReason, CandidateOutcomeView, EntryOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
-import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
+import { getDailyCycleCopy, getEntryReviewSectionCopy, type DailyCycleLocale } from "./copy";
 
 const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "resolve_consistency"];
 
@@ -113,14 +113,14 @@ export function OriginalRecord({
   original: OriginalEntryView;
   locale: DailyCycleLocale;
 }) {
-  const pt = locale === "pt-BR";
+  const copy = getEntryReviewSectionCopy(locale);
   return (
     <section className="original-entry review-original" aria-labelledby="review-original-title">
       <div className="section-heading">
         <Quote size={17} aria-hidden="true" />
         <div>
-          <h2 id="review-original-title">{pt ? "O que você escreveu" : "What you wrote"}</h2>
-          <p>{pt ? "Preservado exatamente como foi registrado." : "Preserved exactly as it was recorded."}</p>
+          <h2 id="review-original-title">{copy.originalTitle}</h2>
+          <p>{copy.originalNote}</p>
         </div>
       </div>
       <p className="review-original-content">{original.content}</p>
@@ -146,30 +146,22 @@ export function EntryOutcomes({
   outcomes: EntryOutcomeView;
   locale: DailyCycleLocale;
 }) {
-  const pt = locale === "pt-BR";
+  const copy = getEntryReviewSectionCopy(locale);
 
   return (
     <section className="entry-outcomes" aria-labelledby="entry-outcomes-title">
       <div className="section-heading">
         <span aria-hidden="true">◆</span>
         <div>
-          <h2 id="entry-outcomes-title">{pt ? "O que passou a existir" : "What now exists"}</h2>
-          <p>
-            {pt
-              ? "Tudo que este registro criou ou reconheceu, com onde inspecionar."
-              : "Everything this record created or recognized, and where to inspect it."}
-          </p>
+          <h2 id="entry-outcomes-title">{copy.outcomesTitle}</h2>
+          <p>{copy.outcomesNote}</p>
         </div>
       </div>
 
       {outcomes.isEmpty ? (
         /* Said rather than hidden: "nothing was created" is an answer to the
            owner's question, and an absent section is not. */
-        <p className="entry-outcomes-empty">
-          {pt
-            ? "Nada foi criado a partir deste registro. Ele permanece salvo como referência."
-            : "Nothing was created from this record. It stays saved as reference."}
-        </p>
+        <p className="entry-outcomes-empty">{copy.outcomesEmpty}</p>
       ) : (
         outcomes.groups.map((group) => (
           <div className="entry-outcome-group" key={group.family}>

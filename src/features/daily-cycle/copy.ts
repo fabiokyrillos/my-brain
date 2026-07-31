@@ -19,6 +19,43 @@ export type DailyCycleCopy = {
   messages: Record<DailyCycleMessageKey, string>;
 };
 
+/**
+ * The two sections UX-04 added, as copy rather than as ternaries.
+ *
+ * UX-22's rule is that a slice does not leave more inline locale ternaries than
+ * it found, and that new copy goes through a typed module. `entry-review.tsx`
+ * still carries the ones it was written with; the ones this slice would have
+ * added live here instead.
+ */
+export type EntryReviewSectionCopy = {
+  readonly originalTitle: string;
+  readonly originalNote: string;
+  readonly outcomesTitle: string;
+  readonly outcomesNote: string;
+  readonly outcomesEmpty: string;
+};
+
+const entryReviewSectionCopy: Record<DailyCycleLocale, EntryReviewSectionCopy> = {
+  "pt-BR": {
+    originalTitle: "O que você escreveu",
+    originalNote: "Preservado exatamente como foi registrado.",
+    outcomesTitle: "O que passou a existir",
+    outcomesNote: "Tudo que este registro criou ou reconheceu, com onde inspecionar.",
+    outcomesEmpty: "Nada foi criado a partir deste registro. Ele permanece salvo como referência.",
+  },
+  en: {
+    originalTitle: "What you wrote",
+    originalNote: "Preserved exactly as it was recorded.",
+    outcomesTitle: "What now exists",
+    outcomesNote: "Everything this record created or recognized, and where to inspect it.",
+    outcomesEmpty: "Nothing was created from this record. It stays saved as reference.",
+  },
+};
+
+export function getEntryReviewSectionCopy(locale: DailyCycleLocale): EntryReviewSectionCopy {
+  return entryReviewSectionCopy[locale];
+}
+
 export const dailyCycleCopy = {
   "pt-BR": {
     productStates: {

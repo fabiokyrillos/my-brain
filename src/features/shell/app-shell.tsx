@@ -1,12 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { signOut } from "@/features/auth/actions";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
 import { AccountMenu } from "./account-menu";
 import type { AccountIdentity } from "./account-identity";
-import { LocaleSwitchLink, NavigationLinks } from "./navigation-links";
+import { LocaleSwitchLink, NavigationLinks, NotificationsLink } from "./navigation-links";
 
 /**
  * Pure presentation over the shell's two navigations and its account surface.
@@ -55,13 +54,9 @@ export function AppShell({
             <Suspense fallback={<span aria-hidden="true">{locale === "pt-BR" ? "EN" : "PT"}</span>}>
               <LocaleSwitchLink locale={locale} />
             </Suspense>
-            <Link
-              href={`/${locale}/app/notifications`}
-              className="notification-link"
-              aria-label={t.nav.notifications}
-            >
-              <Bell size={19} aria-hidden="true" />
-            </Link>
+            {/* A client component, because marking the current destination
+                needs the pathname and this shell reads nothing (UX-34). */}
+            <NotificationsLink locale={locale} />
           </div>
         </header>
         <main>{children}</main>

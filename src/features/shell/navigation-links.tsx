@@ -98,6 +98,36 @@ function NavigationOverflow({
   );
 }
 
+/**
+ * The top bar's notifications bell (UX-34).
+ *
+ * It is a navigation link on every page in the product, and it was the one that
+ * never said when the owner had arrived at it — `AppShell` rendered it as a
+ * plain `<Link>`, so a screen reader announced the same "Notificações, link" on
+ * `/app/notifications` as everywhere else. Slice H's route sweep found it by
+ * asserting that navigation marks the current destination on every route.
+ *
+ * It lives here rather than in `app-shell.tsx` because knowing "am I there" needs
+ * the pathname, and `AppShell` is deliberately a server component with no data
+ * access of its own.
+ */
+export function NotificationsLink({ locale }: { locale: Locale }) {
+  const pathname = usePathname() ?? "";
+  const active = isNavigationActive(pathname, "notifications");
+  const t = getMessages(locale);
+
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      aria-label={t.nav.notifications}
+      className={`notification-link${active ? " active" : ""}`}
+      href={`/${locale}/app/notifications`}
+    >
+      {active ? <BellRing size={19} aria-hidden="true" /> : <Bell size={19} aria-hidden="true" />}
+    </Link>
+  );
+}
+
 export function LocaleSwitchLink({ locale }: { locale: Locale }) {
   const pathname = usePathname() ?? `/${locale}/app`;
   const searchParams = useSearchParams();
