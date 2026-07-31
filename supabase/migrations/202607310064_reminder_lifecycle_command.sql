@@ -677,7 +677,13 @@ begin
   -- would be silently discarded (2E-UNDO-004): a snooze followed by an edit,
   -- then an undo of the snooze, leaves `status` untouched, so a status-only
   -- guard would match and the restore would quietly revert the edit too.
-  -- `55P03`, never `40001` (2C-UNDO-004 / migration 050).
+  --
+  -- The SQLSTATE below is `55P03`, and the serialization-failure code that
+  -- 2C-UNDO-004 banned (migration 050) is deliberately **not spelled here**:
+  -- this body is part of `private.undo_operation_definition_bundle()`, which the
+  -- post-deploy guard greps for that exact five-character string. A comment
+  -- saying "never <code>" trips the guard that forbids <code>, because
+  -- `pg_get_functiondef` returns comments along with the statements.
   update public.reminders
   set
     status = restored_status,
