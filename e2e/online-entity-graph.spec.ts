@@ -65,12 +65,31 @@ test.describe("the entity graph's own surfaces", () => {
     expect(deletion.ok).toBe(true);
   });
 
+  /**
+   * `E-mail` is **not** localized on the login form — `login/page.tsx:54` prints
+   * it with no ternary while the password label and the button beside it both
+   * have one. Asserting a translated "Email" here would fail for a reason that
+   * has nothing to do with this slice, so the literal is used and the oddity is
+   * recorded rather than worked around silently.
+   */
   async function signIn(page: import("@playwright/test").Page, locale: "pt-BR" | "en") {
     await page.goto(`/${locale}/auth/login`);
-    await page.getByLabel(locale === "pt-BR" ? "E-mail" : "Email").fill(email);
+    await page.getByLabel("E-mail").fill(email);
     await page.getByLabel(locale === "pt-BR" ? "Senha" : "Password").fill(password);
     await page.getByRole("button", { name: locale === "pt-BR" ? "Entrar" : "Sign in" }).click();
     await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+  }
+
+  /**
+   * The visible half of an outcome, never the live region.
+   *
+   * Both forms announce a result twice on purpose — an `aria-live` region for a
+   * screen reader and a paragraph for everyone else — so a bare text match is a
+   * strict-mode violation rather than a failure. Matching the paragraph is also
+   * the stronger assertion: it is the one a sighted owner can actually return to.
+   */
+  function outcome(page: import("@playwright/test").Page, text: string) {
+    return page.locator("p.entity-edit-feedback", { hasText: text });
   }
 
   test("a company can be created, opened and corrected, in Portuguese", async ({ page }, testInfo) => {
@@ -109,6 +128,11 @@ test.describe("the entity graph's own surfaces", () => {
     await page.getByLabel("Descrição").fill("Cliente desde 2023");
     await page.getByRole("button", { name: "Salvar" }).click();
 
+    // Wait for the outcome before reloading. Reloading straight after the click
+    // races the Server Action, and a reload that wins the race would report a
+    // stored-value failure for a write that had not been asked for yet.
+    await expect(outcome(page, "Alterações salvas.")).toBeVisible({ timeout: 30_000 });
+
     await page.reload();
     await expect(page.getByText("Cliente desde 2023")).toBeVisible();
   });
@@ -141,6 +165,7 @@ test.describe("the entity graph's own surfaces", () => {
     await expect(page.getByLabel("Kind")).toHaveValue("personal");
     await page.getByLabel("Kind").selectOption("work");
     await page.getByRole("button", { name: "Save" }).click();
+    await expect(outcome(page, "Changes saved.")).toBeVisible({ timeout: 30_000 });
 
     await page.reload();
     await page.getByRole("button", { name: "Edit" }).click();
@@ -165,7 +190,7 @@ test.describe("the entity graph's own surfaces", () => {
 
     // The whole point of EGC-ORG-005: one act, not "create it, reopen the form,
     // now pick it". The selector must already hold the new company.
-    await expect(page.getByText("Empresa criada e vinculada.")).toBeVisible({ timeout: 30_000 });
+    await expect(outcome(page, "Empresa criada e vinculada.")).toBeVisible({ timeout: 30_000 });
 
     // And it is stored, not merely displayed — this reload is what separates the
     // two.
@@ -184,17 +209,36 @@ test.describe("the entity graph's own surfaces", () => {
     await expect(page.getByRole("link", { name: new RegExp(personName) })).toBeVisible();
   });
 
-  test("both new destinations are in the More navigation and mark themselves current", async ({ page }) => {
+  test("both new destinations mark themselves current, on the list and on a detail page", async ({ page }) => {
     await signIn(page, "pt-BR");
+
+    /**
+     * Attached, not visible.
+     *
+     * Both live in the `context` group inside the `Mais` disclosure, which is
+     * collapsed until opened — so `toBeVisible` would fail on a link that is
+     * doing its job. What the assertion is actually about is that
+     * `classifyNavigationPath` resolved this route to a destination at all: a
+     * route absent from `capabilities.ts` marks nothing, and its overflow entry
+     * would not exist to be found.
+     */
+    for (const route of ["organizations", "contexts"] as const) {
+      await page.goto(`/pt-BR/app/${route}`);
+      await expect(
+        page.locator(`[aria-current="page"][href="/pt-BR/app/${route}"]`).first(),
+      ).toBeAttached();
+    }
+
+    // `nested: true` is what keeps the parent highlighted on a detail page.
+    // Without it the highlight would clear the moment an owner opened a row —
+    // the navigation saying "you are nowhere" halfway through a journey.
     await page.goto("/pt-BR/app/organizations");
-
-    // `nested: true` in `capabilities.ts` is what keeps the parent destination
-    // active on a detail page; asserted on the list first so the detail
-    // assertion is not the only evidence.
-    const current = page.locator('[aria-current="page"]');
-    await expect(current.first()).toBeVisible();
-
-    await page.goto("/pt-BR/app/contexts");
-    await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
+    const firstCompany = page.locator("a.list-row").first();
+    if (await firstCompany.count()) {
+      await firstCompany.click();
+      await expect(
+        page.locator('[aria-current="page"][href="/pt-BR/app/organizations"]').first(),
+      ).toBeAttached();
+    }
   });
 });
