@@ -32,7 +32,7 @@
  * Each is an instruction to store something. Phrasings that merely *mention*
  * memory ("eu lembro", "I remembered") are absent by design: they narrate.
  */
-const MEMORY_OPENERS = [
+export const MEMORY_OPENERS = [
   // pt-BR
   "lembre disso",
   "lembre-se disso",
@@ -71,7 +71,7 @@ const MEMORY_OPENERS = [
  * "don't" to a curly `’`, a desktop keyboard leaves a straight `'`, and both
  * are the one word the opener list spells `dont`.
  */
-function normalize(text: string): string {
+export function normalize(text: string): string {
   return text
     .normalize("NFD")
     .replace(/[̀-ͯ]/gu, "")

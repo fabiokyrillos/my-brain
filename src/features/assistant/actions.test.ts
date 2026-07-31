@@ -171,20 +171,40 @@ describe("runAssistantTurn — memory intent proposes and never persists (DEC-5)
     expect(chatMock).not.toHaveBeenCalled();
   });
 
-  it("offers a next step rather than a write, and says nothing was saved", async () => {
+  // The opener with nothing after it. There is no memory to propose, so the
+  // turn asks for one and still offers the surface that can create it by hand.
+  it("asks for the content when the opener is the whole utterance", async () => {
     const result = await runAssistantTurn(idleAssistantComposerState, ask("Lembre disso sempre"));
 
+    expect(result.proposal).toBeNull();
     expect(result.notice?.nextStep?.href).toBe("/pt-BR/app/memories");
-    expect(result.notice?.detail).toContain("Ainda não salvei nada");
+    expect(result.notice?.detail).toContain("Diga o que eu devo lembrar");
     expect(result.echo).toBe("Lembre disso sempre");
   });
 
-  it("localizes the proposal and its destination", async () => {
+  // The DEC-5 shape: the turn carries what *would* be stored, and carrying it is
+  // not storing it. The action reaches no write path at all — the confirm
+  // control on the rendered proposal is the only thing that can.
+  it("carries a proposal, and still writes nothing", async () => {
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Lembre disso sempre: prefiro reuniões pela manhã"),
+    );
+
+    expect(result.route).toBe("memory_intent");
+    expect(result.proposal).toEqual({ content: "prefiro reuniões pela manhã", kind: "preference" });
+    // The instruction to remember is not part of the thing remembered.
+    expect(result.proposal?.content).not.toContain("Lembre");
+    expect(commandMock).not.toHaveBeenCalled();
+    expect(chatMock).not.toHaveBeenCalled();
+  });
+
+  it("localizes the proposal in English", async () => {
     const data = ask("Remember this: invoices come to me", { locale: "en" });
     const result = await runAssistantTurn(idleAssistantComposerState, data);
 
-    expect(result.notice?.nextStep?.href).toBe("/en/app/memories");
-    expect(result.notice?.detail).toContain("Nothing has been saved");
+    expect(result.proposal?.content).toBe("invoices come to me");
+    expect(result.notice?.detail).toContain("Nothing has been saved yet");
   });
 });
 
