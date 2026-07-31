@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import type { MemoryProposalAction } from "@/features/memories/memory-proposal-card";
 import { idleTaskCommandState } from "@/features/task-commands/console-state";
 
 import { AssistantComposer, type AssistantComposerAction } from "./assistant-composer";
@@ -17,6 +18,7 @@ function resolvesTo(state: AssistantComposerState) {
   return vi.fn<AssistantComposerAction>(async () => state);
 }
 
+/** A memory turn with nothing to propose — the opener was the whole utterance. */
 const memoryProposal: AssistantComposerState = {
   route: "memory_intent",
   command: idleTaskCommandState,
@@ -26,17 +28,41 @@ const memoryProposal: AssistantComposerState = {
     nextStep: { href: "/pt-BR/app/memories", label: "Criar essa memória em Memórias" },
   },
   echo: "Lembre disso sempre",
+  proposal: null,
   announcement: "Isso parece algo para guardar como memória. Ainda não salvei nada.",
 };
 
+/**
+ * The DEC-5 turn: a proposal exists and the confirm control is reachable.
+ *
+ * `memoryAction` is what would write. Every assertion below that it was *not*
+ * called is the invariant DEC-5 exists to protect.
+ */
+const memoryProposalWithContent: AssistantComposerState = {
+  ...memoryProposal,
+  notice: { heading: "Quer que eu guarde isto?", detail: "Nada foi salvo ainda.", nextStep: null },
+  proposal: { content: "prefiro reuniões pela manhã", kind: "preference" },
+};
+
+// Typed as the action itself, so `mock.calls[n][1]` is the `FormData` the
+// proposal card submitted rather than `undefined` from a zero-argument
+// inference — the same reason `resolvesTo` above is typed.
+function noopMemoryAction() {
+  return vi.fn<MemoryProposalAction>(async () => ({
+    status: "idle" as const,
+    message: "",
+    memoryId: null,
+  }));
+}
+
 describe("AssistantComposer", () => {
   it("presents exactly one text field, which is the whole point of UX-07", () => {
-    render(<AssistantComposer agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });
 
   it("does not ask the user to pick a mode before typing", () => {
-    render(<AssistantComposer agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     // No radio, no select, no toggle: the composer classifies, the user writes.
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
@@ -44,7 +70,7 @@ describe("AssistantComposer", () => {
   });
 
   it("labels the field and links the keyboard hint to it", () => {
-    render(<AssistantComposer agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     const field = screen.getByLabelText("O que você quer dizer ao Brain?");
     expect(field).toBeTruthy();
     const describedBy = field.getAttribute("aria-describedby");
@@ -54,7 +80,7 @@ describe("AssistantComposer", () => {
 
   it("submits the declared ask intent with the composed text", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "O que combinei com Marina?");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -67,7 +93,7 @@ describe("AssistantComposer", () => {
 
   it("carries the conversation id inside a thread so the answer joins it", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer agentName="Brain" action={action} conversationId="c-1" locale="en" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} conversationId="c-1" locale="en" />);
     await userEvent.type(screen.getByRole("textbox"), "and then?");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -77,7 +103,7 @@ describe("AssistantComposer", () => {
 
   it("sends on Enter and breaks the line on Shift+Enter", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     const field = screen.getByRole("textbox");
 
     await userEvent.type(field, "primeira linha{Shift>}{Enter}{/Shift}segunda linha");
@@ -92,7 +118,7 @@ describe("AssistantComposer", () => {
 
   it("mounts a single form, so nothing on the surface is a rival submission", () => {
     const { container } = render(
-      <AssistantComposer agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />,
+      <AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />,
     );
     // Command controls add their own forms once a preview exists — Apply,
     // Confirm, Choose — but at rest there is exactly one, and it is the
@@ -102,14 +128,14 @@ describe("AssistantComposer", () => {
 
   it("distinguishes what the user wrote from what the system understood", async () => {
     const action = resolvesTo(memoryProposal);
-    render(<AssistantComposer agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
     await waitFor(() => expect(screen.getByText("Você escreveu")).toBeTruthy());
     expect(screen.getByText("Isso parece algo para guardar como memória")).toBeTruthy();
-    // The proposal is a link, not a button: nothing here may persist a memory
-    // until Slice G builds the confirmed-memory contract (DEC-5).
+    // This turn had nothing to propose, so the only affordance is a link out.
+    // No confirm control appears, because there is no memory to confirm.
     const nextStep = screen.getByRole("link", { name: "Criar essa memória em Memórias" });
     expect(nextStep.getAttribute("href")).toBe("/pt-BR/app/memories");
     expect(screen.queryByRole("button", { name: /memória/i })).toBeNull();
@@ -117,7 +143,7 @@ describe("AssistantComposer", () => {
 
   it("announces the outcome once, not twice", async () => {
     const action = resolvesTo(memoryProposal);
-    render(<AssistantComposer agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -135,7 +161,7 @@ describe("AssistantComposer", () => {
     const action = vi.fn(
       () => new Promise<AssistantComposerState>((resolve) => { release = resolve; }),
     );
-    render(<AssistantComposer agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Marque a tarefa como feita");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -151,9 +177,81 @@ describe("AssistantComposer", () => {
   });
 
   it("localizes every visible string in English", () => {
-    render(<AssistantComposer agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="en" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="en" />);
     expect(screen.getByLabelText("What do you want to tell Brain?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     expect(screen.getByText("Enter sends · Shift+Enter adds a line")).toBeTruthy();
+  });
+});
+
+/**
+ * DEC-5: a recognised memory request proposes, and only an explicit confirmation
+ * writes. These assertions are the contract, not the styling.
+ */
+describe("AssistantComposer memory proposal (DEC-5)", () => {
+  async function submitMemoryTurn(locale: "pt-BR" | "en" = "pt-BR") {
+    const memoryAction = noopMemoryAction();
+    render(
+      <AssistantComposer
+        action={resolvesTo(memoryProposalWithContent)}
+        agentName="Brain"
+        locale={locale}
+        memoryAction={memoryAction}
+      />,
+    );
+    await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre: prefiro reuniões pela manhã");
+    await userEvent.click(screen.getByRole("button", { name: locale === "en" ? "Send" : "Enviar" }));
+    await waitFor(() => expect(screen.getByText("Quer que eu guarde isto?")).toBeTruthy());
+    return memoryAction;
+  }
+
+  it("shows the proposed memory without writing anything", async () => {
+    const memoryAction = await submitMemoryTurn();
+
+    // The proposed text is present and editable — a proposal the owner cannot
+    // correct is a confirmation in name only.
+    const proposed = screen.getByDisplayValue("prefiro reuniões pela manhã");
+    expect((proposed as HTMLTextAreaElement).disabled).toBe(false);
+    // And nothing has been persisted merely by rendering it.
+    expect(memoryAction).not.toHaveBeenCalled();
+  });
+
+  it("preselects the proposed kind as a suggestion the owner can change", async () => {
+    await submitMemoryTurn();
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("preference");
+  });
+
+  it("writes only when the owner confirms, and sends what is on screen", async () => {
+    const memoryAction = await submitMemoryTurn();
+
+    const proposed = screen.getByDisplayValue("prefiro reuniões pela manhã");
+    await userEvent.clear(proposed);
+    await userEvent.type(proposed, "prefiro reuniões às 9h");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar memória" }));
+
+    await waitFor(() => expect(memoryAction).toHaveBeenCalled());
+    const submitted = memoryAction.mock.calls[0]![1] as FormData;
+    // The corrected text is what is stored, not the originally proposed one.
+    expect(submitted.get("content")).toBe("prefiro reuniões às 9h");
+    expect(submitted.get("kind")).toBe("preference");
+    expect(submitted.get("locale")).toBe("pt-BR");
+  });
+
+  it("discards without any server round-trip, because nothing was written", async () => {
+    const memoryAction = await submitMemoryTurn();
+
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+
+    await waitFor(() => expect(screen.getByText("Nada foi guardado.")).toBeTruthy());
+    expect(memoryAction).not.toHaveBeenCalled();
+    // The confirm control is gone, so a discarded proposal cannot be revived by
+    // a stray second click.
+    expect(screen.queryByRole("button", { name: "Guardar memória" })).toBeNull();
+  });
+
+  it("localizes the proposal in English", async () => {
+    await submitMemoryTurn("en");
+    expect(screen.getByRole("button", { name: "Keep memory" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
   });
 });

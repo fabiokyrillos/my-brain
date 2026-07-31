@@ -26,6 +26,11 @@ import { useActionState } from "react";
 import { TaskCommandResult } from "@/features/task-commands/command-console";
 import type { Locale } from "@/lib/preferences";
 
+import {
+  MemoryProposalCard,
+  type MemoryProposalAction,
+} from "@/features/memories/memory-proposal-card";
+
 import { idleAssistantComposerState, type AssistantComposerState } from "./composer-state";
 import { getAssistantCopy } from "./copy";
 
@@ -36,11 +41,18 @@ export type AssistantComposerAction = (
 
 export function AssistantComposer({
   action,
+  memoryAction,
   locale,
   agentName,
   conversationId,
 }: {
   action: AssistantComposerAction;
+  /**
+   * The confirmed-memory write (DEC-5), passed in for the same reason `action`
+   * is: this is a client component and may not import a `"use server"` module
+   * for a value. It is reachable only from the proposal card's confirm control.
+   */
+  memoryAction: MemoryProposalAction;
   locale: Locale;
   /** The assistant’s configured name (UX-06). Passed in, never read here: this is a client component. */
   agentName: string;
@@ -137,6 +149,20 @@ export function AssistantComposer({
           )}
           <h3>{state.notice.heading}</h3>
           <p>{state.notice.detail}</p>
+          {/*
+            The confirmation step DEC-5 requires. It appears only on the memory
+            route and only when there was something to propose; the write lives
+            behind its own control, so reaching this point has still stored
+            nothing.
+          */}
+          {state.proposal === null ? null : (
+            <MemoryProposalCard
+              action={memoryAction}
+              content={state.proposal.content}
+              kind={state.proposal.kind}
+              locale={locale}
+            />
+          )}
           {state.notice.nextStep === null ? null : (
             <Link className="assistant-composer-next" href={state.notice.nextStep.href}>
               {state.notice.nextStep.label}

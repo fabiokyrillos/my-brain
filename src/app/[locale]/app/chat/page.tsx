@@ -5,6 +5,7 @@ import { ConversationalQuestions } from "@/features/agent/conversational-questio
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { createProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
@@ -40,7 +41,12 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         whole of UX-07's fix: one field, no mode to choose, and nothing above it
         competing for the first thing the user types into.
       */}
-      <AssistantComposer action={runAssistantTurn} agentName={agentName} locale={locale} />
+      <AssistantComposer
+        action={runAssistantTurn}
+        agentName={agentName}
+        locale={locale}
+        memoryAction={createProposedMemory}
+      />
 
       {/*
         Proactive questions stay — they are the agent's own open loops and

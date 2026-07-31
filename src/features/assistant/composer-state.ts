@@ -15,6 +15,7 @@
  */
 
 import { idleTaskCommandState, type TaskCommandConsoleState } from "@/features/task-commands/console-state";
+import type { MemoryProposal } from "./memory-proposal";
 
 /**
  * Where the turn went, as a declared value.
@@ -28,8 +29,9 @@ import { idleTaskCommandState, type TaskCommandConsoleState } from "@/features/t
  *   it can produce: preview, disambiguation, confirmation, creation offer,
  *   clarification, undo, refusal, **and every unsupported reason except the one
  *   that means "this was not a command at all"**.
- * - `memory_intent` — recognised as a request to remember. Proposes; writes
- *   nothing (DEC-5).
+ * - `memory_intent` — recognised as a request to remember. Carries a **proposal**
+ *   and writes nothing by itself; only the owner's explicit confirmation on that
+ *   proposal persists anything (DEC-5).
  * - `knowledge_failed` — the knowledge answer was attempted and failed. A
  *   *successful* answer never appears here: it redirects into the thread, which
  *   is the pre-existing behaviour of `sendChatMessage`.
@@ -61,9 +63,10 @@ export type AssistantComposerIntent = (typeof ASSISTANT_COMPOSER_INTENTS)[number
 /**
  * What the composer says about a turn the command pipeline did not render.
  *
- * `nextStep` is a link rather than an action on purpose. The two routes that
- * use this — a proposed memory and a failed answer — must not write, and a
- * button that looked like it might would be the wrong promise.
+ * `nextStep` is a link rather than an action on purpose: it navigates, and
+ * nothing reachable through it writes. The memory route now carries its write
+ * separately, in `proposal` — a distinct control with its own confirmation —
+ * precisely so this stays a promise the notice can keep.
  */
 export type AssistantNotice = {
   readonly heading: string;
@@ -85,6 +88,19 @@ export type AssistantComposerState = {
    * routes need no echo: the preview already renders the task and the deltas.
    */
   readonly echo: string | null;
+  /**
+   * The memory offered for confirmation, on the `memory_intent` route only
+   * (DEC-5).
+   *
+   * Non-null means **nothing has been written** and the owner is being asked.
+   * It is deliberately not folded into `notice`: a notice is prose, and this is
+   * a payload that a form posts back verbatim, so keeping them apart is what
+   * stops a rendering change from silently altering what gets stored.
+   *
+   * `null` on a `memory_intent` turn is the case where the opener was the whole
+   * utterance — there is nothing to propose, and the notice says so.
+   */
+  readonly proposal: MemoryProposal | null;
   /** What a polite live region announces once the turn resolves. */
   readonly announcement: string;
 };
@@ -94,5 +110,6 @@ export const idleAssistantComposerState: AssistantComposerState = {
   command: idleTaskCommandState,
   notice: null,
   echo: null,
+  proposal: null,
   announcement: "",
 };

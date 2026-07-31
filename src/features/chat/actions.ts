@@ -8,6 +8,7 @@ import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
+import { isMemoryInForce } from "@/features/memories/lifecycle";
 import type { ChatState } from "./chat-state";
 import { getAgentName } from "@/features/profile/agent-identity";
 
@@ -59,6 +60,37 @@ type KnowledgeRow = {
   similarity: number;
   occurred_at: string;
 };
+
+/**
+ * Which of the matched memories are actually in force right now.
+ *
+ * Returns the ids the assistant may cite. A memory whose row cannot be read is
+ * **excluded**, deliberately: the failure mode to avoid is citing something the
+ * owner archived, and staying silent about one memory is recoverable in a way
+ * that quoting a retracted fact back at them is not.
+ *
+ * `entry` matches never reach here — entries have no validity window, and
+ * filtering them against a table they are not in would drop every one.
+ */
+async function memoriesInForce(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  matches: readonly KnowledgeRow[],
+): Promise<Set<string>> {
+  const ids = matches.filter((match) => match.source_type === "memory").map((match) => match.source_id);
+  if (ids.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from("memories")
+    .select("id,valid_from,valid_until")
+    .in("id", ids);
+  if (error) {
+    console.error("Memory validity lookup failed", error.message);
+    return new Set();
+  }
+
+  const now = new Date();
+  return new Set((data ?? []).filter((row) => isMemoryInForce(row, now)).map((row) => row.id));
+}
 
 export async function sendChatMessage(_state: ChatState, formData: FormData): Promise<ChatState> {
   // Resolve the locale first and independently: the validation failure below
@@ -117,8 +149,20 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     });
     if (matchError) throw matchError;
 
-    const sources: ChatSource[] = ((matches ?? []) as KnowledgeRow[])
-      .filter((match) => match.similarity >= 0.2)
+    // A memory the owner archived must stop being used, or "Archive" on the
+    // Memories page is a label with nothing behind it (UX-10).
+    //
+    // `match_internal_knowledge` selects memories on `embedding is not null`
+    // alone (`202607160006:116-117`) — it has never read `valid_from` or
+    // `valid_until`, and teaching it to would mean a migration this slice is not
+    // authorized to make. Filtering here is the read-only equivalent: the RPC
+    // returns at most 20 rows, so this is one indexed lookup over a handful of
+    // ids, and it shares `isMemoryInForce` with the badge the owner reads, so
+    // the page and the retrieval provably cannot disagree.
+    const relevant = ((matches ?? []) as KnowledgeRow[]).filter((match) => match.similarity >= 0.2);
+    const inForce = await memoriesInForce(supabase, relevant);
+    const sources: ChatSource[] = relevant
+      .filter((match) => match.source_type !== "memory" || inForce.has(match.source_id))
       .map((match) => ({
         id: `${match.source_type}:${match.source_id}`,
         type: match.source_type,

@@ -1,0 +1,316 @@
+/*
+ * Memories (UX-10).
+ *
+ * Layered on the shared list and entity-detail styles rather than replacing
+ * them: a memory row is a list row, and the detail page is an entity detail. What
+ * is here is only what those two do not already say.
+ */
+
+/* The mental model, stated once above the list. Quiet enough not to compete
+   with the rows, present enough to be read on a first visit. */
+.memory-explainer {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid #e3e7ee;
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.memory-explainer > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4a5568;
+}
+
+/* The rows are links now (UX-20): they were `<article>` elements styled as
+   interactive with nothing to activate. `color: inherit` keeps them reading as
+   rows rather than as a stack of blue links. */
+.memory-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+.memory-row:hover {
+  border-color: #c9d3e2;
+  background: #fbfcfe;
+}
+
+.memory-row:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.memory-row-chevron {
+  flex: none;
+  color: #9aa6b8;
+}
+
+.memory-related-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  color: #8290a4;
+}
+
+/* The lifecycle badge. Colour carries emphasis, never meaning on its own — the
+   word is always present, so this reads the same to a colour-blind user. */
+.memory-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 650 10px var(--font-jetbrains);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.memory-state-active {
+  color: #1f6b43;
+  background: #e6f5ec;
+}
+
+.memory-state-archived {
+  color: #6b7280;
+  background: #eef1f5;
+}
+
+.memory-state-scheduled {
+  color: #8a6116;
+  background: #fdf3e0;
+}
+
+/* Detail: the memory itself is the heading, and it is owner prose up to 4000
+   characters. It wraps rather than truncating — a memory the owner cannot read
+   in full is one they cannot decide about. */
+.memory-content-heading {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.memory-retrieval-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #4a5568;
+}
+
+/* The facts grid. `auto-fit` with a floor keeps the pairs side by side on a
+   desktop and stacked on a phone with no breakpoint of its own. */
+.memory-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px 20px;
+  margin: 22px 0;
+  padding: 18px;
+  border: 1px solid #e3e7ee;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.memory-facts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.memory-facts dt {
+  font: 650 9px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8290a4;
+}
+
+.memory-facts dd {
+  margin: 0;
+  font-size: 13px;
+  /* Person and project names are owner content and can be long. */
+  overflow-wrap: anywhere;
+}
+
+.memory-controls {
+  display: grid;
+  gap: 14px;
+}
+
+/* Archive sits apart from the edit form: it is a named transition, not a field,
+   and its own form so it cannot submit a half-finished edit alongside it. */
+.memory-lifecycle {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f5;
+}
+
+.memory-lifecycle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* 44px minimum touch target, matching the affordance audit's floor. */
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #d9dfe8;
+  border-radius: 9px;
+  background: #fff;
+  font: 600 13px var(--font-manrope), sans-serif;
+  color: #40506a;
+  cursor: pointer;
+}
+
+.memory-lifecycle-button:hover:not(:disabled) {
+  border-color: #c2ccdb;
+  background: #f7f9fc;
+}
+
+.memory-lifecycle-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.memory-lifecycle-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.memory-lifecycle-hint {
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #7a8698;
+}
+
+.memory-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+
+.memory-checkbox input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+}
+
+/*
+ * The proposal card (DEC-5). Visually distinct from the notice around it,
+ * because "nothing is saved yet" is the single most important thing about it.
+ */
+.memory-proposal {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 16px;
+  border: 1px dashed #c3cedd;
+  border-radius: 11px;
+  background: #fbfcfe;
+}
+
+.memory-proposal > label {
+  display: grid;
+  gap: 6px;
+  font: 650 11px var(--font-jetbrains);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #66748a;
+}
+
+.memory-proposal textarea,
+.memory-proposal select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d9dfe8;
+  border-radius: 8px;
+  background: #fff;
+  font: 400 14px var(--font-manrope), sans-serif;
+  color: inherit;
+}
+
+.memory-proposal textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.memory-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.memory-proposal-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 10px 17px;
+  border-radius: 9px;
+  font: 600 13px var(--font-manrope), sans-serif;
+  cursor: pointer;
+}
+
+.memory-proposal-confirm {
+  border: 1px solid transparent;
+  background: var(--ink);
+  color: #fff;
+}
+
+.memory-proposal-confirm:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.memory-proposal-discard {
+  border: 1px solid #d9dfe8;
+  background: #fff;
+  color: #40506a;
+}
+
+.memory-proposal-discard:hover:not(:disabled) {
+  border-color: #c2ccdb;
+  background: #f7f9fc;
+}
+
+.memory-proposal :focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.memory-proposal-closed {
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #e3e7ee;
+  border-radius: 11px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.memory-proposal-closed > div > p {
+  margin: 0;
+}
+
+.memory-proposal-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .memory-facts {
+    padding: 15px;
+  }
+
+  .memory-proposal-actions > button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}

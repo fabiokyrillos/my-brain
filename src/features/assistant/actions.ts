@@ -22,13 +22,16 @@
  * 2. **Fallthrough is a declared value, never an exception.** `routing.ts`
  *    decides it from the model's own closed vocabulary; a refusal, a provider
  *    fault and invalid model output all stay with the command pipeline.
- * 3. **The memory branch cannot write.** It is reached before any provider call
- *    and returns a proposal with a link. DEC-5's confirmed-memory contract is
- *    Slice G's, and until it exists there is deliberately no path from here to
- *    `memories`.
+ * 3. **The memory branch still cannot write.** It is reached before any provider
+ *    call and returns a *proposal* — the memory that would be stored, for the
+ *    owner to read and accept. Slice G completes DEC-5's contract by giving that
+ *    proposal a confirm control wired to `createProposedMemory`; the write lives
+ *    there, behind the owner's explicit act, and there is deliberately still no
+ *    path from this module to `memories`.
  */
 
 import { sendChatMessage } from "@/features/chat/actions";
+import { getMemoryCopy } from "@/features/memories/copy";
 import { runTaskCommand } from "@/features/task-commands/actions";
 import {
   TASK_COMMAND_INTENTS,
@@ -43,6 +46,7 @@ import {
   type AssistantNotice,
 } from "./composer-state";
 import { getAssistantCopy } from "./copy";
+import { buildMemoryProposal } from "./memory-proposal";
 import { commandTurnFallsThrough, decideAssistantRoute } from "./routing";
 
 /** The ceiling `chat/actions.ts` already enforces; repeated so the refusal can be localized here. */
@@ -111,7 +115,7 @@ export async function runAssistantTurn(
   // the confirmation requirement is decided.
   if (isTaskCommandIntent(intent)) {
     const command = await runTaskCommand(previous.command, formData);
-    return { route: "command", command, notice: null, echo: null, announcement: command.announcement };
+    return { route: "command", command, notice: null, echo: null, proposal: null, announcement: command.announcement };
   }
 
   if (intent !== "ask") {
@@ -141,18 +145,32 @@ export async function runAssistantTurn(
   const decision = decideAssistantRoute(text);
 
   if (decision.kind === "memory_intent") {
-    // No provider call, no write, and nothing downstream to reach. The proposal
-    // names what was understood and points at the surface that can actually
-    // create a memory today (DEC-5; the conversational contract is Slice G).
-    return noticed(
-      "memory_intent",
-      {
-        heading: copy.memoryHeading,
-        detail: copy.memoryDetail,
-        nextStep: { href: `/${locale}/app/memories`, label: copy.memoryNextStep },
-      },
-      text,
-    );
+    // Still no provider call and still no write *here* (DEC-5). What Slice G
+    // adds is the other half: the turn now carries the memory it would store, so
+    // the owner can read it, correct it and accept it. Persistence happens only
+    // in `createProposedMemory`, from the confirm control on that proposal.
+    const proposal = buildMemoryProposal(text);
+    const memoryCopy = getMemoryCopy(locale);
+    return {
+      ...noticed(
+        "memory_intent",
+        proposal
+          ? {
+              heading: memoryCopy.proposalHeading,
+              detail: memoryCopy.proposalDetail,
+              nextStep: null,
+            }
+          : {
+              // The opener with nothing after it. There is no memory to show, so
+              // the composer asks for one rather than offering an empty card.
+              heading: memoryCopy.proposalHeading,
+              detail: memoryCopy.proposalEmpty,
+              nextStep: { href: `/${locale}/app/memories`, label: copy.memoryNextStep },
+            },
+        text,
+      ),
+      proposal,
+    };
   }
 
   if (decision.kind === "knowledge") {
@@ -171,5 +189,5 @@ export async function runAssistantTurn(
   if (commandTurnFallsThrough(command)) {
     return answerFromKnowledge(text, locale, conversationId);
   }
-  return { route: "command", command, notice: null, echo: null, announcement: command.announcement };
+  return { route: "command", command, notice: null, echo: null, proposal: null, announcement: command.announcement };
 }
