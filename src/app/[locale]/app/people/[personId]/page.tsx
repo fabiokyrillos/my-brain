@@ -1,7 +1,7 @@
 import { ArrowLeft, UserRound } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updatePerson } from "@/features/entities/actions";
+import { createOrganizationForSubject, updatePerson } from "@/features/entities/actions";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
@@ -90,6 +90,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
 
       <EntityEditForm
         action={updatePerson}
+        createOrganizationAction={createOrganizationForSubject}
         fields={{
           kind: "person",
           id: person.id,

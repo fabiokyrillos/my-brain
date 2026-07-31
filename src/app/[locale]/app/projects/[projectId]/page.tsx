@@ -1,7 +1,7 @@
 import { ArrowLeft, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updateProject } from "@/features/entities/actions";
+import { createOrganizationForSubject, updateProject } from "@/features/entities/actions";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
@@ -77,6 +77,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       <EntityEditForm
         action={updateProject}
+        createOrganizationAction={createOrganizationForSubject}
         fields={{
           kind: "project",
           id: project.id,

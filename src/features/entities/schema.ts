@@ -61,6 +61,18 @@ export const CONTEXT_KINDS = ["work", "personal", "custom"] as const;
 export type ContextKind = (typeof CONTEXT_KINDS)[number];
 
 /**
+ * `contexts.kind` narrowed for rendering, defaulting to `custom`.
+ *
+ * The column is `text` with a CHECK, so a value outside the three is a data
+ * fault rather than a crash — the same posture `projects/[projectId]/page.tsx`
+ * already takes for `projects.status`. `custom` is the safe default because it
+ * is the kind that promises the reader least about the row.
+ */
+export function asContextKind(value: string): ContextKind {
+  return (CONTEXT_KINDS as readonly string[]).includes(value) ? (value as ContextKind) : "custom";
+}
+
+/**
  * Organizations and contexts gain their first write path (EGC-ORG, EGC-CTX).
  *
  * Both tables have carried forced RLS, four own-row policies and full

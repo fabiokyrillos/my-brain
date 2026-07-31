@@ -252,3 +252,229 @@ describe("EntityEditForm", () => {
     expect(notes).toHaveValue("Prefere áudio a texto");
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* Organizations and contexts — EGC.1                                          */
+/* -------------------------------------------------------------------------- */
+
+const CONTEXT_ID = "44444444-4444-4444-8444-444444444444";
+
+const organizationFields: EntityEditFields = {
+  kind: "organization",
+  id: ACME.id,
+  name: "Acme",
+  description: "Cliente desde 2024",
+};
+
+const contextFields: EntityEditFields = {
+  kind: "context",
+  id: CONTEXT_ID,
+  name: "Pessoal",
+  description: null,
+  contextKind: "personal",
+};
+
+describe("EntityEditForm — organizations and contexts", () => {
+  it("submits each kind's id under the key its own action validates", async () => {
+    // All four schemas are `.strict()`, so a wrong key is a refused save rather
+    // than an ignored field. This is the assertion that would fail if the id
+    // name were derived by a ternary that forgot a kind.
+    const organizationAction = resolvesTo(saved);
+    const { unmount } = render(
+      <EntityEditForm action={organizationAction} fields={organizationFields} locale="pt-BR" organizations={[]} />,
+    );
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(organizationAction).toHaveBeenCalled());
+    expect((organizationAction.mock.calls[0]![1] as FormData).get("organizationId")).toBe(ACME.id);
+    unmount();
+
+    const contextAction = resolvesTo(saved);
+    render(<EntityEditForm action={contextAction} fields={contextFields} locale="pt-BR" organizations={[]} />);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(contextAction).toHaveBeenCalled());
+    const submitted = contextAction.mock.calls[0]![1] as FormData;
+    expect(submitted.get("contextId")).toBe(CONTEXT_ID);
+    expect(submitted.get("kind")).toBe("personal");
+  });
+
+  it("offers no company control to the two kinds that have no company column", async () => {
+    // A selector here would create a row and have nowhere to put it:
+    // `organizations` and `contexts` carry no `organization_id`.
+    const { unmount } = render(
+      <EntityEditForm action={resolvesTo(idle)} fields={organizationFields} locale="pt-BR" organizations={[ACME]} />,
+    );
+    await open();
+    expect(screen.queryByLabelText("Empresa")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Criar nova empresa" })).toBeNull();
+    unmount();
+
+    render(<EntityEditForm action={resolvesTo(idle)} fields={contextFields} locale="pt-BR" organizations={[ACME]} />);
+    await open();
+    expect(screen.queryByLabelText("Empresa")).toBeNull();
+  });
+
+  it("offers a context's kind and never a status, and bounds its name at 120", async () => {
+    render(<EntityEditForm action={resolvesTo(idle)} fields={contextFields} locale="pt-BR" organizations={[]} />);
+    await open();
+
+    expect(screen.getByLabelText("Tipo")).toHaveValue("personal");
+    expect(screen.queryByLabelText("Situação")).toBeNull();
+    expect(screen.getByLabelText("Nome")).toHaveAttribute("maxlength", "120");
+  });
+
+  it("bounds an organization's name at 160, which is a different column's bound", async () => {
+    render(<EntityEditForm action={resolvesTo(idle)} fields={organizationFields} locale="pt-BR" organizations={[]} />);
+    await open();
+    expect(screen.getByLabelText("Nome")).toHaveAttribute("maxlength", "160");
+  });
+
+  it("localizes the context kinds rather than rendering the stored token", async () => {
+    render(<EntityEditForm action={resolvesTo(idle)} fields={contextFields} locale="en" organizations={[]} />);
+    await open("Edit");
+
+    const kind = screen.getByLabelText("Kind");
+    expect(Array.from(kind.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
+      "Work",
+      "Personal",
+      "Custom",
+    ]);
+  });
+});
+
+describe("create-and-select on the company selector", () => {
+  const created: EntityEditState = {
+    status: "success",
+    message: "Empresa criada e vinculada.",
+    createdId: ACME.id,
+  };
+
+  it("appears for a person and a project, as a sibling form rather than a nested one", async () => {
+    // HTML forbids nested forms and browsers recover by dropping the inner one,
+    // which would make this control submit the *edit* action with a stray name
+    // field — an invalid-input refusal for reasons no user could read.
+    const { container } = render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        createOrganizationAction={resolvesTo(idle)}
+        fields={personFields}
+        locale="pt-BR"
+        organizations={[]}
+      />,
+    );
+    await open();
+
+    expect(screen.getByRole("button", { name: "Criar nova empresa" })).toBeVisible();
+    expect(container.querySelectorAll("form form")).toHaveLength(0);
+  });
+
+  it("does not appear at all when the page passes no creating action", async () => {
+    render(<EntityEditForm action={resolvesTo(idle)} fields={personFields} locale="pt-BR" organizations={[]} />);
+    await open();
+    expect(screen.queryByRole("button", { name: "Criar nova empresa" })).toBeNull();
+  });
+
+  it("submits the subject, its id and an empty description the strict schema requires", async () => {
+    // `organizationCreateSchema` is `.strict()` and its `description` is
+    // required-but-nullable, so an absent key would refuse a form that has no
+    // description control for the owner to fix.
+    const createAction = resolvesTo(created);
+    render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        createOrganizationAction={createAction}
+        fields={personFields}
+        locale="pt-BR"
+        organizations={[]}
+      />,
+    );
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+
+    await waitFor(() => expect(createAction).toHaveBeenCalled());
+    const submitted = createAction.mock.calls[0]![1] as FormData;
+    expect(submitted.get("subject")).toBe("person");
+    expect(submitted.get("subjectId")).toBe(PERSON_ID);
+    expect(submitted.get("name")).toBe("Acme");
+    expect(submitted.get("description")).toBe("");
+    expect(submitted.get("locale")).toBe("pt-BR");
+  });
+
+  it("routes a project to its own table rather than to people", async () => {
+    const createAction = resolvesTo(created);
+    render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        createOrganizationAction={createAction}
+        fields={projectFields}
+        locale="pt-BR"
+        organizations={[ACME]}
+      />,
+    );
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Beta");
+    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+
+    await waitFor(() => expect(createAction).toHaveBeenCalled());
+    const submitted = createAction.mock.calls[0]![1] as FormData;
+    expect(submitted.get("subject")).toBe("project");
+    expect(submitted.get("subjectId")).toBe(PROJECT_ID);
+  });
+
+  it("keeps the refused name visible instead of letting React 19 reset it away", async () => {
+    const refused: EntityEditState = {
+      status: "error",
+      message: "Esse nome já existe.",
+      submitted: { name: "Acme" },
+    };
+    render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        createOrganizationAction={resolvesTo(refused)}
+        fields={personFields}
+        locale="pt-BR"
+        organizations={[]}
+      />,
+    );
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Esse nome já existe."));
+    expect(screen.getByLabelText("Nome da nova empresa")).toHaveValue("Acme");
+  });
+
+  it("reports a company created but not linked as its own outcome, not as a flat failure", async () => {
+    // The organization exists either way. Reporting a plain failure would send
+    // the owner to create a duplicate of a row they already own.
+    const partial: EntityEditState = {
+      status: "error",
+      message: "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+      submitted: { name: "Acme" },
+    };
+    render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        createOrganizationAction={resolvesTo(partial)}
+        fields={personFields}
+        locale="pt-BR"
+        organizations={[]}
+      />,
+    );
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+      ),
+    );
+  });
+});

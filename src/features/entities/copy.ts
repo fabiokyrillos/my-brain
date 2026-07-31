@@ -44,6 +44,7 @@ type EntityCopy = {
   readonly created: string;
   readonly createdAndLinked: string;
   readonly organizations: string;
+  readonly organizationsIntro: string;
   readonly organizationsEyebrow: string;
   readonly organizationsEmpty: string;
   readonly organizationsEmptyHint: string;
@@ -51,6 +52,7 @@ type EntityCopy = {
   readonly createOrganization: string;
   readonly organizationNotFound: string;
   readonly contextsTitle: string;
+  readonly contextsIntro: string;
   readonly contextsEyebrow: string;
   readonly contextsListEmpty: string;
   readonly contextsListEmptyHint: string;
@@ -68,6 +70,7 @@ type EntityCopy = {
   readonly addCompanyInline: string;
   readonly newCompanyName: string;
   readonly cancelInline: string;
+  readonly noDescription: string;
 };
 
 const copy = {
@@ -109,6 +112,7 @@ const copy = {
     created: "Criado.",
     createdAndLinked: "Empresa criada e vinculada.",
     organizations: "Empresas",
+    organizationsIntro: "Empresas reconhecidas nas suas entradas ou criadas por você.",
     organizationsEyebrow: "EMPRESA",
     organizationsEmpty: "Nenhuma empresa ainda.",
     organizationsEmptyHint: "Crie a primeira para poder vinculá-la a pessoas e projetos.",
@@ -116,6 +120,7 @@ const copy = {
     createOrganization: "Criar empresa",
     organizationNotFound: "Esta empresa não existe.",
     contextsTitle: "Contextos",
+    contextsIntro: "Âmbitos que separam o que é trabalho do que é pessoal.",
     contextsEyebrow: "CONTEXTO",
     contextsListEmpty: "Nenhum contexto ainda.",
     contextsListEmptyHint: "Crie o primeiro para poder vinculá-lo a pessoas e tarefas.",
@@ -133,6 +138,7 @@ const copy = {
     addCompanyInline: "Criar nova empresa",
     newCompanyName: "Nome da nova empresa",
     cancelInline: "Cancelar",
+    noDescription: "Sem descrição.",
   },
   en: {
     edit: "Edit",
@@ -172,6 +178,7 @@ const copy = {
     created: "Created.",
     createdAndLinked: "Company created and linked.",
     organizations: "Companies",
+    organizationsIntro: "Companies recognized in your entries or created by you.",
     organizationsEyebrow: "COMPANY",
     organizationsEmpty: "No companies yet.",
     organizationsEmptyHint: "Create the first one so you can link it to people and projects.",
@@ -179,6 +186,7 @@ const copy = {
     createOrganization: "Create company",
     organizationNotFound: "This company does not exist.",
     contextsTitle: "Contexts",
+    contextsIntro: "The scopes that keep work apart from personal life.",
     contextsEyebrow: "CONTEXT",
     contextsListEmpty: "No contexts yet.",
     contextsListEmptyHint: "Create the first one so you can link it to people and tasks.",
@@ -196,6 +204,7 @@ const copy = {
     addCompanyInline: "Create a new company",
     newCompanyName: "New company name",
     cancelInline: "Cancel",
+    noDescription: "No description.",
   },
 } satisfies Record<Locale, EntityCopy>;
 
