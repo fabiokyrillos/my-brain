@@ -1,0 +1,317 @@
+/*
+ * Reminders (UX-12).
+ *
+ * The page reuses `.content-page`, `.list-header`, `.list-stack`, `.list-row`,
+ * `.list-meta`, `.status-badge` and `.empty-list` from the shared styles — a
+ * reminder is a list row, and the slice that gave it a lifecycle should not also
+ * give it a private layout. What is here is the part that did not exist before:
+ * the view selector, the schedule/subject lines inside a row, and the lifecycle
+ * controls with their three disclosure panels.
+ *
+ * Two rules shape the whole file:
+ *
+ * 1. **Every interactive target is at least 44 px tall on the narrow layout.**
+ *    The controls sit inside a list row that already carries text, so without a
+ *    floor the buttons collapse to their line height at 375 px.
+ * 2. **The controls wrap rather than scroll.** A row can carry four of them plus
+ *    a select; at 375 px they stack, and nothing is reachable only by dragging.
+ */
+
+.reminder-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.reminder-view {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink-soft);
+  font: 650 13px var(--font-inter, inherit);
+  text-decoration: none;
+}
+
+.reminder-view:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/*
+ * Selection is carried by `aria-current`, not by the class alone: the attribute
+ * is what a screen reader announces, and styling from it keeps the visual state
+ * and the announced state from ever disagreeing.
+ */
+.reminder-view[aria-current="page"] {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+  color: var(--blue);
+}
+
+.reminder-row {
+  align-items: flex-start;
+}
+
+/* A long, unbroken reminder title must wrap rather than widen the page. */
+.reminder-row .list-row-main strong {
+  overflow-wrap: anywhere;
+}
+
+.reminder-schedule,
+.reminder-subject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.reminder-status-hint {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.reminder-overdue {
+  margin-top: 4px;
+  color: var(--signal);
+  font: 650 12.5px var(--font-inter, inherit);
+}
+
+.reminder-subject-link,
+.reminder-history-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.reminder-subject-link:hover,
+.reminder-history-link:hover {
+  text-decoration: underline;
+}
+
+.reminder-subject-kind {
+  font: 700 11px var(--font-jetbrains, inherit);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.reminder-subject-none {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Lifecycle controls                                                        */
+/* ------------------------------------------------------------------------- */
+
+.reminder-actions {
+  margin-top: 12px;
+}
+
+.reminder-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reminder-snooze {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/*
+ * The snooze select's own label. Visible rather than `sr-only`: the control sits
+ * next to a button carrying the same word, and hiding the label would leave a
+ * sighted user with an unlabelled dropdown while a screen-reader user heard one.
+ */
+.reminder-inline-label {
+  font: 700 11px var(--font-jetbrains, inherit);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.reminder-select {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.reminder-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font: 650 13px var(--font-inter, inherit);
+  cursor: pointer;
+}
+
+.reminder-button:hover:not(:disabled) {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.reminder-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.reminder-button.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: var(--white);
+}
+
+.reminder-button.primary:hover:not(:disabled) {
+  color: var(--white);
+  filter: brightness(1.06);
+}
+
+/*
+ * Cancel is styled apart from the other three because it is the only one that
+ * ends a pending delivery — the same reason it is the only one behind a
+ * confirmation step.
+ */
+.reminder-button.danger {
+  border-color: #e5b4b4;
+  color: #a3282f;
+}
+
+.reminder-button.danger:hover:not(:disabled) {
+  border-color: #a3282f;
+  color: #a3282f;
+}
+
+.reminder-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--mist);
+}
+
+.reminder-panel.danger {
+  border-color: #e5b4b4;
+  background: #fdf5f5;
+}
+
+.reminder-panel label {
+  display: grid;
+  gap: 6px;
+  font: 700 11px var(--font-jetbrains, inherit);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.reminder-panel input[type="text"],
+.reminder-panel input[type="datetime-local"] {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font: 400 14px var(--font-inter, inherit);
+}
+
+.reminder-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  font: 400 13px var(--font-inter, inherit);
+  color: var(--ink);
+}
+
+.reminder-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+/* Current vs proposed, stated together — the distinction UX-12 asks for. */
+.reminder-panel-current {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.reminder-panel-title {
+  font: 700 14px var(--font-inter, inherit);
+  color: var(--ink);
+}
+
+.reminder-panel-body {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.reminder-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reminder-feedback {
+  margin-top: 10px;
+  font: 650 13px var(--font-inter, inherit);
+}
+
+.reminder-feedback.success {
+  color: #1f7a4d;
+}
+
+.reminder-feedback.error {
+  color: #a3282f;
+}
+
+/*
+ * The narrow layout. Below 480 px the action row's buttons take the full width
+ * so the labels never truncate, and the snooze select and its button share a
+ * line rather than each taking one.
+ */
+@media (max-width: 480px) {
+  .reminder-action-row > form,
+  .reminder-action-row > button {
+    flex: 1 1 100%;
+  }
+
+  .reminder-snooze {
+    width: 100%;
+  }
+
+  .reminder-snooze .reminder-select {
+    flex: 1 1 auto;
+  }
+
+  .reminder-panel-actions > .reminder-button {
+    flex: 1 1 100%;
+  }
+}
