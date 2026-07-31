@@ -84,7 +84,7 @@ export default async function EntryDetailPage({
   const nextActions = editableCurrent ? (
     <>
       {editableCurrent.isRecordOnly ? (
-        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale).recordOnly}</p></div>
+        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale, agentName).recordOnly}</p></div>
       ) : canConfirmCandidates || taskInitialState ? (
         <TaskCandidateForm
           action={resolveEntryTaskCandidates}
@@ -102,7 +102,7 @@ export default async function EntryDetailPage({
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
       )}
       {canCorrect && (
-        <InterpretationRevisionEditor
+        <InterpretationRevisionEditor agentName={agentName}
           canUndo={canUndoCorrection}
           correctionAction={correctInterpretation}
           current={{
@@ -132,7 +132,7 @@ export default async function EntryDetailPage({
       <AlertTriangle size={24} />
       <h2>{pt ? "Ainda não há interpretação" : "There is no interpretation yet"}</h2>
       <p>{pt ? "O registro original permanece disponível. Você pode tentar novamente." : "The original record remains available. You can try again."}</p>
-      {!canRetry && <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
+      {!canRetry && <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
     </div>
   );
 
@@ -147,7 +147,7 @@ export default async function EntryDetailPage({
         originalDefaultOpen={!editableCurrent}
         slots={{
           attentionAction: canRetry
-            ? <EntryReprocessButton action={reprocessEntry} entryId={entryId} locale={locale} operationKey={randomUUID()} />
+            ? <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />
             : undefined,
           attentionDetail,
           nextActions,

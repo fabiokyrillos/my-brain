@@ -46,14 +46,16 @@ export function EntryReprocessButton({
   action,
   entryId,
   locale,
+  agentName,
   operationKey,
 }: {
   action: ReprocessAction;
   entryId: string;
   locale: InterpretationLocale;
+  agentName: string;
   operationKey: string;
 }) {
-  const labels = getInterpretationCopy(locale);
+  const labels = getInterpretationCopy(locale, agentName);
   const [state, formAction, pending] = useActionState(action, idleState);
   return (
     <form action={formAction} className="entry-reprocess-form">
@@ -73,6 +75,7 @@ function SecondaryActions({
   canUndo,
   entryId,
   locale,
+  agentName,
   reprocessAction,
   reprocessOperationKey,
   undoId,
@@ -81,12 +84,13 @@ function SecondaryActions({
   canUndo: boolean;
   entryId: string;
   locale: InterpretationLocale;
+  agentName: string;
   reprocessAction: ReprocessAction;
   reprocessOperationKey: string;
   undoId: string;
   undoAction: UndoCorrectionAction;
 }) {
-  const labels = getInterpretationCopy(locale);
+  const labels = getInterpretationCopy(locale, agentName);
   const [undoState, undoFormAction, undoPending] = useActionState(undoAction, idleState);
   const [reprocessState, reprocessFormAction, reprocessPending] = useActionState(reprocessAction, idleState);
 
@@ -125,6 +129,7 @@ export function InterpretationRevisionEditor({
   entityOptions,
   entryId,
   locale,
+  agentName,
   operationKey: suppliedOperationKey,
   reprocessAction,
   reprocessOperationKey: suppliedReprocessOperationKey,
@@ -138,6 +143,7 @@ export function InterpretationRevisionEditor({
   entityOptions: EntityOption[];
   entryId: string;
   locale: InterpretationLocale;
+  agentName: string;
   operationKey?: string;
   reprocessAction: ReprocessAction;
   reprocessOperationKey?: string;
@@ -145,7 +151,7 @@ export function InterpretationRevisionEditor({
   undoId?: string;
   undoAction: UndoCorrectionAction;
 }) {
-  const labels = getInterpretationCopy(locale);
+  const labels = getInterpretationCopy(locale, agentName);
   const [editing, setEditing] = useState(false);
   const [operationKey, setOperationKey] = useState(suppliedOperationKey ?? entryId);
   const [dates, setDates] = useState(() => current.extractedDates.map((date, index) => ({ ...date, key: `${index}-${date.value}` })));
@@ -167,6 +173,7 @@ export function InterpretationRevisionEditor({
             canUndo={canUndo}
             entryId={entryId}
             locale={locale}
+            agentName={agentName}
             reprocessAction={reprocessAction}
             reprocessOperationKey={suppliedReprocessOperationKey ?? entryId}
             undoId={undoId ?? entryId}

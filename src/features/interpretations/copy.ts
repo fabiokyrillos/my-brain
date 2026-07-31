@@ -1,4 +1,5 @@
 export type InterpretationLocale = "pt-BR" | "en";
+import { withAgentName } from "@/lib/agent-name";
 
 export const conceptOptions = [
   "raw_record",
@@ -24,7 +25,7 @@ export const conceptOptions = [
 
 const copy = {
   "pt-BR": {
-    correct: "Corrigir interpretação",
+    correct: "Ajustar o que o {agent} entendeu",
     cancel: "Cancelar correção",
     save: "Salvar nova versão",
     saving: "Salvando…",
@@ -48,7 +49,7 @@ const copy = {
     noEntities: "Nenhum vínculo disponível.",
   },
   en: {
-    correct: "Correct interpretation",
+    correct: "Adjust what {agent} understood",
     cancel: "Cancel correction",
     save: "Save new version",
     saving: "Saving…",
@@ -95,8 +96,12 @@ export const conceptLabels: Record<(typeof conceptOptions)[number], { "pt-BR": s
   waiting_for_third_party: { "pt-BR": "Aguardando terceiro", en: "Waiting on someone" },
 };
 
-export function getInterpretationCopy(locale: InterpretationLocale) {
-  return copy[locale];
+/**
+ * @param agentName the assistant’s configured name (UX-06). Required, so the
+ * compiler finds every surface that would otherwise render a hardcoded one.
+ */
+export function getInterpretationCopy(locale: InterpretationLocale, agentName: string) {
+  return withAgentName(copy[locale], agentName);
 }
 
 export const lifecycleLabels = {
