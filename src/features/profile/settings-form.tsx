@@ -52,14 +52,27 @@ function ModelSelect({
   pt: boolean;
   onChange: (route: TextRouteKey, model: TextModelId) => void;
 }) {
-  return <label className="ai-route" htmlFor={id}>
-    <span className="ai-route-copy"><strong>{label}</strong><small>{description}</small></span>
+  /**
+   * The row is a `<div>` with a `<label>` inside it, not a `<label>` wrapping
+   * everything.
+   *
+   * Wrapping put the route's description inside the control's accessible name;
+   * the `aria-label` here hid that, at the cost of the description never being
+   * announced at all. Split, the label names the select and `aria-describedby`
+   * carries the description — the same correction the assistant-name and
+   * timezone fields take, for the same reason.
+   */
+  return <div className="ai-route">
+    <span className="ai-route-copy">
+      <label htmlFor={id}>{label}</label>
+      <small id={`${id}-description`}>{description}</small>
+    </span>
     <span className="ai-route-control">
-      <select id={id} name={name} aria-label={label} value={value} onChange={(event) => onChange(name, event.target.value as TextModelId)}>
+      <select aria-describedby={`${id}-description`} id={id} name={name} value={value} onChange={(event) => onChange(name, event.target.value as TextModelId)}>
         {TEXT_MODEL_IDS.map((model) => <option key={model} value={model}>{TEXT_MODEL_LABELS[model]} · {modelPrice(model, pt)}</option>)}
       </select>
     </span>
-  </label>;
+  </div>;
 }
 
 export function SettingsForm({
@@ -128,7 +141,15 @@ export function SettingsForm({
     <input type="hidden" name="locale" value={locale} />
 
     <Section number="01" title={pt ? "Fuso horário" : "Time zone"} description={pt ? "Datas, prazos, revisões manuais e períodos silenciosos usam esta escolha." : "Dates, deadlines, manual reviews, and quiet periods use this setting."} />
-    <div className="settings-fields"><label htmlFor="timezone">{pt ? "Fuso horário" : "Time zone"}<select id="timezone" name="timezone" aria-label={pt ? "Fuso horário" : "Time zone"} defaultValue={values.timezone}>{zones.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><small>{pt ? "Também interpreta expressões como “amanhã”." : "It also resolves phrases such as tomorrow."}</small></label></div>
+    {/*
+      Hints sit **outside** the label and are linked by `aria-describedby`, the
+      pattern `entity-edit-form.tsx` records: a `<small>` nested inside a label
+      joins the control's accessible *name*, because the label's whole subtree is
+      the name. The timezone select had an `aria-label` that hid the symptom and
+      cost the hint instead — it was announced to nobody. Now the name is the
+      label and the hint is the description, which is what each is for.
+    */}
+    <div className="settings-fields"><div className="settings-field"><label htmlFor="timezone">{pt ? "Fuso horário" : "Time zone"}<select id="timezone" name="timezone" aria-describedby="timezone-hint" defaultValue={values.timezone}>{zones.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><small id="timezone-hint">{pt ? "Também interpreta expressões como “amanhã”." : "It also resolves phrases such as tomorrow."}</small></div></div>
 
     <Section number="02" title={pt ? `Como ${values.agentName} responde` : `How ${values.agentName} responds`} description={pt ? "Estas escolhas afetam chat e revisões geradas sob demanda." : "These settings affect chat and reviews generated on demand."} />
     {/*
@@ -138,7 +159,7 @@ export function SettingsForm({
       re-sent unchanged on every save. `maxLength` mirrors the column's own
       1–60 check, and the input is `required` because the column is `not null`.
     */}
-    <div className="settings-fields"><label htmlFor="agent-name">{pt ? "Nome do assistente" : "Assistant name"}<input id="agent-name" name="agentName" type="text" required minLength={1} maxLength={60} autoComplete="off" defaultValue={values.agentName} /><small>{pt ? "Como o assistente se chama nas telas e nas respostas. O produto continua sendo My Brain." : "What the assistant is called on screen and in its answers. The product is still My Brain."}</small></label></div>
+    <div className="settings-fields"><div className="settings-field"><label htmlFor="agent-name">{pt ? "Nome do assistente" : "Assistant name"}<input id="agent-name" name="agentName" type="text" required minLength={1} maxLength={60} autoComplete="off" aria-describedby="agent-name-hint" defaultValue={values.agentName} /></label><small id="agent-name-hint">{pt ? "Como o assistente se chama nas telas e nas respostas. O produto continua sendo My Brain." : "What the assistant is called on screen and in its answers. The product is still My Brain."}</small></div></div>
     <div className="settings-fields"><label htmlFor="personality">{pt ? "Personalidade" : "Personality"}<select id="personality" name="personality" defaultValue={values.personality}><option value="proactive">{pt ? "Proativa" : "Proactive"}</option><option value="direct">{pt ? "Direta" : "Direct"}</option><option value="warm">{pt ? "Acolhedora" : "Warm"}</option><option value="analytical">{pt ? "Analítica" : "Analytical"}</option></select></label><label htmlFor="tone">{pt ? "Tom" : "Tone"}<select id="tone" name="tone" defaultValue={values.tone}><option value="direct">{pt ? "Direto" : "Direct"}</option><option value="informal">Informal</option><option value="natural">Natural</option><option value="professional">{pt ? "Profissional" : "Professional"}</option></select></label><label htmlFor="response-detail">{pt ? "Detalhe das respostas" : "Response detail"}<select id="response-detail" name="responseDetail" defaultValue={values.responseDetail}><option value="short">{pt ? "Curto" : "Short"}</option><option value="balanced">{pt ? "Equilibrado" : "Balanced"}</option><option value="detailed">{pt ? "Detalhado" : "Detailed"}</option></select></label></div>
 
     <Section number="03" title={pt ? "Silêncio e frequência" : "Quiet hours and frequency"} description={pt ? "Limites aplicados pelo processamento de lembretes e acompanhamentos." : "Limits enforced by reminder and follow-up processing."} />

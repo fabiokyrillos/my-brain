@@ -208,4 +208,47 @@ describe("EntityEditForm", () => {
     const options = [...screen.getByLabelText("Status").querySelectorAll("option")].map((option) => option.textContent);
     expect(options).toEqual(["Active", "Paused", "Completed", "Archived"]);
   });
+
+  /**
+   * G3 recorded a latent accessible-name defect here: React renders a
+   * `<textarea>`'s value as a child text node, so a wrapping `<label>` was said
+   * to make the stored text part of the field's *name*.
+   *
+   * Slice H measured it instead of inheriting it, in three accessible-name
+   * implementations — Chromium's own AX tree over CDP, Playwright's
+   * `toHaveAccessibleName`, and the `dom-accessibility-api` these tests use —
+   * and this shape computes correctly in all three. The label associates by
+   * `for`/`id` **and** wraps the control, which is the case the algorithm is
+   * explicit about: the element being named does not contribute its own value.
+   *
+   * What does pollute the name is a label wrapping a control *plus other
+   * content*, or wrapping two controls. Those are asserted in
+   * `settings-form.test.tsx`, where a real instance was found. This one stays as
+   * a regression guard so the shape cannot drift into one of those.
+   *
+   * `getByLabelText` cannot stand in for this: it matches the `for`/`id`
+   * association, which was correct throughout. Only the computed name shows it.
+   */
+  it("names the description textarea after its label, not after the text inside it", async () => {
+    render(<EntityEditForm action={resolvesTo(idle)} fields={projectFields} locale="pt-BR" organizations={[ACME]} />);
+    await open();
+
+    const description = screen.getByRole("textbox", { name: "Descrição" });
+    expect(description).toHaveValue("Migração do faturamento");
+  });
+
+  it("names the notes textarea after its label once the person has notes", async () => {
+    render(
+      <EntityEditForm
+        action={resolvesTo(idle)}
+        fields={{ ...personFields, notes: "Prefere áudio a texto" }}
+        locale="en"
+        organizations={[]}
+      />,
+    );
+    await open("Edit");
+
+    const notes = screen.getByRole("textbox", { name: "Notes" });
+    expect(notes).toHaveValue("Prefere áudio a texto");
+  });
 });
