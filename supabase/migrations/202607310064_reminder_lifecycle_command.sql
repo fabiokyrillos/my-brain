@@ -101,6 +101,11 @@
 --   * `coalesce` / `nullif` / `greatest` / `least` are grammar special forms with
 --     no `pg_proc` entry: they are written **unqualified**, and `pg_catalog.` in
 --     front of one raises `42883` under an empty search_path.
+--   * `POSITION(x IN y)` belongs to that same family and is the member this file
+--     added to the list, having shipped the mistake once: qualifying it makes the
+--     parser read an ordinary call whose argument list is `'x' in y`, and the
+--     `42601` it raises names the *variable*, not the construct. Use
+--     `pg_catalog.strpos(y, x)`, which is a real function.
 --   * a bare `case … then … end` may not appear in an `if` condition (`42601`);
 --     parenthesize or hoist.
 --   * staleness raises **`55P03`, never `40001`** — 2C-UNDO-004 / migration 050:
@@ -870,17 +875,29 @@ begin
   end if;
 
   bundle := private.undo_operation_definition_bundle();
+  --
+  -- `pg_catalog.strpos(haystack, needle)`, **not** `position(needle in haystack)`.
+  --
+  -- `POSITION(x IN y)` is a grammar special form, exactly like COALESCE, NULLIF,
+  -- GREATEST and LEAST — the ones the header of this file warns about. Writing
+  -- it as `pg_catalog.position('40001' in bundle)` makes the parser read an
+  -- ordinary function call, where `'40001' in bundle` is not valid argument
+  -- syntax, and the migration fails to apply with `42601` at the *variable* name
+  -- rather than at the construct. This file shipped that once and CI caught it
+  -- before any deploy. `strpos` is a plain function with a `pg_proc` entry, so
+  -- it qualifies cleanly and says the same thing.
+  --
   -- 2C-UNDO-004: `40001` makes the gateway hang; staleness is `55P03`.
-  if pg_catalog.position('40001' in bundle) > 0 then
+  if pg_catalog.strpos(bundle, '40001') > 0 then
     raise exception 'the undo bundle reintroduced serialization_failure (40001)';
   end if;
   -- The `greatest`/`least`/`coalesce`/`nullif` special forms cannot resolve
   -- qualified under an empty search_path (shipped three times: 202607220042,
   -- 202607220044, 202607220045).
-  if pg_catalog.position('pg_catalog.greatest(' in bundle) > 0
-    or pg_catalog.position('pg_catalog.least(' in bundle) > 0
-    or pg_catalog.position('pg_catalog.coalesce(' in bundle) > 0
-    or pg_catalog.position('pg_catalog.nullif(' in bundle) > 0
+  if pg_catalog.strpos(bundle, 'pg_catalog.greatest(') > 0
+    or pg_catalog.strpos(bundle, 'pg_catalog.least(') > 0
+    or pg_catalog.strpos(bundle, 'pg_catalog.coalesce(') > 0
+    or pg_catalog.strpos(bundle, 'pg_catalog.nullif(') > 0
   then
     raise exception 'the undo bundle qualifies a SQL special form';
   end if;
