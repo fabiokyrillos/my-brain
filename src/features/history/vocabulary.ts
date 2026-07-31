@@ -45,6 +45,11 @@ export const HISTORY_ENTITY_TYPES = [
   // (`202607160003:132`), so nothing in the database gated this — the surface
   // would simply have rendered the fallback until it was listed here.
   "reminder",
+  // EGC.1. `entities/actions.ts` is the first writer to record either, and both
+  // are TypeScript writers — the migration scan in `vocabulary.test.ts` cannot
+  // see them, so the test names them explicitly beside the other TS-only ones.
+  "organization",
+  "context",
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -59,6 +64,8 @@ export const HISTORY_ACTION_TYPES = [
   "archive_memory",
   "chat_answered",
   "confirm_entry_task_candidates_v5",
+  "create_context",
+  "create_organization",
   "confirm_entry_task_candidates_v6",
   "create_memory",
   "entry_interpretation_corrected",
@@ -90,7 +97,9 @@ export const HISTORY_ACTION_TYPES = [
   "task_created",
   "task_updated",
   "tasks_confirmed",
+  "update_context",
   "update_memory",
+  "update_organization",
   "update_person",
   "update_project",
 ] as const;
@@ -120,7 +129,9 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   chat_answered: "answered",
   confirm_entry_task_candidates_v5: "created",
   confirm_entry_task_candidates_v6: "created",
+  create_context: "created",
   create_memory: "created",
+  create_organization: "created",
   entry_interpretation_corrected: "changed",
   entry_interpretation_correction_undone: "undone",
   entry_interpretation_failed: "failed",
@@ -149,7 +160,9 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   task_created: "created",
   task_updated: "changed",
   tasks_confirmed: "created",
+  update_context: "changed",
   update_memory: "changed",
+  update_organization: "changed",
   update_person: "changed",
   update_project: "changed",
 };

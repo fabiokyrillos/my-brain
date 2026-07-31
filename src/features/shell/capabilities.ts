@@ -79,6 +79,12 @@ export const navigationCapabilities = [
   { key: "chat", route: "chat", group: "primary", visibility: "primary", nested: true, aliases: [] },
   { key: "projects", route: "projects", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "people", route: "people", group: "context", visibility: "more", nested: true, aliases: [] },
+  // EGC.1. Both tables predate every route in this list; what they never had was
+  // a place. `nested: true` because each owns a detail page, so
+  // `/app/organizations/<id>` has to keep the parent destination active rather
+  // than clearing the highlight mid-navigation.
+  { key: "organizations", route: "organizations", group: "context", visibility: "more", nested: true, aliases: [] },
+  { key: "contexts", route: "contexts", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "memories", route: "memories", group: "context", visibility: "more", nested: false, aliases: [] },
   { key: "files", route: "files", group: "context", visibility: "more", nested: false, aliases: [] },
   { key: "reviews", route: "reviews", group: "reflection", visibility: "more", nested: false, aliases: [] },

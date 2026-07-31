@@ -76,6 +76,8 @@ describe("AppShell", () => {
     ).toEqual([
       "/pt-BR/app/projects",
       "/pt-BR/app/people",
+      "/pt-BR/app/organizations",
+      "/pt-BR/app/contexts",
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
       "/pt-BR/app/reviews",
@@ -133,6 +135,8 @@ describe("AppShell", () => {
       "/pt-BR/app/chat",
       "/pt-BR/app/projects",
       "/pt-BR/app/people",
+      "/pt-BR/app/organizations",
+      "/pt-BR/app/contexts",
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
       "/pt-BR/app/reviews",

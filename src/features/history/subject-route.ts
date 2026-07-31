@@ -52,6 +52,11 @@ export const HISTORY_SUBJECT_ROUTES = {
   // the fragment is a real destination and not a hopeful guess. It is linked
   // rather than left null because the destination genuinely shows the subject.
   reminder: (locale, id) => `/${locale}/app/reminders#reminder-${id}`,
+  // EGC.1. Both became linkable in the same change that gave them detail
+  // routes, which is the ordering this map is meant to enforce: an entity type
+  // is linked because its page exists, never because a link would look tidier.
+  organization: (locale, id) => `/${locale}/app/organizations/${id}`,
+  context: (locale, id) => `/${locale}/app/contexts/${id}`,
   entry_interpretation: null,
   entry_task_candidate_resolution: null,
   pending_question: null,

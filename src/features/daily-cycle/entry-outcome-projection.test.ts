@@ -11,6 +11,7 @@ const MEMORY = "33333333-3333-4333-8333-333333333333";
 const PERSON = "44444444-4444-4444-8444-444444444444";
 const PROJECT = "55555555-5555-4555-8555-555555555555";
 const CONTEXT = "66666666-6666-4666-8666-666666666666";
+const ORGANIZATION = "77777777-7777-4777-8777-777777777777";
 
 function build(overrides: Partial<EntryOutcomeProjectionInput> = {}): EntryOutcomeProjectionInput {
   return {
@@ -84,6 +85,14 @@ describe("what now exists because of an entry", () => {
       expect(memories!.items[0]!.href).toBe(`/pt-BR/app/memories/${MEMORY}`);
     });
 
+    /**
+     * **Amended by EGC.1.** This used to assert that a context rendered as plain
+     * text because it had no route, which was true and is no longer: EGC.1 gave
+     * organizations and contexts detail pages, so the honest answer moved with
+     * the fact. What the test is *for* has not moved — an `entity_type` with no
+     * route must still degrade rather than have a URL guessed for it — so the
+     * unrouted case is now carried by a type no route exists for at all.
+     */
     it("links only the entity types that have a route, and never invents one", () => {
       const view = toEntryOutcomeView(
         build({
@@ -91,6 +100,8 @@ describe("what now exists because of an entry", () => {
             { entity_id: PERSON, entity_type: "person", mention: "Marina", name: "Marina" },
             { entity_id: PROJECT, entity_type: "project", mention: "Atlas", name: "Atlas" },
             { entity_id: CONTEXT, entity_type: "context", mention: "trabalho", name: "Trabalho" },
+            { entity_id: ORGANIZATION, entity_type: "organization", mention: "Acme", name: "Acme" },
+            { entity_id: PERSON, entity_type: "widget", mention: "algo", name: "Algo" },
           ],
         }),
       );
@@ -98,6 +109,8 @@ describe("what now exists because of an entry", () => {
       expect(view.groups[0]!.items.map((item) => item.href)).toEqual([
         `/pt-BR/app/people/${PERSON}`,
         `/pt-BR/app/projects/${PROJECT}`,
+        `/pt-BR/app/contexts/${CONTEXT}`,
+        `/pt-BR/app/organizations/${ORGANIZATION}`,
         null,
       ]);
     });

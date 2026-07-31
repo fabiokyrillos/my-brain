@@ -22,6 +22,17 @@ const messages = {
       waiting: "Aguardando",
       projects: "Projetos",
       people: "Pessoas",
+      /*
+       * `Empresas`, not `Organizações` (EGC.1).
+       *
+       * The table is `organizations` and the route key follows it, but the
+       * product has called the relation "Empresa" everywhere it was already
+       * visible — the Company selector on Person and Project, and both detail
+       * heroes. A destination named after the column while every control
+       * naming the same thing says `Empresa` would be two words for one idea.
+       */
+      organizations: "Empresas",
+      contexts: "Contextos",
       reminders: "Lembretes",
       questions: "Perguntas pendentes",
       /*
@@ -69,6 +80,8 @@ const messages = {
       waiting: "Waiting",
       projects: "Projects",
       people: "People",
+      organizations: "Companies",
+      contexts: "Contexts",
       reminders: "Reminders",
       questions: "Pending questions",
       chat: "Talk",
