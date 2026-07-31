@@ -25,6 +25,12 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 **History gained a reminder vocabulary.** Six `action_type` members, the `reminder` entity type, a subject route to the list plus a `#reminder-<uuid>` anchor the list now stamps, `remind_at` as a described change field, and a reminder status map — so the new rows read as sentences instead of falling through to the safe fallback.
 
+**Deployed 2026-07-31; remote parity `202607300063` → `202607310064`.** Exactly one migration proposed, no drift, no repair. The deploy was gated on the PR's `database` job because Docker is unavailable on this workstation — CI's `supabase db reset` from an empty database was this SQL's first execution anywhere, and it caught two defects before production saw either: `POSITION(x IN y)` is a grammar special form that cannot be schema-qualified, and the 2C-UNDO-004 guard must grep the *raise clause* rather than the bare code, since the router's own body discusses the code it stopped raising.
+
+**The live authenticated journey is 24/24** against the linked project — 12 cases on desktop and Pixel 7, pt-BR and English — and it found three defects no unit test could: a `"use server"` module exporting a non-function, a function passed across the server/client boundary, and `formatInstantForDateTimeLocal` throwing for any instant whose seconds are not literally `:00`. Each now carries a guard, one of them repository-wide. A fourth issue was design: `cancel` and `restore` unmount the row in the same commit that would have delivered their outcome, so the action state moved above the list and the page carries one live region instead of one per row.
+
+**UX-12 is RESOLVED, DEC-6 and DEC-7 are COMPLETE.** Zero fixture residue verified after the run; zero `snoozed` rows before and after; `authenticated`'s UPDATE and DELETE on `public.reminders` refused live with the owner's own session token, after that same session provably read the row.
+
 ## 2026-07-30 — Phase 2F — One Write Path is COMPLETE
 
 Slice 2F.6 merged as **PR #33 → `7e3e5f0`**; **merge-SHA CI run `30520514810` green on all three jobs on the first attempt**. No migration, so nothing was deployed and remote parity stays **`202607300063`** — verified before and after. `main` is clean and synchronized with `origin`.

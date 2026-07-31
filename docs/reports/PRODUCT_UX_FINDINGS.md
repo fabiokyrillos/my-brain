@@ -2276,10 +2276,18 @@ grant constraint.
   `public.reminders`, by a deliberate Phase 2F determination that the parity-head migration
   asserts at deploy time.
 
-> **DEC-6 — DECIDED 2026-07-31: option (a).** A new `SECURITY DEFINER` RPC for owner-initiated
-> transitions, keeping `authenticated`'s grant posture intact. No re-grant, no physical
-> deletion, and the boundary must state in SQL which transitions belong to it and which stay
-> with `apply_task_command`. Recorded as **ADR-060**; implemented in Slice G5.
+> **DEC-6 — DECIDED 2026-07-31: option (a), and COMPLETE.** A new `SECURITY DEFINER` RPC for
+> owner-initiated transitions, keeping `authenticated`'s grant posture intact. No re-grant, no
+> physical deletion, and the boundary states in SQL which transitions belong to it and which
+> stay with `apply_task_command`. Recorded as **ADR-060**; shipped and deployed in Slice G5
+> (migration `202607310064`).
+>
+> **DEC-7 — DECIDED 2026-07-31: option (a), and COMPLETE.** Surfaced by DEC-6's own required
+> investigation, which stopped the slice before any code was written: `reminders.status =
+> 'snoozed'` is dormant with no reactivation path, and the two halves of the Phase 2E/2F
+> contract disagree about whether it is live. Owner-visible snooze is therefore a **movement of
+> `remind_at` with the row left `scheduled`**; the literal is never written and
+> `2F-REMINDER-004` stays deferred. Recorded as **ADR-061**.
 
 ---
 
@@ -2745,3 +2753,88 @@ remaining inline locale ternaries, UX-27's PARTIAL duplicate task audit events, 
 entity-edit-form textarea accessible-name defect recorded during G3, and the native date-input
 locale placeholder limitation. All carried into Slice H, along with the Windows CRLF test
 fragility as a separate repository-hygiene item.
+
+## Slice G5 — deployment and live evidence (2026-07-31)
+
+**Migration `202607310064` is deployed.** Remote parity moved `202607300063` → `202607310064`,
+confirmed with `npx supabase migration list --linked` before and after; exactly one migration
+was proposed, and no drift or repair was reported. The deploy was deliberately gated on the
+PR's `database` job — Docker is unavailable on this workstation, so CI's `supabase db reset`
+over the whole chain from an empty database was this SQL's first execution anywhere, and it
+caught two defects before production saw either.
+
+### Post-deployment verification
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | Remote parity | `202607310064` exactly |
+| 2 | `authenticated` UPDATE/DELETE on `public.reminders` | still revoked — the migration's own post-deploy block re-asserted it fail-closed against the production catalog, so a successful apply *is* the proof; `anon` PATCH refused `401` |
+| 3 | RPC exists with the expected signature | published with exactly `p_reminder_id, p_command, p_expected_state, p_operation_key`; `undo_apply_reminder_command_v1` absent from REST, as a `private` function must be |
+| 4 | Definer, owner, fixed `search_path`, execute grants | post-deploy assertion 6 passed against production |
+| 5 | `status = 'snoozed'` | **0 rows**, and 0 non-null `snoozed_until` |
+| 6 | Existing reminders unmodified | 1 reminder in the project, `updated_at` `2026-07-17T10:00:00Z` — months before this deploy |
+| 7 | Unexpected audit or fixture rows | 0 reminder audit rows, 0 `apply_reminder_command_v1` undo rows, 0 `codex-` accounts |
+
+### The live authenticated journey
+
+`e2e/online-reminders.spec.ts`, **12 cases × 2 projects = 24/24 green** against the linked
+project, on desktop (Chrome) and Pixel 7, in pt-BR and English. Covered: snooze; reschedule;
+cancel with confirmation, including dismissing the confirmation and leaving the row scheduled;
+restore from cancelled; the refusal to restore, snooze or reschedule a delivered reminder;
+independent-reminder edit; task-linked edit refusal, at both the surface and the contract; stale
+pre-state refusal; idempotent replay; reused key with a different payload; foreign and missing
+reminder isolation; the audit row read back through the History surface as a localized sentence;
+keyboard-only operation; the live region; and 375 px / 412 px without horizontal scroll.
+
+**DEC-7 confirmed live:** the owner-visible snooze moved `remind_at` to roughly `now() + 60min`
+and left `status = 'scheduled'`. Zero `snoozed` rows existed before the journey and zero after.
+
+**The revocation confirmed live:** a direct PostgREST `PATCH` and `DELETE` against
+`public.reminders`, carrying the owner's own session token, were both refused — after the same
+session provably *read* the row, so the refusal is the missing grant and not a missing row.
+
+**Zero fixture residue**, verified after the run against the deployed project: 2 disposable
+accounts created and both deleted (teardown is fail-closed and asserts its own success), 0
+`codex-` accounts remaining, total auth users unchanged at 3, reminders back to the single
+pre-existing row with its `updated_at` untouched, and 0 reminder audit rows.
+
+### Three defects the live journey found that no unit test could
+
+Recorded because the pattern generalises, not as incidental history. Each is now guarded.
+
+1. **A `"use server"` module may export only async functions.** `actions.ts` exported the idle
+   form state beside the Server Action. It compiles, typechecks, and passes every unit test,
+   then throws at request time — so the page renders its error boundary and the failure reads
+   as a data problem. A repository-wide test now asserts the rule for every `"use server"`
+   module; it passes everywhere else, so this was the only violation.
+2. **A function cannot cross the server/client boundary.** The Server Component list passed its
+   date formatter to the Client Component controls. jsdom renders both as ordinary components
+   with no boundary between them, so all 21 component tests passed. A test now reads the client
+   component's own prop type and fails if it declares a function.
+3. **`formatInstantForDateTimeLocal` throws for almost every real reminder** — its parser
+   accepts only instants whose seconds are literally `:00` with no fractional part, while every
+   instant this surface reads carries whatever `now()` had. Opening the reschedule panel on a
+   just-snoozed reminder threw inside render. The value is now built server-side from `Intl`
+   parts; the component fixture uses an instant that is not on a whole minute.
+
+A fourth issue was design, not a defect: `cancel` and `restore` move a reminder out of the
+current view, so `revalidatePath` unmounted the row in the same commit that would have delivered
+its outcome — the success sentence never rendered and the live region was destroyed before
+announcing. The action state now lives above the list, with one live region on the page.
+
+---
+
+## Dispositions closed by Slice G5
+
+- **DEC-6 — COMPLETE.** Option (a): a narrow `SECURITY DEFINER` boundary, `authenticated`'s
+  grant posture byte-identical before and after, re-asserted by the migration itself. **ADR-060.**
+- **DEC-7 — COMPLETE.** Option (a): owner-visible snooze is a movement of `remind_at` with the
+  row left `scheduled`; the dormant `snoozed` literal is never written, `2F-REMINDER-004` stays
+  deferred, and the closeout census still measures zero. **ADR-061.**
+- **UX-12 — RESOLVED.** The entire authorized lifecycle — snooze, reschedule, cancel with
+  explicit confirmation, restore, and edit for independent reminders — is reachable from the
+  product and verified live against the deployed project on desktop and mobile in both locales.
+  Physical deletion is not exposed and no `delete` against `public.reminders` exists anywhere in
+  the repository. The two read-only halves G2 deliberately withheld — the linked task/record
+  link, and a localized status instead of the raw enum — ship here with the lifecycle they were
+  waiting for.
