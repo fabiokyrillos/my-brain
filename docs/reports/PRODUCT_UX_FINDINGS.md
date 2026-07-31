@@ -140,15 +140,16 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-32 | A hint nested in a `<label>` becomes part of the field's accessible name | accessibility | P1 | yes | **RESOLVED** (Slice H — three sites in Settings) |
 | UX-33 | `<input type="date">` renders its placeholder in the browser's locale | localization | P2 | yes | **RETAINED** (with evidence — user-agent behaviour) |
 | UX-34 | The notifications bell never marks itself as the current page | accessibility | P1 | yes | **RESOLVED** (Slice H — found by the route sweep) |
+| UX-35 | The composer's memory journey had been red since G3, and nobody ran it | usability | P1 | yes | **RESOLVED** (Slice H — spec repaired, dead copy deleted) |
 
 Owner findings map to IDs 1:1 in order: owner 1→UX-01 … owner 14→UX-14.
 UX-15…UX-23 were discovered during this audit. UX-24 is an owner-listed concern
 that measured clean and is recorded so it is not "fixed" without cause.
-UX-25…UX-31 were raised by the slices that found them. UX-32, UX-33 and UX-34
-were raised by Slice H's re-audit: see *Slice H* for how each was measured.
+UX-25…UX-31 were raised by the slices that found them. UX-32 through UX-35 were
+raised by Slice H's re-audit: see *Slice H* for how each was measured.
 
 **Every detail record below states the disposition the finding was opened with.**
-Slice H reconciled all 34 against repository truth; where a detail record still
+Slice H reconciled all 35 against repository truth; where a detail record still
 reads `OPEN`, a **Reconciled in H** line beneath it carries the current
 disposition and the slice that closed it. The table above is the current state.
 
@@ -3169,6 +3170,72 @@ This is the finding that most justifies the sweep existing. Fourteen slices of
 manual review, four viewports and two locales never noticed it; an assertion run
 168 times found it on the first pass.
 
+## UX-35 — an authenticated journey had been red since G3, and nobody ran it
+
+**New in H, and the most uncomfortable finding in the closeout.**
+
+Running *all* the authenticated suites together — which no slice had done, since
+each ran only its own — produced four consistent failures in
+`online-assistant-composer.spec.ts`, in both projects and both locales. They
+were not flaky and they were not caused by H, which touches nothing in
+`src/features/assistant`, `src/features/memories` or `src/features/agent`.
+
+The chain, from repository truth:
+
+- Slice **E** wrote the journey against `assistant/copy.ts`'s `memoryHeading` —
+  *"Isso parece algo para guardar como memória"*.
+- Slice **G3** added the confirm-before-remember step DEC-5 required and moved
+  the rendered heading to `memories/copy.ts`'s `proposalHeading` — *"Quer que eu
+  guarde isto?"* — putting the memory vocabulary with the feature that owns it,
+  which was right. `actions.ts:159,166` reads it in both branches.
+- The journey was **not** updated, and `assistant/copy.ts`'s `memoryHeading` and
+  `memoryDetail` became **declared, localized strings with no consumer** — UX-19's
+  defect, reintroduced in miniature three slices after UX-19 was raised.
+- **G4 and G5 each ran only their own online specs**, so the red survived two
+  more slices and two more closeout claims.
+
+**And the heading was only the first of two.** Repairing it revealed the next
+assertion was stale for the same reason: Slice E's journey expects a *"Criar essa
+memória em Memórias"* link, and `actions.ts:161` sets `nextStep: null` whenever
+there is a proposal to show. G3 replaced the link with the **confirm control**
+DEC-5 required; the link survives only on the opener with nothing after it, where
+there is no memory to offer. The journey was asserting Slice E's design against
+Slice G3's product, twice in four lines.
+
+**What H changed.** The journey asserts what the product renders — the proposal's
+content in its textarea, its kind select, and its confirm and discard controls —
+and still ends by proving the memories list is empty, which is the whole of
+DEC-5's guarantee. The two dead strings are deleted rather than kept "in case",
+so the type stops describing a surface that does not exist and the pair cannot
+diverge again; `memoryNextStep` is live on the empty-opener branch and stays.
+
+**Category** usability · **Priority** P1 · **Disposition — RESOLVED.**
+
+**The lesson is about the gate, not the string.** A per-slice journey gate proves
+the slice; it cannot prove the product, and it will not notice when a slice
+correctly improves a surface another slice's journey still asserts. Running every
+authenticated suite together is a closeout instrument this initiative did not
+have until its last slice, and it should have had from B. That is recorded in the
+Phase 2G recommendation as a maintenance item rather than left as a lesson.
+
+## Three journey failures that were the harness, not the product
+
+The same all-suites run produced three further failures, all in the `mobile`
+project, all with the identical cause: `?error=invalid-credentials` at sign-in,
+against accounts the same run had just minted successfully.
+
+`online-entity-editing.spec.ts:142`, `online-history.spec.ts:226` and
+`account-session.spec.ts:287` mint and sign in roughly fifty accounts inside
+three minutes when the suites run together, which is Supabase auth rate-limiting
+rather than a product defect. Each passes in isolation, and each passed in its
+own slice's gate — G4 recorded 16/16 and G5 24/24.
+
+Recorded rather than quietly re-run, because "92 passed, 7 failed" is the honest
+headline and a closeout that reported only the re-run would be hiding how its
+evidence was produced. The rate limit is a property of the shared project, not of
+the code, and it is the reason the all-suites run is a closeout instrument rather
+than a CI gate.
+
 ## The route inventory, re-audited live
 
 `e2e/online-route-audit.spec.ts` walks the **current** inventory — read from
@@ -3185,6 +3252,23 @@ reachable (UX-26); **no** stored enum in the visible text (UX-21); no
 Routes added since audit 1, and therefore audited here for the first time:
 `/app/work/[taskId]`, `/app/work/cancelled`, `/app/memories/[memoryId]`,
 `/app/projects/[projectId]` and `/app/people/[personId]`.
+
+**Result: 9/9 green — 168/168 loads, every invariant.** Zero horizontal overflow
+at every viewport in both locales, one `<h1>` everywhere, navigation marking the
+destination on every route that has one, the account disclosure present on every
+page, no stored enum anywhere in the visible text, no inert row carrying the
+interactive affordance, and no sub-44px target on either phone viewport.
+
+**The sweep also found a defect in itself, which is recorded rather than quietly
+corrected.** Its first account-reachability check read `body.innerText` for
+"sair" or "account" — which measures whether a page happens to use those words,
+not whether the owner can sign out. The account surface is a **collapsed**
+`<details>`, and `innerText` omits everything a closed disclosure contains, so
+the check failed on 160 of 168 loads and passed on the eight whose page copy
+coincidentally contained the word. It now asserts the disclosure and its
+sign-out control structurally. A check that reports a real failure for a fake
+reason is worse than no check, and a closeout that hid the correction would be
+asking to be trusted rather than read.
 
 ## Gates
 

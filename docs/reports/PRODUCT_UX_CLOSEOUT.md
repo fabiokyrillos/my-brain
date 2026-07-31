@@ -17,14 +17,14 @@ maintenance is listed separately from all four, because calling maintenance
 
 ## 1. Final finding counts
 
-**34 findings.** Each ID appears exactly once in the summary table; there are no
-gaps across `UX-01`…`UX-34`.
+**35 findings.** Each ID appears exactly once in the summary table; there are no
+gaps across `UX-01`…`UX-35`.
 
 ### By disposition
 
 | Disposition | Count |
 | --- | --- |
-| **RESOLVED** | **29** |
+| **RESOLVED** | **30** |
 | **RETAINED** with evidence | **4** |
 | **DEFERRED** to a named destination | **1** |
 | BLOCKED | **0** |
@@ -35,7 +35,7 @@ gaps across `UX-01`…`UX-34`.
 | Priority | Count | Resolved | Not resolved |
 | --- | --- | --- | --- |
 | **P0** | 8 | **8** | **0** |
-| P1 | 23 | 21 | 2 (UX-25 RETAINED, UX-22 DEFERRED) |
+| P1 | 24 | 22 | 2 (UX-25 RETAINED, UX-22 DEFERRED) |
 | P2 | 2 | 0 | 2 (UX-27 RETAINED, UX-33 RETAINED) |
 | — (UX-24, verified-good) | 1 | — | RETAINED |
 
@@ -46,7 +46,7 @@ gaps across `UX-01`…`UX-34`.
 | Category | Count |
 | --- | --- |
 | missing-lifecycle | 8 |
-| usability | 6 |
+| usability | 7 |
 | localization | 5 |
 | interaction-model | 4 |
 | IA | 3 |
@@ -55,13 +55,26 @@ gaps across `UX-01`…`UX-34`.
 | accessibility | 2 |
 | — (UX-24) | 1 |
 
-### The three findings Slice H's own re-audit raised
+### The four findings Slice H's own re-audit raised
+
+None of them came from looking harder at the same surfaces. Each came from an
+instrument the initiative did not have until its last slice.
 
 | ID | How it was found | Disposition |
 | --- | --- | --- |
 | **UX-32** | By *disproving* the accessibility finding H inherited. The blamed shape computes correctly in three accname implementations; probing the neighbours found the one that does not, live in three Settings fields. | RESOLVED |
 | **UX-33** | By reproducing G4's "cosmetic limitation" and finding the mechanism narrower than described — the **browser's UI language**, which the page cannot influence at all. | RETAINED |
 | **UX-34** | By the route sweep, on its first pass. The notifications bell is a navigation link on every page and never marked itself current; fifteen slices of review had not noticed. | RESOLVED |
+| **UX-35** | By running **every** authenticated suite together, which no slice had done. The composer's memory journey had been red since G3 and survived two more slices' closeouts. | RESOLVED |
+
+**UX-35 is the one worth reading twice.** Slice G3 correctly moved the memory
+heading to the feature that owns it and correctly replaced a link with the
+confirm control DEC-5 required — and left Slice E's journey asserting both of the
+old ones. `assistant/copy.ts` kept two declared, localized strings with no
+consumer, which is UX-19's defect reintroduced three slices after UX-19 was
+raised. G4 and G5 each ran only their own online specs, so two closeouts were
+signed with that red in the tree. The finding is not about a string; it is about
+a per-slice gate that can prove a slice and cannot prove a product.
 
 ### The five findings that are not RESOLVED
 
@@ -289,6 +302,27 @@ already have tables, ownership and relations; only the surface is missing.
 - **Localization maintenance (D-1)** — real debt, zero product behaviour change.
   Its own slice, not Phase 2G.
 - **`.gitattributes` (D-2)** — repository maintenance. A ten-line PR.
+- **Run every authenticated suite together, on a schedule (D-3)** — process, not
+  product. UX-35's cost was two closeouts signed over a red journey nobody had
+  run. See below.
+
+### D-3 — the gate that would have caught UX-35
+
+Every slice from B onward ran **its own** online spec and reported it green. None
+ran the others. A per-slice gate proves a slice; it cannot notice when a slice
+correctly improves a surface that a *different* slice's journey still asserts —
+which is exactly what G3 did to Slice E's composer journey, and what stayed
+unnoticed through G4's and G5's closeouts.
+
+The whole authenticated set is 106 tests and runs in about 3½ minutes. It cannot
+be a per-PR gate on the shared project — this run produced three sign-in failures
+from Supabase auth rate-limiting under its own load, which is a property of the
+project rather than of the code. It should be a **scheduled or pre-merge-queue
+run**, with its results read rather than re-run until green.
+
+**Cost of not having it:** UX-35 was live for three slices. **Cost of having it:**
+one 3½-minute run, plus the discipline to treat a rate-limit failure as a
+harness result rather than as a product one.
 
 ### What Phase 2G should not inherit
 
