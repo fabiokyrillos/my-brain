@@ -702,3 +702,35 @@ This file is append-only for accepted architectural decisions. Amend a decision 
 - **Reason:** The correction costs an accepted slice a mark it never earned and costs the phase nothing real, because the property the mark stood for was proven by a mechanism better suited to it. The alternative costs the ledger its meaning permanently.
 - **Consequences:** The sweep that found this is now `A14` in the closeout contract and has a mechanical partner in the generator, which fails when a `●` cell's slice has no acceptance-bearing artifact to name its session. Future phases inherit both. Two further ledger corrections travel with it (Revision 4.3-a and 4.3-b), and the same audit corrected a misattributed CI run id in `STATE.md`/`TODO.md` and recorded a third flaky component test found while verifying it — neither smoothed, both filed.
 
+
+## ADR-060 - The reminder lifecycle gets its own narrow SECURITY DEFINER boundary, and Phase 2F's revoked grant stays revoked
+
+**Date:** 2026-07-31. **Context:** UX-12 (Slice G5), owner decision DEC-6.
+
+UX-12 proposed row actions for snooze, cancel and reschedule "through a validated Server Action that writes the reminder's own columns", and set its own precondition: confirm, before implementing, which reminder mutations are reserved to the command path. The audit ran in Slice G2 and stopped the slice. `202607300063:92` revokes `update` and `delete` on `public.reminders` from `authenticated` on the 2F-REMINDER-003 determination, and **asserts that posture at deploy time** — the proposed Server Action would run as `authenticated` and be refused by the grant. Routing through `apply_task_command` does not rescue it either: that function reconciles reminders as a side effect of *task state*, and a reminder created by `createReminder` has no task to command.
+
+**Decision.** One narrow `SECURITY DEFINER` RPC, `public.apply_reminder_command_v1`, admitting five named commands and nothing else. `authenticated`'s grant posture is unchanged: `select` and `insert`, the latter being the Option C authoring exception. The migration re-asserts the revocation in its own post-deploy block, so a future migration that re-granted either privilege fails to apply.
+
+**Rejected: re-granting `update`.** The smallest diff, and it reverses a recorded determination, weakens One Write Path for this table, and would fail `202607300063`'s own assertion.
+
+**Rejected: shipping the read-only half only** (links and localized status). It would leave the page saying "create only" while implying more, and the two read halves were already deliberately withheld in G2 for exactly that reason.
+
+**Consequences.** A second reminder-mutation authority now exists alongside `apply_task_command`, which is what UX-12 warned about — so the boundary states in SQL which transitions belong to it (owner-initiated lifecycle) and which stay with the command path (derived reconciliation from task state), and the two are disjoint by construction: `apply_task_command` never runs from a reminder id, and this RPC never touches a task. It is reversible: the RPC can be dropped without touching anything else. Using `undo_operations` as the idempotency ledger obliged the slice to ship a registered compensation handler, because `undo_operations_registered_handler` (`202607250052:764`) refuses a row whose `action_type` has none — which is a feature, not a cost: the slice cannot record an operation it could not reverse.
+
+## ADR-061 - Owner-visible snooze is a schedule movement, not the dormant `snoozed` status
+
+**Date:** 2026-07-31. **Context:** UX-12 (Slice G5), owner decision DEC-7, and 2F-REMINDER-004.
+
+DEC-6 authorized `snooze_reminder` as a named operation. The repository cannot deliver a firing snooze under the name's obvious implementation, and the investigation found this before any code was written.
+
+`reminders.status = 'snoozed'` is dead vocabulary. Nothing writes it; nothing reads `reminders.snoozed_until`; `run_user_heartbeat` (`202607170016:508-512`) fires on `status = 'scheduled' and remind_at <= now()` and has no reactivation branch. The Phase 2F closeout says so in an executable assertion — `src/lib/closeout/phase-2f-census.test.ts:152`, *"never fire; no reactivation path exists"* — and measured the bucket at zero rows against the deployed project.
+
+Worse than a missing branch: **the two halves of the Phase 2E/2F reminder contract disagree about whether `snoozed` is live.** `apply_task_command`'s close half (`202607270060:1570`) and `list_task_command_candidates` see `status = 'scheduled'` only; `private.undo_apply_task_command` (`202607270060:2047`) and `private.undo_create_task_command` (`202607290062:753,767,780`) treat `status in ('scheduled','snoozed')` as the live set. The disagreement is inert **only because no `snoozed` row can exist**. Creating the first one would mean completing a task no longer cancels that task's snoozed reminder while both undo handlers still count it — a behaviour change in four `SECURITY DEFINER` bodies Slice G5 was not authorized to touch.
+
+**Decision.** `snooze` moves `remind_at` to a bounded future instant and leaves the row `scheduled`. `snoozed_until` is left null — writing it to make a dormant column look used would be decoration, since nothing consumes it. `status = 'snoozed'` is never written, and the migration's post-deploy block greps the function body to keep it that way.
+
+**Rejected: writing `status = 'snoozed'` and adding heartbeat reactivation**, mirroring the live `pending_questions` pattern (`202607230048`). It requires modifying `run_user_heartbeat` — the Phase 1 delivery engine, outside the boundary DEC-6 scoped — plus reconciling the two disagreeing live sets, and it reverses a recorded determination whose census reads zero. Materially larger blast radius than DEC-6 described.
+
+**Rejected: dropping snooze as a distinct operation.** DEC-6 named it explicitly.
+
+**Consequences.** Snooze and reschedule perform the same physical write. They remain separate product actions, distinguished by command name, accepted input shape (bounded relative preset from `now()` versus an explicit absolute instant), validation, audit `action_type` and UI affordance — which is the shape DEC-7 requires. The word "snooze" no longer means "enters the `snoozed` state", and the CHECK member stays dormant and unretired: **2F-REMINDER-004 is untouched, and the closeout census keeps measuring zero.** The `snoozed` status is still modelled in the surface's state machine — as a state that accepts nothing and renders an honest label — so a legacy row would fail closed rather than crash a lookup.
