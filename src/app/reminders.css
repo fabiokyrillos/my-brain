@@ -53,6 +53,20 @@
   color: var(--blue);
 }
 
+/*
+ * The page-level outcome. Always in the DOM, even when empty: a live region has
+ * to exist before its text arrives, or the change that fills it is not a change
+ * to announce. `min-height` keeps the list from jumping when it fills.
+ */
+.reminder-page-feedback {
+  min-height: 22px;
+  margin-bottom: 12px;
+}
+
+.reminder-page-feedback .reminder-feedback {
+  margin-top: 0;
+}
+
 .reminder-row {
   align-items: flex-start;
 }

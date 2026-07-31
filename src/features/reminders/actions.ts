@@ -46,6 +46,10 @@ import { localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-dat
 import { requireUser } from "@/lib/auth/require-user";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 
+// This module carries `"use server"`, so it may export only async functions.
+// The state type and its idle value therefore live next door — see
+// `action-state.ts` for the failure that constraint produces when ignored.
+import type { ReminderActionState } from "./action-state";
 import { getReminderCopy, reminderFailureMessage } from "./copy";
 import { canApplyReminderAction, type ReminderAction } from "./lifecycle";
 import { mapReminderCommandError } from "./outcomes";
@@ -54,21 +58,6 @@ import {
   reminderSubmissionSchema,
   type ExpectedReminderState,
 } from "./schema";
-
-export type ReminderActionState = {
-  readonly status: "idle" | "success" | "error";
-  readonly message: string;
-  /** Which row the message belongs to, so one banner cannot label another row. */
-  readonly reminderId: string | null;
-  readonly action: ReminderAction | null;
-};
-
-export const IDLE_REMINDER_ACTION_STATE: ReminderActionState = {
-  status: "idle",
-  message: "",
-  reminderId: null,
-  action: null,
-};
 
 function failure(
   locale: Locale,

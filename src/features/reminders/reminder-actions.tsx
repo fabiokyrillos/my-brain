@@ -1,14 +1,13 @@
 "use client";
 
 import { CalendarClock, Clock, LoaderCircle, Pencil, RotateCcw, X } from "lucide-react";
-import { useActionState, useId, useState } from "react";
+import { useId, useState } from "react";
 
-import { formatInstantForDateTimeLocal } from "@/features/tasks/candidate-due-date";
 import type { Locale } from "@/lib/preferences";
 
-import type { ReminderActionState } from "./actions";
-import { applyReminderCommand, IDLE_REMINDER_ACTION_STATE } from "./actions";
+import type { ReminderActionState } from "./action-state";
 import { getReminderCopy } from "./copy";
+import { useReminderCommand } from "./feedback";
 import { SNOOZE_PRESET_MINUTES, type ReminderAction } from "./lifecycle";
 import { reminderOperationKey } from "./operation-key";
 import type { ReminderViewModel } from "./projection";
@@ -49,22 +48,44 @@ import type { ReminderViewModel } from "./projection";
 export function ReminderActions({
   reminder,
   locale,
-  timezone,
-  formatInstant,
+  currentScheduleLabel,
+  remindAtLocalValue,
 }: {
   reminder: ReminderViewModel;
   locale: Locale;
-  /** The owner's profile timezone. Presentation only — the action re-reads it. */
-  timezone: string;
-  /** Server-formatted, so the current schedule reads identically to the row above. */
-  formatInstant: (iso: string) => string;
+  /**
+   * The current schedule, **already formatted by the server**.
+   *
+   * A `(iso: string) => string` formatter would be the obvious prop here, and it
+   * is the one thing that cannot cross this boundary: `reminder-list.tsx` is a
+   * Server Component, and React refuses to serialize a function into a Client
+   * Component. Shipping that threw at request time and rendered the page's error
+   * boundary — invisible to the jsdom component tests, which render both halves
+   * as ordinary components with no RSC boundary between them.
+   *
+   * Passing the finished string also keeps one formatter, bound to one timezone,
+   * for the whole page, which is what the route already builds.
+   */
+  currentScheduleLabel: string;
+  /**
+   * The same instant as `YYYY-MM-DDTHH:mm` in the owner's timezone, for the
+   * `datetime-local` input — **also computed by the server**.
+   *
+   * The obvious client-side call is `formatInstantForDateTimeLocal`, and it
+   * throws for most real reminders: its parser requires seconds to be literally
+   * `:00` with no fractional part (`candidate-due-date.ts:2`), while every
+   * instant this surface writes or reads carries whatever `now()` had —
+   * `2026-07-31T14:37:12.345678+00:00`. Opening the reschedule panel on a
+   * just-snoozed reminder therefore threw inside render and took the page to its
+   * error boundary. Formatting server-side removes the throwing parser from the
+   * client entirely rather than widening a regex two other features depend on.
+   */
+  remindAtLocalValue: string;
 }) {
-  const [state, formAction, pending] = useActionState(
-    // Imported through the module boundary rather than passed as a prop, so this
-    // component cannot be handed a different writer by a caller.
-    applyReminderCommand,
-    IDLE_REMINDER_ACTION_STATE,
-  );
+  // The action state is owned above the list, not here: `cancel` and `restore`
+  // unmount this component in the same commit that would have delivered their
+  // outcome. See `feedback.tsx` for the whole reasoning.
+  const { state, formAction, pending } = useReminderCommand();
   const copy = getReminderCopy(locale);
   const fieldId = useId();
 
@@ -95,14 +116,18 @@ export function ReminderActions({
   return (
     <div className="reminder-actions">
       {/*
-        One live region for the row, not one per form. Four regions on one row
-        would announce in an order nothing controls; one region whose content is
-        the current round's message announces exactly once.
-      */}
-      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-        {pending ? copy.working : mine && state.status !== "idle" ? state.message : ""}
-      </div>
+        No live region here.
 
+        There is exactly one on the page, in `ReminderFeedbackBanner`. A second
+        one carrying the same sentence would make a screen reader announce every
+        outcome twice, and — since these rows unmount on cancel and restore — the
+        row's copy would sometimes be torn down mid-announcement while the page's
+        finished. One region, above the list, is both the accessible answer and
+        the only one that survives a transition.
+
+        The inline paragraph below is deliberately *not* live: it is the visual
+        echo next to the control, already announced elsewhere.
+      */}
       <div className="reminder-action-row">
         {has("snooze") ? (
           <form action={formAction} className="reminder-snooze">
@@ -200,12 +225,12 @@ export function ReminderActions({
           {/* Current and proposed are stated side by side, because "what it is
               now" is the fact the owner needs to decide the new value. */}
           <p className="reminder-panel-current">
-            {copy.currentSchedule}: <strong>{formatInstant(reminder.remindAt)}</strong>
+            {copy.currentSchedule}: <strong>{currentScheduleLabel}</strong>
           </p>
           <label htmlFor={`${fieldId}-remind-at`}>
             {copy.proposedSchedule}
             <input
-              defaultValue={formatInstantForDateTimeLocal(reminder.remindAt, timezone)}
+              defaultValue={remindAtLocalValue}
               disabled={pending}
               id={`${fieldId}-remind-at`}
               name="remindAtLocal"

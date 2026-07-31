@@ -1,8 +1,11 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireUser } from "@/lib/auth/require-user";
 
-import { applyReminderCommand, IDLE_REMINDER_ACTION_STATE } from "./actions";
+import { IDLE_REMINDER_ACTION_STATE } from "./action-state";
+import { applyReminderCommand } from "./actions";
 
 /**
  * The write half (UX-12, DEC-6, DEC-7).
@@ -83,6 +86,51 @@ const base = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('every "use server" module exports only async functions', () => {
+  it("holds across the whole repository", () => {
+    /*
+     * This shipped and reached the deployed project.
+     *
+     * `actions.ts` exported the idle form-state constant next to the Server
+     * Action. That compiles, typechecks, and passes every test in this file —
+     * and then throws at request time with
+     *
+     *     A "use server" file can only export async functions, found object.
+     *
+     * so the reminders page rendered its error boundary and the failure looked
+     * like a data problem. `memories/edit-state.ts` already existed for exactly
+     * this reason; the convention was there and simply not followed.
+     *
+     * Checked repository-wide rather than for this feature alone: the constraint
+     * is the framework's, so the guard belongs at the framework's scope. Type
+     * exports are erased at build time and are allowed.
+     */
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry) || /\.test\.tsx?$/.test(entry)) continue;
+        const source = readFileSync(full, "utf8");
+        if (!/^\s*["']use server["']/.test(source)) continue;
+        const relative = path.relative(process.cwd(), full).split(path.sep).join("/");
+        for (const line of source.split("\n")) {
+          const exported = /^export\s+(?!type\b|interface\b)(\S+)(?:\s+(\S+))?/.exec(line.trim());
+          if (!exported) continue;
+          const [, first, second] = exported;
+          const isAsyncFunction = first === "async" && second === "function";
+          if (!isAsyncFunction) offenders.push(`${relative}: ${line.trim().slice(0, 72)}`);
+        }
+      }
+    };
+    walk(path.resolve(process.cwd(), "src"));
+    expect(offenders).toEqual([]);
+  });
 });
 
 describe("the command reaches the boundary, and only the boundary", () => {

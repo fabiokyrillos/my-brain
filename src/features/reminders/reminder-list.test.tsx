@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -5,6 +7,7 @@ import type { Locale } from "@/lib/preferences";
 
 import { getReminderCopy } from "./copy";
 import type { ReminderViewModel } from "./projection";
+import { ReminderFeedbackProvider } from "./feedback";
 import { ReminderEmptyState, ReminderList, ReminderViewNav } from "./reminder-list";
 
 /**
@@ -24,6 +27,10 @@ vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
 afterEach(cleanup);
 
 const formatInstant = (iso: string) => `[${iso}]`;
+// A real `datetime-local` value, and a reminder instant that is *not* on a whole
+// minute — which is what every snooze produces and what crashed the reschedule
+// panel when the client formatted it.
+const formatLocalInput = (iso: string) => iso.slice(0, 16);
 
 function reminder(overrides: Partial<ReminderViewModel> = {}): ReminderViewModel {
   return {
@@ -49,13 +56,17 @@ function reminder(overrides: Partial<ReminderViewModel> = {}): ReminderViewModel
 }
 
 function renderList(reminders: readonly ReminderViewModel[], locale: Locale = "pt-BR") {
+  // The provider owns the action state the row controls submit to; rendering the
+  // list without it is the wiring mistake `useReminderCommand` throws on.
   return render(
-    <ReminderList
-      formatInstant={formatInstant}
-      locale={locale}
-      reminders={reminders}
-      timezone="America/Sao_Paulo"
-    />,
+    <ReminderFeedbackProvider>
+      <ReminderList
+        formatInstant={formatInstant}
+        formatLocalInput={formatLocalInput}
+        locale={locale}
+        reminders={reminders}
+      />
+    </ReminderFeedbackProvider>,
   );
 }
 
@@ -216,6 +227,42 @@ describe("the empty state", () => {
     render(<ReminderEmptyState agentName="Íris" locale="pt-BR" view="cancelled" />);
     // "Create one above" would be wrong advice for an empty cancelled view.
     expect(screen.queryByText(/Íris/)).not.toBeInTheDocument();
+  });
+});
+
+describe("the server/client boundary", () => {
+  it("passes no function prop into the client component", () => {
+    /*
+     * The defect this exists for shipped and reached the deployed project.
+     *
+     * `reminder-list.tsx` is a Server Component and `reminder-actions.tsx` is a
+     * Client one. Handing the former's `formatInstant` callback to the latter is
+     * the natural thing to write and the one thing React refuses to serialize:
+     * the page threw at request time and rendered its error boundary.
+     *
+     * Every test above missed it, and would again — jsdom renders both halves as
+     * ordinary components with no boundary between them, so a function prop
+     * works perfectly here and fails only in a real RSC render. Reading the
+     * client component's own prop type is the check that does not depend on the
+     * environment: if it declares no function, none can be passed.
+     */
+    const source = readFileSync(
+      path.resolve(process.cwd(), "src/features/reminders/reminder-actions.tsx"),
+      "utf8",
+    );
+    expect(source.startsWith('"use client"')).toBe(true);
+
+    const props = source.slice(
+      source.indexOf("export function ReminderActions({"),
+      source.indexOf("}) {", source.indexOf("export function ReminderActions({")),
+    );
+    // A `=>` inside the prop type annotation is a function type. Comments are
+    // stripped first so the explanatory prose above the props cannot trip it.
+    const declarations = props
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("*") && !line.trim().startsWith("/*"))
+      .join("\n");
+    expect(declarations, "a function prop crosses into the client component").not.toContain("=>");
   });
 });
 

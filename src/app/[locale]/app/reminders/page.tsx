@@ -4,6 +4,10 @@ import { createReminder } from "@/features/agent/actions";
 import { ReminderForm } from "@/features/agent/forms";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { getReminderCopy } from "@/features/reminders/copy";
+import {
+  ReminderFeedbackBanner,
+  ReminderFeedbackProvider,
+} from "@/features/reminders/feedback";
 import { asReminderView, loadReminderPage } from "@/features/reminders/projection";
 import {
   ReminderEmptyState,
@@ -76,6 +80,33 @@ export default async function RemindersPage({
   });
   const formatInstant = (iso: string) => formatter.format(new Date(iso));
 
+  /**
+   * The same instants as `datetime-local` values, in the owner's zone.
+   *
+   * Built from `Intl` parts rather than through
+   * `formatInstantForDateTimeLocal`: that helper's parser accepts only instants
+   * whose seconds are literally `:00` and carry no fractional part, and every
+   * reminder this surface reads carries whatever `now()` had. Calling it threw
+   * inside the client render and took the page to its error boundary. `en-CA`
+   * gives ISO-ordered date parts, so the pieces assemble without a locale
+   * assumption.
+   */
+  const localInputFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const formatLocalInput = (iso: string) => {
+    const parts = localInputFormatter.formatToParts(new Date(iso));
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((candidate) => candidate.type === type)?.value ?? "";
+    return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+  };
+
   const { reminders, hasNext } = await loadReminderPage(supabase, {
     userId: user.id,
     locale,
@@ -97,16 +128,25 @@ export default async function RemindersPage({
 
       <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />
 
-      {reminders.length ? (
-        <ReminderList
-          formatInstant={formatInstant}
-          locale={locale}
-          reminders={reminders}
-          timezone={timezone}
-        />
-      ) : (
-        <ReminderEmptyState agentName={agentName} locale={locale} view={view} />
-      )}
+      {/*
+        The provider wraps the list so a completed transition survives the row
+        that produced it: cancel and restore move a reminder out of the current
+        view, and the row's own result would unmount with it. Server-rendered
+        children pass through a client provider unchanged.
+      */}
+      <ReminderFeedbackProvider>
+        <ReminderFeedbackBanner label={copy.heading} working={copy.working} />
+        {reminders.length ? (
+          <ReminderList
+            formatInstant={formatInstant}
+            formatLocalInput={formatLocalInput}
+            locale={locale}
+            reminders={reminders}
+          />
+        ) : (
+          <ReminderEmptyState agentName={agentName} locale={locale} view={view} />
+        )}
+      </ReminderFeedbackProvider>
 
       {/* The view travels through `query`, not concatenated into `path` —
           `PaginationLinks` builds its own `?page=…`, so a query string baked

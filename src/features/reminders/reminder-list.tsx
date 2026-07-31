@@ -30,13 +30,22 @@ import { REMINDER_VIEWS, type ReminderView, type ReminderViewModel } from "./pro
 export function ReminderList({
   reminders,
   locale,
-  timezone,
   formatInstant,
+  formatLocalInput,
 }: {
   reminders: readonly ReminderViewModel[];
   locale: Locale;
-  timezone: string;
   formatInstant: (iso: string) => string;
+  /**
+   * The instant as a `datetime-local` value in the owner's timezone.
+   *
+   * Both formatters are applied here and their *results* handed downward: the
+   * row controls are a Client Component, and a function cannot cross that
+   * boundary. The local-input one additionally must not be
+   * `formatInstantForDateTimeLocal`, whose parser rejects any instant whose
+   * seconds are not literally `:00` — which is nearly all of them.
+   */
+  formatLocalInput: (iso: string) => string;
 }) {
   const copy = getReminderCopy(locale);
 
@@ -103,11 +112,13 @@ export function ReminderList({
               </Link>
             </p>
 
+            {/* The formatted string, never the formatter: this file is a Server
+                Component and a function cannot be serialized into a Client one. */}
             <ReminderActions
-              formatInstant={formatInstant}
+              currentScheduleLabel={formatInstant(reminder.remindAt)}
               locale={locale}
               reminder={reminder}
-              timezone={timezone}
+              remindAtLocalValue={formatLocalInput(reminder.remindAt)}
             />
           </div>
 
