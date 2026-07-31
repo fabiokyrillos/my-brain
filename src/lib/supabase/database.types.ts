@@ -2386,6 +2386,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_reminder_command_v1: {
+        Args: {
+          p_command: Json
+          p_expected_state: Json
+          p_operation_key: string
+          p_reminder_id: string
+        }
+        Returns: Json
+      }
       apply_task_command: {
         Args: {
           p_action: string

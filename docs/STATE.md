@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and merged, remote parity `202607300063`, closeout gates re-executed from merged `main`)
+Last updated: 2026-07-31 (Phase 2F complete; the product UX/UI remediation is running between phases — Slice G5 added migration `202607310064`, moving remote parity off the Phase 2F head)
 
 ## Current truth
 
@@ -8,7 +8,9 @@ Last updated: 2026-07-30 (Phase 2F — **complete**: all six slices accepted and
 
 **No successor phase is authorized or started.** Phase 2G is named as a recommendation in `docs/PHASE_2F_PROPOSAL.md` and nowhere else: no PRD, no plan, no ADR, no requirement ID, no artifact. The closeout asserts this rather than assuming it, and the traceability generator fails closed if a non-`2F-` requirement is ever declared as Phase 2F work.
 
-**Remote migration parity is `202607300063`.** Slice 2F.4's deployment moved it from `202607290062` on 2026-07-29; local head is identical and there is no drift.
+**Remote migration parity is `202607310064`.** Slice 2F.4's deployment moved it to `202607300063` on 2026-07-29, and that was the Phase 2F head; the UX remediation's **Slice G5** moved it to `202607310064` on 2026-07-31 by adding the reminder lifecycle command boundary (UX-12, DEC-6, DEC-7 — ADR-060 and ADR-061). Local head is identical and there is no drift. Phase 2F's own claim that the phase applied exactly two migrations is unaffected: `202607310064` is **not** Phase 2F work, and the traceability generator's "no third Phase 2F migration" rule reads the phase's own inventory rather than the directory's length.
+
+**The product UX/UI remediation is the active work, and it is not a phase.** It is governed by `docs/reports/PRODUCT_UX_FINDINGS.md`, runs in lettered slices (A–H), and has been merging into `main` since 2026-07-29. Slices A–G5 are merged. **No successor phase is authorized or started** — Phase 2G remains a recommendation in `docs/PHASE_2F_PROPOSAL.md` and nowhere else, and Slice H's closeout is to *recommend* its scope, not to begin it.
 
 **`public.tasks` now has exactly one validated write path in both the application and the database.** The application half closed at Slice 2F.3; the database half closed here. `authenticated` holds `SELECT` only on `public.tasks`, and `SELECT` + `INSERT` on `public.reminders` — the latter being the documented Option C authoring exception. `anon` holds nothing on either table. See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 

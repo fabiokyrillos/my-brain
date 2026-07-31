@@ -24,6 +24,10 @@ describe("history subject routes", () => {
       project: join("projects", "[projectId]"),
       person: join("people", "[personId]"),
       conversation: join("chat", "[conversationId]"),
+      // Slice G5. The reminders route is a list, not a `[id]` page — the link
+      // carries a `#reminder-<uuid>` fragment to the row instead. The promise
+      // being checked here is still the same one: the page it lands on exists.
+      reminder: "reminders",
     };
 
     for (const entityType of LINKABLE_ENTITY_TYPES) {

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
@@ -233,15 +233,42 @@ describe("TaskCandidateForm", () => {
     const action = actionReturning(recoverableErrorState);
     renderForm({ action });
 
-    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
-    await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
+    /*
+     * Each click waits for the submit button to be enabled again first.
+     *
+     * `disabled={pending || selected.length === 0}` (`task-candidate-form.tsx:517`)
+     * means a click issued while the previous action is still in flight lands on
+     * a disabled button and is silently dropped — so the retry this case is about
+     * never happens and `mock.calls[1]` is undefined. `user.click` flushes
+     * microtasks, which settles the `useActionState` transition on a fast machine
+     * and *usually* on a slow one; back-to-back clicks were therefore relying on
+     * scheduling rather than on state. It passed for months and then failed three
+     * CI runs in a row when an unrelated slice added test files and changed worker
+     * load on a two-core runner.
+     *
+     * Waiting on the button's own enabled state asserts the precondition the
+     * clicks always had, instead of hoping for it. Nothing about what the case
+     * covers changes: the same key must be reused for a same-payload retry, and a
+     * material payload change must replace it.
+     */
+    const submit = (name: string) => screen.getByRole("button", { name });
+
+    await user.click(submit("Resolver 2 sugestões"));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(submit("Resolver 2 sugestões")).toBeEnabled());
+
+    await user.click(submit("Resolver 2 sugestões"));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+
     const firstKey = submittedFormData(action, 0).get("operationKey");
     const retryKey = submittedFormData(action, 1).get("operationKey");
     expect(firstKey).toBe(operationKey);
     expect(retryKey).toBe(firstKey);
 
+    await waitFor(() => expect(submit("Resolver 2 sugestões")).toBeEnabled());
     await user.click(screen.getByRole("checkbox", { name: /^Conversar com Maria/ }));
-    await user.click(screen.getByRole("button", { name: "Resolver 1 sugestão" }));
+    await user.click(submit("Resolver 1 sugestão"));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(3));
     expect(submittedFormData(action, 2).get("operationKey")).not.toBe(firstKey);
   });
 

@@ -9,6 +9,7 @@ import type {
   TaskPriority,
   TaskStatus,
 } from "./vocabulary";
+import type { ReminderStatus } from "@/features/reminders/lifecycle";
 
 /**
  * The History surface's copy (UX-13, UX-21, UX-22, UX-28).
@@ -58,6 +59,10 @@ export const HISTORY_CHANGE_FIELDS = [
   "priority",
   "due_at",
   "planned_at",
+  // Slice G5. Without it, "you rescheduled the reminder" would render with no
+  // trace of *what it moved from and to* — which is the one fact that sentence
+  // is missing, and the one the audit row already carries.
+  "remind_at",
   "title",
   "description",
   "content",
@@ -128,6 +133,14 @@ export type HistoryCopy = {
   readonly fieldsInSentence: Readonly<Record<HistoryChangeField, string>>;
   readonly taskStatuses: Readonly<Record<TaskStatus, string>>;
   readonly projectStatuses: Readonly<Record<ProjectStatus, string>>;
+  /**
+   * Slice G5. Deliberately a second map rather than an import from
+   * `features/reminders/copy.ts`: History describes rows that are already
+   * written and must keep rendering them if the reminders surface later
+   * rewords its own badges. The two are checked against each other in
+   * `copy.test.ts` so the duplication is visible rather than silent.
+   */
+  readonly reminderStatuses: Readonly<Record<ReminderStatus, string>>;
   readonly taskPriorities: Readonly<Record<TaskPriority, string>>;
   /** A single-field change, read as one sentence. */
   readonly changeSentence: string;
@@ -181,6 +194,7 @@ const ptBR: HistoryCopy = {
     project: "projeto",
     person: "pessoa",
     memory: "memória",
+    reminder: "lembrete",
   },
   actions: {
     archive_memory: "arquivou a memória[ “{subject}”]",
@@ -198,6 +212,12 @@ const ptBR: HistoryCopy = {
     entry_reprocessing_failed: "não conseguiu reinterpretar o registro[ “{subject}”]",
     operation_undone: "desfez uma alteração[ em “{subject}”]",
     question_consequence_confirmed: "confirmou a consequência de uma resposta",
+    reminder_cancelled: "cancelou o lembrete[ “{subject}”]",
+    reminder_command_undone: "desfez uma alteração no lembrete[ “{subject}”]",
+    reminder_edited: "alterou o lembrete[ “{subject}”]",
+    reminder_rescheduled: "reagendou o lembrete[ “{subject}”]",
+    reminder_restored: "reativou o lembrete[ “{subject}”]",
+    reminder_snoozed: "adiou o lembrete[ “{subject}”]",
     resolve_pending_question_v1: "respondeu a uma pergunta pendente",
     resolve_pending_question_v2: "respondeu a uma pergunta pendente",
     resolve_pending_question_v3: "respondeu a uma pergunta pendente",
@@ -227,6 +247,7 @@ const ptBR: HistoryCopy = {
     priority: "Prioridade",
     due_at: "Prazo",
     planned_at: "Data planejada",
+    remind_at: "Horário do lembrete",
     title: "Título",
     description: "Descrição",
     content: "Conteúdo",
@@ -237,6 +258,7 @@ const ptBR: HistoryCopy = {
     priority: "a prioridade",
     due_at: "o prazo",
     planned_at: "a data planejada",
+    remind_at: "o horário do lembrete",
     title: "o título",
     description: "a descrição",
     content: "o conteúdo",
@@ -257,6 +279,12 @@ const ptBR: HistoryCopy = {
     paused: "Pausado",
     completed: "Concluído",
     archived: "Arquivado",
+  },
+  reminderStatuses: {
+    scheduled: "Agendado",
+    sent: "Entregue",
+    cancelled: "Cancelado",
+    snoozed: "Inativo",
   },
   taskPriorities: { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" },
   changeSentence: "{actor} alterou {field} de “{subject}” de {from} para {to}",
@@ -307,6 +335,7 @@ const en: HistoryCopy = {
     project: "project",
     person: "person",
     memory: "memory",
+    reminder: "reminder",
   },
   actions: {
     archive_memory: "archived the memory[ “{subject}”]",
@@ -324,6 +353,12 @@ const en: HistoryCopy = {
     entry_reprocessing_failed: "could not reinterpret the record[ “{subject}”]",
     operation_undone: "undid a change[ to “{subject}”]",
     question_consequence_confirmed: "confirmed the consequence of an answer",
+    reminder_cancelled: "cancelled the reminder[ “{subject}”]",
+    reminder_command_undone: "undid a change to the reminder[ “{subject}”]",
+    reminder_edited: "changed the reminder[ “{subject}”]",
+    reminder_rescheduled: "rescheduled the reminder[ “{subject}”]",
+    reminder_restored: "reactivated the reminder[ “{subject}”]",
+    reminder_snoozed: "snoozed the reminder[ “{subject}”]",
     resolve_pending_question_v1: "answered a pending question",
     resolve_pending_question_v2: "answered a pending question",
     resolve_pending_question_v3: "answered a pending question",
@@ -353,6 +388,7 @@ const en: HistoryCopy = {
     priority: "Priority",
     due_at: "Due date",
     planned_at: "Planned date",
+    remind_at: "Reminder time",
     title: "Title",
     description: "Description",
     content: "Content",
@@ -363,6 +399,7 @@ const en: HistoryCopy = {
     priority: "the priority",
     due_at: "the due date",
     planned_at: "the planned date",
+    remind_at: "the reminder time",
     title: "the title",
     description: "the description",
     content: "the content",
@@ -377,6 +414,12 @@ const en: HistoryCopy = {
     deferred: "Deferred",
     completed: "Completed",
     cancelled: "Cancelled",
+  },
+  reminderStatuses: {
+    scheduled: "Scheduled",
+    sent: "Delivered",
+    cancelled: "Cancelled",
+    snoozed: "Inactive",
   },
   projectStatuses: {
     active: "Active",

@@ -210,3 +210,51 @@ Provar que um adiamento se manteve é parte do encerramento, não uma cortesia. 
 ### O status `snoozed` continua dormente, e continua exercitado
 
 Sem mudança: o literal está no CHECK, nada em produção o escreve, nada dispara a partir dele, e os ramos `snoozed` dos handlers de undo seguem cobertos pelas montagens pgTAP para que permaneçam falsificáveis. O censo de encerramento mediu **0 linhas `snoozed`** (bucket 5) contra o projeto implantado. A aposentadoria do literal continua diferida por `2F-REMINDER-004`.
+
+## Slice G5 — o limite de comando de lembretes (UX-12, DEC-6 opção A, DEC-7 opção a)
+
+**Migration `202607310064`.** Duas funções novas e uma linha de registro. Nenhum objeto existente foi alterado, nenhum grant se moveu, nenhuma política nasceu ou morreu.
+
+### O que existe agora
+
+`public.apply_reminder_command_v1(p_reminder_id uuid, p_command jsonb, p_expected_state jsonb, p_operation_key text) returns jsonb` — `security definer`, `search_path = ''`, `revoke all from public, anon`, `grant execute to authenticated`. E `private.undo_apply_reminder_command_v1(uuid, uuid)`, sem grant algum, alcançável só pelo roteador `public.undo_operation`.
+
+### Por que a slice tem handler de undo
+
+Não por escolha de produto: desde `202607250052:764` o gatilho `undo_operations_registered_handler` recusa qualquer linha cujo `action_type` não esteja em `private.undo_operation_handlers`. Usar o ledger de chave de operação — que é a disciplina de idempotência deste repositório — **exige** publicar o handler. Os dois não são separáveis, e isso é uma virtude: a slice não consegue registrar uma operação que não saberia reverter. O roteador **não** foi substituído; desde a `202607250052` acrescentar uma operação é um handler mais uma linha de registro.
+
+### A tabela de transições
+
+| Comando | Campos próprios | De | Para | Colunas escritas |
+|---|---|---|---|---|
+| `snooze` | `snoozeMinutes` ∈ {15, 60, 180, 1440, 10080} | `scheduled` | `scheduled` | `remind_at := now() + intervalo` |
+| `reschedule` | `remindAt` (instante com offset explícito, futuro, ≤ 366 dias) | `scheduled` | `scheduled` | `remind_at` |
+| `cancel` | — | `scheduled` | `cancelled` | `status` |
+| `restore` | — | `cancelled` | `scheduled` | `status` (o `remind_at` gravado é mantido literalmente) |
+| `edit` | `title` (1..500), `important` | `scheduled`, e só com `task_id is null` | inalterado | `title`, `important` |
+
+Igualdade **exata** de conjunto de chaves nas duas direções por comando: campo faltante e campo estranho são a mesma recusa `22023`. Não existe patch JSON genérico (DEC-6).
+
+### `sent` é terminal, e isso é uma propriedade do banco e não uma decisão de produto
+
+`run_user_heartbeat` insere a notificação com `on conflict (user_id, dedupe_key) do nothing` sobre `'reminder:' || reminder.id`, e depois marca `sent` justamente as linhas para as quais uma notificação existe. Uma vez entregue, aquela chave está gasta **para aquele id, para sempre**. Devolver a linha a `scheduled` produziria algo que o heartbeat seleciona, não notifica, e re-carimba `sent` no mesmo tique — um lembrete mudo. É a mesma razão pela qual o undo de `apply_task_command` restaura lembretes por fechar-e-inserir em vez de descancelar (`202607260058:141-150`). Rearmar lembrete entregue é lembrete novo, não transição.
+
+### `edit` só alcança lembrete avulso
+
+O meio de inserção de `apply_task_command` copia o **título efetivo da tarefa** para o lembrete que arma (`202607270060:1595-1596`), exatamente para o lembrete não contradizer a tarefa. Editar o título de um lembrete vinculado seria descartado em silêncio pelo próximo comando naquela tarefa — então é recusado com token próprio (`G5_REMINDER_EDIT_TASK_LINKED`), porque "a tarefa é dona deste título" e "estado errado" levam o dono a coisas diferentes. Reagendar um lembrete vinculado continua permitido: só o *título* é derivado.
+
+### Estado obsoleto antes de legalidade, sobre os quatro escalares
+
+O pré-estado esperado é parâmetro e não campo por comando — descreve a linha que o chamador estava vendo, não a operação. Os quatro escalares que a superfície renderiza (`status`, `remind_at`, `title`, `important`) são comparados, não só `status`: guardar uma coluna enquanto uma irmã se moveu é exatamente o buraco que 2E-UNDO-004 documenta (`202607260058:152-163`). Divergência levanta **`55P03`**, nunca `40001` (2C-UNDO-004, migration 050 — `40001` trava o gateway).
+
+### O literal `snoozed` continua dormente (DEC-7)
+
+O adiamento visível ao dono **move `remind_at` e mantém a linha `scheduled`**. Não escreve `status = 'snoozed'` e não escreve `snoozed_until`. A razão é estrutural, não estética: nada lê `reminders.snoozed_until`, `run_user_heartbeat` não tem ramo de reativação, e as duas metades do contrato 2E/2F **discordam** sobre `snoozed` ser vivo — o meio de fechamento de `apply_task_command` (`202607270060:1570`) e `list_task_command_candidates` veem só `scheduled`, enquanto `private.undo_apply_task_command` (`202607270060:2047`) e `private.undo_create_task_command` (`202607290062:753,767,780`) tratam `status in ('scheduled','snoozed')` como o conjunto vivo. A discordância é inerte só porque nenhuma linha `snoozed` pode existir. Criar a primeira faria concluir uma tarefa deixar de cancelar o lembrete adiado dela enquanto os handlers de undo continuariam contando-o — mudança de comportamento em quatro corpos que esta slice não está autorizada a tocar. O bloco pós-deploy faz grep no corpo da função e reprova se o literal reaparecer; a suíte pgTAP assere zero linhas `snoozed`; 2F-REMINDER-004 segue diferido e o bucket 5 do censo segue medindo zero.
+
+### Auditoria e vocabulário
+
+`entity_type = 'reminder'` — `public.audit_logs.entity_type` **não tem CHECK** (`202607160003:132`), então nada no banco gatilhava isso; o que faltava era a superfície de Histórico conhecer o valor. `action_type` nomeia o comando: `reminder_snoozed`, `reminder_rescheduled`, `reminder_cancelled`, `reminder_restored`, `reminder_edited`, e `reminder_command_undone` para a compensação. `actor = 'user'` no caminho direto, `'system'` na compensação.
+
+### Nove asserções pós-deploy
+
+Fail-closed, no idioma da Fase 2F: a revogação de `update`/`delete` da `202607300063` **reasserida** (se uma migration futura reconceder, esta reprova ao aplicar); `select`/`insert` retidos; `anon` sem nada; RLS `enable` **e** `force`; as quatro políticas por dono presentes; a função `security definer` com `search_path` vazio, executável por `authenticated` e não por `anon`; ausência do literal `'snoozed'` no corpo; handler registrado e resolvível na assinatura roteada; e os dois guardas de fonte de longa data (`40001`, formas especiais qualificadas) sobre o *bundle* de undo, que agora inclui o handler novo automaticamente.

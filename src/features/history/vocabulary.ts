@@ -40,6 +40,11 @@ export const HISTORY_ENTITY_TYPES = [
   "project",
   "person",
   "memory",
+  // Slice G5: `apply_reminder_command_v1` is the first writer to record
+  // `entity_type = 'reminder'`. `audit_logs.entity_type` carries no CHECK
+  // (`202607160003:132`), so nothing in the database gated this — the surface
+  // would simply have rendered the fallback until it was listed here.
+  "reminder",
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -66,6 +71,16 @@ export const HISTORY_ACTION_TYPES = [
   "entry_reprocessing_failed",
   "operation_undone",
   "question_consequence_confirmed",
+  // Slice G5 — the five owner-initiated reminder transitions plus the
+  // compensation the registered undo handler writes. Named per command rather
+  // than one `reminder_updated`, because "you cancelled it" and "you postponed
+  // it" are different facts to read back a month later.
+  "reminder_cancelled",
+  "reminder_command_undone",
+  "reminder_edited",
+  "reminder_rescheduled",
+  "reminder_restored",
+  "reminder_snoozed",
   "resolve_pending_question_v1",
   "resolve_pending_question_v2",
   "resolve_pending_question_v3",
@@ -116,6 +131,15 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   entry_reprocessing_failed: "failed",
   operation_undone: "undone",
   question_consequence_confirmed: "answered",
+  // Cancel and restore end or resume a delivery, which is `lifecycle`; snooze,
+  // reschedule and edit move an attribute of a reminder that stays live, which
+  // is `changed`.
+  reminder_cancelled: "lifecycle",
+  reminder_command_undone: "undone",
+  reminder_edited: "changed",
+  reminder_rescheduled: "changed",
+  reminder_restored: "lifecycle",
+  reminder_snoozed: "changed",
   resolve_pending_question_v1: "answered",
   resolve_pending_question_v2: "answered",
   resolve_pending_question_v3: "answered",

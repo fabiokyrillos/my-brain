@@ -46,6 +46,12 @@ export const HISTORY_SUBJECT_ROUTES = {
   project: (locale, id) => `/${locale}/app/projects/${id}`,
   person: (locale, id) => `/${locale}/app/people/${id}`,
   conversation: (locale, id) => `/${locale}/app/chat/${id}`,
+  // Slice G5. There is no `/app/reminders/[id]` detail page, so this is the one
+  // route in the map that reaches a list plus an anchor rather than a page of
+  // its own — `reminder-list.tsx` stamps `id="reminder-<uuid>"` on every row, so
+  // the fragment is a real destination and not a hopeful guess. It is linked
+  // rather than left null because the destination genuinely shows the subject.
+  reminder: (locale, id) => `/${locale}/app/reminders#reminder-${id}`,
   entry_interpretation: null,
   entry_task_candidate_resolution: null,
   pending_question: null,
