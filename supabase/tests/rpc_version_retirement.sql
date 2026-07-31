@@ -10,7 +10,9 @@
 
 begin;
 
-select plan(24);
+-- 24 through Phase 2F; Slice G5 adds two — the no-unplanned-v2 probe and the
+-- generation count — for the third versioned family.
+select plan(26);
 
 -- Retained: every version a governing document says must stay callable -------
 -- confirm_entry_task_candidates family — GATE-03,
@@ -201,8 +203,23 @@ select ok(
   to_regprocedure('public.resolve_pending_question_v4(uuid, jsonb, text)') is null,
   'no unplanned resolution version exists beyond v3'
 );
+select ok(
+  to_regprocedure('public.apply_reminder_command_v2(uuid, jsonb, jsonb, text)') is null,
+  'no unplanned reminder command version exists beyond v1'
+);
 
 -- The inventory is complete: these are the only versioned mutation families --
+--
+-- Slice G5 (2026-07-31) made it three. `apply_reminder_command_v1` is versioned
+-- for the reason the other two are and `apply_task_command`/`create_task_command`
+-- are not: it records its own name as the `action_type` on `public.undo_operations`,
+-- so a future v2 would need its own registered handler while v1's rows stayed
+-- compensable. ADR-053 rejected a versioned pair for the *creation* contract
+-- because that would have left two write paths live; here the version is the
+-- compensation namespace, not a second door.
+--
+-- This assertion failing on a new family is the guard working: a third
+-- inventoried family has to be a reviewed edit here, never a silent arrival.
 
 select is(
   (
@@ -213,9 +230,22 @@ select is(
       and procedure.proname ~ '_v[0-9]+$'
       and procedure.proname not like 'confirm_entry_task_candidates%'
       and procedure.proname not like 'resolve_pending_question%'
+      and procedure.proname not like 'apply_reminder_command%'
   ),
   0,
-  'no versioned public function exists outside the two inventoried families'
+  'no versioned public function exists outside the three inventoried families'
+);
+
+select is(
+  (
+    select count(*)::int
+    from pg_proc procedure
+    join pg_namespace space on space.oid = procedure.pronamespace
+    where space.nspname = 'public'
+      and procedure.proname ~ '^apply_reminder_command(_v[0-9]+)?$'
+  ),
+  1,
+  'the reminder command family has exactly the one inventoried generation'
 );
 
 select is(
