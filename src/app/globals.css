@@ -14,6 +14,7 @@
 @import "./assistant.css";
 @import "./entities.css";
 @import "./memories.css";
+@import "./history.css";
 
 :root { --ink:#14233b; --ink-soft:#526078; --blue:#315cff; --blue-wash:#eef2ff; --mist:#f4f7fb; --paper:#fbfcfe; --line:#dce3ed; --signal:#f0a431; --white:#fff;
   /* The page gutter. Clamped rather than a bare `5vw`: every page box is also
