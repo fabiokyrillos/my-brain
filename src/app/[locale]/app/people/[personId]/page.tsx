@@ -2,10 +2,26 @@ import { ArrowLeft, UserRound } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createOrganizationForSubject, updatePerson } from "@/features/entities/actions";
+import { AssociationPanel } from "@/features/entities/association-panel";
+import {
+  associatePersonContext,
+  associatePersonProject,
+  endPersonContext,
+  endPersonProject,
+  updatePersonProjectRole,
+} from "@/features/entities/associations";
+import { loadContextOptions } from "@/features/entities/contexts";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
-import { contextKindLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
+import { RelationshipPanel } from "@/features/entities/relationship-panel";
+import { describeRelationshipType } from "@/features/entities/relationship-vocabulary";
+import {
+  createOwnerRelationship,
+  endOwnerRelationship,
+  updateOwnerRelationship,
+} from "@/features/entities/relationships";
+import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -27,6 +43,8 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     relationshipResult,
     contextLinkResult,
     organizations,
+    contextOptions,
+    projectOptionsResult,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
     supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at").eq("id", personId).maybeSingle(),
@@ -40,6 +58,11 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     supabase.from("person_relationships").select("id,relationship_type,description,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).order("valid_from", { ascending: false }).limit(50),
     supabase.from("person_contexts").select("context_id,valid_until").eq("person_id", personId).is("valid_until", null).limit(50),
     loadOrganizationOptions(supabase),
+    // EGC.2. The two selectors the association panels offer, bounded at 200 by
+    // the loaders themselves (EGC-ASSOC-008). Loaded here rather than inside the
+    // panels because a client component cannot query.
+    loadContextOptions(supabase),
+    supabase.from("projects").select("id,name").neq("status", "archived").order("name").limit(200),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];
@@ -64,6 +87,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const projects = requireSupabaseData(projectResult, "load related projects") ?? [];
   const entries = requireSupabaseData(entryResult, "load person timeline") ?? [];
   const contexts = requireSupabaseData(contextResult, "load person context names") ?? [];
+  const projectOptions = requireSupabaseData(projectOptionsResult, "load project options") ?? [];
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.
@@ -81,9 +105,17 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           <p className="eyebrow">{pt ? "PESSOA" : "PERSON"}</p>
           <h1>{person.name}</h1>
           <p>{person.notes ?? (pt ? "Contexto construído a partir das interações registradas." : "Context built from recorded interactions.")}</p>
+          {/*
+            EGC-REL-009. Company and relationship-to-owner are visibly distinct
+            concerns: this line says where they work, and the relationship panel
+            below says who they are to the owner. The explainer is what stops the
+            Company field from reading as a way to describe a personal
+            relationship — the confusion the Camila scenario exposed.
+          */}
           <p className="entity-relation-line">
             <span>{copy.company}</span>
             <strong>{organizationName ?? copy.companyNone}</strong>
+            <small>{copy.companyExplainer}</small>
           </p>
         </div>
       </header>
@@ -102,32 +134,42 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         organizations={organizations}
       />
 
+      {/*
+        EGC.2. These four sections were read-only until now: the page loaded
+        `person_relationships` and `person_contexts` and rendered whatever it
+        found, which was always nothing, because nothing had ever written them.
+        `person_relationships` in particular had no writer in either layer.
+      */}
       <div className="entity-columns">
-        <section>
-          <h2>{copy.relationships}</h2>
-          {relationships.length ? (
-            <div className="mini-list">
-              {relationships.map((relationship) => (
-                <article key={relationship.id}>
-                  <strong>{relationship.relationship_type}</strong>
-                  <span>
-                    {relationship.description ?? `${copy.since} ${formatDate(relationship.valid_from)}`}
-                  </span>
-                </article>
-              ))}
-            </div>
-          ) : <p className="quiet-state">{copy.relationshipsEmpty}</p>}
-        </section>
-        <section>
-          <h2>{copy.contexts}</h2>
-          {contexts.length ? (
-            <div className="mini-list">
-              {contexts.map((context) => (
-                <article key={context.id}><strong>{context.name}</strong><span>{contextKindLabel(locale, context.kind) ?? vocabulary.unknownState}</span></article>
-              ))}
-            </div>
-          ) : <p className="quiet-state">{copy.contextsEmpty}</p>}
-        </section>
+        <RelationshipPanel
+          createAction={createOwnerRelationship}
+          endAction={endOwnerRelationship}
+          locale={locale}
+          personId={person.id}
+          relationships={relationships.map((relationship) => ({
+            id: relationship.id,
+            storedType: relationship.relationship_type,
+            // `null` for a value outside the vocabulary, so the panel renders the
+            // stored token rather than a guess (EGC-REL-006).
+            label: describeRelationshipType(locale, relationship.relationship_type),
+            description: relationship.description,
+            since: formatDate(relationship.valid_from),
+          }))}
+          updateAction={updateOwnerRelationship}
+        />
+        <AssociationPanel
+          addAction={associatePersonContext}
+          endAction={endPersonContext}
+          heading={copy.contexts}
+          locale={locale}
+          options={contextOptions.map((option) => ({ id: option.id, label: option.name }))}
+          rows={contexts.map((context) => ({
+            id: context.id,
+            label: context.name,
+            href: `/${locale}/app/contexts/${context.id}`,
+          }))}
+          target={{ kind: "person-context", personId: person.id }}
+        />
       </div>
 
       <div className="entity-columns">
@@ -139,19 +181,21 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
         </section>
-        <section>
-          <h2>{pt ? "Projetos em comum" : "Shared projects"}</h2>
-          {projects.length ? (
-            <div className="mini-list">
-              {projects.map((project) => (
-                <Link href={`/${locale}/app/projects/${project.id}`} key={project.id}>
-                  <strong>{project.name}</strong>
-                  <span>{roleByProjectId.get(project.id) ?? copy.noRole}</span>
-                </Link>
-              ))}
-            </div>
-          ) : <p className="quiet-state">{pt ? "Nenhum projeto vinculado." : "No linked projects."}</p>}
-        </section>
+        <AssociationPanel
+          addAction={associatePersonProject}
+          endAction={endPersonProject}
+          heading={copy.linkedProjects}
+          locale={locale}
+          options={projectOptions.map((option) => ({ id: option.id, label: option.name }))}
+          roleAction={updatePersonProjectRole}
+          rows={projects.map((project) => ({
+            id: project.id,
+            label: project.name,
+            href: `/${locale}/app/projects/${project.id}`,
+            role: roleByProjectId.get(project.id) ?? null,
+          }))}
+          target={{ kind: "person-project", personId: person.id }}
+        />
       </div>
 
       {memories.length > 0 && (

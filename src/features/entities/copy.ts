@@ -71,6 +71,46 @@ type EntityCopy = {
   readonly newCompanyName: string;
   readonly cancelInline: string;
   readonly noDescription: string;
+  /** Relationships and associations (EGC.2). */
+  readonly duplicateRelation: string;
+  readonly foreignTarget: string;
+  readonly relationshipAdded: string;
+  readonly relationshipEnded: string;
+  readonly associationAdded: string;
+  readonly associationEnded: string;
+  readonly addRelationship: string;
+  readonly editRelationship: string;
+  readonly endRelationship: string;
+  readonly relationshipTypeLabel: string;
+  readonly relationshipDescriptionLabel: string;
+  readonly relationshipDescriptionHint: string;
+  readonly saveRelationship: string;
+  readonly unknownRelationship: string;
+  readonly addContextAssociation: string;
+  readonly contextAssociationLabel: string;
+  readonly saveContextAssociation: string;
+  readonly removeContextAssociation: string;
+  readonly noContextsToAssociate: string;
+  readonly addProjectAssociation: string;
+  readonly projectAssociationLabel: string;
+  readonly saveProjectAssociation: string;
+  readonly removeProjectAssociation: string;
+  readonly noProjectsToAssociate: string;
+  readonly addPersonAssociation: string;
+  readonly personAssociationLabel: string;
+  readonly savePersonAssociation: string;
+  readonly removePersonAssociation: string;
+  readonly noPeopleToAssociate: string;
+  readonly roleLabel: string;
+  readonly rolePlaceholder: string;
+  readonly saveRole: string;
+  /**
+   * EGC-REL-009. The Person page shows Company and relationship-to-owner as two
+   * separate concerns, and each says what it is for — a company is where someone
+   * works, and it has never been a way to say what they are to you.
+   */
+  readonly companyExplainer: string;
+  readonly relationshipExplainer: string;
 };
 
 const copy = {
@@ -145,6 +185,40 @@ const copy = {
      */
     cancelInline: "Cancelar nova empresa",
     noDescription: "Sem descrição.",
+    duplicateRelation: "Isso já está registrado.",
+    foreignTarget: "Não encontramos esse registro na sua conta.",
+    relationshipAdded: "Relação registrada.",
+    relationshipEnded: "Relação encerrada. O histórico continua guardado.",
+    associationAdded: "Vínculo criado.",
+    associationEnded: "Vínculo encerrado. O histórico continua guardado.",
+    addRelationship: "Registrar relação",
+    editRelationship: "Editar relação",
+    endRelationship: "Encerrar relação",
+    relationshipTypeLabel: "Tipo de relação",
+    relationshipDescriptionLabel: "Observação",
+    relationshipDescriptionHint: "Opcional. Suas palavras, do seu jeito.",
+    saveRelationship: "Salvar relação",
+    unknownRelationship: "Relação não reconhecida",
+    addContextAssociation: "Vincular a um contexto",
+    contextAssociationLabel: "Contexto",
+    saveContextAssociation: "Vincular contexto",
+    removeContextAssociation: "Encerrar vínculo com o contexto",
+    noContextsToAssociate: "Crie um contexto antes de vincular alguém a ele.",
+    addProjectAssociation: "Vincular a um projeto",
+    projectAssociationLabel: "Projeto",
+    saveProjectAssociation: "Vincular projeto",
+    removeProjectAssociation: "Encerrar vínculo com o projeto",
+    noProjectsToAssociate: "Crie um projeto antes de vincular alguém a ele.",
+    addPersonAssociation: "Vincular uma pessoa",
+    personAssociationLabel: "Pessoa",
+    savePersonAssociation: "Vincular pessoa",
+    removePersonAssociation: "Encerrar vínculo com a pessoa",
+    noPeopleToAssociate: "Cadastre uma pessoa antes de vinculá-la a este projeto.",
+    roleLabel: "Papel",
+    rolePlaceholder: "Ex.: revisora do contrato",
+    saveRole: "Salvar papel",
+    companyExplainer: "Onde a pessoa trabalha.",
+    relationshipExplainer: "Quem essa pessoa é para você.",
   },
   en: {
     edit: "Edit",
@@ -211,6 +285,40 @@ const copy = {
     newCompanyName: "New company name",
     cancelInline: "Cancel new company",
     noDescription: "No description.",
+    duplicateRelation: "That is already recorded.",
+    foreignTarget: "We could not find that record in your account.",
+    relationshipAdded: "Relationship recorded.",
+    relationshipEnded: "Relationship ended. The history is still kept.",
+    associationAdded: "Link created.",
+    associationEnded: "Link ended. The history is still kept.",
+    addRelationship: "Record a relationship",
+    editRelationship: "Edit relationship",
+    endRelationship: "End relationship",
+    relationshipTypeLabel: "Kind of relationship",
+    relationshipDescriptionLabel: "Note",
+    relationshipDescriptionHint: "Optional. Your words, your way.",
+    saveRelationship: "Save relationship",
+    unknownRelationship: "Unrecognized relationship",
+    addContextAssociation: "Link to a context",
+    contextAssociationLabel: "Context",
+    saveContextAssociation: "Link context",
+    removeContextAssociation: "End the context link",
+    noContextsToAssociate: "Create a context before linking anyone to it.",
+    addProjectAssociation: "Link to a project",
+    projectAssociationLabel: "Project",
+    saveProjectAssociation: "Link project",
+    removeProjectAssociation: "End the project link",
+    noProjectsToAssociate: "Create a project before linking anyone to it.",
+    addPersonAssociation: "Link a person",
+    personAssociationLabel: "Person",
+    savePersonAssociation: "Link person",
+    removePersonAssociation: "End the person link",
+    noPeopleToAssociate: "Add a person before linking them to this project.",
+    roleLabel: "Role",
+    rolePlaceholder: "e.g. contract reviewer",
+    saveRole: "Save role",
+    companyExplainer: "Where this person works.",
+    relationshipExplainer: "Who this person is to you.",
   },
 } satisfies Record<Locale, EntityCopy>;
 

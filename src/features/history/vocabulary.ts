@@ -50,6 +50,14 @@ export const HISTORY_ENTITY_TYPES = [
   // see them, so the test names them explicitly beside the other TS-only ones.
   "organization",
   "context",
+  // EGC.2. `entities/relationships.ts` and `entities/associations.ts` are the
+  // first writers of all three. They are deliberately **not** linkable in
+  // `subject-route.ts`: `entity_id` is the junction row's own id, and there is
+  // no page for a relationship — the place to see one is the Person it belongs
+  // to, whose id this row does not carry.
+  "person_relationship",
+  "person_context",
+  "person_project",
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -62,10 +70,16 @@ export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
  */
 export const HISTORY_ACTION_TYPES = [
   "archive_memory",
+  "associate_person_context",
+  "associate_person_project",
   "chat_answered",
   "confirm_entry_task_candidates_v5",
   "create_context",
   "create_organization",
+  "create_person_relationship",
+  "end_person_context",
+  "end_person_project",
+  "end_person_relationship",
   "confirm_entry_task_candidates_v6",
   "create_memory",
   "entry_interpretation_corrected",
@@ -101,6 +115,8 @@ export const HISTORY_ACTION_TYPES = [
   "update_memory",
   "update_organization",
   "update_person",
+  "update_person_project_role",
+  "update_person_relationship",
   "update_project",
 ] as const;
 export type HistoryActionType = (typeof HISTORY_ACTION_TYPES)[number];
@@ -126,12 +142,20 @@ export type HistoryCategory = (typeof HISTORY_CATEGORIES)[number];
 
 export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, HistoryCategory>> = {
   archive_memory: "lifecycle",
+  // A link created is a creation; a link ended is a lifecycle event, not a
+  // change — the same split `reminder_cancelled` versus `reminder_edited` uses.
+  associate_person_context: "created",
+  associate_person_project: "created",
   chat_answered: "answered",
   confirm_entry_task_candidates_v5: "created",
   confirm_entry_task_candidates_v6: "created",
   create_context: "created",
   create_memory: "created",
   create_organization: "created",
+  create_person_relationship: "created",
+  end_person_context: "lifecycle",
+  end_person_project: "lifecycle",
+  end_person_relationship: "lifecycle",
   entry_interpretation_corrected: "changed",
   entry_interpretation_correction_undone: "undone",
   entry_interpretation_failed: "failed",
@@ -164,6 +188,8 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   update_memory: "changed",
   update_organization: "changed",
   update_person: "changed",
+  update_person_project_role: "changed",
+  update_person_relationship: "changed",
   update_project: "changed",
 };
 
