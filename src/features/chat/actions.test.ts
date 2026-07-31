@@ -39,6 +39,9 @@ function form(overrides: Record<string, string> = {}) {
 type ChatStub = {
   citedSourceIds: string[];
   matches?: { source_type: "entry" | "memory"; source_id: string; content: string; similarity: number; occurred_at: string }[];
+  /** The validity windows `memoriesInForce` will read back for the matched ids. */
+  memoryRows?: { id: string; valid_from: string | null; valid_until: string | null }[];
+  memoryLookupFails?: boolean;
 };
 
 let insertedAssistantMessage: Record<string, unknown> | null = null;
@@ -70,6 +73,16 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
     }
     if (table === "audit_logs") {
       return { insert: async () => ({ data: null, error: null }) };
+    }
+    if (table === "memories") {
+      return {
+        select: () => ({
+          in: async () =>
+            options.memoryLookupFails
+              ? { data: null, error: { message: "lookup failed" } }
+              : { data: options.memoryRows ?? [], error: null },
+        }),
+      };
     }
     throw new Error(`unexpected table ${table}`);
   });
@@ -131,6 +144,80 @@ describe("sendChatMessage localized failures", () => {
       status: "error",
       message: "Sua sessão expirou.",
     });
+  });
+});
+
+describe("sendChatMessage memory lifecycle filtering", () => {
+  const memoryId = "44444444-4444-4444-8444-444444444444";
+  const entryIdMatch = "33333333-3333-4333-8333-333333333333";
+  const matches = [
+    {
+      source_type: "memory" as const,
+      source_id: memoryId,
+      content: "Prefiro reuniões pela manhã.",
+      similarity: 0.9,
+      occurred_at: "2026-07-20T10:00:00Z",
+    },
+    {
+      source_type: "entry" as const,
+      source_id: entryIdMatch,
+      content: "Conteúdo da entrada sobre a Ana.",
+      similarity: 0.8,
+      occurred_at: "2026-07-20T10:00:00Z",
+    },
+  ];
+
+  async function run(stub: Partial<ChatStub>) {
+    const citedSourceIds = [`memory:${memoryId}`, `entry:${entryIdMatch}`];
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds, matches, ...stub }) as unknown as Awaited<
+        ReturnType<typeof createClient>
+      >,
+    );
+    vi.mocked(getAIProvider).mockReturnValue(
+      stubProvider(citedSourceIds) as unknown as ReturnType<typeof getAIProvider>,
+    );
+    await expect(sendChatMessage(idleState, form())).rejects.toThrow("NEXT_REDIRECT");
+    return insertedAssistantMessage;
+  }
+
+  function citedTypes(message: Record<string, unknown> | null): string[] {
+    return (message?.citations as { type: string }[] | undefined)?.map((item) => item.type) ?? [];
+  }
+
+  it("keeps a memory that is still in force", async () => {
+    const message = await run({
+      memoryRows: [{ id: memoryId, valid_from: null, valid_until: null }],
+    });
+
+    expect(citedTypes(message)).toEqual(["memory", "entry"]);
+  });
+
+  // This is the assertion that makes "Archive" mean something. Without the
+  // filter the RPC returns the row on `embedding is not null` alone, and the
+  // assistant would keep quoting a fact the owner explicitly retired.
+  it("excludes a memory the owner archived", async () => {
+    const message = await run({
+      memoryRows: [{ id: memoryId, valid_from: null, valid_until: "2026-01-01T00:00:00Z" }],
+    });
+
+    expect(citedTypes(message)).toEqual(["entry"]);
+  });
+
+  it("excludes a memory whose validity has not started yet", async () => {
+    const message = await run({
+      memoryRows: [{ id: memoryId, valid_from: "2099-01-01T00:00:00Z", valid_until: null }],
+    });
+
+    expect(citedTypes(message)).toEqual(["entry"]);
+  });
+
+  // Failing closed: citing a fact that may have been retracted is the worse
+  // error, and an entry match is unaffected because entries have no window.
+  it("excludes memories when the validity lookup fails, and keeps entries", async () => {
+    const message = await run({ memoryLookupFails: true });
+
+    expect(citedTypes(message)).toEqual(["entry"]);
   });
 });
 
