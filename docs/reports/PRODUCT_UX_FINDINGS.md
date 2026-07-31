@@ -2871,7 +2871,11 @@ announcing. The action state now lives above the list, with one live region on t
 
 # Slice H — closeout. The ledger reconciled, UX-04 answered, and what is honestly left
 
-**Branch** `codex/ux-slice-h-closeout` · the final remediation slice.
+**Branch** `codex/ux-slice-h-closeout` · **PR #50** · the final remediation slice.
+**Status — implemented and PR-ready; not yet merged.** Every disposition below is
+final and does not depend on integration; the initiative itself is declared
+COMPLETE only in §10 of `PRODUCT_UX_CLOSEOUT.md`, after CI is green on the exact
+merge SHA.
 **Covers** the ledger reconciliation, UX-04, UX-21's remainder, UX-22's final
 disposition, UX-27's final disposition, the accessibility carryover, the native
 date-input limitation, the full authenticated route re-audit, and the closeout

@@ -3,7 +3,9 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
-## 2026-07-31 — Slice H — the product UX remediation's closeout (UX-04, UX-21, UX-22, UX-27, UX-32, UX-33, UX-34)
+## 2026-07-31 — Slice H — the product UX remediation's closeout (UX-04, UX-21, UX-22, UX-27, UX-32, UX-33, UX-34, UX-35)
+
+**Status: implemented and PR-ready as PR #50; not yet merged.** The initiative is declared COMPLETE only in §10 of `docs/reports/PRODUCT_UX_CLOSEOUT.md`, after CI is green on the exact merge SHA. Final adjudication regardless of integration: **35 findings — 30 RESOLVED, 4 RETAINED with evidence, 1 DEFERRED, 0 BLOCKED, 0 OPEN, 0 PARTIAL, all 8 P0 RESOLVED.**
 
 **No migration, no SQL, no RPC and no grant change.** Migration parity stays `202607310064` on both sides. `authenticated` keeps exactly the privileges Phase 2F and Slice G5 left it, including `SELECT` and `INSERT` only on `public.reminders`.
 

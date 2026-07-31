@@ -3,9 +3,14 @@
 **Initiative** — My Brain product UX/UI remediation, audit 1 through Slice H.
 **Period** — 2026-07-30 to 2026-07-31.
 **Durable source of truth** — [`PRODUCT_UX_FINDINGS.md`](./PRODUCT_UX_FINDINGS.md).
-**Status** — closed. Every finding has exactly one final disposition. No finding
-is OPEN, PARTIAL, ambiguous, duplicated, or contradictory between the summary
-table and its detail record.
+
+**Status — Slice H implemented and PR-ready (PR #50), not yet integrated.**
+Every finding has exactly one final disposition; no finding is OPEN, PARTIAL,
+ambiguous, duplicated, or contradictory between the summary table and its detail
+record. **The initiative is not COMPLETE until PR #50 is merged and CI is green
+on the exact merge SHA** — §10 records that transition and is the only place that
+may declare it. The dispositions below are final regardless; what is pending is
+integration, not adjudication.
 
 This report separates four things that are easy to blur together and expensive
 to confuse: **product work completed**, **retained limitations**, **deferred
@@ -333,15 +338,41 @@ starts from a clean ledger.
 
 ---
 
-## 9. Statement of completion
+## 9. Statement of adjudication (pre-merge)
 
-- Every one of the **34** findings has exactly one final disposition.
+Everything here is settled and does not depend on integration.
+
+- Every one of the **35** findings has exactly one final disposition:
+  **30 RESOLVED · 4 RETAINED with evidence · 1 DEFERRED · 0 BLOCKED.**
 - **All 8 P0 findings are RESOLVED.**
 - **0** findings are OPEN, PARTIAL, ambiguous, duplicated, or contradictory
   between summary and detail.
 - Migration parity is **202607310064** on both sides and **unchanged by Slice H**.
 - Grants and RLS are unchanged; `authenticated` still holds only `SELECT` and
-  `INSERT` on `public.reminders`.
+  `INSERT` on `public.reminders` — verified behaviourally, §5.
 - **Zero fixture accounts and zero fixture-shaped rows** remain.
 - **Phase 2G has not started and is not authorized by this report.** The scope
-  above is a recommendation awaiting the owner's decision.
+  in §8 is a recommendation awaiting the owner's decision.
+
+---
+
+## 10. Statement of completion (post-merge only)
+
+**This section is the single place the initiative may be declared COMPLETE, and
+it may only be filled in after PR #50 is merged and CI is green on the exact
+merge SHA.** Until every row below carries a real value, the initiative is
+*implemented and PR-ready*, not complete.
+
+| | |
+| --- | --- |
+| Slice H PR | **#50** |
+| PR-head CI run | *pending* |
+| Merge SHA | *pending* |
+| Merge-SHA CI run | *pending* |
+| `application` job | *pending* |
+| `database and journey` job | *pending* |
+| `edge worker` job | *pending* |
+| Final `main` HEAD | *pending* |
+| Parity after merge | *pending* |
+| Fixture residue after merge | *pending* |
+| **Initiative status** | **NOT COMPLETE — awaiting integration** |
