@@ -29,6 +29,16 @@ export type EntityEditState = {
   status: "idle" | "success" | "error";
   message: string;
   submitted?: EntityEditSubmission | null;
+  /**
+   * The id of a row a *creating* action just made (EGC-ORG-005).
+   *
+   * Present only on success, and only for the actions that create. It exists so
+   * the create-and-select affordance can pre-select what it just made without
+   * re-querying, and it is deliberately **not** an object: a create round returns
+   * an identifier, never a row, so nothing here can drift from what the detail
+   * page would load.
+   */
+  createdId?: string;
 };
 
 export const idleEntityEditState: EntityEditState = { status: "idle", message: "", submitted: null };

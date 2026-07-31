@@ -28,6 +28,8 @@ type EntityCopy = {
   readonly duplicateName: string;
   readonly notFound: string;
   readonly saveFailed: string;
+  readonly createFailed: string;
+  readonly createdButNotLinked: string;
   /** The read-only relation blocks this slice surfaces. */
   readonly relationships: string;
   readonly relationshipsEmpty: string;
@@ -38,6 +40,34 @@ type EntityCopy = {
   readonly company: string;
   readonly companyNone: string;
   readonly since: string;
+  /** Organizations and contexts as first-class surfaces (EGC.1). */
+  readonly created: string;
+  readonly createdAndLinked: string;
+  readonly organizations: string;
+  readonly organizationsEyebrow: string;
+  readonly organizationsEmpty: string;
+  readonly organizationsEmptyHint: string;
+  readonly newOrganization: string;
+  readonly createOrganization: string;
+  readonly organizationNotFound: string;
+  readonly contextsTitle: string;
+  readonly contextsEyebrow: string;
+  readonly contextsListEmpty: string;
+  readonly contextsListEmptyHint: string;
+  readonly newContext: string;
+  readonly createContext: string;
+  readonly contextNotFound: string;
+  readonly kindLabel: string;
+  readonly kinds: Readonly<Record<"work" | "personal" | "custom", string>>;
+  readonly linkedPeople: string;
+  readonly linkedPeopleEmpty: string;
+  readonly linkedProjects: string;
+  readonly linkedProjectsEmpty: string;
+  readonly linkedTasks: string;
+  readonly linkedTasksEmpty: string;
+  readonly addCompanyInline: string;
+  readonly newCompanyName: string;
+  readonly cancelInline: string;
 };
 
 const copy = {
@@ -65,6 +95,8 @@ const copy = {
     duplicateName: "Esse nome já existe.",
     notFound: "Este registro não existe mais.",
     saveFailed: "Não foi possível salvar agora.",
+    createFailed: "Não foi possível criar agora.",
+    createdButNotLinked: "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
     relationships: "Relação com você",
     relationshipsEmpty: "Nenhuma relação registrada.",
     contexts: "Contextos",
@@ -74,6 +106,33 @@ const copy = {
     company: "Empresa",
     companyNone: "Sem empresa",
     since: "desde",
+    created: "Criado.",
+    createdAndLinked: "Empresa criada e vinculada.",
+    organizations: "Empresas",
+    organizationsEyebrow: "EMPRESA",
+    organizationsEmpty: "Nenhuma empresa ainda.",
+    organizationsEmptyHint: "Crie a primeira para poder vinculá-la a pessoas e projetos.",
+    newOrganization: "Nova empresa",
+    createOrganization: "Criar empresa",
+    organizationNotFound: "Esta empresa não existe.",
+    contextsTitle: "Contextos",
+    contextsEyebrow: "CONTEXTO",
+    contextsListEmpty: "Nenhum contexto ainda.",
+    contextsListEmptyHint: "Crie o primeiro para poder vinculá-lo a pessoas e tarefas.",
+    newContext: "Novo contexto",
+    createContext: "Criar contexto",
+    contextNotFound: "Este contexto não existe.",
+    kindLabel: "Tipo",
+    kinds: { work: "Trabalho", personal: "Pessoal", custom: "Personalizado" },
+    linkedPeople: "Pessoas",
+    linkedPeopleEmpty: "Nenhuma pessoa vinculada.",
+    linkedProjects: "Projetos",
+    linkedProjectsEmpty: "Nenhum projeto vinculado.",
+    linkedTasks: "Tarefas",
+    linkedTasksEmpty: "Nenhuma tarefa vinculada.",
+    addCompanyInline: "Criar nova empresa",
+    newCompanyName: "Nome da nova empresa",
+    cancelInline: "Cancelar",
   },
   en: {
     edit: "Edit",
@@ -99,6 +158,8 @@ const copy = {
     duplicateName: "That name already exists.",
     notFound: "This record no longer exists.",
     saveFailed: "We could not save right now.",
+    createFailed: "We could not create it right now.",
+    createdButNotLinked: "The company was created but not linked. Select it from the list.",
     relationships: "Relationship to you",
     relationshipsEmpty: "No relationship recorded.",
     contexts: "Contexts",
@@ -108,6 +169,33 @@ const copy = {
     company: "Company",
     companyNone: "No company",
     since: "since",
+    created: "Created.",
+    createdAndLinked: "Company created and linked.",
+    organizations: "Companies",
+    organizationsEyebrow: "COMPANY",
+    organizationsEmpty: "No companies yet.",
+    organizationsEmptyHint: "Create the first one so you can link it to people and projects.",
+    newOrganization: "New company",
+    createOrganization: "Create company",
+    organizationNotFound: "This company does not exist.",
+    contextsTitle: "Contexts",
+    contextsEyebrow: "CONTEXT",
+    contextsListEmpty: "No contexts yet.",
+    contextsListEmptyHint: "Create the first one so you can link it to people and tasks.",
+    newContext: "New context",
+    createContext: "Create context",
+    contextNotFound: "This context does not exist.",
+    kindLabel: "Kind",
+    kinds: { work: "Work", personal: "Personal", custom: "Custom" },
+    linkedPeople: "People",
+    linkedPeopleEmpty: "No linked people.",
+    linkedProjects: "Projects",
+    linkedProjectsEmpty: "No linked projects.",
+    linkedTasks: "Tasks",
+    linkedTasksEmpty: "No linked tasks.",
+    addCompanyInline: "Create a new company",
+    newCompanyName: "New company name",
+    cancelInline: "Cancel",
   },
 } satisfies Record<Locale, EntityCopy>;
 

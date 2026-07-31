@@ -10,11 +10,17 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
  * The owner's organizations, for the company selector (UX-08, UX-09).
  *
  * `projects.organization_id` and `people.organization_id` have always existed
- * and have never been settable. This is the list that makes them settable —
- * **read only**. Nothing here creates an organization: DEC-4 authorizes
- * surfacing what the schema already holds, and a create path would be a new
- * write surface on a third table nobody asked for. Rows arrive today from the
- * extraction pipeline.
+ * and have never been settable. This is the list that makes them settable.
+ *
+ * **Amended by EGC.1.** The original header said "nothing here creates an
+ * organization … rows arrive today from the extraction pipeline", and that was
+ * true when written: DEC-4 authorized surfacing what the schema already held and
+ * nothing more. Real owner use then found the consequence — a selector that
+ * reports emptiness while owning no way to fix it is a dead end presented as a
+ * choice (`EG-04`) — so `createOrganization` and `createOrganizationForSubject`
+ * now exist in `actions.ts`. **This module is still read-only**; the sentence is
+ * amended rather than deleted so the reason the gap existed survives beside its
+ * closure.
  *
  * Row-level security scopes this to the caller, and the query adds no
  * `user_id` predicate of its own because the value is never used as a filter —
