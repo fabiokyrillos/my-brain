@@ -28,6 +28,29 @@
   background: var(--mist);
 }
 
+/**
+ * The create surfaces EGC.1 adds, as modifiers rather than as a second language.
+ *
+ * `.entity-create` sits in a list header beside a title, where `.entity-edit`'s
+ * bottom margin would push the header's baseline off the list. `.entity-inline-create`
+ * sits directly under an open edit form and belongs to it visually, so it loses
+ * the gap that separates independent blocks and gains the indent that says
+ * "this control is about the field above".
+ *
+ * Both reuse `.entity-edit-form`'s box, controls and buttons untouched. A create
+ * form that looked different from an edit form would be two visual grammars for
+ * one act.
+ */
+.entity-create {
+  margin: 0;
+}
+
+.entity-inline-create {
+  margin: -14px 0 26px;
+  padding-left: 22px;
+  border-left: 2px solid var(--line);
+}
+
 .entity-edit-form {
   display: grid;
   gap: 16px;

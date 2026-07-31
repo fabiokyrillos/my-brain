@@ -111,9 +111,11 @@ describe("history vocabulary", () => {
     }
   });
 
-  it("covers the four action types written from TypeScript rather than SQL", () => {
-    // `chat/actions.ts`, `entities/actions.ts` (×2) and `memories/actions.ts`
-    // insert directly, so the migration scan above cannot see them.
+  it("covers every action type written from TypeScript rather than SQL", () => {
+    // `chat/actions.ts`, `entities/actions.ts` and `memories/actions.ts` insert
+    // directly, so the migration scan above cannot see them. Each one has to be
+    // named here or it would render as the neutral fallback with nothing
+    // failing — which is precisely what would have happened to EGC.1's four.
     for (const action of [
       "chat_answered",
       "update_project",
@@ -122,10 +124,23 @@ describe("history vocabulary", () => {
       "update_memory",
       "archive_memory",
       "restore_memory",
+      // EGC.1 — the first writers of either entity type.
+      "create_organization",
+      "update_organization",
+      "create_context",
+      "update_context",
     ] as const) {
       expect(HISTORY_ACTION_TYPES).toContain(action);
       expect(historyCopy["pt-BR"].actions[action]).toBeTruthy();
       expect(historyCopy.en.actions[action]).toBeTruthy();
+    }
+  });
+
+  it("covers the two entity types no migration writes either", () => {
+    for (const entityType of ["organization", "context"] as const) {
+      expect(HISTORY_ENTITY_TYPES).toContain(entityType);
+      expect(historyCopy["pt-BR"].entityTypes[entityType]).toBeTruthy();
+      expect(historyCopy.en.entityTypes[entityType]).toBeTruthy();
     }
   });
 

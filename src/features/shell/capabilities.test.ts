@@ -65,7 +65,10 @@ describe("navigation capabilities", () => {
   it("defines the same ordered hierarchy for desktop and mobile More", () => {
     expect(primaryNavigationKeys).toEqual(["home", "inbox", "work", "chat"]);
     expect(moreNavigationGroups).toEqual([
-      { key: "context", items: ["projects", "people", "memories", "files"] },
+      // EGC.1 puts organizations and contexts beside the two entity destinations
+      // they relate, and ahead of the two that are stores rather than graph
+      // members. Declared order is rendered order, so this pins both.
+      { key: "context", items: ["projects", "people", "organizations", "contexts", "memories", "files"] },
       { key: "reflection", items: ["reviews", "questions"] },
       { key: "organization", items: ["reminders"] },
       { key: "transparency", items: ["history", "costs"] },

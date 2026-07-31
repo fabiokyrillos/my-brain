@@ -1,19 +1,31 @@
 # Project State
 
-Last updated: 2026-07-31 (Phase 2F complete; **the product UX/UI remediation is COMPLETE** — Slice H merged as `864d39c`, merge-SHA CI green; parity remains `202607310064`, which Slice G5 set; **hosted signup is now disabled and verified — see "Authorization state" below**)
+Last updated: 2026-07-31 (Phase 2F complete; the product UX/UI remediation is COMPLETE; **Entity Graph Completion Slice EGC.1 is COMPLETE** — organizations and contexts have their first application write path, gates A1–A10 all pass, parity unchanged at `202607310064`; hosted signup remains disabled and verified)
 
 ## Authorization state (2026-07-31)
 
 Bounded statements. Each is verified, and nothing here authorizes work beyond what it says.
 
 - **Hosted signup is DISABLED and verified.** `disable_signup: true` on the linked project `ulvwzqlpsjyrnqzfxmck`, proven by three cache-busted reads plus a signup attempt that returned `422 signup_disabled` using a **provider-accepted** address as a positive control. Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`. This closes gate **G-0.5**.
-- **Entity Graph Completion is AUTHORIZED; implementation has NOT started.** Governed by `docs/ENTITY_GRAPH_COMPLETION_PRD.md` and `docs/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`, on the evidence in `docs/reports/ENTITY_GRAPH_FINDINGS.md`. Three slices, **zero migrations**, zero grant or policy changes, no provider call, no `tasks`/`reminders` write-path change.
+- **Entity Graph Completion is AUTHORIZED and IN IMPLEMENTATION. Slice EGC.1 is complete.** Governed by `docs/ENTITY_GRAPH_COMPLETION_PRD.md` and `docs/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`, on the evidence in `docs/reports/ENTITY_GRAPH_FINDINGS.md`. Three slices, **zero migrations**, zero grant or policy changes, no provider call, no `tasks`/`reminders` write-path change — all four held through EGC.1. Its acceptance record is `docs/reports/EGC_SLICE_01_ACCEPTANCE.md`; all ten gates A1–A10 pass. **EGC.2 and EGC.3 have not started.**
 - **BYOK architecture and design package are APPROVED; implementation has NOT started.** `docs/reports/BYOK_SECURITY_DEFINITION.md`, `docs/BYOK_PRD.md`, `docs/BYOK_IMPLEMENTATION_PLAN.md`. No credential table, no resolver, no adapter and no guard exists yet.
 - **Phase 2G remains UNAUTHORIZED and UNSTARTED.** `docs/reports/PHASE_2G_DEFINITION.md` is a definition study: it declares no requirement, plans no work, and its own header says the phase is unauthorized. The A13 guard now measures phase start by **implementation-governing artifact, declared requirement family, accepted ADR or implementation-marked file** rather than by filename — see ADR-067.
 - **Public signup remains BLOCKED** on BYOK implementation plus signup hardening, which includes account deletion, admin suspension, terms and privacy policy — none of which exists.
 - **The closed product UX ledger is unchanged:** 35 findings, 30 RESOLVED, 4 RETAINED, 1 DEFERRED, 0 OPEN, 0 PARTIAL, 0 BLOCKED, all 8 P0 RESOLVED. No count and no disposition moved.
 - **Migration parity remains `202607310064`**, local and remote. Nothing in this branch adds, edits or applies a migration.
 - **One production account was removed** as abandoned test residue, with owner authorization and full cascade verification: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`. Two real accounts remain.
+
+## Slice EGC.1 — Organizations and Contexts (complete)
+
+**`public.organizations` and `public.contexts` now have their first application write path.** Both were created by `202607160003` with forced RLS, four own-row policies and full `authenticated` CRUD, and for fifteen days nothing in the application wrote either — the only writer of any kind was `persist_entry_interpretation`. So a company could exist because a capture mentioned it, while the Company selector reported emptiness with no way to fix it (`EG-04`).
+
+Delivered: four routes (`/app/organizations`, `/app/organizations/[organizationId]`, `/app/contexts`, `/app/contexts/[contextId]`), five Server Actions, two list loaders and one bounded options loader, both destinations in the `context` navigation group, both entity types in the History vocabulary and linkable from a history row, and create-and-select on the Company selector of the Person and Project forms.
+
+**Zero migrations, zero grant changes, zero policy changes, zero new privileged boundaries, zero AI calls, no `tasks`/`reminders` write-path change, no deletion path.** Parity stays `202607310064`. The locale-ternary count stays at **266**, the G-0.4 baseline exactly.
+
+**The adversarial review found thirteen defects and all thirteen were fixed, not argued down.** Three were BLOCKERs in the pgTAP suite that would have made the `database` CI job red on its first run — Docker is unavailable locally, so the suite could not be executed before CI would have. One was a real audit defect: the create-and-assign path overwrote an existing company with no `before_state`. One was **older than this slice** — Cancel-after-a-refusal permanently killed the reopen control on the Project and Person edit forms shipped in Phase 2F, leaving a dead Edit button until a page reload. Full accounting in `docs/reports/EGC_SLICE_01_ACCEPTANCE.md` §4.
+
+**Two tests fail locally and are not this slice's.** `sql-reachability.test.ts` loses 2 of 46 assertions on this Windows checkout and loses the identical two on `main` at `4071a2f`, whose CI was green. The cause is the CRLF fragility Slice H diagnosed; it is recorded as repository maintenance and deliberately not fixed inside a feature branch. See §5 of the acceptance record.
 
 ## Current truth
 

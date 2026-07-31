@@ -69,6 +69,11 @@ const SUBJECT_SOURCES: Readonly<
   person: { table: "people", column: "name" },
   conversation: { table: "conversations", column: "title" },
   reminder: { table: "reminders", column: "title" },
+  // EGC.1. Both tables carry `user_id` and `name`, so they need no special case
+  // beyond being listed — and being listed is compulsory, since the record is
+  // keyed on `LinkableEntityType` and omitting one would not compile.
+  organization: { table: "organizations", column: "name" },
+  context: { table: "contexts", column: "name" },
 };
 
 export type HistoryPage = {

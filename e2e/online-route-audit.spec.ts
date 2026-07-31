@@ -55,6 +55,10 @@ const STATIC_ROUTES = [
   "/tasks",
   "/projects",
   "/people",
+  // EGC.1. Both must appear here or the sweep would measure a shrinking share
+  // of the product while still calling itself the current inventory.
+  "/organizations",
+  "/contexts",
   "/memories",
   "/reminders",
   "/reviews",

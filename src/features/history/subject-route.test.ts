@@ -28,6 +28,11 @@ describe("history subject routes", () => {
       // carries a `#reminder-<uuid>` fragment to the row instead. The promise
       // being checked here is still the same one: the page it lands on exists.
       reminder: "reminders",
+      // EGC.1. Both routes are created in the same change that makes these two
+      // linkable, so this assertion is the one that would have caught a link
+      // added ahead of its page.
+      organization: join("organizations", "[organizationId]"),
+      context: join("contexts", "[contextId]"),
     };
 
     for (const entityType of LINKABLE_ENTITY_TYPES) {
@@ -48,6 +53,8 @@ describe("history subject routes", () => {
     expect(subjectHref("task", "task-1", "pt-BR")).toBe("/pt-BR/app/work/task-1");
     expect(subjectHref("memory", "mem-1", "en")).toBe("/en/app/memories/mem-1");
     expect(subjectHref("person", "person-1", "pt-BR")).toBe("/pt-BR/app/people/person-1");
+    expect(subjectHref("organization", "org-1", "en")).toBe("/en/app/organizations/org-1");
+    expect(subjectHref("context", "ctx-1", "pt-BR")).toBe("/pt-BR/app/contexts/ctx-1");
   });
 
   it("returns null for the kinds with no detail page", () => {

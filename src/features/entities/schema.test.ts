@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { personUpdateSchema, projectUpdateSchema, PROJECT_STATUSES } from "./schema";
+import {
+  asContextKind,
+  contextCreateSchema,
+  contextUpdateSchema,
+  CONTEXT_KINDS,
+  organizationCreateSchema,
+  organizationUpdateSchema,
+  personUpdateSchema,
+  projectUpdateSchema,
+  PROJECT_STATUSES,
+} from "./schema";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const PERSON_ID = "22222222-2222-4222-8222-222222222222";
@@ -100,5 +110,102 @@ describe("personUpdateSchema", () => {
 
   it("refuses an unknown field rather than ignoring it", () => {
     expect(personUpdateSchema.safeParse(person({ userId: "someone-else" })).success).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Organizations and contexts — EGC.1                                          */
+/* -------------------------------------------------------------------------- */
+
+const CONTEXT_ID = "44444444-4444-4444-8444-444444444444";
+
+describe("the organization schemas", () => {
+  const create = (overrides: Record<string, unknown> = {}) => ({
+    locale: "pt-BR",
+    name: "Acme",
+    description: "Cliente",
+    ...overrides,
+  });
+
+  it("accepts a name at the 160 bound and refuses 161", () => {
+    // `organizations_name_check` is 1–160. Accepting 161 here would put the
+    // refusal in the database, where the form has no sentence for it.
+    expect(organizationCreateSchema.safeParse(create({ name: "x".repeat(160) })).success).toBe(true);
+    expect(organizationCreateSchema.safeParse(create({ name: "x".repeat(161) })).success).toBe(false);
+  });
+
+  it("refuses a name that is only whitespace", () => {
+    expect(organizationCreateSchema.safeParse(create({ name: "   " })).success).toBe(false);
+  });
+
+  it("normalizes an empty description to null rather than storing an empty string", () => {
+    // A row that is neither absent nor present: the placeholder stops appearing
+    // and nothing takes its place.
+    const parsed = organizationCreateSchema.safeParse(create({ description: "  " }));
+    expect(parsed.success && parsed.data.description).toBeNull();
+  });
+
+  it("refuses an unknown field rather than ignoring it", () => {
+    expect(organizationCreateSchema.safeParse(create({ userId: "someone-else" })).success).toBe(false);
+    expect(organizationCreateSchema.safeParse(create({ organizationId: CONTEXT_ID })).success).toBe(false);
+  });
+
+  it("requires a uuid on the update schema, so a forged id is a refusal", () => {
+    expect(organizationUpdateSchema.safeParse({ ...create(), organizationId: "nope" }).success).toBe(false);
+    expect(
+      organizationUpdateSchema.safeParse({ ...create(), organizationId: CONTEXT_ID }).success,
+    ).toBe(true);
+  });
+});
+
+describe("the context schemas", () => {
+  const create = (overrides: Record<string, unknown> = {}) => ({
+    locale: "en",
+    name: "Personal",
+    description: "",
+    kind: "personal",
+    ...overrides,
+  });
+
+  it("bounds the name at 120, not at the 160 the other three tables use", () => {
+    // The single most likely way to get this wrong is to reuse `entityName`.
+    // `contexts_name_check` is 120, so 121–160 would pass the form and be
+    // refused by the database with a `23514` nobody can read.
+    expect(contextCreateSchema.safeParse(create({ name: "x".repeat(120) })).success).toBe(true);
+    expect(contextCreateSchema.safeParse(create({ name: "x".repeat(121) })).success).toBe(false);
+  });
+
+  it("accepts exactly the three kinds the CHECK allows", () => {
+    for (const kind of CONTEXT_KINDS) {
+      expect(contextCreateSchema.safeParse(create({ kind })).success, kind).toBe(true);
+    }
+    expect(contextCreateSchema.safeParse(create({ kind: "family" })).success).toBe(false);
+    expect(contextCreateSchema.safeParse(create({ kind: "" })).success).toBe(false);
+  });
+
+  it("refuses an unknown field and a missing kind", () => {
+    expect(contextCreateSchema.safeParse(create({ userId: "someone-else" })).success).toBe(false);
+    const withoutKind: Record<string, unknown> = create();
+    delete withoutKind.kind;
+    expect(contextCreateSchema.safeParse(withoutKind).success).toBe(false);
+  });
+
+  it("requires a uuid on the update schema", () => {
+    expect(contextUpdateSchema.safeParse({ ...create(), contextId: "nope" }).success).toBe(false);
+    expect(contextUpdateSchema.safeParse({ ...create(), contextId: CONTEXT_ID }).success).toBe(true);
+  });
+});
+
+describe("asContextKind", () => {
+  it("returns each of the three unchanged", () => {
+    for (const kind of CONTEXT_KINDS) expect(asContextKind(kind)).toBe(kind);
+  });
+
+  it("folds an unrecognised stored value to custom rather than throwing", () => {
+    // `contexts.kind` is `text` with a CHECK, so a value outside the three is a
+    // data fault. A detail page must render it, not crash on it — and `custom`
+    // is the kind that promises the reader least about the row.
+    expect(asContextKind("family")).toBe("custom");
+    expect(asContextKind("")).toBe("custom");
   });
 });

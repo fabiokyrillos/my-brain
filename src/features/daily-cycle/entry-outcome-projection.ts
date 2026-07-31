@@ -70,15 +70,22 @@ const reminderStates: Record<DailyCycleLocale, Record<string, string>> = {
 /**
  * The route each family's rows can be inspected at, or `null` where none exists.
  *
- * Entities are the honest `null` case: a person and a project each have a detail
- * page, an organization and a context do not. UX-20's rule is that what looks
- * actionable must be actionable, so the two without a destination render as
- * plain text rather than as a link to a 404 — the same mistake G4 caught itself
- * making with deleted history subjects.
+ * **Amended by EGC.1.** This used to say organizations and contexts were "the
+ * honest `null` case … a person and a project each have a detail page, an
+ * organization and a context do not", and that was true when written: UX-20's
+ * rule is that what looks actionable must be actionable, so both degraded to
+ * plain text rather than link to a 404. EGC.1 gave both a route, so the honest
+ * answer changed with the fact rather than because the plain text looked poor.
+ *
+ * The `null` return survives for a different reason than it was written for: an
+ * `entry_entities` row can name an `entity_type` no route exists for, and that
+ * unknown must still degrade to text rather than to a guessed URL.
  */
 function entityHref(locale: string, entityType: string, entityId: string): string | null {
   if (entityType === "person") return `/${locale}/app/people/${entityId}`;
   if (entityType === "project") return `/${locale}/app/projects/${entityId}`;
+  if (entityType === "organization") return `/${locale}/app/organizations/${entityId}`;
+  if (entityType === "context") return `/${locale}/app/contexts/${entityId}`;
   return null;
 }
 
