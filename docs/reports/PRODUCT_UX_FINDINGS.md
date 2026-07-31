@@ -106,7 +106,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
 | UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | **RESOLVED** (Slice G1) |
-| UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | OPEN |
+| UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | **BLOCKED on DEC-6** (grant posture) |
 | UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | OPEN |
 | UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring closed in B2) |
 | UX-15 | Panel list rows collapse the title to ~6–16 lines (`auto` meta column) | visual | **P0** | yes | **RESOLVED** |
@@ -637,8 +637,11 @@ that measured clean and is recorded so it is not "fixed" without cause.
   the one `apply_task_command` maintains. The audit must confirm, before implementing,
   which reminder mutations are reserved to the command path — recorded as an
   implementation precondition for Slice G.
-- **Slice** — G.
-- **Disposition** — OPEN.
+- **Slice** — G2.
+- **Disposition** — **BLOCKED on DEC-6.** The precondition this finding set for
+  itself was run and it stops the slice: `202607300063` revokes `update` and `delete` on
+  `public.reminders` from `authenticated` and asserts that posture at deploy time, so the
+  proposed Server Action cannot write. See the Slice G2 section.
 
 ## UX-13 — History has no search, no filters, raw vocabulary and no link to the subject
 
@@ -2161,3 +2164,92 @@ no default), and PostgREST refuses a batch insert whose objects do not share key
 - **UX-11 — RESOLVED.** A resolved question is reachable, says what it changed, and links to
   where the decision is recorded. The control names the owner's goal rather than the internal
   object.
+
+---
+
+# Slice G2 — BLOCKED. The reminder precondition is answered, and it is a gate
+
+UX-12 set its own implementation precondition: *"The audit must confirm, before implementing,
+which reminder mutations are reserved to the command path."* That confirmation was run before
+any code was written, and it stops the slice.
+
+## What the audit found
+
+**`authenticated` cannot update a reminder at all.** Migration `202607300063` — Phase 2F Slice
+2F.4, still the parity head — revokes it:
+
+```sql
+revoke update, delete on public.reminders from authenticated;
+```
+
+and the table's own comment states the determination it enforces:
+
+> `Phase 2F Slice 2F.4: authenticated holds SELECT and INSERT. INSERT is the documented Option C
+> authoring exception (PRD §2 item 6, sole caller createReminder); UPDATE and DELETE are revoked
+> on the 2F-REMINDER-003 determination. Reminder mutation in production is derived reconciliation
+> inside apply_task_command and the undo handlers, or delivery mark-sent inside
+> run_user_heartbeat. Rows are removed only by cascade.`
+
+The migration does not merely revoke — it **asserts** the posture at deploy time, raising if
+`authenticated` still holds `update`/`delete` or has lost `select`/`insert`
+(`202607300063:135-144`).
+
+### Every reminder mutation that exists today
+
+| Writer | Kind |
+| --- | --- |
+| `apply_task_command` and the destructive-confirmation / no-match-creation family | derived reconciliation from task state |
+| the registered `undo_*` handlers via `undo_operation` | compensation |
+| `run_user_heartbeat` | delivery mark-sent |
+| `auth.users` cascade | deletion |
+| `createReminder` (`agent/actions.ts:125`) | **INSERT only** — the sole application writer, and the documented Option C exception |
+
+## Why that blocks UX-12 as proposed
+
+UX-12's proposal is *"row actions for snooze, cancel and reschedule through a validated Server
+Action that writes the reminder's own columns"*. That Server Action would run as
+`authenticated` and would be refused by the grant. There is no way to ship it without one of:
+
+1. **Re-granting `update`** on `public.reminders` to `authenticated` — a migration that
+   directly reverses the 2F-REMINDER-003 determination, and would fail 2F's own assertion.
+2. **A new `SECURITY DEFINER` RPC** for owner-initiated reminder transitions — a migration, a
+   new validated write contract, and a second reminder-mutation authority alongside
+   `apply_task_command`, which UX-12 itself said must not happen.
+
+Routing through the existing command path does not rescue it either: `apply_task_command`
+reconciles reminders *as a side effect of task state*, and a standalone reminder created by
+`createReminder` has no task to command. "Snooze this reminder" is not expressible as a task
+command.
+
+## What is not blocked
+
+Two parts of UX-12 are pure reads and need no decision. They are deliberately **not** shipped
+here, because shipping half a lifecycle would leave the page still saying "create only" while
+implying more:
+
+- showing the linked task or entry as a link (`reminders.task_id` / `entry_id`);
+- rendering `status` through a copy module instead of printing the raw enum (UX-21).
+
+They are folded into whichever slice takes UX-12 once the decision below is made.
+
+## DEC-6 — owner decision required (UX-12)
+
+**Does the owner want reminder snooze / cancel / reschedule from the reminders page, knowing it
+requires a migration that changes a Phase 2F determination?**
+
+- **(a) A new `SECURITY DEFINER` RPC** for owner-initiated transitions, keeping
+  `authenticated`'s grant posture intact — *recommended if the capability is wanted*. It adds a
+  second reminder authority, so it must state, in SQL, which transitions belong to it and which
+  stay with `apply_task_command`. Reversible: the RPC can be dropped.
+- **(b) Re-grant `update`** to `authenticated`. Smallest diff, and it reverses a recorded
+  determination and weakens One Write Path for this table. **Not recommended.**
+- **(c) Ship the read-only half only** — links and localized status — and leave the lifecycle
+  where Phase 2F put it. No migration, no decision reversed; the page stays create-only for
+  mutation. Reversible: yes.
+
+**Blocks:** UX-12 and Slice G2. **Does not block:** UX-10 (G3) or UX-13 (G4), which carry no
+grant constraint.
+
+- **UX-12 — BLOCKED on DEC-6.** Not a UI problem: `authenticated` holds no `update` on
+  `public.reminders`, by a deliberate Phase 2F determination that the parity-head migration
+  asserts at deploy time.
