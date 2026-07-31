@@ -1,6 +1,7 @@
 import { Workflow } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { getVocabularyCopy, jobStatusLabel, jobTypeLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
@@ -17,5 +18,5 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
   const result = await supabase.from("jobs").select("id,type,status,attempts,max_attempts,error,created_at").order("created_at", { ascending: false }).range(from, to);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load jobs") ?? []);
 
-  return <div className="content-page"><header className="list-header"><div><p className="eyebrow">{pt ? "PROCESSAMENTO" : "PROCESSING"}</p><h1>Jobs</h1><p>{pt ? "Fila técnica privada para processamentos assíncronos e tentativas." : "Private technical queue for asynchronous processing and retries."}</p></div></header>{items.length ? <div className="list-stack">{items.map((job) => <article className="list-row" key={job.id}><div className="list-row-main"><strong>{job.type}</strong><p>{job.error ?? `${pt ? "Tentativas" : "Attempts"}: ${job.attempts}/${job.max_attempts}`}</p></div><div className="list-meta"><span className={`status-badge ${job.status}`}>{job.status}</span></div></article>)}</div> : <div className="empty-list"><Workflow size={30} /><strong>{pt ? "Fila vazia" : "Queue empty"}</strong><p>{pt ? "Jobs de arquivos, resumos e integrações aparecerão aqui." : "File, summary, and integration jobs appear here."}</p></div>}<PaginationLinks locale={locale} path="jobs" page={page} hasNext={hasNext} /></div>;
+  return <div className="content-page"><header className="list-header"><div><p className="eyebrow">{pt ? "PROCESSAMENTO" : "PROCESSING"}</p><h1>Jobs</h1><p>{pt ? "Fila técnica privada para processamentos assíncronos e tentativas." : "Private technical queue for asynchronous processing and retries."}</p></div></header>{items.length ? <div className="list-stack">{items.map((job) => <article className="list-row" key={job.id}><div className="list-row-main"><strong>{jobTypeLabel(locale, job.type)}</strong><p>{job.error ?? `${pt ? "Tentativas" : "Attempts"}: ${job.attempts}/${job.max_attempts}`}</p></div><div className="list-meta"><span className={`status-badge ${job.status}`}>{jobStatusLabel(locale, job.status) ?? getVocabularyCopy(locale).unknownState}</span></div></article>)}</div> : <div className="empty-list"><Workflow size={30} /><strong>{pt ? "Fila vazia" : "Queue empty"}</strong><p>{pt ? "Jobs de arquivos, resumos e integrações aparecerão aqui." : "File, summary, and integration jobs appear here."}</p></div>}<PaginationLinks locale={locale} path="jobs" page={page} hasNext={hasNext} /></div>;
 }

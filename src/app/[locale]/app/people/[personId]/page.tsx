@@ -5,6 +5,7 @@ import { updatePerson } from "@/features/entities/actions";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
+import { contextKindLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -15,6 +16,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const locale = candidate;
   const pt = locale === "pt-BR";
   const copy = getEntityCopy(locale);
+  const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
   const [
     personResult,
@@ -120,7 +122,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           {contexts.length ? (
             <div className="mini-list">
               {contexts.map((context) => (
-                <article key={context.id}><strong>{context.name}</strong><span>{context.kind}</span></article>
+                <article key={context.id}><strong>{context.name}</strong><span>{contextKindLabel(locale, context.kind) ?? vocabulary.unknownState}</span></article>
               ))}
             </div>
           ) : <p className="quiet-state">{copy.contextsEmpty}</p>}
@@ -132,7 +134,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           <h2>{pt ? "Pendências e tarefas" : "Open work and tasks"}</h2>
           {tasks.length ? (
             <div className="mini-list">
-              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{task.status}</span></article>)}
+              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span></article>)}
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
         </section>
@@ -155,7 +157,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         <section className="entity-memory">
           <h2>{pt ? "Memórias" : "Memories"}</h2>
           {memories.map((memory) => (
-            <article key={memory.id}><strong>{memory.content}</strong><span>{memory.kind}</span></article>
+            <article key={memory.id}><strong>{memory.content}</strong><span>{memoryKindLabel(locale, memory.kind) ?? vocabulary.unknownState}</span></article>
           ))}
         </section>
       )}

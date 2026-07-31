@@ -12,6 +12,7 @@
 import { getTaskCommandCopy } from "./copy";
 import type { TaskMatchEvidence } from "./match-policy";
 import type { TaskMatchResult } from "./matching";
+import { getVocabularyCopy, taskStatusLabel } from "@/features/vocabulary/copy";
 import type { Locale } from "@/lib/preferences";
 
 /**
@@ -141,7 +142,12 @@ export function buildTaskDisambiguation(
       : result.candidates.map((candidate) => ({
           taskId: candidate.taskId,
           title: candidate.preState.title,
-          status: candidate.preState.status,
+          // Localized here, beside `dueAt` and the evidence text, because every
+          // other value on this view already is (UX-21). The console rendered
+          // `in_progress` verbatim to both locales, under a title the same
+          // projection had translated.
+          status: taskStatusLabel(locale, candidate.preState.status)
+            ?? getVocabularyCopy(locale).unknownState,
           dueAt: renderInstant(
             candidate.preState.dueAt,
             locale,
