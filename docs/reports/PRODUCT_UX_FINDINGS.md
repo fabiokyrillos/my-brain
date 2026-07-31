@@ -105,7 +105,7 @@ Route inventory (`src/app/[locale]/app/`): `page` (Home), `capture`, `inbox`,
 | UX-08 | Projects: create-by-name only; no edit path at all | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
 | UX-09 | People: create-by-name only; modelled relations unsurfaced | missing-lifecycle | P1 | yes | **RESOLVED** (Slice F2) |
 | UX-10 | Memories have no mental model, no provenance, no lifecycle | missing-lifecycle | P1 | yes | OPEN |
-| UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | OPEN |
+| UX-11 | Pending-question resolution has no visible after-state | interaction-model | **P0** | partly | **RESOLVED** (Slice G1) |
 | UX-12 | Reminders expose create only; snooze/cancel/edit modelled but unreachable | missing-lifecycle | P1 | yes | OPEN |
 | UX-13 | History has no search, no filters, raw DB vocabulary, no link to subject | usability | P1 | yes | OPEN |
 | UX-14 | Mobile: capture FAB mis-ordered and off-centre; no safe-area inset | responsive | **P0** | yes | **RESOLVED** (centring closed in B2) |
@@ -328,7 +328,11 @@ that measured clean and is recorded so it is not "fixed" without cause.
 - **Validation** — component tests for the outcome panel; DB-backed test that an
   answered question is retrievable in the resolved view; Playwright journey through
   answer → outcome → inspect-later, desktop + mobile, both locales.
-- **Disposition** — OPEN.
+- **Slice** — G1.
+- **Disposition** — **RESOLVED** in Slice G1. The after-state was already stored and is now
+  reachable: a resolved tab whose filter is the exact complement of the open queue’s, an
+  outcome card stating what changed and linking to where it is recorded, and the control
+  renamed to the owner’s goal. No write was added.
 
 ---
 
@@ -2063,3 +2067,97 @@ against real use rather than in the abstract, which is what DEC-4 asked for.
   are shown. New fields remain a DEC-4 question.
 - **UX-09 — RESOLVED.** Name, notes and company are editable; relationships, contexts and
   per-project roles are surfaced. A person-level role remains a DEC-4 question.
+
+---
+
+# Slice G1 — what happened after you answered (UX-11)
+
+**Branch** `codex/ux-slice-g1-question-outcome`, cut from the green Slice F2 merge SHA
+`558ecdd`. **Covers** UX-11, the last **P0** in the ledger. **Non-goals** — no new write, no
+change to `resolve_pending_question_v3`, and nothing about memories, reminders or history
+(G2–G4). **Rollback boundary** — removing the `?view=resolved` branch restores the previous
+page; the projection and the card are otherwise unreferenced.
+
+**Slice G is split into four.** They are four independent findings on four routes, and one of
+them (UX-12) carries an implementation precondition the ledger set for itself. Splitting keeps
+each diff reviewable, as B/B2, D1–D3 and F1/F2 were.
+
+| | Finding | Status |
+| --- | --- | --- |
+| **G1** | UX-11 — question after-state (**P0**) | this slice |
+| **G2** | UX-12 — reminders lifecycle | precondition first: confirm which reminder mutations are reserved to `apply_task_command` |
+| **G3** | UX-10 — memories | conversational path stays DEC-5-deferred |
+| **G4** | UX-13 — history | |
+
+## The finding was not a missing feature
+
+Everything the owner wanted to see was **already stored**. `pending_questions` has held
+`answer`, `answered_at` and `status` since `202607160007`; `resolve_pending_question_v3`
+writes two independently replay-safe audit rows and `202607230050` reinterprets on answer.
+
+What happened is that `actionablePendingQuestionFilter` removed the row from **the only list
+that existed**, and nothing else listed it. The owner answered, the card vanished, and the
+product said nothing about what that had achieved.
+
+So this slice **reads**. It writes nothing and changes no contract.
+
+## The partition, which is the actual fix
+
+`resolvedPendingQuestionFilter` lives next to `actionablePendingQuestionFilter` in
+`question-visibility.ts`, because the two are only correct **as a pair**: between them they
+must cover all four `pending_questions` states exactly once. The test asserts *that property*
+— over every status the column's CHECK allows — rather than asserting either filter string,
+because "a resolved question was in neither list" is precisely the defect.
+
+A snoozed question whose deadline is still ahead is included as **deferred**. It is not
+resolved, but it left the queue because the owner acted on it, and that is the same
+disappearance the finding is about. Slice 2D.2's read-time reactivation is untouched: once the
+deadline passes the question is open again, and the two filters swap it back.
+
+## What the card says, and one thing it refuses to say
+
+Four lines, separate because they are separately actionable: **what you wrote**, **what it
+changed**, **whether anything still needs you**, **where it is recorded** — only the last leads
+anywhere.
+
+The refusal matters. Whether an answer re-ran the interpretation is read from the
+`question_consequence_confirmed` audit row, which the RPC writes *only when a consequence was
+actually applied* — never inferred from the answer's presence. A plain answer with
+`consequence: "none"` changes the record without re-reading it, and telling the owner otherwise
+would describe work that never happened. An unreadable audit degrades to "not reinterpreted",
+which is the truthful reading when the process cannot say.
+
+## The label
+
+`Corrigir interpretação` → **`Ajustar o que o {agent} entendeu`** (and `Correct interpretation`
+→ `Adjust what {agent} understood`). The old label asked the owner to know what an
+interpretation *is*; the owner's own note was that it must not feel like an internal debugging
+action. It carries the assistant's configured name through Slice F1's token, so it stays
+personalized. `getInterpretationCopy` now takes the name as a required argument for the same
+reason the other three getters do — the compiler finds every surface rather than a grep.
+
+## Gates
+
+`tsc --noEmit` 0 · `eslint` 0 · `npm test` **2859/2861** (the two are the pre-existing
+Windows-CRLF regex reads in `sql-reachability.test.ts`, unchanged since B2) ·
+`npm run build` exit 0 · **19 new tests** across the partition and the outcome card.
+
+Journeys, **on the production build against the linked live database**: **80/80** across
+`online-question-outcome`, `online-entity-editing`, `online-assistant-name`,
+`online-assistant-composer`, `online-mobile-navigation`, `account-session`,
+`layout-contracts`, `foundation` and `task-command`, on desktop **and** Pixel 7, both locales.
+Disposable account deleted fail-closed — the cascade takes the entry, the interpretation and
+both seeded questions — and a post-run sweep found **zero** residue.
+
+Migration parity unchanged at `202607300063`. No deployment. Phase 2G remains unstarted.
+
+### Two things the seed had to learn from the schema
+
+Recorded because they cost two failing runs and would cost the next author the same:
+`entry_interpretations` requires its provenance columns **and** `raw_output` (all `not null`,
+no default), and PostgREST refuses a batch insert whose objects do not share keys
+(`PGRST102`) — so a dismissal has to state its nulls explicitly.
+
+- **UX-11 — RESOLVED.** A resolved question is reachable, says what it changed, and links to
+  where the decision is recorded. The control names the owner's goal rather than the internal
+  object.
