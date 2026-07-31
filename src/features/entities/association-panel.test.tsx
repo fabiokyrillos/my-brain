@@ -51,6 +51,42 @@ describe("AssociationPanel", () => {
     expect(screen.queryByRole("button", { name: "Vincular a um contexto" })).toBeNull();
   });
 
+  it("says everything is linked, not 'create one first', when the owner owns some", async () => {
+    // The defect the Camila journey caught. Linking a person to the owner's
+    // ONLY context left the panel advising them to create a context — something
+    // they already had — printed over the confirmation it had just replaced.
+    // "You own none" and "you have linked them all" are different facts with
+    // different next steps, and this is the assertion that keeps them apart.
+    const linked: EntityEditState = { status: "success", message: "Vínculo criado." };
+    render(panel(personContext, {
+      addAction: resolvesTo(linked),
+      options: [{ id: CONTEXT_ID, label: "Pessoal" }],
+      rows: [{ id: CONTEXT_ID, label: "Pessoal", href: null }],
+    }));
+
+    expect(screen.getByText("Todos os seus contextos já estão vinculados a esta pessoa.")).toBeVisible();
+    expect(screen.queryByText("Crie um contexto antes de vincular alguém a ele.")).toBeNull();
+  });
+
+  it("keeps the outcome readable in that state rather than replacing it with a hint", async () => {
+    // The round that linked the last one is the round whose confirmation the
+    // owner most needs to see: the control they used has just disappeared.
+    const linked: EntityEditState = { status: "success", message: "Vínculo criado." };
+    render(panel(personProject, {
+      addAction: resolvesTo(linked),
+      options: [{ id: PROJECT_ID, label: "Atlas" }],
+      roleAction: resolvesTo(idle),
+      rows: [],
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Vincular a um projeto" }));
+    await userEvent.click(screen.getByRole("button", { name: "Vincular projeto" }));
+
+    // The panel's own rows do not change without a server round trip, so the
+    // success state is what has to carry the news here.
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Vínculo criado."));
+  });
+
   it("names the missing thing per placement, not with one generic sentence", () => {
     const { unmount } = render(panel(personProject));
     expect(screen.getByText("Crie um projeto antes de vincular alguém a ele.")).toBeVisible();

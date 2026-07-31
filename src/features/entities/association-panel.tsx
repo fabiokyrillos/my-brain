@@ -105,6 +105,21 @@ export function AssociationPanel({
         ? copy.addProjectAssociation
         : copy.addPersonAssociation;
 
+  /**
+   * "You own none of these" and "you have linked them all" are different facts.
+   *
+   * The first draft collapsed them, and the Camila journey caught it: linking a
+   * person to the owner's only context left the panel saying *create a context
+   * first* — advice to make something they already had, printed over the success
+   * it had just replaced. That is the same shape as `EG-04`, in a new place.
+   */
+  const allLinkedHint =
+    target.kind === "person-context"
+      ? copy.allContextsLinked
+      : target.kind === "person-project"
+        ? copy.allProjectsLinked
+        : copy.allPeopleLinked;
+
   /** Rows the owner already has, so the selector cannot offer a duplicate. */
   const linkedIds = new Set(rows.map((row) => row.id));
   const selectable = options.filter((option) => !linkedIds.has(option.id));
@@ -135,10 +150,12 @@ export function AssociationPanel({
       <AssociationCreate
         action={addAction}
         addLabel={addLabel}
+        allLinkedHint={allLinkedHint}
         emptyOptionsHint={emptyOptionsHint}
         hasRole={hasRole}
         locale={locale}
         options={selectable}
+        ownsNone={options.length === 0}
         target={target}
       />
     </section>
@@ -247,18 +264,24 @@ function AssociationRowItem({
 function AssociationCreate({
   action,
   addLabel,
+  allLinkedHint,
   emptyOptionsHint,
   hasRole,
   locale,
   options,
+  ownsNone,
   target,
 }: {
   action: EntityEditAction;
   addLabel: string;
+  allLinkedHint: string;
   emptyOptionsHint: string;
   hasRole: boolean;
   locale: Locale;
+  /** What is left to choose — the owner's own rows, minus what is already linked. */
   options: readonly AssociationOption[];
+  /** Whether the owner has none of this kind at all, which is a different fact. */
+  ownsNone: boolean;
   target: AssociationTarget;
 }) {
   const copy = getEntityCopy(locale);
@@ -269,15 +292,37 @@ function AssociationCreate({
   const open = openedFor === state || (state.status === "error" && dismissed !== state);
 
   /**
-   * With nothing left to choose, the panel explains instead of offering an empty
+   * With nothing to choose, the panel explains instead of offering an empty
    * select (EGC-ASSOC-008).
    *
    * The disclosure is not merely disabled: a control that opens onto one empty
    * dropdown is the same dead end `EG-04` named on the Company selector, and
    * this initiative exists because of that pattern.
    */
-  if (options.length === 0) {
+  if (ownsNone) {
     return <p className="entity-edit-hint">{emptyOptionsHint}</p>;
+  }
+
+  /**
+   * Everything is linked already — a *success* state, not a missing-prerequisite
+   * one, and it keeps the outcome of the round that produced it.
+   *
+   * The first draft returned `emptyOptionsHint` here too. The Camila journey
+   * caught it: linking a person to the owner's only context printed "create a
+   * context first" over the confirmation it had just replaced.
+   */
+  if (options.length === 0) {
+    return (
+      <div className="entity-edit">
+        <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+          {state.status === "idle" ? "" : state.message}
+        </div>
+        {state.status === "success" ? (
+          <p className="entity-edit-feedback success">{state.message}</p>
+        ) : null}
+        <p className="entity-edit-hint">{allLinkedHint}</p>
+      </div>
+    );
   }
 
   const selectName =

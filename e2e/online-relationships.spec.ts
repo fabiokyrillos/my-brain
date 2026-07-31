@@ -79,6 +79,21 @@ test.describe("relationships and associations", () => {
     return page.locator("p.entity-edit-feedback", { hasText: text });
   }
 
+  /**
+   * Association selects are addressed by their form field name, not by label.
+   *
+   * `getByLabel("Contexto")` matches three nodes on a Person page, and two of
+   * them are navigation: `navGroups.context` is `aria-label="Contexto"` on both
+   * the desktop rail and the mobile overflow. The third is the select itself,
+   * whose computed name is `ContextoPessoal` — the label plus its own selected
+   * option — so even an exact match would not reach it. The field name is what
+   * the Server Action's strict schema keys on, which makes it both precise and
+   * the thing actually worth asserting against.
+   */
+  function field(page: import("@playwright/test").Page, name: string) {
+    return page.locator(`select[name="${name}"], input[name="${name}"]`);
+  }
+
   async function createPerson(page: import("@playwright/test").Page, name: string) {
     await page.goto("/pt-BR/app/people");
     await page.getByRole("textbox", { name: "Nome da pessoa" }).fill(name);
@@ -90,6 +105,16 @@ test.describe("relationships and associations", () => {
   }
 
   test("gate B1: the Camila scenario, end to end", async ({ page }) => {
+    /**
+     * The longest journey in the suite, and deliberately so: it is the whole
+     * scenario rather than a slice of it — four creations, five server round
+     * trips and a reload after each, then the same association read back from
+     * the other surface. It ran in 28.4s against the 30s default, which is a
+     * budget rather than a measurement. Raised so a slow round trip reports as
+     * a slow round trip instead of as a missing link on the last assertion.
+     */
+    test.setTimeout(120_000);
+
     const camila = `Camila ${crypto.randomUUID().slice(0, 8)}`;
     const context = `Pessoal ${crypto.randomUUID().slice(0, 8)}`;
     const company = `Acme ${crypto.randomUUID().slice(0, 8)}`;
@@ -116,8 +141,8 @@ test.describe("relationships and associations", () => {
 
     // --- The relationship. This is the thing that was impossible. -----------
     await page.getByRole("button", { name: "Registrar relação" }).click();
-    await page.getByLabel("Tipo de relação").selectOption("spouse");
-    await page.getByLabel("Observação").fill("casamos em 2019");
+    await field(page, "relationshipType").selectOption("spouse");
+    await field(page, "description").fill("casamos em 2019");
     await page.getByRole("button", { name: "Salvar relação" }).click();
     await expect(outcome(page, "Relação registrada.")).toBeVisible({ timeout: 30_000 });
 
@@ -131,9 +156,16 @@ test.describe("relationships and associations", () => {
 
     // --- The context. -------------------------------------------------------
     await page.getByRole("button", { name: "Vincular a um contexto" }).click();
-    await page.getByLabel("Contexto").selectOption({ label: context });
+    await field(page, "contextId").selectOption({ label: context });
     await page.getByRole("button", { name: "Vincular contexto" }).click();
     await expect(outcome(page, "Vínculo criado.")).toBeVisible({ timeout: 30_000 });
+
+    // The account owns exactly one context and it is now linked, so the create
+    // control is correctly gone — replaced by a sentence saying they are all
+    // linked, not by advice to create one they already have.
+    await expect(
+      page.getByText("Todos os seus contextos já estão vinculados a esta pessoa."),
+    ).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole("link", { name: context })).toBeVisible();
@@ -157,8 +189,8 @@ test.describe("relationships and associations", () => {
 
     // --- The project, with a role. ------------------------------------------
     await page.getByRole("button", { name: "Vincular a um projeto" }).click();
-    await page.getByLabel("Projeto").selectOption({ label: project });
-    await page.getByLabel("Papel").fill("responsável pela obra");
+    await field(page, "projectId").selectOption({ label: project });
+    await field(page, "role").fill("responsável pela obra");
     await page.getByRole("button", { name: "Vincular projeto" }).click();
     await expect(outcome(page, "Vínculo criado.")).toBeVisible({ timeout: 30_000 });
 
@@ -180,7 +212,7 @@ test.describe("relationships and associations", () => {
     await createPerson(page, person);
 
     await page.getByRole("button", { name: "Registrar relação" }).click();
-    await page.getByLabel("Tipo de relação").selectOption("colleague");
+    await field(page, "relationshipType").selectOption("colleague");
     await page.getByRole("button", { name: "Salvar relação" }).click();
     await expect(outcome(page, "Relação registrada.")).toBeVisible({ timeout: 30_000 });
 
@@ -196,7 +228,7 @@ test.describe("relationships and associations", () => {
     // cannot reach.
     await page.reload();
     await page.getByRole("button", { name: "Registrar relação" }).click();
-    await page.getByLabel("Tipo de relação").selectOption("colleague");
+    await field(page, "relationshipType").selectOption("colleague");
     await page.getByRole("button", { name: "Salvar relação" }).click();
     await expect(outcome(page, "Relação registrada.")).toBeVisible({ timeout: 30_000 });
 
@@ -217,7 +249,7 @@ test.describe("relationships and associations", () => {
 
     await expect(page.getByText("Who this person is to you.")).toBeVisible();
     await page.getByRole("button", { name: "Record a relationship" }).click();
-    await page.getByLabel("Kind of relationship").selectOption("mentor");
+    await field(page, "relationshipType").selectOption("mentor");
     await page.getByRole("button", { name: "Save relationship" }).click();
     await expect(outcome(page, "Relationship recorded.")).toBeVisible({ timeout: 30_000 });
 
@@ -232,12 +264,17 @@ test.describe("relationships and associations", () => {
     await signIn(page, "pt-BR");
     await createPerson(page, person);
     await page.getByRole("button", { name: "Registrar relação" }).click();
-    await page.getByLabel("Tipo de relação").selectOption("friend");
+    await field(page, "relationshipType").selectOption("friend");
     await page.getByRole("button", { name: "Salvar relação" }).click();
     await expect(outcome(page, "Relação registrada.")).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/pt-BR/app/history");
-    await expect(page.getByText("registrou uma relação com uma pessoa")).toBeVisible({ timeout: 30_000 });
+    // `.first()`: earlier tests in this file share the account, so the history
+    // legitimately holds several of these. What is being asserted is that the
+    // sentence renders at all rather than the raw token.
+    await expect(
+      page.getByText("registrou uma relação com uma pessoa").first(),
+    ).toBeVisible({ timeout: 30_000 });
     // The raw action_type must never reach the screen (UX-21).
     await expect(page.getByText("create_person_relationship")).toHaveCount(0);
   });

@@ -91,6 +91,15 @@ type EntityCopy = {
   readonly saveContextAssociation: string;
   readonly removeContextAssociation: string;
   readonly noContextsToAssociate: string;
+  /**
+   * "You own none of these" and "you have linked them all" are different facts
+   * with different next steps, and collapsing them tells an owner to create
+   * something they already have. Three sentences rather than one, because the
+   * thing that ran out differs per placement.
+   */
+  readonly allContextsLinked: string;
+  readonly allProjectsLinked: string;
+  readonly allPeopleLinked: string;
   readonly addProjectAssociation: string;
   readonly projectAssociationLabel: string;
   readonly saveProjectAssociation: string;
@@ -204,6 +213,9 @@ const copy = {
     saveContextAssociation: "Vincular contexto",
     removeContextAssociation: "Encerrar vínculo com o contexto",
     noContextsToAssociate: "Crie um contexto antes de vincular alguém a ele.",
+    allContextsLinked: "Todos os seus contextos já estão vinculados a esta pessoa.",
+    allProjectsLinked: "Todos os seus projetos já estão vinculados a esta pessoa.",
+    allPeopleLinked: "Todas as suas pessoas já estão vinculadas a este projeto.",
     addProjectAssociation: "Vincular a um projeto",
     projectAssociationLabel: "Projeto",
     saveProjectAssociation: "Vincular projeto",
@@ -304,6 +316,9 @@ const copy = {
     saveContextAssociation: "Link context",
     removeContextAssociation: "End the context link",
     noContextsToAssociate: "Create a context before linking anyone to it.",
+    allContextsLinked: "Every one of your contexts is already linked to this person.",
+    allProjectsLinked: "Every one of your projects is already linked to this person.",
+    allPeopleLinked: "Every one of your people is already linked to this project.",
     addProjectAssociation: "Link to a project",
     projectAssociationLabel: "Project",
     saveProjectAssociation: "Link project",
