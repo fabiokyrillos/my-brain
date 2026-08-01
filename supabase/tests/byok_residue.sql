@@ -22,6 +22,25 @@
 -- non-cascading foreign row, and a fixed list cannot tell an unknown row from an
 -- absent one.
 --
+-- WHAT THIS DOES NOT COVER, SAID HERE RATHER THAN INFERRED
+-- ---------------------------------------------------------------------------
+-- **The `public` schema only.** Uploaded files live in `storage.objects`, in a
+-- different schema, and deleting an `auth.users` row does not necessarily remove
+-- them -- so a deleted account can leave orphaned storage that this file will
+-- report as clean. That is a real gap, not a rounding error: `attachments` rows
+-- cascade and the bytes they point at may not.
+--
+-- It is out of scope here because removing orphan storage is an explicit
+-- deliverable of the account-deletion work, which owns the trusted
+-- administrative boundary that can do it. Naming the gap in the verifier is the
+-- only way a future reader does not mistake "no residue in `public`" for "no
+-- residue".
+--
+-- Also uncovered: anything keyed by something other than a `user_id` column.
+-- Every owned table in this schema uses that name today -- 35 of them -- but a
+-- table that recorded ownership under a different column would be invisible to
+-- this sweep, and no assertion here would notice.
+--
 -- THE NEGATIVE CONTROL IS THE POINT
 -- ---------------------------------------------------------------------------
 -- "Everything is gone" is trivially satisfied by a verifier that deletes too
