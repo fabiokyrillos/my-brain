@@ -3,6 +3,22 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — G-0.4 satisfied, and the per-IP throttle gets a column and a third secret
+
+**No migration, no source change.** Two append-only amendments, one ADR, and one secret that exists only in two git-ignored files.
+
+**The conflict BYOK.1 raised is resolved by the owner, which is whose call it was.** `BYOK-SCHEMA-007` fixed `credential_validation_attempts` at three columns; `BYOK-VALIDATE-004` and plan task 3.8 required throttling per user **and per IP** over that table; BYOK.3's migration budget was zero. All three could not hold. BYOK.1 implemented the declared shape exactly and **invented nothing**, because expanding a governing document's schema inside a branch is the move `ADR-069` exists because the owner is entitled to make. The resolution: one column, `ip_hash`, in a BYOK.3 migration, and **the initiative budget rises from four to five**.
+
+**`ip_hash` never stores an address.** `HMAC-SHA256` over a **canonicalized** value — and the canonicalization is part of the contract rather than an implementation detail, because an un-canonicalized hash mints a fresh bucket per spelling and silently defeats the ceiling it exists to enforce. IPv4 without leading zeros; IPv6 lower-cased, compressed, IPv4-mapped prefixes normalized; ports and whitespace stripped; and anything that does not parse hashes as the literal `unparseable`, so a malformed forwarded header cannot buy unlimited buckets.
+
+**A third secret, not a reused one.** `BYOK_RATE_LIMIT_PEPPER` is never `BYOK_MASTER_KEY` and never `BYOK_FINGERPRINT_PEPPER`. The argument that already keeps those two apart is **strongest** here: the rate-limit pepper is touched on every validation attempt, including the failed and throttled ones an attacker generates, so coupling it to the ability to decrypt credentials would be the worst pairing available. Three secrets, three capabilities, no single compromise that yields two.
+
+`local` and `test` values are provisioned under the same evidence rule as the other four, and the generator **refuses to overwrite an existing value** — rotating the master key by accident would invalidate every ciphertext already sealed under it. Now **6/6 present, valid base64, 32 bytes, 15/15 pairs distinct, and 0 matches across 1007 tracked files**. Preview and production stay deferred to the point of use.
+
+**G-0.4 is satisfied, and BYOK.3 is authorized to begin.** A dedicated OpenAI project and key exist as `BYOK_VALIDATION_OPENAI_API_KEY` with a USD 2 budget alert, restricted models, lowest practical limits and acceptance-lane-only use — every constraint Amendment A-1.3 named.
+
+**One thing is recorded now rather than discovered at the acceptance gate: the key is provisioned but not reachable.** Measured at `0b62a5b`, `gh secret list` returns empty on a `repo`-scoped token and the name is absent from `.env.local` and `.env.test.local`. `ADR-059` runs the opt-in lane **locally**, deliberately keeping credentials out of CI, so `.env.local` is the place that matters. Until one line is run, the lane can be **written but not executed** — and `ADR-069` forbids BYOK.3 closing with it unexercised. **This gates BYOK.3's closeout, not its start.**
+
 ## 2026-08-01 — BYOK.2: the resolvers, and no caller for them
 
 **One migration, `202608010066`** — parity `202608010065` → `202608010066`. Two functions, **no consumer**: BYOK.3 gives the synchronous one a caller, BYOK.4 the asynchronous one. No table, no column, no policy, no table grant.

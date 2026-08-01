@@ -4,7 +4,9 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the **BYOK.2 boundary — the loop's required stop**.
+Last updated: **2026-08-01**, at the **BYOK.3 authorization boundary**. G-0.4 is satisfied
+and `ADR-070` records the per-IP decision; BYOK.3 is authorized to begin, and must not
+close until §7's step 5 is done.
 
 ---
 
@@ -13,7 +15,7 @@ Last updated: **2026-08-01**, at the **BYOK.2 boundary — the loop's required s
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **BYOK.1 and BYOK.2 CLOSED, both merged with green merge-SHA CI. STOPPED before BYOK.3** — G-0.4 is unprovisioned and `ADR-069` makes it gate BYOK.3's acceptance and merge. See §4 and §7 |
+| 2 | **BYOK** | **BYOK.1 and BYOK.2 CLOSED**, both merged with green merge-SHA CI. **BYOK.3 AUTHORIZED** — G-0.4 satisfied (`ADR-070`), migration budget raised 4→5. Its **closeout** still waits on §7 step 5 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -85,32 +87,35 @@ status:
 | **G-0.1** — provider call-site census, re-measured against `main` | **DONE.** `docs/reports/BYOK_G01_PROVIDER_CENSUS.md`, measured at `961feeb` |
 | **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **DONE and executed.** Node 22.18.0 ↔ Deno 2.9.4, both directions, 7/7. `npm run byok:interop`; evidence in `docs/reports/BYOK_G02_CRYPTO_INTEROP_EVIDENCE.md` |
 | **G-0.3** — procedure | **DONE.** `docs/reports/BYOK_G03_MASTER_KEY_PROCEDURE.md` |
-| **G-0.3** — `local` / `test` provisioning | **DONE and verified**, authorized by the owner as `BYOK-GATE-DEC-2`. 4/4 present, valid base64, 32 bytes; 6/6 pairs distinct; 994 tracked files scanned against 20 needle forms, **0 matches**. Evidence: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §7 |
-| **G-0.3** — `preview` / `production` provisioning | **DEFERRED to point of use** (Amendment A-1.2). Gates *deployment*, not BYOK.1 or BYOK.2. **Owner action** when it arrives |
-| **G-0.4** — dedicated low-limit OpenAI validation key | **NOT PROVISIONED. Still a stop condition.** Gates BYOK.3's validation lane **and BYOK.3's acceptance and merge**. Constraints: Amendment A-1.3 |
+| **G-0.3** — `local` / `test` provisioning | **DONE and verified.** Now **three** secrets per environment, not two: `ADR-070` added `BYOK_RATE_LIMIT_PEPPER`. 6/6 present, valid base64, 32 bytes; **15/15 pairs distinct**; 1007 tracked files scanned, **0 matches**. Evidence: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §7 and §8 |
+| **G-0.3** — `preview` / `production` provisioning | **DEFERRED to point of use** (Amendment A-1.2), for all three secrets. Gates *deployment*. **Owner action** when it arrives |
+| **G-0.4** — dedicated low-limit OpenAI validation key | **SATISFIED** (`ADR-070`). Dedicated project and key, USD 2 budget alert, restricted models, lowest practical limits, acceptance-lane-only. **BYOK.3 is authorized to begin.** Its *closeout* still needs §7 step 5 — see below |
 | **G-0.5** — hosted signup closed | **Satisfied and verified** |
 
-### What is authorized, and where the loop stopped
+### What is authorized now
 
-**BYOK.1 and BYOK.2 were authorized, and both are CLOSED** — merged, with green merge-SHA
-CI on all three jobs. They depended on nothing G-0.4 provides: schema, crypto and RPC work,
-tested against ephemeral keys.
+**BYOK.1 and BYOK.2 are CLOSED** — merged, with green merge-SHA CI on all three jobs.
 
-**The loop has stopped before BYOK.3.** G-0.4 is unprovisioned, and `ADR-069` makes it gate
-BYOK.3's **acceptance and merge**, not merely its lane — so BYOK.3 cannot be built with the
-lane disabled and reported as passing. The lane is not weakened, not bypassed, and not
-marked complete. The smallest owner action needed is §7.
+**BYOK.3 is AUTHORIZED and may begin.** G-0.4's decision is made and its artifact exists.
 
-**Two decisions are waiting, and BYOK.3 needs both:**
+**Both questions this file previously listed as blocking are answered:**
 
-1. **G-0.4** — the validation key. §7 has the exact steps.
-2. **The per-IP throttle conflict** — `BYOK-SCHEMA-007` fixes
-   `credential_validation_attempts` at `(user_id, attempted_at, outcome)`, plan task 3.8
-   requires a throttle "per user **and per IP**" over that table, and BYOK.3's migration
-   budget is **zero**. All three cannot hold. BYOK.1 implemented SCHEMA-007 exactly and
-   invented no column, because expanding a governing document's schema inside a branch is
-   the move `ADR-069` exists because the *owner* is entitled to make. Three options with
-   their trade-offs: `BYOK_SLICE_01_ACCEPTANCE.md` §5.
+1. **G-0.4** — satisfied. The key exists with every A-1.3 constraint met.
+2. **The per-IP throttle conflict** — resolved by `ADR-070`: `credential_validation_attempts`
+   gains an `ip_hash` column in a BYOK.3 migration, the budget rises from four to five, and
+   the HMAC key is a **third independent secret**, `BYOK_RATE_LIMIT_PEPPER`. Requirements:
+   `BYOK-SCHEMA-010…015` in PRD Amendment P-1.
+
+### The one thing that still gates BYOK.3's CLOSEOUT
+
+**The validation key is provisioned but not reachable.** Measured at `0b62a5b`:
+`gh secret list` is empty on a `repo`-scoped token, and the name is absent from
+`.env.local` and `.env.test.local`. `ADR-059` runs the opt-in lane locally and deliberately
+keeps credentials out of CI, so `.env.local` is where it must be. **§7 step 5 is one line.**
+
+Until then the lane can be **written but not executed**, and `ADR-069` forbids BYOK.3 being
+accepted or merged with it shipped-but-unexercised. Everything else in BYOK.3 — the
+adapter, Settings, the fallback removal, rotation, removal, gated states — proceeds.
 
 ### One concern investigated and dismissed
 
@@ -205,8 +210,37 @@ key, and a distinct name is what makes BYOK-GUARD-001's allowlist able to say so
 6. **Tell the implementer the secret exists.** It never needs the value.
 7. **After BYOK.3's acceptance lane, revoke the key** unless it is needed continuously.
 
-**Until step 5 is done, BYOK.3 does not start.** The lane is not built-and-disabled and it
-is not reported as passing; the slice waits.
+### Status, 2026-08-01: steps 1–4, 6 and 7 are the owner's and are DONE. Step 5 is not.
+
+The owner has provisioned the dedicated project and key with every constraint A-1.3 named,
+and **`ADR-070` records G-0.4 as satisfied — BYOK.3 is authorized to begin.**
+
+**What is still missing is only step 5: the value is not readable by anything in this
+repository.** Measured at `0b62a5b`:
+
+- `gh secret list` returns **empty** on a token holding `repo` scope — so there is no
+  repository Actions secret of that name;
+- the name is **absent** from `.env.local` and from `.env.test.local`.
+
+`ADR-059` runs the opt-in lane **locally**, deliberately "without putting credentials in
+CI", so `.env.local` is the place that matters. **One line, run by the owner, never pasted
+into chat:**
+
+```bash
+# In the repository root. The value goes straight from the OpenAI dashboard into
+# a git-ignored file; `.gitignore:37` (`.env*`) already covers it.
+printf '\nBYOK_VALIDATION_OPENAI_API_KEY=%s\n' 'sk-proj-…' >> .env.local
+```
+
+Then tell the implementer it is present. It never needs the value, and it will verify only
+presence — never printing, logging or committing it, exactly as it did for the six
+provisioned peppers and master keys.
+
+**This gates BYOK.3's CLOSEOUT, not its start.** The adapter, the Settings surface, the
+fallback removal, rotation, removal and the gated states can all be built and tested
+without it. The one thing that cannot is the live validation lane — and `ADR-069` forbids
+BYOK.3 being accepted or merged with that lane shipped-but-unexercised. So BYOK.3 proceeds,
+and stops short of closing until this line is run.
 
 ---
 
