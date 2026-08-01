@@ -2,9 +2,10 @@
 
 **Revision 1** · 2026-07-31 · Governs [`BYOK_PRD.md`](./BYOK_PRD.md) Revision 1.
 
-**Status — APPROVED 2026-08-01. BYOK.1 and BYOK.2 are authorized; BYOK.3 onward are not.**
-Revision 1's body is unchanged; §0 carries an append-only **Amendment A-1** recording the
-owner's gate decomposition (`ADR-069`).
+**Status — APPROVED 2026-08-01. BYOK.1 and BYOK.2 are CLOSED; BYOK.3 is authorized to
+begin.** Revision 1's body is unchanged; §0 carries append-only **Amendment A-1** (the
+owner's gate decomposition, `ADR-069`) and **Amendment A-2** (G-0.4 satisfied, and BYOK.3's
+migration allocation raised from 0 to 1, `ADR-070`).
 
 Six slices in order. **Separate branches, separate commits, separate PRs from Entity Graph
 Completion — no shared branch at any point.** Each slice ends in a merged PR with a green
@@ -100,6 +101,53 @@ these constraints, which BYOK.3 must honour in code and record in its acceptance
 
 ---
 
+### Amendment A-2 — G-0.4 satisfied, and BYOK.3 gains a migration
+
+**Date: 2026-08-01. Status: accepted, owner decision. Append-only — Amendment A-1 and §0
+above are reproduced unchanged.** Recorded as `ADR-070`; the PRD carries the matching
+Amendment P-1.
+
+#### A-2.1 — G-0.4 is satisfied
+
+The owner has provisioned a dedicated OpenAI project and API key for the opt-in validation
+lane, held as **`BYOK_VALIDATION_OPENAI_API_KEY`**, with a USD 2 monthly budget, restricted
+model access, the lowest practical rate limits, a dedicated key, and use confined to the
+acceptance lane. Every constraint A-1.3 named is met. **G-0.4's decision is made and its
+artifact exists**, so BYOK.3 is authorized to begin.
+
+**One thing repository truth cannot yet confirm, recorded rather than assumed.** Measured
+at `0b62a5b`: no repository Actions secret of that name exists, and the name is absent from
+`.env.local` and `.env.test.local`. `ADR-059` runs the opt-in lane **locally**, deliberately
+"without putting credentials in CI", so the value must be readable by a local run. Until it
+is, the lane can be **written but not executed** — and A-1.3 forbids BYOK.3 closing with it
+unexercised. **This gates BYOK.3's closeout, not its start.** The one-line resolution is in
+`AUTONOMOUS_LOOP_HANDOFF.md` §7.
+
+#### A-2.2 — BYOK.3's migration allocation moves from 0 to 1
+
+Task 3.8 requires a throttle "per user **and per IP**" over
+`credential_validation_attempts`, whose declared shape has no column that can carry an IP.
+BYOK.1 raised the conflict and invented nothing. The owner's resolution:
+`credential_validation_attempts` gains **one** column, `ip_hash`, in a BYOK.3 migration, and
+the initiative budget rises from four to five.
+
+The full requirement set is `BYOK-SCHEMA-010…015` in PRD Amendment P-1. In summary: never
+the raw IP; `HMAC-SHA256` over a canonicalized value; under a **third independent secret**,
+`BYOK_RATE_LIMIT_PEPPER`, which is never the master key and never the fingerprint pepper;
+distinct local and test values now, preview and production before deployment to those
+environments (the A-1.2 ordering, unchanged); never displayed, logged or persisted; used
+only for throttling and abuse control; a bounded retention period; and indexing that
+supports concurrency-safe daily ceilings per user and per IP and nothing more.
+
+#### A-2.3 — Task 3.8, restated
+
+> 3.8 — Throttle per user **and per IP** with a daily ceiling, over
+> `credential_validation_attempts`, using `ip_hash` (`BYOK-SCHEMA-010…015`). The ceiling
+> check and the attempt insert must be **concurrency-safe**: two simultaneous attempts must
+> not both observe a count below the limit.
+
+---
+
 ## Slice BYOK.1 — Credential store and crypto core
 
 **Delivers:** BYOK-SCHEMA-001…007, BYOK-CRYPTO-001…007, BYOK-MASTER-001…012,
@@ -175,7 +223,9 @@ Slice 2E.1 shape.
 BYOK-VALIDATE-001…007, BYOK-ROTATE-001…004, BYOK-GUARD-001/002/004 (Node scope),
 BYOK-COPY-001…007, BYOK-QUOTA-003 (Node paths).
 
-**Migration: 0.**
+**Migration: 1** — `credential_validation_attempts.ip_hash`, its index and the retention
+mechanism. *Amendment A-2.2 raised this from 0; the original allocation is preserved in the
+budget table's note.*
 
 > **This is the slice that removes the Node environment fallback.** From its merge, the
 > seven Node provider paths require a resolved credential. Settings must therefore ship in
@@ -193,7 +243,7 @@ BYOK-COPY-001…007, BYOK-QUOTA-003 (Node paths).
 | 3.5 | `max_output_tokens` on every operation (BYOK-QUOTA-003) |
 | 3.6 | Settings surface: save, test, rotate, remove; metadata only; password input, never prefilled, cleared on submit and unmount; **no reveal control anywhere** |
 | 3.7 | Validation: shape → live call with `maxRetries: 0` → closed-vocabulary mapping; provider error never re-thrown or logged whole |
-| 3.8 | Throttle per user **and** per IP with a daily ceiling, over `credential_validation_attempts` |
+| 3.8 | Throttle per user **and** per IP with a daily ceiling, over `credential_validation_attempts`, using `ip_hash` — **restated by Amendment A-2.3**, which adds the concurrency-safety requirement and the column that makes the per-IP half possible at all |
 | 3.9 | Atomic rotation: validate first, single-transaction in-place overwrite, row lock, metadata-only return, `audit_logs` row with no key material |
 | 3.10 | Removal: `status = 'removed'` with `ciphertext`/`iv` nulled in one statement |
 | 3.11 | Gated states on every AI surface, both locales, typed copy modules |
@@ -211,7 +261,8 @@ BYOK-COPY-001…007, BYOK-QUOTA-003 (Node paths).
 | C6 | An invalid key never becomes `active` |
 | C7 | The browser never receives plaintext: every action result and rendered prop asserted; a Settings DOM snapshot contains no key |
 | C8 | Logs and errors contain no key, asserted by a scan over captured output |
-| C9 | Throttle refuses past the ceiling, per user **and** per IP |
+| C9 | Throttle refuses past the ceiling, per user **and** per IP. **Amendment A-2** adds: the raw IP appears nowhere — not in the column, not in a log, not in a result; the pepper is a third independent secret; two simultaneous attempts cannot both pass a ceiling check; and the retention window is enforced rather than described |
+| C13 | **Amendment A-2**: parity moves by exactly one, and `db lint` shows only the two pre-existing `run_user_heartbeat` warnings |
 | C10 | Concurrent rotation: one wins, one gets a declared conflict, no partial write |
 | C11 | Desktop + Pixel 7 Settings, both locales |
 | C12 | Locale-ternary count ≤ baseline; lint/typecheck/tests/build green |
@@ -326,15 +377,20 @@ BYOK-OPERATIONS-001…006.
 
 ## 1. Migration budget
 
-**Four migrations total**, and no slice may exceed its allocation without an owner decision:
+**Five migrations total** — raised from four by owner decision on 2026-08-01
+(`ADR-070`, Amendment A-2). No slice may exceed its allocation without an owner decision,
+and the rule that produced this change is the rule working: BYOK.1 **raised** the conflict
+that forced it rather than quietly spending a migration it was not allocated.
 
 | Slice | Migrations | Content |
 | --- | --- | --- |
 | BYOK.1 | 1 | `user_ai_credentials`, `credential_validation_attempts` |
 | BYOK.2 | 1 | the two resolver RPCs |
-| BYOK.3 | 0 | — |
+| BYOK.3 | **1** | `credential_validation_attempts.ip_hash`, its index, and the retention mechanism (`BYOK-SCHEMA-010…015`) |
 | BYOK.4 | 2 | `entries.status` literal; `claim_next_entry_interpretation_job` replacement |
 | BYOK.5–6 | 0 | — |
+
+*The original allocation is preserved for the record: four total, with BYOK.3 at zero.*
 
 ## 2. What this plan explicitly does not do
 

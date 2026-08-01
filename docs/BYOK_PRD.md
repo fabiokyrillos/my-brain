@@ -366,3 +366,72 @@ is not built for users who do not exist — it is built *before the first non-ow
 which is the moment its absence would be a defect. What would be over-engineering is
 building infrastructure quotas here; BYOK-QUOTA-001 explicitly refuses them and hands them
 to signup hardening.
+
+---
+
+## 22. Amendment P-1 — the per-IP throttle gets a column, and G-0.4 is satisfied
+
+**Date: 2026-08-01. Status: accepted, owner decision. Append-only — every section above is
+reproduced unchanged.** Recorded as `ADR-070`; the implementation plan carries the matching
+Amendment A-2.
+
+### P-1.1 — Why this amendment exists
+
+`BYOK-SCHEMA-007` fixes `credential_validation_attempts` at `(user_id, attempted_at,
+outcome)`. `BYOK-VALIDATE-004` requires throttling **per user *and per IP***, and the
+implementation plan's task 3.8 puts that throttle over this table while budgeting BYOK.3
+**zero** migrations.
+
+**The three could not all hold.** BYOK.1 raised the conflict rather than resolving it —
+inventing a column would have been an implementer expanding a governing document's schema
+inside a branch — and implemented `BYOK-SCHEMA-007` exactly as written. The owner has now
+decided.
+
+### P-1.2 — `BYOK-SCHEMA-010`: `credential_validation_attempts.ip_hash`
+
+`credential_validation_attempts` gains **one** column, `ip_hash`. `BYOK-SCHEMA-007`'s
+three-column list is superseded **only** by this row; every other clause of it — no key
+material, no fingerprint, forced RLS, owner-scoped, append-only to `authenticated` — stands
+unchanged.
+
+| ID | Requirement |
+| --- | --- |
+| **BYOK-SCHEMA-010** | `ip_hash` stores `HMAC-SHA256` over a **canonicalized** IP value. **The raw IP is never stored**, never logged, and never returned by any read path. |
+| **BYOK-SCHEMA-011** | The HMAC key is a **new, independent secret**, `BYOK_RATE_LIMIT_PEPPER`. It is **never** `BYOK_MASTER_KEY` and **never** `BYOK_FINGERPRINT_PEPPER`: three secrets, three purposes, and no single compromise that yields two capabilities. It is subject to `BYOK-MASTER-001…005` independently, exactly as `BYOK-FINGERPRINT-001` makes the fingerprint pepper. |
+| **BYOK-SCHEMA-012** | The pepper is **never displayed, logged or persisted** — not in a migration, not in `.env.example` beyond its name with an empty value, not in a test snapshot, not in a log line, and not in an error message that rejected it. |
+| **BYOK-SCHEMA-013** | `ip_hash` is used **only** for validation throttling and abuse control. It is not a join key, not an analytics dimension, not a user-visible field, and it appears in no other table. |
+| **BYOK-SCHEMA-014** | `credential_validation_attempts` has a **bounded retention period**, declared as a repository fact and enforced rather than described. An attempt record older than the window is not evidence; it is a log of somebody's network location that outlived its purpose. |
+| **BYOK-SCHEMA-015** | Indexing supports **concurrency-safe daily ceilings per user and per IP**, and nothing beyond what those two queries require. An index is a retention surface as much as a performance one. |
+
+### P-1.3 — Canonicalization, stated rather than assumed
+
+`HMAC-SHA256` over an un-canonicalized IP string produces a different hash for values that
+are the same address, which would silently defeat the ceiling it exists to enforce.
+Canonicalization is therefore part of the contract, not an implementation detail:
+
+- IPv4 in decimal-dotted form, no leading zeros;
+- IPv6 lower-cased and compressed to its canonical form, with any IPv4-mapped prefix
+  normalized to the IPv4 form;
+- surrounding whitespace and any port suffix stripped;
+- a value that does not parse as an address hashes as the literal `unparseable`, so a
+  malformed forwarded header cannot mint unlimited distinct buckets.
+
+### P-1.4 — G-0.4 is satisfied, with one thing still unreachable
+
+The owner has provisioned a dedicated OpenAI project and API key for the opt-in validation
+lane, held as **`BYOK_VALIDATION_OPENAI_API_KEY`** — deliberately not `OPENAI_API_KEY` — with
+a USD 2 monthly budget, restricted model access, the lowest practical rate limits, and use
+confined to the acceptance lane. **The gate's decision is made and its artifact exists.**
+
+**What repository truth cannot yet confirm** is that the lane can *reach* it. Measured at
+`0b62a5b`: no repository Actions secret of that name exists, and the name is absent from
+`.env.local` and `.env.test.local`. `ADR-059` puts the opt-in lane's execution **locally**,
+deliberately "without putting credentials in CI" — so the value has to be readable by a
+local run. Until it is, the lane can be *written* but not *executed*, and `ADR-069` forbids
+BYOK.3 closing with it unexercised. This is recorded now rather than discovered at BYOK.3's
+acceptance gate; the one-line resolution is in `AUTONOMOUS_LOOP_HANDOFF.md` §7.
+
+### P-1.5 — The migration budget
+
+**Four becomes five.** BYOK.3's allocation moves from **0** to **1**, for this column, its
+index and the retention mechanism. No other slice's allocation changes.
