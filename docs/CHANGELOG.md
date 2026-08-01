@@ -3,6 +3,24 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.3: the project key stops serving users, and Settings arrives to replace it
+
+**One migration, `202608010067`** — parity `202608010066` → `202608010067`, the allocation `ADR-070` raised BYOK.3 to. **This is the slice that removes the fallback**, and Settings ships with it because a fallback removed before the surface that configures a replacement would leave the product AI-less.
+
+**`options?.apiKey ?? process.env.OPENAI_API_KEY` is deleted, not disabled.** A disabled fallback is a line somebody re-enables during an incident, and from that moment every user's AI spends the owner's money under the owner's rate limits, silently and correctly-looking. The credential is now a **required property of a required argument**, so a call site that forgets one fails at `tsc` rather than at runtime on somebody's first chat message — and `tsc` found exactly the five sites the G-0.1 census predicted.
+
+**Plaintext travels in a type that fights being written down.** `Secret` throws on `toString`, `toJSON`, `Symbol.toPrimitive` and `JSON.stringify`, holds its value in a `#` field that spreads and `structuredClone` cannot reach, and renders as `[BYOK Secret]` under `util.inspect` — which is what a crash handler runs on a whole error context. Nobody logs a credential on purpose; they log the object that happens to contain one. `getAIProvider` is the only place in the application that unwraps it.
+
+**The throttle is a database RPC, because the obvious implementation is wrong.** "Count today's attempts, proceed if under the limit" lets two simultaneous requests both read `ceiling - 1` and both proceed. Insert-then-count does not fix it either: under `READ COMMITTED` neither transaction sees the other's uncommitted row. `pg_advisory_xact_lock` serializes the read-and-write for one bucket — the mechanism `run_all_heartbeats` already uses — with two locks always in the same order, because two locks in different orders is a deadlock. The slot is reserved **by inserting inside the locked transaction**, and a reservation that is never finalized still counts: a crash must not be a way to buy free attempts against somebody else's key.
+
+**`ip_hash` is never an address, and the canonicalization is in the contract.** An HMAC over an un-canonicalized string mints a fresh bucket per spelling and silently defeats the ceiling it exists to enforce, so `::ffff:203.0.113.7` and `203.0.113.7` land in **one** bucket, and 200 distinct garbage headers collapse into **one** shared bucket — making a garbled header strictly worse than a real address, which is the correct incentive.
+
+**G-0.4's live lane was EXECUTED**, not shipped disabled: 4 passed, three real round trips. `succeeded` is reachable only if a real authenticated call resolved, and `invalid_key` requires a genuine `401` carrying OpenAI's actual error shape — a network failure would have classified as `unknown`. That is the half a mocked suite cannot prove. `models.list` costs no tokens, and the report states plainly that the project's USD 2 figure is a **budget alert, not a hard spending cap**.
+
+**Three acceptance items are recorded as NOT EXECUTED, for one shared reason**, rather than glossed: matrix cases 1–3, concurrent rotation and the desktop/Pixel 7 Settings journeys all need a shared database carrying the BYOK tables, and none of the three migrations has been applied to one. They become available at the first BYOK deployment.
+
+**Three guard drafts were wrong and say so in their own comments.** One forbade `?? process.env` outright and failed on the model-name reads, which are not credentials — a model id is public and creates no path to a provider. One grepped `return[^;]*ciphertext` and flagged `sealCredential`, which returns database columns and is exactly where a ciphertext belongs; it now reads the declared result **type**. And the migration scan reddened on its own header — the **third** time a guard in this initiative forbade documenting the thing it guards.
+
 ## 2026-08-01 — G-0.4 satisfied, and the per-IP throttle gets a column and a third secret
 
 **No migration, no source change.** Two append-only amendments, one ADR, and one secret that exists only in two git-ignored files.

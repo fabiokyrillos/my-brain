@@ -33,6 +33,7 @@
     "test:remote:2e:cleanup": "node scripts/verify-phase-2e-cleanup.mjs",
     "test:remote:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs --proof",
     "test:remote:2f:baseline": "vitest run --config vitest.remote.config.ts",
+    "test:byok:validation": "vitest run --config vitest.remote.config.ts src/features/byok/live-validation.remote.test.ts",
     "test:remote:2f:census": "node scripts/phase-2f-reminder-census.mjs",
     "test:remote:2f:cleanup": "node scripts/verify-phase-2f-cleanup.mjs",
     "measure:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs",
