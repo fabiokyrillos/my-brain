@@ -4,7 +4,7 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the EGC.3 boundary.
+Last updated: **2026-08-01**, at the BYOK pre-code boundary.
 
 ---
 
@@ -13,7 +13,7 @@ Last updated: **2026-08-01**, at the EGC.3 boundary.
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **PRE-CODE GATES PARTLY DONE.** G-0.1 and G-0.2 executed and committed on `codex/byok-precode`; G-0.3 procedure written, provisioning blocked; G-0.4 blocked. See §4 |
+| 2 | **BYOK** | **PRE-CODE GATES CLOSED EXCEPT G-0.4. BYOK.1 and BYOK.2 AUTHORIZED** by `ADR-069`. G-0.4 remains a stop condition for BYOK.3. See §4 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -63,32 +63,34 @@ recorded as repository maintenance in `PRODUCT_UX_CLOSEOUT.md` §8.
 
 ---
 
-## 4. BYOK — what blocks the start, precisely
+## 4. BYOK — gate status, and the one thing still blocking
 
 Governing artifacts exist and are approved: `docs/BYOK_PRD.md`,
 `docs/BYOK_IMPLEMENTATION_PLAN.md`, `docs/reports/BYOK_SECURITY_DEFINITION.md`.
 
-The plan declares **five pre-code gates** and the rule that no slice may start until every
-artifact is in the repository. Their status:
+The plan declared **five pre-code gates** under one absolute rule. **On 2026-08-01 the
+owner amended that rule to a dependency-specific one** — `ADR-069`, recorded as append-only
+**Amendment A-1** in the plan's §0, which reproduces the original text unchanged. Current
+status:
 
-| Gate | Can this loop satisfy it? |
+| Gate | Status |
 | --- | --- |
 | **G-0.1** — provider call-site census, re-measured against `main` | **DONE.** `docs/reports/BYOK_G01_PROVIDER_CENSUS.md`, measured at `961feeb` |
 | **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **DONE and executed.** Node 22.18.0 ↔ Deno 2.9.4, both directions, 7/7. `npm run byok:interop`; evidence in `docs/reports/BYOK_G02_CRYPTO_INTEROP_EVIDENCE.md` |
-| **G-0.3** — master-key procedure **and four keys provisioned** | **Procedure DONE** (`docs/reports/BYOK_G03_MASTER_KEY_PROCEDURE.md`), **provisioning is an owner action.** Production and preview need the hosting platform's secret store and the Supabase Edge Function secrets — an administrative control this loop cannot reach without extracting or exposing credentials. Local and test are one documented command the developer runs; the loop deliberately did **not** generate them, because writing live key material into an environment it also commits from is the one thing this gate exists to prevent |
-| **G-0.4** — a dedicated low-limit OpenAI key for the validation lane, with a spend limit | **No.** Requires OpenAI dashboard access **and a spend decision** — a paid external vendor commitment |
-| **G-0.5** — hosted signup closed | **Already satisfied and verified** |
+| **G-0.3** — procedure | **DONE.** `docs/reports/BYOK_G03_MASTER_KEY_PROCEDURE.md` |
+| **G-0.3** — `local` / `test` provisioning | **DONE and verified**, authorized by the owner as `BYOK-GATE-DEC-2`. 4/4 present, valid base64, 32 bytes; 6/6 pairs distinct; 994 tracked files scanned against 20 needle forms, **0 matches**. Evidence: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §7 |
+| **G-0.3** — `preview` / `production` provisioning | **DEFERRED to point of use** (Amendment A-1.2). Gates *deployment*, not BYOK.1 or BYOK.2. **Owner action** when it arrives |
+| **G-0.4** — dedicated low-limit OpenAI validation key | **NOT PROVISIONED. Still a stop condition.** Gates BYOK.3's validation lane **and BYOK.3's acceptance and merge**. Constraints: Amendment A-1.3 |
+| **G-0.5** — hosted signup closed | **Satisfied and verified** |
 
-### The honest reading
+### What is authorized, and where the loop must stop
 
-**G-0.4 is a genuine stop condition** as the loop defines one: *"paid external vendor
-commitment requiring the owner to choose a vendor or price"* and *"inability to access a
-required administrative control without extracting or exposing credentials."*
+**BYOK.1 and BYOK.2 are authorized** and depend on nothing G-0.4 provides — they are
+schema, crypto and RPC work, tested against the provisioned `test` keys and ephemeral keys.
 
-**It does not block everything.** G-0.4 exists for the opt-in validation lane, which is
-**BYOK.3**'s concern. BYOK.1 (credential store and crypto core) and BYOK.2 (resolvers)
-depend on none of it: they are schema, crypto and RPC work, testable against local and
-test master keys this loop can generate.
+**The loop stops before BYOK.3** while G-0.4 is unprovisioned. It does **not** ship BYOK.3
+with the validation lane marked passed, and does not weaken or bypass it. The smallest
+owner action needed is in §7.
 
 ### One concern investigated and dismissed
 
@@ -101,46 +103,27 @@ protection, and that the repository's answer is a **content comparison between t
 migration and the types file**. So the types file is maintained by hand alongside the
 migration, with parity proven by test — no Docker, no token, no live database.
 
-### The gate question this loop did not decide for itself
+### The gate question, asked and answered
 
-The plan's §0 says: *"No slice may start until every artifact below is in the
-repository."* **G-0.4's artifact cannot be created by this loop**, so by the plan's own
-words BYOK.1 may not start.
+The plan's §0 said: *"No slice may start until every artifact below is in the
+repository."* On 2026-07-31 the loop reached the reading that G-0.4 gates BYOK.3's
+validation lane specifically — and **refused to act on it**, because softening a governing
+document's invariant inside a branch is not an implementer's act. It stopped and asked.
 
-The loop's reading — that G-0.4 gates BYOK.3's validation lane specifically, and that
-BYOK.1 and BYOK.2 depend on none of it — is an *inference*, and a plausible one. It is
-also exactly the kind of reasoning this repository refuses elsewhere: "the invariant is
-not renegotiated inside a branch." So the loop stopped rather than relax a governing
-document's hard gate on its own authority.
+**The owner decided on 2026-08-01, and the decision is recorded rather than assumed**:
+`ADR-069` and Amendment A-1. The owner's ruling confirms the reading and **strengthens one
+half of it** — G-0.4 gates not only the lane but BYOK.3's acceptance and merge, so the lane
+cannot ship unexercised behind a "built but disabled" framing.
 
-**This is the owner's decision, not the implementer's.**
+The three questions this file previously carried are now closed:
 
-**Recommended continuation**, in this order, *once the owner has decided*:
-
-1. Execute **G-0.1** and **G-0.2** in full and commit them.
-2. Write the **G-0.3** procedure; generate and place the `local` and `test` master keys
-   and fingerprint peppers in untracked env files; record production and preview as
-   **owner actions**, with the exact variable names and the procedure to follow.
-3. Execute **BYOK.1** and **BYOK.2** as normal slices, each with its own branch, PR,
-   merge-SHA CI and acceptance report.
-4. **Stop before BYOK.3's validation lane** and ask the owner for: the production and
-   preview master keys / peppers to be provisioned, and the decision on the validation
-   key and its spend limit. Everything else in BYOK.3 (Settings surface, Node adapter,
-   fallback removal) can be built with validation disabled behind its absent key,
-   provided the acceptance report says plainly that the lane is unexercised.
+| Question | Answer |
+| --- | --- |
+| Provision preview and production secrets? | **Deferred to point of use** (`BYOK-GATE-DEC-3` / A-1.2). Preview before the first BYOK preview deployment; production before BYOK.5. Both runtimes per environment; all values distinct |
+| The validation key and its spend limit? | **`BYOK-GATE-DEC-4`.** Dedicated project and key, restricted permissions, USD 2 monthly budget **alert** — documented as a soft alert, **not** a hard cap — lowest practical rate limits, opt-in lane only, `maxRetries: 0`, short timeout, hard daily attempt ceiling, revoked after acceptance. **Not yet created** |
+| May BYOK.1 and BYOK.2 start ahead of G-0.4? | **Yes, explicitly** (`BYOK-GATE-DEC-1` / A-1) |
 
 **Do not fabricate a key, do not commit one, and do not weaken a gate to proceed.**
-
-### The three decisions the owner is being asked for
-
-1. **Provision `BYOK_MASTER_KEY` and `BYOK_FINGERPRINT_PEPPER` for preview and
-   production** — hosting platform secrets *and* Supabase Edge Function secrets, both
-   projects. Procedure and exact commands: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §3.
-2. **Decide the validation-lane OpenAI key and its spend limit** (G-0.4), or decide the
-   lane is deferred and BYOK.3 ships with it disabled and reported as unexercised.
-3. **Say whether BYOK.1 and BYOK.2 may start ahead of G-0.4.** They depend on nothing
-   G-0.4 provides. If yes, say so explicitly — the plan's §0 gate is written as absolute,
-   and an implementer should not soften it unilaterally.
 
 ---
 
@@ -171,3 +154,36 @@ document's hard gate on its own authority.
 | What is BYOK supposed to be? | `docs/BYOK_PRD.md`, `docs/BYOK_IMPLEMENTATION_PLAN.md` |
 | What can BYOK never claim? | `docs/reports/BYOK_SECURITY_DEFINITION.md` |
 | What is still outstanding? | `docs/TODO.md` |
+
+---
+
+## 7. The smallest owner action that unblocks BYOK.3 (G-0.4)
+
+**Nothing is pasted into chat, into a file, or into a commit.** The key goes straight from
+the OpenAI dashboard into the CI/test secret store under the name below.
+
+**Secret variable name: `BYOK_VALIDATION_OPENAI_API_KEY`.** Deliberately not
+`OPENAI_API_KEY` — the validation lane must be incapable of being satisfied by the project
+key, and a distinct name is what makes BYOK-GUARD-001's allowlist able to say so.
+
+1. **platform.openai.com → Organization → Projects → Create project.** Name it something
+   unmistakable, e.g. `my-brain-byok-validation`. **A dedicated project, not the owner's
+   normal one** — the whole point is that its budget, limits and blast radius are separate.
+2. **Inside that project → Limits → Rate limits.** Set the **lowest practical** per-model
+   limits. The lane makes one call per validation attempt; it needs almost nothing.
+3. **Inside that project → Limits → Budgets → set a monthly budget of USD 2 with an alert.**
+   **Record, and expect, that this is a soft alert and not a hard spending cap.** The hard
+   ceiling is the application-side daily validation-attempt limit BYOK.3 implements; the
+   OpenAI budget is the second line, not the first.
+4. **API keys → Create secret key**, scoped to that project, with permissions **restricted
+   to only the endpoints and models validation calls** — no fine-tuning, no assistants, no
+   batch, no admin.
+5. **Store it as `BYOK_VALIDATION_OPENAI_API_KEY`** in the GitHub Actions secret store for
+   this repository (Settings → Secrets and variables → Actions → New repository secret),
+   and, if the lane is to be runnable locally, in `.env.local` — never in `.env.example`,
+   never in a commit.
+6. **Tell the implementer the secret exists.** It never needs the value.
+7. **After BYOK.3's acceptance lane, revoke the key** unless it is needed continuously.
+
+**Until step 5 is done, BYOK.3 does not start.** The lane is not built-and-disabled and it
+is not reported as passing; the slice waits.
