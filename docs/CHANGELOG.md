@@ -3,6 +3,36 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.4: the worker's process-wide key, deleted with its exception
+
+**Two migrations, `202608010068` and `202608010069`** — parity `202608010067` → `202608010069`, exactly the allocation BYOK.4 is budgeted.
+
+**The first commit is the irreversible one, and it had to be one commit.** `Deno.env.get("OPENAI_API_KEY")`, its 503 branch, the `openaiKey` parameter threaded through `dispatch.ts` into both handlers, and the allowlist entry that permitted the read all went together — because `project-key-guard.test.ts` asserted the read was **present**, precisely so that deleting it would fail the suite and force the entry to shrink alongside it. An allowlist that outlives its exception is how they grow. There is now no Deno path to a process-wide provider key.
+
+**The adapter takes a job id and nothing else.** The worker is the one place where *"who asked"* and *"whose key"* are genuinely different questions: a direct invocation carries an end-user bearer token, and the job it names belongs to whoever `jobs.user_id` says it does. If the adapter accepted an owner, every call site would become somewhere that substitution could happen. So the envelope comes from `resolve_job_ai_credential`, which reads the row itself, and the AAD owner is read from the same row **again**, here, rather than accepted from a caller. The second read is not redundant: it makes the safety structural rather than accidental, and it costs one indexed primary-key lookup on a path about to make an HTTPS call.
+
+**`jobs.error` is a closed vocabulary now, and the database enforces half of it.** The line that used to be there — `error.message.slice(0, 500)` — is what leaked a provider-derived message into that column once already, and it is gone from both handlers. `fail_job_terminal` restricts `p_error` to the declared terminal set *in SQL*, so a future handler that reverts to `error.message` fails loudly instead of quietly writing a provider message into a column the Jobs page renders verbatim.
+
+**A configuration failure is not a transient failure.** No amount of backoff turns a removed credential into a present one, and this codebase has already been burned by a retry budget spent on errors retrying could not fix. Terminality is a property of the **code**, decided once, not a judgement each call site makes. `insufficient_quota` sits on the terminal side by owner decision: the user's provider account is out of money and the fix is on their side of the boundary.
+
+**`fail_job_terminal` is a declared expansion of an approved migration's content** (`ADR-071`), written into the file header rather than found in review. `fail_job` cannot express terminality — its only rule is `attempts >= max_attempts` — and PostgreSQL cannot extend an argument list with `create or replace`, which `ADR-057` records this codebase learning the expensive way. Two migration files; the head moves by exactly two.
+
+**"Consumes no retry" is narrowed to what it can mean.** `jobs.attempts` is incremented by the **claim**, so by the time any handler runs the attempt is already spent and no failure path can give it back. What is guaranteed is that no *further* attempt is scheduled. The migration says so in those words, so the requirement is not read as a promise the implementation cannot keep.
+
+**Capture without a key is a state, not an error and not a refusal.** The entry is stored, because the user typed it and losing their words to a configuration gap is the one outcome that is never acceptable; no job is enqueued, because nothing could run it; and the status says exactly that, so the Inbox and the entry detail can render it with the one link that resolves it. The awaiting branch sits **above** every job-derived branch in the projection, because an entry enqueued while a key was active and run after it was removed still has an exhausted job row — and reading the job first would answer *"could not organize, try again"*, offering the one action that cannot work while hiding the one that can.
+
+**`entries.capture_idempotency_key` is not scope creep — it is the hole the rest would open.** Capture's idempotency lived in `jobs.idempotency_key`, so a capture that writes no job leaves a replay nothing to recognise, and a double submit from a user with no key would store the entry twice. A partial unique index on `(user_id, key)` closes it in the database rather than in the function.
+
+**Nothing is bulk-processed when a key becomes active.** The obvious design — notice the credential, enqueue everything waiting — is the design that charges somebody two hundred interpretations because they pasted a key. Spending a user's money without an explicit act is the same class of error as an unconfirmed AI write, so there is no hook on the save path and a guard asserts the absence. The explicit action is bounded at 25, reports the count it enqueued, and says when more remain. Its operation key is **per invocation**, and that is correctness rather than hygiene: a fixed key would still match after the first run's job had died and returned the entry to the queue, so the second run would replay the dead job and strand the entry permanently.
+
+**The parity lock is shown to fail.** A parity test that has never failed is one nobody can trust — this repository has a review that rewrote a policy table with a fully green suite. So gate D9 feeds the comparison four mutations (a renamed code, a dropped code, a `Secret` missing `Symbol.toPrimitive`, a `byteaToBase64` that stopped agreeing) and asserts each is caught.
+
+**`fetch` is replaced by something that fails the test if it is called.** The requirement is not *"the provider returns an error when there is no key"*, it is *"the provider is never contacted"*, and only a fetch that cannot succeed can tell those apart.
+
+**One defect was found by the slice's own adversarial review and fixed before the PR.** `mark_entry_awaiting_ai_configuration` deliberately refuses an entry that already carries an interpretation; the worker's first draft treated the mark as unconditional. A **reprocessing** job whose credential vanished mid-flight therefore left its entry in `reprocessing` with the lease never released — "organizing" forever, nothing running, nothing left to expire it. Recorded in `BYOK_SLICE_04_ACCEPTANCE.md` §7 with three smaller findings, because a review that finds nothing is a review that was not run.
+
+**Two gates are recorded as NOT CLAIMED, for one shared reason.** No BYOK migration has been applied to any shared environment, so there is no deployed worker that can decrypt a credential — which makes the deployed-function matrix cases and the deployed-bundle comparison unrunnable rather than skipped. It is the same blocker BYOK.3 recorded, and it moves in BYOK.5.
+
 ## 2026-08-01 — BYOK.3: the project key stops serving users, and Settings arrives to replace it
 
 **One migration, `202608010067`** — parity `202608010066` → `202608010067`, the allocation `ADR-070` raised BYOK.3 to. **This is the slice that removes the fallback**, and Settings ships with it because a fallback removed before the surface that configures a replacement would leave the product AI-less.

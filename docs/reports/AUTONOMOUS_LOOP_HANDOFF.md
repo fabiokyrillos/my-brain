@@ -4,8 +4,10 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the **BYOK.3 close**. G-0.4 is satisfied, its live lane
-has been **executed**, and the project-key fallback is **deleted**. BYOK.4 is next.
+Last updated: **2026-08-01**, at the **BYOK.4 close**. The worker's process-wide provider
+key is **deleted**, together with the allowlist entry that permitted it, in one commit.
+**No Node or Deno user path can reach a project key.** BYOK.5 — owner cutover — is next,
+and it stops at an action no agent may perform.
 
 ---
 
@@ -14,7 +16,7 @@ has been **executed**, and the project-key fallback is **deleted**. BYOK.4 is ne
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **BYOK.1, BYOK.2 and BYOK.3 CLOSED**, all merged with green merge-SHA CI. The project-key fallback is **deleted** and Settings shipped with it. G-0.4's live lane was **executed**. **BYOK.4 is next**; three acceptance items await the first deployment. See §9 |
+| 2 | **BYOK** | **BYOK.1 through BYOK.4 CLOSED**, all merged with green merge-SHA CI. Both the Node and the Deno project-key fallbacks are **deleted**. **BYOK.5 is next**; it removes the deployed Edge Function secret and stops at owner credential entry. See §10 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -27,14 +29,16 @@ has been **executed**, and the project-key fallback is **deleted**. BYOK.4 is ne
 - **Branches, all preserved:** `codex/docs-and-gates`, `codex/egc-slice-1`,
   `codex/egc-slice-2`, `codex/egc-slice-3`, `codex/byok-precode`, `codex/byok-slice-1`,
   `codex/byok-slice-2`, `codex/byok-handoff`, `codex/byok-gate-amendment-2`,
-  `codex/byok-slice-3`.
-- **Migration chain head: `202608010067`.** Entity Graph Completion added **zero**
-  migrations across all three slices; BYOK.1, BYOK.2 and BYOK.3 added one each, each moving
-  the head by exactly its budgeted allocation. The budget is **five** since `ADR-070`.
-- **None of the three BYOK migrations has been applied to a shared environment.** All three
-  are validated on every CI run by `supabase db reset` from empty. The last verified
-  local/remote parity is the version Slice G5 closed on. **This is what blocks the three
-  deferred acceptance items** — see §9.
+  `codex/byok-slice-3`, `codex/byok-slice-3-handoff`, `codex/byok-slice-4`.
+- **Migration chain head: `202608010069`.** Entity Graph Completion added **zero**
+  migrations across all three slices; BYOK.1, BYOK.2 and BYOK.3 added one each and BYOK.4
+  two, each slice moving the head by exactly its budgeted allocation. The budget is
+  **five** since `ADR-070`, and all five are now spent.
+- **None of the five BYOK migrations has been applied to a shared environment.** All five
+  are validated on every CI run by `supabase db reset` from empty, plus 57, 31, 58 and 47
+  pgTAP assertions. The last verified local/remote parity is the version Slice G5 closed
+  on. **This is the single shared reason for every deferred acceptance item in both §9 and
+  §10.**
 - **Hosted signup: DISABLED and verified** (gate G-0.5).
   Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
 
@@ -51,6 +55,8 @@ has been **executed**, and the project-key fallback is **deleted**. BYOK.4 is ne
 | BYOK handoff | #59 | `0b62a5b` | `30686913834` | green, all three jobs |
 | BYOK gate amendment | #60 | `e43df60` | (run on main) | green, all three jobs |
 | **BYOK.3** | #61 | `2c70784` | `30711977571` | green, all three jobs |
+| BYOK.3 handoff | #62 | `423625d` | see §10 | green, all three jobs |
+| **BYOK.4** | see §10 | see §10 | see §10 | see §10 |
 
 ---
 
@@ -345,3 +351,108 @@ Delete `Deno.env.get("OPENAI_API_KEY")` and its 503 branch from
 `supabase/functions/process-jobs/index.ts`, and **shrink the allowlist in
 `project-key-guard.test.ts` in the same commit** — that test asserts the read is present
 precisely so this cannot be forgotten.
+
+
+---
+
+## 10. BYOK.4 — final state, and what BYOK.5 must do
+
+**Branch:** `codex/byok-slice-4`, from `main` at `423625d`.
+**Migrations:** `202608010068`, `202608010069`. Head `202608010067` -> `202608010069`,
+**by exactly two** — the whole of BYOK.4's approved budget, and the last of the
+initiative's five.
+
+**Acceptance record:** `docs/reports/BYOK_SLICE_04_ACCEPTANCE.md` — all fourteen gates,
+with two recorded as NOT CLAIMED and one requirement deviation named.
+
+### What is closed now
+
+`Deno.env.get("OPENAI_API_KEY")` is **gone**, with its 503 branch, the `openaiKey`
+parameter through `dispatch.ts`, and the allowlist entry that permitted it — in one
+commit, because `project-key-guard.test.ts` asserted the read's *presence* precisely so
+that deleting it would force the allowlist to shrink alongside it. **No deployed Deno path
+can reach a process-wide provider key**, asserted by walking every file under
+`supabase/functions/` in both directions.
+
+What exists that did not before:
+
+| Thing | Where |
+| --- | --- |
+| Deno credential adapter — takes a **job id and nothing else** | `supabase/functions/_shared/byok-adapter.ts` |
+| Branded secret, Deno half, one declared asymmetry | `supabase/functions/_shared/byok-secret.ts` |
+| Closed failure vocabulary + retry policy + the only way to record a failure | `supabase/functions/_shared/job-failure.ts` |
+| `awaiting_ai_configuration` lifecycle, capture idempotency, credential-aware capture | `202608010068` |
+| Credential-aware drain, `fail_job_terminal` | `202608010069` |
+| Bounded, explicit pending-entry action (25/invocation, reports its count) | `src/features/byok/actions.ts` |
+| Node/Deno adapter parity lock, with four proven-failing mutations | `src/lib/byok/adapter-parity.test.ts` |
+| Heartbeat-AI-free, boot-check and no-auto-processing guards | `src/lib/byok/worker-guard.test.ts` |
+| Executed ownership behaviour, against a `fetch` that fails the test if called | `supabase/functions/process-jobs/ownership.test.ts` |
+| 47 pgTAP assertions over both migrations | `supabase/tests/byok_awaiting_and_drain.sql` |
+
+### Two gates are NOT claimed, for the same reason as BYOK.3's three
+
+**D2** (async matrix cases against the deployed function) and **half of D10** (deployed
+bundle matches local). No BYOK migration has been applied to any shared environment and
+`OPENAI_API_KEY` is still the deployed function's secret, so there is no deployed worker
+that can decrypt a credential. These are not skipped cases — there is nowhere to run them.
+The blocker is the same one that holds BYOK.3's matrix cases, concurrent rotation and the
+Settings journeys, and **it moves in BYOK.5 and BYOK.6, not by re-running anything here.**
+
+### One requirement deviation, named rather than papered over
+
+`BYOK-GUARD-003` asks for *a Deno test* asserting handlers resolve from the claimed row's
+owner before any provider call. The worker suite runs with **no `--allow-*` flags at all**,
+by design, so it cannot read a source file. The substance is split — behaviour executed in
+Deno (`ownership.test.ts`), absence asserted in Node (`worker-guard.test.ts`) — and the
+split is written into both files' headers. Stronger than the single test described; still
+not that test.
+
+### `ADR-071` — read it before touching migration 2
+
+Two things it records, both of which a future session would otherwise re-derive:
+
+1. **`fail_job_terminal` is a declared expansion of an approved migration's content.** The
+   file count stayed at two; the described content did not. `fail_job` cannot express
+   terminality (its only rule is `attempts >= max_attempts`), and PostgreSQL cannot extend
+   an argument list with `create or replace` — `ADR-057`.
+2. **"Consumes no retry" is narrowed.** `jobs.attempts` is incremented by the **claim**, so
+   the attempt is spent before any handler runs. What is guaranteed is that no *further*
+   attempt is scheduled.
+
+### Three residual risks, open and named
+
+`fail_job` still accepts free text at the database level (safe only because
+`_shared/job-failure.ts` is its sole caller); `reap_expired_jobs` writes the fixed literal
+`'Worker lease expired'`, which is not a vocabulary member; and
+`attachments.processing_error` is Portuguese-only, a pre-existing gap BYOK.4 matched rather
+than widened. All three are in `BYOK_SLICE_04_ACCEPTANCE.md` §6 and `TODO.md`.
+
+### One defect this slice found in itself
+
+`mark_entry_awaiting_ai_configuration` refuses an entry that already carries an
+interpretation. The worker's first draft treated the mark as unconditional, so a
+**reprocessing** job whose credential vanished mid-flight left its entry in `reprocessing`
+with the lease never released — "organizing" forever, nothing running, nothing left to
+expire it. Fixed and pinned in both directions before the PR. Three smaller findings are in
+`BYOK_SLICE_04_ACCEPTANCE.md` §7.
+
+### What BYOK.5 must do, and where it must stop
+
+1. **Remove `OPENAI_API_KEY` from the deployed Edge Function secrets** and from the
+   application runtime environment. Verified **against the deployment**, not the
+   repository.
+2. **Pin the allowlist to exactly three entries** — `.env.example`, and the two test files
+   that assert this posture. It is already at three; `BYOK-GUARD-006` makes adding a fourth
+   require an ADR.
+3. **The owner configures their own key through the same Settings flow every user uses.**
+   Not seeded from the environment, not copied by a script or a migration.
+4. Execute the owner's synchronous and asynchronous journeys on that credential.
+
+**The stop is step 3, and it is a true stop condition**: it requires entering a credential
+through an authenticated product surface, which no agent may do. Steps 1 and 2 also require
+platform access. Everything else — code, guards, tests, documentation — must be committed
+and pushed before stopping, and the exact owner-facing commands must be written here.
+
+**Do not seed the owner credential from `OPENAI_API_KEY`.** Not by script, not by
+migration, not as a convenience. The whole point of BYOK.5 is that the owner is not
+privileged in the credential-resolution contract.
