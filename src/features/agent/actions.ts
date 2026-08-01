@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
 import { taskCommandUndoErrorDetailFor } from "@/features/task-commands/errors";
+import { getByokCopy } from "@/features/byok/copy";
+import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -880,7 +882,20 @@ export async function generateReview(
   };
   try {
     const preferences = preferencesResult.data;
+
+    // BYOK gate. Review generation is the most expensive operation in the
+    // product, so a gated user must reach it before the prompt is assembled and
+    // before any network call — not after.
+    const gate = await openAiGate(supabase, user.id);
+    if (!gate.ok) {
+      return {
+        status: "error",
+        message: getByokCopy(parsed.data.locale).messages[gateMessageKey(gate.reason)],
+      };
+    }
+
     const answer = await getAIProvider({
+      credential: gate.credential.secret,
       model: preferences?.review_model ?? "gpt-5.6-terra",
     }).answerFromKnowledge({
       question: prompts[parsed.data.period],

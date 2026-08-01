@@ -40,6 +40,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 
+import { getByokCopy } from "@/features/byok/copy";
+import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider } from "@/lib/ai";
 import {
   TASK_COMMAND_PROMPT_VERSION,
@@ -663,6 +665,23 @@ export async function startTaskCommand(
     });
   }
 
+  // BYOK gate, before the preference read and before the operation key is
+  // minted: a gated command must consume no identity and reach no network.
+  //
+  // It returns through the console's own resolved-state vocabulary rather than
+  // throwing, so the surface renders a gated state with a route to Settings —
+  // the same shape every other refusal here uses.
+  const gate = await openAiGate(context.supabase, context.userId);
+  if (!gate.ok) {
+    const byok = getByokCopy(context.locale);
+    return resolved({
+      heading: copy.outcomes.unsupported.title,
+      detail: byok.messages[gateMessageKey(gate.reason)],
+      reason: byok.messages[gateMessageKey(gate.reason)],
+      retryable: false,
+    });
+  }
+
   const preferences = await context.supabase
     .from("agent_preferences")
     .select("chat_model")
@@ -672,7 +691,10 @@ export async function startTaskCommand(
   // requirement asks for one). Resolved at the call site, which is what
   // `model-routing.ts` records as the convention after `resolveAIRoutes` was
   // removed for having no production caller.
-  const provider = getAIProvider({ model: preferences.data?.chat_model ?? "gpt-5.6-terra" });
+  const provider = getAIProvider({
+    credential: gate.credential.secret,
+    model: preferences.data?.chat_model ?? "gpt-5.6-terra",
+  });
 
   // Minted here, once, and never again for this command. The key is the
   // idempotency identity the RPC namespaces, and the instant is what every
