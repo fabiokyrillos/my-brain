@@ -4,8 +4,10 @@
 *"The written procedure, and four distinct keys provisioned (production, preview, test,
 local), none in the repository."*
 
-**Status: the procedure is written and half the provisioning is done. Two environments
-require an owner action this loop cannot perform.** See §5.
+**Status (2026-08-01): the procedure is written; `local` and `test` are provisioned and
+verified; `preview` and `production` are deferred to the point of use by owner decision.**
+§5 is the record as of 2026-07-31 and is left standing; **§7 supersedes its `local` and
+`test` rows**. The deferral is `ADR-069` / Amendment A-1 of the implementation plan.
 
 ---
 
@@ -90,7 +92,7 @@ history that persists.
 
 ---
 
-## 5. Provisioning status — what is done, and what is blocked
+## 5. Provisioning status as of 2026-07-31 — superseded for `local` and `test` by §7
 
 | Environment | `BYOK_MASTER_KEY` | `BYOK_FINGERPRINT_PEPPER` | Status |
 | --- | --- | --- | --- |
@@ -131,3 +133,56 @@ It gates **BYOK.3's validation lane specifically**, not the whole initiative. BY
 Settings surface, Node adapter and project-key fallback removal can all be built and
 tested with validation disabled behind its absent key — provided the acceptance report
 says plainly that the lane is unexercised rather than implying it passed.
+
+**Owner ruling, 2026-08-01 (`ADR-069`).** The above reading is confirmed *with one
+correction*: G-0.4 gates not only the lane but **BYOK.3's acceptance and merge**. BYOK.3
+may not be closed with the lane shipped-but-unexercised. The constraints the validation
+key must carry are listed in Amendment A-1.3 of the implementation plan.
+
+---
+
+## 7. Executed provisioning — `local` and `test` (2026-08-01)
+
+Authorized by `BYOK-GATE-DEC-2` / Amendment A-1.1. Four values generated:
+`crypto.randomBytes(32)`, base64-encoded, one `BYOK_MASTER_KEY` and one
+`BYOK_FINGERPRINT_PEPPER` per environment.
+
+### Pre-conditions, proven before any value was written
+
+| # | Check | Method | Result |
+| --- | --- | --- | --- |
+| 1 | `.env.local` and `.env.test.local` are git-ignored | `git check-ignore -v` | both matched by `.gitignore:37` (`.env*`) |
+| 2 | Neither file is tracked | `git ls-files --error-unmatch` | both unmatched — untracked |
+| 3 | No repository script prints their values | read of `scripts/byok-crypto-interop.mjs` and every `.env`-loading site | the interop script generates its **own ephemeral** key and reads no env file; nothing in `vitest.config.ts`, `vitest.setup.ts` or `package.json` loads `.env.test.local`; no script echoes either variable |
+| 4 | Shell tracing disabled | `$-`, `SHELLOPTS`, `BASH_XTRACEFD` | no `x`, no `v`, `SHELLOPTS=braceexpand:hashall:interactive-comments`, `BASH_XTRACEFD` unset |
+| 5 | No persistent shell history | `HISTFILE`, `$-` | `HISTFILE` unset, shell non-interactive — no history file written. Values never crossed a command line: generation, write and verification all happened inside one Node process |
+
+### Post-conditions, proven after writing
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | `git status` lists neither file | confirmed — the only entries were the two edited docs |
+| 2 | Present | 4/4 |
+| 3 | Valid base64 | 4/4, canonical round-trip (`Buffer.from(v,'base64').toString('base64') === v`) |
+| 4 | Decoded length | 32 bytes, 4/4 |
+| 5 | Pairwise distinct | 6/6 pairs compared with `timingSafeEqual` over decoded bytes; **0 collisions** |
+| 6 | Tracked-repository scan | 994 tracked files scanned byte-exact (`latin1`), 0 skipped, 20 needles — each secret in 5 encodings (base64, unpadded base64, base64url, hex, upper-hex) — **0 matches** |
+
+**Nothing beyond this table is recorded.** No value, no prefix, no suffix, no hash, no
+length-of-line, no fingerprint. The scanner is written to name a file and a variable on a
+hit and never the matched text.
+
+**The scan above was a one-shot instrument, and it does not stay one.** BYOK.1 task 1.8
+lands the permanent chain-scan in the repository and in CI, where it cannot read a
+developer's `.env.local` and therefore asserts the complementary property: that the two
+variable names appear with **empty** values in `.env.example` and that no high-entropy
+32-byte-shaped literal appears in any migration, function body or source file. The two
+scans check the same rule from the two sides available to them.
+
+### What is *not* provisioned
+
+`preview` and `production`. Deferred to the point of use by Amendment A-1.2, with the
+required ordering stated there. When the first BYOK preview deployment or BYOK.5's owner
+cutover becomes the next action, the implementer **stops** and states §3's commands
+verbatim for the owner to run — it does not reach for hosting or Supabase administrative
+credentials.
