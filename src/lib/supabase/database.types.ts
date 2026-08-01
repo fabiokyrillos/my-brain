@@ -567,18 +567,21 @@ export type Database = {
         Row: {
           attempted_at: string
           id: string
+          ip_hash: string | null
           outcome: string
           user_id: string
         }
         Insert: {
           attempted_at?: string
           id?: string
+          ip_hash?: string | null
           outcome: string
           user_id: string
         }
         Update: {
           attempted_at?: string
           id?: string
+          ip_hash?: string | null
           outcome?: string
           user_id?: string
         }
@@ -2501,6 +2504,14 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_credential_validation_slot: {
+        Args: {
+          p_ip_ceiling?: number
+          p_ip_hash: string
+          p_user_ceiling?: number
+        }
+        Returns: string
+      }
       claim_entry_interpretation_job: {
         Args: {
           p_job_id: string
@@ -2643,6 +2654,13 @@ export type Database = {
       }
       get_ai_cost_summary: { Args: { p_timezone?: string }; Returns: Json }
       get_job_queue_metrics: { Args: never; Returns: Json }
+      finalize_credential_validation_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_outcome: string
+        }
+        Returns: undefined
+      }
       interpretation_lifecycle_status: {
         Args: {
           p_element_trust: Json
@@ -2817,6 +2835,10 @@ export type Database = {
         Returns: Json
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
+      prune_credential_validation_attempts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       record_ai_usage: {
         Args: {
           p_cached_input_tokens?: number
