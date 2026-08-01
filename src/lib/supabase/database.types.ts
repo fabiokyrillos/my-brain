@@ -2881,6 +2881,28 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_job_ai_credential: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: {
+          ciphertext: string
+          iv: string
+          key_version: number
+          provider: string
+          status: string
+        }[]
+      }
+      resolve_own_ai_credential: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          ciphertext: string
+          iv: string
+          key_version: number
+          provider: string
+          status: string
+        }[]
+      }
       resolve_pending_question_v1: {
         Args: {
           p_operation_key: string

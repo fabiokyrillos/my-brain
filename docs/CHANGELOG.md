@@ -3,6 +3,24 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.2: the resolvers, and no caller for them
+
+**One migration, `202608010066`** — parity `202608010065` → `202608010066`. Two functions, **no consumer**: BYOK.3 gives the synchronous one a caller, BYOK.4 the asynchronous one. No table, no column, no policy, no table grant.
+
+**Neither resolver accepts a `user_id`.** A resolver that takes an owner is a resolver that can be asked for somebody else's credential, and every defence after that point is a check somebody has to remember to write. The owner is derived **structurally** — from `auth.uid()` in one, from `jobs.user_id` of the handed row in the other. The absence is asserted three ways: in the migration's own post-deploy block, against `pg_proc.proargnames` in pgTAP, and against the declaration text in a parity test.
+
+**And the guard is proven to fire.** Gate B1 asks for the mutation *executed*, not read, so the pgTAP suite creates `byok_resolver_mutation_probe(p_user_id uuid)` inside the transaction, runs the same detector against it, requires it to be **caught**, drops it, and re-checks that the real resolver survived — so a detector that had started matching everything fails too.
+
+**Neither decrypts, and there is no key here to decrypt with.** Both return the sealed envelope; the runtime holding the master key opens it. That is what keeps a database copy inert, and it is why `BYOK-RESOLVER-007` can accept in writing that a user calling the synchronous resolver through PostgREST with their own token receives their own ciphertext — their secret, which they typed, useless without a key the database has never seen and useless in any other account because of the AAD.
+
+**Only `active` resolves.** `invalid`, `removed` and absent collapse to one outcome, so a resolver is never an oracle for another account's configuration state. Each transition is applied and the caller's view re-read, rather than described.
+
+**A PRD contradiction, resolved in one direction and recorded.** `BYOK-RESOLVER-006` wants the same `P0002` for a job "the caller may not see" and a non-existent job; matrix case 8 wants a job owned by B to return **B's** credential. Both hold, because they describe disjoint situations: the function is `service_role`-only and `service_role` sees every job, so "a job the caller may not see" is the empty set for the only caller that exists. Case 8 governs foreign jobs; `P0002` is reserved for an id matching nothing. Written down rather than silently chosen, because the two sentences read as though they conflict.
+
+**Static scrutiny caught three defects that would each have reddened CI**, and Docker is unavailable here so none of them would have been caught locally by running anything. `information_schema.columns` does not describe a function's return columns — that view covers tables and views, so both return-shape assertions would have compared `''` against the expected list. `jobs.type = 'interpret_entry'` fires a payload-validation trigger that rejects the default `'{}'`, so the fixture would have raised before assertion one and killed the file with **zero** assertions run. And `proconfig` stores the empty search path as `search_path=""`, not `search_path=` — the post-deploy block asserted the wrong spelling and would have **failed the migration while the function was correct**; it now uses the tolerant pair two other files in this repository already established.
+
+**The EGC migration-pin guard needed a real correction, not just a bump.** Its second assertion — added in BYOK.1 to keep Entity Graph Completion's zero-migration claim checkable after the head was allowed to move — used the *moving* pin as its upper bound. The moment a second BYOK migration arrived, BYOK.1's own migration fell inside the window and the assertion failed while nothing was wrong. Both bounds are now historical constants, which is what makes the window mean anything.
+
 ## 2026-08-01 — BYOK.1: the credential store, and no reader for it
 
 **One migration, `202608010065`** — parity `202607310064` → `202608010065`, exactly the allocation the plan budgets. **No resolver, no adapter, no product surface, no provider call, and `OPENAI_API_KEY` untouched.** Removing the fallback is BYOK.3's, and doing it here would leave the product AI-less with no screen to configure a replacement.

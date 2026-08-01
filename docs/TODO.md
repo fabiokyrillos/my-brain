@@ -19,8 +19,8 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
   - [ ] **G-0.3 `preview` / `production` secrets.** **OWNER ACTION, deferred to point of use.** Preview pair before the first BYOK preview deployment; production pair before BYOK.5's cutover. Both runtimes — hosting platform *and* Supabase Edge Function secrets — per environment, all values distinct.
   - [x] **BYOK.1** — credential store and crypto core. Migration `202608010065`; acceptance record `docs/reports/BYOK_SLICE_01_ACCEPTANCE.md`.
   - [ ] **OWNER DECISION, needed before BYOK.3 starts: the per-IP validation throttle.** `BYOK-SCHEMA-007` fixes `credential_validation_attempts` at `(user_id, attempted_at, outcome)`; plan task 3.8 requires a throttle "per user **and per IP**" over that table; BYOK.3's migration budget is **zero**. The three cannot all hold. BYOK.1 implemented SCHEMA-007 exactly and invented no column. Options and trade-offs: `BYOK_SLICE_01_ACCEPTANCE.md` §5.
-  - [ ] **BYOK.2** — resolvers. Authorized.
-  - [ ] **BYOK.3–BYOK.6** — unauthorized until G-0.4 is provisioned.
+  - [x] **BYOK.2** — resolvers. Migration `202608010066`; acceptance record `docs/reports/BYOK_SLICE_02_ACCEPTANCE.md`.
+  - [ ] **BYOK.3–BYOK.6** — **BLOCKED on G-0.4.** The loop stops here. `ADR-069` makes G-0.4 gate BYOK.3's acceptance and merge, so the validation lane cannot be built-and-disabled and reported as passing. Owner action: `AUTONOMOUS_LOOP_HANDOFF.md` §7 — seven dashboard steps, secret name `BYOK_VALIDATION_OPENAI_API_KEY`, no value ever pasted into chat.
 - [ ] **Phase 2G — UNAUTHORIZED and unstarted.** `docs/reports/PHASE_2G_DEFINITION.md` is a definition study only: no PRD, no plan, no accepted ADR, no declared requirement, no code. Its position in the roadmap is **after** BYOK implementation (ADR-068).
 - [ ] **Public signup — BLOCKED.** Gated on BYOK implementation plus signup hardening. Three prerequisites do not exist at all: **account deletion**, **admin suspension**, **terms and privacy policy**.
 

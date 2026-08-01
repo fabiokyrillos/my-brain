@@ -4,7 +4,7 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the BYOK pre-code boundary.
+Last updated: **2026-08-01**, at the **BYOK.2 boundary — the loop's required stop**.
 
 ---
 
@@ -13,7 +13,7 @@ Last updated: **2026-08-01**, at the BYOK pre-code boundary.
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **PRE-CODE GATES CLOSED EXCEPT G-0.4. BYOK.1 and BYOK.2 AUTHORIZED** by `ADR-069`. G-0.4 remains a stop condition for BYOK.3. See §4 |
+| 2 | **BYOK** | **BYOK.1 and BYOK.2 CLOSED, both merged with green merge-SHA CI. STOPPED before BYOK.3** — G-0.4 is unprovisioned and `ADR-069` makes it gate BYOK.3's acceptance and merge. See §4 and §7 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -23,11 +23,15 @@ Last updated: **2026-08-01**, at the BYOK pre-code boundary.
 
 ## 2. Repository truth
 
-- **Main HEAD at last sync:** `8305424` (EGC.2 merge).
 - **Branches, all preserved:** `codex/docs-and-gates`, `codex/egc-slice-1`,
-  `codex/egc-slice-2`, `codex/egc-slice-3`.
-- **Migration parity: `202607310064`**, local and remote, unchanged since Slice G5.
-  Entity Graph Completion added **zero** migrations across all three slices.
+  `codex/egc-slice-2`, `codex/egc-slice-3`, `codex/byok-precode`, `codex/byok-slice-1`,
+  `codex/byok-slice-2`.
+- **Migration chain head: `202608010066`.** Entity Graph Completion added **zero**
+  migrations across all three slices; BYOK.1 and BYOK.2 added one each, each moving the
+  head by exactly its budgeted allocation.
+- **Neither BYOK migration has been applied to a shared environment.** Both are validated
+  on every CI run by `supabase db reset` from empty. The last verified local/remote parity
+  is the version Slice G5 closed on.
 - **Hosted signup: DISABLED and verified** (gate G-0.5).
   Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
 
@@ -38,13 +42,16 @@ Last updated: **2026-08-01**, at the BYOK pre-code boundary.
 | EGC.1 | #53 | `840da99` | `30672108083` | green, all three jobs |
 | EGC.2 | #54 | `8305424` | `30677225551` | green, all three jobs |
 | EGC.3 | #55 | `961feeb` | `30679796049` | green, all three jobs |
+| BYOK pre-code | #56 | `6ae230e` | `30683099857` | green, all three jobs |
+| BYOK.1 | #57 | `bf99c37` | `30684596621` | green, all three jobs |
+| BYOK.2 | #58 | see §8 | see §8 | see §8 |
 
 ---
 
 ## 3. Test and gate state
 
 - **Lint 0, typecheck 0, build exit 0.**
-- **Vitest: 3342 passed, 2 failed.**
+- **Vitest: 3411 passed, 2 failed.**
 - **Locale ternaries: 262** (ceiling 266, now permanently guarded).
 - **Serialized authenticated journeys:** EGC set 16/16, route audit 18/18, desktop +
   Pixel 7, both locales.
@@ -83,14 +90,27 @@ status:
 | **G-0.4** — dedicated low-limit OpenAI validation key | **NOT PROVISIONED. Still a stop condition.** Gates BYOK.3's validation lane **and BYOK.3's acceptance and merge**. Constraints: Amendment A-1.3 |
 | **G-0.5** — hosted signup closed | **Satisfied and verified** |
 
-### What is authorized, and where the loop must stop
+### What is authorized, and where the loop stopped
 
-**BYOK.1 and BYOK.2 are authorized** and depend on nothing G-0.4 provides — they are
-schema, crypto and RPC work, tested against the provisioned `test` keys and ephemeral keys.
+**BYOK.1 and BYOK.2 were authorized, and both are CLOSED** — merged, with green merge-SHA
+CI on all three jobs. They depended on nothing G-0.4 provides: schema, crypto and RPC work,
+tested against ephemeral keys.
 
-**The loop stops before BYOK.3** while G-0.4 is unprovisioned. It does **not** ship BYOK.3
-with the validation lane marked passed, and does not weaken or bypass it. The smallest
-owner action needed is in §7.
+**The loop has stopped before BYOK.3.** G-0.4 is unprovisioned, and `ADR-069` makes it gate
+BYOK.3's **acceptance and merge**, not merely its lane — so BYOK.3 cannot be built with the
+lane disabled and reported as passing. The lane is not weakened, not bypassed, and not
+marked complete. The smallest owner action needed is §7.
+
+**Two decisions are waiting, and BYOK.3 needs both:**
+
+1. **G-0.4** — the validation key. §7 has the exact steps.
+2. **The per-IP throttle conflict** — `BYOK-SCHEMA-007` fixes
+   `credential_validation_attempts` at `(user_id, attempted_at, outcome)`, plan task 3.8
+   requires a throttle "per user **and per IP**" over that table, and BYOK.3's migration
+   budget is **zero**. All three cannot hold. BYOK.1 implemented SCHEMA-007 exactly and
+   invented no column, because expanding a governing document's schema inside a branch is
+   the move `ADR-069` exists because the *owner* is entitled to make. Three options with
+   their trade-offs: `BYOK_SLICE_01_ACCEPTANCE.md` §5.
 
 ### One concern investigated and dismissed
 
@@ -187,3 +207,45 @@ key, and a distinct name is what makes BYOK-GUARD-001's allowlist able to say so
 
 **Until step 5 is done, BYOK.3 does not start.** The lane is not built-and-disabled and it
 is not reported as passing; the slice waits.
+
+---
+
+## 8. BYOK.1 and BYOK.2 — final state
+
+| Slice | Migration | Delivered | Acceptance record |
+| --- | --- | --- | --- |
+| **BYOK.1** | `202608010065` | `BYOK-SCHEMA-001…007`, `BYOK-CRYPTO-001…007`, `BYOK-MASTER-001…012`, `BYOK-FINGERPRINT-001…005`, `BYOK-GUARD-005` | `BYOK_SLICE_01_ACCEPTANCE.md` — all nine gates A1–A9 |
+| **BYOK.2** | `202608010066` | `BYOK-RESOLVER-001…008` | `BYOK_SLICE_02_ACCEPTANCE.md` — all seven gates B1–B7 |
+
+**What exists now:** two tables with forced RLS and no client `DELETE` anywhere, an
+AES-256-GCM envelope whose AAD binds each ciphertext to its owner in both runtimes, a
+fingerprint that is a slice of nothing, startup validators for both secrets, two locality
+guards, a chain scan, and two resolvers that derive their owner structurally and return
+ciphertext only.
+
+**What does not exist, and must not be assumed:** no adapter, no Settings surface, no
+validation lane, no provider change. **`OPENAI_API_KEY` is untouched and every existing AI
+path still uses it.** Nothing in the product reads a credential yet, and the startup
+validators are called by no process — deliberately, because wiring a fail-to-start check
+before preview and production secrets exist would invert Amendment A-1.2's ordering and
+schedule an outage.
+
+### Four things the next session should not have to rediscover
+
+1. **The startup checks are unwired on purpose.** Node's call site belongs to BYOK.3,
+   the worker's to BYOK.4 (whose task 4.13 already owns the deploy). Gate A6 is recorded as
+   passed *with that limit stated*, not as fully wired.
+2. **Docker is unavailable here, and pgTAP is the highest-risk artifact every time.**
+   BYOK.2's static review caught three defects that would each have reddened CI and none of
+   which any local command would have found: `information_schema.columns` does not describe
+   function return columns; `jobs.type = 'interpret_entry'` fires a payload trigger that
+   rejects `'{}'`; and `proconfig` stores the empty search path as `search_path=""`.
+3. **A guard must not forbid documenting the thing it guards.** Three separate scans in
+   this initiative needed comment-stripping before they stopped failing on their own
+   explanations — the third also needed `comment on … is '…'` bodies stripped, because a
+   catalog comment is prose that happens to live in SQL.
+4. **The EGC migration pin now has two historical bounds and one moving one.** A slice that
+   adds a migration updates `AUTHORIZED_MIGRATION_HEAD` in the same commit. It must **not**
+   touch `EGC_FINAL_HEAD` or `FIRST_POST_EGC_MIGRATION` — those are facts about the past,
+   and an earlier revision that used the moving pin as an upper bound broke the moment a
+   second migration arrived.
