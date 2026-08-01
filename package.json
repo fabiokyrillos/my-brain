@@ -43,6 +43,7 @@
     "docs:phase-2f:traceability": "node scripts/generate-phase-2f-traceability.mjs",
     "docs:egc:traceability": "node scripts/generate-egc-traceability.mjs",
     "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
+    "byok:interop": "node scripts/byok-crypto-interop.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {
