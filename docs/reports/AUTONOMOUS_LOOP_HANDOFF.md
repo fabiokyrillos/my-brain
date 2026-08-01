@@ -44,7 +44,7 @@ Last updated: **2026-08-01**, at the **BYOK.2 boundary — the loop's required s
 | EGC.3 | #55 | `961feeb` | `30679796049` | green, all three jobs |
 | BYOK pre-code | #56 | `6ae230e` | `30683099857` | green, all three jobs |
 | BYOK.1 | #57 | `bf99c37` | `30684596621` | green, all three jobs |
-| BYOK.2 | #58 | see §8 | see §8 | see §8 |
+| BYOK.2 | #58 | `0c5f4f9` | `30686033145` | green, all three jobs |
 
 ---
 
