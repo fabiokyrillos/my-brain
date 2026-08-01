@@ -4,10 +4,10 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the **BYOK.4 close**. The worker's process-wide provider
-key is **deleted**, together with the allowlist entry that permitted it, in one commit.
-**No Node or Deno user path can reach a project key.** BYOK.5 — owner cutover — is next,
-and it stops at an action no agent may perform.
+Last updated: **2026-08-01**, at **BYOK.5's stop boundary**. BYOK.4 is merged and green.
+BYOK.5 did everything a repository can do and **stopped at four owner actions** — three
+platform-secret operations and one credential entry through an authenticated product
+surface. The exact commands are in §11. **Nothing is half-applied.**
 
 ---
 
@@ -16,7 +16,7 @@ and it stops at an action no agent may perform.
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **BYOK.1 through BYOK.4 CLOSED**, all merged with green merge-SHA CI. Both the Node and the Deno project-key fallbacks are **deleted**. **BYOK.5 is next**; it removes the deployed Edge Function secret and stops at owner credential entry. See §10 |
+| 2 | **BYOK** | **BYOK.1 through BYOK.4 CLOSED**, all merged with green merge-SHA CI. Both project-key fallbacks are **deleted**. **BYOK.5 is STOPPED at its owner boundary** — every repository task done, four owner actions outstanding. See §10 and §11 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -55,8 +55,8 @@ and it stops at an action no agent may perform.
 | BYOK handoff | #59 | `0b62a5b` | `30686913834` | green, all three jobs |
 | BYOK gate amendment | #60 | `e43df60` | (run on main) | green, all three jobs |
 | **BYOK.3** | #61 | `2c70784` | `30711977571` | green, all three jobs |
-| BYOK.3 handoff | #62 | `423625d` | see §10 | green, all three jobs |
-| **BYOK.4** | see §10 | see §10 | see §10 | see §10 |
+| BYOK.3 handoff | #62 | `423625d` | `30715442719` | green, all three jobs |
+| **BYOK.4** | #63 | `81b1110` | `30720640705` | green, all three jobs |
 
 ---
 
@@ -357,7 +357,8 @@ precisely so this cannot be forgotten.
 
 ## 10. BYOK.4 — final state, and what BYOK.5 must do
 
-**Branch:** `codex/byok-slice-4`, from `main` at `423625d`.
+**Branch:** `codex/byok-slice-4`, from `main` at `423625d`. **Merged as `81b1110`
+(PR #63), merge-SHA CI run `30720640705`, all three jobs green.**
 **Migrations:** `202608010068`, `202608010069`. Head `202608010067` -> `202608010069`,
 **by exactly two** — the whole of BYOK.4's approved budget, and the last of the
 initiative's five.
@@ -456,3 +457,79 @@ and pushed before stopping, and the exact owner-facing commands must be written 
 **Do not seed the owner credential from `OPENAI_API_KEY`.** Not by script, not by
 migration, not as a convenience. The whole point of BYOK.5 is that the owner is not
 privileged in the credential-resolution contract.
+
+
+---
+
+## 11. BYOK.5 — STOPPED at the owner boundary
+
+**Branch:** `codex/byok-slice-5`, from `main` at `81b1110`. **Migrations: 0.**
+**Acceptance record:** `docs/reports/BYOK_SLICE_05_ACCEPTANCE.md`.
+
+**This is a true stop condition**, not an incomplete slice. Three gates need
+platform access; one needs a credential typed into an authenticated product
+surface. Neither is derivable from the approved architecture, and no agent may
+perform either.
+
+### What is done
+
+| Gate | State |
+| --- | --- |
+| **E4** — allowlist exactly three, both directions | **EXECUTED** |
+| E1, E2, E3 | **BLOCKED** on owner actions below |
+| E5 — full remote suite | **NOT RUN, deliberately** — its purpose is to confirm the scripts still work *after* the cutover |
+
+Also done: a classification per allowlist entry compared in both directions; a
+proof that every exception is unreachable from a deployed user bundle; a scan
+asserting no deployed module in either runtime reads an `API_KEY`-shaped
+environment name; and an assertion that the credential chain contains **no
+identity comparison, no identity from configuration, and no hardcoded uuid** — so
+the mechanism by which the owner could be privileged does not exist. That does
+not discharge E3; it removes the way E3 could fail.
+
+### A plan correction, measured
+
+Task 5.3 names `scripts/remote-*.mjs` as the third classified exception. **It is
+empty in fact** — no script references `OPENAI_API_KEY`; `remote-supabase-smoke.mjs`
+carries the literal `"openai"` only as a provider *name*. The count agrees with
+the plan while the composition does not, and the guard now asserts this in both
+directions so a future edit cannot "restore" a scripts entry to match prose.
+
+### The four owner actions, in order
+
+Order matters in two places, and getting it wrong causes an outage rather than a
+mistake.
+
+1. **Provision three secrets** — `BYOK_MASTER_KEY`, `BYOK_FINGERPRINT_PEPPER`,
+   `BYOK_RATE_LIMIT_PEPPER` — in **both** the Supabase Edge Function secret store
+   and the hosting platform's Next.js environment. Distinct per environment,
+   distinct from each other, distinct from local and test.
+2. **Apply migrations `202608010065`…`202608010069`** — *after* step 1, because
+   the worker refuses to serve without `BYOK_MASTER_KEY` by design.
+3. **Deploy `process-jobs`, then unset `OPENAI_API_KEY`** — in that order, so
+   there is no window where a deployed old worker has neither key. Then remove it
+   from the Next.js environment. **E2 is the read-back**, verified against the
+   deployment.
+4. **The owner configures their own key through Settings.** Not seeded from
+   `OPENAI_API_KEY`, not by script, not by migration — a seeded credential would
+   make the owner the one account that never proved the flow.
+
+Exact commands: `BYOK_SLICE_05_ACCEPTANCE.md` §3.
+
+### What resumes automatically afterwards
+
+E1, E2, E3, E5, **and every item BYOK.3 and BYOK.4 deferred on the same
+blocker**: the asynchronous matrix cases against the deployed function, the
+deployed-bundle comparison, concurrent rotation, and the desktop/Pixel 7 Settings
+journeys. One unblocking clears all of them, which is why they were recorded
+together rather than slice by slice.
+
+### One question left open on purpose
+
+After step 3, `OPENAI_API_KEY` has **no reader anywhere** — not the app, not the
+worker, not a script, not a test. This repository removes consumer-less contracts
+rather than keeping them, so the `.env.example` line should probably go. It is
+not removed here: it would disagree with a deployed reality until step 3
+completes, and `guards.test.ts` currently asserts its presence as the control
+keeping `BYOK_VALIDATION_OPENAI_API_KEY` distinct from it. Handed to **BYOK.6's
+convergence audit**, whose standard is exactly this.

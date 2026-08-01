@@ -3,6 +3,26 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.5: the allowlist is closed, and the slice stops where an agent must
+
+**Zero migrations.** Every repository task is done; **four owner actions remain**, and they are the reason this slice stops rather than closes.
+
+**The allowlist is pinned by classification, not by length.** It was already three entries after BYOK.4 deleted the worker's. What is new is what keeps it three: each entry now carries the classification that justifies it, compared against the list in **both directions** — an entry without a classification and a classification without an entry fail identically, because they are the same defect, somebody editing one list and not the other.
+
+**A plan correction, measured rather than absorbed.** Task 5.3 names three classified exceptions, the third being `scripts/remote-*.mjs`. **That one is empty in fact**: no script references `OPENAI_API_KEY`, and `remote-supabase-smoke.mjs` carries the literal `"openai"` only as a provider *name* in a preferences payload. The count agreeing with the plan hid that the composition did not. The guard asserts it in both directions now, so a future edit cannot "restore" a scripts entry to match a sentence.
+
+**Every exception is proven unreachable from a deployed bundle, by its own mechanism.** Not by file extension: `.env.example` is proven not to be a module at all, and each test file is proven to be imported by nothing outside a test — asserted across the whole source tree, because "it ends in `.test.ts`" is a convention and the requirement is a fact.
+
+**No account is privileged, proven as an absence.** Gate E3 normally means configuring the owner and watching them fail without a key, which needs a deployment and a credential entry. The stronger property is structural: the resolution chain contains **no identity comparison, no identity read from configuration, and no hardcoded uuid**, so the mechanism by which anyone could be exempted does not exist. A future "just let the owner through while we debug" fails on it. This does not discharge E3 and is not claimed to — it removes the way E3 could fail.
+
+**`.env.example` now says what is true.** `OPENAI_API_KEY` stays, as a classified exception, but the line records that **nothing that ships reads it**. The failure this initiative guards against was never somebody deciding to re-add a fallback; it is somebody needing a key at 3am, finding the name, and wiring it into "one path that just needs to work". A name with no explanation invites exactly that.
+
+**E5 is not run, deliberately, and that is a different thing from skipped.** Its purpose is to confirm the remote scripts still work **after** the cutover. Running it before the deployed secret is removed would prove nothing about the state it exists to check, and it writes to a real linked project.
+
+**The stop is honest about which actions and why.** Three gates need platform-secret access; one needs a credential typed into an authenticated product surface. The four owner actions are written down in the order that matters — secrets before migrations, because the worker refuses to serve without its master key; deploy before unsetting the project key, so no deployed worker is ever left with neither. And the owner's credential is **not** seeded from `OPENAI_API_KEY`: that would make the owner the one account that never proved the flow.
+
+**One question is left open on purpose.** After the cutover, `OPENAI_API_KEY` has no reader anywhere — not the app, not the worker, not a script, not a test. This repository removes consumer-less contracts rather than keeping them. It is not removed here because it would disagree with a deployed reality until the cutover completes, and because a live guard currently asserts its presence. Handed to BYOK.6's convergence audit, whose standard is exactly this.
+
 ## 2026-08-01 — BYOK.4: the worker's process-wide key, deleted with its exception
 
 **Two migrations, `202608010068` and `202608010069`** — parity `202608010067` → `202608010069`, exactly the allocation BYOK.4 is budgeted.
