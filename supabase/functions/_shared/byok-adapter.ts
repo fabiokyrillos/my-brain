@@ -83,7 +83,10 @@ type ResolverRow = {
  * transport speaks hex because that is what PostgREST does with `bytea`.
  */
 function byteaToBase64(value: string): string {
-  if (!value.startsWith("\\x")) return value;
+  if (!value.startsWith("\\x")) {
+    // Already base64 — the shape a direct RPC result or a test fixture uses.
+    return value;
+  }
   const hex = value.slice(2);
   const bytes = new Uint8Array(new ArrayBuffer(hex.length / 2));
   for (let index = 0; index < bytes.length; index += 1) {
@@ -156,6 +159,22 @@ async function openEnvelope(
 export async function resolveJobCredential(
   service: SupabaseClient,
   jobId: string,
+  /**
+   * The master key, defaulted from the Edge Function secret store.
+   *
+   * The Deno mirror of the Node adapter's `env: NodeJS.ProcessEnv = process.env`
+   * parameter, and it exists for the same two reasons: tests must be able to
+   * supply one, and `deno test` runs with **no `--allow-env`**, so a call that
+   * reached `Deno.env.get` would raise a permission error rather than run.
+   *
+   * Note what it is and is not. It is the operator's master key, the same for
+   * every user, defaulted from the environment on every real call. It is **not**
+   * a way to choose *whose* credential is resolved — that is `jobs.user_id`, read
+   * from the row below, and no argument here can influence it. A wrong master key
+   * produces `credential_unreadable`, never somebody else's plaintext, because
+   * the AAD binds the ciphertext to the owner regardless.
+   */
+  master?: Bytes,
 ): Promise<WorkerCredential> {
   // The authoritative owner. `jobs.user_id` is `not null`, so an absent value
   // here means there is no such row — and a job that does not exist has no
@@ -179,5 +198,5 @@ export async function resolveJobCredential(
   // reconstructed here.
   if (rows.length === 0) throw new JobFailure("credential_required");
 
-  return openEnvelope(rows[0], jobRow.user_id, requireMasterKey());
+  return openEnvelope(rows[0], jobRow.user_id, master ?? requireMasterKey());
 }

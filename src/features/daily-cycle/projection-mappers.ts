@@ -1,11 +1,9 @@
 import {
-  attentionReasons,
   trackedAttentionReasons,
   dailyCycleActions,
   dailyCycleMessageKeys,
   productStates,
   workItemPriorities,
-  type AttentionReason,
   type TrackedAttentionReason,
   type AvailableAction,
   type CaptureReceipt,
@@ -120,10 +118,6 @@ function isSafeHref(value: unknown): value is string {
 
 function isProductState(value: unknown): value is ProductState {
   return typeof value === "string" && productStates.includes(value as ProductState);
-}
-
-function isAttentionReason(value: unknown): value is AttentionReason {
-  return typeof value === "string" && attentionReasons.includes(value as AttentionReason);
 }
 
 /**
