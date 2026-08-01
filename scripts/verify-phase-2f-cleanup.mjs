@@ -137,6 +137,19 @@ export const SCANNED_TABLES = Object.freeze([
   // Posture-protected: scanned so the refusal is asserted, never for orphans.
   "task_command_confirmations",
   "product_events",
+  // Added by BYOK.1 (`202608010065`). Scanned rather than excused, because these
+  // are the two tables where residue would matter most: a surviving
+  // `user_ai_credentials` row is a surviving *ciphertext*, and a surviving
+  // `credential_validation_attempts` row is a surviving record that a deleted
+  // account tried to configure one. Both cascade from `auth.users`, so a
+  // non-zero count here means the cascade broke.
+  //
+  // This is not BYOK-DELETE-002's zero-secret residue verifier — that one is
+  // BYOK.6's, and it checks more than row counts. This is the existing
+  // owner-scoped sweep learning about two new tables, which is exactly what the
+  // partition guard in `phase-2f-cleanup.test.ts` exists to force.
+  "user_ai_credentials",
+  "credential_validation_attempts",
 ]);
 
 /**

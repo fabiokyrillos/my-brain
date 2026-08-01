@@ -563,6 +563,27 @@ export type Database = {
         }
         Relationships: []
       }
+      credential_validation_attempts: {
+        Row: {
+          attempted_at: string
+          id: string
+          outcome: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          id?: string
+          outcome: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string
+          id?: string
+          outcome?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       entity_aliases: {
         Row: {
           alias: string
@@ -2380,6 +2401,48 @@ export type Database = {
             referencedColumns: ["user_id", "id"]
           },
         ]
+      }
+      user_ai_credentials: {
+        Row: {
+          ciphertext: string | null
+          created_at: string
+          fingerprint: string | null
+          iv: string | null
+          key_version: number | null
+          last_failure_code: string | null
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+          validated_at: string | null
+        }
+        Insert: {
+          ciphertext?: string | null
+          created_at?: string
+          fingerprint?: string | null
+          iv?: string | null
+          key_version?: number | null
+          last_failure_code?: string | null
+          provider?: string
+          status: string
+          updated_at?: string
+          user_id: string
+          validated_at?: string | null
+        }
+        Update: {
+          ciphertext?: string | null
+          created_at?: string
+          fingerprint?: string | null
+          iv?: string | null
+          key_version?: number | null
+          last_failure_code?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          validated_at?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

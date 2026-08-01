@@ -107,6 +107,7 @@ describe("Deno worker copies stay identical to their Node source", () => {
       "extraction-normalization.ts",
       "extraction-normalization.test.ts",
       "byok-envelope.ts",
+      "byok-envelope.test.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

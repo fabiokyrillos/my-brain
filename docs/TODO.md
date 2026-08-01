@@ -17,7 +17,8 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
   - [x] **Pre-code gates G-0.1, G-0.2, G-0.3 (procedure + `local`/`test`), G-0.5** — satisfied and evidenced.
   - [ ] **G-0.4 — dedicated low-limit OpenAI validation key.** **OWNER ACTION.** Blocks BYOK.3's acceptance and merge, not BYOK.1 or BYOK.2 (`ADR-069`). Constraints in Amendment A-1.3: dedicated project and key, restricted permissions, USD 2 monthly budget **alert** (a soft alert, not a hard cap), lowest practical rate limits, opt-in lane only, `maxRetries: 0`, short timeout, hard daily attempt ceiling, revoked after acceptance.
   - [ ] **G-0.3 `preview` / `production` secrets.** **OWNER ACTION, deferred to point of use.** Preview pair before the first BYOK preview deployment; production pair before BYOK.5's cutover. Both runtimes — hosting platform *and* Supabase Edge Function secrets — per environment, all values distinct.
-  - [ ] **BYOK.1** — credential store and crypto core. Authorized.
+  - [x] **BYOK.1** — credential store and crypto core. Migration `202608010065`; acceptance record `docs/reports/BYOK_SLICE_01_ACCEPTANCE.md`.
+  - [ ] **OWNER DECISION, needed before BYOK.3 starts: the per-IP validation throttle.** `BYOK-SCHEMA-007` fixes `credential_validation_attempts` at `(user_id, attempted_at, outcome)`; plan task 3.8 requires a throttle "per user **and per IP**" over that table; BYOK.3's migration budget is **zero**. The three cannot all hold. BYOK.1 implemented SCHEMA-007 exactly and invented no column. Options and trade-offs: `BYOK_SLICE_01_ACCEPTANCE.md` §5.
   - [ ] **BYOK.2** — resolvers. Authorized.
   - [ ] **BYOK.3–BYOK.6** — unauthorized until G-0.4 is provisioned.
 - [ ] **Phase 2G — UNAUTHORIZED and unstarted.** `docs/reports/PHASE_2G_DEFINITION.md` is a definition study only: no PRD, no plan, no accepted ADR, no declared requirement, no code. Its position in the roadmap is **after** BYOK implementation (ADR-068).
