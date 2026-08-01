@@ -118,17 +118,90 @@ describe("BYOK-ADAPTER-004: the two runtimes implement one format", () => {
     }
   });
 
-  it("reads no environment inside either crypto core", () => {
-    // The master key arrives as an argument in both. A module that found its own
-    // key could encrypt under one the caller did not intend, and the only place
-    // that is allowed to look is the explicit startup check.
+  it("reads the environment only inside the two sanctioned startup checks", () => {
+    // Every secret arrives as an argument everywhere else. A module that found
+    // its own key could encrypt under one the caller did not intend, and the
+    // only places allowed to look are the explicit startup checks.
     const node = readFileSync(join(REPO, "src/lib/byok/crypto.ts"), "utf8");
     const deno = readFileSync(DENO_SOURCE, "utf8");
 
-    // `requireMasterKey` is the one sanctioned reader in each file.
-    expect(node.match(/process\.env/g) ?? []).toHaveLength(1);
-    expect(deno.match(/Deno\.env\.get/g) ?? []).toHaveLength(1);
-    expect(node).toMatch(/export function requireMasterKey/);
-    expect(deno).toMatch(/export function requireMasterKey/);
+    // Two sanctioned readers per runtime, and exactly two: `requireMasterKey`
+    // and `requireFingerprintPepper`. The count is asserted rather than the
+    // names alone, so a third read added inside either function's body — the
+    // easiest place to hide one — moves this number.
+    //
+    // In the Node file both occurrences are the `= process.env` default
+    // parameter, one per function. That is the read, and it is a default rather
+    // than a direct lookup so the tests can exercise absence and malformation by
+    // passing an object instead of mutating the real environment — which under
+    // a parallel test runner would be a shared mutable global.
+    expect(node.match(/process\.env/g) ?? []).toHaveLength(2);
+    expect(deno.match(/Deno\.env\.get/g) ?? []).toHaveLength(2);
+
+    for (const [name, source] of [["node", node], ["deno", deno]] as const) {
+      expect(source, `${name} validates the master key at startup`).toMatch(
+        /export function requireMasterKey/,
+      );
+      expect(source, `${name} validates the pepper at startup`).toMatch(
+        /export function requireFingerprintPepper/,
+      );
+    }
+  });
+
+  it("records the one asymmetry between the cores rather than letting it drift", () => {
+    // BYOK-ADAPTER-004 locks envelope format, AAD composition, status handling
+    // and failure vocabulary — all of which are identical above. `hmacSha256`
+    // is none of those: it is the fingerprint primitive, the fingerprint is
+    // computed once at save time on the Node Settings path, and the worker never
+    // computes one. Exporting it from the Deno core would be a consumer-less
+    // contract.
+    //
+    // So the asymmetry is intended — and asserted in **both** directions, so
+    // neither "somebody added HMAC to the worker" nor "somebody deleted it from
+    // Node" can pass silently. If BYOK.4 ever does need it, this test is the
+    // thing that has to change first.
+    const node = readFileSync(join(REPO, "src/lib/byok/crypto.ts"), "utf8");
+    const deno = readFileSync(DENO_SOURCE, "utf8");
+
+    // Matched on the *declaration*, not on any mention: the Deno file explains
+    // the asymmetry in prose, and a bare `/hmacSha256/` would be failed by its
+    // own comment — a guard that forbids documenting the thing it guards.
+    expect(node).toMatch(/export async function hmacSha256/);
+    expect(deno).not.toMatch(/(?:export\s+)?(?:async\s+)?(?:function|const|let|var)\s+hmacSha256/);
+  });
+
+  it("wires both startup checks to the one validator, in both runtimes", () => {
+    // This assertion belongs to the Deno suite by subject and lives here by
+    // necessity: it reads the worker source as text, `Deno.readTextFile` needs
+    // `--allow-read`, and the worker job runs with no `--allow-*` flags so it can
+    // never reach a network. The Node side already reads that file for the parity
+    // lock, so the check costs nothing here and would cost the permission-free
+    // guarantee there.
+    //
+    // What it proves: neither runtime validates a secret twice, differently. A
+    // second implementation is how "fails to start" becomes "fails to start in
+    // one of the two places".
+    const sources = {
+      node: readFileSync(join(REPO, "src/lib/byok/crypto.ts"), "utf8"),
+      deno: readFileSync(DENO_SOURCE, "utf8"),
+    } as const;
+
+    const wiring = [
+      ["requireMasterKey", "BYOK_MASTER_KEY"],
+      ["requireFingerprintPepper", "BYOK_FINGERPRINT_PEPPER"],
+    ] as const;
+
+    for (const [runtime, source] of Object.entries(sources)) {
+      for (const [fn, variable] of wiring) {
+        const declaration = source.indexOf(`export function ${fn}(`);
+        expect(declaration, `${runtime}.${fn} must exist`).toBeGreaterThan(-1);
+
+        const body = source.slice(declaration, source.indexOf("\n}", declaration));
+        expect(body, `${runtime}.${fn} must read ${variable}`).toContain(variable);
+        expect(body, `${runtime}.${fn} must delegate to decodeMasterKey`).toContain(
+          "decodeMasterKey(",
+        );
+      }
+    }
   });
 });

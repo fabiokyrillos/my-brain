@@ -164,3 +164,20 @@ export async function decryptCredential(
 export function requireMasterKey(): Bytes {
   return decodeMasterKey(Deno.env.get("BYOK_MASTER_KEY"), "BYOK_MASTER_KEY");
 }
+
+/**
+ * The same check for the fingerprint pepper, Deno side.
+ *
+ * **A declared asymmetry, not drift.** The Node core also exports `hmacSha256`;
+ * this one does not, because the worker never computes a fingerprint — that
+ * happens once, at save time, on the Settings path. What the worker does need
+ * is to refuse to start when the pepper is absent or malformed, because
+ * BYOK-FINGERPRINT-001 makes the pepper subject to BYOK-MASTER-005
+ * independently and "in both runtimes". Exporting an HMAC nothing here calls
+ * would be a consumer-less contract, which this repository removes rather than
+ * keeps. `src/lib/byok/parity.test.ts` asserts this asymmetry explicitly, so it
+ * stays a decision rather than becoming a divergence nobody noticed.
+ */
+export function requireFingerprintPepper(): Bytes {
+  return decodeMasterKey(Deno.env.get("BYOK_FINGERPRINT_PEPPER"), "BYOK_FINGERPRINT_PEPPER");
+}
