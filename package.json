@@ -41,6 +41,8 @@
     "docs:phase-2d:traceability": "node scripts/generate-phase-2d-traceability.mjs",
     "docs:phase-2e:traceability": "node scripts/generate-phase-2e-traceability.mjs",
     "docs:phase-2f:traceability": "node scripts/generate-phase-2f-traceability.mjs",
+    "docs:egc:traceability": "node scripts/generate-egc-traceability.mjs",
+    "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {
