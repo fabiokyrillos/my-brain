@@ -23,15 +23,31 @@ import { describe, expect, it } from "vitest";
 const REPO = resolve(__dirname, "../../..");
 
 /**
- * The migration-chain head at the moment Entity Graph Completion was authorized.
+ * The migration-chain head, pinned.
  *
- * Set by Slice G5 of the product UX remediation (`202607310064`, the reminder
- * lifecycle command). Entity Graph Completion must not move it. **BYOK will** —
- * its plan budgets four migrations — so when that initiative starts, this pin is
- * updated by the slice that adds the first one, deliberately and visibly, rather
- * than deleted.
+ * **Moved by BYOK.1, deliberately and visibly — which is what the previous
+ * revision of this comment instructed.** It read: *"Entity Graph Completion must
+ * not move it. **BYOK will** — its plan budgets four migrations — so when that
+ * initiative starts, this pin is updated by the slice that adds the first one,
+ * deliberately and visibly, rather than deleted."* This is that slice, and
+ * `202608010065` is that migration: the BYOK credential store.
+ *
+ * The pin is not the whole guard any more, because a moving pin cannot by itself
+ * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
+ * the head Entity Graph Completion ended on is still in the chain, and **no
+ * version sits between it and the next one**, so the initiative's central claim
+ * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202607310064";
+const AUTHORIZED_MIGRATION_HEAD = "202608010065";
+
+/**
+ * The head at Entity Graph Completion's close, which nothing may ever change.
+ *
+ * Unlike the pin above, this constant is historical: EGC is a closed initiative,
+ * and the version it ended on is a fact about the past rather than a budget for
+ * the future.
+ */
+const EGC_FINAL_HEAD = "202607310064";
 
 function migrationVersions(): string[] {
   return readdirSync(join(REPO, "supabase/migrations"))
@@ -46,12 +62,34 @@ describe("EGC-INVARIANT-001: Entity Graph Completion adds no migration", () => {
     const versions = migrationVersions();
     expect(
       versions[versions.length - 1],
-      "Entity Graph Completion moved the migration chain head. The initiative's "
-        + "central claim is that the entity graph is reachable with no schema change, "
-        + "and EGC-INVARIANT-001 makes that mechanical. If a migration is genuinely "
-        + "required, the slice stops and the PRD is amended by owner decision — the "
-        + "invariant is not renegotiated inside a branch.",
+      "The migration chain head moved without this pin moving with it. The pin is "
+        + "updated by the slice that adds a migration, deliberately and visibly, in "
+        + "the same commit — never deleted, and never edited by a slice that added "
+        + "nothing. If a migration is genuinely required and unbudgeted, the slice "
+        + "stops and the plan is amended by owner decision: the invariant is not "
+        + "renegotiated inside a branch.",
     ).toBe(AUTHORIZED_MIGRATION_HEAD);
+  });
+
+  it("keeps Entity Graph Completion's own claim mechanical after the chain moved on", () => {
+    // EGC-INVARIANT-001 says the entity graph became reachable with **no schema
+    // change**. Once the head is allowed to move for a later initiative, that
+    // claim needs its own check or it quietly becomes unfalsifiable.
+    //
+    // Two facts, together sufficient: the version EGC ended on is still in the
+    // chain, and nothing was inserted between it and whatever came next. A
+    // migration added by EGC would have to sit in that gap — its slices ran
+    // entirely between `202607310064` and the first BYOK migration.
+    const versions = migrationVersions();
+
+    expect(versions, "EGC's final head must still be in the chain").toContain(EGC_FINAL_HEAD);
+
+    const after = versions.filter((version) => version > EGC_FINAL_HEAD);
+    expect(
+      after.filter((version) => version < AUTHORIZED_MIGRATION_HEAD),
+      "a migration sits between Entity Graph Completion's close and the next "
+        + "authorized migration, so EGC's zero-migration claim is no longer true",
+    ).toEqual([]);
   });
 
   it("reads the head from the directory rather than trusting a restated constant", () => {
