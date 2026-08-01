@@ -3,6 +3,24 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — EGC.3: Entity Graph Completion closes
+
+**No migration, no grant, no policy, no RPC, no provider call, and no product-source change beyond one lint fix.** Parity stays `202607310064` — unchanged across the whole initiative. **53 requirements, 53 delivered, 0 deferred.**
+
+**Four permanent instruments ship, and one of them changed shape because a production incident said it had to.**
+
+`egc-reachability.test.ts` turns EGC-INVARIANT-004 into a mechanical check over the **whole** authenticated route tree: every `page.tsx` must appear in the inventory with a verdict, so a new route cannot slip in unenumerated. It needed **three** verdicts rather than two, and the third was forced by the code rather than anticipated — the Context detail page renders the people in a context and offers no control, because EGC-ASSOC-003 puts the single writer on the Person side. That is not `EG-09`, which was no path *anywhere*; "writable from a named other route" is a different fact, recorded as its own and then checked. It resolves the **export name** rather than the module, which is what makes it worth running — a module-level check would have been satisfied for two collections the Organizations page cannot write at all — and that strengthening caught a real inventory error on its first run.
+
+`locale-ternary-guard.test.ts` is the non-increase guard the UX closeout proposed and nobody built. Ceiling 266, current **262**. Proven by executing the mutation over a real temporary tree rather than over `src/`, because two sibling closeout tests walk `src/` concurrently and a probe file there would make their results depend on this test's timing.
+
+`scripts/generate-egc-traceability.mjs` parses the requirement inventory from the PRD's declaration shape, parses slice ownership from the plan's own `**Delivers:**` lines, resolves every claimed artifact on disk, fails closed on drift, and regenerates content-identically. **It shipped with the same CRLF fragility that already costs this repository two red assertions**: it found zero of the three owner decisions on a Windows checkout, because their declaration ends `(.+)$` and `.` does not match `\r`, while the table rows kept working on `\s*$`. Fixed, with a test that parses one fixture under both line endings.
+
+`scripts/verify-egc-cleanup.mjs` **replaces the fixed-prefix definition of fixture residue with combined evidence.** The prefix rule failed in production: the account removed on 2026-07-31 was classified as a real user by two acceptance artifacts, because no fixture creator in this repository emits that prefix — while the hourly heartbeat ran on its behalf for three weeks. Six independent signals now, two of them behavioural (entity-graph rows with no product activity; scheduled activity with no product activity), and `likely-fixture` requires a behavioural signal plus at least one more — so a naming heuristic alone can never reach it, which is what keeps a real person with an unusual address out of the deletion conversation. **It reports and never deletes, and holds no delete path**, asserted by a test that reads its own source. Live run: 2 accounts, 0 likely fixtures, 0 residue.
+
+**Serialized authenticated evidence:** the EGC journey set 16/16 and the route-audit sweep 18/18, both on desktop and Pixel 7 across both locales, run with `--workers=1` per the P1 method — and residue re-verified as zero afterwards.
+
+Full accounting, including the six factual corrections to the governing documents and all twenty-seven review findings: `docs/reports/EGC_REPORT.md`.
+
 ## 2026-07-31 — EGC.2: the Camila scenario becomes possible
 
 **No migration, no column, no grant, no policy, no RPC, no provider call, and no hard delete anywhere on the three relationship tables.** Parity stays `202607310064`. Locale ternaries fall from 266 to **262**.
