@@ -71,6 +71,10 @@ export const dailyCycleCopy = {
       answer_existing_question: { title: "Responda uma pergunta", description: "Uma informação precisa ser esclarecida para concluir a organização." },
       retry_processing: { title: "Tente organizar novamente", description: "O processamento não foi concluído e pode ser tentado de novo." },
       resolve_consistency: { title: "Revise este registro", description: "Encontramos uma inconsistência e preservamos o registro para sua revisão." },
+      configure_ai_credential: {
+        title: "Configure sua chave de IA",
+        description: "Seu registro foi salvo por completo. Para o {agent} interpretá-lo, configure sua própria chave de IA em Configurações.",
+      },
     },
     actions: {
       open_entry: "Abrir registro",
@@ -87,6 +91,8 @@ export const dailyCycleCopy = {
       wait_task: "Aguardar",
       resume_task: "Retomar",
       reopen_task: "Reabrir",
+      configure_ai_credential: "Configurar chave de IA",
+      interpret_pending_entries: "Interpretar registros pendentes",
     },
     messages: {
       capture_saved: "Salvo. A organização foi solicitada.",
@@ -105,6 +111,9 @@ export const dailyCycleCopy = {
       action_unavailable: "Esta ação não está mais disponível.",
       retry_not_available: "Ainda não é possível tentar novamente.",
       action_failed: "Não foi possível concluir esta ação agora.",
+      pending_entries_queued: "{count} registro(s) enviados para interpretação.",
+      pending_entries_none: "Nenhum registro pendente para interpretar.",
+      credential_required: "Configure sua chave de IA em Configurações antes de usar este recurso.",
     },
   },
   en: {
@@ -121,6 +130,10 @@ export const dailyCycleCopy = {
       answer_existing_question: { title: "Answer a question", description: "One detail needs clarification before organization can finish." },
       retry_processing: { title: "Try organizing again", description: "Processing did not finish and can be tried again." },
       resolve_consistency: { title: "Review this record", description: "We found an inconsistency and preserved the record for your review." },
+      configure_ai_credential: {
+        title: "Set up your AI key",
+        description: "Your record was saved in full. For {agent} to interpret it, set up your own AI key in Settings.",
+      },
     },
     actions: {
       open_entry: "Open record",
@@ -137,6 +150,8 @@ export const dailyCycleCopy = {
       wait_task: "Wait",
       resume_task: "Resume",
       reopen_task: "Reopen",
+      configure_ai_credential: "Set up AI key",
+      interpret_pending_entries: "Interpret pending records",
     },
     messages: {
       capture_saved: "Saved. Organization was queued.",
@@ -155,6 +170,9 @@ export const dailyCycleCopy = {
       action_unavailable: "This action is no longer available.",
       retry_not_available: "This item cannot be tried again yet.",
       action_failed: "This action could not be completed right now.",
+      pending_entries_queued: "{count} record(s) queued for interpretation.",
+      pending_entries_none: "No pending records to interpret.",
+      credential_required: "Set up your AI key in Settings before using this feature.",
     },
   },
 } satisfies Record<DailyCycleLocale, DailyCycleCopy>;

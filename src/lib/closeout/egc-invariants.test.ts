@@ -32,7 +32,10 @@ const REPO = resolve(__dirname, "../../..");
  * deliberately and visibly, rather than deleted."* BYOK.1 was that slice and
  * `202608010065` its migration, the credential store; BYOK.2's resolvers
  * (`202608010066`) moved the pin again under the same rule, in the same commit
- * that added them.
+ * that added them, and BYOK.3's validation throttle (`202608010067`) after that.
+ * BYOK.4 moves it by **two** in one commit — `202608010068`, the awaiting-AI
+ * -configuration lifecycle, and `202608010069`, the credential-aware drain —
+ * which is the whole of that slice's approved budget.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -40,7 +43,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608010067";
+const AUTHORIZED_MIGRATION_HEAD = "202608010069";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

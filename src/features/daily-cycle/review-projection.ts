@@ -19,6 +19,7 @@ import type {
   CandidateOutcomeView,
 } from "./contracts";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
+import { byokSettingsHref } from "@/features/byok/routes";
 import { resolveDailyCycleLifecycle, type DailyCycleLifecycleInput } from "./lifecycle";
 import { getAgentName } from "@/features/profile/agent-identity";
 
@@ -145,6 +146,7 @@ export function attentionActionId(reason: AttentionReason): DailyCycleAction {
     case "answer_existing_question": return "answer_existing_question";
     case "retry_processing": return "retry_processing";
     case "resolve_consistency": return "resolve_consistency";
+    case "configure_ai_credential": return "configure_ai_credential";
   }
 }
 
@@ -210,12 +212,21 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
   const attentionItems: AttentionItemView[] = [];
   if (attentionReason) {
     const reasonCopy = copy.attentionReasons[attentionReason];
+    const attentionAction = attentionActionId(attentionReason);
     attentionItems.push({
       key: `${input.entryId}:${attentionReason}`,
       reason: attentionReason,
       title: reasonCopy.title,
       explanation: reasonCopy.description,
-      availableActions: [action(attentionActionId(attentionReason))],
+      // `BYOK-CAPTURE-002`: the awaiting state is the one attention reason whose
+      // resolution is not on this page, so its action carries the route out.
+      // Every other reason is resolved here and keeps the bare action id it has
+      // always had.
+      availableActions: [
+        attentionAction === "configure_ai_credential"
+          ? Object.freeze({ id: attentionAction, href: byokSettingsHref(input.locale) })
+          : action(attentionAction),
+      ],
     });
   }
 

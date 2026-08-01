@@ -62,6 +62,22 @@ export type ByokCopy = {
   readonly removed: string;
   readonly rotationConflict: string;
   readonly shapeInvalid: string;
+  /**
+   * `BYOK-CAPTURE-004`/`005`/`006` — the bounded, explicit pending-entry action.
+   *
+   * `queued` and `partial` carry `{count}`, and `partial` exists because a
+   * bounded action that reports only "done" after processing 25 of 200 entries
+   * has told the user something false by omission.
+   */
+  readonly pendingEntries: {
+    readonly title: string;
+    readonly description: string;
+    readonly button: string;
+    readonly none: string;
+    readonly queued: string;
+    readonly partial: string;
+    readonly alreadyQueued: string;
+  };
 };
 
 const ptBR: ByokCopy = {
@@ -105,6 +121,17 @@ const ptBR: ByokCopy = {
   removed: "Chave removida.",
   rotationConflict: "Outra alteração aconteceu ao mesmo tempo. Recarregue e tente de novo.",
   shapeInvalid: "Formato de chave inválido.",
+  pendingEntries: {
+    title: "Registros aguardando interpretação",
+    description:
+      "Estes registros foram salvos enquanto nenhuma chave estava configurada. Nada é interpretado automaticamente: cada interpretação consome a sua cota na OpenAI, então ela só acontece quando você pedir.",
+    button: "Interpretar registros pendentes",
+    none: "Nenhum registro aguardando interpretação.",
+    queued: "{count} registro(s) enviados para interpretação.",
+    partial:
+      "{count} registro(s) enviados para interpretação. Ainda há registros pendentes — use o botão de novo para continuar.",
+    alreadyQueued: "Estes registros já estavam na fila.",
+  },
 };
 
 const en: ByokCopy = {
@@ -147,6 +174,17 @@ const en: ByokCopy = {
   removed: "Key removed.",
   rotationConflict: "Something else changed at the same time. Reload and try again.",
   shapeInvalid: "Invalid key format.",
+  pendingEntries: {
+    title: "Records awaiting interpretation",
+    description:
+      "These records were saved while no key was configured. Nothing is interpreted automatically: each interpretation spends your own OpenAI quota, so it happens only when you ask.",
+    button: "Interpret pending records",
+    none: "No records are awaiting interpretation.",
+    queued: "{count} record(s) queued for interpretation.",
+    partial:
+      "{count} record(s) queued for interpretation. More are still pending — use the button again to continue.",
+    alreadyQueued: "Those records were already queued.",
+  },
 };
 
 export const byokCopy: Record<Locale, ByokCopy> = { "pt-BR": ptBR, en };

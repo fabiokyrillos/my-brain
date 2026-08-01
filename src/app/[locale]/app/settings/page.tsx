@@ -1,6 +1,7 @@
-import { removeAiCredential, saveAiCredential } from "@/features/byok/actions";
+import { interpretPendingEntries, removeAiCredential, saveAiCredential } from "@/features/byok/actions";
 import { CredentialPanel } from "@/features/byok/credential-panel";
 import { loadCredentialMetadata } from "@/features/byok/credential-view";
+import { loadPendingEntryCount } from "@/features/byok/pending-entries";
 import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
 import { loadSettingsFormValues } from "@/features/profile/settings-view";
@@ -14,6 +15,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const { supabase, user } = await requireUser(locale);
   const values = await loadSettingsFormValues(supabase, user.id);
   const credential = await loadCredentialMetadata(supabase, user.id);
+  const pending = await loadPendingEntryCount(supabase, user.id);
 
   return (
     <div className="settings-page">
@@ -28,8 +30,10 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       <CredentialPanel
         locale={locale}
         credential={credential}
+        pending={pending}
         saveAction={saveAiCredential}
         removeAction={removeAiCredential}
+        interpretPendingAction={interpretPendingEntries}
       />
       <SettingsForm action={updateProfile} locale={locale} values={values} />
     </div>
