@@ -195,3 +195,118 @@
     flex: 1 1 100%;
   }
 }
+
+/**
+ * The relationship and association panels (EGC.2).
+ *
+ * Sized against `.entity-columns > section`, which is what these replace: the
+ * Person page's four read-only blocks. A panel that added a write control and
+ * also changed how the block looked would make the change read as a redesign
+ * rather than as the same section becoming usable.
+ */
+.relation-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.relation-explainer {
+  margin: -4px 0 0;
+  color: var(--muted, #64748b);
+  font-size: 12px;
+}
+
+.relation-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relation-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+}
+
+.relation-row-main {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.relation-row-main strong {
+  font-size: 14px;
+}
+
+.relation-row-main span {
+  color: var(--muted, #64748b);
+  font-size: 12px;
+}
+
+/* A stored value outside the vocabulary, rendered rather than hidden (EGC-REL-006). */
+.relation-unknown {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.relation-unknown-note {
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.relation-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 44px is the touch target the mobile audit fixed everywhere else; these are new
+   controls and start there rather than being corrected into it later. */
+.relation-row-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #bcc7d6;
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.relation-row-actions button:hover:not(:disabled) {
+  background: var(--mist);
+}
+
+.relation-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.relation-form > label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.relation-form input[type="text"],
+.relation-form select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #bcc7d6;
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  font-weight: 400;
+}

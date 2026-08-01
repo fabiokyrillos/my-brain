@@ -60,6 +60,15 @@ export const HISTORY_SUBJECT_ROUTES = {
   entry_interpretation: null,
   entry_task_candidate_resolution: null,
   pending_question: null,
+  // EGC.2 — three more of the same shape as `entry_interpretation`. Each
+  // `entity_id` is the junction row's own id, and there is no page for a
+  // relationship or a link; the place to see one is the Person it belongs to,
+  // whose id these rows do not carry. Linking would need a lookup this surface
+  // has no reason to do, and guessing would send the reader to a 404 reached
+  // from their own history — which reads as lost data.
+  person_relationship: null,
+  person_context: null,
+  person_project: null,
 } satisfies Record<HistoryEntityType, SubjectRouteBuilder | null>;
 
 /** The entity types whose subject has a page — derived, never re-listed. */

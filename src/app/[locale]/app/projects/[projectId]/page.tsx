@@ -2,6 +2,12 @@ import { ArrowLeft, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createOrganizationForSubject, updateProject } from "@/features/entities/actions";
+import { AssociationPanel } from "@/features/entities/association-panel";
+import {
+  associatePersonProject,
+  endPersonProject,
+  updatePersonProjectRole,
+} from "@/features/entities/associations";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
@@ -24,7 +30,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const copy = getEntityCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
-  const [projectResult, taskLinkResult, personLinkResult, entryLinkResult, organizations] = await Promise.all([
+  const [projectResult, taskLinkResult, personLinkResult, entryLinkResult, organizations, peopleOptionsResult] = await Promise.all([
     // `organization_id` joins the projection here for the first time: the column
     // has always existed and the page never read it (UX-08).
     supabase.from("projects").select("id,name,description,status,organization_id,created_at,updated_at").eq("id", projectId).maybeSingle(),
@@ -32,11 +38,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     supabase.from("person_projects").select("person_id,role,valid_from,valid_until").eq("project_id", projectId).is("valid_until", null).limit(100),
     supabase.from("entry_entities").select("entry_id").eq("entity_type", "project").eq("entity_id", projectId).limit(100),
     loadOrganizationOptions(supabase),
+    // EGC-ASSOC-008. Bounded at 200, the `relation-options.ts` precedent, and
+    // owner-scoped by RLS. Loaded here because a client component cannot query.
+    supabase.from("people").select("id,name").order("name").limit(200),
   ]);
   const project = requireSupabaseData(projectResult, "load project");
   const taskLinks = requireSupabaseData(taskLinkResult, "load project tasks") ?? [];
   const personLinks = requireSupabaseData(personLinkResult, "load project people") ?? [];
   const entryLinks = requireSupabaseData(entryLinkResult, "load project timeline links") ?? [];
+  const peopleOptions = requireSupabaseData(peopleOptionsResult, "load people options") ?? [];
   if (!project) notFound();
 
   const taskIds = taskLinks.map((item) => item.task_id);
@@ -99,19 +109,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
         </section>
-        <section>
-          <h2>{pt ? "Pessoas" : "People"}</h2>
-          {people.length ? (
-            <div className="mini-list">
-              {people.map((person) => (
-                <Link href={`/${locale}/app/people/${person.id}`} key={person.id}>
-                  <strong>{person.name}</strong>
-                  <span>{roleByPersonId.get(person.id) ?? copy.noRole}</span>
-                </Link>
-              ))}
-            </div>
-          ) : <p className="quiet-state">{pt ? "Nenhuma pessoa vinculada." : "No linked people."}</p>}
-        </section>
+        {/*
+          EGC-ASSOC-003. The same `person_projects` row, written from the other
+          side by the same module. Neither surface owns a private path, and
+          `egc-invariants.test.ts` asserts the single writer in both directions —
+          two paths is how a soft-end contract acquires a hard delete on the
+          surface that forgot about it.
+        */}
+        <AssociationPanel
+          addAction={associatePersonProject}
+          endAction={endPersonProject}
+          heading={copy.linkedPeople}
+          locale={locale}
+          options={peopleOptions.map((option) => ({ id: option.id, label: option.name }))}
+          roleAction={updatePersonProjectRole}
+          rows={people.map((person) => ({
+            id: person.id,
+            label: person.name,
+            href: `/${locale}/app/people/${person.id}`,
+            role: roleByPersonId.get(person.id) ?? null,
+          }))}
+          target={{ kind: "project-person", projectId: project.id }}
+        />
       </div>
 
       <section className="entity-timeline">
