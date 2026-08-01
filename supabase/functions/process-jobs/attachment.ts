@@ -1,5 +1,15 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceData, requireServiceSuccess } from "../_shared/result.ts";
+import { resolveJobCredential } from "../_shared/byok-adapter.ts";
+import {
+  classifyJobFailure,
+  classifyProviderResponse,
+  classifyTransportError,
+  CONFIGURATION_FAILURE_CODES,
+  failJob,
+  JobFailure,
+  type JobFailureCode,
+} from "../_shared/job-failure.ts";
 
 const analysisSchema = {
   type: "object",
@@ -36,6 +46,39 @@ const analysisSchema = {
 const OPENAI_TIMEOUT_MS = 120_000;
 const RETRY_BASE_DELAY_SECONDS = 60;
 
+/** `fetch`, with its rejection classified before a message can escape. */
+async function fetchProvider(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new JobFailure(classifyTransportError(error));
+  }
+}
+
+/**
+ * `attachments.processing_error` is the one user-facing string this handler
+ * writes, and it is rendered on the Files surface.
+ *
+ * The two existing sentences are unchanged. The third is new, and it exists
+ * because "the analysis failed, try again" is a lie when the reason is that the
+ * account has no usable AI credential — the only action that helps is in
+ * Settings, and a message that does not say so sends the user round a retry loop.
+ *
+ * These are Portuguese-only, which is a **pre-existing** gap in this worker
+ * (`attachment.ts` has never had access to the entry's locale, unlike
+ * `entry.ts`). BYOK.4 matches the existing shape rather than widening the gap;
+ * moving the three strings behind the i18n contract is recorded in `TODO.md`
+ * rather than smuggled into a credential slice.
+ */
+function attachmentFailureMessage(code: JobFailureCode, terminal: boolean): string {
+  if (CONFIGURATION_FAILURE_CODES.has(code)) {
+    return "A análise precisa de uma chave de IA configurada. Configure em Configurações.";
+  }
+  return terminal
+    ? "A análise não pôde ser concluída após várias tentativas."
+    : "A análise falhou e poderá ser tentada novamente.";
+}
+
 function outputText(response: Record<string, unknown>) {
   const output = Array.isArray(response.output) ? response.output : [];
   for (const item of output as Array<{
@@ -44,7 +87,7 @@ function outputText(response: Record<string, unknown>) {
     for (const content of item.content ?? [])
       if (content.type === "output_text" && content.text) return content.text;
   }
-  throw new Error("No structured output returned");
+  throw new JobFailure("provider_response_invalid");
 }
 
 type JobRow = {
@@ -60,7 +103,6 @@ type JobRow = {
 // messages are unchanged.
 export async function processAttachmentJob(
   service: SupabaseClient,
-  openaiKey: string,
   job: JobRow,
   workerId: string,
 ): Promise<Response> {
@@ -68,15 +110,14 @@ export async function processAttachmentJob(
   const attachmentId = job.payload?.attachment_id;
 
   try {
-    if (typeof attachmentId !== "string")
-      throw new Error("Attachment job payload is invalid");
+    if (typeof attachmentId !== "string") throw new JobFailure("invalid_payload");
     const { data: attachment, error } = await service
       .from("attachments")
       .select("*")
       .eq("id", attachmentId)
       .eq("user_id", job.user_id)
       .single();
-    if (error || !attachment) throw new Error("Attachment not found");
+    if (error || !attachment) throw new JobFailure("subject_not_found");
 
     const existingInterpretation = requireServiceData(
       await service
@@ -114,7 +155,7 @@ export async function processAttachmentJob(
         }),
         "complete restored attachment job",
       );
-      if (!completed) throw new Error("Job lease is no longer active");
+      if (!completed) throw new JobFailure("persistence_failed");
       console.info("Attachment job completed from persisted interpretation", {
         jobId: job.id,
         attempt: job.attempts,
@@ -127,6 +168,17 @@ export async function processAttachmentJob(
       });
     }
 
+    // `BYOK-JOBS-001`/`007` — resolved at execution time, from the claimed row's
+    // owner, and **after** the reuse branch above.
+    //
+    // The position is deliberate on both sides. It is after the reuse branch
+    // because restoring an interpretation that already exists makes no provider
+    // call, and gating a free operation on a credential would refuse work the
+    // user has already paid for. It is before `status = 'processing'` because an
+    // attachment shown as processing for an account that cannot process it is
+    // the same lie `BYOK-CAPTURE-002` removes from entries.
+    const credential = await resolveJobCredential(service, job.id);
+
     requireServiceSuccess(
       await service
         .from("attachments")
@@ -137,8 +189,7 @@ export async function processAttachmentJob(
     const { data: signed, error: signedError } = await service.storage
       .from("user-files")
       .createSignedUrl(attachment.storage_path, 600);
-    if (signedError || !signed?.signedUrl)
-      throw new Error("Could not sign attachment URL");
+    if (signedError || !signed?.signedUrl) throw new JobFailure("persistence_failed");
     const media = attachment.mime_type.startsWith("image/")
       ? { type: "input_image", image_url: signed.signedUrl, detail: "auto" }
       : {
@@ -156,10 +207,12 @@ export async function processAttachmentJob(
         .maybeSingle(),
       "load file model preference",
     );
-    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+    // `.expose()` at the provider boundary, and nowhere else — the one line in
+    // this file where the plaintext exists.
+    const openaiResponse = await fetchProvider("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        authorization: `Bearer ${openaiKey}`,
+        authorization: `Bearer ${credential.secret.expose()}`,
         "content-type": "application/json",
       },
       signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
@@ -191,10 +244,7 @@ export async function processAttachmentJob(
         },
       }),
     });
-    if (!openaiResponse.ok)
-      throw new Error(
-        `OpenAI file analysis failed with ${openaiResponse.status}`,
-      );
+    if (!openaiResponse.ok) throw new JobFailure(await classifyProviderResponse(openaiResponse));
     const responseJson = await openaiResponse.json();
     const model = responseJson.model ?? "gpt-5.6-luna";
     const usage = responseJson.usage ?? {};
@@ -216,7 +266,17 @@ export async function processAttachmentJob(
         model,
         code: usageError.code,
       });
-    const analysis = JSON.parse(outputText(responseJson));
+    let analysis: Record<string, unknown>;
+    try {
+      analysis = JSON.parse(outputText(responseJson));
+    } catch (parseError) {
+      // A SyntaxError message embeds an excerpt of the offending output, and
+      // this used to reach `jobs.error` verbatim. `outputText` already throws a
+      // declared code; anything else becomes one here.
+      throw parseError instanceof JobFailure
+        ? parseError
+        : new JobFailure("provider_response_invalid");
+    }
     requireServiceSuccess(
       await service.from("attachment_interpretations").insert({
         user_id: job.user_id,
@@ -255,7 +315,7 @@ export async function processAttachmentJob(
       }),
       "complete attachment job",
     );
-    if (!completed) throw new Error("Job lease is no longer active");
+    if (!completed) throw new JobFailure("persistence_failed");
     console.info("Attachment job completed", {
       jobId: job.id,
       attempt: job.attempts,
@@ -263,29 +323,24 @@ export async function processAttachmentJob(
     });
     return Response.json({ ok: true, attachmentId: attachment.id });
   } catch (error) {
-    const safeError =
-      error instanceof Error
-        ? error.message.slice(0, 500)
-        : "Attachment processing failed";
-    const failedJob = await service.rpc("fail_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error: safeError,
-      p_base_delay_seconds: RETRY_BASE_DELAY_SECONDS,
+    // `BYOK-JOBS-005`/`007`. The attachment path is the one that leaked a
+    // provider-derived message into `jobs.error` (`SECURITY.md:34`), and the line
+    // that did it was exactly the `error.message.slice(0, 500)` that used to be
+    // here. Attachments follow the same contract as entries now, through the
+    // same helper, with the same closed vocabulary and the same retry policy.
+    const code = classifyJobFailure(error);
+    const failedJob = await failJob(service, {
+      jobId: job.id,
+      workerId,
+      code,
+      baseDelaySeconds: RETRY_BASE_DELAY_SECONDS,
     });
-    if (failedJob.error) {
-      console.error("Failed to persist job failure", {
-        code: failedJob.error.code,
-      });
-    }
-    if (failedJob.data && attachmentId) {
+    if (failedJob && attachmentId) {
       const failedAttachment = await service
         .from("attachments")
         .update({
           status: "failed",
-          processing_error: failedJob.data.status === "exhausted"
-            ? "A análise não pôde ser concluída após várias tentativas."
-            : "A análise falhou e poderá ser tentada novamente.",
+          processing_error: attachmentFailureMessage(code, failedJob.terminal),
         })
         .eq("id", attachmentId)
         .neq("status", "ready");
@@ -297,10 +352,11 @@ export async function processAttachmentJob(
     console.warn("Attachment job failed", {
       jobId: job.id,
       attempt: job.attempts,
-      status: failedJob.data?.status ?? "lease_lost",
+      failureCode: code,
+      status: failedJob?.status ?? "lease_lost",
       durationMs: Date.now() - processingStartedAt,
     });
-    if (!failedJob.data)
+    if (!failedJob)
       return Response.json(
         { error: "Job lease is no longer active" },
         { status: 409 },
@@ -308,9 +364,7 @@ export async function processAttachmentJob(
     return Response.json(
       {
         error: "Processing failed",
-        code: failedJob.data.status === "exhausted"
-          ? "job_exhausted"
-          : "job_retry_scheduled",
+        code: failedJob.terminal ? "job_exhausted" : "job_retry_scheduled",
       },
       { status: 500 },
     );

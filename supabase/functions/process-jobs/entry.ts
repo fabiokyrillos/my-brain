@@ -9,7 +9,34 @@ import {
   type ExtractionValue,
 } from "../_shared/extraction-validation.ts";
 import { normalizeExtractionInstants } from "../_shared/extraction-normalization.ts";
+import { resolveJobCredential } from "../_shared/byok-adapter.ts";
+import type { Secret } from "../_shared/byok-secret.ts";
+import {
+  classifyJobFailure,
+  classifyProviderResponse,
+  classifyTransportError,
+  CONFIGURATION_FAILURE_CODES,
+  failJob,
+  isTerminalJobFailureCode,
+  JobFailure,
+} from "../_shared/job-failure.ts";
 import { recordEntryProcessingEvent, toProcessingOutcome } from "./product-events.ts";
+
+/**
+ * `fetch`, with its rejection classified rather than propagated.
+ *
+ * A rejected `fetch` throws a `TypeError` whose message names the host, and an
+ * `AbortSignal.timeout` throws a `DOMException`. Both used to reach `jobs.error`
+ * through `error.message`; here they become one declared retryable code before
+ * they can.
+ */
+async function fetchProvider(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new JobFailure(classifyTransportError(error));
+  }
+}
 
 // Mirrors src/lib/ai/openai-provider.ts EXTRACTION_STRATEGY_VERSION /
 // EXTRACTION_PROMPT_VERSION and system prompt. openai-provider.ts cannot be
@@ -128,7 +155,7 @@ function outputText(response: Record<string, unknown>) {
     for (const content of item.content ?? [])
       if (content.type === "output_text" && content.text) return content.text;
   }
-  throw new Error("No structured output returned");
+  throw new JobFailure("provider_response_invalid");
 }
 
 function formatKnownContext(groups: Array<[string, NamedEntity[] | null]>) {
@@ -196,7 +223,7 @@ function resolveExtractionEntities(input: {
 
 async function extractEntry(input: {
   service: SupabaseClient;
-  openaiKey: string;
+  credential: Secret;
   userId: string;
   entryId: string;
   content: string;
@@ -237,10 +264,13 @@ async function extractEntry(input: {
     ["People", people],
   ]);
 
-  const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+  // `.expose()` at the provider boundary, and nowhere else. A template literal
+  // over the `Secret` itself throws (`Symbol.toPrimitive`), which is the whole
+  // point of the type: this is the one line in the file where the value exists.
+  const openaiResponse = await fetchProvider("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      authorization: `Bearer ${input.openaiKey}`,
+      authorization: `Bearer ${input.credential.expose()}`,
       "content-type": "application/json",
     },
     signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
@@ -270,7 +300,7 @@ async function extractEntry(input: {
       },
     }),
   });
-  if (!openaiResponse.ok) throw new Error(`OpenAI entry extraction failed with ${openaiResponse.status}`);
+  if (!openaiResponse.ok) throw new JobFailure(await classifyProviderResponse(openaiResponse));
   const responseJson = await openaiResponse.json();
   const responseModel = responseJson.model ?? model;
   const usage = responseJson.usage ?? {};
@@ -299,8 +329,9 @@ async function extractEntry(input: {
     parsedExtraction = JSON.parse(outputText(responseJson));
   } catch {
     // A SyntaxError message embeds an excerpt of the offending input, and this
-    // message reaches jobs.error, so it must never be propagated.
-    throw new Error("Entry extraction returned output that is not valid JSON");
+    // message reaches jobs.error, so it must never be propagated. Since BYOK.4
+    // the prose is gone too: only the declared code is persisted.
+    throw new JobFailure("provider_response_invalid");
   }
 
   // The provider schema types occurredAt/dueAt as bare strings and Structured
@@ -312,10 +343,13 @@ async function extractEntry(input: {
 
   const validated = validateExtraction(normalizedExtraction);
   if (!validated.ok) {
-    // Field paths and codes only — never the offending value.
-    throw new Error(
-      `Entry extraction output failed validation (${describeExtractionIssues(validated.issues)})`,
-    );
+    // The field paths were already safe — they name locations, never values —
+    // but `jobs.error` is now a closed vocabulary, so they go to the log and the
+    // declared code goes to the row.
+    console.warn("Entry extraction failed validation", {
+      issues: describeExtractionIssues(validated.issues),
+    });
+    throw new JobFailure("provider_response_invalid");
   }
   const extraction: Extraction = validated.value;
 
@@ -344,7 +378,7 @@ async function extractEntry(input: {
 
 async function persistEmbedding(input: {
   service: SupabaseClient;
-  openaiKey: string;
+  credential: Secret;
   userId: string;
   entryId: string;
   content: string;
@@ -352,13 +386,16 @@ async function persistEmbedding(input: {
   embeddingModel: string;
 }) {
   const embeddingContent = `${input.summary}\n\n${input.content}`;
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
+  const response = await fetchProvider("https://api.openai.com/v1/embeddings", {
     method: "POST",
-    headers: { authorization: `Bearer ${input.openaiKey}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${input.credential.expose()}`,
+      "content-type": "application/json",
+    },
     signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
     body: JSON.stringify({ model: input.embeddingModel, input: embeddingContent, encoding_format: "float" }),
   });
-  if (!response.ok) throw new Error(`OpenAI embedding failed with ${response.status}`);
+  if (!response.ok) throw new JobFailure(await classifyProviderResponse(response));
   // /v1/embeddings has no `id` in its body, unlike /v1/responses, so the
   // provider request id has to come from the header. Without it
   // ai_usage_events_request_id_idx cannot deduplicate, and a job retry
@@ -367,7 +404,7 @@ async function persistEmbedding(input: {
   const providerRequestId = response.headers.get("x-request-id");
   const json = await response.json();
   const embedding = json.data?.[0]?.embedding;
-  if (!embedding) throw new Error("OpenAI returned no embedding");
+  if (!embedding) throw new JobFailure("provider_response_invalid");
   const usage = json.usage ?? {};
 
   const { error: usageError } = await input.service.rpc("record_ai_usage", {
@@ -392,7 +429,7 @@ async function persistEmbedding(input: {
     model: json.model ?? input.embeddingModel,
     input_tokens: usage.prompt_tokens ?? usage.total_tokens ?? 0,
   }, { onConflict: "entry_id" });
-  if (error) throw error;
+  if (error) throw new JobFailure("persistence_failed");
 }
 
 // Single pipeline for both interpret_entry modes ("initial" and
@@ -402,7 +439,6 @@ async function persistEmbedding(input: {
 // (extended in migration 026 with a service-role-gated p_service_user_id).
 export async function processEntryJob(
   service: SupabaseClient,
-  openaiKey: string,
   job: JobRow,
   workerId: string,
 ): Promise<Response> {
@@ -413,24 +449,21 @@ export async function processEntryJob(
   let eventLocale: "pt-BR" | "en" = "en";
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+  // Both payload failures are terminal now, and that is a behaviour change with
+  // a reason: the payload of a claimed row is immutable, so the retries these
+  // used to schedule re-read the same invalid JSON and fail identically until
+  // `max_attempts` ran out. The declared code carries which of the two it was
+  // into the log, not into the row.
   if (typeof entryId !== "string" || !uuidPattern.test(entryId) || (mode !== "initial" && mode !== "reprocess")) {
-    const failedJob = await service.rpc("fail_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error: "Entry interpretation job payload is invalid",
-      p_base_delay_seconds: RETRY_BASE_DELAY_SECONDS,
-    });
-    if (!failedJob.data) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
+    console.warn("Entry interpretation job payload is invalid", { jobId: job.id, reason: "entry_id_or_mode" });
+    const failed = await failJob(service, { jobId: job.id, workerId, code: "invalid_payload", baseDelaySeconds: RETRY_BASE_DELAY_SECONDS });
+    if (!failed) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
     return Response.json({ error: "Invalid job payload", code: "invalid_payload" }, { status: 500 });
   }
   if (mode === "reprocess" && typeof operationKey !== "string") {
-    const failedJob = await service.rpc("fail_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error: "Reprocessing job payload is missing its operation key",
-      p_base_delay_seconds: RETRY_BASE_DELAY_SECONDS,
-    });
-    if (!failedJob.data) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
+    console.warn("Entry interpretation job payload is invalid", { jobId: job.id, reason: "operation_key" });
+    const failed = await failJob(service, { jobId: job.id, workerId, code: "invalid_payload", baseDelaySeconds: RETRY_BASE_DELAY_SECONDS });
+    if (!failed) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
     return Response.json({ error: "Invalid job payload", code: "invalid_payload" }, { status: 500 });
   }
 
@@ -441,15 +474,29 @@ export async function processEntryJob(
       .eq("id", entryId)
       .eq("user_id", job.user_id)
       .single();
-    if (entryError || !entry) throw new Error("Entry not found");
+    if (entryError || !entry) throw new JobFailure("subject_not_found");
     eventLocale = entry.locale === "pt-BR" ? "pt-BR" : "en";
+
+    // `BYOK-JOBS-001` — resolved **here**, at execution time, from the claimed
+    // row's owner, and before anything is mutated or spent.
+    //
+    // The position is the contract. Above this line nothing has been written and
+    // no provider has been contacted; below it the entry has been moved into
+    // `interpreting`. Resolving after `begin_entry_interpretation` would leave an
+    // entry showing "organizing" for a user who has no key — the exact dishonesty
+    // `BYOK-CAPTURE-002` exists to remove.
+    //
+    // The owner is `job.user_id` by construction: `resolveJobCredential` reads it
+    // from the row itself and takes no owner argument, so the user who invoked
+    // this function cannot substitute their own credential for the job owner's.
+    const credential = await resolveJobCredential(service, job.id);
 
     if (mode === "initial") {
       const begin = await service.rpc("begin_entry_interpretation", {
         p_entry_id: entryId,
         p_service_user_id: job.user_id,
       });
-      if (begin.error) throw begin.error;
+      if (begin.error) throw new JobFailure("persistence_failed");
     } else {
       const begin = await service.rpc("begin_entry_reprocessing", {
         p_entry_id: entryId,
@@ -457,12 +504,12 @@ export async function processEntryJob(
         p_lease_seconds: 180,
         p_service_user_id: job.user_id,
       });
-      if (begin.error) throw begin.error;
+      if (begin.error) throw new JobFailure("persistence_failed");
     }
 
     const extracted = await extractEntry({
       service,
-      openaiKey,
+      credential: credential.secret,
       userId: job.user_id,
       entryId,
       content: entry.original_content,
@@ -480,7 +527,7 @@ export async function processEntryJob(
         p_output_tokens: extracted.outputTokens,
         p_service_user_id: job.user_id,
       });
-      if (persist.error) throw persist.error;
+      if (persist.error) throw new JobFailure("persistence_failed");
     } else {
       const elementTrust = buildExtractionElementTrust({
         modelConfidence: extracted.extraction.confidence,
@@ -500,13 +547,13 @@ export async function processEntryJob(
         p_element_trust: elementTrust,
         p_service_user_id: job.user_id,
       });
-      if (persist.error) throw persist.error;
+      if (persist.error) throw new JobFailure("persistence_failed");
     }
 
     try {
       await persistEmbedding({
         service,
-        openaiKey,
+        credential: credential.secret,
         userId: job.user_id,
         entryId,
         content: entry.original_content,
@@ -514,7 +561,11 @@ export async function processEntryJob(
         embeddingModel: extracted.embeddingModel,
       });
     } catch (embeddingError) {
-      console.error("Entry embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
+      // Non-blocking by design (an embedding failure never destroys the
+      // interpretation), and the code rather than the message for the same
+      // reason the persisted failures carry codes: a provider message is a
+      // provider message wherever it lands.
+      console.error("Entry embedding failed", { code: classifyJobFailure(embeddingError) });
     }
 
     const completed = requireServiceData(
@@ -525,7 +576,7 @@ export async function processEntryJob(
       }),
       "complete entry interpretation job",
     );
-    if (!completed) throw new Error("Job lease is no longer active");
+    if (!completed) throw new JobFailure("persistence_failed");
 
     try {
       const persistedEntry = await service.from("entries").select("status").eq("id", entryId).eq("user_id", job.user_id).maybeSingle();
@@ -559,17 +610,59 @@ export async function processEntryJob(
     });
     return Response.json({ ok: true, entryId, mode });
   } catch (error) {
-    const safeError = error instanceof Error ? error.message.slice(0, 500) : "Entry interpretation failed";
-    const failedJob = await service.rpc("fail_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error: safeError,
-      p_base_delay_seconds: RETRY_BASE_DELAY_SECONDS,
+    // `BYOK-JOBS-005`. The old line here was
+    // `error.message.slice(0, 500)`, and it is what put a provider-derived
+    // message into `jobs.error` once already (`SECURITY.md:34`). What reaches the
+    // row now is one member of a closed vocabulary and nothing else.
+    const code = classifyJobFailure(error);
+    const failedJob = await failJob(service, {
+      jobId: job.id,
+      workerId,
+      code,
+      baseDelaySeconds: RETRY_BASE_DELAY_SECONDS,
     });
-    const terminal = failedJob.data?.status === "exhausted";
+    const terminal = failedJob?.terminal ?? isTerminalJobFailureCode(code);
+    const configuration = CONFIGURATION_FAILURE_CODES.has(code);
+
+    // `BYOK-CAPTURE-002` again, on the asynchronous side: an entry whose job
+    // died because its owner has no usable credential is *awaiting
+    // configuration*, not *unorganizable*. Marking it an error would offer the
+    // user a retry that cannot succeed and hide the one action that can.
+    //
+    // But the RPC deliberately refuses an entry that already carries an
+    // interpretation, and that case is real rather than hypothetical: a
+    // **reprocessing** job whose credential vanished mid-flight belongs to an
+    // entry the user already has an understanding of, and erasing that would be
+    // a far worse outcome than an unhelpful error message.
+    //
+    // So the mark is attempted and its answer is honoured. `false` means "this
+    // entry is not awaiting anything", and the ordinary failure path runs —
+    // which for a reprocessing job is what releases the reprocessing lease and
+    // restores the prior state. Without this fall-through, such an entry would
+    // sit in `reprocessing` forever, showing "organizing" with nothing running.
+    let returnedToAwaiting = false;
+    if (configuration) {
+      try {
+        const marked = await service.rpc("mark_entry_awaiting_ai_configuration", {
+          p_entry_id: entryId,
+          p_service_user_id: job.user_id,
+        });
+        returnedToAwaiting = marked.data === true;
+        if (marked.error) console.error("Entry awaiting-state update failed", { jobId: job.id });
+      } catch {
+        // A raised RPC — `P0002` for a row this owner does not have — leaves
+        // `returnedToAwaiting` false, so the ordinary failure path below still
+        // runs. Failing to reach the honest state must not also mean failing to
+        // record anything at all.
+        console.error("Entry awaiting-state update raised", { jobId: job.id });
+      }
+    }
 
     try {
-      if (mode === "initial") {
+      if (returnedToAwaiting) {
+        // Nothing further: the entry is in the honest state and the job is
+        // terminal.
+      } else if (mode === "initial") {
         await service.rpc("fail_entry_interpretation", {
           p_entry_id: entryId,
           p_error: "Interpretation unavailable. The original was preserved.",
@@ -585,10 +678,10 @@ export async function processEntryJob(
         });
       }
     } catch (entryFailureError) {
-      console.error("Entry failure state update failed", entryFailureError instanceof Error ? entryFailureError.message : "unknown error");
+      console.error("Entry failure state update failed", { code: classifyJobFailure(entryFailureError) });
     }
 
-    if (failedJob.data) {
+    if (failedJob) {
       await recordEntryProcessingEvent(service, {
         userId: job.user_id,
         entryId,
@@ -618,10 +711,11 @@ export async function processEntryJob(
       entryId,
       mode,
       attempt: job.attempts,
-      status: failedJob.data?.status ?? "lease_lost",
+      failureCode: code,
+      status: failedJob?.status ?? "lease_lost",
       durationMs: Date.now() - processingStartedAt,
     });
-    if (!failedJob.data) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
+    if (!failedJob) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
     return Response.json(
       { error: "Processing failed", code: terminal ? "job_exhausted" : "job_retry_scheduled" },
       { status: 500 },

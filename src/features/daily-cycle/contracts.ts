@@ -14,9 +14,49 @@ export const attentionReasons = [
   "answer_existing_question",
   "retry_processing",
   "resolve_consistency",
+  /**
+   * `BYOK-CAPTURE-002`. The entry is stored and nothing is running for it,
+   * because the account has no usable AI credential.
+   *
+   * A reason rather than a sixth `ProductState`, because the user-facing fact is
+   * the one `needs_attention` already names — something is waiting on you — and
+   * the reason is what says *what*. Adding a product state would have rippled
+   * through every mapper and both copy tables to express a distinction the
+   * reason already carries.
+   *
+   * It is emphatically **not** `retry_processing`: retrying is the one action
+   * that cannot help here, and offering it would send the user round a loop
+   * while hiding the link that ends it.
+   */
+  "configure_ai_credential",
 ] as const;
 
 export type AttentionReason = (typeof attentionReasons)[number];
+
+/**
+ * The subset the **needs-attention queue** can contain, and therefore the subset
+ * `needs_attention_item_opened` may report.
+ *
+ * Not a style choice — a coupling made visible. That analytics event validates
+ * `attentionReason` against a five-member enum **inside the database**
+ * (`202607170024:205`), and `list_needs_attention` is an RPC that BYOK.4 does not
+ * change. So `configure_ai_credential` cannot appear in that queue and cannot be
+ * reported by that event, and typing the view's `kind` narrowly is what makes
+ * that a compile error rather than a runtime `22023` from a check constraint
+ * nobody was thinking about.
+ *
+ * The awaiting state still reaches the user, through the two surfaces that read
+ * `entries.status` directly: the Inbox and the entry detail.
+ */
+export const trackedAttentionReasons = [
+  "review_interpretation",
+  "confirm_existing_candidates",
+  "answer_existing_question",
+  "retry_processing",
+  "resolve_consistency",
+] as const;
+
+export type TrackedAttentionReason = (typeof trackedAttentionReasons)[number];
 
 export const dailyCycleActions = [
   "open_entry",
@@ -33,6 +73,10 @@ export const dailyCycleActions = [
   "wait_task",
   "resume_task",
   "reopen_task",
+  /** Goes to Settings, which is where the awaiting state is resolved. */
+  "configure_ai_credential",
+  /** `BYOK-CAPTURE-004`/`006` — the bounded, explicit pending-entry action. */
+  "interpret_pending_entries",
 ] as const;
 
 export type DailyCycleAction = (typeof dailyCycleActions)[number];
@@ -54,6 +98,10 @@ export const dailyCycleMessageKeys = [
   "action_unavailable",
   "retry_not_available",
   "action_failed",
+  /** `BYOK-CAPTURE-006` — reports the count, so it is a template. */
+  "pending_entries_queued",
+  "pending_entries_none",
+  "credential_required",
 ] as const;
 
 export type DailyCycleMessageKey = (typeof dailyCycleMessageKeys)[number];
@@ -103,7 +151,7 @@ export type InboxItemView = {
 
 export type NeedsAttentionItemView = {
   readonly key: string;
-  readonly kind: AttentionReason;
+  readonly kind: TrackedAttentionReason;
   readonly entryId: string;
   readonly title: string;
   readonly explanation: string;

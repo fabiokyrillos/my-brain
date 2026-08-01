@@ -1,10 +1,10 @@
 import {
-  attentionReasons,
+  trackedAttentionReasons,
   dailyCycleActions,
   dailyCycleMessageKeys,
   productStates,
   workItemPriorities,
-  type AttentionReason,
+  type TrackedAttentionReason,
   type AvailableAction,
   type CaptureReceipt,
   type DailyCycleMessageKey,
@@ -120,8 +120,20 @@ function isProductState(value: unknown): value is ProductState {
   return typeof value === "string" && productStates.includes(value as ProductState);
 }
 
-function isAttentionReason(value: unknown): value is AttentionReason {
-  return typeof value === "string" && attentionReasons.includes(value as AttentionReason);
+/**
+ * The narrower guard the needs-attention queue needs.
+ *
+ * `configure_ai_credential` is a real attention reason and a real product state,
+ * but it cannot appear in that queue: `list_needs_attention` does not emit it,
+ * and the analytics event the row fires validates against a five-member enum in
+ * the database. The mapper is fail-closed everywhere else in this file, and it
+ * is fail-closed here too — an unexpected reason returns `null` and the row is
+ * dropped rather than rendered into a component that would then try to record an
+ * event Postgres refuses.
+ */
+function isTrackedAttentionReason(value: unknown): value is TrackedAttentionReason {
+  return typeof value === "string"
+    && trackedAttentionReasons.includes(value as TrackedAttentionReason);
 }
 
 function isMessageKey(value: unknown): value is DailyCycleMessageKey {
@@ -305,7 +317,7 @@ export function toInboxItemView(source: InboxItemSource): InboxItemView | null {
 export function toNeedsAttentionItemView(source: NeedsAttentionItemSource): NeedsAttentionItemView | null {
   if (!isRecord(source)
     || !isNonEmptyString(source.key)
-    || !isAttentionReason(source.kind)
+    || !isTrackedAttentionReason(source.kind)
     || !isNonEmptyString(source.entryId)
     || !isNonEmptyString(source.title)
     || !isNonEmptyString(source.explanation)

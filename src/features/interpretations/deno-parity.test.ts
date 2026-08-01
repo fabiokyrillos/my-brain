@@ -108,6 +108,26 @@ describe("Deno worker copies stay identical to their Node source", () => {
       "extraction-normalization.test.ts",
       "byok-envelope.ts",
       "byok-envelope.test.ts",
+      // BYOK.4's three, and each is a different kind of "not a copy":
+      //
+      //   * `byok-secret.ts` IS a hand copy of `src/lib/byok/secret.ts`, and it
+      //     cannot be a `pair` either — it carries one deliberate divergence,
+      //     Deno's inspection hook in place of Node's, because installing Node's
+      //     would leave the actual leak path open. A body-for-body comparison
+      //     would fail on the line that makes it correct, so its parity is held
+      //     by `src/lib/byok/adapter-parity.test.ts`, which compares the member
+      //     set and asserts the swap explicitly;
+      //   * `byok-adapter.ts` is the Deno analogue of `src/lib/byok/adapter.ts`
+      //     rather than a copy: same vocabulary, different control flow (throws a
+      //     `JobFailure` where Node returns a union, because its caller is a job
+      //     handler and not a Server Action). Same file holds the two in step;
+      //   * `job-failure.ts` is Deno-owned. Nothing in Node classifies a job
+      //     failure, because nothing in Node runs jobs.
+      "byok-adapter.ts",
+      "byok-secret.ts",
+      "job-failure.ts",
+      "job-failure.test.ts",
+      "byok-adapter.test.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

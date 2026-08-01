@@ -23,16 +23,15 @@ type JobRow = {
 // unknown type never reaches a claim RPC at all.
 export async function processClaimedJob(
   service: SupabaseClient,
-  openaiKey: string,
   type: SupportedJobType,
   job: JobRow,
   workerId: string,
 ): Promise<Response> {
   switch (type) {
     case "process_attachment":
-      return processAttachmentJob(service, openaiKey, job, workerId);
+      return processAttachmentJob(service, job, workerId);
     case "interpret_entry":
-      return processEntryJob(service, openaiKey, job, workerId);
+      return processEntryJob(service, job, workerId);
   }
 }
 
@@ -53,7 +52,6 @@ export type DispatchDrainSummary = {
 // ever calls claim_next_entry_interpretation_job.
 export async function runEntryDispatchDrain(
   service: SupabaseClient,
-  openaiKey: string,
 ): Promise<DispatchDrainSummary> {
   const startedAt = Date.now();
   const summary: DispatchDrainSummary = { processed: 0, succeeded: 0, failed: 0 };
@@ -72,7 +70,7 @@ export async function runEntryDispatchDrain(
 
     summary.processed += 1;
     try {
-      const response = await processEntryJob(service, openaiKey, job as JobRow, workerId);
+      const response = await processEntryJob(service, job as JobRow, workerId);
       if (response.ok) summary.succeeded += 1;
       else summary.failed += 1;
     } catch (processingError) {

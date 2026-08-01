@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LoaderCircle, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
+import { Inbox, KeyRound, LoaderCircle, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useRef } from "react";
 
 import type { Locale } from "@/lib/preferences";
@@ -8,6 +8,7 @@ import type { Locale } from "@/lib/preferences";
 import type { ByokActionState } from "./actions";
 import { getByokCopy } from "./copy";
 import type { CredentialMetadata } from "./credential-view";
+import type { PendingEntryCount } from "./pending-entries";
 
 /**
  * `BYOK-LIFECYCLE-002/003`, `BYOK-COPY-001…007`.
@@ -41,17 +42,25 @@ type Action = (state: ByokActionState, formData: FormData) => Promise<ByokAction
 export function CredentialPanel({
   locale,
   credential,
+  pending,
   saveAction,
   removeAction,
+  interpretPendingAction,
 }: {
   locale: Locale;
   credential: CredentialMetadata;
+  pending: PendingEntryCount;
   saveAction: Action;
   removeAction: Action;
+  interpretPendingAction: Action;
 }) {
   const copy = getByokCopy(locale);
   const [saveState, save, savePending] = useActionState(saveAction, idle);
   const [removeState, remove, removePending] = useActionState(removeAction, idle);
+  const [pendingState, interpretPending, interpretPendingBusy] = useActionState(
+    interpretPendingAction,
+    idle,
+  );
   const keyField = useRef<HTMLInputElement>(null);
 
   // Cleared after every settled submission, and again on unmount. Both, because
@@ -69,6 +78,11 @@ export function CredentialPanel({
   }, []);
 
   const state = saveState.status !== "idle" ? saveState : removeState;
+  // `BYOK-CAPTURE-004`/`005`. Offered only when a key is active and something is
+  // actually waiting, so the section is never a button that would do nothing —
+  // and never, on any path, something that runs by itself. Saving a key renders
+  // this; it does not press it.
+  const showPendingEntries = credential.status === "active" && pending.count > 0;
   const statusLabel =
     credential.status === "active"
       ? copy.settings.statusConfigured
@@ -166,6 +180,32 @@ export function CredentialPanel({
             {copy.settings.remove}
           </button>
         </form>
+      ) : null}
+
+      {showPendingEntries ? (
+        <div className="byok-pending" aria-labelledby="byok-pending-heading">
+          <h3 id="byok-pending-heading">
+            <Inbox size={16} aria-hidden /> {copy.pendingEntries.title}
+          </h3>
+          <p>{copy.pendingEntries.description}</p>
+          <p className="byok-pending-count">
+            {pending.atLeast ? `${pending.count}+` : pending.count}
+          </p>
+          <form action={interpretPending}>
+            <input type="hidden" name="locale" value={locale} />
+            <button type="submit" disabled={interpretPendingBusy}>
+              {interpretPendingBusy ? (
+                <LoaderCircle size={16} className="spin" aria-hidden />
+              ) : null}
+              {copy.pendingEntries.button}
+            </button>
+          </form>
+          {pendingState.status !== "idle" ? (
+            <p role="status" data-state={pendingState.status} className="byok-feedback">
+              {pendingState.message}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {state.status !== "idle" ? (

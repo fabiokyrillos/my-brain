@@ -30,7 +30,7 @@ function resolve(input: LifecycleInput) {
 }
 
 describe("daily cycle lifecycle projection", () => {
-  it("documents the eight internal entry lifecycle states and job states", () => {
+  it("documents the nine internal entry lifecycle states and job states", () => {
     expect(lifecycle.entryLifecycleStates).toEqual([
       "saved",
       "interpreting",
@@ -40,6 +40,7 @@ describe("daily cycle lifecycle projection", () => {
       "recoverable_error",
       "terminal_error",
       "reprocessing",
+      "awaiting_ai_configuration",
     ]);
     expect(lifecycle.jobLifecycleStates).toEqual(["pending", "running", "failed", "completed", "exhausted"]);
   });
@@ -53,6 +54,7 @@ describe("daily cycle lifecycle projection", () => {
     [{ entryLifecycle: "recoverable_error" }, { productState: "could_not_organize", attentionReason: "retry_processing", fallback: false }],
     [{ entryLifecycle: "terminal_error" }, { productState: "could_not_organize", attentionReason: "retry_processing", fallback: false }],
     [{ entryLifecycle: "reprocessing" }, { productState: "organizing", attentionReason: null, fallback: false }],
+    [{ entryLifecycle: "awaiting_ai_configuration" }, { productState: "needs_attention", attentionReason: "configure_ai_credential", fallback: false }],
   ] as const)("maps %o to the public product state", (input, expected) => {
     expect(resolve(input)).toEqual(expected);
   });
@@ -115,6 +117,54 @@ describe("daily cycle lifecycle projection", () => {
       productState: "needs_attention",
       attentionReason: "resolve_consistency",
       fallback: false,
+    });
+  });
+
+  /**
+   * `BYOK-CAPTURE-002`, and specifically the ordering the projection depends on.
+   *
+   * An entry reaches the awaiting state two ways, and only one of them leaves
+   * the job table empty. These assertions pin the harder one.
+   */
+  describe("awaiting AI configuration", () => {
+    it("beats an exhausted job left behind by a credential failure", () => {
+      // The failure mode this prevents: enqueued while a key was active, run
+      // after it was removed, job terminal. Reading the job first would answer
+      // `could_not_organize` + `retry_processing` — offering the one action that
+      // cannot work and hiding the one that can.
+      expect(resolve({ entryLifecycle: "awaiting_ai_configuration", job: { status: "exhausted" } })).toEqual({
+        productState: "needs_attention",
+        attentionReason: "configure_ai_credential",
+        fallback: false,
+      });
+    });
+
+    it("beats a pending or failed job, so nothing claims to be organizing", () => {
+      for (const status of ["pending", "running", "failed"]) {
+        expect(
+          resolve({ entryLifecycle: "awaiting_ai_configuration", job: { status } }),
+          `a ${status} job must not make an awaiting entry look organizing`,
+        ).toEqual({
+          productState: "needs_attention",
+          attentionReason: "configure_ai_credential",
+          fallback: false,
+        });
+      }
+    });
+
+    it("is never reported as organizing, saved or ready", () => {
+      // The negative form of the requirement, stated once so a future reordering
+      // of the branches above cannot satisfy the positives by accident.
+      const projection = resolve({ entryLifecycle: "awaiting_ai_configuration" });
+      expect(["organizing", "saved", "ready"]).not.toContain(projection?.productState);
+    });
+
+    it("still fails closed on an unknown job state", () => {
+      expect(resolve({ entryLifecycle: "awaiting_ai_configuration", job: { status: "invented" } })).toEqual({
+        productState: "could_not_organize",
+        attentionReason: "resolve_consistency",
+        fallback: true,
+      });
     });
   });
 

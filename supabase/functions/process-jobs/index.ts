@@ -1,19 +1,59 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  requireFingerprintPepper,
+  requireMasterKey,
+} from "../_shared/byok-envelope.ts";
 import { isSupportedJobType, processClaimedJob, runEntryDispatchDrain } from "./dispatch.ts";
 
 const JOB_LEASE_SECONDS = 300;
 
+/**
+ * `BYOK-ADAPTER-005` — the worker holds no process-wide provider key.
+ *
+ * What used to be here was `Deno.env.get("OPENAI_API_KEY")` and a 503 when it
+ * was absent, and that one read was the reason every job in the queue ran on the
+ * project's credential regardless of who owned it. It is gone, and with it the
+ * only Deno path to a shared key: each handler now resolves the **job owner's**
+ * credential through `resolveJobCredential`, at execution time.
+ *
+ * ## What replaced the missing-key branch
+ *
+ * The startup check below, which is a different question with a different
+ * answer. The worker no longer needs a provider key to run — it needs the
+ * **master key**, without which no user's credential can be decrypted and every
+ * job would fail identically. `BYOK-MASTER-005` says the runtime refuses to
+ * start rather than degrade, so this is evaluated once at module scope and
+ * every request is refused with a declared code until it is fixed.
+ *
+ * The pepper is checked alongside it for the reason `byok-envelope.ts` records:
+ * it is subject to the same requirement independently, and a worker that booted
+ * without it would only discover the gap on the first save-path deployment that
+ * needed it.
+ */
+const workerConfigurationError: string | null = (() => {
+  try {
+    requireMasterKey();
+    requireFingerprintPepper();
+    return null;
+  } catch {
+    // The message names the variable, which is safe, but nothing here echoes a
+    // value — the code below is the whole diagnostic.
+    return "worker_not_configured";
+  }
+})();
+
 Deno.serve(async (request) => {
   if (request.method !== "POST")
     return Response.json({ error: "Method not allowed" }, { status: 405 });
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!openaiKey)
+  if (workerConfigurationError) {
+    console.error("Worker refused to serve", { code: workerConfigurationError });
     return Response.json(
-      { error: "Server is not configured", code: "missing_openai_key" },
+      { error: "Server is not configured", code: workerConfigurationError },
       { status: 503 },
     );
+  }
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const service = createClient(url, serviceRole, { auth: { persistSession: false } });
   const body = await request.json().catch(() => ({}));
 
@@ -26,7 +66,7 @@ Deno.serve(async (request) => {
     if (!dispatchSecret || request.headers.get("x-dispatch-secret") !== dispatchSecret) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const summary = await runEntryDispatchDrain(service, openaiKey);
+    const summary = await runEntryDispatchDrain(service);
     return Response.json({ ok: true, mode: "dispatch", ...summary });
   }
 
@@ -71,5 +111,8 @@ Deno.serve(async (request) => {
   }
   if (!claimedJob) return Response.json({ error: "Job is not available" }, { status: 409 });
 
-  return processClaimedJob(service, openaiKey, jobRow.type, claimedJob, workerId);
+  // The claimed row carries its own `user_id`, and that is the only owner any
+  // handler below is allowed to act on. `user.id` above authorised *this
+  // request*; it never selects a credential — see `resolveJobCredential`.
+  return processClaimedJob(service, jobRow.type, claimedJob, workerId);
 });

@@ -70,6 +70,28 @@ insert into auth.users (
     '{}'::jsonb, '{}'::jsonb, now(), now()
   );
 
+-- Both fixture owners are credentialed, and BYOK.4 is why.
+--
+-- `capture_entry_async` and `claim_next_entry_interpretation_job` became
+-- credential-aware in `202608010068` / `202608010069`: with no ACTIVE credential
+-- the capture stores the entry in `awaiting_ai_configuration` and enqueues
+-- nothing, and the drain skips the owner entirely. This suite is about the job
+-- machinery -- atomicity, idempotency, leases, the reaper -- so it needs the
+-- credentialed path, and without these two rows every assertion below would be
+-- testing the uncredentialed one instead and failing for a reason that has
+-- nothing to do with what it is checking.
+--
+-- The uncredentialed path has its own suite: `byok_awaiting_and_drain.sql`.
+insert into public.user_ai_credentials
+  (user_id, status, ciphertext, iv, key_version, fingerprint, validated_at)
+values
+  ('11111111-1111-4111-8111-111111111111', 'active',
+   '\x1101020304050607080910111213141516'::bytea,
+   '\x110102030405060708091011'::bytea, 1, 'sk-proj:111111', now()),
+  ('22222222-2222-4222-8222-222222222222', 'active',
+   '\x2201020304050607080910111213141516'::bytea,
+   '\x220102030405060708091011'::bytea, 1, 'sk-proj:222222', now());
+
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 

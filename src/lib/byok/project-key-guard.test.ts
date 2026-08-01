@@ -66,15 +66,17 @@ function code(source: string): string {
  *      developer's own credentials and are not reachable from the product;
  *   3. the tests that assert this very posture.
  *
- * `BYOK.5` removes the deployed Edge Function secret; until then
- * `process-jobs/index.ts` still reads it, and that is the one entry with an
- * expiry rather than a justification.
+ * **BYOK.4 removed the fourth.** `supabase/functions/process-jobs/index.ts` read
+ * `Deno.env.get("OPENAI_API_KEY")` and was allowlisted with an expiry rather than
+ * a justification; the read and the entry were deleted in the same commit,
+ * because the test below asserted the read was *present* precisely so that
+ * removing it would fail here and force the allowlist to shrink alongside it. An
+ * allowlist that outlives its exception is how they grow.
  */
 const PROJECT_KEY_ALLOWLIST = [
   ".env.example",
   "src/lib/byok/project-key-guard.test.ts",
   "src/lib/byok/guards.test.ts",
-  "supabase/functions/process-jobs/index.ts",
 ] as const;
 
 function filesReferencing(pattern: RegExp): string[] {
@@ -108,11 +110,55 @@ describe("BYOK-GUARD-001: no deployed Node path can reach the project key", () =
     expect(productPaths).toEqual([]);
   });
 
-  it("the Deno entry read is the one remaining exception, and it is dated", () => {
-    // BYOK.4 deletes it. Asserted as *present* so that when BYOK.4 removes it,
-    // this test fails and forces the allowlist to shrink in the same commit —
-    // an allowlist that outlives its exception is how they grow.
-    expect(read("supabase/functions/process-jobs/index.ts")).toMatch(/OPENAI_API_KEY/);
+  it("no Deno path reads a process-wide provider key (BYOK-GUARD-001, Deno scope)", () => {
+    // Gate D1, from the other direction: not "the allowlist is short" but "the
+    // deployed worker sources contain no such read at all", including the 503
+    // branch that used to guard it. Both entrypoints and everything they import
+    // are covered, because `filesReferencing` walks `supabase/functions`
+    // entirely.
+    const denoFiles = ALL_FILES.filter((file) => file.startsWith("supabase/functions/"));
+    expect(denoFiles.length).toBeGreaterThan(8);
+
+    for (const file of denoFiles) {
+      const source = code(read(file));
+      expect(source, `${file} must not reach for a process-wide provider key`).not.toMatch(
+        /OPENAI_API_KEY/,
+      );
+      // Any environment name that reads like a **provider** credential, not only
+      // the one that was there. Two exclusions are deliberate rather than
+      // sloppy, and both were found by this assertion's first two drafts:
+      //
+      //   * `OPENAI_FILE_MODEL` — a model id is public, costs nothing to know
+      //     and creates no path to a provider. `BYOK-GUARD-002` records the same
+      //     exception on the Node side for `OPENAI_EXTRACTION_MODEL`;
+      //   * `SUPABASE_SERVICE_ROLE_KEY` and `WORKER_DISPATCH_SECRET` — the
+      //     worker's own identity and its dispatch authentication. Neither is a
+      //     user's provider credential, and removing them would not make the
+      //     worker safer, only unable to run.
+      //
+      // So the pattern names the thing being guarded: an API key.
+      expect(source, `${file} must not read a provider credential from the environment`).not.toMatch(
+        /Deno\.env\.get\(\s*["'`][A-Z_]*(API_KEY|PROVIDER_KEY)[A-Z_]*["'`]\s*\)/,
+      );
+    }
+  });
+
+  it("every worker provider call is authorized by a resolved Secret", () => {
+    // Positively, so a worker that stopped calling the provider entirely would
+    // also fail rather than pass vacuously.
+    const handlers = ["entry.ts", "attachment.ts"].map(
+      (name) => `supabase/functions/process-jobs/${name}`,
+    );
+    for (const handler of handlers) {
+      const source = code(read(handler));
+      const authorizations = source.match(/authorization:\s*`Bearer \$\{([^}]+)\}`/g) ?? [];
+      expect(authorizations.length, `${handler} must contact the provider`).toBeGreaterThan(0);
+      for (const authorization of authorizations) {
+        expect(authorization, `${handler} must authorize with an exposed Secret`).toMatch(
+          /credential(\.secret)?\.expose\(\)/,
+        );
+      }
+    }
   });
 
   it("the allowlist contains only files that exist", () => {

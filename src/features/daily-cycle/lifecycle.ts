@@ -9,6 +9,7 @@ export const entryLifecycleStates = [
   "recoverable_error",
   "terminal_error",
   "reprocessing",
+  "awaiting_ai_configuration",
 ] as const;
 
 export type EntryLifecycleState = (typeof entryLifecycleStates)[number];
@@ -72,6 +73,19 @@ export function resolveDailyCycleLifecycle(input: DailyCycleLifecycleInput): Dai
 
   const { entryLifecycle, job } = input;
   if (input.hasConsistencyIssue) return project("needs_attention", "resolve_consistency");
+
+  // `BYOK-CAPTURE-002`, and deliberately **above** every job-derived branch.
+  //
+  // An entry reaches this state in two ways, and the second is why the order
+  // matters: captured with no key and never enqueued, or enqueued while a key
+  // was active and returned here after the job died on a configuration failure.
+  // In the second case an exhausted job row still exists, and the branch below
+  // would read it as `could_not_organize` + `retry_processing` — offering the
+  // one action that cannot work and hiding the one that can. The entry's own
+  // status is the more recent fact, so it wins.
+  if (entryLifecycle === "awaiting_ai_configuration") {
+    return project("needs_attention", "configure_ai_credential");
+  }
 
   if (entryLifecycle === "terminal_error" || job?.status === "exhausted") {
     return project("could_not_organize", "retry_processing");

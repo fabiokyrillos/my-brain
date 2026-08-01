@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 type ContractsModule = {
   productStates?: readonly string[];
   attentionReasons?: readonly string[];
+  trackedAttentionReasons?: readonly string[];
   dailyCycleActions?: readonly string[];
   dailyCycleMessageKeys?: readonly string[];
   isDailyCycleSerializable?: (value: unknown) => boolean;
@@ -24,14 +25,37 @@ describe("daily cycle product contracts", () => {
     ]);
   });
 
-  it("defines only the five supported attention reasons", () => {
+  it("defines only the six supported attention reasons", () => {
     expect(contracts.attentionReasons).toEqual([
       "review_interpretation",
       "confirm_existing_candidates",
       "answer_existing_question",
       "retry_processing",
       "resolve_consistency",
+      "configure_ai_credential",
     ]);
+  });
+
+  it("keeps the tracked subset to exactly what the database enum admits", () => {
+    // `needs_attention_item_opened` validates `attentionReason` against a
+    // five-member enum inside Postgres (`202607170024:205`), and BYOK.4 spends no
+    // migration widening it. The narrow type is what turns "would raise 22023 at
+    // runtime" into "does not compile", so it is asserted rather than trusted.
+    expect(contracts.trackedAttentionReasons).toEqual([
+      "review_interpretation",
+      "confirm_existing_candidates",
+      "answer_existing_question",
+      "retry_processing",
+      "resolve_consistency",
+    ]);
+
+    // And the relationship between the two: the tracked list is a strict subset,
+    // and `configure_ai_credential` is exactly what it excludes.
+    const all = contracts.attentionReasons ?? [];
+    const tracked = contracts.trackedAttentionReasons ?? [];
+    const wider = new Set<string>(all);
+    for (const reason of tracked) expect(wider.has(reason)).toBe(true);
+    expect(all.filter((reason) => !tracked.includes(reason))).toEqual(["configure_ai_credential"]);
   });
 
   it("exposes product-oriented actions and semantic message keys", () => {

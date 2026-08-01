@@ -4,6 +4,7 @@ import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates } from
 import { pageRange, paginateRows } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import { requireSupabaseData } from "@/lib/supabase/result";
+import { byokSettingsHref } from "@/features/byok/routes";
 import type { InboxItemView } from "./contracts";
 import { toInboxItemView, type InboxItemSource } from "./projection-mappers";
 
@@ -122,7 +123,17 @@ export async function loadInboxProjection(
     const job = latestJobByEntryId.get(entry.id);
     const originalPreview = toOriginalPreview(entry.original_content);
     const title = interpretation?.summary?.trim() || originalPreview;
-    const availableActions = [{ id: "open_entry" as const, href: `/${locale}/app/inbox/${entry.id}` }];
+    // `BYOK-CAPTURE-002`. An entry stored with no usable AI credential gets a
+    // second action, and it is the only one that resolves the state: opening the
+    // record shows the original and says why nothing happened, but the fix is in
+    // Settings. Offered here rather than only on the detail page because the
+    // Inbox is where a user with several such entries actually notices them.
+    const availableActions = entry.status === "awaiting_ai_configuration"
+      ? [
+          { id: "open_entry" as const, href: `/${locale}/app/inbox/${entry.id}` },
+          { id: "configure_ai_credential" as const, href: byokSettingsHref(locale) },
+        ]
+      : [{ id: "open_entry" as const, href: `/${locale}/app/inbox/${entry.id}` }];
     const taskCandidateCount = interpretation !== undefined && Array.isArray(interpretation.task_candidates)
       ? interpretation.task_candidates.length
       : 0;

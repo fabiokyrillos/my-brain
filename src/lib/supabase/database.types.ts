@@ -712,6 +712,7 @@ export type Database = {
       }
       entries: {
         Row: {
+          capture_idempotency_key: string | null
           created_at: string
           current_interpretation_id: string | null
           id: string
@@ -730,6 +731,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          capture_idempotency_key?: string | null
           created_at?: string
           current_interpretation_id?: string | null
           id?: string
@@ -748,6 +750,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          capture_idempotency_key?: string | null
           created_at?: string
           current_interpretation_id?: string | null
           id?: string
@@ -2652,6 +2655,14 @@ export type Database = {
         }
         Returns: Json
       }
+      fail_job_terminal: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       get_ai_cost_summary: { Args: { p_timezone?: string }; Returns: Json }
       get_job_queue_metrics: { Args: never; Returns: Json }
       finalize_credential_validation_attempt: {
@@ -2760,6 +2771,13 @@ export type Database = {
           token_overlap: number
           updated_at: string
         }[]
+      }
+      mark_entry_awaiting_ai_configuration: {
+        Args: {
+          p_entry_id: string
+          p_service_user_id: string
+        }
+        Returns: boolean
       }
       match_internal_knowledge: {
         Args: { p_match_count?: number; p_query_embedding: string }

@@ -11,6 +11,7 @@ import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 
 import { getByokCopy } from "./copy";
+import { PENDING_ENTRY_BATCH_LIMIT } from "./pending-entries";
 import { validateAgainstProvider } from "./probe";
 import { parseApiKey, runValidation, type ValidationOutcome } from "./validation";
 
@@ -208,4 +209,110 @@ export async function removeAiCredential(
 
   revalidatePath(`/${resolveLocale(formData.get("locale"))}/app/settings`);
   return { status: "success", message: copy.removed };
+}
+
+/**
+ * `BYOK-CAPTURE-004`/`005`/`006` — interpret the entries that were stored while
+ * no key was configured.
+ *
+ * ## Why this is a button and not a trigger
+ *
+ * `BYOK-CAPTURE-005`. The obvious design is to notice a credential becoming
+ * active and enqueue everything waiting. It is also the design that charges the
+ * user for two hundred interpretations because they pasted a key. Spending
+ * somebody's money without an explicit act is the same class of error as an
+ * unconfirmed AI write, and this repository treats it the same way: the user
+ * asks, or it does not happen. There is deliberately **no** hook on the save
+ * path, and `byok-activation-guard.test.ts` asserts the absence.
+ *
+ * ## Why it reuses `enqueue_entry_reprocessing`
+ *
+ * It is the deployed enqueue path, it takes the advisory lock, it refuses an
+ * entry that already has an active job with `55P03`, and it is already exercised
+ * against entries that carry no interpretation — the daily cycle's
+ * `retry_processing` action does exactly that. Writing a second enqueue path
+ * would mean a second set of the same guarantees to keep in step.
+ *
+ * ## Why the operation key is per-invocation
+ *
+ * A fixed key would be idempotent in the wrong direction. The first run's key
+ * would still match after its job had failed and returned the entry here, so the
+ * second run would replay the dead job instead of queuing a live one, and the
+ * entry would be stranded permanently. A fresh key per invocation, plus the
+ * function's own `55P03` on an already-active job, gives the behaviour that is
+ * actually wanted: repeating is safe, and it creates no duplicate work.
+ */
+export async function interpretPendingEntries(
+  _previous: ByokActionState,
+  formData: FormData,
+): Promise<ByokActionState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getByokCopy(formData.get("locale"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: copy.messages.credentialRequired };
+
+  // The gate, and it is checked here rather than inferred from the entries.
+  // `resolve_own_ai_credential` would also answer, but it returns ciphertext this
+  // action has no use for; the status column alone is the whole question, and
+  // reading less is the right default on a credential row.
+  const { data: credential, error: credentialError } = await supabase
+    .from("user_ai_credentials")
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (credentialError) return { status: "error", message: copy.validation.unknown };
+  if (credential?.status !== "active") {
+    return { status: "error", message: copy.messages.credentialRequired };
+  }
+
+  // One more than the ceiling, so "there are more" is a fact rather than a
+  // guess. RLS scopes this to the caller; the `eq` on `user_id` is the belt.
+  const { data: pending, error: pendingError } = await supabase
+    .from("entries")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "awaiting_ai_configuration")
+    .order("created_at", { ascending: true })
+    .limit(PENDING_ENTRY_BATCH_LIMIT + 1);
+  if (pendingError) return { status: "error", message: copy.validation.unknown };
+
+  const rows = pending ?? [];
+  if (rows.length === 0) return { status: "success", message: copy.pendingEntries.none };
+
+  const batch = rows.slice(0, PENDING_ENTRY_BATCH_LIMIT);
+  const hasMore = rows.length > PENDING_ENTRY_BATCH_LIMIT;
+
+  let enqueued = 0;
+  let alreadyQueued = 0;
+  for (const entry of batch) {
+    const { error } = await supabase.rpc("enqueue_entry_reprocessing", {
+      p_entry_id: entry.id,
+      p_operation_key: `byok-pending:${crypto.randomUUID()}`,
+    });
+    if (!error) {
+      enqueued += 1;
+      continue;
+    }
+    // `55P03` is the function's own "this entry already has an active job".
+    // It is not a failure of this action — it is the idempotency contract
+    // working — so it is counted separately and never reported as an error.
+    if (error.code === "55P03") alreadyQueued += 1;
+  }
+
+  revalidatePath(`/${locale}/app/settings`);
+  revalidatePath(`/${locale}/app/inbox`);
+  revalidatePath(`/${locale}/app`);
+
+  if (enqueued === 0) {
+    return {
+      status: "success",
+      message: alreadyQueued > 0 ? copy.pendingEntries.alreadyQueued : copy.pendingEntries.none,
+    };
+  }
+
+  const template = hasMore ? copy.pendingEntries.partial : copy.pendingEntries.queued;
+  return { status: "success", message: template.replace("{count}", String(enqueued)) };
 }

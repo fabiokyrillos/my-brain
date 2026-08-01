@@ -82,6 +82,7 @@ export const HISTORY_ACTION_TYPES = [
   "end_person_relationship",
   "confirm_entry_task_candidates_v6",
   "create_memory",
+  "entry_awaiting_ai_configuration",
   "entry_interpretation_corrected",
   "entry_interpretation_correction_undone",
   "entry_interpretation_failed",
@@ -157,6 +158,14 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   end_person_project: "lifecycle",
   end_person_relationship: "lifecycle",
   entry_interpretation_corrected: "changed",
+  // `lifecycle`, and deliberately neither of its two neighbours. Not
+  // `interpreted`, because nothing was: the record was saved and no
+  // interpretation was attempted. Not `failed`, because nothing failed either —
+  // the account simply has no AI key, and filing it under failures would put a
+  // configuration state in the list a user scans for things that went wrong.
+  // What actually happened is that the entry entered a waiting state, which is
+  // the same shape as `reminder_cancelled` and `end_person_project`.
+  entry_awaiting_ai_configuration: "lifecycle",
   entry_interpretation_correction_undone: "undone",
   entry_interpretation_failed: "failed",
   entry_interpreted: "interpreted",
