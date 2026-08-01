@@ -464,6 +464,7 @@ privileged in the credential-resolution contract.
 ## 11. BYOK.5 — STOPPED at the owner boundary
 
 **Branch:** `codex/byok-slice-5`, from `main` at `81b1110`. **Migrations: 0.**
+**Merged as `41240ab` (PR #64), merge-SHA CI run `30723026363`, all three jobs green.**
 **Acceptance record:** `docs/reports/BYOK_SLICE_05_ACCEPTANCE.md`.
 
 **This is a true stop condition**, not an incomplete slice. Three gates need
@@ -533,3 +534,47 @@ not removed here: it would disagree with a deployed reality until step 3
 completes, and `guards.test.ts` currently asserts its presence as the control
 keeping `BYOK_VALIDATION_OPENAI_API_KEY` distinct from it. Handed to **BYOK.6's
 convergence audit**, whose standard is exactly this.
+
+
+---
+
+## 12. BYOK.6 — PARTIAL, and it cannot close
+
+**Branch:** `codex/byok-slice-6`, from `main` at `41240ab`. **Migrations: 0.**
+
+BYOK.6's deliverables split in two, and the split is the whole story:
+
+**Executed here (environment-independent):**
+
+- `supabase/tests/byok_residue.sql` — the zero-secret residue verifier, **run in
+  CI**. It does not check a list of tables: it enumerates every base table in
+  `public` carrying a `user_id` at run time, so a future BYOK table without a
+  cascade fails by name without anybody having remembered to add it. Five
+  calibration assertions prove the scanner finds rows *before* the delete, and
+  four negative-control assertions prove a second account's identical rows
+  survive — because "everything is gone" is trivially satisfied by a cascade that
+  reached too far.
+- `docs/reports/BYOK_INCIDENT_RUNBOOK.md` — master-key rotation, loss and
+  compromise; pepper rotation; the validation key's lifecycle. **Marked "written,
+  not drilled" at the top of the file and of every section**, because a runbook
+  nobody has run is a hypothesis with formatting.
+
+**Blocked on the same four owner actions as BYOK.5:** the complete cross-user
+isolation matrix, concurrent rotation, queued-job removal and rotation execution,
+the desktop and Pixel 7 Settings journeys in both locales, the master-key loss
+drill against a disposable project, the validation-key revocation evidence, and
+the remote smoke.
+
+**One code deliverable remains and is deliberately not attempted:** the bounded
+two-key master-key rotation window (§2a of the runbook). It needs a previous-key
+read, a per-row `key_version` bump and a completion counter — designed against a
+real environment rather than invented against none. Until it exists, the only
+available rotation is invalidate-and-ask, which is correct for a compromise and
+wrong for hygiene, and the runbook says so.
+
+**BYOK does not close here, and must not be recorded as closed.** Its own
+criteria include proven Node/Deno isolation at runtime, removal blocking future
+asynchronous work in a deployed environment, and recovery procedures that exist
+*and have been executed*. `ADR-069`'s rule applies to all of it: a lane that
+ships marked "passed" while unexercised is worse than one marked "unexercised",
+because the first is believed.
