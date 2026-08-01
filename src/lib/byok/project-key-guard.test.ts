@@ -168,6 +168,166 @@ describe("BYOK-GUARD-001: no deployed Node path can reach the project key", () =
   });
 });
 
+/**
+ * `BYOK-GUARD-006` — the allowlist is **closed**, and every entry is classified.
+ *
+ * `BYOK-GUARD-001` above asks "is anything reaching for the key that should not
+ * be?". This asks the narrower and harder question: **is every entry that
+ * remains still one of the classified exceptions, and can any of them reach a
+ * deployed user bundle?** A list that is right today and unexamined tomorrow is
+ * the shape the deleted worker entry had.
+ *
+ * ## A correction to the implementation plan, recorded rather than absorbed
+ *
+ * Plan task 5.3 names three classified exceptions: local development
+ * configuration, mocked or opt-in tests, and `scripts/remote-*.mjs`. Measured
+ * against the repository, **the third is empty**: no script under `scripts/`
+ * references `OPENAI_API_KEY` at all. `remote-supabase-smoke.mjs` contains the
+ * literal `"openai"` only as a provider *name* in a preferences payload, and
+ * `byok-crypto-interop.mjs` touches no provider key.
+ *
+ * So the allowlist has three entries and the plan describes three exceptions,
+ * and the *count* agreeing hides that the *composition* does not. The scripts
+ * are not an exception that was removed — they were never one. Asserted below in
+ * both directions, so a future edit that "restores" a scripts entry to match the
+ * plan's prose fails here instead of widening the surface to match a sentence.
+ */
+describe("BYOK-GUARD-006: the allowlist is closed and every entry is classified", () => {
+  /**
+   * Each entry, with the classification that justifies it. A new entry must
+   * arrive here **with** a classification, which is what makes "adding one
+   * requires an ADR" a mechanical fact rather than a convention.
+   */
+  const CLASSIFIED = {
+    ".env.example": "local-development-configuration",
+    "src/lib/byok/project-key-guard.test.ts": "opt-in-or-mocked-test",
+    "src/lib/byok/guards.test.ts": "opt-in-or-mocked-test",
+  } as const;
+
+  it("has exactly three entries, and the classification covers all of them", () => {
+    // Both directions, on the exact set — not a subset check. An entry without a
+    // classification and a classification without an entry are the same defect:
+    // somebody edited one of the two lists and not the other.
+    expect([...PROJECT_KEY_ALLOWLIST].sort()).toEqual(Object.keys(CLASSIFIED).sort());
+    expect(PROJECT_KEY_ALLOWLIST).toHaveLength(3);
+  });
+
+  it("no script is an exception, because none needs to be", () => {
+    // The plan's third classified exception, measured. If a script ever does
+    // need the project key, this fails and an ADR is the way through — which is
+    // exactly the intended friction.
+    const scripts = ALL_FILES.filter((file) => file.startsWith("scripts/"));
+    expect(scripts.length).toBeGreaterThan(10);
+
+    const reaching = scripts.filter((file) => /\bOPENAI_API_KEY\b/.test(code(read(file))));
+    expect(reaching, "a script reached for the project key without an ADR").toEqual([]);
+  });
+
+  it("every exception is unreachable from a deployed user bundle", () => {
+    // The requirement is not "these files are harmless", it is that they
+    // **cannot enter a bundle a user's browser or a deployed server runs**. Each
+    // entry is proven unreachable by its own mechanism, and the mechanism is
+    // asserted rather than assumed:
+    for (const [entry, classification] of Object.entries(CLASSIFIED)) {
+      if (classification === "local-development-configuration") {
+        // Not a module. `.env.example` is documentation — it is never imported,
+        // never resolved by a bundler, and carries no value to leak.
+        expect(entry.endsWith(".ts") || entry.endsWith(".tsx")).toBe(false);
+        expect(read(entry)).toMatch(/^OPENAI_API_KEY=\s*$/m);
+        continue;
+      }
+
+      // A test file. `next build` compiles what the app graph imports, and the
+      // app graph cannot reach a `*.test.ts` — so the proof is that **nothing
+      // outside a test imports it**, asserted across the whole source tree
+      // rather than trusted to the extension.
+      expect(entry).toMatch(/\.test\.tsx?$/);
+
+      const moduleSpecifier = entry.replace(/^src\//, "@/").replace(/\.tsx?$/, "");
+      const bareName = entry.split("/").pop()!.replace(/\.tsx?$/, "");
+      const importers = ALL_FILES.filter((file) => {
+        if (!/\.(ts|tsx)$/.test(file)) return false;
+        if (file === entry) return false;
+        const source = code(read(file));
+        return (
+          source.includes(`"${moduleSpecifier}"`) ||
+          source.includes(`'${moduleSpecifier}'`) ||
+          new RegExp(`from\\s+["'][^"']*${bareName}["']`).test(source)
+        );
+      });
+      expect(importers, `${entry} is imported by a non-test module`).toEqual([]);
+    }
+  });
+
+  it("the credential contract has no identity branch, so no account is privileged", () => {
+    // Gate E-class, stated as an **absence** rather than as a journey.
+    //
+    // "The owner is not privileged" is normally proven by configuring the owner
+    // and watching them fail without a key — which needs a deployment and a
+    // credential no agent may enter. But the stronger property is structural and
+    // checkable here: **there is no code that could privilege anybody.** The
+    // resolution chain takes an id and uses it to compose an AAD; nothing in it
+    // compares that id against a constant, an allowlist or an environment value.
+    //
+    // A future "just let the owner through while we debug" is exactly the change
+    // this fails on.
+    const chain = [
+      "src/lib/byok/gate.ts",
+      "src/lib/byok/adapter.ts",
+      "src/lib/ai/index.ts",
+      "supabase/functions/_shared/byok-adapter.ts",
+    ];
+
+    for (const file of chain) {
+      const source = code(read(file));
+
+      // An identity compared against anything that is not the row it came from.
+      expect(source, `${file} branches on who the user is`).not.toMatch(
+        /\b(isOwner|OWNER_[A-Z_]+|ADMIN_[A-Z_]+|allowlistedUsers?|privilegedUsers?)\b/,
+      );
+      // An identity read from configuration rather than from the session or the
+      // row — the shape a hardcoded owner id would take.
+      expect(source, `${file} reads an identity from the environment`).not.toMatch(
+        /(process\.env|Deno\.env\.get\()[^\n]*\b(USER|OWNER|ADMIN|ACCOUNT)_?ID\b/i,
+      );
+      // A uuid literal. There is no legitimate reason for one in this chain, and
+      // it is how a "temporary" exemption would actually be written.
+      expect(source, `${file} carries a hardcoded account identifier`).not.toMatch(
+        /["'`][0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}["'`]/i,
+      );
+    }
+
+    // Positively, so a chain that stopped resolving anything would also fail:
+    // the gate still resolves, and it still reports the three declared outcomes.
+    const gate = code(read("src/lib/byok/gate.ts"));
+    expect(gate).toMatch(/resolveOwnCredential\(supabase, userId/);
+    expect(gate).toMatch(/reason: resolution\.outcome/);
+  });
+
+  it("no deployed runtime reads the project key, in either language", () => {
+    // Gate E-class, from the direction that matters after the deployed secret is
+    // removed: not "the allowlist is short" but "no code that ships would use
+    // the value even if the variable were present". Both runtimes, both
+    // spellings, every non-test module under the deployed roots.
+    const deployed = ALL_FILES.filter(
+      (file) =>
+        /\.(ts|tsx)$/.test(file) &&
+        (file.startsWith("src/") || file.startsWith("supabase/functions/")) &&
+        !file.endsWith(".test.ts") &&
+        !file.endsWith(".test.tsx"),
+    );
+    expect(deployed.length).toBeGreaterThan(100);
+
+    for (const file of deployed) {
+      const source = code(read(file));
+      expect(source, `${file} reads the project key`).not.toMatch(/\bOPENAI_API_KEY\b/);
+      expect(source, `${file} reads a provider credential from the environment`).not.toMatch(
+        /(process\.env|Deno\.env\.get\()\s*[.[(]?\s*["'`]?[A-Z_]*API_KEY/,
+      );
+    }
+  });
+});
+
 describe("BYOK-GUARD-002: the provider cannot be constructed without a credential", () => {
   it("getAIProvider has no environment-reading branch for a key", () => {
     const source = code(read("src/lib/ai/index.ts"));
