@@ -3,6 +3,26 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.1: the credential store, and no reader for it
+
+**One migration, `202608010065`** — parity `202607310064` → `202608010065`, exactly the allocation the plan budgets. **No resolver, no adapter, no product surface, no provider call, and `OPENAI_API_KEY` untouched.** Removing the fallback is BYOK.3's, and doing it here would leave the product AI-less with no screen to configure a replacement.
+
+**No plaintext column exists, under any name.** The only key material `user_ai_credentials` holds is `ciphertext`, sealed AES-256-GCM under a master key that lives in the application environment and never in the database. The absence is asserted over the *whole* column list — by pgTAP and by a types-parity test — rather than against a list of names somebody remembered to forbid.
+
+**The AAD binds each ciphertext to its owner**, so a row copied into another user's identity fails authentication rather than merely being hidden by RLS. Proven in both runtimes, for all three AAD components, each time with the positive control first — and the failure is one word, `credential_unreadable`, with the rendered error scanned for six distinct leak candidates.
+
+**No `DELETE` for any client role, and no `DELETE` policy.** Removal is a status transition that nulls `ciphertext` and `iv` in one statement; rows disappear by exactly one path, the `auth.users` cascade, which is asserted from `pg_constraint` rather than described. The refusal is executed against the caller's **own** row, so what refuses it is the missing privilege and not RLS. `credential_validation_attempts` is append-only in the same way: select and insert, nothing else, because evidence that can be rewritten is not evidence.
+
+**The fingerprint is a slice of nothing.** `HMAC-SHA256(pepper, key)` truncated to six hex, prefixed from a closed vocabulary that is closed **in the database** by CHECK and compared against the TypeScript list in both directions. No substring of the key is stored or shown, including the last four characters — the tail carries the entropy and is what a screenshot captures. The pepper is a separate secret from the master key, so a fingerprint leak can never assist decryption.
+
+**Three departures from the PRD, recorded rather than folded in.** An own-row INSERT policy exists, because `BYOK-SCHEMA-005` grants INSERT and `BYOK-SCHEMA-004` names no policy for it — under forced RLS that grant would be dead weight. `fingerprint` stores `<prefix>:<6 hex>` because the display form needs the prefix and the declared column list has nowhere else to put it. And `BYOK-GUARD-005` admits **one named exception**: a pre-existing *keyless* SHA-256 in `product-events.ts` that takes no key parameter and therefore cannot reach a credential — bounded by a keyed-operation assertion that admits no exceptions at all, plus a test that the exception is still keyless.
+
+**The startup checks ship and are called by no process, deliberately.** They refuse an absent, empty, non-base64 or wrong-length value in both runtimes without echoing it. Wiring them into the app or the worker *now* would invert Amendment A-1.2's ordering — preview and production secrets are deferred to the point of use — and schedule a boot failure on a secret nobody has provisioned, for no gain, since nothing in this slice reads a credential. Each call site lands with the slice that depends on it.
+
+**A conflict raised and not resolved.** `BYOK-SCHEMA-007` fixes the attempts table at three columns; task 3.8 wants a throttle "per user **and per IP**" over it; BYOK.3's migration budget is zero. All three cannot hold. This slice implemented SCHEMA-007 exactly and invented no column, because expanding a governing document's schema inside a branch is the move `ADR-069` exists because the *owner* is entitled to make. Three options are laid out in `BYOK_SLICE_01_ACCEPTANCE.md` §5; the decision is needed before BYOK.3 starts.
+
+**Docker is unavailable locally, so the 57-assertion pgTAP suite could not be run.** It was scrutinised statically instead: the plan count was verified mechanically against the assertion calls; every `throws_ok` argument is explicitly cast, because pgTAP overloads it on `(TEXT, CHAR(5), …)` and `(TEXT, TEXT, …)`; and **no assertion depends on which CHECK PostgreSQL reports**, since one statement can violate two and the order is not promised — that evidence comes from `pg_constraint` instead. Gate A3's cross-runtime proof now runs in the `worker` CI job, where the Deno runtime already lives.
+
 ## 2026-08-01 — BYOK pre-code: the gates close, and §0's absolute rule becomes a dependency-specific one
 
 **No migration, no source change, no provider call.** Documentation, one ADR, and four secrets that exist only in two git-ignored files.
