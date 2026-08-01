@@ -103,19 +103,38 @@ describe("BYOK-FINGERPRINT-002/003: the value identifies without revealing", () 
     expect(fingerprint.split(":")[1]).toHaveLength(FINGERPRINT_HEX_LENGTH);
   });
 
-  it("contains no substring of the key — including the tail", async () => {
-    const fingerprint = await computeFingerprint(PROJECT_KEY, pepper());
-    const hex = fingerprint.split(":")[1];
+  it("is not the tail of the key, nor any slice of it", async () => {
+    // BYOK-FINGERPRINT-003 names the tail explicitly, because it carries the
+    // entropy and it is what a screenshot captures.
+    //
+    // Stated as **derivation**, not as containment. A containment check against
+    // a short slice is a coin flip: the digest is six hex characters, so
+    // `not.toContain(key.slice(-4))` fails by chance whenever those four
+    // characters are hex — roughly 1 in 20,000 runs, which is exactly often
+    // enough to erode trust in the suite and never often enough to be
+    // diagnosed. The sibling `ip.test.ts` shipped that mistake and CI caught it
+    // within two runs.
+    const secret = pepper();
 
-    // The tail is the part BYOK-FINGERPRINT-003 names explicitly, because it
-    // carries the entropy and it is what a screenshot captures.
-    expect(fingerprint).not.toContain(PROJECT_KEY.slice(-4));
-    expect(fingerprint).not.toContain(PROJECT_KEY.slice(-6));
-    expect(fingerprint).not.toContain(PROJECT_KEY.slice(8));
+    // Two keys that share their entire tail. If the fingerprint were derived
+    // from the tail — the thing the requirement forbids — these would collide.
+    const sharedTail = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const [first, second] = await Promise.all([
+      computeFingerprint(`sk-proj-1111${sharedTail}`, secret),
+      computeFingerprint(`sk-proj-2222${sharedTail}`, secret),
+    ]);
+    expect(first).not.toBe(second);
 
-    // And the reverse direction: no six-character window of the key equals the
-    // digest. A weaker assertion would pass for a fingerprint that simply *was*
-    // a slice, as long as it was not one of the three tested above.
+    // And the digest is drawn from the hex alphabet, so it cannot be a slice of
+    // a key containing anything outside it. Deterministic, unlike a
+    // substring search.
+    const hex = (await computeFingerprint(PROJECT_KEY, secret)).split(":")[1];
+    expect(hex).toMatch(/^[0-9a-f]{6}$/);
+
+    // The reverse direction: no six-character window of the key equals the
+    // digest. This one is a genuine check rather than a coin flip, because it
+    // compares whole windows to a whole digest rather than searching for a
+    // fragment.
     const windows = new Set<string>();
     for (let index = 0; index + 6 <= PROJECT_KEY.length; index += 1) {
       windows.add(PROJECT_KEY.slice(index, index + 6));

@@ -16,7 +16,7 @@
 -- Written in pure ASCII, following `phase_2e_task_command_matching.sql`.
 
 begin;
-select plan(57);
+select plan(58);
 
 set local timezone to 'UTC';
 
@@ -38,7 +38,7 @@ insert into auth.users (
    'byok-stranger@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 -- ---------------------------------------------------------------------------
--- Section 1 -- the schema BYOK-SCHEMA-001/002/007 declares (17)
+-- Section 1 -- the schema BYOK-SCHEMA-001/002/007 declares (18)
 -- ---------------------------------------------------------------------------
 
 select has_table('public', 'user_ai_credentials', 'the credential table exists');
@@ -82,8 +82,18 @@ select is(
   'no column on the credential table reads like plaintext key material'
 );
 
--- BYOK-SCHEMA-007: the attempts table carries an identity and an outcome, and
--- nothing that could identify or reconstruct a key.
+-- BYOK-SCHEMA-007, as amended by BYOK-SCHEMA-010: the attempts table carries an
+-- identity, an outcome and a hashed address -- and nothing that could identify
+-- or reconstruct a key.
+--
+-- **`ip_hash` was added by `202608010067`, and this list moved with it.** The
+-- assertion's value is "no key material and no fingerprint", not "exactly these
+-- four columns forever"; a slice that legitimately adds a column updates this
+-- line in the same commit, deliberately and visibly, exactly as the migration
+-- pin and the types-parity check do. What must never appear here is a
+-- ciphertext, an IV, a key version, a provider or a fingerprint -- and the next
+-- assertion checks that as a property rather than as a spelling, so a future
+-- column cannot slip in by editing this list alone.
 select is(
   (
     select coalesce(string_agg(column_name, ', ' order by column_name), '')
@@ -91,8 +101,22 @@ select is(
     where table_schema = 'public'
       and table_name = 'credential_validation_attempts'
   ),
-  'attempted_at, id, outcome, user_id',
-  'the attempts table holds exactly four columns, none of them key material'
+  'attempted_at, id, ip_hash, outcome, user_id',
+  'the attempts table holds exactly five columns, none of them key material'
+);
+
+-- The property, checked independently of the spelling above. This is the half
+-- that survives somebody updating the list without thinking.
+select is(
+  (
+    select coalesce(string_agg(column_name, ', ' order by column_name), '')
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'credential_validation_attempts'
+      and column_name in ('ciphertext', 'iv', 'key_version', 'fingerprint', 'provider')
+  ),
+  '',
+  'and none of the credential-bearing column names exists on it, whatever the list above says'
 );
 
 select has_index(

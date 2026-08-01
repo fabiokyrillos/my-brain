@@ -125,27 +125,38 @@ describe("BYOK-ADAPTER-004: the two runtimes implement one format", () => {
     const node = readFileSync(join(REPO, "src/lib/byok/crypto.ts"), "utf8");
     const deno = readFileSync(DENO_SOURCE, "utf8");
 
-    // Two sanctioned readers per runtime, and exactly two: `requireMasterKey`
-    // and `requireFingerprintPepper`. The count is asserted rather than the
-    // names alone, so a third read added inside either function's body — the
-    // easiest place to hide one — moves this number.
+    // Three sanctioned readers in Node, two in Deno, and exactly those. The
+    // counts are asserted rather than the names alone, so an extra read added
+    // inside any function's body — the easiest place to hide one — moves the
+    // number.
+    //
+    // The asymmetry is the third secret. `BYOK_RATE_LIMIT_PEPPER` (ADR-070)
+    // keys the validation throttle's `ip_hash`, and validation happens on the
+    // Node Settings path. The worker never validates and never throttles, so a
+    // reader there would be a consumer-less contract — the same reasoning that
+    // keeps `hmacSha256` out of the Deno core, asserted the same way below.
     //
     // In the Node file both occurrences are the `= process.env` default
     // parameter, one per function. That is the read, and it is a default rather
     // than a direct lookup so the tests can exercise absence and malformation by
     // passing an object instead of mutating the real environment — which under
     // a parallel test runner would be a shared mutable global.
-    expect(node.match(/process\.env/g) ?? []).toHaveLength(2);
+    expect(node.match(/process\.env/g) ?? []).toHaveLength(3);
     expect(deno.match(/Deno\.env\.get/g) ?? []).toHaveLength(2);
 
     for (const [name, source] of [["node", node], ["deno", deno]] as const) {
       expect(source, `${name} validates the master key at startup`).toMatch(
         /export function requireMasterKey/,
       );
-      expect(source, `${name} validates the pepper at startup`).toMatch(
+      expect(source, `${name} validates the fingerprint pepper at startup`).toMatch(
         /export function requireFingerprintPepper/,
       );
     }
+
+    // Node only, and asserted in both directions so neither adding it to the
+    // worker nor deleting it from Node passes silently.
+    expect(node).toMatch(/export function requireRateLimitPepper/);
+    expect(deno).not.toMatch(/export function requireRateLimitPepper/);
   });
 
   it("records the one asymmetry between the cores rather than letting it drift", () => {

@@ -12,6 +12,18 @@ import { sendChatMessage } from "./actions";
 
 // `agent-identity` begins `import "server-only"`, which throws in this jsdom
 // environment. The name it resolves is not what these cases are about.
+
+// The BYOK gate is mocked open here: these suites exercise their own feature's
+// logic, not credential resolution. The gate's real behaviour -- including that
+// a closed gate makes NO provider call (matrix case 12) -- is exercised against
+// the real module in src/lib/byok/gate.test.ts.
+vi.mock("@/lib/byok/gate", () => ({
+  openAiGate: vi.fn(async () => ({
+    ok: true,
+    credential: { outcome: "resolved", secret: { expose: () => "sk-test" }, provider: "openai", keyVersion: 1 },
+  })),
+  gateMessageKey: (reason: string) => (reason === "credential_required" ? "credentialRequired" : "credentialUnreadable"),
+}));
 vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: vi.fn(async () => "Brain") }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({

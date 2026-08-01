@@ -32,6 +32,25 @@ export const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
 /** Explicit ceiling per provider call. See the constructor for why. */
 export const NODE_OPENAI_TIMEOUT_MS = 120_000;
 
+/**
+ * `BYOK-QUOTA-003` — an output ceiling on **every** operation, not only the
+ * task-command path that already had one.
+ *
+ * Under BYOK this stops protecting the owner's wallet and starts protecting the
+ * **user's**. A runaway generation on somebody's own OpenAI account is a bill
+ * they did not agree to and cannot see coming, and "the model decided to write
+ * for a while" is not a defence. It also bounds worst-case latency, which the
+ * timeout alone does not: a call can stream tokens steadily for two minutes and
+ * never trip a timeout.
+ *
+ * Two ceilings rather than one, because the operations differ by an order of
+ * magnitude in legitimate output. Extraction emits a structured object over one
+ * entry; a chat answer is prose with citations. Sizing both to the larger would
+ * make the smaller ceiling meaningless.
+ */
+export const EXTRACTION_MAX_OUTPUT_TOKENS = 4_000;
+export const CHAT_ANSWER_MAX_OUTPUT_TOKENS = 6_000;
+
 const systemPrompt = `You extract personal knowledge and possible actions from one user entry.
 
 Security and truth rules:
@@ -55,23 +74,41 @@ export class OpenAIProvider implements AIProvider {
   private readonly model: string;
   private readonly embeddingModel: string;
 
-  constructor(options?: { apiKey?: string; model?: string; embeddingModel?: string }) {
-    const apiKey = options?.apiKey ?? process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  /**
+   * `BYOK-ADAPTER-002` — `apiKey` is **required**, and there is no fallback.
+   *
+   * The clause that used to sit here was
+   * `options?.apiKey ?? process.env.OPENAI_API_KEY`. It is **deleted**, not
+   * disabled: a disabled fallback is a line somebody re-enables during an
+   * incident at 3am, and from that moment every user's AI spends the owner's
+   * money under the owner's rate limits, silently and correctly-looking.
+   *
+   * Omitting the credential is now a **type error**, and passing an empty one
+   * throws. `BYOK-GUARD-002` asserts both, and asserts that this constructor has
+   * no environment-reading branch at all.
+   */
+  constructor(options: { apiKey: string; model?: string; embeddingModel?: string }) {
+    const apiKey = options.apiKey;
+    if (!apiKey) throw new Error("A provider credential is required");
     // The SDK defaults to a 10-minute timeout with 2 retries, so a stalled
     // provider could hold a blocking Server Action (chat, review generation,
     // memory embedding) for up to ~30 minutes. The Deno worker already bounds
     // its own calls with AbortSignal.timeout(120_000); this is the Node
     // equivalent, kept longer because review generation is the slowest call.
     this.client = new OpenAI({ apiKey, timeout: NODE_OPENAI_TIMEOUT_MS, maxRetries: 2 });
-    this.model = options?.model ?? process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-5.6-luna";
-    this.embeddingModel = options?.embeddingModel ?? process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+    // Model names stay environment-configurable. They are **not** credentials:
+    // a model id is public, costs nothing to know, and reading one here creates
+    // no path to a provider. BYOK-GUARD-001 scans for `OPENAI_API_KEY`, not for
+    // the word `process.env`, precisely so this distinction survives.
+    this.model = options.model ?? process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-5.6-luna";
+    this.embeddingModel = options.embeddingModel ?? process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
   }
 
   async extractEntry(input: ExtractionInput): Promise<ExtractionResult> {
     const response = await this.client.responses.parse({
       model: this.model,
       reasoning: { effort: "low" },
+      max_output_tokens: EXTRACTION_MAX_OUTPUT_TOKENS,
       input: [
         { role: "system", content: systemPrompt },
         {
@@ -202,6 +239,7 @@ export class OpenAIProvider implements AIProvider {
     const response = await this.client.responses.parse({
       model: this.model,
       reasoning: { effort: "low" },
+      max_output_tokens: CHAT_ANSWER_MAX_OUTPUT_TOKENS,
       input: [
         {
           role: "system",

@@ -171,3 +171,19 @@ export function requireMasterKey(env: SecretEnv = process.env): Bytes {
 export function requireFingerprintPepper(env: SecretEnv = process.env): Bytes {
   return decodeMasterKey(env.BYOK_FINGERPRINT_PEPPER, "BYOK_FINGERPRINT_PEPPER");
 }
+
+/**
+ * The same check for the rate-limit pepper — the **third** independent secret
+ * (`ADR-070`, `BYOK-SCHEMA-011`).
+ *
+ * It is never `BYOK_MASTER_KEY` and never `BYOK_FINGERPRINT_PEPPER`, and the
+ * reason is sharper here than for the other pair: this pepper is touched on
+ * **every** validation attempt, including the failed and throttled ones an
+ * attacker generates. It is the most widely handled of the three, so coupling it
+ * to the ability to decrypt credentials would be the worst pairing available.
+ *
+ * Three secrets, three capabilities, and no single compromise that yields two.
+ */
+export function requireRateLimitPepper(env: SecretEnv = process.env): Bytes {
+  return decodeMasterKey(env.BYOK_RATE_LIMIT_PEPPER, "BYOK_RATE_LIMIT_PEPPER");
+}

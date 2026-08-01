@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -43,6 +43,31 @@ function migrationSource(): string {
  * `constraint`. Parsing rather than listing is the whole point — a hand-written
  * list here would drift from the migration exactly as the types file might.
  */
+/**
+ * Columns added to a table by a **later** migration.
+ *
+ * The first version of this file parsed only `202608010065`'s `create table`,
+ * which was correct until `202608010067` added `ip_hash` by `alter table` — at
+ * which point the types file grew a column the parser could not see and this
+ * suite failed while nothing was wrong. Anchoring a schema check to one
+ * migration is the same mistake the EGC pin made with a moving bound: the
+ * schema is the **chain**, not one file in it.
+ */
+function addedColumns(table: string): string[] {
+  const directory = path.resolve(process.cwd(), "supabase/migrations");
+  const added: string[] = [];
+  for (const file of readdirSync(directory).sort()) {
+    if (!file.endsWith(".sql")) continue;
+    const source = readFileSync(path.join(directory, file), "utf8").replace(/\r\n/g, "\n");
+    const pattern = new RegExp(
+      `alter table\\s+public\\.${table}\\s+add column\\s+(?:if not exists\\s+)?([a-z_]+)`,
+      "g",
+    );
+    for (const match of source.matchAll(pattern)) added.push(match[1]);
+  }
+  return added;
+}
+
 function migrationColumns(table: string): string[] {
   const source = migrationSource();
   const start = source.indexOf(`create table public.${table} (`);
@@ -94,6 +119,7 @@ const CREDENTIAL_ROW = {
 const ATTEMPT_ROW = {
   attempted_at: "",
   id: "",
+  ip_hash: null,
   outcome: "",
   user_id: "",
 } satisfies Tables["credential_validation_attempts"]["Row"];
@@ -106,9 +132,13 @@ describe("A8: the migration and the generated types describe the same tables", (
   });
 
   it("credential_validation_attempts columns match, in both directions", () => {
-    expect(migrationColumns("credential_validation_attempts").sort()).toEqual(
-      Object.keys(ATTEMPT_ROW).sort(),
-    );
+    // create-table columns PLUS every column a later migration added.
+    expect(
+      [
+        ...migrationColumns("credential_validation_attempts"),
+        ...addedColumns("credential_validation_attempts"),
+      ].sort(),
+    ).toEqual(Object.keys(ATTEMPT_ROW).sort());
   });
 
   it("the parse is not vacuous", () => {
@@ -116,6 +146,7 @@ describe("A8: the migration and the generated types describe the same tables", (
     // stops a regex that silently stopped matching from reporting agreement.
     expect(migrationColumns("user_ai_credentials")).toHaveLength(11);
     expect(migrationColumns("credential_validation_attempts")).toHaveLength(4);
+    expect(addedColumns("credential_validation_attempts")).toEqual(["ip_hash"]);
     expect(migrationColumns("user_ai_credentials")).toContain("ciphertext");
     expect(migrationColumns("credential_validation_attempts")).toContain("outcome");
   });
@@ -132,7 +163,7 @@ describe("A8: the migration and the generated types describe the same tables", (
   });
 
   it("BYOK-SCHEMA-007: the attempts table stores no fingerprint and no key material", () => {
-    const columns = migrationColumns("credential_validation_attempts");
+    const columns = [...migrationColumns("credential_validation_attempts"), ...addedColumns("credential_validation_attempts")];
     for (const forbidden of ["fingerprint", "ciphertext", "iv", "key_version", "provider"]) {
       expect(columns).not.toContain(forbidden);
     }

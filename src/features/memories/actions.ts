@@ -109,6 +109,16 @@ async function embedMemory(
   try {
     const { getAIProvider } = await import("@/lib/ai");
     const { recordAIUsage } = await import("@/lib/ai/usage");
+    const { openAiGate } = await import("@/lib/byok/gate");
+
+    // BYOK gate. Embedding is already best-effort here — the memory is saved
+    // either way and an embedding failure must never destroy it — so a missing
+    // credential degrades exactly like a provider outage: no embedding, no
+    // error, no provider call. Returning early rather than throwing keeps that
+    // contract, and **no project key is consulted**, because none exists.
+    const gate = await openAiGate(supabase, userId);
+    if (!gate.ok) return undefined;
+
     const preferencesResult = await supabase
       .from("agent_preferences")
       .select("embedding_model")
@@ -116,6 +126,7 @@ async function embedMemory(
       .maybeSingle();
     const preferences = requireSupabaseData(preferencesResult, "load embedding preference");
     const result = await getAIProvider({
+      credential: gate.credential.secret,
       embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
     }).embedText(content);
     await recordAIUsage(supabase, {

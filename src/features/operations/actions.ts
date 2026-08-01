@@ -158,17 +158,30 @@ export async function createRecord(
   } else {
     const { getAIProvider } = await import("@/lib/ai");
     const { recordAIUsage } = await import("@/lib/ai/usage");
+    const { openAiGate } = await import("@/lib/byok/gate");
     let embedding: number[] | null = null;
     let embeddingModel: string | null = null;
-    try {
-      const preferencesResult = await supabase.from("agent_preferences").select("embedding_model").eq("user_id", user.id).maybeSingle();
-      const preferences = requireSupabaseData(preferencesResult, "load embedding preference");
-      const result = await getAIProvider({ embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small" }).embedText(parsed.data.name);
-      embedding = result.embedding;
-      embeddingModel = result.model;
-      await recordAIUsage(supabase, { operation: "semantic_search", model: result.model, userId: user.id, usage: result, sourceType: "memory" });
-    } catch (embeddingError) {
-      console.error("Memory embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
+
+    // BYOK gate, **outside** the try. This embedding is already best-effort —
+    // the record is created either way — so a missing credential degrades like a
+    // provider outage: no embedding, no error, and no provider call.
+    //
+    // Hoisted rather than thrown from inside the block, because "the user has
+    // not configured a key" is not an embedding failure and must not be logged
+    // as one. A gated user is a normal user; only a real failure reaches the
+    // catch below.
+    const gate = await openAiGate(supabase, user.id);
+    if (gate.ok) {
+      try {
+        const preferencesResult = await supabase.from("agent_preferences").select("embedding_model").eq("user_id", user.id).maybeSingle();
+        const preferences = requireSupabaseData(preferencesResult, "load embedding preference");
+        const result = await getAIProvider({ credential: gate.credential.secret, embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small" }).embedText(parsed.data.name);
+        embedding = result.embedding;
+        embeddingModel = result.model;
+        await recordAIUsage(supabase, { operation: "semantic_search", model: result.model, userId: user.id, usage: result, sourceType: "memory" });
+      } catch (embeddingError) {
+        console.error("Memory embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
+      }
     }
     ({ error } = await supabase.from("memories").insert({
       user_id: user.id,

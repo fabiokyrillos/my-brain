@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { getByokCopy } from "@/features/byok/copy";
+import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -128,9 +130,21 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   if (userMessageError) return { status: "error", message: copy.questionNotSaved };
 
   try {
+    // BYOK gate, before any preference read and before any provider call. A
+    // gated user costs nothing and reaches no network; the project key is not
+    // consulted because no code path can consult one any more.
+    const gate = await openAiGate(supabase, user.id);
+    if (!gate.ok) {
+      return {
+        status: "error",
+        message: getByokCopy(formData.get("locale")).messages[gateMessageKey(gate.reason)],
+      };
+    }
+
     const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
     const preferences = requireSupabaseData(preferencesResult, "load chat preferences");
     const provider = getAIProvider({
+      credential: gate.credential.secret,
       model: preferences?.chat_model ?? "gpt-5.6-terra",
       embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
     });

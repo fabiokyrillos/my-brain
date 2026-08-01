@@ -273,17 +273,36 @@ describe("task 1.8: the chain scan finds no key material anywhere", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("no migration or function body mentions a secret name at all", () => {
+  it("no migration READS a secret, though one may explain why it does not", () => {
     // BYOK-MASTER-004: the master key must never enter the database — not as a
-    // column, not in a Vault secret, not in a function body, not in a comment.
-    // Migrations are scanned **without** comment stripping, deliberately: a
-    // commented-out key in a migration is still a key in the repository.
+    // column, not in a Vault secret, not in a function body.
+    //
+    // The scan is over **executable** SQL, not over the whole file. The first
+    // version scanned everything and reddened on `202608010067`, whose header
+    // explains at length that the rate-limit pepper lives in the application
+    // environment and never here. That is the third time a guard in this
+    // initiative has forbidden documenting the thing it guards, and the fix is
+    // the same: strip `--` lines and `comment on … is '…'` bodies, then scan.
+    //
+    // What survives the strip is what matters — a migration that actually
+    // referenced one of these names in a function body or a `current_setting`
+    // call would be reading a secret into the database, which is the defect.
+    const executable = (source: string) =>
+      source.replace(/^\s*--[^\n]*$/gm, "").replace(/comment on [\s\S]*?;\n/g, "");
+
     const offenders = ALL_FILES.filter(
       (file) =>
         file.startsWith("supabase/migrations/") &&
-        /BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER|BYOK_RATE_LIMIT_PEPPER/.test(read(file)),
+        /BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER|BYOK_RATE_LIMIT_PEPPER/.test(
+          executable(read(file)),
+        ),
     );
     expect(offenders).toEqual([]);
+
+    // Non-vacuity: the stripper must not be emptying the files it scans.
+    const throttle = executable(read("supabase/migrations/202608010067_byok_validation_throttle.sql"));
+    expect(throttle).toContain("add column ip_hash");
+    expect(throttle.length).toBeGreaterThan(500);
   });
 
   it("the scan actually covers the tree it claims to", () => {
