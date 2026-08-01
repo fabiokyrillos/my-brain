@@ -349,14 +349,31 @@ select is(
 -- Section 5 -- the credential-aware drain (gate D4) (8)
 -- ---------------------------------------------------------------------------
 
--- `auth.role()` reads the **JWT claim**, not the PostgreSQL role — Supabase's
--- helper coalesces `request.jwt.claim.role` and `request.jwt.claims ->> 'role'`.
--- `claim_next_entry_interpretation_job` and `mark_entry_awaiting_ai_configuration`
--- both gate on it, so `set local role service_role` alone is not enough: without
--- the claim they raise `42501` and every assertion below fails for a reason that
--- has nothing to do with credentials. `entry_processing_jobs.sql:309` sets it the
--- same way.
-set local role service_role;
+-- THE CLAIM, NOT THE ROLE -- and the role reset, not a role switch.
+--
+-- Two facts that took two attempts to get right, written down so the next suite
+-- does not rediscover them:
+--
+--   1. `auth.role()` reads the **JWT claim**, never the PostgreSQL role:
+--      Supabase's helper coalesces `request.jwt.claim.role` and
+--      `request.jwt.claims ->> 'role'`. `claim_next_entry_interpretation_job`
+--      and `mark_entry_awaiting_ai_configuration` both gate on it, so without
+--      the claim they raise `42501` and every assertion below fails for a
+--      reason that has nothing to do with credentials.
+--
+--   2. `set local role service_role` is **worse than useless** here. That role
+--      holds EXECUTE on the job RPCs and no table-level SELECT on `public.jobs`
+--      at all -- the posture `phase_2f_task_write_grants.sql` exists to pin --
+--      so the direct inspection queries below raise `permission denied for
+--      table jobs`. The first draft of this file did exactly that and aborted
+--      the transaction at assertion 31.
+--
+-- So: `reset role` back to the session superuser, and set the claim. That is
+-- the pattern `entry_processing_jobs.sql:309` already uses, and it is the
+-- correct one -- the grant posture is asserted directly in section 2, by
+-- `has_function_privilege`, which is where a privilege claim belongs. These
+-- sections are about behaviour.
+reset role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select set_config('request.jwt.claim.role', 'service_role', true);
 
