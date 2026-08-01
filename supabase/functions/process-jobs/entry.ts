@@ -624,16 +624,44 @@ export async function processEntryJob(
     const terminal = failedJob?.terminal ?? isTerminalJobFailureCode(code);
     const configuration = CONFIGURATION_FAILURE_CODES.has(code);
 
-    try {
-      if (configuration) {
-        // `BYOK-CAPTURE-002` again, on the asynchronous side: an entry whose job
-        // died because its owner has no usable credential is *awaiting
-        // configuration*, not *unorganizable*. Marking it an error would offer
-        // the user a retry that cannot succeed and hide the one action that can.
-        await service.rpc("mark_entry_awaiting_ai_configuration", {
+    // `BYOK-CAPTURE-002` again, on the asynchronous side: an entry whose job
+    // died because its owner has no usable credential is *awaiting
+    // configuration*, not *unorganizable*. Marking it an error would offer the
+    // user a retry that cannot succeed and hide the one action that can.
+    //
+    // But the RPC deliberately refuses an entry that already carries an
+    // interpretation, and that case is real rather than hypothetical: a
+    // **reprocessing** job whose credential vanished mid-flight belongs to an
+    // entry the user already has an understanding of, and erasing that would be
+    // a far worse outcome than an unhelpful error message.
+    //
+    // So the mark is attempted and its answer is honoured. `false` means "this
+    // entry is not awaiting anything", and the ordinary failure path runs —
+    // which for a reprocessing job is what releases the reprocessing lease and
+    // restores the prior state. Without this fall-through, such an entry would
+    // sit in `reprocessing` forever, showing "organizing" with nothing running.
+    let returnedToAwaiting = false;
+    if (configuration) {
+      try {
+        const marked = await service.rpc("mark_entry_awaiting_ai_configuration", {
           p_entry_id: entryId,
           p_service_user_id: job.user_id,
         });
+        returnedToAwaiting = marked.data === true;
+        if (marked.error) console.error("Entry awaiting-state update failed", { jobId: job.id });
+      } catch {
+        // A raised RPC — `P0002` for a row this owner does not have — leaves
+        // `returnedToAwaiting` false, so the ordinary failure path below still
+        // runs. Failing to reach the honest state must not also mean failing to
+        // record anything at all.
+        console.error("Entry awaiting-state update raised", { jobId: job.id });
+      }
+    }
+
+    try {
+      if (returnedToAwaiting) {
+        // Nothing further: the entry is in the honest state and the job is
+        // terminal.
       } else if (mode === "initial") {
         await service.rpc("fail_entry_interpretation", {
           p_entry_id: entryId,

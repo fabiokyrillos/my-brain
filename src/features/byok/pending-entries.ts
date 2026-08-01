@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { createClient } from "@/lib/supabase/server";
-import { requireSupabaseData } from "@/lib/supabase/result";
+import { requireSupabaseSuccess } from "@/lib/supabase/result";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -23,9 +23,11 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
  * to count them would pull a user's raw captured text into a page that has no
  * reason to hold it.
  *
- * The ceiling exists so the label stays honest without an unbounded count over a
- * growing table: past it the copy says "N+", which is true, cheap, and does not
- * pretend to a precision nobody acts on.
+ * The ceiling bounds the **label**, not the query. `count: "exact"` computes the
+ * real total regardless, and PostgREST does not stop early for a `limit` — so
+ * this is not a performance guard and is not described as one. What it does is
+ * keep the surface from rendering a four-digit number nobody acts on: past the
+ * ceiling the copy says "N+", which is true and enough to decide with.
  */
 export const PENDING_ENTRY_COUNT_CEILING = 500;
 
@@ -59,10 +61,11 @@ export async function loadPendingEntryCount(
     .from("entries")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .eq("status", "awaiting_ai_configuration")
-    .limit(PENDING_ENTRY_COUNT_CEILING);
+    .eq("status", "awaiting_ai_configuration");
 
-  requireSupabaseData(result, "count entries awaiting AI configuration");
+  // `requireSupabaseSuccess`, not `requireSupabaseData`: a `head` request returns
+  // no rows by definition, so asserting on `data` would be asserting on `null`.
+  requireSupabaseSuccess(result, "count entries awaiting AI configuration");
   const count = result.count ?? 0;
 
   return {

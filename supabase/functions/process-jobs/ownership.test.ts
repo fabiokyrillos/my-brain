@@ -35,6 +35,11 @@ type Fixture = {
   credentialRows?: unknown[];
   entryOwner?: string;
   attachmentOwner?: string;
+  /**
+   * `mark_entry_awaiting_ai_configuration` answers `false` — the shape the real
+   * RPC returns for an entry that already carries an interpretation.
+   */
+  markRefuses?: boolean;
 };
 
 function workerDouble(fixture: Fixture) {
@@ -97,7 +102,7 @@ function workerDouble(fixture: Fixture) {
       if (name === "fail_job_terminal") return Promise.resolve({ data: { status: "exhausted" }, error: null });
       if (name === "fail_job") return Promise.resolve({ data: { status: "failed" }, error: null });
       if (name === "mark_entry_awaiting_ai_configuration") {
-        return Promise.resolve({ data: true, error: null });
+        return Promise.resolve({ data: !fixture.markRefuses, error: null });
       }
       return Promise.resolve({ data: null, error: null });
     },
@@ -227,6 +232,64 @@ Deno.test("the entry is loaded by both id and the job's owner", async () => {
     assert(entryRead, "the handler must reload the entry");
     assertStrictEquals(entryRead.filters.id, ENTRY);
     assertStrictEquals(entryRead.filters.user_id, OWNER);
+  } finally {
+    provider.restore();
+  }
+});
+
+Deno.test("a reprocessing job on an interpreted entry falls back to the ordinary failure path", async () => {
+  // The defect this pins, found in BYOK.4's own adversarial review:
+  // `mark_entry_awaiting_ai_configuration` **refuses** an entry that already
+  // carries an interpretation, because erasing an understanding the user already
+  // has would be worse than an unhelpful message. The first draft treated the
+  // mark as unconditional, so such an entry sat in `reprocessing` forever —
+  // showing "organizing" with nothing running and no lease left to expire.
+  //
+  // The answer is honoured now: `false` means the ordinary failure path runs,
+  // and for a reprocessing job that is what releases the lease.
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({ credentialRows: [], markRefuses: true });
+    await processEntryJob(
+      service,
+      {
+        id: "job-3",
+        user_id: OWNER,
+        attempts: 1,
+        payload: { entry_id: ENTRY, mode: "reprocess", operation_key: "op-0000001" },
+      },
+      "worker-3",
+    );
+
+    assertEquals(provider.attempts, []);
+    const marked = rpcCalls.find((call) => call.name === "mark_entry_awaiting_ai_configuration");
+    assert(marked, "the mark is still attempted");
+
+    const released = rpcCalls.find((call) => call.name === "fail_entry_reprocessing");
+    assert(released, "a refused mark must fall through to the reprocessing failure path");
+    assertStrictEquals(released.args.p_service_user_id, OWNER);
+    assertStrictEquals(released.args.p_operation_key, "op-0000001");
+  } finally {
+    provider.restore();
+  }
+});
+
+Deno.test("an accepted mark does not also run the error path", async () => {
+  // The other direction, so the fall-through above cannot degenerate into
+  // "always do both" — which would put the entry into an error state right after
+  // putting it into the honest one.
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({ credentialRows: [] });
+    await processEntryJob(
+      service,
+      { id: "job-1", user_id: OWNER, attempts: 1, payload: { entry_id: ENTRY, mode: "initial" } },
+      "worker-1",
+    );
+
+    assert(rpcCalls.some((call) => call.name === "mark_entry_awaiting_ai_configuration"));
+    assert(!rpcCalls.some((call) => call.name === "fail_entry_interpretation"));
+    assert(!rpcCalls.some((call) => call.name === "fail_entry_reprocessing"));
   } finally {
     provider.restore();
   }

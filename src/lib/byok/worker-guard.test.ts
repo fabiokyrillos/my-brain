@@ -140,6 +140,45 @@ describe("BYOK-GUARD-003: every worker provider call is behind one resolution", 
   });
 });
 
+describe("BYOK-MASTER-005: the worker refuses to serve without its secrets", () => {
+  const entrypoint = "supabase/functions/process-jobs/index.ts";
+
+  it("validates both BYOK secrets once, at module scope", () => {
+    const source = code(read(entrypoint));
+
+    // At module scope, not per request: a check inside the handler would let the
+    // function boot, accept traffic, and fail every job individually with an
+    // error that reads like a credential problem rather than a deployment one.
+    const handlerAt = source.indexOf("Deno.serve(");
+    const masterAt = source.indexOf("requireMasterKey()");
+    const pepperAt = source.indexOf("requireFingerprintPepper()");
+
+    expect(masterAt, "the entrypoint must require the master key").toBeGreaterThan(-1);
+    expect(pepperAt, "the entrypoint must require the pepper").toBeGreaterThan(-1);
+    expect(masterAt, "the master-key check must run before the server starts").toBeLessThan(handlerAt);
+    expect(pepperAt, "the pepper check must run before the server starts").toBeLessThan(handlerAt);
+  });
+
+  it("refuses every request rather than degrading, and echoes no value", () => {
+    const source = code(read(entrypoint));
+
+    // Fail-closed: a 503 with a declared code, before anything else in the
+    // handler — including before the request is authenticated, because an
+    // unconfigured worker has nothing useful to say to anybody.
+    expect(source).toMatch(/workerConfigurationError/);
+    expect(source).toMatch(/status: 503/);
+    expect(source).toMatch(/"worker_not_configured"/);
+
+    // The catch must be total: `decodeMasterKey`'s message names the variable,
+    // which is safe, but nothing may forward an exception whose contents are not
+    // controlled here.
+    expect(source).not.toMatch(/catch \(\w+\)[\s\S]{0,200}return "worker_not_configured"/);
+
+    // And the deleted branch has not come back under a new name.
+    expect(source).not.toMatch(/missing_openai_key/);
+  });
+});
+
 describe("BYOK-JOBS-008: the heartbeat performs no AI", () => {
   const heartbeat = "supabase/functions/heartbeat/index.ts";
 
