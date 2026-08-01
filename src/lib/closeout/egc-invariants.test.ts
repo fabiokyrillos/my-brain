@@ -29,8 +29,10 @@ const REPO = resolve(__dirname, "../../..");
  * revision of this comment instructed.** It read: *"Entity Graph Completion must
  * not move it. **BYOK will** — its plan budgets four migrations — so when that
  * initiative starts, this pin is updated by the slice that adds the first one,
- * deliberately and visibly, rather than deleted."* This is that slice, and
- * `202608010065` is that migration: the BYOK credential store.
+ * deliberately and visibly, rather than deleted."* BYOK.1 was that slice and
+ * `202608010065` its migration, the credential store; BYOK.2's resolvers
+ * (`202608010066`) moved the pin again under the same rule, in the same commit
+ * that added them.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -38,7 +40,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608010065";
+const AUTHORIZED_MIGRATION_HEAD = "202608010066";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
@@ -48,6 +50,21 @@ const AUTHORIZED_MIGRATION_HEAD = "202608010065";
  * the future.
  */
 const EGC_FINAL_HEAD = "202607310064";
+
+/**
+ * The first migration added *after* Entity Graph Completion closed.
+ *
+ * Also historical, and it exists because the check below needs a fixed upper
+ * bound. The previous revision compared against `AUTHORIZED_MIGRATION_HEAD`,
+ * which **moves** — so the moment BYOK.2 added a second migration, BYOK.1's own
+ * `202608010065` fell inside the window and the assertion failed while nothing
+ * was wrong. A boundary that drifts cannot bound anything.
+ *
+ * With both ends pinned the check is non-vacuous in the way that matters: a
+ * migration back-dated into the gap between EGC's close and this one — which is
+ * exactly how a retroactively-added EGC migration would have to appear — fails.
+ */
+const FIRST_POST_EGC_MIGRATION = "202608010065";
 
 function migrationVersions(): string[] {
   return readdirSync(join(REPO, "supabase/migrations"))
@@ -76,19 +93,27 @@ describe("EGC-INVARIANT-001: Entity Graph Completion adds no migration", () => {
     // change**. Once the head is allowed to move for a later initiative, that
     // claim needs its own check or it quietly becomes unfalsifiable.
     //
-    // Two facts, together sufficient: the version EGC ended on is still in the
-    // chain, and nothing was inserted between it and whatever came next. A
-    // migration added by EGC would have to sit in that gap — its slices ran
-    // entirely between `202607310064` and the first BYOK migration.
+    // Three facts, together sufficient: both boundary versions are still in the
+    // chain, and nothing sits strictly between them. A migration added by EGC
+    // would have to occupy that gap — its slices ran entirely between the two.
+    //
+    // Both bounds are **historical constants**. An earlier revision used the
+    // moving pin as the upper bound, which broke the moment a second BYOK
+    // migration arrived: BYOK.1's own migration fell inside the window and the
+    // assertion failed while nothing was wrong.
     const versions = migrationVersions();
 
     expect(versions, "EGC's final head must still be in the chain").toContain(EGC_FINAL_HEAD);
+    expect(versions, "the first post-EGC migration must still be in the chain").toContain(
+      FIRST_POST_EGC_MIGRATION,
+    );
 
-    const after = versions.filter((version) => version > EGC_FINAL_HEAD);
     expect(
-      after.filter((version) => version < AUTHORIZED_MIGRATION_HEAD),
-      "a migration sits between Entity Graph Completion's close and the next "
-        + "authorized migration, so EGC's zero-migration claim is no longer true",
+      versions.filter(
+        (version) => version > EGC_FINAL_HEAD && version < FIRST_POST_EGC_MIGRATION,
+      ),
+      "a migration sits between Entity Graph Completion's close and the first "
+        + "migration added after it, so EGC's zero-migration claim is no longer true",
     ).toEqual([]);
   });
 
