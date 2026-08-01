@@ -186,3 +186,59 @@ required ordering stated there. When the first BYOK preview deployment or BYOK.5
 cutover becomes the next action, the implementer **stops** and states §3's commands
 verbatim for the owner to run — it does not reach for hosting or Supabase administrative
 credentials.
+
+---
+
+## 8. A third secret — `BYOK_RATE_LIMIT_PEPPER` (2026-08-01)
+
+`ADR-070` adds `credential_validation_attempts.ip_hash`, an `HMAC-SHA256` over a
+canonicalized IP. Its key is a **third independent secret**, and §1's "two secrets per
+environment, four environments, eight distinct values" becomes **three secrets per
+environment, four environments, twelve distinct values**. §1's table is otherwise unchanged
+and this row is added to it:
+
+| Variable | Purpose | Shape |
+| --- | --- | --- |
+| `BYOK_RATE_LIMIT_PEPPER` | HMAC-SHA256 key for the validation-throttle IP hash | 32 random bytes, base64 |
+
+### Why a third rather than reusing either existing one
+
+The same argument §1 already makes for keeping the fingerprint pepper separate from the
+master key, applied once more — and it is **strongest** here. The rate-limit pepper is the
+most widely handled of the three: it is touched on every validation attempt, including
+failed and throttled ones, which is exactly the traffic an attacker generates. Coupling
+that to the ability to decrypt credentials would be the worst pairing available.
+
+Three secrets, three capabilities, and no single compromise that yields two.
+
+### Executed provisioning — `local` and `test`
+
+Same procedure, same evidence rule, same five pre-conditions re-verified before writing
+(both files git-ignored, neither tracked, no script printing the name — at generation time
+it appeared only in the three governing documents that name it and never value it — no
+shell tracing, no persistent history). Generation, writing and verification again happened
+**inside one Node process**, so no value crossed a command line.
+
+**The generator refuses to overwrite an existing value.** Rotating `BYOK_MASTER_KEY` by
+accident would invalidate every ciphertext already sealed under it, so the script adds the
+new name and leaves the other two alone.
+
+| Check | Result |
+| --- | --- |
+| Present | 6/6 (three secrets × two environments) |
+| Valid canonical base64 | 6/6 |
+| Decoded length 32 bytes | 6/6 |
+| Pairwise distinct (`timingSafeEqual`, decoded bytes) | **15/15 pairs, 0 collisions** |
+| Tracked-repository scan | 1007 files byte-exact, 29 needle forms, **0 matches** |
+
+Nothing beyond this table is recorded: no value, no prefix, no hash.
+
+### Not provisioned
+
+`preview` and `production`, for this secret as for the other two — deferred to the point of
+use by Amendment A-1.2, with the same required ordering. The owner's `ADR-070` decision
+states it explicitly: preview and production values before deployment to those environments.
+
+`.env.example` gains `BYOK_RATE_LIMIT_PEPPER` with an **empty** value, alongside
+`BYOK_VALIDATION_OPENAI_API_KEY` — also empty, and also never to be filled in a committed
+file.
