@@ -12,8 +12,8 @@ Last updated: **2026-08-01**, at the EGC.3 boundary.
 
 | # | Initiative | State |
 | --- | --- | --- |
-| 1 | **Entity Graph Completion** | **COMPLETE** (EGC.1, EGC.2 merged green; EGC.3 in PR #55) |
-| 2 | **BYOK** | **NOT STARTED** — pre-code gates partially blocked, see §4 |
+| 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
+| 2 | **BYOK** | **PRE-CODE GATES PARTLY DONE.** G-0.1 and G-0.2 executed and committed on `codex/byok-precode`; G-0.3 procedure written, provisioning blocked; G-0.4 blocked. See §4 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -37,7 +37,7 @@ Last updated: **2026-08-01**, at the EGC.3 boundary.
 | --- | --- | --- | --- | --- |
 | EGC.1 | #53 | `840da99` | `30672108083` | green, all three jobs |
 | EGC.2 | #54 | `8305424` | `30677225551` | green, all three jobs |
-| EGC.3 | #55 | pending | pending | pending |
+| EGC.3 | #55 | `961feeb` | `30679796049` | green, all three jobs |
 
 ---
 
@@ -73,9 +73,9 @@ artifact is in the repository. Their status:
 
 | Gate | Can this loop satisfy it? |
 | --- | --- |
-| **G-0.1** — provider call-site census, re-measured against `main` | **Yes.** Pure measurement |
-| **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **Yes.** Executable locally and in CI |
-| **G-0.3** — master-key procedure **and four keys provisioned** (production, preview, test, local) | **Partly.** The written procedure and the `local`/`test` keys, yes. **Production and preview require the hosting platform's secret store**, which is an administrative control this loop cannot reach without extracting or exposing credentials |
+| **G-0.1** — provider call-site census, re-measured against `main` | **DONE.** `docs/reports/BYOK_G01_PROVIDER_CENSUS.md`, measured at `961feeb` |
+| **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **DONE and executed.** Node 22.18.0 ↔ Deno 2.9.4, both directions, 7/7. `npm run byok:interop`; evidence in `docs/reports/BYOK_G02_CRYPTO_INTEROP_EVIDENCE.md` |
+| **G-0.3** — master-key procedure **and four keys provisioned** | **Procedure DONE** (`docs/reports/BYOK_G03_MASTER_KEY_PROCEDURE.md`), **provisioning is an owner action.** Production and preview need the hosting platform's secret store and the Supabase Edge Function secrets — an administrative control this loop cannot reach without extracting or exposing credentials. Local and test are one documented command the developer runs; the loop deliberately did **not** generate them, because writing live key material into an environment it also commits from is the one thing this gate exists to prevent |
 | **G-0.4** — a dedicated low-limit OpenAI key for the validation lane, with a spend limit | **No.** Requires OpenAI dashboard access **and a spend decision** — a paid external vendor commitment |
 | **G-0.5** — hosted signup closed | **Already satisfied and verified** |
 
