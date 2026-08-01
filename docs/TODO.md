@@ -14,6 +14,12 @@ Items are ordered by execution priority. Completed work moves to `CHANGELOG.md`;
   - The **UX-22 localization sweep stays deferred** to localization maintenance, unchanged — the guard stops the count growing, it does not do the sweep.
   - The **CRLF test fragility** Slice H diagnosed stays deferred to repository maintenance: `sql-reachability.test.ts` loses 2 of 46 assertions on a Windows checkout and is green in CI. EGC's own traceability generator hit the identical fragility and was fixed, because that one is this initiative's instrument.
 - [ ] **BYOK — design APPROVED, implementation not started.** `docs/BYOK_PRD.md` + `..._IMPLEMENTATION_PLAN.md`, on `docs/reports/BYOK_SECURITY_DEFINITION.md`. Runs **after** Entity Graph Completion. Four migrations budgeted; none written.
+  - [x] **Pre-code gates G-0.1, G-0.2, G-0.3 (procedure + `local`/`test`), G-0.5** — satisfied and evidenced.
+  - [ ] **G-0.4 — dedicated low-limit OpenAI validation key.** **OWNER ACTION.** Blocks BYOK.3's acceptance and merge, not BYOK.1 or BYOK.2 (`ADR-069`). Constraints in Amendment A-1.3: dedicated project and key, restricted permissions, USD 2 monthly budget **alert** (a soft alert, not a hard cap), lowest practical rate limits, opt-in lane only, `maxRetries: 0`, short timeout, hard daily attempt ceiling, revoked after acceptance.
+  - [ ] **G-0.3 `preview` / `production` secrets.** **OWNER ACTION, deferred to point of use.** Preview pair before the first BYOK preview deployment; production pair before BYOK.5's cutover. Both runtimes — hosting platform *and* Supabase Edge Function secrets — per environment, all values distinct.
+  - [ ] **BYOK.1** — credential store and crypto core. Authorized.
+  - [ ] **BYOK.2** — resolvers. Authorized.
+  - [ ] **BYOK.3–BYOK.6** — unauthorized until G-0.4 is provisioned.
 - [ ] **Phase 2G — UNAUTHORIZED and unstarted.** `docs/reports/PHASE_2G_DEFINITION.md` is a definition study only: no PRD, no plan, no accepted ADR, no declared requirement, no code. Its position in the roadmap is **after** BYOK implementation (ADR-068).
 - [ ] **Public signup — BLOCKED.** Gated on BYOK implementation plus signup hardening. Three prerequisites do not exist at all: **account deletion**, **admin suspension**, **terms and privacy policy**.
 

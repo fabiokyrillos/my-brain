@@ -87,12 +87,26 @@ describe("Deno worker copies stay identical to their Node source", () => {
     // (one proven implementation, reused) rather than the copy it forbids. It
     // is therefore a genuinely shared module, and the test below keeps it
     // importable from Node.
+    //
+    // `byok-envelope.ts` is a hand copy, but it cannot be a `pair` above: it is
+    // the Deno merge of *two* Node modules — `src/lib/byok/envelope.ts` and
+    // `src/lib/byok/crypto.ts`, whose `import "server-only"` throws under Deno —
+    // and the body-for-body comparison this file performs is 1:1. Its parity is
+    // held the way `extraction-validation.ts`'s is: by a dedicated test,
+    // `src/lib/byok/parity.test.ts`, which digests the format constants and the
+    // AAD composition out of both sources, plus the executed cross-runtime
+    // interop proof in `scripts/byok-crypto-interop.mjs`.
+    //
+    // It is listed here rather than left out because this inventory is closed in
+    // both directions on purpose, and it caught exactly what it exists to catch:
+    // the file landed in `c5eedea` unregistered, and the first CI run reddened.
     const denoOnly = [
       "result.ts",
       "extraction-validation.ts",
       "extraction-validation.test.ts",
       "extraction-normalization.ts",
       "extraction-normalization.test.ts",
+      "byok-envelope.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

@@ -2,7 +2,9 @@
 
 **Revision 1** · 2026-07-31 · Governs [`BYOK_PRD.md`](./BYOK_PRD.md) Revision 1.
 
-**Status — AWAITING OWNER APPROVAL. No implementation may begin.**
+**Status — APPROVED 2026-08-01. BYOK.1 and BYOK.2 are authorized; BYOK.3 onward are not.**
+Revision 1's body is unchanged; §0 carries an append-only **Amendment A-1** recording the
+owner's gate decomposition (`ADR-069`).
 
 Six slices in order. **Separate branches, separate commits, separate PRs from Entity Graph
 Completion — no shared branch at any point.** Each slice ends in a merged PR with a green
@@ -22,6 +24,79 @@ merge-SHA CI run on all three jobs.
 | **G-0.3 — master-key generation and distribution procedure** | The written procedure, and four distinct keys provisioned (production, preview, test, local), none in the repository | BYOK-MASTER-001…005. Code that reads a key nobody has provisioned cannot be tested honestly |
 | **G-0.4 — validation-call cost control** | The dedicated low-limit OpenAI key for the opt-in validation lane, its spend limit, and where it is held | The one live provider call this initiative needs (`ADR-059`'s opt-in-lane precedent) |
 | **G-0.5 — hosted signup closed, verified** | A recorded re-read of the GoTrue settings endpoint showing `disable_signup: true` | Independent of BYOK, and a **hard gate** on this initiative starting. Building a credential system over an open signup is building on the hole |
+
+---
+
+### Amendment A-1 — owner-approved gate decomposition
+
+**Date: 2026-08-01. Status: accepted, owner decision. Append-only — the table above and
+the sentence "No slice may start until every artifact below is in the repository" are
+reproduced unchanged and are not rewritten.** Recorded as `ADR-069`.
+
+The original rule is written as a single absolute over all five gates and all six slices.
+Executing G-0.1, G-0.2 and G-0.3 showed that this is stronger than the property the rule
+protects: **G-0.4's artifact — a dedicated low-limit OpenAI key — is consumed by exactly
+one lane, BYOK.3's live credential validation.** Read absolutely, an artifact that only
+BYOK.3 can consume blocks BYOK.1's schema and BYOK.2's resolvers, which do not reach a
+provider at all.
+
+The owner therefore amends the rule to a **dependency-specific** one. This is an
+owner-authorized correction to an overly broad pre-code rule; it is **not** an implementer
+weakening a gate, and no gate is removed, deferred without a successor, or relaxed in the
+direction of shipping something unexercised.
+
+| Gate | What it gates, as amended |
+| --- | --- |
+| **G-0.1** | **All** BYOK implementation. Unchanged. |
+| **G-0.2** | **All** BYOK implementation. Unchanged. |
+| **G-0.3 — written procedure** | **BYOK.1.** The procedure must exist before code reads a key. |
+| **G-0.3 — local/test provisioning** | **Execution of crypto integration tests that require persistent environment secrets.** Tests that generate ephemeral keys are unaffected. |
+| **G-0.3 — preview/production provisioning** | **Deployment to those environments.** Not local implementation of BYOK.1 or BYOK.2. |
+| **G-0.4** | **BYOK.3's live credential-validation lane, and BYOK.3 closeout.** BYOK.3 may not be accepted or merged without it. |
+| **G-0.5** | **All** BYOK implementation. Unchanged, and already satisfied. |
+
+#### A-1.1 — Local and test secret provisioning (authorized)
+
+Four values — a `BYOK_MASTER_KEY` and a `BYOK_FINGERPRINT_PEPPER` for `local`, and the
+same pair for `test` — are authorized for generation by the implementer: cryptographically
+secure 32 random bytes, base64, **all four pairwise distinct**, written to `.env.local` and
+`.env.test.local` respectively. Preview and production values are **not** authorized here.
+
+The values are never displayed, committed, logged, printed to CI, or recorded as hashes or
+prefixes in any repository artifact. What may be recorded is only: presence, valid base64,
+decoded length of 32 bytes, and pairwise distinctness. Evidence:
+[`BYOK_G03_MASTER_KEY_PROCEDURE.md`](./reports/BYOK_G03_MASTER_KEY_PROCEDURE.md) §7.
+
+#### A-1.2 — Preview and production provisioning (deferred to point of use)
+
+Deferred to the point at which each environment is actually used, with a required ordering:
+
+1. preview secrets exist **before the first BYOK preview deployment**;
+2. production secrets exist **before BYOK.5's owner cutover or any production deployment
+   using per-user credentials**;
+3. **both** the Next.js runtime and the Supabase Edge Function runtime receive the same
+   environment-specific pair;
+4. preview and production values differ from each other and from local and test.
+
+When provisioning becomes the next required action, the implementer **stops** and states
+the exact owner-facing commands and verification steps. It does not attempt to reach
+hosting or Supabase administrative credentials.
+
+#### A-1.3 — G-0.4's validation lane (still required, not weakened)
+
+G-0.4 remains required before BYOK.3 can be accepted or merged. **The live validation lane
+may not ship marked "passed" while unexercised.** The key the owner will provision carries
+these constraints, which BYOK.3 must honour in code and record in its acceptance report:
+
+- a **dedicated OpenAI project**, not the owner's normal project, and a dedicated API key;
+- permissions restricted to only the endpoints and models validation requires;
+- a monthly project budget alert of **USD 2** — and the report must state plainly that an
+  OpenAI project budget is a **soft alert, not a hard spending cap**;
+- the lowest practical model rate limits;
+- used **only** in an opt-in test lane, never in normal product runtime;
+- `maxRetries: 0` and a short timeout;
+- a **hard application-side daily validation-attempt ceiling**;
+- revoked after the acceptance lane unless continuously needed.
 
 ---
 

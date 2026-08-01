@@ -3,6 +3,22 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK pre-code: the gates close, and §0's absolute rule becomes a dependency-specific one
+
+**No migration, no source change, no provider call.** Documentation, one ADR, and four secrets that exist only in two git-ignored files.
+
+**The gate rule was overbroad and the owner corrected it.** `BYOK_IMPLEMENTATION_PLAN.md` §0 said *"No slice may start until every artifact below is in the repository"* over all five gates and all six slices. Executing the gates showed the rule protects less than it blocks: **G-0.4's artifact — a dedicated low-limit OpenAI key — is consumed by exactly one lane**, BYOK.3's live credential validation, and read absolutely it also stops BYOK.1's tables and BYOK.2's resolvers, neither of which reaches a provider. The implementer had reached the same reading on 2026-07-31 and **refused to act on it**, because softening a governing document inside a branch is not an implementer's act. It is now the owner's: `ADR-069`, recorded as append-only **Amendment A-1**. §0's table and its sentence are reproduced byte-for-byte and are not rewritten.
+
+Each gate now binds to what depends on its artifact. G-0.1, G-0.2 and G-0.5 gate everything. G-0.3's **procedure** gates BYOK.1; its **local/test** values gate crypto integration tests needing persistent secrets; its **preview/production** values gate deployment to those environments. **G-0.4 gates BYOK.3's validation lane *and* BYOK.3's acceptance and merge** — the amendment adds that second half deliberately, so the lane can never ship marked "passed" while unexercised.
+
+**G-0.3's `local` and `test` values are provisioned.** Four values, `randomBytes(32)` base64, one `BYOK_MASTER_KEY` and one `BYOK_FINGERPRINT_PEPPER` per environment, in `.env.local` and `.env.test.local`. Five pre-conditions were proven **before** a byte was written — both files git-ignored by `.gitignore:37`, neither tracked, no repository script printing either variable, no shell tracing (`$-` free of `x` and `v`, `BASH_XTRACEFD` unset), and no persistent history (`HISTFILE` unset, non-interactive shell). Generation, writing and verification happened **inside one Node process**, so no value ever crossed a command line.
+
+What is recorded is only presence, base64 validity, decoded length and distinctness: 4/4 present, 4/4 canonical base64, 4/4 exactly 32 bytes, **6/6 pairs distinct** under `timingSafeEqual` over decoded bytes. A scanner then read **994 tracked files byte-exact** against 20 needles — each secret in base64, unpadded base64, base64url, hex and upper-hex — and found **0 matches**. No value, prefix, suffix or hash appears in any artifact, and the scanner is written to name a file and a variable on a hit, never the matched text.
+
+**`preview` and `production` are not provisioned, and that is the decision rather than a gap.** They are deferred to the point of use, with a required ordering: preview before the first BYOK preview deployment, production before BYOK.5's cutover, both runtimes receiving the same environment-specific pair, and all values distinct across environments. When either becomes the next action the implementer **stops** with the exact owner-facing commands instead of reaching for administrative credentials.
+
+**G-0.4's key acquires named constraints** that BYOK.3 must honour in code and state in its report — dedicated project and key, permissions restricted to the endpoints and models validation needs, a USD 2 monthly budget **alert documented as a soft alert and not a hard spending cap**, lowest practical rate limits, opt-in lane only, `maxRetries: 0`, a short timeout, a hard application-side daily attempt ceiling, and revocation after acceptance.
+
 ## 2026-08-01 — EGC.3: Entity Graph Completion closes
 
 **No migration, no grant, no policy, no RPC, no provider call, and no product-source change beyond one lint fix.** Parity stays `202607310064` — unchanged across the whole initiative. **53 requirements, 53 delivered, 0 deferred.**
