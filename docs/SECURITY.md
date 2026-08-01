@@ -246,3 +246,19 @@ A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro 
 **Nenhum controle de exclusão foi entregue (EGC-DEC-1),** e a razão é lida do catálogo em vez de escrita em prosa: `person_contexts` e `task_contexts` ainda têm chave estrangeira em cascata a partir de `contexts`, de modo que um botão de excluir destruiria associações silenciosamente. `people` e `projects` apenas fazem `SET NULL` a partir de `organizations` — não destruiriam nada, mas desvinculariam em silêncio, o que também é uma mudança que esta fatia não faz.
 
 **Uma correção de segurança de entrada.** `createOrganizationForSubject` executa duas escritas e não desfaz a primeira. O `subjectId` chegava a uma escrita sem validação de UUID, então uma requisição malformada deixava uma organização persistida que o dono nunca pediu, reportada como sucesso parcial. Agora os dois campos de roteamento são validados **antes** da criação. Registro completo: `docs/reports/EGC_SLICE_01_ACCEPTANCE.md`.
+
+## Slice EGC.2 — relações e vínculos de pessoas (2026-07-31)
+
+`public.person_relationships`, `public.person_contexts` e `public.person_projects` ganharam seu **primeiro caminho de escrita na aplicação**. As três já existiam desde `202607160009` com RLS forçado, quatro políticas de linha própria e CRUD completo para `authenticated`. `person_relationships` **nunca havia sido escrita por nada** — nem pela RPC de interpretação, nem por gatilho, nem pela aplicação.
+
+**Nada no banco mudou.** Zero migrações — a cabeça da cadeia continua `202607310064`. Zero grants, zero políticas, zero novos limites privilegiados. As oito Server Actions são DML comum, escopada por RLS mais um predicado explícito de `user_id`.
+
+**Nenhuma exclusão existe (EGC-DEC-2).** Encerrar é `valid_until`, não `delete`. Não há caminho de exclusão em nenhum dos dois módulos escritores, não há schema de exclusão, e `egc-invariants.test.ts` asseria mecanicamente que nenhum arquivo em `src/` chama `.delete()` sobre qualquer uma das três tabelas — em ambas as direções, com um controle de não-vacuidade que falha se o próprio detector parar de funcionar.
+
+**Um escritor por contrato, asserido como conjunto exato.** `EGC-ASSOC-003` exige um contrato por tabela porque a página da Pessoa e a página do Projeto escrevem a mesma linha; dois caminhos são como um contrato de encerramento suave ganha uma exclusão dura na superfície que esqueceu dele. Um teste prova que as duas superfícies produzem cargas idênticas byte a byte, e que `origin` altera apenas a razão de auditoria e a revalidação.
+
+**Conteúdo do usuário fica fora do livro-razão.** `person_relationships.description` é a frase do próprio dono sobre outra pessoa, e `person_projects.role` é o vocabulário do dono sobre o próprio trabalho. Nenhum dos dois é copiado para `audit_logs`: registra-se **que** houve mudança, não o que ela dizia. Asserido por teste em ambos os módulos.
+
+**Isolamento entre donos, provado duas vezes.** As chaves compostas de `202607170016` levantam `23503` para um contexto, projeto ou pessoa de outro dono, e a política de inserção levanta `42501` para um `user_id` alheio — dois controles distintos, asseridos separadamente, com um controle positivo ao final para que as quatro recusas sejam sobre propriedade e não sobre inserções quebradas.
+
+**Uma correção factual com consequência de segurança.** `person_relationships` **não tem índice único algum além da chave primária**. A recusa de duplicata é, portanto, apenas da aplicação e sofre corrida; o cabeçalho de `relationships.ts` diz isso em vez de sugerir uma garantia que o banco não dá. Perder a corrida produz uma segunda linha viva, que a superfície mostra e o dono pode encerrar — resultado melhor do que acrescentar uma migração a uma iniciativa cujo invariante de zero migrações é o ponto. Registro completo: `docs/reports/EGC_SLICE_02_ACCEPTANCE.md`.
