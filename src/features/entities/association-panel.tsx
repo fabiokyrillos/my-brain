@@ -11,9 +11,10 @@
  * `EGC-ASSOC-003` requires exactly that: neither surface owns a private path,
  * and an architecture test asserts it in both directions.
  *
- * `origin` travels with a project association and steers **only** the audit
- * reason and which page is revalidated. It cannot select a table, a predicate or
- * a write.
+ * `origin` travels with a project association and reaches **only** the audit
+ * reason, which records which page the owner was on. It cannot select a table, a
+ * predicate or a write, and revalidation does not depend on it — both pages
+ * render the same row and both are refreshed either way.
  *
  * ## Ending, not removing
  *
@@ -143,7 +144,17 @@ export function AssociationPanel({
         </ul>
       ) : (
         <p className="quiet-state">
-          {target.kind === "person-context" ? copy.contextsEmpty : copy.linkedProjectsEmpty}
+          {/*
+            Three placements, so three sentences. A two-way ternary here made the
+            Project page's People panel say "Nenhum projeto vinculado" under a
+            heading reading "Pessoas" — the right copy key existed and was simply
+            never reached.
+          */}
+          {target.kind === "person-context"
+            ? copy.contextsEmpty
+            : target.kind === "person-project"
+              ? copy.linkedProjectsEmpty
+              : copy.linkedPeopleEmpty}
         </p>
       )}
 
@@ -178,12 +189,24 @@ function AssociationRowItem({
   const copy = getEntityCopy(locale);
   const fieldId = useId();
   const fields = hiddenFields(target, row.id);
-  const [editingRole, setEditingRole] = useState(false);
   const [endState, end, ending] = useActionState(endAction, idleEntityEditState);
   const [roleState, saveRole, savingRole] = useActionState(
     roleAction ?? endAction,
     idleEntityEditState,
   );
+
+  /**
+   * The same state-identity derivation the create forms use.
+   *
+   * A plain boolean never cleared on success left the role editor open after a
+   * successful save, showing the value it had just written with no confirmation
+   * — the only signal was the spinner stopping, and a screen-reader user got
+   * nothing at all.
+   */
+  const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
+  const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
+  const editingRole = openedFor === roleState
+    || (roleState.status === "error" && dismissed !== roleState);
 
   const endLabel =
     target.kind === "person-context"
@@ -200,8 +223,19 @@ function AssociationRowItem({
       </div>
 
       <div className="relation-row-actions">
+        {/*
+          Named for what it does and for which row it does it to. `copy.roleLabel`
+          alone was both the wrong kind of label — "Papel" is a noun, not an
+          action — and a duplicate of the `<label>` of the field it opens.
+        */}
         {roleAction && !editingRole ? (
-          <button onClick={() => setEditingRole(true)} type="button">{copy.roleLabel}</button>
+          <button
+            aria-label={`${copy.editRole}: ${row.label}`}
+            onClick={() => setOpenedFor(roleState)}
+            type="button"
+          >
+            {copy.editRole}
+          </button>
         ) : null}
         <form action={end}>
           <input name="locale" type="hidden" value={locale} />
@@ -209,7 +243,7 @@ function AssociationRowItem({
           {"contextId" in fields ? <input name="contextId" type="hidden" value={fields.contextId} /> : null}
           {"projectId" in fields ? <input name="projectId" type="hidden" value={fields.projectId} /> : null}
           {fields.origin ? <input name="origin" type="hidden" value={fields.origin} /> : null}
-          <button disabled={ending} type="submit">
+          <button aria-label={`${endLabel}: ${row.label}`} disabled={ending} type="submit">
             {ending ? <LoaderCircle aria-hidden="true" className="spin" size={14} /> : <X aria-hidden="true" size={14} />}
             {endLabel}
           </button>
@@ -220,6 +254,9 @@ function AssociationRowItem({
         <form action={saveRole} className="relation-form">
           <input name="locale" type="hidden" value={locale} />
           <input name="personId" type="hidden" value={fields.personId} />
+          <div aria-atomic="true" aria-busy={savingRole} aria-live="polite" className="sr-only" role="status">
+            {savingRole ? copy.saving : roleState.status === "idle" ? "" : roleState.message}
+          </div>
           {"projectId" in fields ? <input name="projectId" type="hidden" value={fields.projectId} /> : null}
           {fields.origin ? <input name="origin" type="hidden" value={fields.origin} /> : null}
           <label htmlFor={`${fieldId}-role`}>
@@ -242,7 +279,7 @@ function AssociationRowItem({
             <button
               className="entity-edit-cancel"
               disabled={savingRole}
-              onClick={() => setEditingRole(false)}
+              onClick={() => { setDismissed(roleState); setOpenedFor(null); }}
               type="button"
             >
               {copy.cancel}
@@ -254,6 +291,12 @@ function AssociationRowItem({
         </form>
       ) : null}
 
+      <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+        {endState.status === "idle" ? "" : endState.message}
+      </div>
+      {roleState.status === "success" ? (
+        <p className="entity-edit-feedback success">{roleState.message}</p>
+      ) : null}
       {endState.status === "error" ? (
         <p className="entity-edit-feedback error" role="alert">{endState.message}</p>
       ) : null}
@@ -375,10 +418,16 @@ function AssociationCreate({
 
       <label htmlFor={`${fieldId}-target`}>
         {selectLabel}
+        {/* Keyed on its own default, for the reason every other select in this
+            feature records: React applies `defaultValue` to a select only on
+            mount, so after a refusal the restored value needs a remount to take.
+            Without it, a `foreignTarget` or duplicate refusal would silently
+            revert the selection to the first option. */}
         <select
           defaultValue={state.submitted?.[selectName] ?? options[0]!.id}
           disabled={pending}
           id={`${fieldId}-target`}
+          key={`target-${state.submitted?.[selectName] ?? options[0]!.id}`}
           name={selectName}
         >
           {options.map((option) => (

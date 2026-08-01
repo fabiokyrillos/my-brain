@@ -10,10 +10,13 @@
  * owner is looking at Marina or at Atlas. Two write paths would be two places
  * for the soft-end contract, the ownership check and the duplicate refusal to
  * disagree — and risk R3 in the PRD names exactly that. So both surfaces submit
- * the same shape to the same action, and `origin` steers only the revalidation
- * and the audit reason. **It can never select a different table, predicate or
- * write.** `write-path-inventory.test.ts` asserts the single writer in both
- * directions.
+ * the same shape to the same action, and `origin` reaches exactly one
+ * expression: the audit `reason`, which records which page the owner was on.
+ * **It selects no table, no predicate and no payload**, and revalidation does
+ * not depend on it either — both pages are refreshed either way, because the
+ * row they both render is the same row. `egc-invariants.test.ts` asserts the
+ * single writer in both directions, and `associations.test.ts` asserts the two
+ * origins produce byte-identical payloads.
  *
  * ## The trigger already writes these tables, and that matters
  *
@@ -295,7 +298,7 @@ export async function endPersonProject(
   const fields = submittedRelationFields(formData);
   const parsed = personProjectEndSchema.safeParse(fields);
   if (!parsed.success) return failedRelation(locale, "invalidInput", fields);
-  const { personId, projectId } = parsed.data;
+  const { personId, projectId, origin } = parsed.data;
 
   const { supabase, user } = await requireUser(parsed.data.locale);
 
@@ -320,7 +323,10 @@ export async function endPersonProject(
     actor: "user",
     before_state: { valid_until: null },
     after_state: { person_id: personId, project_id: projectId, ended: true },
-    reason: "Owner ended a person-project association",
+    // `origin` is required by the schema, so it is read here rather than
+    // ignored: a field a strict schema refuses the form for, and which then
+    // affects nothing, is a refusal the owner cannot act on.
+    reason: `Owner ended a person-project association from the ${origin} page`,
   });
   if (audit.error) console.error("Person-project end audit failed", audit.error.message);
 

@@ -150,7 +150,6 @@ describe("endPersonContext", () => {
     );
 
     expect(result.status).toBe("success");
-    expect(links.stub.delete).toBeUndefined();
     expect(links.payloads[0]).toHaveProperty("valid_until");
     // Load-bearing: without it a second click would overwrite the first end date
     // with a later one and quietly move when the link stopped.
@@ -271,7 +270,6 @@ describe("endPersonProject", () => {
     );
 
     expect(result.status).toBe("success");
-    expect(links.stub.delete).toBeUndefined();
     expect(links.payloads[0]).toHaveProperty("valid_until");
     expect(links.isNull).toContain("valid_until");
     expect(audit.mock.calls[0]![0]).toMatchObject({ action_type: "end_person_project" });

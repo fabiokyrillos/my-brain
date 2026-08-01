@@ -12,7 +12,7 @@
  * ## One writer, and why that is asserted rather than intended
  *
  * `EGC-ASSOC-003` requires one contract per relationship table, and
- * `write-path-inventory.test.ts` asserts it in both directions: this module
+ * `egc-invariants.test.ts` asserts it in both directions: this module
  * writes the table, and no other module does. Two writers is not a style
  * problem — it is how a soft-end contract acquires a hard delete on the surface
  * that forgot about it.
@@ -63,6 +63,38 @@ function revalidatePerson(locale: "pt-BR" | "en", personId: string) {
   revalidatePath(`/${locale}/app/people`);
 }
 
+/**
+ * Is there already a live relationship of this type for this person?
+ *
+ * **Deliberately not `.maybeSingle()`.** That helper raises `PGRST116` the
+ * moment the query matches more than one row, and this query legitimately can:
+ * nothing at the database prevents two live rows of the same type (see the
+ * header), so a probe that errors on the duplicate state it exists to detect
+ * would report an outage instead. It reads a bounded list and counts.
+ *
+ * `excludeId` is what lets the edit path use the same probe: when correcting a
+ * relationship's type, the row being corrected is not its own duplicate.
+ */
+async function liveDuplicate(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  personId: string,
+  relationshipType: string,
+  excludeId: string | null,
+): Promise<"none" | "duplicate" | "failed"> {
+  const { data, error } = await supabase
+    .from("person_relationships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("person_id", personId)
+    .eq("relationship_type", relationshipType)
+    .is("valid_until", null)
+    .limit(5);
+
+  if (error || !data) return "failed";
+  return data.some((row) => row.id !== excludeId) ? "duplicate" : "none";
+}
+
 export async function createOwnerRelationship(
   _previous: EntityEditState,
   formData: FormData,
@@ -89,18 +121,9 @@ export async function createOwnerRelationship(
   if (person.error) return failedRelation(locale, "saveFailed");
   if (!person.data) return failedRelation(locale, "notFound");
 
-  // The duplicate check with no constraint behind it — see the header. A live
-  // row of the same type for the same person is refused here and nowhere else.
-  const existing = await supabase
-    .from("person_relationships")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("person_id", personId)
-    .eq("relationship_type", relationshipType)
-    .is("valid_until", null)
-    .maybeSingle();
-  if (existing.error) return failedRelation(locale, "saveFailed");
-  if (existing.data) return failedRelation(locale, "duplicateRelation", fields);
+  const duplicate = await liveDuplicate(supabase, user.id, personId, relationshipType, null);
+  if (duplicate === "failed") return failedRelation(locale, "saveFailed", fields);
+  if (duplicate === "duplicate") return failedRelation(locale, "duplicateRelation", fields);
 
   const { data: created, error } = await supabase
     .from("person_relationships")
@@ -171,6 +194,21 @@ export async function updateOwnerRelationship(
     .maybeSingle();
   if (before.error) return failedRelation(locale, "saveFailed");
   if (!before.data) return failedRelation(locale, "notFound");
+
+  // The same refusal the create path applies, and its absence here was a real
+  // hole rather than an oversight of symmetry: without it, correcting a
+  // `colleague` row to `friend` beside an existing live `friend` produced two
+  // live rows of one type — a state no index prevents and which the create
+  // path's own probe would then have to cope with forever.
+  const duplicate = await liveDuplicate(
+    supabase,
+    user.id,
+    personId,
+    relationshipType,
+    relationshipId,
+  );
+  if (duplicate === "failed") return failedRelation(locale, "saveFailed", fields);
+  if (duplicate === "duplicate") return failedRelation(locale, "duplicateRelation", fields);
 
   const { data: after, error } = await supabase
     .from("person_relationships")

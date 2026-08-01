@@ -206,9 +206,10 @@ export const personContextEndSchema = z.object({
  * One shape for both directions (EGC-ASSOC-003).
  *
  * The Person surface and the Project surface associate the same row, so they
- * submit the same fields. `origin` says which page the owner was on — it steers
- * revalidation and the audit reason, and **nothing else**: it can never select a
- * different table, a different predicate or a different write.
+ * submit the same fields. `origin` says which page the owner was on and reaches
+ * exactly one expression: the audit `reason`. It selects no table, no predicate
+ * and no payload — and it does not steer revalidation either, because both
+ * pages render the same row and both are refreshed regardless.
  */
 export const personProjectSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),

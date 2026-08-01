@@ -8,6 +8,7 @@ import {
   organizationCreateSchema,
   organizationUpdateSchema,
   personContextSchema,
+  personProjectEndSchema,
   personProjectSchema,
   personUpdateSchema,
   relationshipCreateSchema,
@@ -263,11 +264,22 @@ describe("the relationship and association schemas", () => {
     expect(parsed.success && parsed.data.role).toBeNull();
   });
 
-  it("accepts only the two origins, since origin steers revalidation and nothing else", () => {
+  it("accepts only the two origins, since origin reaches the audit reason and nothing else", () => {
     const base = { locale: "en", personId: PERSON, projectId: PROJECT, role: "" };
     expect(personProjectSchema.safeParse({ ...base, origin: "person" }).success).toBe(true);
     expect(personProjectSchema.safeParse({ ...base, origin: "project" }).success).toBe(true);
     expect(personProjectSchema.safeParse({ ...base, origin: "admin" }).success).toBe(false);
+  });
+
+  it("requires the same origin on the end shape, which the action now reads", () => {
+    // It was required and then ignored — a field a strict schema refuses the
+    // form for, and which then affects nothing, is a refusal the owner has no
+    // way to act on. `endPersonProject` records it in the audit reason.
+    const base = { locale: "en", personId: PERSON, projectId: PROJECT };
+    expect(personProjectEndSchema.safeParse({ ...base, origin: "project" }).success).toBe(true);
+    expect(personProjectEndSchema.safeParse(base).success).toBe(false);
+    expect(personProjectEndSchema.safeParse({ ...base, origin: "admin" }).success).toBe(false);
+    expect(personProjectEndSchema.safeParse({ ...base, origin: "person", role: "x" }).success).toBe(false);
   });
 
   it("keeps origin out of the context association, which has no second surface", () => {

@@ -113,6 +113,8 @@ type EntityCopy = {
   readonly roleLabel: string;
   readonly rolePlaceholder: string;
   readonly saveRole: string;
+  /** The control that opens the role editor — a verb, and distinct from the field's own label. */
+  readonly editRole: string;
   /**
    * EGC-REL-009. The Person page shows Company and relationship-to-owner as two
    * separate concerns, and each says what it is for — a company is where someone
@@ -229,6 +231,7 @@ const copy = {
     roleLabel: "Papel",
     rolePlaceholder: "Ex.: revisora do contrato",
     saveRole: "Salvar papel",
+    editRole: "Editar papel",
     companyExplainer: "Onde a pessoa trabalha.",
     relationshipExplainer: "Quem essa pessoa é para você.",
   },
@@ -332,6 +335,7 @@ const copy = {
     roleLabel: "Role",
     rolePlaceholder: "e.g. contract reviewer",
     saveRole: "Save role",
+    editRole: "Edit role",
     companyExplainer: "Where this person works.",
     relationshipExplainer: "Who this person is to you.",
   },

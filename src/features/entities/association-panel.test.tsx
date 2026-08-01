@@ -189,7 +189,7 @@ describe("AssociationPanel", () => {
       rows: [{ id: CONTEXT_ID, label: "Pessoal", href: null }],
     }));
 
-    const control = screen.getByRole("button", { name: "Encerrar vínculo com o contexto" });
+    const control = screen.getByRole("button", { name: /Encerrar vínculo com o contexto/ });
     expect(control).toBeVisible();
     await userEvent.click(control);
 
@@ -206,7 +206,7 @@ describe("AssociationPanel", () => {
       rows: [{ id: PROJECT_ID, label: "Atlas", href: null, role: "revisora" }],
     }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Papel" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar papel/ }));
     const field = screen.getByLabelText("Papel");
     expect(field).toHaveValue("revisora");
     await userEvent.clear(field);

@@ -105,9 +105,24 @@ function RelationshipRowItem({
 }) {
   const copy = getEntityCopy(locale);
   const fieldId = useId();
-  const [editing, setEditing] = useState(false);
   const [updateState, update, updating] = useActionState(updateAction, idleEntityEditState);
   const [endState, end, ending] = useActionState(endAction, idleEntityEditState);
+
+  /**
+   * Openness derived from *which state object* is current, not held free.
+   *
+   * A plain `useState` boolean never cleared on success left this form open
+   * after a successful correction, showing the values it had just saved with no
+   * confirmation of any kind — the only signal was the spinner stopping. The
+   * derivation below is the one the create forms use: a success closes because
+   * the row above has already re-rendered with the new term, an error stays open
+   * because there is something to fix, and `dismissed` guards only the error
+   * clause so an explicit reopen always wins.
+   */
+  const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
+  const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
+  const editing = openedFor === updateState
+    || (updateState.status === "error" && dismissed !== updateState);
 
   /**
    * A type outside the vocabulary renders its stored value, in a muted style,
@@ -119,6 +134,8 @@ function RelationshipRowItem({
    * would see a relationship that appears to say nothing.
    */
   const known = relationship.label !== null;
+  /** What each control names, so two rows never share an accessible name. */
+  const subject = known ? relationship.label! : relationship.storedType;
 
   if (editing) {
     return (
@@ -127,6 +144,10 @@ function RelationshipRowItem({
           <input name="locale" type="hidden" value={locale} />
           <input name="personId" type="hidden" value={personId} />
           <input name="relationshipId" type="hidden" value={relationship.id} />
+
+          <div aria-atomic="true" aria-busy={updating} aria-live="polite" className="sr-only" role="status">
+            {updating ? copy.saving : updateState.status === "idle" ? "" : updateState.message}
+          </div>
 
           <label htmlFor={`${fieldId}-type`}>
             {copy.relationshipTypeLabel}
@@ -165,7 +186,7 @@ function RelationshipRowItem({
             <button
               className="entity-edit-cancel"
               disabled={updating}
-              onClick={() => setEditing(false)}
+              onClick={() => { setDismissed(updateState); setOpenedFor(null); }}
               type="button"
             >
               {copy.cancel}
@@ -189,8 +210,19 @@ function RelationshipRowItem({
         {known ? null : <small className="relation-unknown-note">{copy.unknownRelationship}</small>}
         <span>{relationship.description ?? `${copy.since} ${relationship.since}`}</span>
       </div>
+      {/*
+        Both controls carry an `aria-label` naming the relationship they act on.
+        Without it a person with a spouse and a sibling gives a screen-reader
+        user two buttons called "Editar relação" and two called "Encerrar
+        relação", with nothing to tell them apart — the same duplicate-name
+        problem `cancelInline` exists to prevent elsewhere in this feature.
+      */}
       <div className="relation-row-actions">
-        <button onClick={() => setEditing(true)} type="button">
+        <button
+          aria-label={`${copy.editRelationship}: ${subject}`}
+          onClick={() => setOpenedFor(updateState)}
+          type="button"
+        >
           <Pencil aria-hidden="true" size={14} />
           {copy.editRelationship}
         </button>
@@ -198,12 +230,18 @@ function RelationshipRowItem({
           <input name="locale" type="hidden" value={locale} />
           <input name="personId" type="hidden" value={personId} />
           <input name="relationshipId" type="hidden" value={relationship.id} />
-          <button disabled={ending} type="submit">
+          <button aria-label={`${copy.endRelationship}: ${subject}`} disabled={ending} type="submit">
             {ending ? <LoaderCircle aria-hidden="true" className="spin" size={14} /> : <X aria-hidden="true" size={14} />}
             {copy.endRelationship}
           </button>
         </form>
       </div>
+      <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+        {endState.status === "idle" ? "" : endState.message}
+      </div>
+      {updateState.status === "success" ? (
+        <p className="entity-edit-feedback success">{updateState.message}</p>
+      ) : null}
       {endState.status === "error" ? (
         <p className="entity-edit-feedback error" role="alert">{endState.message}</p>
       ) : null}

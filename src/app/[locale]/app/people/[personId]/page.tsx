@@ -62,7 +62,13 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     // the loaders themselves (EGC-ASSOC-008). Loaded here rather than inside the
     // panels because a client component cannot query.
     loadContextOptions(supabase),
-    supabase.from("projects").select("id,name").neq("status", "archived").order("name").limit(200),
+    // **Archived projects are included on purpose.** Filtering them out made
+    // `options.length === 0` mean two different things: "you have no projects"
+    // and "all of yours are archived" — so an owner with three archived
+    // projects was told to create one, which is the `EG-04` shape again. It is
+    // also a true thing to record that somebody worked on a project that has
+    // since been archived.
+    supabase.from("projects").select("id,name").order("name").limit(200),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];

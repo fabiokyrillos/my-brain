@@ -41,15 +41,30 @@ function tableStub(...results: Result[]) {
   const calls: Array<[string, unknown]> = [];
   const payloads: unknown[] = [];
   const isNull: string[] = [];
+  /**
+   * `.limit()` results, separate from `.maybeSingle()` results.
+   *
+   * The duplicate probe reads a **list** rather than a single row, and
+   * deliberately: `.maybeSingle()` raises `PGRST116` the moment a query matches
+   * more than one row, and this query legitimately can — nothing at the database
+   * prevents two live relationships of one type. A probe that errored on the
+   * exact state it exists to detect would report an outage instead.
+   *
+   * Default `{ data: [], error: null }` means "no duplicate", so the happy-path
+   * cases below need say nothing about it.
+   */
+  const lists: Result[] = [];
   let index = 0;
+  let listIndex = 0;
   const stub: Record<string, unknown> = {};
   stub.select = vi.fn(() => stub);
   stub.insert = vi.fn((row: unknown) => { payloads.push(row); return stub; });
   stub.update = vi.fn((row: unknown) => { payloads.push(row); return stub; });
   stub.eq = vi.fn((column: string, value: unknown) => { calls.push([column, value]); return stub; });
   stub.is = vi.fn((column: string) => { isNull.push(column); return stub; });
+  stub.limit = vi.fn(async () => lists[listIndex++] ?? { data: [], error: null });
   stub.maybeSingle = vi.fn(async () => results[index++] ?? { data: null, error: null });
-  return { stub, calls, payloads, isNull };
+  return { stub, calls, payloads, isNull, lists };
 }
 
 function client(
@@ -90,7 +105,6 @@ describe("createOwnerRelationship", () => {
     // authors. A sentinel uuid here would need a migration and a backfill.
     const people = tableStub({ data: { id: PERSON_ID }, error: null });
     const relationships = tableStub(
-      { data: null, error: null },
       { data: { id: RELATIONSHIP_ID, relationship_type: "spouse", description: null }, error: null },
     );
     const { supabase, audit } = client({ people, person_relationships: relationships });
@@ -120,7 +134,6 @@ describe("createOwnerRelationship", () => {
     // is a fact the ledger should hold; what it said is not.
     const people = tableStub({ data: { id: PERSON_ID }, error: null });
     const relationships = tableStub(
-      { data: null, error: null },
       { data: { id: RELATIONSHIP_ID, relationship_type: "sibling", description: "brigamos em 2019" }, error: null },
     );
     const { supabase, audit } = client({ people, person_relationships: relationships });
@@ -152,7 +165,6 @@ describe("createOwnerRelationship", () => {
   it("scopes the ownership probe to the caller, not only to the person id", async () => {
     const people = tableStub({ data: { id: PERSON_ID }, error: null });
     const relationships = tableStub(
-      { data: null, error: null },
       { data: { id: RELATIONSHIP_ID, relationship_type: "spouse", description: null }, error: null },
     );
     const { supabase } = client({ people, person_relationships: relationships });
@@ -171,7 +183,8 @@ describe("createOwnerRelationship", () => {
     // refusal is application-only, with no `23505` behind it, and it is the only
     // thing standing between the owner and two live "spouse" rows.
     const people = tableStub({ data: { id: PERSON_ID }, error: null });
-    const relationships = tableStub({ data: { id: RELATIONSHIP_ID }, error: null });
+    const relationships = tableStub();
+    relationships.lists.push({ data: [{ id: RELATIONSHIP_ID }], error: null });
     const { supabase } = client({ people, person_relationships: relationships });
     vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
 
@@ -183,6 +196,43 @@ describe("createOwnerRelationship", () => {
     // The probe looks at live rows only, so an *ended* spouse relationship does
     // not block recording a new one.
     expect(relationships.isNull).toContain("valid_until");
+  });
+
+  it("survives the two-live-rows state instead of reporting it as an outage", async () => {
+    // The probe reads a list precisely so this case is a refusal rather than a
+    // `PGRST116`. Before the fix, a person who had somehow acquired two live
+    // rows of one type made every later attempt return "could not save now" —
+    // an outage message for a duplicate — **and discard the note the owner had
+    // typed**, because the failure passed no submission back.
+    const people = tableStub({ data: { id: PERSON_ID }, error: null });
+    const relationships = tableStub();
+    relationships.lists.push({ data: [{ id: RELATIONSHIP_ID }, { id: "other" }], error: null });
+    const { supabase } = client({ people, person_relationships: relationships });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await createOwnerRelationship(
+      idleEntityEditState,
+      createForm({ description: "mora em Olinda" }),
+    );
+
+    expect(result.message).toBe("Isso já está registrado.");
+    expect(result.submitted?.description).toBe("mora em Olinda");
+  });
+
+  it("returns the typed note even when the probe itself fails", async () => {
+    const people = tableStub({ data: { id: PERSON_ID }, error: null });
+    const relationships = tableStub();
+    relationships.lists.push({ data: null, error: { message: "boom" } });
+    const { supabase } = client({ people, person_relationships: relationships });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await createOwnerRelationship(
+      idleEntityEditState,
+      createForm({ description: "mora em Olinda" }),
+    );
+
+    expect(result.message).toBe("Não foi possível salvar agora.");
+    expect(result.submitted?.description).toBe("mora em Olinda");
   });
 
   it("refuses a relationship type outside the vocabulary before touching the database", async () => {
@@ -247,6 +297,59 @@ describe("updateOwnerRelationship", () => {
     });
   });
 
+  it("refuses a correction that would create a second live row of the same type", async () => {
+    // The hole the review found, and it was deterministic rather than a race:
+    // the create path refused duplicates and the edit path did not, so
+    // correcting a `colleague` row to `friend` beside an existing live `friend`
+    // produced two live rows of one type — which no index prevents on this
+    // table, and which then poisoned every later create.
+    const relationships = tableStub({ data: { relationship_type: "colleague", description: null }, error: null });
+    relationships.lists.push({ data: [{ id: "an-existing-friend-row" }], error: null });
+    const { supabase } = client({ person_relationships: relationships });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateOwnerRelationship(
+      idleEntityEditState,
+      form({
+        locale: "pt-BR",
+        relationshipId: RELATIONSHIP_ID,
+        personId: PERSON_ID,
+        relationshipType: "friend",
+        description: "",
+      }),
+    );
+
+    expect(result.message).toBe("Isso já está registrado.");
+    expect(relationships.payloads).toHaveLength(0);
+  });
+
+  it("does not treat the row being corrected as its own duplicate", async () => {
+    // Re-saving a relationship without changing its type must succeed. The
+    // probe excludes the row under edit, which is the difference between a
+    // duplicate check and a lock.
+    const relationships = tableStub(
+      { data: { relationship_type: "friend", description: null }, error: null },
+      { data: { relationship_type: "friend", description: "atualizado" }, error: null },
+    );
+    relationships.lists.push({ data: [{ id: RELATIONSHIP_ID }], error: null });
+    const { supabase } = client({ person_relationships: relationships });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateOwnerRelationship(
+      idleEntityEditState,
+      form({
+        locale: "pt-BR",
+        relationshipId: RELATIONSHIP_ID,
+        personId: PERSON_ID,
+        relationshipType: "friend",
+        description: "atualizado",
+      }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(relationships.payloads[0]).toMatchObject({ description: "atualizado" });
+  });
+
   it("refuses to edit a relationship that has already ended", async () => {
     const relationships = tableStub({ data: null, error: null });
     const { supabase } = client({ person_relationships: relationships });
@@ -283,7 +386,6 @@ describe("endOwnerRelationship", () => {
 
     expect(result.status).toBe("success");
     expect(relationships.stub.update).toHaveBeenCalledTimes(1);
-    expect(relationships.stub.delete).toBeUndefined();
     expect(relationships.payloads[0]).toHaveProperty("valid_until");
     expect(audit.mock.calls[0]![0]).toMatchObject({
       action_type: "end_person_relationship",

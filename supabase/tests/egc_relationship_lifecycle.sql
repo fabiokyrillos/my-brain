@@ -26,7 +26,7 @@
 -- `phase_2f_task_write_grants.sql`.
 
 begin;
-select plan(24);
+select plan(25);
 
 set local timezone to 'UTC';
 
@@ -64,7 +64,7 @@ select set_config(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 1 -- gate B9: nothing about the three tables moved (5)
+-- Section 1 -- gate B9: nothing about the three tables moved (6)
 -- ---------------------------------------------------------------------------
 --
 -- EGC.2 adds no migration, so its central claim is negative. Every absence
@@ -111,16 +111,33 @@ select is(
 );
 
 -- EGC.2 introduced no privileged boundary either: no RPC, no definer function,
--- no worker path. Named by the functions a future slice might reach for.
+-- no worker path.
+--
+-- **Matched against all three table names, and paired with a presence control.**
+-- The first draft matched `'%person_relationship%'` alone, which would have
+-- stayed at zero through the exact violation it claims to guard: a definer
+-- named `associate_person_context` or `end_person_project` contains no such
+-- substring. And a count of zero proves nothing unless the same query shape can
+-- produce a non-zero, which is what the second assertion establishes.
 select is(
-  (select count(*)::integer
+  (select coalesce(string_agg(procedure.proname, ', ' order by procedure.proname), '')
      from pg_catalog.pg_proc procedure
      join pg_catalog.pg_namespace namespace on namespace.oid = procedure.pronamespace
     where namespace.nspname = 'public'
       and procedure.prosecdef
-      and procedure.proname like '%person_relationship%'),
-  0,
-  'EGC.2 introduced no SECURITY DEFINER function -- the write path is plain RLS-scoped DML'
+      and (procedure.proname like '%person_relationship%'
+        or procedure.proname like '%person_context%'
+        or procedure.proname like '%person_project%')),
+  '',
+  'EGC.2 introduced no SECURITY DEFINER function over any of the three tables -- the write path is plain RLS-scoped DML'
+);
+
+select ok(
+  (select count(*)::integer
+     from pg_catalog.pg_proc procedure
+     join pg_catalog.pg_namespace namespace on namespace.oid = procedure.pronamespace
+    where namespace.nspname = 'public' and procedure.prosecdef) > 0,
+  'while SECURITY DEFINER functions do exist in this schema, so the empty result above is a measurement rather than a query that finds nothing'
 );
 
 set local role authenticated;
@@ -185,19 +202,39 @@ select isnt(
 -- Section 3 -- gates B3 and B5: the association lifecycle (6)
 -- ---------------------------------------------------------------------------
 
-insert into public.person_contexts (user_id, person_id, context_id, confidence)
-values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
-        'e6c22001-0000-4000-8000-000000000001', 1);
+-- EVERY INSERT BELOW CARRIES AN EXPLICIT `valid_from`, AND THAT IS LOAD-BEARING.
+--
+-- These tables carry **two** unique constraints each, not one: the partial
+-- `person_contexts_current_idx` over the live pair (`202607160011:2`) and the
+-- base `unique (person_id, context_id, valid_from)` declared inline at
+-- `202607160009:18`. `valid_from` defaults to `now()`, which is
+-- `transaction_timestamp()` -- **constant for this whole file**, since it is one
+-- `begin … rollback`.
+--
+-- Leaving the default would break both assertions below in opposite ways. The
+-- duplicate would raise `23505` from the *base* key rather than from the partial
+-- index -- passing while proving nothing, and continuing to pass if the partial
+-- index were dropped outright. And the re-add after the end would raise `23505`
+-- too, failing a `lives_ok` that describes real production behaviour correctly:
+-- there, the end and the re-add are separate transactions with different
+-- timestamps.
+--
+-- Distinct timestamps isolate the constraint under test.
 
--- Gate B5. The partial unique index refuses a second LIVE pair. The application
--- turns this into a sentence before the owner ever sees the code.
+insert into public.person_contexts (user_id, person_id, context_id, valid_from, confidence)
+values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
+        'e6c22001-0000-4000-8000-000000000001', now() - interval '2 days', 1);
+
+-- Gate B5. With a different `valid_from`, the base key is satisfied and the only
+-- constraint that can refuse this is the partial index over the live pair. The
+-- application turns it into a sentence before the owner ever sees the code.
 select throws_ok(
-  $$ insert into public.person_contexts (user_id, person_id, context_id, confidence)
+  $$ insert into public.person_contexts (user_id, person_id, context_id, valid_from, confidence)
      values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
-             'e6c22001-0000-4000-8000-000000000001', 1) $$,
+             'e6c22001-0000-4000-8000-000000000001', now() - interval '1 day', 1) $$,
   '23505',
   null::text,
-  'a duplicate LIVE person-context association is refused by person_contexts_current_idx'
+  'a duplicate LIVE person-context association is refused by person_contexts_current_idx, and by that index specifically -- the base (person_id, context_id, valid_from) key is satisfied here'
 );
 
 update public.person_contexts set valid_until = now()
@@ -205,13 +242,13 @@ update public.person_contexts set valid_until = now()
    and context_id = 'e6c22001-0000-4000-8000-000000000001'
    and valid_until is null;
 
--- Gate B3. The index is partial, so ending frees the pair. Without `where
--- valid_until is null` on the index this insert would fail and re-adding a
--- context somebody had left would be impossible.
+-- Gate B3. The index is partial, so ending frees the pair. Without
+-- `where valid_until is null` on it, re-adding a context somebody had left would
+-- be impossible.
 select lives_ok(
-  $$ insert into public.person_contexts (user_id, person_id, context_id, confidence)
+  $$ insert into public.person_contexts (user_id, person_id, context_id, valid_from, confidence)
      values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
-             'e6c22001-0000-4000-8000-000000000001', 1) $$,
+             'e6c22001-0000-4000-8000-000000000001', now(), 1) $$,
   'and re-adding after the end succeeds, because the unique index covers live rows only'
 );
 
@@ -232,18 +269,19 @@ select is(
   'and two rows in total, so the ended association is still readable history'
 );
 
--- The same shape for `person_projects`, including the role that travels with it.
-insert into public.person_projects (user_id, person_id, project_id, role, confidence)
+-- The same shape for `person_projects`, including the role that travels with it,
+-- and the same explicit timestamps for the same reason.
+insert into public.person_projects (user_id, person_id, project_id, role, valid_from, confidence)
 values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
-        'e6c23001-0000-4000-8000-000000000001', 'revisora do contrato', 1);
+        'e6c23001-0000-4000-8000-000000000001', 'revisora do contrato', now() - interval '2 days', 1);
 
 select throws_ok(
-  $$ insert into public.person_projects (user_id, person_id, project_id, role, confidence)
+  $$ insert into public.person_projects (user_id, person_id, project_id, role, valid_from, confidence)
      values ('e6c20001-0000-4000-8000-000000000001', 'e6c21001-0000-4000-8000-000000000001',
-             'e6c23001-0000-4000-8000-000000000001', 'outro papel', 1) $$,
+             'e6c23001-0000-4000-8000-000000000001', 'outro papel', now() - interval '1 day', 1) $$,
   '23505',
   null::text,
-  'a duplicate LIVE person-project association is refused, whatever the role says'
+  'a duplicate LIVE person-project association is refused by person_projects_current_idx, whatever the role says'
 );
 
 -- EGC-ASSOC-004: the role is free text at the database, with no CHECK and no

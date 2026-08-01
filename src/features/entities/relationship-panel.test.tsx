@@ -115,7 +115,7 @@ describe("RelationshipPanel", () => {
     const endAction = resolvesTo(idle);
     render(panel({ endAction, relationships: [spouse] }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Encerrar relação" }));
+    await userEvent.click(screen.getByRole("button", { name: /Encerrar relação/ }));
 
     await waitFor(() => expect(endAction).toHaveBeenCalled());
     const submitted = endAction.mock.calls[0]![1] as FormData;
@@ -126,7 +126,7 @@ describe("RelationshipPanel", () => {
   it("opens the edit form on the row and pre-selects its current type", async () => {
     render(panel({ relationships: [spouse] }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar relação" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar relação/ }));
 
     expect(screen.getByLabelText("Tipo de relação")).toHaveValue("spouse");
   });
@@ -139,7 +139,7 @@ describe("RelationshipPanel", () => {
     // claim to know what the row meant.
     render(panel({ relationships: [{ ...spouse, storedType: "godparent", label: null }] }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar relação" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar relação/ }));
 
     expect(screen.getByLabelText("Tipo de relação")).toHaveValue("other");
   });
@@ -152,7 +152,7 @@ describe("RelationshipPanel", () => {
     render(panel({ endAction: resolvesTo(refused), relationships: [spouse, second] }));
 
     const rows = screen.getAllByRole("listitem");
-    await userEvent.click(within(rows[0]!).getByRole("button", { name: "Encerrar relação" }));
+    await userEvent.click(within(rows[0]!).getByRole("button", { name: /Encerrar relação/ }));
 
     await waitFor(() => expect(within(rows[0]!).getByRole("alert")).toBeVisible());
     expect(within(rows[1]!).queryByRole("alert")).toBeNull();
