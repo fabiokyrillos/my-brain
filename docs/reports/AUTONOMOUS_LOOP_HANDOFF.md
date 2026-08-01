@@ -90,7 +90,32 @@ required administrative control without extracting or exposing credentials."*
 depend on none of it: they are schema, crypto and RPC work, testable against local and
 test master keys this loop can generate.
 
-**Recommended continuation**, in this order:
+### One concern investigated and dismissed
+
+BYOK.1 task 1.2 says "regenerate `src/lib/supabase/database.types.ts`", and Docker is
+unavailable here — so it looked like a third blocker. **It is not.**
+`database-types-parity.test.ts` records that `supabase gen types typescript` refuses to
+run without an access token even against a local `--db-url`, that planting a
+credential-shaped string in the workflow was tried and correctly rejected by push
+protection, and that the repository's answer is a **content comparison between the
+migration and the types file**. So the types file is maintained by hand alongside the
+migration, with parity proven by test — no Docker, no token, no live database.
+
+### The gate question this loop did not decide for itself
+
+The plan's §0 says: *"No slice may start until every artifact below is in the
+repository."* **G-0.4's artifact cannot be created by this loop**, so by the plan's own
+words BYOK.1 may not start.
+
+The loop's reading — that G-0.4 gates BYOK.3's validation lane specifically, and that
+BYOK.1 and BYOK.2 depend on none of it — is an *inference*, and a plausible one. It is
+also exactly the kind of reasoning this repository refuses elsewhere: "the invariant is
+not renegotiated inside a branch." So the loop stopped rather than relax a governing
+document's hard gate on its own authority.
+
+**This is the owner's decision, not the implementer's.**
+
+**Recommended continuation**, in this order, *once the owner has decided*:
 
 1. Execute **G-0.1** and **G-0.2** in full and commit them.
 2. Write the **G-0.3** procedure; generate and place the `local` and `test` master keys
@@ -105,6 +130,17 @@ test master keys this loop can generate.
    provided the acceptance report says plainly that the lane is unexercised.
 
 **Do not fabricate a key, do not commit one, and do not weaken a gate to proceed.**
+
+### The three decisions the owner is being asked for
+
+1. **Provision `BYOK_MASTER_KEY` and `BYOK_FINGERPRINT_PEPPER` for preview and
+   production** — hosting platform secrets *and* Supabase Edge Function secrets, both
+   projects. Procedure and exact commands: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §3.
+2. **Decide the validation-lane OpenAI key and its spend limit** (G-0.4), or decide the
+   lane is deferred and BYOK.3 ships with it disabled and reported as unexercised.
+3. **Say whether BYOK.1 and BYOK.2 may start ahead of G-0.4.** They depend on nothing
+   G-0.4 provides. If yes, say so explicitly — the plan's §0 gate is written as absolute,
+   and an implementer should not soften it unilaterally.
 
 ---
 
