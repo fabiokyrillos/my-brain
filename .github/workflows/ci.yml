@@ -82,6 +82,25 @@ jobs:
           echo "Discovering tests in: $DIRS"
           deno test --config supabase/functions/process-jobs/deno.json --node-modules-dir=none --no-lock $DIRS
 
+      - name: Re-execute the BYOK crypto interop proof (gate G-0.2, gate A3)
+        # BYOK.1 acceptance gate A3 requires the cross-runtime round trip to be
+        # *executed* in CI, not asserted. It lives in this job rather than in
+        # `application` because it is the only job with a Deno runtime, and the
+        # script needs both: it encrypts in Node and decrypts in Deno, then
+        # reverses the direction. Node is preinstalled on the runner and the
+        # script imports nothing outside `node:` builtins, so no `npm ci` is
+        # needed here.
+        #
+        # The master key is generated in memory for the run and reaches the Deno
+        # child through an environment variable scoped to that process. Nothing
+        # is written to disk, nothing is printed, and no repository secret is
+        # involved — which is why this can run on a fork PR.
+        #
+        # `src/lib/byok/parity.test.ts` in the `application` job is the cheap
+        # half of the same guarantee: it catches the edit, this catches the
+        # divergence.
+        run: node scripts/byok-crypto-interop.mjs
+
   # The database is this product's trust boundary and its largest body of
   # logic. Nothing verified it automatically before this job: pgTAP had never
   # run as a suite in any environment, and no check proved the migration chain
