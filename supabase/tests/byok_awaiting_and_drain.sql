@@ -349,7 +349,16 @@ select is(
 -- Section 5 -- the credential-aware drain (gate D4) (8)
 -- ---------------------------------------------------------------------------
 
+-- `auth.role()` reads the **JWT claim**, not the PostgreSQL role — Supabase's
+-- helper coalesces `request.jwt.claim.role` and `request.jwt.claims ->> 'role'`.
+-- `claim_next_entry_interpretation_job` and `mark_entry_awaiting_ai_configuration`
+-- both gate on it, so `set local role service_role` alone is not enough: without
+-- the claim they raise `42501` and every assertion below fails for a reason that
+-- has nothing to do with credentials. `entry_processing_jobs.sql:309` sets it the
+-- same way.
 set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
 
 -- B's job is older and would sort first. This selects A's, which is the whole
 -- claim.
