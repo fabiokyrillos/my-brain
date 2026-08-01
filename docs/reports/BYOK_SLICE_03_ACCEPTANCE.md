@@ -118,7 +118,7 @@ shrink in the same commit — an allowlist that outlives its exception is how th
 
 ---
 
-## 5. Three guard drafts that were wrong, recorded
+## 5. Four test defects that were wrong, recorded
 
 Written down because a guard that was silently corrected teaches nothing, and because each of
 these was a real near-miss.
@@ -130,6 +130,15 @@ these was a real near-miss.
 2. **`return[^;]*ciphertext` in the actions module.** It flagged `sealCredential`, which
    returns database columns and is exactly where a ciphertext belongs. A textual guard could
    not tell that apart from a leak; the check now reads the **declared result type**.
+4. **A probabilistic assertion, caught by CI as a flake.** `ip.test.ts` asserted that a
+   64-character hex digest does not contain the substring `"113"`. Three hex digits appear
+   in a random 64-character hex string about **1.5%** of the time, so it passed locally,
+   passed one CI run, and failed the next. A probabilistic assertion is worse than no
+   assertion: it fails at random and teaches everyone to re-run the suite. Both it and the
+   same latent mistake in `fingerprint.test.ts` — a four-character tail check against a
+   six-character digest, roughly 1 in 20,000 — are replaced by **derivation** checks that
+   are deterministic: two inputs differing in one octet, or sharing an entire tail, produce
+   unrelated digests. Confirmed by ten consecutive local runs.
 3. **The migration scan without comment stripping.** It reddened on `202608010067`, whose
    header explains at length that the rate-limit pepper lives in the application environment
    and never in the database. That is the **third** time a guard in this initiative forbade

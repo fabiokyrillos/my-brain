@@ -115,10 +115,36 @@ describe("hashClientIp produces the stored shape and nothing else", () => {
     });
   });
 
-  it("never contains the address", async () => {
+  it("never contains the address, and is not derived from any part of it", async () => {
     const hash = await hashClientIp("203.0.113.7", pepper());
-    expect(hash).not.toContain("203");
-    expect(hash).not.toContain("113");
+
+    // The whole address. Deterministic: a 64-character hex digest cannot
+    // contain a `.`, so this can never be a coin flip.
+    expect(hash).not.toContain("203.0.113.7");
+    expect(hash).not.toMatch(/\./);
+
+    // **The first draft of this test asserted `not.toContain("113")` and was
+    // flaky by construction.** "113" is three hex digits, and a random
+    // 64-character hex string contains any given three-digit sequence about 1.5%
+    // of the time — so it passed locally, passed one CI run, and failed the
+    // next. A probabilistic assertion is worse than no assertion: it fails at
+    // random and teaches everyone to re-run the suite.
+    //
+    // The property that assertion was reaching for is *derivation*, and this is
+    // how to state it deterministically: two addresses sharing every octet but
+    // one produce unrelated digests, so no part of the input survives into the
+    // output.
+    const secret = pepper();
+    const [a, b] = await Promise.all([
+      hashClientIp("203.0.113.7", secret),
+      hashClientIp("203.0.113.8", secret),
+    ]);
+    expect(a).not.toBe(b);
+    // And they share no long common prefix, which a truncating or
+    // prefix-preserving transform would produce.
+    let shared = 0;
+    while (shared < a.length && a[shared] === b[shared]) shared += 1;
+    expect(shared).toBeLessThan(8);
   });
 
   it("hashes equal for equivalent spellings and differs for different addresses", async () => {
