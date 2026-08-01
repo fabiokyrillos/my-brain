@@ -210,10 +210,34 @@ describe("BYOK-GUARD-005: secret locality", () => {
 });
 
 describe("task 1.8: the chain scan finds no key material anywhere", () => {
-  it(".env.example carries both names with empty values", () => {
+  it(".env.example carries every secret name with an empty value", () => {
+    // Four names now. `BYOK_RATE_LIMIT_PEPPER` arrived with ADR-070 as the third
+    // independent secret, and `BYOK_VALIDATION_OPENAI_API_KEY` is the opt-in
+    // lane's key — deliberately not `OPENAI_API_KEY`, so the lane cannot be
+    // satisfied by the project key. Every one of them carries a name and no
+    // value, which is the whole contract `.env.example` has.
     const example = read(".env.example");
-    expect(example).toMatch(/^BYOK_MASTER_KEY=\s*$/m);
-    expect(example).toMatch(/^BYOK_FINGERPRINT_PEPPER=\s*$/m);
+    for (const name of [
+      "BYOK_MASTER_KEY",
+      "BYOK_FINGERPRINT_PEPPER",
+      "BYOK_RATE_LIMIT_PEPPER",
+      "BYOK_VALIDATION_OPENAI_API_KEY",
+    ]) {
+      expect(example, `${name} must be present with an empty value`).toMatch(
+        new RegExp(`^${name}=\\s*$`, "m"),
+      );
+    }
+  });
+
+  it("the validation key is never conflated with the project key", () => {
+    // BYOK-GUARD-001's allowlist can only distinguish the two if they are two.
+    // A future edit that "simplified" the lane onto OPENAI_API_KEY would defeat
+    // the entire point of the dedicated low-limit project, so the distinctness
+    // is asserted rather than assumed.
+    const example = read(".env.example");
+    expect(example).toMatch(/^OPENAI_API_KEY=\s*$/m);
+    expect(example).toMatch(/^BYOK_VALIDATION_OPENAI_API_KEY=\s*$/m);
+    expect("BYOK_VALIDATION_OPENAI_API_KEY").not.toBe("OPENAI_API_KEY");
   });
 
   it("no tracked file assigns a value to either secret", () => {
@@ -231,7 +255,7 @@ describe("task 1.8: the chain scan finds no key material anywhere", () => {
         continue;
       }
       for (const match of body.matchAll(
-        /(BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER)\s*[=:]\s*(\S+)/g,
+        /(BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER|BYOK_RATE_LIMIT_PEPPER|BYOK_VALIDATION_OPENAI_API_KEY)\s*[=:]\s*(\S+)/g,
       )) {
         const value = match[2];
         // Permitted: an empty value, a placeholder, or a reference to the name
@@ -257,7 +281,7 @@ describe("task 1.8: the chain scan finds no key material anywhere", () => {
     const offenders = ALL_FILES.filter(
       (file) =>
         file.startsWith("supabase/migrations/") &&
-        /BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER/.test(read(file)),
+        /BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER|BYOK_RATE_LIMIT_PEPPER/.test(read(file)),
     );
     expect(offenders).toEqual([]);
   });
