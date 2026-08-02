@@ -791,6 +791,17 @@ Nothing else is needed. No migration, no deployment, no schema change.
 
 ### What is open in the repository at this stop
 
-- **PR #68** — the candidate due-date contract fix — is **open with all three CI jobs
-  green** and awaiting the owner's merge. It is independent of BYOK.
-- This branch carries the two inverted remote smokes and the documentation for §10/§15.
+Three PRs are open, each with **all three CI jobs green**, each awaiting the owner's
+merge. The agent's merge was refused by the harness, not skipped. They are independent of
+each other and can be merged in any order.
+
+- **PR #68** — the candidate due-date contract fix. A model-produced end-of-day due date
+  took the entry detail route to the error boundary because one reader demanded `:00`
+  seconds while the contract on both sides of it permitted any. Independent of BYOK.
+- **PR #69** — this branch: the two inverted remote smokes and the documentation for §10
+  and §15.
+- **PR #70** — the service worker cloned a `Response` after handing it to the page, so
+  `sw.js` logged an error on every cache miss and cached nothing. Independent of both.
+  Unrelated to the due-date failure it was reported alongside; the
+  `asynchronous listener` / `No Listener` messages reported with it are
+  browser-extension noise and are deliberately not chased.
