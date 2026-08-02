@@ -804,7 +804,8 @@ Three PRs came out of this loop. They are independent of each other.
   green**. The candidate due-date contract fix: a model-produced end-of-day due date took
   the entry detail route to the error boundary because one reader demanded `:00` seconds
   while the contract on both sides of it permitted any. Independent of BYOK.
-- **PR #69** — this branch, **rebased onto `156e414`**. The two inverted remote smokes and
+- **PR #69 — MERGED** at `f15bcca`, merge-SHA CI run `30753460203`, **all three jobs
+  green**. Rebased onto `156e414` first. The two inverted remote smokes and
   the documentation for §10 and §15. Its `CHANGELOG.md` and `STATE.md` conflicts with
   PR #68 were reconciled **semantically and append-only**: both entries are retained in
   full, and the superseded "cutover fails" records carry an explicit dated supersession
@@ -813,4 +814,7 @@ Three PRs came out of this loop. They are independent of each other.
   `sw.js` logged an error on every cache miss and cached nothing. Unrelated to the
   due-date failure it was reported alongside; the `asynchronous listener` /
   `No Listener` messages reported with it are browser-extension noise and are
-  deliberately not chased. It is rebased after PR #69 merges.
+  deliberately not chased. **Rebased onto `f15bcca`**; its `CHANGELOG.md` conflict was
+  reconciled the same way — every entry retained, the service-worker record placed
+  beside the other product-defect entry so the two BYOK entries stay adjacent as a
+  supersession pair.
