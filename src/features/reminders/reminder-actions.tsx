@@ -71,14 +71,15 @@ export function ReminderActions({
    * The same instant as `YYYY-MM-DDTHH:mm` in the owner's timezone, for the
    * `datetime-local` input — **also computed by the server**.
    *
-   * The obvious client-side call is `formatInstantForDateTimeLocal`, and it
-   * throws for most real reminders: its parser requires seconds to be literally
-   * `:00` with no fractional part (`candidate-due-date.ts:2`), while every
-   * instant this surface writes or reads carries whatever `now()` had —
-   * `2026-07-31T14:37:12.345678+00:00`. Opening the reschedule panel on a
-   * just-snoozed reminder therefore threw inside render and took the page to its
-   * error boundary. Formatting server-side removes the throwing parser from the
-   * client entirely rather than widening a regex two other features depend on.
+   * The obvious client-side call is `formatInstantForDateTimeLocal`. It used to
+   * throw for most real reminders — its parser demanded seconds of literally
+   * `:00` with no fractional part, while every instant this surface writes or
+   * reads carries whatever `now()` had, `2026-07-31T14:37:12.345678+00:00`. So
+   * opening the reschedule panel on a just-snoozed reminder threw inside render
+   * and took the page to its error boundary. That parser now accepts the whole
+   * `z.string().datetime({ offset: true })` grammar, but the formatting stays
+   * server-side: it keeps a throwing parser out of client render entirely,
+   * which is the property this panel actually wants.
    */
   remindAtLocalValue: string;
 }) {

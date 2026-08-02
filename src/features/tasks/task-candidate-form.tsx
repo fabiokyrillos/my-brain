@@ -18,6 +18,7 @@ import {
   type CandidateResolution,
 } from "./candidate-disposition-contract";
 import { CandidateEditor } from "./candidate-editor";
+import { describeInstantForDateTimeLocal } from "./candidate-due-date";
 import type { CandidateRelationOptions } from "./relation-options";
 
 export type ConfirmTasksCode =
@@ -95,11 +96,22 @@ const formCopy = {
   },
 } as const;
 
-function formatDueDate(value: string | null, locale: "pt-BR" | "en") {
+/**
+ * The candidate's due date as a label, or nothing at all.
+ *
+ * `new Date` is not a contract: it throws through `Intl` on a malformed offset
+ * and, worse, reads a date-only value as UTC midnight — a day the owner never
+ * stated. The typed reader decides first, and the owner's timezone is named
+ * explicitly so this label can never disagree with the editor sitting beside it.
+ */
+function formatDueDate(value: string | null, locale: "pt-BR" | "en", timezone: string) {
   if (!value) return null;
+  if (describeInstantForDateTimeLocal(value, timezone).status !== "valid") return null;
+
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: timezone,
   }).format(new Date(value));
 }
 
@@ -259,7 +271,7 @@ export function TaskCandidateForm({
         ? normalizeCandidateEdits({
           edits: candidateEdits,
           selectedCandidateIndexes: confirmedCandidateIndexes,
-          suggestions: candidates.map(toEditSuggestion),
+          suggestions: candidates.map((candidate) => toEditSuggestion(candidate, timezone)),
         }).edits
         : [];
       const canonical = normalizeCandidateResolutionCommand({
@@ -399,6 +411,7 @@ export function TaskCandidateForm({
             const siblingCandidates = visibleCandidates
               .filter((sibling) => Number(sibling.key) !== index)
               .map((sibling) => ({ index: Number(sibling.key), title: sibling.title }));
+            const dueDateLabel = formatDueDate(candidate.dueAt ?? null, locale, timezone);
 
             return (
               <div
@@ -425,10 +438,8 @@ export function TaskCandidateForm({
                   <span className="candidate-copy">
                     <strong>{candidate.title}</strong>
                     {candidate.description && <small>{candidate.description}</small>}
-                    {candidate.dueAt && (
-                      <small>
-                        {pt ? "Prazo" : "Due"}: {formatDueDate(candidate.dueAt, locale)}
-                      </small>
+                    {dueDateLabel && (
+                      <small>{pt ? "Prazo" : "Due"}: {dueDateLabel}</small>
                     )}
                   </span>
                 </label>
@@ -557,12 +568,27 @@ function excludeSetIndexes(
   return new Set([...source].filter((candidateIndex) => !excludedIndexes.has(candidateIndex)));
 }
 
-function toEditSuggestion(candidate: ActionableCandidateView): CandidateEditSuggestion {
+/**
+ * The suggestion as the owner was actually shown it.
+ *
+ * A due date outside the readable contract is presented as absent — the same
+ * thing `CandidateEditor` does, next to a localized notice saying so. Carrying
+ * it through instead would fail suggestion validation and refuse the whole
+ * batch, which would cost the owner every other candidate in the entry over one
+ * optional field. Nothing stored is altered: only what this form claims the
+ * owner saw.
+ */
+function toEditSuggestion(
+  candidate: ActionableCandidateView,
+  timezone: string,
+): CandidateEditSuggestion {
+  const dueAt = candidate.dueAt ?? null;
+
   return {
     candidateIndex: Number(candidate.key),
     title: candidate.title,
     description: candidate.description ?? null,
-    dueAt: candidate.dueAt ?? null,
+    dueAt: describeInstantForDateTimeLocal(dueAt, timezone).status === "valid" ? dueAt : null,
   };
 }
 

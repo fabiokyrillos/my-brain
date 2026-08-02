@@ -404,4 +404,71 @@ describe("TaskCandidateForm", () => {
     expect(screen.getByRole("checkbox", { name: /^Conversar com Maria/ })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "Criar tarefa" })).toBeChecked();
   });
+
+  // The form is what the entry detail route mounts for its "next actions", so
+  // this is where a due date the editor cannot read either costs the owner one
+  // field or costs them the whole page. Entry
+  // bdf48c06-5ceb-4c27-a7c7-ddc901e366b2 lost the whole page.
+  describe("a candidate whose due date the editor cannot read", () => {
+    const endOfDayInstant = "2026-08-08T23:59:59-03:00";
+
+    it("renders the batch when a candidate carries an instant with seconds", () => {
+      renderForm({
+        candidates: [{ ...candidates[0], dueAt: endOfDayInstant }, candidates[1]],
+      });
+
+      expect(editorFor("Atualizar o relatório")).toBeVisible();
+      expect(editorFor("Conversar com Maria")).toBeVisible();
+      // Once on the candidate card, once inside its editor — and both read the
+      // owner's timezone, so they never disagree.
+      const labels = screen.getAllByText(/^Prazo: .*23:59$/);
+      expect(labels).toHaveLength(2);
+      for (const label of labels) expect(label).toBeVisible();
+    });
+
+    it.each([
+      ["a date-only value", "2026-08-08"],
+      ["a local date-time without an offset", "2026-08-08T23:59:00"],
+      ["a SQL-style timestamp", "2026-08-08 23:59:00+00"],
+      ["a malformed offset", "2026-08-08T23:59:00+3:00"],
+      ["an impossible date", "2026-02-30T10:00:00-03:00"],
+    ])("renders the whole batch when one candidate carries %s", (_label, dueAt) => {
+      renderForm({ candidates: [{ ...candidates[0], dueAt }, candidates[1]] });
+
+      expect(editorFor("Atualizar o relatório")).toBeVisible();
+      expect(editorFor("Conversar com Maria")).toBeVisible();
+      expect(screen.getByText(
+        "Não foi possível ler o prazo sugerido. Defina uma data se quiser um prazo.",
+      )).toBeVisible();
+      expect(screen.getByRole("button", { name: /^Resolver/ })).toBeVisible();
+    });
+
+    it("still resolves the batch around the unreadable field", async () => {
+      const user = userEvent.setup();
+      const { action } = renderForm({
+        candidates: [{ ...candidates[0], dueAt: "2026-08-08" }, candidates[1]],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Resolver 2 sugestões" }));
+
+      await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(await screen.findByRole("status")).toHaveTextContent("Sugestões resolvidas.");
+    });
+
+    it("keeps a valid sibling due date working alongside an unreadable one", async () => {
+      const user = userEvent.setup();
+      renderForm({
+        candidates: [
+          { ...candidates[0], dueAt: "2026-08-08" },
+          { ...candidates[1], dueAt: endOfDayInstant },
+        ],
+      });
+
+      await expandEditor(user, "Conversar com Maria");
+
+      expect(within(editorFor("Conversar com Maria"))
+        .getByLabelText("Data limite (America/Sao_Paulo)"))
+        .toHaveValue("2026-08-08T23:59");
+    });
+  });
 });

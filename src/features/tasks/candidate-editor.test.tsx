@@ -995,4 +995,118 @@ describe("CandidateEditor", () => {
       expect(screen.getByRole("combobox", { name: "Tarefa-mãe" })).toHaveDisplayValue("Nenhuma");
     });
   });
+
+  // One optional field carrying a representation this editor cannot read must
+  // cost the user that field and nothing else — not the candidate, not the
+  // entry, not the route.
+  describe("due dates outside the readable contract", () => {
+    const unreadableDueDates = [
+      ["a date-only value", "2026-08-08"],
+      ["a local date-time without an offset", "2026-08-08T23:59:00"],
+      ["a SQL-style timestamp", "2026-08-08 23:59:00+00"],
+      ["a malformed offset", "2026-08-08T23:59:00+3:00"],
+      ["an impossible date", "2026-02-30T10:00:00-03:00"],
+      ["an empty string", ""],
+    ] as const;
+
+    it("renders the end-of-day instant that crashed the entry route", () => {
+      renderEditor({ candidate: { ...candidate, dueAt: "2026-08-08T23:59:59-03:00" } });
+
+      expect(screen.getByText(/^Prazo: .*23:59$/)).toBeVisible();
+    });
+
+    it("populates the control from an instant carrying seconds", async () => {
+      const user = userEvent.setup();
+      renderEditor({ candidate: { ...candidate, dueAt: "2026-08-08T23:59:59-03:00" } });
+
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data limite (America/Sao_Paulo)"))
+        .toHaveValue("2026-08-08T23:59");
+    });
+
+    it.each(unreadableDueDates.filter(([label]) => label !== "an empty string"))(
+      "keeps the candidate readable when the due date is %s",
+      (_label, dueAt) => {
+        renderEditor({ candidate: { ...candidate, dueAt } });
+
+        expect(screen.getByText("Enviar o relatório")).toBeVisible();
+        expect(screen.getByText(
+          "Não foi possível ler o prazo sugerido. Defina uma data se quiser um prazo.",
+        )).toBeVisible();
+        expect(screen.queryByText(/^Prazo: /)).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(unreadableDueDates)(
+      "never renders %s as if it were a valid instant",
+      (_label, dueAt) => {
+        const { container } = renderEditor({ candidate: { ...candidate, dueAt } });
+
+        // No rendered date at all: neither the raw value echoed back nor a
+        // neighbouring day arrived at by assuming an offset.
+        expect(container.textContent).not.toContain("2026");
+      },
+    );
+
+    it("leaves the due-date control empty rather than guessing an offset", async () => {
+      const user = userEvent.setup();
+      renderEditor({ candidate: { ...candidate, dueAt: "2026-08-08T23:59:00" } });
+
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      expect(screen.getByLabelText("Data limite (America/Sao_Paulo)")).toHaveValue("");
+    });
+
+    it("keeps every other field of the candidate editable", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({
+        candidate: { ...candidate, dueAt: "2026-08-08" },
+      });
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      await user.type(screen.getByRole("textbox", { name: "Título" }), " hoje");
+
+      expect(onEditChange).toHaveBeenLastCalledWith(expect.objectContaining({
+        candidateIndex: 0,
+        changes: expect.objectContaining({ title: "Enviar o relatório hoje" }),
+      }));
+    });
+
+    it("emits no due-date change while the unreadable value is left alone", async () => {
+      const user = userEvent.setup();
+      const { onEditChange } = renderEditor({
+        candidate: { ...candidate, dueAt: "2026-08-08" },
+      });
+
+      await user.click(screen.getByRole("button", { name: "Editar sugestão: Enviar o relatório" }));
+
+      expect(onEditChange).not.toHaveBeenCalledWith(expect.objectContaining({
+        changes: expect.objectContaining({ dueAt: expect.anything() }),
+      }));
+    });
+
+    it("announces the refusal in English too", () => {
+      renderEditor({
+        candidate: { ...candidate, dueAt: "2026-08-08" },
+        locale: "en",
+      });
+
+      expect(screen.getByText(
+        "The suggested due date could not be read. Set a date if you want one.",
+      )).toBeVisible();
+    });
+
+    it("survives a timezone change while the due date stays unreadable", () => {
+      const { rerender, props } = renderEditor({
+        candidate: { ...candidate, dueAt: "2026-08-08" },
+      });
+
+      rerender(<CandidateEditor {...props} timezone="America/New_York" />);
+
+      expect(screen.getByText(
+        "Não foi possível ler o prazo sugerido. Defina uma data se quiser um prazo.",
+      )).toBeVisible();
+    });
+  });
 });

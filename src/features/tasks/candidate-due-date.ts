@@ -1,5 +1,15 @@
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
-const OFFSET_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(00)(Z|([+-])(\d{2}):(\d{2}))$/;
+// The upstream contract — `storableInstant` in `src/lib/ai/extraction-schema.ts`
+// and `dueAtSchema` in `./candidate-edit-contract.ts`, both
+// `z.string().datetime({ offset: true })` — permits any seconds value and
+// optional fractional seconds. This reader accepts exactly that grammar. It
+// used to demand `:00` seconds, which meant a model-produced end-of-day due
+// date such as `...T23:59:59-03:00` passed every validated boundary and then
+// threw here, taking the whole entry detail route down through the error
+// boundary. The seconds are read only to be discarded: a datetime-local control
+// has minute precision, and truncating to the minute never moves the wall clock.
+const OFFSET_INSTANT_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 const EXPLICIT_OFFSET_PATTERN = /(?:Z|[+-]\d{2}:\d{2})$/;
 const MINUTE_IN_MILLISECONDS = 60_000;
 const SEARCH_WINDOW_MINUTES = 24 * 60;
@@ -11,6 +21,53 @@ type DateTimeParts = {
   hour: number;
   minute: number;
 };
+
+/**
+ * Why a candidate due date could not be shown, when it could not be shown.
+ *
+ * `missing-offset` covers every representation that names no instant at all —
+ * a date-only value, a local date-time, a SQL-style timestamp. Such a value
+ * cannot be rendered without inventing an offset, so it is refused rather than
+ * guessed at.
+ */
+export type CandidateDueDateReason = "missing-offset" | "malformed-instant";
+
+export type CandidateDueDateState =
+  | { readonly status: "absent" }
+  | { readonly status: "valid"; readonly localValue: string }
+  | { readonly status: "unreadable"; readonly reason: CandidateDueDateReason };
+
+/**
+ * The candidate due date as a datetime-local control can show it.
+ *
+ * One optional field carrying a legacy or malformed representation must not be
+ * able to take down an entry, so the failure is a value the caller renders, not
+ * an exception it has to catch. An unusable timezone still throws: that is a
+ * configuration defect rather than a defect in the candidate's own data.
+ */
+export function describeInstantForDateTimeLocal(
+  instant: string | null | undefined,
+  timezone: string,
+): CandidateDueDateState {
+  const formatter = createTimezoneFormatter(timezone);
+
+  if (!instant) {
+    return { status: "absent" };
+  }
+
+  if (!declaresOffset(instant)) {
+    return { status: "unreadable", reason: "missing-offset" };
+  }
+
+  try {
+    return {
+      status: "valid",
+      localValue: formatDateTimeParts(formatter, parseOffsetInstant(instant)),
+    };
+  } catch {
+    return { status: "unreadable", reason: "malformed-instant" };
+  }
+}
 
 export function formatInstantForDateTimeLocal(
   instant: string | null | undefined,
@@ -74,6 +131,21 @@ export function localDateTimeToOffsetInstant(
   return `${localValue}:00${formatUtcOffset(utcOffsetMinutes)}`;
 }
 
+/**
+ * Whether the value even attempts to name an instant.
+ *
+ * A date-only value, a bare local date-time and a SQL-style timestamp all say
+ * nothing about an offset, and the difference matters: those cannot be shown
+ * without inventing one, whereas a value that declares an offset badly is
+ * simply malformed. The search is confined to the time half so the `-` in a
+ * date such as `2026-08-08` is never mistaken for an offset sign.
+ */
+function declaresOffset(value: string): boolean {
+  const timeSeparatorIndex = value.indexOf("T");
+  return timeSeparatorIndex >= 0
+    && /[Z+-]/.test(value.slice(timeSeparatorIndex + 1));
+}
+
 function createTimezoneFormatter(timezone: string): Intl.DateTimeFormat {
   if (timezone !== "UTC" && !timezone.includes("/")) {
     throw new Error("Invalid IANA timezone");
@@ -119,6 +191,13 @@ function parseOffsetInstant(instant: string): number {
 
   const parts = matchToDateTimeParts(match);
   const localMilliseconds = createUtcTimestamp(parts);
+
+  // Seconds are discarded rather than carried, but an impossible seconds field
+  // still means the whole instant is malformed and must not be shown.
+  if (Number(match[6]) > 59) {
+    throw new Error("Invalid offset-bearing instant");
+  }
+
   const isUtc = match[7] === "Z";
   const offsetHours = isUtc ? 0 : Number(match[9]);
   const offsetMinutes = isUtc ? 0 : Number(match[10]);

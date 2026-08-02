@@ -41,9 +41,11 @@ export function ReminderList({
    *
    * Both formatters are applied here and their *results* handed downward: the
    * row controls are a Client Component, and a function cannot cross that
-   * boundary. The local-input one additionally must not be
-   * `formatInstantForDateTimeLocal`, whose parser rejects any instant whose
-   * seconds are not literally `:00` — which is nearly all of them.
+   * boundary. The local-input one is deliberately not
+   * `formatInstantForDateTimeLocal`: that parser once rejected any instant
+   * whose seconds were not literally `:00` — nearly all of them — and although
+   * it now accepts the full stored grammar, keeping a throwing parser out of
+   * client render is the property this list wants.
    */
   formatLocalInput: (iso: string) => string;
 }) {

@@ -78,7 +78,13 @@ const localized = {
   },
 } as const;
 
-function extraction(prefix: string, locale: Locale) {
+const DEFAULT_CONFIRMED_DUE_AT = "2026-08-01T15:00:00Z";
+
+function extraction(
+  prefix: string,
+  locale: Locale,
+  confirmedDueAt: string = DEFAULT_CONFIRMED_DUE_AT,
+) {
   return {
     language: locale,
     summary: `Candidate disposition UI smoke (${locale})`,
@@ -94,7 +100,7 @@ function extraction(prefix: string, locale: Locale) {
       {
         title: `${prefix} confirmed candidate`,
         description: "Original confirmed description",
-        dueAt: "2026-08-01T15:00:00Z",
+        dueAt: confirmedDueAt,
         waitingOn: null,
         parentIndex: null,
         confidence: 0.9,
@@ -137,6 +143,7 @@ async function createFixture(
   owner: SupabaseClient,
   locale: Locale,
   onUserCreated: (userId: string) => void,
+  confirmedDueAt: string = DEFAULT_CONFIRMED_DUE_AT,
 ): Promise<DisposableFixture> {
   const prefix = `phase-2c-ui-${locale.toLowerCase()}-${crypto.randomUUID()}`;
   const email = `${prefix}@example.com`;
@@ -184,7 +191,7 @@ async function createFixture(
     "persist_entry_interpretation",
     {
       p_entry_id: entry.id,
-      p_extraction: extraction(prefix, locale),
+      p_extraction: extraction(prefix, locale, confirmedDueAt),
       p_model: "gpt-test",
       p_strategy_version: "phase-2c-ui-smoke",
       p_prompt_version: "phase-2c-ui-smoke",
@@ -472,6 +479,75 @@ test.describe("candidate dispositions through the production confirmation Server
         disposableAccessToken = fixture.accessToken;
         await login(page, fixture, locale);
         await runDispositionJourney(page, owner, fixture, locale);
+      } finally {
+        if (disposableUserId && disposableAccessToken) {
+          await cleanupFixture(admin, disposableUserId, disposableAccessToken);
+        } else if (disposableUserId) {
+          const { error } = await admin.auth.admin.deleteUser(disposableUserId);
+          expect(error).toBeNull();
+        }
+      }
+    });
+  }
+});
+
+/**
+ * The exact shape that took entry bdf48c06-5ceb-4c27-a7c7-ddc901e366b2 to the
+ * app error boundary: a due date the model was entitled to produce — a valid
+ * negative-offset end-of-day instant — whose seconds were not `:00`. Every
+ * validated boundary accepted it; the reader that fills the `datetime-local`
+ * control threw on it, and one optional field took the whole route down.
+ *
+ * The owner's zone here is America/New_York, so 23:59:59-03:00 must arrive as
+ * 22:59 rather than as the digits of the stored string.
+ */
+test.describe("an entry detail whose candidate due date carries seconds", () => {
+  test.describe.configure({ mode: "serial" });
+  test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
+  test.setTimeout(180_000);
+
+  for (const locale of ["pt-BR", "en"] as const) {
+    test(`renders rather than reaching the error boundary in ${locale}`, async ({ page }) => {
+      const admin = createClient(supabaseUrl!, serviceRoleKey!, clientOptions);
+      const owner = createClient(supabaseUrl!, publishableKey!, clientOptions);
+      let disposableUserId: string | undefined;
+      let disposableAccessToken: string | undefined;
+      try {
+        const fixture = await createFixture(
+          admin,
+          owner,
+          locale,
+          (userId) => {
+            disposableUserId = userId;
+          },
+          "2026-08-08T23:59:59-03:00",
+        );
+        disposableAccessToken = fixture.accessToken;
+        const text = localized[locale];
+        await login(page, fixture, locale);
+
+        await page.goto(`/${locale}/app/inbox/${fixture.entryId}`);
+
+        await expect(page.getByRole("heading", {
+          name: locale === "pt-BR" ? "Não foi possível carregar" : "We could not load this page",
+        })).toHaveCount(0);
+
+        const title = `${fixture.prefix} confirmed candidate`;
+        const editor = page.getByRole("group", { name: text.candidate(title) });
+        await expect(editor).toBeVisible();
+        // The editor's own label is 24-hour in pt-BR and 12-hour in English;
+        // both must name the same New York wall time.
+        await expect(editor.getByText(
+          locale === "pt-BR" ? /22:59/ : /10:59\s*PM/,
+        )).toBeVisible();
+
+        await editor.getByRole("button", { name: text.edit(title) }).click();
+        await expect(editor.getByLabel(text.dueDate)).toHaveValue("2026-08-08T22:59");
+
+        // The rest of the batch is still there and still resolvable.
+        await expect(
+          page.getByRole("group", { name: text.candidate(`${fixture.prefix} rejected candidate`) }),
+        ).toBeVisible();
       } finally {
         if (disposableUserId && disposableAccessToken) {
           await cleanupFixture(admin, disposableUserId, disposableAccessToken);
