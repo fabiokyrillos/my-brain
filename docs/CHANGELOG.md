@@ -3,6 +3,18 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-02 — Signup Hardening: the planning package (no code, no migrations)
+
+**Documentation only. Zero product code, zero migrations; the head stays at `202608010069`.** This is the planning initiative `ADR-068` ordered after BYOK's close, and BYOK closed earlier today, so the package is authorized to exist. **It authorizes no implementation** — the plan's per-slice pre-code gates do that.
+
+**Scope was measured before it was declared.** A four-agent read-only census (auth surfaces; database privileged boundaries; storage, workers and Edge Functions; product surfaces and doc conventions) produced `docs/reports/SIGNUP_HARDENING_FINDINGS.md`. It corrected the shape of the work rather than confirming a preliminary list: row-level cascade from `auth.users` is **already complete** (41/41 user-owned tables, zero exceptions), so the deletion gaps are **storage objects** (six live orphans from 2026-07-16, which do not cascade) and the **untested** 43 composite `NO ACTION` foreign keys that sit in a bulk-delete's path; **no account-lifecycle state exists anywhere**, so deletion and suspension are built on one foundation, not two; `service_role` still holds platform-default DML on the two BYOK tables; and the only retention sweep in the whole database is BYOK's 30-day validation-attempt prune.
+
+**The package.** `docs/SIGNUP_HARDENING_PRD.md` (16 `SH-*` families, ~120 mechanically-testable requirements, each carrying its slice, migration expectation, trust boundary, owner/shared-env flags and evidence class); `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` (seven slices SH.0–SH.7, an eight-migration budget, tiered pre-code gates, and the BYOK-OPERATIONS/Phase 2H boundary reasoning); `docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md` (35 threats T-01…T-35 with prevention, detection, test and residual); `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` (a fail-closed checklist where an absent artifact is a failed gate, never a skip); and ADR-073…ADR-076 (Proposed) — the initiative shape and `SH-*` namespace, the self-only deletion executor, the operator-CLI admin boundary, and provider-enforced CAPTCHA.
+
+**The requirement namespace is `SH-*`, deliberately not a phase prefix**, because `ADR-067`'s phase-start guard fails the build on a declared `2G-`-shaped requirement family. The pre-code gates are tiered per `ADR-069`'s lesson so no single external dependency (a CAPTCHA vendor, hosted Auth config, SMTP) blocks unrelated slices. Deletion, suspension and rollout are specified never to share a PR. `disable_signup` stays `true` throughout; the initiative's output is the rollout gate that would *prove* readiness, not the flip.
+
+**The ADR ledger's `ADR-060`/`ADR-061` double-use is recorded** (a ledger note above ADR-073) so future citations disambiguate by title; new ADRs continue from ADR-073.
+
 ## 2026-08-02 — BYOK closes: the gates that needed real credentials, and the rotation window that needed building
 
 **Zero migrations; the head stays at `202608010069`. BYOK is CLOSED**, and what is *not* closed is named below rather than folded in.

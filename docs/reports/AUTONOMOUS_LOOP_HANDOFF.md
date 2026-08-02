@@ -4,9 +4,9 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-02**, at **BYOK's close**. **§16 supersedes §15, which supersedes
-§14, which supersedes §13**, and §16 is the only section a resuming context needs to act
-on first.
+Last updated: **2026-08-02**, at the **Signup Hardening planning merge**. **§17 supersedes §16's
+"Next", which supersedes §15, which supersedes §14, which supersedes §13.** BYOK's close is §16;
+what comes next is §17, and §17 is the section a resuming context acts on first.
 §13 and §14 are retained as the record of the first two stops; every owner action either
 listed has since been performed.
 
@@ -884,3 +884,61 @@ product's — a decrypt harness that read `bytea` as base64 and reported a false
 prerequisites do not exist at all: **account deletion** (and the storage-residue
 gap above is part of it), **admin suspension**, and **terms and privacy policy**.
 Phase 2G stays unauthorised until Signup Hardening closes.
+
+---
+
+## 17. Signup Hardening — PLANNED. **This supersedes §16's "Next".**
+
+Last updated **2026-08-02**, at the Signup Hardening planning merge. §16 remains the
+record of BYOK's close; act on this section for what comes next.
+
+**The planning package exists and is merged; no implementation is authorized by it.**
+`ADR-068` ordered Signup Hardening after BYOK's close; BYOK closed on `b007ffa`, so the
+initiative is authorized to be *planned*, and it now is. The package:
+
+- `docs/SIGNUP_HARDENING_PRD.md` — 16 `SH-*` families, ~120 requirements, each with slice,
+  migration expectation, trust boundary, owner/shared-env flags, evidence class.
+- `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` — slices SH.0–SH.7, eight-migration budget,
+  tiered pre-code gates, the BYOK-OPERATIONS/Phase 2H boundary.
+- `docs/reports/SIGNUP_HARDENING_FINDINGS.md` — the four-agent census (the evidence base).
+- `docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md` — 35 threats with prevention/detection/test/
+  residual.
+- `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` — the fail-closed public-signup checklist.
+- ADR-073…ADR-076 (Proposed).
+
+**What the census changed about the assumed scope** — measured, not inferred:
+
+- Row-level cascade from `auth.users` is **already complete** (41/41 user-owned tables). The
+  deletion gaps are **storage objects** (six live orphans from 2026-07-16, no cascade) and the
+  **untested** 43 composite `NO ACTION` FKs in a bulk delete's path — not the tables. The
+  cascade drill (`SH-DELETE-001`) is the load-bearing all-implementation gate.
+- **No account-lifecycle state exists anywhere.** Deletion and suspension share one foundation
+  (`account_lifecycle`), enforced in the DB and workers, not React.
+- `service_role` still holds platform-default DML on `user_ai_credentials` and
+  `credential_validation_attempts` (`SH-EXPOSURE-001` revokes it).
+- Retention is absent except BYOK's 30-day prune (`SH-RETENTION`).
+
+**Do not, on resuming:**
+
+- **Do not begin Signup Hardening implementation, Phase 2G, or Phase 2H.** The package
+  authorizes none of them. Implementation begins only when the owner approves the package and
+  SH.0's pre-code gates pass.
+- **Do not open self-service signup or flip `disable_signup`.** It stays `true`; the initiative
+  delivers the rollout gate, not the flip (`SH-ROLLOUT-005` is post-initiative, owner-only).
+- **Do not use a `2G-` (or any phase) prefix for a Signup Hardening requirement** — it trips
+  `ADR-067`'s phase-start guard. The namespace is `SH-*`.
+- **Do not absorb the BYOK-OPERATIONS operator surfaces** (dashboard, alerting, credential/
+  account-health) into Signup Hardening — they go to a Phase 2H-aligned Operations initiative
+  (`ADR-073`, plan §8). Signup Hardening builds the admin *boundary*, not the operations
+  tooling.
+- **Do not delete the six orphaned storage objects yet** — `SH-DELETE-015`: manifest first,
+  then a separate owner-authorized irreversible step.
+
+**Owner actions the plan will need** (tiered, so none blocks unrelated slices): sign the PRD
+§20 quota/retention value sheet; verify a restorable production backup; provision disposable
+accounts for the deletion/suspension journeys; make the hosted-config readbacks and the CAPTCHA
+vendor / SMTP / hosting decisions at their slice's point of use.
+
+**Roadmap, explicit:** Signup Hardening → Phase 2G (Conversational Creation) → Phase 2H
+(Deploy and Operate, which absorbs the operator-surface residual) → open self-service signup.
+Public signup is a gate proven by a checklist, never a scheduled step.
