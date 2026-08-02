@@ -5,6 +5,14 @@ function assert(condition, label) {
   if (!condition) throw new Error(label);
 }
 
+/**
+ * Not a failure: the signal that the script has run every case a disposable
+ * account can reach and the rest needs a credential that cannot exist here.
+ * Thrown so the `finally` still deletes the fixture users — an early `exit`
+ * would leak them into the shared project.
+ */
+class SmokeBlocked extends Error {}
+
 function dataOrThrow(result, label) {
   if (result.error) {
     throw new Error(`${label} (${result.error.code ?? "unknown"}): ${result.error.message}`);
@@ -54,6 +62,67 @@ try {
     createTestUser(1),
     createTestUser(2),
   ]);
+
+  /**
+   * The uncredentialed half of the capture lifecycle (BYOK-CAPTURE-001/002/003).
+   *
+   * This smoke's users are disposable, so until BYOK they were the only kind of
+   * user it had — and every assertion below assumed a capture always enqueues a
+   * job. It does not any more: with no active credential the entry is stored in
+   * `awaiting_ai_configuration` and **no job is created**, in the same
+   * transaction. Nothing is queued that nothing can run.
+   */
+  const uncredentialedKey = `remote-entry-nokey:${suffix}`;
+  const uncredentialedCapture = dataOrThrow(
+    await first.rpc("capture_entry_async", {
+      p_original_content: "Remote entry-processing capture without a credential",
+      p_locale: "en",
+      p_source: "web",
+      p_idempotency_key: uncredentialedKey,
+    }),
+    "capture entry without an AI credential",
+  );
+  assert(
+    uncredentialedCapture.status === "saved" && uncredentialedCapture.replayed === false,
+    "Uncredentialed capture did not return a saved receipt",
+  );
+  const uncredentialedEntry = dataOrThrow(
+    await first.from("entries").select("status").eq("id", uncredentialedCapture.entry_id).single(),
+    "read uncredentialed entry state",
+  );
+  assert(
+    uncredentialedEntry.status === "awaiting_ai_configuration",
+    `Uncredentialed capture stored status ${uncredentialedEntry.status} instead of awaiting_ai_configuration`,
+  );
+  const uncredentialedJobs = dataOrThrow(
+    await first.from("jobs").select("id").eq("idempotency_key", `entry-capture:${uncredentialedKey}`),
+    "read uncredentialed capture jobs",
+  );
+  assert(uncredentialedJobs.length === 0, "Uncredentialed capture queued a job nothing can run");
+
+  /**
+   * The credentialed half, for the queue mechanics below.
+   *
+   * The row is seeded directly and its ciphertext is synthetic — the same
+   * technique `supabase/tests/byok_awaiting_and_drain.sql` uses, and legitimate
+   * here for the same reason: nothing in this file invokes the worker or reaches
+   * a provider, so what is being exercised is claim, lease, staleness and
+   * failure accounting. A disposable account cannot hold a real product
+   * credential, because saving one requires a provider-accepted key.
+   */
+  dataOrThrow(
+    await admin.from("user_ai_credentials").insert({
+      user_id: firstUser.id,
+      status: "active",
+      ciphertext: "\\xaa01020304050607080910111213141516",
+      iv: "\\xaa0102030405060708091011",
+      key_version: 1,
+      // BYOK-FINGERPRINT-002/004's closed shape: prefix, colon, six lowercase hex.
+      fingerprint: "sk-proj:aaaaaa",
+      validated_at: new Date().toISOString(),
+    }).select("user_id").single(),
+    "seed a synthetic active credential for the queue fixture",
+  );
 
   const captureKey = `remote-entry-capture:${suffix}`;
   const capture = dataOrThrow(
@@ -297,11 +366,66 @@ try {
       .single(),
     "read initial job for direct worker invocation",
   );
+  /**
+   * Here the script reaches the BYOK boundary, and stops honestly.
+   *
+   * Everything above this line is exercisable by a disposable account. Nothing
+   * below it is: a real end-to-end interpretation needs a credential the worker
+   * can both decrypt **and** authenticate against OpenAI, and a disposable
+   * account cannot hold one — saving a credential requires a provider-accepted
+   * key, and the acceptance lane's key is explicitly not a product credential.
+   *
+   * So the direct invocation asserts what is actually true of this fixture: the
+   * seeded ciphertext is synthetic, the worker cannot open it, and it must fail
+   * closed with a declared code, burning one attempt, making no provider call
+   * and billing nothing. That is the master-key-loss contract, asserted on the
+   * path that used to assert a project-key success.
+   *
+   * The remaining end-to-end section is then reported as BLOCKED by name rather
+   * than left to fail as though something had regressed.
+   */
   const directInvoke = await first.functions.invoke("process-jobs", {
     body: { jobId: workerInitialJob.id },
   });
-  assert(!directInvoke.error, `Direct worker invocation failed: ${directInvoke.error?.message ?? "unknown"}`);
-  assert(directInvoke.data?.ok === true && directInvoke.data?.mode === "initial", "Direct worker invocation did not report a completed initial run");
+  assert(
+    directInvoke.error !== null,
+    "The worker opened a synthetic ciphertext, or ran the job without opening one",
+  );
+  const refusedJob = dataOrThrow(
+    await first.from("jobs").select("status,attempts,error").eq("id", workerInitialJob.id).single(),
+    "read job state after the refused invocation",
+  );
+  assert(
+    refusedJob.error === "credential_unreadable",
+    `Refused job carried ${refusedJob.error} instead of the declared credential_unreadable`,
+  );
+  assert(refusedJob.attempts === 1, `Refused job burned ${refusedJob.attempts} attempts instead of one`);
+  const refusedEntry = dataOrThrow(
+    await first.from("entries").select("status,processing_error").eq("id", workerCapture.entry_id).single(),
+    "read entry state after the refused invocation",
+  );
+  assert(
+    refusedEntry.status === "awaiting_ai_configuration",
+    `Entry landed in ${refusedEntry.status} instead of awaiting_ai_configuration`,
+  );
+  const refusedUsage = dataOrThrow(
+    await first.from("ai_usage_events").select("id").eq("source_id", workerCapture.entry_id),
+    "read the ledger after the refused invocation",
+  );
+  assert(refusedUsage.length === 0, "An unreadable credential still produced a billed provider call");
+
+  console.log(
+    "Remote entry-processing smoke: atomic capture (credentialed and not), bounded payloads, idempotency, "
+    + "ownership, exclusive leases, retries, stale-worker protection, recovery, reprocessing isolation, and a "
+    + "worker that fails closed on an unopenable credential without billing anything.",
+  );
+  console.log(
+    "BLOCKED past this point: end-to-end interpretation, product events and the unattended dispatch drain all "
+    + "need a credential the worker can decrypt AND authenticate against the provider. A disposable account "
+    + "cannot hold one. See docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md.",
+  );
+  process.exitCode = 0;
+  throw new SmokeBlocked();
 
   const interpretedEntry = dataOrThrow(
     await first.from("entries").select("status,current_interpretation_id").eq("id", workerCapture.entry_id).single(),
@@ -491,6 +615,8 @@ try {
   assert(drainedEvents[0].properties?.outcome === expectedDrainOutcome, "The unattended dispatch completion event did not match the persisted entry outcome");
 
   console.log("Remote entry-processing smoke passed: atomic capture, bounded payloads, idempotency, ownership, exclusive leases, retries, stale-worker protection, recovery, reprocessing isolation, direct worker invocation (initial and reprocess), and unattended dispatch drain.");
+} catch (error) {
+  if (!(error instanceof SmokeBlocked)) throw error;
 } finally {
   await Promise.all(createdUsers.map(async (userId) => {
     const cleanup = await admin.auth.admin.deleteUser(userId);
