@@ -361,3 +361,75 @@ to this loop: `BYOK_VALIDATION_OPENAI_API_KEY` is explicitly not one (`ADR-070`,
 **BYOK is therefore still not closed.** What changed is which claim is false: no central
 runtime claim is false any more, and the remainder is blocked on an external credential
 rather than on a broken deployment.
+
+---
+
+## 11. The closeout, 2026-08-02 — every remaining gate executed. **Appended; nothing above is edited.**
+
+The owner provisioned two disposable, low-limit OpenAI **product** credentials
+(`BYOK_TEST_USER_A_OPENAI_API_KEY`, `BYOK_TEST_USER_B_OPENAI_API_KEY`, in
+`.env.local` and nowhere else). That cleared the single blocker §10 named, and
+every item it listed as blocked has now been executed against the deployment
+with real provider calls.
+
+Preflight, reported as counts only: **A present, B present, distinct,
+repository matches: zero** across 1047 tracked files, `.env.local` ignored and
+untracked. No value, prefix, length or digest was printed at any point.
+
+### What now passes
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| **C11 — Settings journeys** | **PASS 4/4** | desktop + Pixel 7 × pt-BR + English, `e2e/byok-settings-journey.spec.ts`. Gated state, live validation, metadata-only configured state, invalid candidate preserving the active credential, replacement, removal with confirmation, immediate gating, reconfiguration, no reveal control, no prefill, both honesty disclosures, keyboard order and no horizontal overflow. |
+| **Two-user isolation, real credentials** | **PASS** | `e2e/byok-isolation-and-rotation.spec.ts`. Sync: each session's `resolve_own_ai_credential` returns its own envelope, the RPC takes no user id, A's cross-read and cross-write of B's row both return nothing. Async: `resolve_job_ai_credential` follows the **job's** owner — a job of B's naming an entry of A's resolves B's credential — both jobs completed on the deployed worker and each ledger row is attributed to its own owner. |
+| **C10 — genuine concurrent rotation** | **PASS** | Two tabs loaded from the same row, therefore the same staleness witness, submitted with `Promise.all`. Exactly one `validated.`, exactly one `Something else changed at the same time`, one row, one active ciphertext, both `ciphertext` and `iv` non-null, and no candidate value in `credential_validation_attempts` or `audit_logs`. |
+| **Removal, queued jobs, capture lifecycle** | **PASS** | `e2e/byok-removal-jobs-capture.spec.ts`. Uncredentialed capture → `awaiting_ai_configuration`, zero jobs. Activating a key starts nothing. Explicit processing queues exactly one and does not duplicate on a second press. A job queued before a removal stays `pending`, attempts **0**, across a full drain window, and the ledger does not move. Reconfiguration recovers that same job. A bystander account with its own credential is untouched throughout. |
+| **Bounded processing** | **PASS** | 26 pending, 25 queued, the *partial* message rendered — "done" after 25 of 26 would be false by omission. |
+| **Two-key rotation window** | **BUILT and DRILLED** | Disposable material only; `--status` also run read-only against the deployment (`remaining: 0` at version 1). |
+| **Fixture cleanup** | **PASS, with non-vacuous controls** | Zero BYOK fixture users remain; **zero orphaned rows** across nine owned tables. Positive control: the scanner sees 9 rows for a live account, so the zero is not vacuous. Negative control: the owner's credential survives, `active`, ciphertext intact. |
+
+### How isolation was evidenced, and why not by "both calls succeeded"
+
+Two valid keys both work, so a product that used A's key for B's request would
+pass a "both succeeded" test. A **provider-side** distinguisher was looked for
+and **measured absent**: both credentials return HTTP 200 from `GET /v1/models`,
+expose no `openai-organization` or `openai-project` response header, and see an
+identical 131-model list. Nothing in a provider response says which key asked.
+
+Identity is therefore evidenced cryptographically, which is stronger. The stored
+fingerprint is `HMAC(pepper, plaintext)` truncated — a function of the key and
+of nothing else — so two distinct keys have two distinct fingerprints, and A's
+row carrying A's fingerprint proves whose key is in whose row without reading
+either. The resolvers then prove each path reaches only its own row. Neither
+half is "it worked".
+
+### Three product defects the acceptance lane found
+
+None was findable by unit tests, and each is fixed with a regression test.
+
+1. **`formatFingerprint` had no production consumer.** The parse-don't-trust
+   guard shipped with BYOK.1 — a stored value outside the closed shape renders
+   as `unknown` rather than being echoed — and the panel rendered the stored
+   column directly. The guarantee was written and not in force.
+2. **The panel reported the wrong action.** `useActionState` retains its result
+   forever, so after any successful save a later **removal** kept showing "Key
+   replaced and validated" beside a status reading "No key configured".
+3. **"Key replaced" after a removal.** The staleness witness drives the
+   mechanism correctly, but it was also picking the message, so a user who
+   pressed a button labelled *Save key* was told the key had been *replaced*.
+
+### What remains, and it is not a gate
+
+* **The production master-key rotation has never been run** — an
+  owner-authorised key change. The code is built and drilled; there is no undo.
+* **`BYOK-OPERATIONS` (6 requirements) is not built** — no operator dashboard or
+  alerting. Named, not counted as delivered.
+* **Six orphaned storage objects from 2026-07-16** predate this work: database
+  rows cascade on account deletion, storage objects do not. Signup Hardening's
+  problem, recorded here because this sweep is what found it.
+* **Three keys should be revoked** at platform.openai.com: the validation key
+  and the two disposable product credentials. Outside the implementer's
+  administrative boundary.
+
+Full requirement accounting, including the 47 untraced ids and their
+disposition: `docs/reports/BYOK_TRACEABILITY_MATRIX.md`.

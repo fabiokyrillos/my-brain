@@ -1,7 +1,7 @@
 "use client";
 
 import { Inbox, KeyRound, LoaderCircle, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/preferences";
 
@@ -77,7 +77,20 @@ export function CredentialPanel({
     };
   }, []);
 
-  const state = saveState.status !== "idle" ? saveState : removeState;
+  /**
+   * The feedback belongs to whichever action the user last took.
+   *
+   * The obvious `saveState.status !== "idle" ? saveState : removeState` is
+   * wrong in a way only a full journey reveals: `useActionState` keeps its
+   * result forever, so once a save or rotation has succeeded, `saveState` is
+   * never idle again — and a subsequent **removal** silently kept showing
+   * "Key replaced and validated" while the status beside it read "No key
+   * configured". The panel contradicted itself about the one action a user
+   * most needs confirmed. Which form was submitted is the only thing that
+   * disambiguates two independently-retained states, so it is recorded.
+   */
+  const [lastAction, setLastAction] = useState<"save" | "remove" | null>(null);
+  const state = lastAction === "remove" ? removeState : lastAction === "save" ? saveState : idle;
   // `BYOK-CAPTURE-004`/`005`. Offered only when a key is active and something is
   // actually waiting, so the section is never a button that would do nothing —
   // and never, on any path, something that runs by itself. Saving a key renders
@@ -124,7 +137,7 @@ export function CredentialPanel({
 
       <p className="byok-honesty">{copy.settings.honesty}</p>
 
-      <form action={save} className="byok-form">
+      <form action={save} className="byok-form" onSubmit={() => setLastAction("save")}>
         <input type="hidden" name="locale" value={locale} />
         {/* The staleness witness. Present only when a row exists, which is what
             makes this a rotation rather than a first save. */}
@@ -167,7 +180,13 @@ export function CredentialPanel({
             // that matters: the key cannot come back, only be re-entered. An
             // explicit confirmation is the standard's requirement for exactly
             // this shape of action.
-            if (!window.confirm(copy.settings.removeConfirm)) event.preventDefault();
+            if (!window.confirm(copy.settings.removeConfirm)) {
+              event.preventDefault();
+              return;
+            }
+            // Only a confirmed removal owns the feedback line; a cancelled one
+            // must leave whatever the previous action said standing.
+            setLastAction("remove");
           }}
         >
           <input type="hidden" name="locale" value={locale} />

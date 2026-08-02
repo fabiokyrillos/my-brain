@@ -128,6 +128,16 @@ describe("Deno worker copies stay identical to their Node source", () => {
       "job-failure.ts",
       "job-failure.test.ts",
       "byok-adapter.test.ts",
+      // BYOK.6's bounded two-key rotation window. It IS a hand copy of
+      // `src/lib/byok/rotation.ts` and still cannot be a `pair`: the Node copy
+      // carries the whole rationale in prose and takes its environment as an
+      // argument, while this one points at that rationale and reads `Deno.env`
+      // itself, because the worker has no equivalent seam. A body-for-body
+      // comparison of the *files* would fail on exactly the lines that make
+      // each correct. Its parity is held function-body for function-body by
+      // `src/lib/byok/rotation-parity.test.ts`, which also asserts that
+      // asymmetry explicitly and pins the four environment names both may read.
+      "byok-rotation.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

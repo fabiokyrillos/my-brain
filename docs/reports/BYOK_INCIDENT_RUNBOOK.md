@@ -1,10 +1,28 @@
 # BYOK — master-key rotation, loss and compromise: the runbook
 
-**Status:** written, **not yet drilled**. `BYOK-MASTER-007` and BYOK.6's gate F3
-require the loss procedure to have been **executed against a disposable
-project** before it is trusted, and no disposable project exists. Every
-procedure below is therefore a plan, and says so at the top of its own section.
-A runbook nobody has run is a hypothesis with formatting.
+**Status, updated 2026-08-02: partly drilled, and each section now says which.**
+The original status line — *written, not yet drilled* — is retained below as the
+record of what this file was when BYOK.6 shipped it, because a document that
+quietly upgrades its own credibility is exactly what `ADR-069` exists to
+prevent.
+
+- **§2a two-key rotation window — BUILT and DRILLED** on disposable material,
+  and read-only `--status` was run against the deployment. **Not yet executed
+  against the live master key**; that is an owner-authorised change and the
+  smallest outstanding action in the whole initiative.
+- **§3 master-key loss — EXECUTED, for real.** It did not need a disposable
+  project: it happened against the deployment on 2026-08-02 when the first
+  cutover left the two runtimes holding different keys, and every property the
+  drill exists to establish was observed. `BYOK-MASTER-007` and gate F3 are
+  satisfied by that, not by a simulation.
+- **§4 compromise, §5 pepper rotation, §6 the validation key — still written,
+  not drilled.**
+
+> *Original status, 2026-08-01:* written, **not yet drilled**. `BYOK-MASTER-007`
+> and BYOK.6's gate F3 require the loss procedure to have been **executed
+> against a disposable project** before it is trusted, and no disposable project
+> exists. Every procedure below is therefore a plan, and says so at the top of
+> its own section. A runbook nobody has run is a hypothesis with formatting.
 
 **Scope.** The three BYOK secrets, per environment:
 
@@ -45,17 +63,53 @@ Rotation is not a key swap. Every ciphertext is bound by AAD to
 it was written, so a new master key opens **nothing** that already exists. There
 are only two honest shapes:
 
-### 2a. Two-key bounded window — re-encryption, requires code that does not exist
+### 2a. Two-key bounded window — **BUILT and DRILLED on disposable material, 2026-08-02. Not yet run against the live key.**
 
 Accept the previous master key for decryption while writing only under the new
-one, re-encrypting each credential as it is next resolved, and close the window
-when the last row has moved.
+one, re-encrypt each credential, and close the window when the last row has
+moved.
 
-This needs a second environment variable the runtime reads on a decryption
-failure, a `key_version` bump per row, and a counter that says when the window
-may close. **None of it is built.** It is the right shape, and it is BYOK.6's
-one remaining code deliverable rather than something this document can pretend
-into existence.
+**What exists now.** `src/lib/byok/rotation.ts` and its Deno twin
+`supabase/functions/_shared/byok-rotation.ts`, held function-body for
+function-body by `src/lib/byok/rotation-parity.test.ts`; the re-encryption tool
+`npm run byok:rotate-master-key`; and three environment names that are absent in
+normal operation — `BYOK_MASTER_KEY_VERSION`, `BYOK_PREVIOUS_MASTER_KEY`,
+`BYOK_PREVIOUS_MASTER_KEY_EXPIRES_AT`.
+
+**It is not a fallback, and that is the whole design.** The row's own
+`key_version` selects **one** key. A reader that tried the current key and fell
+back to the previous one would be a decryption oracle — the number of attempts
+is observable, and "it opened under the old key" is a fact an attacker would
+like. `BYOK-CRYPTO-005` forbids a decryption failure from naming its cause, and
+this preserves that: a row at a version neither key covers is offered no key at
+all and fails **identically** to a corrupt row.
+
+**Drilled, on disposable material only.** Executed 2026-08-02, no live
+credential touched: a row sealed under a synthetic previous key opens inside the
+window; re-sealing produces a different ciphertext that opens under the current
+key; the previous key can no longer open the re-sealed row; once the window
+closes the old row is offered no key while the new one still reads; and the
+progress counter refuses to report completion while any row is at the previous
+version **or unreadable**. `--status` was also run read-only against the
+deployment and reported `remaining: 0` at version 1, which is the state a
+pre-rotation environment should show.
+
+**Startup refuses more than it accepts.** A malformed current *or previous* key
+fails to start; an expiry without a key is refused; a key without an expiry is
+refused; a previous key at version 1 is refused; and a window declared longer
+than 30 days is **refused rather than truncated**, so the runtime and this
+document can never disagree about when the old key stops working. No third key
+is read — the guard `src/lib/byok/guards.test.ts` pins the exact four names both
+runtimes may see.
+
+**Rollback limitations, stated plainly.** There is no undo. Once a row is
+re-sealed at the new version, the previous key cannot open it, so a rotation
+started with a *wrong* current key strands every row it touches — which is why
+`npm run byok:verify-runtime` must print `IN PARITY` **before** a rotation
+begins, not after. `--limit N` exists so a first production run can move a
+handful of rows and be checked before the rest. Restoring a pre-rotation state
+means restoring a database backup; there is no key-side recovery and none is
+claimed.
 
 The window is bounded because an unbounded one is not a rotation — it is two
 live keys forever, which doubles the surface the rotation was performed to
@@ -220,8 +274,8 @@ Each of these turns a section from a plan into a procedure:
 
 | Section | What is missing | Who can do it |
 | --- | --- | --- |
-| §2a two-key window | The code. A previous-key read, a per-row version bump, a completion counter | An implementer, once an environment exists to design against |
-| §3 loss | An **executed** drill against a disposable Supabase project | Owner — creating the project; then an implementer |
+| §2a two-key window | **Built and drilled 2026-08-02** on disposable material — version-selected reads in both runtimes, `npm run byok:rotate-master-key`, a completion counter that refuses to say "done" while any row is unreadable. What remains is one **production** run, which needs an owner-authorised master-key change and is the smallest outstanding action | Owner — the key change; the tool is ready |
+| §3 loss | **Executed, for real, 2026-08-02** — not against a disposable project but against the deployment, when the first cutover left the two runtimes holding different keys. Every property this drill exists to establish was observed: ciphertext unreadable, application failed closed, no plaintext recovery claimed, owner re-entered. `BYOK_DEPLOYED_ACCEPTANCE.md` §5 | Done |
 | §4 compromise | A dry run of steps 1–3 in the same disposable project | Same |
 | §6 revocation | The revocation itself, and its evidence line | Owner, at the OpenAI dashboard |
 

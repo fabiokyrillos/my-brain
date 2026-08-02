@@ -4,8 +4,9 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-02**, at the **loop's third stop**. **§15 supersedes §14, which
-supersedes §13**, and §15 is the only section a resuming context needs to act on first.
+Last updated: **2026-08-02**, at **BYOK's close**. **§16 supersedes §15, which supersedes
+§14, which supersedes §13**, and §16 is the only section a resuming context needs to act
+on first.
 §13 and §14 are retained as the record of the first two stops; every owner action either
 listed has since been performed.
 
@@ -24,9 +25,12 @@ the credential opens under both runtimes, and the owner's asynchronous AI runs o
 against the deployed worker. **The earlier failure is superseded, not rewritten** — §14
 and the "Deployment state" section of `STATE.md` keep it exactly as it was recorded.
 
-**What still blocks closure is the real-credential half:** the two-user isolation matrix,
-concurrent rotation, and the Settings journeys. Signup Hardening and Phase 2G remain
-deliberately unstarted until BYOK closes (`ADR-068`).
+**BYOK is now CLOSED** — see §16. The real-credential half that blocked it (the two-user
+isolation matrix, concurrent rotation and the Settings journeys) was executed on
+2026-08-02 once the owner provisioned two disposable product credentials, and BYOK.6's
+last code deliverable, the bounded two-key rotation window, is built and drilled.
+**Signup Hardening is now authorised** (`ADR-068`); Phase 2G remains unauthorised until
+Signup Hardening closes.
 
 ---
 
@@ -818,3 +822,65 @@ Three PRs came out of this loop. They are independent of each other.
   reconciled the same way — every entry retained, the service-worker record placed
   beside the other product-defect entry so the two BYOK entries stay adjacent as a
   supersession pair.
+
+---
+
+## 16. BYOK is CLOSED — 2026-08-02. **This supersedes §15.**
+
+§13, §14 and §15 are retained as the record of the three stops. Every owner
+action any of them listed has been performed, and every gate they left blocked
+has been executed.
+
+### What closed it
+
+The owner provisioned two disposable, low-limit OpenAI **product** credentials.
+That was the single blocker §15 named, and with it every remaining gate ran
+against the deployment with real provider calls:
+
+- **C11 Settings journeys — 4/4**, desktop and Pixel 7, pt-BR and English.
+- **Two-user isolation with real credentials — PASS**, synchronous and
+  asynchronous, evidenced cryptographically because a provider-side
+  distinguisher was looked for and **measured absent**.
+- **C10 genuine concurrent rotation — PASS**: same staleness witness, two tabs,
+  `Promise.all`, one winner and one declared conflict.
+- **Removal, queued jobs, capture lifecycle, bounded processing — PASS.**
+- **Fixture cleanup — PASS** with non-vacuous positive and negative controls.
+- **BYOK.6's last code deliverable — the bounded two-key rotation window — is
+  built, parity-locked across both runtimes, and drilled** on disposable
+  material.
+
+Full records: `BYOK_DEPLOYED_ACCEPTANCE.md` §11 and
+`BYOK_TRACEABILITY_MATRIX.md`.
+
+### What the lane found on the way
+
+Three product defects no unit test could reach, each fixed with a regression
+test: `formatFingerprint`'s parse-don't-trust guard had **no consumer**; the
+panel reported the previous action's outcome after a removal; and a save after a
+removal announced itself as a *replacement*. A fourth finding was mine, not the
+product's — a decrypt harness that read `bytea` as base64 and reported a false
+"master key mismatch".
+
+### What is NOT closed, and must not be recorded as if it were
+
+- **`BYOK-OPERATIONS` (6 requirements) is not built.** No operator dashboard, no
+  alerting, no admin view of credential health. Unchanged from
+  `2F-OPERATIONS-002`.
+- **The production master-key rotation has never been run.** Owner-authorised
+  key change; there is no undo; `byok:verify-runtime` must print `IN PARITY`
+  first and `--limit` exists so a first run can be checked.
+- **Six orphaned storage objects from 2026-07-16.** Database rows cascade on
+  account deletion; storage objects do not. This is Signup Hardening's
+  account-deletion requirement, found by this sweep.
+- **Three OpenAI keys should be revoked** — the validation key and the two
+  disposable product credentials. Outside the implementer's boundary.
+- **47 of 131 requirement ids are untraced**, dispositioned family by family in
+  the traceability matrix. Most are implemented and were executed this session;
+  `BYOK-OPERATIONS` genuinely is not.
+
+### Next
+
+**Signup Hardening**, per `ADR-068`, which BYOK's close authorises. Its three
+prerequisites do not exist at all: **account deletion** (and the storage-residue
+gap above is part of it), **admin suspension**, and **terms and privacy policy**.
+Phase 2G stays unauthorised until Signup Hardening closes.

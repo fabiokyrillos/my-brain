@@ -151,6 +151,24 @@ export async function saveAiCredential(
   const witness = formData.get("observedUpdatedAt");
   const rotating = typeof witness === "string" && witness.length > 0;
 
+  /**
+   * Whether this **replaces a working key**, which is a different question from
+   * whether a row exists.
+   *
+   * `rotating` drives the *mechanism* — a witnessed update, so two simultaneous
+   * saves cannot both win — and it is true whenever any row is present,
+   * including a `removed` one. Using it to pick the message made the product
+   * answer "Key replaced and validated" to a user who had just removed their
+   * key and pressed a button labelled *Save key*. The button reads
+   * `credential.configured`, so the message has to read the same thing.
+   */
+  const { data: existing } = await supabase
+    .from("user_ai_credentials")
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const replacingActiveKey = existing?.status === "active";
+
   if (rotating) {
     const { data, error } = await supabase
       .from("user_ai_credentials")
@@ -163,7 +181,10 @@ export async function saveAiCredential(
       return { status: "error", message: copy.rotationConflict };
     }
     revalidatePath(`/${resolveLocale(formData.get("locale"))}/app/settings`);
-    return { status: "success", message: copy.rotated };
+    return {
+      status: "success",
+      message: replacingActiveKey ? copy.rotated : copy.saved,
+    };
   }
 
   const { error } = await supabase

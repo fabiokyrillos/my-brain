@@ -4,8 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/supabase/database.types";
 
-import { CredentialUnreadableError, decryptCredential, requireMasterKey } from "./crypto";
-import { fromBase64, toBase64, type Bytes } from "./envelope";
+import { CredentialUnreadableError, decryptCredential, requireMasterKeyRing } from "./crypto";
+import { keyForVersion, type MasterKeyRing } from "./rotation";
+import { fromBase64, toBase64 } from "./envelope";
 import { Secret } from "./secret";
 
 /**
@@ -114,9 +115,18 @@ function isUsable(row: ResolverRow | undefined | null): row is ResolverRow & {
 async function openEnvelope(
   row: ResolverRow,
   userId: string,
-  master: Bytes,
+  ring: MasterKeyRing,
 ): Promise<CredentialResolution> {
   if (!isUsable(row)) return { outcome: "credential_required" };
+
+  /**
+   * One key, chosen by the row's own declared version — never a list tried in
+   * order. A version neither key seals yields the *same* outcome as a failed
+   * decryption, so nothing here reveals whether a different key would have
+   * worked. That is `BYOK-CRYPTO-005` applied to the rotation window.
+   */
+  const master = keyForVersion(ring, row.key_version);
+  if (master === null) return { outcome: "credential_unreadable" };
 
   try {
     const plaintext = await decryptCredential(
@@ -169,7 +179,7 @@ export async function resolveOwnCredential(
   const rows = (data ?? []) as ResolverRow[];
   if (rows.length === 0) return { outcome: "credential_required" };
 
-  return openEnvelope(rows[0], userId, requireMasterKey(env));
+  return openEnvelope(rows[0], userId, requireMasterKeyRing(env));
 }
 
 /**
@@ -193,7 +203,7 @@ export async function openStoredCredential(
       provider: envelope.provider,
     },
     userId,
-    requireMasterKey(env),
+    requireMasterKeyRing(env),
   );
 }
 

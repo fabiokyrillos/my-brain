@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { formatFingerprint } from "@/lib/byok/fingerprint";
 import type { Database } from "@/lib/supabase/database.types";
 
 /**
@@ -27,6 +28,18 @@ export type CredentialMetadata = {
   readonly configured: boolean;
   readonly status: CredentialStatus;
   readonly provider: string | null;
+  /**
+   * The fingerprint **in display form**, parsed rather than echoed.
+   *
+   * `formatFingerprint` refuses anything outside the closed
+   * `prefix:6-hex` shape and yields `unknown` instead, so a row written past
+   * the CHECK constraint cannot put arbitrary text on the page. That guard
+   * shipped with BYOK.1 and had **no consumer** — the panel rendered the stored
+   * column directly — until the C11 acceptance journey noticed the rendered
+   * value was the raw stored token. Formatting happens here, on the server,
+   * because `formatFingerprint` lives beside the `server-only` crypto core and
+   * the panel is a Client Component.
+   */
   readonly fingerprint: string | null;
   readonly validatedAt: string | null;
   readonly lastFailureCode: string | null;
@@ -76,7 +89,7 @@ export async function loadCredentialMetadata(
     configured: status === "active",
     status,
     provider: data.provider,
-    fingerprint: data.fingerprint,
+    fingerprint: data.fingerprint === null ? null : formatFingerprint(data.fingerprint),
     validatedAt: data.validated_at,
     lastFailureCode: data.last_failure_code,
     observedUpdatedAt: data.updated_at,
