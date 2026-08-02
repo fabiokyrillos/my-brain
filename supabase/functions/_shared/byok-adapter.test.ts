@@ -8,6 +8,7 @@ import {
   toBase64,
   type Bytes,
 } from "./byok-envelope.ts";
+import type { MasterKeyRing } from "./byok-rotation.ts";
 import { JobFailure } from "./job-failure.ts";
 import { Secret } from "./byok-secret.ts";
 
@@ -28,6 +29,24 @@ const MASTER: Bytes = fromBase64(
   toBase64(new Uint8Array(new ArrayBuffer(32)).fill(7)),
 );
 
+/**
+ * The single-key ring these cases exercise.
+ *
+ * `resolveJobCredential` takes a ring rather than a key since `BYOK-ROTATION`,
+ * because the row's `key_version` selects which key applies. With no window
+ * configured a ring is exactly one key at version 1, so every assertion below
+ * means what it meant before; the rotation window's own behaviour is covered in
+ * `src/lib/byok/rotation.test.ts` and locked across runtimes by
+ * `rotation-parity.test.ts`.
+ */
+const RING: MasterKeyRing = {
+  current: MASTER,
+  currentVersion: 1,
+  previous: null,
+  previousVersion: null,
+  previousExpiresAt: null,
+};
+
 const OWNER: string = "11111111-1111-4111-8111-111111111111";
 const INVOKER: string = "22222222-2222-4222-8222-222222222222";
 const JOB: string = "33333333-3333-4333-8333-333333333333";
@@ -39,8 +58,17 @@ function hex(base64: string): string {
   return out;
 }
 
-async function envelopeRow(userId: string, keyVersion = 1, provider = "openai") {
-  const sealed = await encryptCredential(PLAINTEXT, MASTER, { userId, keyVersion, provider });
+async function envelopeRow(
+  userId: string,
+  options: { keyVersion?: number; provider?: string; master?: Bytes } = {},
+) {
+  const keyVersion = options.keyVersion ?? 1;
+  const provider = options.provider ?? "openai";
+  const sealed = await encryptCredential(PLAINTEXT, options.master ?? MASTER, {
+    userId,
+    keyVersion,
+    provider,
+  });
   return {
     // PostgREST returns `bytea` as `\x`-prefixed hex, which is the shape the
     // adapter has to convert. Fixtures use the transport shape on purpose.
@@ -111,7 +139,7 @@ Deno.test("the owner comes from jobs.user_id, and the resolver is given only the
     rows: [await envelopeRow(OWNER)],
   });
 
-  const credential = await resolveJobCredential(service, JOB, MASTER);
+  const credential = await resolveJobCredential(service, JOB, RING);
 
   assertStrictEquals(credential.userId, OWNER);
   assertStrictEquals(credential.secret.expose(), PLAINTEXT);
@@ -137,7 +165,7 @@ Deno.test("a foreign job id resolves the job owner's credential, not the invoker
     rows: [await envelopeRow(OWNER)],
   });
 
-  const credential = await resolveJobCredential(service, JOB, MASTER);
+  const credential = await resolveJobCredential(service, JOB, RING);
 
   assertStrictEquals(credential.userId, OWNER);
   assert(credential.userId !== INVOKER);
@@ -153,7 +181,7 @@ Deno.test("an envelope sealed for another account cannot be opened for this job"
     rows: [await envelopeRow(INVOKER)],
   });
 
-  const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+  const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
   assert(error instanceof JobFailure);
   assertStrictEquals(error.code, "credential_unreadable");
 });
@@ -161,10 +189,15 @@ Deno.test("an envelope sealed for another account cannot be opened for this job"
 Deno.test("the AAD is composed from the row's owner, version and provider", async () => {
   // Positively, so a future adapter that decrypted with a *constant* AAD would
   // fail here rather than pass every other test in this file.
-  const row = await envelopeRow(OWNER, 4, "openai");
+  const row = await envelopeRow(OWNER, { keyVersion: 4, provider: "openai" });
   const { service } = doubleService({ jobOwner: OWNER, rows: [row] });
+  // The ring has to cover version 4 for this row to be reachable at all: since
+  // `BYOK-ROTATION` a version no key seals is refused before any decryption is
+  // attempted. That refusal is asserted separately below; here the point is the
+  // AAD, so the ring is set to the version the fixture uses.
+  const ringAtFour: MasterKeyRing = { ...RING, currentVersion: 4 };
 
-  const credential = await resolveJobCredential(service, JOB, MASTER);
+  const credential = await resolveJobCredential(service, JOB, ringAtFour);
   assertStrictEquals(credential.keyVersion, 4);
   assertStrictEquals(credential.provider, "openai");
 
@@ -182,7 +215,7 @@ Deno.test("a job that does not exist is credential_unavailable, not credential_r
   // job" is not a statement about anybody's configuration. Both are terminal,
   // so nothing is retried either way.
   const { service } = doubleService({ jobOwner: null });
-  const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+  const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
   assert(error instanceof JobFailure);
   assertStrictEquals(error.code, "credential_unavailable");
 });
@@ -190,7 +223,7 @@ Deno.test("a job that does not exist is credential_unavailable, not credential_r
 Deno.test("a resolver or job-read failure is credential_unavailable", async () => {
   for (const fixture of [{ jobError: true }, { jobOwner: OWNER, rpcError: true }]) {
     const { service } = doubleService(fixture);
-    const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+    const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
     assert(error instanceof JobFailure);
     assertStrictEquals(error.code, "credential_unavailable");
   }
@@ -198,7 +231,7 @@ Deno.test("a resolver or job-read failure is credential_unavailable", async () =
 
 Deno.test("no active row is credential_required", async () => {
   const { service } = doubleService({ jobOwner: OWNER, rows: [] });
-  const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+  const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
   assert(error instanceof JobFailure);
   assertStrictEquals(error.code, "credential_required");
 });
@@ -210,7 +243,7 @@ Deno.test("a row missing any envelope column is credential_required, not a crash
       jobOwner: OWNER,
       rows: [{ ...complete, [missing]: null }],
     });
-    const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+    const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
     assert(error instanceof JobFailure, `a null ${missing} must not escape as something else`);
     assertStrictEquals(error.code, "credential_required");
   }
@@ -224,7 +257,7 @@ Deno.test("a non-active status is credential_required even if the envelope is in
       jobOwner: OWNER,
       rows: [{ ...(await envelopeRow(OWNER)), status }],
     });
-    const error = await resolveJobCredential(service, JOB, MASTER).catch((thrown) => thrown);
+    const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
     assert(error instanceof JobFailure);
     assertStrictEquals(error.code, "credential_required");
   }
@@ -234,9 +267,45 @@ Deno.test("a wrong master key is credential_unreadable, never a wrong plaintext"
   const wrong: Bytes = fromBase64(toBase64(new Uint8Array(new ArrayBuffer(32)).fill(9)));
   const { service } = doubleService({ jobOwner: OWNER, rows: [await envelopeRow(OWNER)] });
 
-  const error = await resolveJobCredential(service, JOB, wrong).catch((thrown) => thrown);
+  const wrongRing: MasterKeyRing = { ...RING, current: wrong };
+  const error = await resolveJobCredential(service, JOB, wrongRing).catch((thrown) => thrown);
   assert(error instanceof JobFailure);
   assertStrictEquals(error.code, "credential_unreadable");
+});
+
+Deno.test("a row sealed at a version no key covers is unreadable, and offers no clue", async () => {
+  // The anti-oracle case for the rotation window. With no previous key
+  // configured, a row at an older version is not tried-and-failed: no key is
+  // selected for it at all, and the failure is the *same* word a genuinely
+  // corrupt row produces.
+  const { service } = doubleService({
+    jobOwner: OWNER,
+    rows: [{ ...(await envelopeRow(OWNER)), key_version: 7 }],
+  });
+
+  const error = await resolveJobCredential(service, JOB, RING).catch((thrown) => thrown);
+  assert(error instanceof JobFailure);
+  assertStrictEquals(error.code, "credential_unreadable");
+});
+
+Deno.test("an open window opens a row sealed by the previous key", async () => {
+  const previous: Bytes = fromBase64(toBase64(new Uint8Array(new ArrayBuffer(32)).fill(3)));
+  const ring: MasterKeyRing = {
+    current: MASTER,
+    currentVersion: 2,
+    previous,
+    previousVersion: 1,
+    previousExpiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const { service } = doubleService({
+    jobOwner: OWNER,
+    rows: [await envelopeRow(OWNER, { master: previous, keyVersion: 1 })],
+  });
+
+  const credential = await resolveJobCredential(service, JOB, ring);
+
+  assertStrictEquals(credential.keyVersion, 1);
+  assert(credential.secret instanceof Secret);
 });
 
 // ---------------------------------------------------------------------------
@@ -245,7 +314,7 @@ Deno.test("a wrong master key is credential_unreadable, never a wrong plaintext"
 
 Deno.test("the resolved credential cannot be serialized, logged or interpolated", async () => {
   const { service } = doubleService({ jobOwner: OWNER, rows: [await envelopeRow(OWNER)] });
-  const credential = await resolveJobCredential(service, JOB, MASTER);
+  const credential = await resolveJobCredential(service, JOB, RING);
 
   // The three accidental paths, in the order they actually happen in incidents.
   assertThrows(() => JSON.stringify(credential));

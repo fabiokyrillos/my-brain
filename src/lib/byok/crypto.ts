@@ -12,6 +12,7 @@ import {
   type Envelope,
   type EnvelopeContext,
 } from "./envelope";
+import { resolveMasterKeyRing, type MasterKeyRing } from "./rotation";
 
 /**
  * The Node half of the BYOK crypto core.
@@ -153,6 +154,18 @@ type SecretEnv = Readonly<Record<string, string | undefined>>;
  */
 export function requireMasterKey(env: SecretEnv = process.env): Bytes {
   return decodeMasterKey(env.BYOK_MASTER_KEY, "BYOK_MASTER_KEY");
+}
+
+/**
+ * The same check, widened to the bounded two-key rotation window.
+ *
+ * The clock is read **here** rather than inside `resolveMasterKeyRing`, so the
+ * decision function stays pure and its boundary cases stay testable without
+ * freezing time globally. With no window configured this returns exactly what
+ * `requireMasterKey` would, so every existing caller keeps its behaviour.
+ */
+export function requireMasterKeyRing(env: SecretEnv = process.env): MasterKeyRing {
+  return resolveMasterKeyRing(env, new Date());
 }
 
 /**

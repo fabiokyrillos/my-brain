@@ -46,6 +46,7 @@
     "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
     "byok:interop": "node scripts/byok-crypto-interop.mjs",
     "byok:verify-runtime": "node scripts/byok-verify-runtime-parity.mjs",
+    "byok:rotate-master-key": "node scripts/byok-rotate-master-key.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs"
   },
   "dependencies": {

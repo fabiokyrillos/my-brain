@@ -81,6 +81,32 @@ const CRYPTO_MODULES = [
 ];
 
 /**
+ * The rotation-window modules, which read the **master key names** without
+ * being crypto cores.
+ *
+ * `BYOK-ROTATION` needs to answer *which* key material applies to a row before
+ * anything decrypts, and that answer depends on `BYOK_MASTER_KEY`,
+ * `BYOK_PREVIOUS_MASTER_KEY` and the window's expiry. So these two files read
+ * key names — and nothing else: they never call `subtle`, never construct a
+ * `CryptoKey`, never see a ciphertext and never see a plaintext. They are
+ * listed here rather than folded into `CRYPTO_MODULES` precisely so the
+ * `subtle`-locality guard keeps naming **two** files, which is the stricter
+ * claim and the one that matters.
+ *
+ * They do **not** read `BYOK_FINGERPRINT_PEPPER`, which is why the allowlist
+ * below is per-secret rather than shared.
+ */
+const ROTATION_MODULES = [
+  "src/lib/byok/rotation.ts",
+  "supabase/functions/_shared/byok-rotation.ts",
+];
+
+const SECRET_READERS: Record<string, readonly string[]> = {
+  BYOK_MASTER_KEY: [...CRYPTO_MODULES, ...ROTATION_MODULES].sort(),
+  BYOK_FINGERPRINT_PEPPER: CRYPTO_MODULES,
+};
+
+/**
  * Files that legitimately mention the primitives while not being product code.
  *
  * `parity.test.ts` and this file read the crypto sources as *text* to assert
@@ -94,6 +120,18 @@ const SCAN_EXEMPT = [
   "src/lib/byok/crypto.test.ts",
   "src/lib/byok/fingerprint.test.ts",
   "scripts/byok-crypto-interop.mjs",
+  // BYOK.6's bounded rotation, and the same class as the interop proof: an
+  // **operator** script, not a runtime path. Nothing in the product imports it,
+  // no request can reach it, and it runs only where the master keys already
+  // are. It genuinely performs keyed crypto — re-sealing a credential under the
+  // current key is the entire operation — and pretending otherwise by routing
+  // it through the core would mean shipping a runtime module whose only caller
+  // is an operator command.
+  //
+  // The exemption is bounded by the assertion below, which requires this file
+  // to re-seal under the *row's own* declared version and never to trial a
+  // second key.
+  "scripts/byok-rotate-master-key.mjs",
 ];
 
 function filesMatching(pattern: RegExp): string[] {
@@ -163,7 +201,7 @@ describe("BYOK-GUARD-005: crypto locality", () => {
 
 describe("BYOK-GUARD-005: secret locality", () => {
   for (const secret of ["BYOK_MASTER_KEY", "BYOK_FINGERPRINT_PEPPER"] as const) {
-    it(`${secret} is read only from the two crypto cores`, () => {
+    it(`${secret} is read only from its declared readers`, () => {
       // The *read*, not the mention. A name in a Zod schema, a docs table or an
       // error message is not access; `process.env.X`, `env.X` and
       // `Deno.env.get("X")` are.
@@ -175,7 +213,7 @@ describe("BYOK-GUARD-005: secret locality", () => {
           `)`,
         "g",
       );
-      expect(filesMatching(reads)).toEqual(CRYPTO_MODULES);
+      expect(filesMatching(reads).sort()).toEqual([...SECRET_READERS[secret]].sort());
     });
   }
 
@@ -191,6 +229,44 @@ describe("BYOK-GUARD-005: secret locality", () => {
         /BYOK_MASTER_KEY|BYOK_FINGERPRINT_PEPPER/,
       );
       expect(body, `${core} must still be the crypto core`).toMatch(/subtle/);
+    }
+  });
+
+  it("the rotation operator script never trials a second key", () => {
+    // The bound on its exemption. The script may decrypt — that is its job —
+    // but it must select by the row's declared version, and a `catch` that
+    // reached for the other key would turn an operator tool into the oracle
+    // `BYOK-CRYPTO-005` forbids. Asserted textually because the script is a
+    // `.mjs` operator command with no import surface to test through.
+    const script = code(read("scripts/byok-rotate-master-key.mjs"));
+
+    expect(script, "must select by the row's own version").toMatch(
+      /row\.key_version !== ring\.previousVersion/,
+    );
+    // Exactly two imported keys, each with a single declared usage.
+    expect(script).toMatch(/importKey\(\s*"raw",\s*ring\.current,[^)]*\[\s*\n?\s*"encrypt",/);
+    expect(script).toMatch(/importKey\(\s*"raw",\s*ring\.previous,[^)]*\[\s*\n?\s*"decrypt",/);
+    // A failed open is skipped, never retried under another key.
+    expect(script).toMatch(/UNREADABLE under the previous key/);
+    expect(script.match(/subtle\.decrypt/g) ?? []).toHaveLength(1);
+    expect(script.match(/subtle\.encrypt/g) ?? []).toHaveLength(1);
+  });
+
+  it("the rotation modules read key names and nothing more", () => {
+    // The same both-ways discipline, with the narrower claim these files make:
+    // they decide which key applies, so they must still read `BYOK_MASTER_KEY`
+    // — and they must still never reach the crypto primitives, because a
+    // rotation module that started decrypting would be a trial-decrypt path
+    // wearing a different name.
+    for (const rotationModule of ROTATION_MODULES) {
+      expect(ALL_FILES, `${rotationModule} must exist`).toContain(rotationModule);
+      const body = code(read(rotationModule));
+      expect(body, `${rotationModule} must still read the master key name`)
+        .toMatch(/BYOK_MASTER_KEY/);
+      expect(body, `${rotationModule} must not touch the crypto primitives`)
+        .not.toMatch(/subtle|encrypt|decrypt/);
+      expect(body, `${rotationModule} must not read the fingerprint pepper`)
+        .not.toMatch(/BYOK_FINGERPRINT_PEPPER/);
     }
   });
 

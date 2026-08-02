@@ -141,7 +141,15 @@ describe("BYOK-ADAPTER-004: the two runtimes implement one format", () => {
     // than a direct lookup so the tests can exercise absence and malformation by
     // passing an object instead of mutating the real environment — which under
     // a parallel test runner would be a shared mutable global.
-    expect(node.match(/process\.env/g) ?? []).toHaveLength(3);
+    //
+    // Four in Node since `BYOK-ROTATION`: `requireMasterKeyRing` is the fourth
+    // sanctioned startup check, and it takes its environment through the same
+    // `= process.env` default so absence and malformation stay testable without
+    // mutating a shared global. The worker's count is unchanged — its rotation
+    // window lives in `byok-rotation.ts`, which reads `Deno.env` itself because
+    // the worker has no equivalent seam, and `rotation-parity.test.ts` asserts
+    // that asymmetry so it stays a decision rather than drift.
+    expect(node.match(/process\.env/g) ?? []).toHaveLength(4);
     expect(deno.match(/Deno\.env\.get/g) ?? []).toHaveLength(2);
 
     for (const [name, source] of [["node", node], ["deno", deno]] as const) {

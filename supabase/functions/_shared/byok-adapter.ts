@@ -3,10 +3,9 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   CredentialUnreadableError,
   decryptCredential,
-  requireMasterKey,
   toBase64,
-  type Bytes,
 } from "./byok-envelope.ts";
+import { keyForVersion, requireMasterKeyRing, type MasterKeyRing } from "./byok-rotation.ts";
 import { JobFailure } from "./job-failure.ts";
 import { Secret } from "./byok-secret.ts";
 
@@ -114,9 +113,16 @@ function isUsable(row: ResolverRow | undefined | null): row is ResolverRow & {
 async function openEnvelope(
   row: ResolverRow,
   userId: string,
-  master: Bytes,
+  ring: MasterKeyRing,
 ): Promise<WorkerCredential> {
   if (!isUsable(row)) throw new JobFailure("credential_required");
+
+  // One key, chosen by the row's own declared version -- never a list tried in
+  // order. A version neither key seals fails identically to a failed
+  // decryption, so nothing reveals whether another key would have worked. The
+  // Node half's reasoning applies verbatim.
+  const master = keyForVersion(ring, row.key_version);
+  if (master === null) throw new JobFailure("credential_unreadable");
 
   let plaintext: string;
   try {
@@ -174,7 +180,7 @@ export async function resolveJobCredential(
    * produces `credential_unreadable`, never somebody else's plaintext, because
    * the AAD binds the ciphertext to the owner regardless.
    */
-  master?: Bytes,
+  ring?: MasterKeyRing,
 ): Promise<WorkerCredential> {
   // The authoritative owner. `jobs.user_id` is `not null`, so an absent value
   // here means there is no such row — and a job that does not exist has no
@@ -198,5 +204,5 @@ export async function resolveJobCredential(
   // reconstructed here.
   if (rows.length === 0) throw new JobFailure("credential_required");
 
-  return openEnvelope(rows[0], jobRow.user_id, master ?? requireMasterKey());
+  return openEnvelope(rows[0], jobRow.user_id, ring ?? requireMasterKeyRing());
 }
