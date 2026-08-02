@@ -4,10 +4,14 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at **BYOK.5's stop boundary**. BYOK.4 is merged and green.
-BYOK.5 did everything a repository can do and **stopped at four owner actions** — three
+Last updated: **2026-08-01**, at the **loop's stop**. BYOK.4 closed; BYOK.5 and BYOK.6
+merged green at their boundaries. **BYOK is NOT closed and must not be recorded as
+closed.** Everything a repository can do is done; **four owner actions** — three
 platform-secret operations and one credential entry through an authenticated product
-surface. The exact commands are in §11. **Nothing is half-applied.**
+surface — gate every remaining gate in BYOK.3, BYOK.4, BYOK.5 and BYOK.6. The exact
+commands are in §11. **Nothing is half-applied.** Signup Hardening and Phase 2G are
+deliberately not started: they sit behind BYOK's close, and starting on top of an
+initiative whose central claims are unproven is the failure `ADR-069` exists to prevent.
 
 ---
 
@@ -16,7 +20,7 @@ surface. The exact commands are in §11. **Nothing is half-applied.**
 | # | Initiative | State |
 | --- | --- | --- |
 | 1 | **Entity Graph Completion** | **CLOSED.** All three slices merged, all three merge-SHA CI runs green |
-| 2 | **BYOK** | **BYOK.1 through BYOK.4 CLOSED**, all merged with green merge-SHA CI. Both project-key fallbacks are **deleted**. **BYOK.5 is STOPPED at its owner boundary** — every repository task done, four owner actions outstanding. See §10 and §11 |
+| 2 | **BYOK** | **BYOK.1–BYOK.4 CLOSED. BYOK.5 and BYOK.6 merged green but NOT closed** — every repository task done, four owner actions outstanding. Both project-key fallbacks are **deleted**. **BYOK itself is not closed.** See §10, §11, §12 |
 | 3 | Signup Hardening | not started |
 | 4 | Phase 2G — Conversational Creation | not started, unauthorized until 1–3 close |
 | 5 | Phase 2H — Deploy and Operate | not started |
@@ -29,7 +33,8 @@ surface. The exact commands are in §11. **Nothing is half-applied.**
 - **Branches, all preserved:** `codex/docs-and-gates`, `codex/egc-slice-1`,
   `codex/egc-slice-2`, `codex/egc-slice-3`, `codex/byok-precode`, `codex/byok-slice-1`,
   `codex/byok-slice-2`, `codex/byok-handoff`, `codex/byok-gate-amendment-2`,
-  `codex/byok-slice-3`, `codex/byok-slice-3-handoff`, `codex/byok-slice-4`.
+  `codex/byok-slice-3`, `codex/byok-slice-3-handoff`, `codex/byok-slice-4`,
+  `codex/byok-slice-5`, `codex/byok-slice-6`, `codex/byok-slice-6-handoff`.
 - **Migration chain head: `202608010069`.** Entity Graph Completion added **zero**
   migrations across all three slices; BYOK.1, BYOK.2 and BYOK.3 added one each and BYOK.4
   two, each slice moving the head by exactly its budgeted allocation. The budget is
@@ -57,6 +62,8 @@ surface. The exact commands are in §11. **Nothing is half-applied.**
 | **BYOK.3** | #61 | `2c70784` | `30711977571` | green, all three jobs |
 | BYOK.3 handoff | #62 | `423625d` | `30715442719` | green, all three jobs |
 | **BYOK.4** | #63 | `81b1110` | `30720640705` | green, all three jobs |
+| **BYOK.5** | #64 | `41240ab` | `30723026363` | green, all three jobs |
+| **BYOK.6 (partial)** | #65 | `4a5b187` | `30725104149` | green, all three jobs |
 
 ---
 
@@ -541,6 +548,9 @@ convergence audit**, whose standard is exactly this.
 ## 12. BYOK.6 — PARTIAL, and it cannot close
 
 **Branch:** `codex/byok-slice-6`, from `main` at `41240ab`. **Migrations: 0.**
+**Merged as `4a5b187` (PR #65), merge-SHA CI run `30725104149`, all three jobs green.**
+The residue suite is confirmed **executed** in that run, not merely shipped:
+`byok_residue.sql ... ok`, 16 assertions.
 
 BYOK.6's deliverables split in two, and the split is the whole story:
 
@@ -578,3 +588,52 @@ asynchronous work in a deployed environment, and recovery procedures that exist
 *and have been executed*. `ADR-069`'s rule applies to all of it: a lane that
 ships marked "passed" while unexercised is worse than one marked "unexercised",
 because the first is believed.
+
+
+---
+
+## 13. Where the loop stops, and what the next context must not do
+
+**Stopped at:** owner-only provisioning and credential entry. Both are true stop
+conditions under the loop's own rules — privileged actions on platforms an agent
+cannot reach, and a credential typed into an authenticated product surface.
+
+**Do not, on resuming:**
+
+- **Do not record BYOK as closed.** Its criteria include proven Node/Deno runtime
+  isolation, removal blocking asynchronous work in a *deployed* environment, and
+  recovery procedures that have been *executed*. None of those has happened.
+- **Do not start Signup Hardening or Phase 2G.** Both sit behind BYOK's close in
+  `ADR-068`'s ordering. Building the next initiative on unproven credential
+  isolation is the exact failure `ADR-069` exists to prevent.
+- **Do not seed the owner's credential** from `OPENAI_API_KEY`, by script,
+  migration or convenience. It would make the owner the one account that never
+  proved the flow.
+- **Do not re-run the deferred gates hoping they pass.** They do not fail; they
+  have nowhere to run. One unblocking clears all of them at once.
+
+**The four owner actions, in the order that matters** (full commands in
+`BYOK_SLICE_05_ACCEPTANCE.md` §3):
+
+1. Provision `BYOK_MASTER_KEY`, `BYOK_FINGERPRINT_PEPPER`,
+   `BYOK_RATE_LIMIT_PEPPER` in **both** the Supabase Edge Function secret store
+   and the hosting platform's Next.js environment.
+2. Apply migrations `202608010065`…`202608010069` — **after** step 1, because the
+   worker refuses to serve without its master key by design.
+3. Deploy `process-jobs`, **then** unset `OPENAI_API_KEY` from the function
+   secrets and the Next.js environment — that order, so no deployed worker is
+   ever left with neither key.
+4. The owner configures their own key through Settings.
+
+**What unblocks the moment those are done**, all at once and from a single
+cause: BYOK.3's matrix cases 1–3, concurrent rotation (C10) and the desktop /
+Pixel 7 Settings journeys (C11); BYOK.4's D2 and the deployed-bundle half of D10;
+BYOK.5's E1, E2, E3 and E5; and BYOK.6's isolation matrix, queued-job removal and
+rotation execution, master-key loss drill, validation-key revocation evidence,
+remote smoke and final report.
+
+**One code deliverable remains that no owner action unblocks:** the bounded
+two-key master-key rotation window — a previous-key read, a per-row `key_version`
+bump, a completion counter, and the 30-day expiry rule. It was deliberately not
+attempted against no environment, and the runbook records that the only rotation
+available today is invalidate-and-ask: right for a compromise, wrong for hygiene.
