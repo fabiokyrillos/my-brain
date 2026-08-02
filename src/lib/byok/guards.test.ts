@@ -234,9 +234,16 @@ describe("task 1.8: the chain scan finds no key material anywhere", () => {
     // A future edit that "simplified" the lane onto OPENAI_API_KEY would defeat
     // the entire point of the dedicated low-limit project, so the distinctness
     // is asserted rather than assumed.
+    //
+    // The project key's own line is gone as of BYOK.7's convergence audit — no
+    // runtime read it after the cutover — so the assertion inverts: the
+    // validation lane's name must be present, and the project key's name must
+    // not be offered at all. `\b` does not fire inside
+    // `BYOK_VALIDATION_OPENAI_API_KEY`, since `_` is a word character, so the
+    // two assertions cannot satisfy each other by accident.
     const example = read(".env.example");
-    expect(example).toMatch(/^OPENAI_API_KEY=\s*$/m);
     expect(example).toMatch(/^BYOK_VALIDATION_OPENAI_API_KEY=\s*$/m);
+    expect(example).not.toMatch(/^OPENAI_API_KEY\s*=/m);
     expect("BYOK_VALIDATION_OPENAI_API_KEY").not.toBe("OPENAI_API_KEY");
   });
 

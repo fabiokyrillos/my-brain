@@ -199,3 +199,35 @@ without deciding about the other would weaken a live guard.
 Recorded as a decision for BYOK.6's convergence audit, whose job is exactly this:
 *one adapter per runtime, one crypto module per runtime, one resolver per path*
 — and, by the same standard, no environment name without a reader.
+
+---
+
+## Appendix — deployed reconciliation, 2026-08-02
+
+Append-only. Nothing above is edited. Full evidence: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md`.
+
+All four owner actions were performed. Three landed. The fourth exposed a fifth condition
+that was never an action, because nothing existed to check it.
+
+| Gate | Status | Evidence |
+| --- | --- | --- |
+| **E1** — every AI capability works for the owner on the owner's own credential | **EXECUTED, FAILED** | The owner's asynchronous path reached the deployed worker and terminated `credential_unreadable`. The credential row is `active`, `key_version` 1, with a fingerprint and a `validated_at` — and its ciphertext opens under no available key. The synchronous half could not be run at all: no Node runtime available to the implementer holds the deployed master key. |
+| **E2** — `OPENAI_API_KEY` absent from the deployed function's secrets | **EXECUTED, PASSED** | Read back from `supabase secrets list` against the deployment: twelve names, and the project key is not among them. Also absent from the deployed bundle's executable code — the only textual occurrence is a doc comment describing the read BYOK.4 deleted. |
+| **E3** — removing the owner's credential blocks their AI exactly as any user's | **NOT EXECUTED — deliberately refused** | Removal would be easy; restoration would not. Re-adding through the only available Settings runtime would seal a new credential under the **local** master key, which the deployed worker also cannot read — leaving the owner equally broken, with a real OpenAI key spent to get there. That is damage to live production state, so it was not attempted. The equivalent property was proven on a disposable account instead: removal blocked queued work, and reconfiguring made the same job claimable again. |
+| **E4** — the allowlist is closed and classified | **EXECUTED, and since amended** | `ADR-072` removes `.env.example` — the census found no runtime consumer left anywhere — and adds the runtime-parity verifier and its test under a new `operator-verification-script` classification. Four entries, still compared in both directions. Every remaining entry now names the key **in order to assert its absence**, a stricter composition than before even though the count rose. |
+| **E5** — the full remote suite exits 0 | **STILL NOT RUN** | Its purpose is to confirm the remote scripts still work *after* a successful cutover. The cutover is not successful. Running it now would test a state nobody intends to keep. |
+
+**What the failure proved anyway.** Under the pre-BYOK architecture the owner's job would
+have **succeeded** on the project key. It failed closed instead: no provider call, no
+`ai_usage_events` row, a declared code and nothing else. So this slice's central claim —
+that no deployed account receives a project-key fallback — was demonstrated
+**behaviourally** rather than only statically, and the owner was subject to exactly the
+rule a disposable account is subject to. That is what E3 exists to show, and what the
+absence of an identity branch predicted.
+
+**The fifth condition, now checkable.** The two runtimes of one environment must hold the
+same three BYOK secrets, byte for byte. Nothing verified that, and nothing inside the
+product could: `BYOK-CRYPTO-005` forbids a decryption failure from naming its cause, so
+the mismatch is structurally invisible from within. `npm run byok:verify-runtime`
+(`ADR-072`) is the outside check, and it reproduces the defect in one command without
+printing a value or a digest. The owner remedy is `BYOK_DEPLOYED_ACCEPTANCE.md` §8.

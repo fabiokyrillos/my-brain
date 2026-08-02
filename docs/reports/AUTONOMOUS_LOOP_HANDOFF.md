@@ -4,14 +4,22 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-01**, at the **loop's stop**. BYOK.4 closed; BYOK.5 and BYOK.6
-merged green at their boundaries. **BYOK is NOT closed and must not be recorded as
-closed.** Everything a repository can do is done; **four owner actions** — three
-platform-secret operations and one credential entry through an authenticated product
-surface — gate every remaining gate in BYOK.3, BYOK.4, BYOK.5 and BYOK.6. The exact
-commands are in §11. **Nothing is half-applied.** Signup Hardening and Phase 2G are
-deliberately not started: they sit behind BYOK's close, and starting on top of an
-initiative whose central claims are unproven is the failure `ADR-069` exists to prevent.
+Last updated: **2026-08-02**, at the **loop's second stop**. §14 supersedes §13 and is the
+only section a resuming context needs to act on first.
+
+**BYOK is DEPLOYED and NOT CLOSED, and it must not be recorded as closed.** The four
+owner actions were performed and verified: five migrations applied (parity
+`202608010069`), `process-jobs` deployed 16/16 byte-identical, the three BYOK secrets in
+the Edge Function store, and `OPENAI_API_KEY` gone from it. **Twenty-three previously
+blocked properties now pass against the deployment.**
+
+**And the owner cutover FAILED.** The Next.js runtime that saved the owner's credential
+held a *different* `BYOK_MASTER_KEY` from the deployed worker, so the credential opens
+nowhere and the owner's asynchronous AI is terminally broken right now. The architecture
+handled it perfectly — failed closed, no project-key fallback, no retry storm, no leak —
+which is why the failure is the strongest evidence in the initiative and still a failure.
+**Two owner steps remediate it; they are in §14.** Signup Hardening and Phase 2G remain
+deliberately unstarted.
 
 ---
 
@@ -637,3 +645,78 @@ two-key master-key rotation window — a previous-key read, a per-row `key_versi
 bump, a completion counter, and the 30-day expiry rule. It was deliberately not
 attempted against no environment, and the runbook records that the only rotation
 available today is invalidate-and-ask: right for a compromise, wrong for hygiene.
+
+---
+
+## 14. The second stop — 2026-08-02, after the deployment. **This supersedes §13.**
+
+§13 is retained as the record of the first stop; every one of its four owner actions has
+since been performed. Do not act on §13's list. Act on this one.
+
+### What the deployment proved
+
+Verified against the deployment rather than reported. Full record:
+`docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md`.
+
+- Parity `202608010069` both sides; `process-jobs` version 20, **16/16 files
+  byte-identical** to `abef6e4`; **zero** executable project-key references in the
+  downloaded bundle; `OPENAI_API_KEY` absent from the deployed secrets (**E2 passes**).
+- **D2 passes on every case** and **D10 passes in full** — both had nowhere to run before.
+- Twelve deployed-worker cases pass: uncredentialed owners skipped without burning
+  attempts; a job made eligible by configuring a credential; terminal state on an
+  unreadable credential with no further attempt scheduled; declared safe code in
+  `jobs.error` and nothing else, censused across the whole table; the entry returned to
+  `awaiting_ai_configuration`; a foreign object id crossing no owner boundary; removal
+  refused as a mere flag by the database; removal blocking queued work; and the same job
+  recovering once a credential is reconfigured.
+- **The master-key loss drill is executed** — not synthetically. It happened for real,
+  and every property it exists to establish was observed.
+
+### The blocker
+
+**The Next.js runtime and the deployed worker hold different `BYOK_MASTER_KEY` values.**
+Established three ways, each with its own control. The owner's credential row looks
+perfect from every surface that can see it — `active`, fingerprint, `validated_at` — and
+its ciphertext opens under no available key. There is no recovery; AES-256-GCM has none
+and none is claimed.
+
+Nothing in the product could have reported this: `BYOK-CRYPTO-005` forbids a decryption
+failure from naming its cause, so the mismatch is structurally invisible from inside.
+`ADR-072` adds the outside check, `npm run byok:verify-runtime`.
+
+### The two owner steps, in this order
+
+1. **Make the two runtimes agree.** The same three BYOK values, byte for byte, in the
+   Next.js runtime and the Supabase Edge Function store of this environment. Either
+   direction. There is no hosting platform — no shared Next.js environment exists — so
+   `.env.local` *is* this environment's Next.js configuration. Confirm with
+   `npm run byok:verify-runtime`; it must print `IN PARITY`, and it prints no value and
+   no digest. It checks the **file**, not a running process: restart the dev server from
+   a clean shell.
+2. **Re-enter the credential through Settings.** The stored ciphertext must be replaced,
+   not repaired. **Not seeded from an environment variable, not by SQL, not by script.**
+
+### Do not, on resuming
+
+- **Do not record BYOK as closed.** One of its central claims is currently false in the
+  deployed environment, and the acceptance record says so.
+- **Do not re-run the still-blocked gates hoping they pass.** Concurrent rotation, the
+  Settings journeys and the two-user matrix with real credentials each need a
+  provider-accepted key used as a **product credential**, and
+  `BYOK_VALIDATION_OPENAI_API_KEY` is explicitly not one. That blocker is *different*
+  from the one §13 recorded, and it does not clear when the master keys agree.
+- **Do not remove the owner's credential to test E3.** Restoring it is not symmetrical
+  with removing it, and getting it wrong costs the owner a real OpenAI key and leaves
+  them equally broken. The equivalent property is already proven on a disposable account.
+- **Do not build the two-key rotation window yet.** Building an unproven recovery
+  mechanism on top of a deployment whose credential path is broken is the failure
+  `ADR-069` exists to prevent.
+- **Do not start Signup Hardening or Phase 2G.** Unchanged from §13, and for the same
+  reason.
+
+### What unblocks the moment the two steps are done
+
+E1 in full, E3, E5, concurrent rotation, the desktop/Pixel 7 Settings journeys in both
+locales, the two-user isolation matrix with real credentials, and the capture lifecycle's
+credentialed half. After those, BYOK's final report and traceability matrix can be
+written honestly — and only then does Signup Hardening begin.
