@@ -161,3 +161,29 @@ these was a real near-miss.
 | **G-0.4, executed** | `src/features/byok/live-validation.remote.test.ts`, `npm run test:byok:validation` |
 | Settings, metadata only, no reveal | `src/features/byok/credential-panel.tsx`, `credential-view.ts` |
 | Copy, both locales, one module | `src/features/byok/copy.ts` |
+
+---
+
+## Appendix — deployed reconciliation, 2026-08-02
+
+Append-only. Nothing above is edited; this records what the first BYOK deployment
+resolved and what it did not. Full evidence: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md`.
+
+§4 recorded three items as NOT EXECUTED for one shared reason — no shared database
+carried the BYOK tables. That reason is **gone**: migrations `202608010065`…`202608010069`
+are applied to `ulvwzqlpsjyrnqzfxmck` and parity is `202608010069` on both sides. The
+three items now split, and they do not all move together.
+
+| Item | Status after the deployment | Why |
+| --- | --- | --- |
+| Matrix cases 1–3 (asynchronous credential resolution) | **EXECUTED, PASSED** | Run against the deployed worker through the unattended drain. Terminal state, no further attempt scheduled, declared safe code, no provider call, entry returned to `awaiting_ai_configuration`. `BYOK_DEPLOYED_ACCEPTANCE.md` §3. |
+| Concurrent rotation (C10) | **STILL NOT EXECUTED — different blocker** | The database blocker is gone; another applies. Genuine contention needs two provider-accepted keys to rotate between, and the only key available to the implementer is `BYOK_VALIDATION_OPENAI_API_KEY`, which is explicitly not a product credential. Not simulated, not claimed. |
+| Settings journeys, desktop and Pixel 7 (C11) | **STILL NOT EXECUTED — different blocker** | The same constraint: every save, validate and rotate step needs a provider-accepted key used as a product credential. |
+
+**One item not on that list changed status.** The live validation lane
+(`npm run test:byok:validation`) remains executed and unaffected. The **owner's** own
+synchronous path is now blocked for a reason that did not exist when this record was
+written: the runtime that saved the owner's credential held a different
+`BYOK_MASTER_KEY` from the deployed worker, so the stored ciphertext opens nowhere. That
+is a configuration defect rather than a slice defect, recorded in full in
+`BYOK_DEPLOYED_ACCEPTANCE.md` §2, with the two-step owner remedy in §8.

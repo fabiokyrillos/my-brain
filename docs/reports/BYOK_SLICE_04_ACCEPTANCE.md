@@ -193,3 +193,28 @@ Recorded because a review that finds nothing is a review that was not run.
 | Heartbeat gaining an AI dependency | Guarded, including "no `fetch` at all". |
 | Retrying permanent credential failures | Refused by the vocabulary, asserted exhaustively. |
 | Retry budget consumed before credential resolution | Narrowed and stated honestly — see §5. |
+
+---
+
+## Appendix — deployed reconciliation, 2026-08-02
+
+Append-only. Nothing above is edited. Full evidence: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md`.
+
+Two gates were recorded as NOT CLAIMED because no deployed worker could decrypt a
+credential. Both are now resolved, and both **passed**.
+
+| Gate | Status | Evidence |
+| --- | --- | --- |
+| **D2** — the asynchronous matrix against the deployed function | **EXECUTED, PASSED** | Every case ran against deployed `process-jobs` version 20 through the `pg_cron` drain: an uncredentialed owner's job was skipped with `attempts` still 0; the same job became claimable once a credential went active; an unreadable credential produced `exhausted` at attempts 1 of 5 with no further attempt scheduled; `jobs.error` carried a declared code; the entry was returned to `awaiting_ai_configuration`; a job owned by B naming an entry owned by A left A's entry untouched and uninterpreted; removal blocked queued work; restoring the credential made the same job claimable again. |
+| **D10, deployed-bundle half** — the deployed bundle matches local | **EXECUTED, PASSED** | `supabase functions download` then `diff`: **16 of 16 files byte-identical** to `abef6e4`. A comment-stripped scan of the downloaded bundle finds **zero** executable references to the project key. The env names the deployed worker reads are `BYOK_MASTER_KEY`, `BYOK_FINGERPRINT_PEPPER`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `WORKER_DISPATCH_SECRET` and `OPENAI_FILE_MODEL` — no provider credential of any kind. |
+
+**`ADR-071`'s narrowing held exactly as written.** "Consumes no retry" was measured on a
+real deployed failure: `attempts` reached 1 because the *claim* spent it, `status` went
+straight to `exhausted`, and `next_attempt_at` was not moved. The migration header's
+wording matches the observed behaviour with nothing left over.
+
+**Residual risk R1 is unchanged and re-measured.** A census of every non-null `jobs.error`
+in the deployed table found only members of the declared closed vocabulary — no provider
+text, no runtime message, no excerpt of anything. `reap_expired_jobs`'s pre-existing
+`'Worker lease expired'` literal remains outside the declared worker vocabulary and is
+**not** claimed as part of it.

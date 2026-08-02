@@ -37,10 +37,18 @@ Variáveis mínimas em `.env.local`:
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-OPENAI_API_KEY=
+BYOK_MASTER_KEY=
+BYOK_FINGERPRINT_PEPPER=
+BYOK_RATE_LIMIT_PEPPER=
 ```
 
-Não coloque service role, segredo do heartbeat ou chave OpenAI em variáveis `NEXT_PUBLIC_*`.
+Não existe chave OpenAI de projeto. Cada usuário configura a própria chave em Ajustes, e ela é guardada cifrada sob `BYOK_MASTER_KEY`. Os três segredos BYOK precisam ser **idênticos** no runtime Next.js e nos segredos das Edge Functions do mesmo ambiente — uma credencial salva sob uma chave não abre sob outra, e a divergência é silenciosa na hora de salvar e terminal na hora de executar. Confira antes de configurar qualquer credencial:
+
+```powershell
+npm run byok:verify-runtime
+```
+
+Não coloque service role, segredo do heartbeat ou segredo BYOK em variáveis `NEXT_PUBLIC_*`.
 
 ## Verificação
 
