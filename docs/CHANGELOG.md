@@ -3,6 +3,28 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-01 — BYOK.6 (partial): a residue verifier that enumerates, and a runbook that admits it is untested
+
+**Zero migrations. BYOK does NOT close here**, and is not recorded as closed.
+
+**The residue verifier does not check a list of tables.** The obvious version names what it knows about and asserts those are empty — correct the day it is written and silently wrong the day somebody adds a table, which is exactly how residue survives a deletion nobody doubted. This one **enumerates `public` at run time**: every base table carrying a `user_id`, whatever it is called and whenever it arrived. A future BYOK table without a cascade fails here, by name, without anybody having remembered to add it.
+
+That is also the detector the account-deletion work will need. Its requirement is that deletion *stop rather than force* when it meets an unknown non-cascading foreign row, and a fixed list cannot tell an unknown row from an absent one.
+
+**Five assertions calibrate the scanner before anything is deleted.** Every "nothing survives" claim is worthless if the scanner cannot find a row it should, so the file first proves it reaches the credential table, the validation-attempt table and the job queue — and that the sweep covers twenty-plus owned tables rather than the four this test inserts into.
+
+**Four more are a negative control, and they are the point.** "Everything is gone" is trivially satisfied by a cascade that deleted too much, and a cascade reaching a second account would be a catastrophe that passes a naive residue test perfectly. So a bystander account is populated identically, and its rows — including its ciphertext, byte for byte — are asserted to survive the same delete.
+
+**A table the scanner cannot read is a finding, not a crash.** Every `user_id` in `public` is a uuid today, but a future text-typed one would raise and abort the transaction, producing "Bad plan: you planned 16 tests but ran 5" — which says nothing about what is wrong. It is reported by name instead. That lesson came from BYOK.4's own CI, twice.
+
+**The runbook says "written, not drilled" at the top of the file and of every section.** Master-key rotation, loss and compromise; pepper rotation; the validation key's lifecycle. A runbook nobody has run is a hypothesis with formatting, and `ADR-069` exists because a lane that ships marked "passed" while unexercised is worse than one marked "unexercised" — the first is believed.
+
+**It refuses to invent the procedure it does not have.** Master-key rotation has two honest shapes: a bounded two-key re-encryption window, which needs code that **does not exist** and is named as BYOK.6's one remaining code deliverable; and invalidate-and-ask, which is available today, correct for a compromise, and wrong for hygiene rotation because it charges every user for an operator's schedule. The document says which is which rather than describing the one it wishes existed.
+
+**Master-key loss is not a breach, and the runbook is careful about the difference.** "We lost the ability to read your key" is true; "your key may have been exposed" is not, and the two require different things of the user. Compromise inverts that: there, re-entering the same key does nothing, and the message has to say *revoke it at OpenAI and create a new one*.
+
+**BYOK's remaining work is named, not deferred vaguely.** The cross-user isolation matrix, concurrent rotation, queued-job removal and rotation execution, the desktop and Pixel 7 Settings journeys, the master-key loss drill against a disposable project, validation-key revocation evidence, and the remote smoke — every one blocked on the same four owner actions BYOK.5 stopped at.
+
 ## 2026-08-01 — BYOK.5: the allowlist is closed, and the slice stops where an agent must
 
 **Zero migrations.** Every repository task is done; **four owner actions remain**, and they are the reason this slice stops rather than closes.
