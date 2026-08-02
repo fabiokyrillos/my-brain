@@ -84,12 +84,13 @@ export default async function RemindersPage({
    * The same instants as `datetime-local` values, in the owner's zone.
    *
    * Built from `Intl` parts rather than through
-   * `formatInstantForDateTimeLocal`: that helper's parser accepts only instants
-   * whose seconds are literally `:00` and carry no fractional part, and every
-   * reminder this surface reads carries whatever `now()` had. Calling it threw
-   * inside the client render and took the page to its error boundary. `en-CA`
-   * gives ISO-ordered date parts, so the pieces assemble without a locale
-   * assumption.
+   * `formatInstantForDateTimeLocal`: that helper's parser once accepted only
+   * instants whose seconds were literally `:00` with no fractional part, while
+   * every reminder this surface reads carries whatever `now()` had, so calling
+   * it threw inside the client render and took the page to its error boundary.
+   * The parser now accepts the full stored grammar; this stays server-side
+   * because a throwing parser has no business in client render. `en-CA` gives
+   * ISO-ordered date parts, so the pieces assemble without a locale assumption.
    */
   const localInputFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,

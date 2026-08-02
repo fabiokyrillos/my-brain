@@ -19,8 +19,10 @@ import {
   type ManualPriority,
 } from "./candidate-edit-contract";
 import {
+  describeInstantForDateTimeLocal,
   formatInstantForDateTimeLocal,
   localDateTimeToOffsetInstant,
+  type CandidateDueDateState,
 } from "./candidate-due-date";
 import type { CandidateRelationOptions } from "./relation-options";
 
@@ -141,6 +143,8 @@ const copy = {
       label: "Erro de tamanho do motivo",
       message: "O motivo deve ter no máximo 2.000 caracteres.",
     },
+    dueDateUnreadable:
+      "Não foi possível ler o prazo sugerido. Defina uma data se quiser um prazo.",
     dueDateErrorLabel: "Erro na data limite",
     dueDateInvalid: "Informe uma data e hora válidas.",
     dueDateGap: "Esse horário não existe no fuso informado.",
@@ -213,6 +217,8 @@ const copy = {
       label: "Reason length error",
       message: "Reason must be 2,000 characters or fewer.",
     },
+    dueDateUnreadable:
+      "The suggested due date could not be read. Set a date if you want one.",
     dueDateErrorLabel: "Due date error",
     dueDateInvalid: "Enter a valid date and time.",
     dueDateGap: "This time does not exist in the selected timezone.",
@@ -251,7 +257,15 @@ export function CandidateEditor({
   const candidateIndex = Number(candidate.key);
   const originalDescription = candidate.description ?? null;
   const originalDueAt = candidate.dueAt ?? null;
-  const originalDueDate = formatInstantForDateTimeLocal(originalDueAt, timezone);
+  const originalDueDateState = describeInstantForDateTimeLocal(originalDueAt, timezone);
+  const originalDueDate = originalDueDateState.status === "valid"
+    ? originalDueDateState.localValue
+    : "";
+  // A due date this editor cannot read is withheld from the edit command as
+  // well as from the control: the user is told the field is empty, and an
+  // untouched field then emits no change, so the stored value survives intact.
+  const readableDueAt = originalDueDateState.status === "valid" ? originalDueAt : null;
+  const dueDateUnreadable = originalDueDateState.status === "unreadable";
   const suggestionSignature = JSON.stringify([
     candidate.key,
     candidate.title,
@@ -301,6 +315,7 @@ export function CandidateEditor({
   const titleErrorId = `${id}-title-error`;
   const descriptionErrorId = `${id}-description-error`;
   const dueDateErrorId = `${id}-due-date-error`;
+  const dueDateUnreadableId = `${id}-due-date-unreadable`;
   const plannedDateErrorId = `${id}-planned-date-error`;
   const noDueReasonErrorId = `${id}-no-due-reason-error`;
   const editorPanelId = `${id}-editor`;
@@ -346,9 +361,8 @@ export function CandidateEditor({
       publishValidity(true);
     } else if (previous.timezone !== timezone) {
       setDueDate((currentDueDate) => {
-        const previousOriginalDueDate = formatInstantForDateTimeLocal(
-          originalDueAt,
-          previous.timezone,
+        const previousOriginalDueDate = localValueOrEmpty(
+          describeInstantForDateTimeLocal(originalDueAt, previous.timezone),
         );
 
         if (currentDueDate === previousOriginalDueDate) {
@@ -417,7 +431,7 @@ export function CandidateEditor({
       candidateIndex,
       title: candidate.title,
       description: originalDescription,
-      dueAt: originalDueAt,
+      dueAt: readableDueAt,
     },
     timezone,
     values,
@@ -435,7 +449,12 @@ export function CandidateEditor({
   const noDueReasonError = noDueReasonTouched
     ? validateNoDueReason(noDueReason, locale)
     : null;
-  const formattedDueDate = formatDueDateForDisplay(originalDueAt, timezone, locale);
+  const formattedDueDate = formatDueDateForDisplay(
+    originalDueDateState,
+    originalDueAt,
+    timezone,
+    locale,
+  );
 
   function emitEdit(nextValues: EditorValues) {
     if (!selected) {
@@ -453,7 +472,7 @@ export function CandidateEditor({
           candidateIndex,
           title: candidate.title,
           description: originalDescription,
-          dueAt: originalDueAt,
+          dueAt: readableDueAt,
         },
         timezone,
         values: nextValues,
@@ -677,6 +696,15 @@ export function CandidateEditor({
         <strong>{candidate.title}</strong>
         {candidate.description && <small>{candidate.description}</small>}
         {formattedDueDate && <small>{localized.due}: {formattedDueDate}</small>}
+        {/* Not a live region: this is a standing property of the suggestion,
+            not something that just happened. It is visible on the card and
+            reaches assistive technology through the due-date control's
+            `aria-describedby` when the editor is open. */}
+        {dueDateUnreadable && (
+          <small className="form-error" id={dueDateUnreadableId}>
+            {localized.dueDateUnreadable}
+          </small>
+        )}
         <small>{localized.timezone(timezone)}</small>
       </div>
 
@@ -776,7 +804,11 @@ export function CandidateEditor({
           <label className="field-label" htmlFor={dueDateId}>
             <span>{localized.dueDate(timezone)}</span>
             <input
-              aria-describedby={dueDateError ? dueDateErrorId : undefined}
+              aria-describedby={dueDateError
+                ? dueDateErrorId
+                : dueDateUnreadable
+                  ? dueDateUnreadableId
+                  : undefined}
               aria-invalid={dueDateError ? true : undefined}
               disabled={!selected || noDue}
               id={dueDateId}
@@ -1340,16 +1372,23 @@ function validatePlannedDate(
   }
 }
 
+function localValueOrEmpty(state: CandidateDueDateState): string {
+  return state.status === "valid" ? state.localValue : "";
+}
+
 function formatDueDateForDisplay(
+  state: CandidateDueDateState,
   instant: string | null,
   timezone: string,
   locale: CandidateEditorProps["locale"],
 ): string | null {
-  if (!instant) {
+  // The state is the gate, not `Intl`: `new Date` below would happily read a
+  // date-only value as UTC midnight and show the user a day that no part of
+  // the system ever stored.
+  if (state.status !== "valid" || !instant) {
     return null;
   }
 
-  formatInstantForDateTimeLocal(instant, timezone);
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
     year: "numeric",
     month: "numeric",

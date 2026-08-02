@@ -3,6 +3,24 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-02 — one optional field could take down an entry: the candidate due-date contract, fixed where it was actually wrong
+
+**Zero migrations. No production data was rewritten**, and none needed to be — the stored value was valid the whole time.
+
+**The defect.** Opening `/pt-BR/app/inbox/bdf48c06-…` rendered the app error boundary. The originating throw was `parseOffsetInstant` — *"Invalid offset-bearing instant format"* — reached from `CandidateEditor` while filling a `datetime-local` control. The stored candidate due date was inspected read-only and classified without reading its content: a **valid negative-offset instant whose seconds were not `:00`**, the shape a model produces for an end-of-day deadline.
+
+**Which side was wrong is not a matter of taste.** The upstream contract is `z.string().datetime({ offset: true })` in *both* `src/lib/ai/extraction-schema.ts` and `src/features/tasks/candidate-edit-contract.ts` — any seconds value, optional fractional seconds. The AI worker, the interpretation persistence, the candidate schema and the edit contract all accepted the value correctly. One reader, `candidate-due-date.ts`, hard-coded `(00)` for the seconds field and was **narrower than the contract on both sides of it**. So the fix is at that reader, not at the data and not at a validated boundary.
+
+**This parser had already done this twice, and the record says so.** `reminder-actions.tsx`, `reminder-list.tsx` and `app/reminders/page.tsx` each carry a comment describing the same crash on the same cause — one of them explicitly choosing a local workaround "rather than widening a regex two other features depend on". A third surface has now hit it, which retires that judgement: the regex *was* the wrong boundary. Those comments are corrected rather than left asserting something no longer true; their server-side formatting stays, for the reason that is still valid.
+
+**Widening is bounded to the declared grammar, not to arbitrary strings.** Seconds `00–59` and optional fractional seconds are accepted; an impossible seconds field is still rejected, an offset without an explicit sign-and-minutes is still rejected, an impossible Gregorian date is still rejected, and an unusable IANA timezone still throws because that is a configuration defect rather than a data one. Sub-minute precision is **truncated, never rounded** — a `datetime-local` control has minute precision and the wall clock must not move.
+
+**Resilience is separate from the fix, and typed rather than caught.** `describeInstantForDateTimeLocal` returns `absent | valid | unreadable`, so a legacy or malformed value is a value the caller renders instead of an exception it must remember to trap. The affected field renders empty beside a localized notice; the candidate stays fully editable; an untouched field emits no change, so the stored value survives intact. Nothing guesses an offset — a date-only value is refused rather than read as UTC midnight, which is a day the owner never stated.
+
+**The integration test found two more crash sites the unit test could not.** `formatDueDate` in `task-candidate-form.tsx` fed `new Date` straight to `Intl` — it threw on a malformed offset and, worse, rendered a date-only value in **the viewer's own timezone** rather than the owner's, because it never passed `timeZone`. And `toEditSuggestion` carried an unreadable value into suggestion validation, which refused the **entire batch** with "review your decisions" — one bad optional field costing the owner every other candidate in the entry. Both are fixed at the same boundary; nothing stored is altered.
+
+**Verified against the deployed environment, not asserted.** 40 unit cases on the reader (every shape in the report: UTC, positive offset, negative offset, date-only, local date-time, SQL-style timestamp, empty, null, malformed offset, malformed date, and the exact affected shape), 84 on the editor, 28 on the form, and an online journey that seeds the exact shape and loads the real entry detail route: **pt-BR and English, desktop and Pixel 7, 4/4 green**. The owner's zone in that fixture is `America/New_York`, so `23:59:59-03:00` must arrive as `22:59` — proving the offset is honoured rather than the digits copied.
+
 ## 2026-08-02 — BYOK deployed acceptance: twelve gates pass, the owner cutover fails, and the failure is the best evidence in the initiative
 
 **Zero migrations; the head stays at `202608010069` and no sixth is needed. BYOK does NOT close here**, and is not recorded as closed.

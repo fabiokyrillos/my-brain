@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeInstantForDateTimeLocal,
   formatInstantForDateTimeLocal,
   localDateTimeToOffsetInstant,
 } from "./candidate-due-date";
@@ -117,5 +118,115 @@ describe("candidate due-date conversion", () => {
       .toBe("2026-07-21T13:30:00-04:00");
     expect(localDateTimeToOffsetInstant(localValue, "UTC"))
       .toBe("2026-07-21T13:30:00+00:00");
+  });
+});
+
+// The upstream contract for a candidate due date is `storableInstant` in
+// `src/lib/ai/extraction-schema.ts` and `dueAtSchema` in
+// `./candidate-edit-contract.ts` — both `z.string().datetime({ offset: true })`,
+// which permits any seconds value and optional fractional seconds. The reader
+// below has to accept exactly that grammar and nothing wider: an instant the
+// model was allowed to produce must never take the entry detail route down, and
+// a value outside the grammar must never be guessed at.
+describe("candidate due-date instant contract", () => {
+  it("reads a whole-minute UTC instant", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T17:30:00Z", "America/Sao_Paulo"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T14:30" });
+  });
+
+  it("reads a UTC instant carrying seconds", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T17:30:45Z", "America/Sao_Paulo"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T14:30" });
+  });
+
+  it("reads a UTC instant carrying fractional seconds", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T17:30:45.123Z", "America/Sao_Paulo"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T14:30" });
+  });
+
+  it("reads a positive-offset instant", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T20:30:00+03:00", "UTC"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T17:30" });
+  });
+
+  it("reads a negative-offset instant", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T14:30:00-03:00", "UTC"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T17:30" });
+  });
+
+  // The exact shape stored for entry bdf48c06-5ceb-4c27-a7c7-ddc901e366b2: a
+  // valid negative-offset end-of-day instant whose seconds are not zero.
+  it("reads the end-of-day negative-offset instant that crashed the entry route", () => {
+    expect(describeInstantForDateTimeLocal("2026-08-08T23:59:59-03:00", "America/Sao_Paulo"))
+      .toEqual({ status: "valid", localValue: "2026-08-08T23:59" });
+  });
+
+  it("truncates sub-minute precision instead of rounding the wall clock forward", () => {
+    expect(describeInstantForDateTimeLocal("2026-07-21T17:30:59.999Z", "UTC"))
+      .toEqual({ status: "valid", localValue: "2026-07-21T17:30" });
+  });
+
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+    ["an empty string", ""],
+  ])("reports %s as an absent due date", (_label, value) => {
+    expect(describeInstantForDateTimeLocal(value, "America/Sao_Paulo"))
+      .toEqual({ status: "absent" });
+  });
+
+  it.each([
+    ["a date-only value", "2026-08-08"],
+    ["a local date-time without an offset", "2026-08-08T23:59:00"],
+    ["a SQL-style timestamp", "2026-08-08 23:59:00+00"],
+  ])("reports %s as unreadable for want of an offset", (_label, value) => {
+    expect(describeInstantForDateTimeLocal(value, "America/Sao_Paulo"))
+      .toEqual({ status: "unreadable", reason: "missing-offset" });
+  });
+
+  it.each([
+    ["a malformed offset", "2026-08-08T23:59:00+3:00"],
+    ["an out-of-range offset", "2026-08-08T23:59:00+99:00"],
+    ["an impossible Gregorian date", "2026-02-30T10:00:00-03:00"],
+    ["an out-of-range seconds field", "2026-08-08T23:59:75-03:00"],
+    ["a truncated instant", "2026-08-08T23Z"],
+  ])("reports %s as unreadable for malformation", (_label, value) => {
+    expect(describeInstantForDateTimeLocal(value, "America/Sao_Paulo"))
+      .toEqual({ status: "unreadable", reason: "malformed-instant" });
+  });
+
+  it("never silently reinterprets an unreadable value as a wall time", () => {
+    for (const value of ["2026-08-08", "2026-08-08T23:59:00", "2026-08-08 23:59:00+00"]) {
+      const state = describeInstantForDateTimeLocal(value, "America/Sao_Paulo");
+
+      expect(state.status).toBe("unreadable");
+      expect(JSON.stringify(state)).not.toContain("2026-08-08T23:59");
+    }
+  });
+
+  // An unusable timezone is a configuration defect, not a candidate-data
+  // defect: it must stay loud rather than be absorbed into the typed state.
+  it("still refuses an invalid IANA timezone", () => {
+    expect(() => describeInstantForDateTimeLocal("2026-07-21T17:30:00Z", "GMT-3"))
+      .toThrow(/timezone/i);
+  });
+
+  it("formats an instant carrying seconds through the throwing reader too", () => {
+    expect(formatInstantForDateTimeLocal(
+      "2026-08-08T23:59:59-03:00",
+      "America/Sao_Paulo",
+    )).toBe("2026-08-08T23:59");
+  });
+
+  it("round-trips an edited whole-minute value out of an instant with seconds", () => {
+    const state = describeInstantForDateTimeLocal(
+      "2026-08-08T23:59:59-03:00",
+      "America/Sao_Paulo",
+    );
+
+    expect(state.status).toBe("valid");
+    if (state.status !== "valid") return;
+    expect(localDateTimeToOffsetInstant(state.localValue, "America/Sao_Paulo"))
+      .toBe("2026-08-08T23:59:00-03:00");
   });
 });
