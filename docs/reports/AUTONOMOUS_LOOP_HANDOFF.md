@@ -4,22 +4,29 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-02**, at the **loop's second stop**. §14 supersedes §13 and is the
-only section a resuming context needs to act on first.
+Last updated: **2026-08-02**, at the **loop's third stop**. **§15 supersedes §14, which
+supersedes §13**, and §15 is the only section a resuming context needs to act on first.
+§13 and §14 are retained as the record of the first two stops; every owner action either
+listed has since been performed.
 
-**BYOK is DEPLOYED and NOT CLOSED, and it must not be recorded as closed.** The four
-owner actions were performed and verified: five migrations applied (parity
-`202608010069`), `process-jobs` deployed 16/16 byte-identical, the three BYOK secrets in
-the Edge Function store, and `OPENAI_API_KEY` gone from it. **Twenty-three previously
-blocked properties now pass against the deployment.**
+**BYOK is DEPLOYED, WORKING, and NOT CLOSED, and it must not be recorded as closed.**
+Five migrations applied (parity `202608010069`), `process-jobs` deployed 16/16
+byte-identical, the three BYOK secrets in the Edge Function store, `OPENAI_API_KEY` gone
+from it.
 
-**And the owner cutover FAILED.** The Next.js runtime that saved the owner's credential
-held a *different* `BYOK_MASTER_KEY` from the deployed worker, so the credential opens
-nowhere and the owner's asynchronous AI is terminally broken right now. The architecture
-handled it perfectly — failed closed, no project-key fallback, no retry storm, no leak —
-which is why the failure is the strongest evidence in the initiative and still a failure.
-**Two owner steps remediate it; they are in §14.** Signup Hardening and Phase 2G remain
-deliberately unstarted.
+**The owner cutover failed once and now SUCCEEDS.** The first attempt left the Next.js
+runtime and the deployed worker holding *different* `BYOK_MASTER_KEY` values, so the
+owner's credential opened nowhere. The architecture handled that perfectly — failed
+closed, no project-key fallback, no retry storm, no leak — which is why it remains the
+strongest evidence in the initiative. The owner then synchronized the three values and
+re-entered the credential through Settings, and it is verified: parity is `IN PARITY`,
+the credential opens under both runtimes, and the owner's asynchronous AI runs on it
+against the deployed worker. **The earlier failure is superseded, not rewritten** — §14
+and the "Deployment state" section of `STATE.md` keep it exactly as it was recorded.
+
+**What still blocks closure is the real-credential half:** the two-user isolation matrix,
+concurrent rotation, and the Settings journeys. Signup Hardening and Phase 2G remain
+deliberately unstarted until BYOK closes (`ADR-068`).
 
 ---
 
@@ -720,3 +727,90 @@ E1 in full, E3, E5, concurrent rotation, the desktop/Pixel 7 Settings journeys i
 locales, the two-user isolation matrix with real credentials, and the capture lifecycle's
 credentialed half. After those, BYOK's final report and traceability matrix can be
 written honestly — and only then does Signup Hardening begin.
+
+---
+
+## 15. The third stop — 2026-08-02, after the remediation. **This supersedes §14.**
+
+§14 is retained as the record of the second stop. Both of its owner steps have been
+performed and **verified rather than believed**. Do not act on §14's list.
+
+### What the remediation proved
+
+Full record, appended not edited: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md` §10.
+
+- `npm run byok:verify-runtime` → **IN PARITY**, 5/0/0, digest control included.
+- The owner's stored credential **opens under the Node runtime's master key** — verified
+  read-only against the row's own AAD, with a passing positive control and a rejecting
+  wrong-AAD control. The value was never read.
+- **OWNER-ASYNC now passes**, on the deployed worker, through the unattended `pg_cron`
+  drain: job `completed`, one interpretation persisted, `ai_usage_events` 8 → 10. The
+  probe entry was cleaned up; the ledger rows are real usage and stay.
+- A deployed account **without** a credential is still refused — `credential_required`,
+  one attempt, zero ledger rows — and an account whose ciphertext cannot be opened is
+  still refused terminally with `credential_unreadable`.
+- `.env.local` holds **no** `OPENAI_API_KEY`. There is nothing to fall back to.
+- Zero credential-shaped residue across six readable product tables; `jobs.error` and
+  `entries.processing_error` both hold zero distinct values.
+- **E5 passes.** All five remote smokes are green.
+
+### One thing this loop changed that a reader must not misread
+
+Two remote scripts were asserting **pre-BYOK** behaviour — that a deployed account with
+no credential still gets AI. They are inverted, not weakened: they now assert the
+refusal, the declared code, the single attempt and the **absent** ledger row. Do not
+"restore" them.
+
+### The blocker, now exactly one
+
+Every remaining BYOK item needs **a provider-accepted OpenAI key that this loop is
+authorized to spend as a product credential**. `BYOK_VALIDATION_OPENAI_API_KEY` is
+explicitly not one (`ADR-070`). That blocks, and only that blocks:
+
+- the two-user isolation matrix with real credentials,
+- concurrent rotation (C10),
+- the desktop/Pixel 7 Settings journeys in both locales (C11),
+- the end-to-end half of `remote-entry-processing-smoke.mjs`.
+
+### The smallest owner action
+
+**Provide one or two disposable, low-limit OpenAI keys that the loop is authorized to
+enter through the Settings product flow on disposable accounts, and say so explicitly.**
+Two keys unblock everything above; one key unblocks everything except concurrent
+rotation. Place them in `.env.local` under names of your choosing and name those names —
+**do not paste any key into a chat message.** A USD 1–2 budget alert and the lowest
+practical rate limits are enough; `ADR-070` records the shape.
+
+Nothing else is needed. No migration, no deployment, no schema change.
+
+### Do not, on resuming
+
+- **Do not record BYOK as closed.** No central runtime claim is false any more, but the
+  isolation matrix, rotation and the Settings journeys are unexecuted, and an initiative
+  whose isolation claim is unexercised must not be marked done.
+- **Do not remove the owner's credential to test E3.** Unchanged from §14 and for the
+  same reason. The equivalent property is proven on disposable accounts.
+- **Do not simulate rotation or isolation with synthetic credentials and claim C10/C11.**
+  A synthetic ciphertext proves the fail-closed path and nothing about a provider.
+- **Do not build the two-key rotation window unasked.** It is BYOK.6's last code
+  deliverable and it is unauthorized, not merely unstarted.
+- **Do not start Signup Hardening or Phase 2G.** Unchanged.
+
+### What is open in the repository at this stop
+
+Three PRs came out of this loop. They are independent of each other.
+
+- **PR #68 — MERGED** at `156e414`, merge-SHA CI run `30752744866`, **all three jobs
+  green**. The candidate due-date contract fix: a model-produced end-of-day due date took
+  the entry detail route to the error boundary because one reader demanded `:00` seconds
+  while the contract on both sides of it permitted any. Independent of BYOK.
+- **PR #69** — this branch, **rebased onto `156e414`**. The two inverted remote smokes and
+  the documentation for §10 and §15. Its `CHANGELOG.md` and `STATE.md` conflicts with
+  PR #68 were reconciled **semantically and append-only**: both entries are retained in
+  full, and the superseded "cutover fails" records carry an explicit dated supersession
+  banner rather than being rewritten.
+- **PR #70** — the service worker cloned a `Response` after handing it to the page, so
+  `sw.js` logged an error on every cache miss and cached nothing. Unrelated to the
+  due-date failure it was reported alongside; the `asynchronous listener` /
+  `No Listener` messages reported with it are browser-extension noise and are
+  deliberately not chased. It is rebased after PR #69 merges.

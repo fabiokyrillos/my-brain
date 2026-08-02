@@ -298,3 +298,66 @@ credentialed half.
   (`ADR-072`), not a workaround that would have slipped the name past the control.
 * It does not remove any historical limitation. §4 and §5 carry every item forward with
   its blocker named, and the prior acceptance records are amended by append, never edited.
+
+---
+
+## 10. Post-remediation, 2026-08-02 — the cutover succeeded. **Appended; nothing above is edited.**
+
+The owner performed the two steps of §8: the three BYOK values were synchronized between
+`.env.local` and the deployed Edge Function store, the dev server was restarted from a
+clean shell, and the credential was **re-entered through the Settings product flow** —
+not by SQL, not from an environment variable, not by script, not by migration.
+
+Everything below was executed against the **deployed** project. Nothing is inferred from
+the fact that the owner reported the steps done.
+
+### What now passes that did not
+
+| Case | Result | Evidence |
+| --- | --- | --- |
+| **RUNTIME-PARITY** | **PASS** | `npm run byok:verify-runtime` → `IN PARITY`, 5 pass / 0 fail / 0 unverifiable, including the digest-algorithm control and `OPENAI_API_KEY` absent from the deployed secrets. No value and no digest printed. |
+| **OWNER-CREDENTIAL-OPENS-IN-NODE** (E1, crypto half) | **PASS** | The stored row was fetched read-only and opened with the Node runtime's `BYOK_MASTER_KEY` under the row's own AAD. Positive control round-tripped; negative control rejected a wrong AAD. Plaintext length observed, **value never read**. |
+| **OWNER-ASYNC** — the owner's asynchronous AI on the owner's own credential | **PASS**, previously **FAILED** | A probe entry and `interpret_entry` job were created on the owner's account and drained by the unattended `pg_cron` tick. Job `completed`, attempts 1, `error` null; one interpretation persisted; `ai_usage_events` **8 → 10**. The probe entry and its rows were deleted; the two ledger rows are genuine usage and correctly retained. |
+| **NO-PROJECT-KEY-IN-THE-NODE-ENVIRONMENT** | **PASS** | `.env.local` contains no `OPENAI_API_KEY`. The single substring match is `BYOK_VALIDATION_OPENAI_API_KEY`, the acceptance lane's key. There is nothing for a Node path to fall back **to**, independently of there being no expression that falls back. |
+| **UNCREDENTIALED-DEPLOYED-ACCOUNT-IS-REFUSED** | **PASS** | A disposable account's `process_attachment` job: HTTP 500 `{"error":"Processing failed","code":"job_exhausted"}`, job `exhausted`, attempts **1**, `error = credential_required`, attachment `failed`, and **zero** `ai_usage_events`. |
+| **CAPTURE-LIFECYCLE-WITHOUT-A-CREDENTIAL** (BYOK-CAPTURE-001/002/003) | **PASS** | An uncredentialed capture returns a `saved` receipt, stores the entry in `awaiting_ai_configuration`, and creates **no job** — asserted in `scripts/remote-entry-processing-smoke.mjs`. |
+| **UNOPENABLE-CREDENTIAL-FAILS-CLOSED-AND-BILLS-NOTHING** | **PASS** | A synthetic ciphertext: job `exhausted`, attempts 1, `error = credential_unreadable`, entry returned to `awaiting_ai_configuration`, zero ledger rows. The master-key-loss contract, now asserted on the path that used to assert a project-key success. |
+| **E5 — remote smoke after cutover** | **PASS** | `npm run test:remote` green. `test:remote:jobs`, `test:remote:interpretations` and `test:remote:product-events` green unchanged. |
+| **ZERO-RESIDUE-IN-PRODUCT-DATA** | **PASS** | Six readable product tables censused (`entries`, `entry_interpretations`, `audit_logs`, `ai_usage_events`, `credential_validation_attempts`, `notifications`): **0** credential-shaped matches. `jobs.error`: **0** distinct values. `entries.processing_error`: **0** distinct values. `product_events` is **not readable by `service_role`** — reported rather than skipped silently, and correct: it is written only through its RPC. |
+
+### Two remote scripts were asserting pre-BYOK behaviour, and both are now inverted
+
+Neither was a regression. Both fixtures predate BYOK and were asserting that a deployed
+account **without** a credential still gets AI — which is exactly the fallback BYOK.3
+deleted.
+
+* `remote-supabase-smoke.mjs` invoked the deployed worker for a disposable user and
+  required `attachment ready`, `job completed`, one `file_analysis` ledger row. It now
+  requires the refusal: a declared code, one attempt, and **no ledger row**. The
+  credentialed half of that path is proven by **OWNER-ASYNC** instead, on the only
+  account in this environment that can hold a credential.
+* `remote-entry-processing-smoke.mjs` assumed every capture enqueues a job. It now
+  asserts both halves of the credential-gated lifecycle, seeds a synthetic credential for
+  the queue mechanics — the same technique `supabase/tests/byok_awaiting_and_drain.sql`
+  already uses — asserts the fail-closed contract at the worker, and then **stops with a
+  named BLOCKED notice** rather than failing as though something had broken.
+
+### What is still blocked, and by exactly one thing
+
+Unchanged in kind from §4, reduced in scope. Every remaining item needs **a
+provider-accepted OpenAI key used as a product credential**, and no such key is available
+to this loop: `BYOK_VALIDATION_OPENAI_API_KEY` is explicitly not one (`ADR-070`,
+`TODO.md`).
+
+| Blocked item | What would unblock it |
+| --- | --- |
+| Two-user isolation with **real** credentials | Two disposable provider-accepted keys the loop is authorized to spend as product credentials. |
+| **Concurrent rotation** (C10) | Two such keys, to rotate between. Not simulated, not claimed. |
+| **Settings journeys**, desktop and Pixel 7, both locales (C11) | One such key: every save/validate/rotate step makes a real provider call. |
+| **E3 — removing and re-adding the owner's credential** | Nothing. It is **refused on purpose**, unchanged from §14 of the handoff: removal is easy, restoring requires the owner to re-enter a key this loop must never see or request, and getting it wrong costs the owner a working credential. The equivalent property is proven on disposable accounts (**REMOVAL-\*** rows in §3, and the refusal rows above). |
+| **Two-key bounded rotation window** (BYOK.6's last code deliverable) | Authorization to build it. `ADR-069`'s reasoning no longer applies in the same form — the credential path now works — but the deliverable is code that does not exist, and it is not started unasked. |
+| End-to-end interpretation inside `remote-entry-processing-smoke.mjs` | A decryptable **and** provider-accepted credential on a disposable account. |
+
+**BYOK is therefore still not closed.** What changed is which claim is false: no central
+runtime claim is false any more, and the remainder is blocked on an external credential
+rather than on a broken deployment.

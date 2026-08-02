@@ -435,25 +435,49 @@ try {
     }).select("id").single(),
     "create worker smoke job",
   );
-  dataOrThrow(
-    await first.functions.invoke("process-jobs", { body: { jobId: job.id } }),
-    "invoke deployed process-jobs worker",
+  /**
+   * Since BYOK this step proves the opposite of what it used to, and the
+   * inversion is the point.
+   *
+   * This smoke's user is disposable, so it can never hold a product credential:
+   * saving one requires a provider-accepted key, and the acceptance lane's key
+   * is explicitly not one. Before BYOK the job succeeded here on the project
+   * key — which is precisely the fallback BYOK.3 deleted. Asserting the old
+   * happy path would now mean asserting that a deployed account without a
+   * credential still gets AI, so the assertion is inverted rather than removed:
+   * the worker must refuse, the refusal must carry a declared code, and **no
+   * `ai_usage_events` row may exist** — no credential, no provider call.
+   *
+   * The credentialed half of this path is not dropped; it is proven on the
+   * owner's real credential in `BYOK_DEPLOYED_ACCEPTANCE.md`, which is the only
+   * account in this environment that has one.
+   */
+  const workerInvocation = await first.functions.invoke("process-jobs", { body: { jobId: job.id } });
+  assert(
+    workerInvocation.error !== null,
+    "Deployed worker accepted a job for an account with no credential",
   );
   const workerState = dataOrThrow(
     await first.from("attachments").select("status").eq("id", attachment.id).single(),
     "read worker attachment state",
   );
   const jobState = dataOrThrow(
-    await first.from("jobs").select("status").eq("id", job.id).single(),
+    await first.from("jobs").select("status,attempts,error").eq("id", job.id).single(),
     "read worker job state",
   );
   const fileUsage = dataOrThrow(
     await first.from("ai_usage_events").select("id").eq("operation", "file_analysis").eq("source_id", attachment.id),
     "read file analysis ledger",
   );
-  assert(workerState.status === "ready" && jobState.status === "completed" && fileUsage.length === 1, "Deployed worker did not finish atomically");
+  assert(
+    jobState.status === "exhausted" && jobState.error === "credential_required",
+    `Uncredentialed job did not fail closed with a declared code (status ${jobState.status}, error ${jobState.error})`,
+  );
+  assert(jobState.attempts === 1, `Uncredentialed job burned ${jobState.attempts} attempts instead of one`);
+  assert(workerState.status === "failed", "Uncredentialed attachment was not marked failed");
+  assert(fileUsage.length === 0, "A provider call was billed for an account with no credential");
 
-  console.log("Remote Supabase smoke passed: auth, atomic settings, RLS, ownership, heartbeat, AI ledger, aggregation, and deployed file worker.");
+  console.log("Remote Supabase smoke passed: auth, atomic settings, RLS, ownership, heartbeat, AI ledger, aggregation, and a deployed worker that refuses an uncredentialed account without billing it.");
 } finally {
   if (uploadedPaths.length > 0) {
     const storageCleanup = await admin.storage.from("user-files").remove(uploadedPaths);
