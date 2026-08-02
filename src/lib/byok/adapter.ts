@@ -6,7 +6,7 @@ import type { Database } from "@/lib/supabase/database.types";
 
 import { CredentialUnreadableError, decryptCredential, requireMasterKeyRing } from "./crypto";
 import { keyForVersion, type MasterKeyRing } from "./rotation";
-import { fromBase64, toBase64, type Bytes } from "./envelope";
+import { fromBase64, toBase64 } from "./envelope";
 import { Secret } from "./secret";
 
 /**
