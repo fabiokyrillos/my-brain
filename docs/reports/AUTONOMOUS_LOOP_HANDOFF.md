@@ -977,6 +977,14 @@ configuration, a boundary that would need weakening, or a PRD/plan/repository
 contradiction). Deployment gates SH-GD.1…SH-GD.4 block shared-environment execution only —
 never repository implementation.
 
+### SH.0 — CLOSED. PR #73, merge SHA `a05cfb5`, merge-SHA CI run `30905402273` green on
+all three jobs; branch `codex/sh-slice-0` preserved. Four PR-head runs: `30903589273`
+(drill ok on its FIRST execution — the bulk delete is NOT blocked by the 43 composite
+`NO ACTION` FKs; census cut 1 refused), `30904179153` (census cut 2 refused),
+`30904706152` (all green), `30905060309` (docs-only, all green). Both census refusals are
+recorded in the acceptance report §4.7 — they are a live measurement of the FINDINGS
+sec. 12.3 local/hosted privilege divergence, not noise.
+
 ### SH.0 — delivered in this slice (branch `codex/sh-slice-0`, 0 migrations)
 
 - **`supabase/tests/signup_hardening_cascade_drill.sql`** — SH-DELETE-001 / gate SH-G0.2.
