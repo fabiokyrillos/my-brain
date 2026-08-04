@@ -74,9 +74,11 @@ of the initiative's eight migrations are now spent.
   table nobody can write to. Plus own-row-only enforcement with a bystander to
   fail on, `UPDATE` and `DELETE` refused, `anon` holding nothing, the RPC's own
   boundary, and the cascade taking acceptances with the account.
-  The suite reads the current version through a `pg_temp` DEFINER wrapper rather
-  than a literal, because `private.current_policy_version` is executable by no
-  role and a hard-coded date would silently rot at the next bump.
+  The suite reads the current version from transaction-local settings captured
+  as the superuser rather than from a literal, because
+  `private.current_policy_version` is executable by no role and a hard-coded
+  date would silently rot at the next bump — see §3.3 for the mechanism this
+  replaced and why.
 - **Unit, 79 cases** across five files: the version parity in both directions;
   the deletion-retention parity against `account_deletion_log`'s **actual column
   list** in both directions, with a guard that the column regex still matches
@@ -109,12 +111,20 @@ of the initiative's eight migrations are now spent.
    surface renders `<main className="auth-page">`, and `auth-page` **exists in
    no stylesheet** — the card rendered without the centred full-height stage.
    Corrected to `auth-stage`, the class the auth layout actually uses.
-3. **FIXED, caught by static review before CI.** The pgTAP suite originally
-   called `private.current_policy_version` from inside its `authenticated`
-   sections. That function is executable by no role — correctly — so every one
-   of those assertions would have failed on a permission error that looked like
-   a logic failure. A `pg_temp` DEFINER wrapper reads it instead, without
-   weakening the production grant.
+3. **FIXED TWICE, both times by static review before CI, and the second fix is
+   the interesting one.** The pgTAP suite first called
+   `private.current_policy_version` directly from inside its `authenticated`
+   sections. That function is executable by no role — correctly — so those
+   assertions would have failed on a permission error that looked like a logic
+   failure. The obvious repair was a `pg_temp` SECURITY DEFINER wrapper, and it
+   was **also wrong**: calling a function in the session's temporary schema
+   needs USAGE on that schema, which `authenticated` does not hold either, so
+   the same assertions would still have failed — on a *different* permission
+   error, equally unrelated to the version guard they exist to test. The working
+   answer is transaction-local settings captured as the superuser and read back
+   with `current_setting`, which any role may do. The reasoning is written into
+   the file, because the next person to reach for `pg_temp` under a switched role
+   will reach for it for the same good-looking reason.
 4. **FIXED, caught by static review.** The "invented document" assertion expected
    `23514` (the CHECK). PostgreSQL runs `BEFORE` row triggers **ahead of**
    constraint checks, so the trigger names it first with `22023`. The expectation
