@@ -1663,3 +1663,108 @@ Everything in §22's list still stands, plus:
 `main` synchronized, tree clean. Hosted: 2 accounts (owner + online fixture),
 both `active`; **storage empty**; `disable_signup: true` and untouched; parity
 `202608040074`. Migration budget: **five of eight spent, none by this work.**
+
+---
+
+## 24. The eighth stop — 2026-08-04, after the hosted readback. **This supersedes §23.**
+
+The owner supplied a Personal Access Token and chose Vercel + the production
+origin. That unblocked §23's stop, and the readback immediately found two things
+worse than the blocker it replaced.
+
+**Merged: PR #83, merge SHA `09cf1d3`, merge-SHA CI run `30958728180` green on
+all three jobs.** `main` synchronized, tree clean.
+
+### The token, verified without being exposed
+
+Present and non-empty in `.env.local` (not the shell environment — worth knowing
+when a script expects `process.env`). `.env.local` is gitignored and untracked,
+and a scan of **all 1,132 tracked files** found zero containing the value. It is
+read as a bearer header only. `scripts/hosted-auth-config.mjs` redacts by field
+**name**, so a secret field the provider adds later is redacted by default
+rather than by having been listed.
+
+### Two findings, both from probing rather than reading
+
+1. **The production project was pointing auth emails at localhost.**
+   `site_url = "http://localhost:3000"` with an **empty** `uri_allow_list`.
+   Supabase falls back to `site_url` for every auth redirect and an empty list
+   permits only that — so every confirmation and recovery link the deployed
+   product could send pointed at the recipient's own machine, and any
+   `redirectTo` the app supplied would have been refused.
+2. **Password recovery was returning a bare HTTP 500 in production.** §23's own
+   work caused it: PR #82's configured origin *throws* when unset, and Vercel
+   Production has no `APP_ORIGIN`. Fixed to a declared `auth-misconfigured`
+   refusal — **verified live**: the 500 is gone and the honest copy renders.
+   The fix makes the failure honest; it does **not** make recovery work.
+
+### What was applied, and why not `config push`
+
+A Management API **PATCH** of two fields, then a re-read of all **242** and a
+field-by-field diff: **2 changed, 0 unintended.** `config push` was not used and
+should not be — it sends the whole `[auth]` block, and 242 fields returned means
+most of what it would set is something `config.toml` never mentions and this
+initiative has no opinion about.
+
+The allow list is **generated from `buildAuthCallbackUrl`**, the same function
+the Server Actions call, so it cannot disagree with the URLs actually sent. 12
+exact URLs, no wildcard, no preview host. localhost enumerated because the
+online suite and `npm run dev` serve the app there against this project.
+
+### Provider ceilings — §23's blocker, now answered
+
+| Limit | Value |
+| --- | --- |
+| `rate_limit_email_sent` | **2 / hour** ← binding |
+| `rate_limit_verify` | 30 / 5 min / IP |
+| `rate_limit_otp` | 30 / 5 min / IP |
+| `rate_limit_token_refresh` | 150 / 5 min / IP |
+
+The email limit is the **default Supabase SMTP** value — it exists *because* no
+custom SMTP is configured, and it will change when Resend lands. Any resend
+ceiling chosen now must sit at or below 2/hour, and must be revisited when SMTP
+changes it. **Migration `202608040075` is still unspent; five of eight remain.**
+
+### What is NOT done
+
+SH.5's remaining repository work: `auth_event_attempts` and migration
+`202608040075`, the throttle claim/finalize paths, genuine-concurrency tests,
+30-day retention and scheduler-only prune, confirmation resend,
+enumeration-uniform responses, session-fixation evidence, Turnstile application
+plumbing, and the SH.5 acceptance report. **SH.6 and SH.7 were not started.**
+
+### Owner actions, smallest first
+
+1. **Set `APP_ORIGIN=https://my-brain-dusky.vercel.app` in Vercel Production and
+   redeploy.** Password recovery is refusing until this exists. The Vercel CLI
+   here is unauthenticated and its login is an interactive OAuth device flow
+   this session cannot complete, so the whole Vercel lane — env inventory,
+   setting the variable, confirming the deployment reads it — is owner-only.
+2. **Configure Resend custom SMTP.** Needs a sending domain, DNS and
+   credentials that do not exist. Blocks every email journey *and* the
+   behavioural verification of the allow list applied above, which is currently
+   correct-by-construction and unverified-by-observation.
+3. **Enable Turnstile** in hosted Auth — `security_captcha_enabled` is `false`
+   and the provider is still `hcaptcha`.
+
+### Do not, on resuming
+
+Everything in §23's list still stands, plus:
+
+- **Do not run `supabase config push`.** Use `scripts/hosted-auth-config.mjs`,
+  which changes only named fields and proves the rest did not move.
+- **Do not treat the redirect allow list as verified.** No email has been
+  delivered through it. The verification step is written down in the readback
+  report; it needs SMTP.
+- **Do not soften `resolveConfiguredOrigin` to stop throwing.** The throw is the
+  honest signal; the graceful handling belongs at the call site and is already
+  there.
+- **Do not add a Vercel preview host to the production allow list.** A parity
+  test forbids it.
+
+### State at this stop
+
+`main` at `09cf1d3` + the record commit, tree clean. Hosted: parity
+`202608040074`; `site_url` is the Vercel origin; 12 enumerated redirect URLs;
+`disable_signup: true`; storage empty; 2 accounts, both `active`. Production
+deployment healthy, recovery refusing honestly, signup closed on both sides.
