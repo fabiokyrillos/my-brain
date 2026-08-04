@@ -39,6 +39,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_lifecycle: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          created_at: string
+          reason_code: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          created_at?: string
+          reason_code: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          created_at?: string
+          reason_code?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_preferences: {
         Row: {
           agent_name: string

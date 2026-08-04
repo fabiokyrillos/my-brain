@@ -40,11 +40,11 @@
 --   5. `authenticated` can still INSERT `audit_logs` directly (census F-18);
 --      UPDATE and DELETE are revoked. Dispositioned by SH-EXPOSURE-003 in
 --      SH.6 -- when that lands, the INSERT pin below flips with it.
---   6. `handle_new_user` retains default PUBLIC EXECUTE (census F-19), so
---      `anon` can technically EXECUTE it today. SH-EXPOSURE-004 revokes it in
---      SH.1 -- this pin flips there. Property 2 above uses EXPLICIT grants
---      precisely so this PUBLIC-inherited case is carried by its own named
---      assertion instead of hiding property 2's meaning.
+--   6. `handle_new_user` retained default PUBLIC EXECUTE at SH.0 (census
+--      F-19). SH-EXPOSURE-004 revoked it in SH.1 (`202608040070`), and the
+--      pin below now asserts the CLOSED state. Property 2 above uses EXPLICIT
+--      grants precisely so this PUBLIC-inherited case is carried by its own
+--      named assertion instead of hiding property 2's meaning.
 --
 -- Written in pure ASCII, following `signup_hardening_cascade_drill.sql`.
 
@@ -194,8 +194,9 @@ select ok(
 );
 
 select ok(
-  has_function_privilege('anon', 'public.handle_new_user()', 'execute'),
-  'RECORDED EXPOSURE (census F-19): handle_new_user retains default PUBLIC execute -- revoked by SH-EXPOSURE-004 in SH.1'
+  not has_function_privilege('anon', 'public.handle_new_user()', 'execute')
+  and not has_function_privilege('authenticated', 'public.handle_new_user()', 'execute'),
+  'F-19 CLOSED by SH-EXPOSURE-004 (202608040070): handle_new_user is executable by no client role; the trigger still fires as owner'
 );
 
 select * from finish();
