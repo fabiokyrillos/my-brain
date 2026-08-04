@@ -81,7 +81,16 @@ export function ConsentSurface({
       </form>
       {signOutState.status === "failed" ? <p role="alert">{signOutState.message}</p> : null}
       <p>
-        <Link href={`/${locale}/app/settings`}>{copy.declineDelete}</Link>
+        {/*
+          `/account/delete`, NOT `/app/settings` — SH-LEGAL-010.
+
+          Everything under `app/` runs the consent gate, so a decline path
+          pointing there sends the one user who cannot pass that gate straight
+          back to this screen. The deletion surface was deliberately placed
+          outside `app/` for exactly this caller; this link is what makes that
+          placement do anything.
+        */}
+        <Link href={`/${locale}/account/delete`}>{copy.declineDelete}</Link>
       </p>
     </div>
   );

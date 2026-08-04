@@ -142,6 +142,19 @@ Slice: **SH.2 — account deletion and zero-residue cleanup.** Branch
 
 ## 5. What SH.2 does not claim
 
+> **Partly superseded 2026-08-04.** The executor is now deployed (v1, ACTIVE)
+> and SH-DELETE-012 has been EXECUTED against the hosted project at parity
+> `202608040074`: `e2e/online-account-deletion.spec.ts` plus a database-level
+> harness for the states a browser cannot observe without racing the executor.
+> The manifest below has also been **taken**. Evidence:
+> `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §2 and §6.
+>
+> Two caveats survive intact and are *not* superseded: the log row is still
+> unreadable by any role (which is the design, and the deployed run confirmed
+> it by being refused), and **deleting the six orphaned objects is still
+> unauthorized.** Taking the manifest was the read-only half; the destructive
+> half is untouched and still gated on the owner and SH-GD.2.
+
 - **No deployed execution.** SH-DELETE-012 (the end-to-end journey against a
   disposable account) needs SH-GD.3, and the executor is not deployed by this
   slice. Every claim above is repository-and-CI evidence.

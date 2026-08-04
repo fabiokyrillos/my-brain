@@ -1420,3 +1420,116 @@ slices have passed since it was written:
   SH.6 removes it by flipping `sweepActive` per class in
   `src/features/legal/retention.ts` as each sweep ships, and a test fails if the
   paragraph and the flags ever disagree.
+
+---
+
+## 22. The sixth stop — 2026-08-04, after the deployed acceptance. **This supersedes §21.**
+
+The owner applied `202608040070`–`202608040074` to the hosted project. That was
+option (2) of §21 — the highest-value action available — and it unblocked every
+deployed acceptance the initiative had been carrying. All of it has now been
+executed. **The loop stops before spending migration `202608040075`.**
+
+### What changed since §21
+
+| | Before | Now |
+| --- | --- | --- |
+| Hosted head | `202608010069` | **`202608040074`** — parity confirmed row-by-row |
+| Deployment-gated rows | 6 NOT EXECUTED | **0** |
+| Acceptance journeys | none | **3, re-runnable, in `e2e/`** |
+| `delete-account` | not deployed | **v1, ACTIVE** |
+| Orphan manifest | unfilled | **taken** — six, all `absent-owner`, no halting class |
+| Runbook | written, not drilled | **3 of 4 drilled** |
+| Migration budget | 5 of 8 spent | **5 of 8 spent** — the acceptance run spent none |
+
+### The two owner-reported facts that did not verify
+
+Both were reconciled append-only rather than assumed:
+
+- **"Hosted Auth configuration was read back and recorded."** It is not in the
+  repository — the tree was clean at `e925ba2`, unchanged since before those
+  actions. The public GoTrue settings were therefore re-read here; the
+  Management-API-only values were not, and SH-GD.1 stays open for them.
+- **"Disposable accounts are available."** There were none. The project held two
+  accounts, both predating this initiative, one of them the shared
+  `ONLINE_AUTH_TEST_EMAIL` fixture the whole online suite depends on — which must
+  **not** be consumed by a deletion journey. SH-GD.3's strategy is
+  "admin-created until signup opens", so the journeys now provision and remove
+  their own. That is strictly better and needs no owner action again.
+
+### Why this stop is a real blocker, unlike §21's
+
+§21 stopped for a *scope decision*; everything it faced was buildable. This one
+is different. The checkpoint conditions spending `202608040075` on reading the
+hosted GoTrue rate limits first, and the reason is sound: SH.5's
+`auth_event_attempts` throttles exist to sit **at or below** the provider's own
+ceilings, and ceilings chosen against unread limits are a number somebody made
+up. Spending a migration on that is precisely the silent budget spend the plan
+forbids.
+
+Those values live behind the Management API. The CLI's personal access token is
+in the **Windows Credential Manager**, not a readable file. Extracting a PAT
+from the OS credential vault is not something this loop will do, so this is
+owner-only by the checkpoint's own stop list: *"CAPTCHA or hosted configuration
+requiring owner-only access."*
+
+The public `GET /auth/v1/settings` endpoint gave what it exposes and no more:
+`disable_signup: true`, `mailer_autoconfirm: false`, email the only enabled
+provider, `saml_enabled: false`, `anonymous_users: false`.
+
+### The smallest owner action
+
+Read back and record, from the dashboard or the Management API:
+
+- the **GoTrue rate limits** (the one that actually blocks `…075`),
+- the redirect allowlist and `site_url`,
+- the password policy.
+
+With those recorded, SH.5's database half becomes buildable with honest
+ceilings. Its application half — the app-level signup gate defaulting closed,
+the `signup_disabled` copy, the origin-not-header fix, the resend surface,
+enumeration-uniform responses, the Turnstile token plumbing, the `safeAuthNext`
+guard — needs **no migration** and could be built first if the owner prefers;
+the plan permits it. That is a legitimate choice and it is the owner's, not
+this loop's, because SH.5's acceptance stays thin without the hosted half.
+
+### What the acceptance found that review had not
+
+- **A production defect, fixed.** The consent decline path's deletion link
+  pointed at `/{locale}/app/settings` — inside the consent gate being declined.
+  Declining looped back to the interposition. SH.4 built
+  `/{locale}/account/delete` outside `app/` for exactly that caller and nothing
+  pinned the link to it. This is the **second** time this initiative's own
+  warning — *"a decline path pointing at a route that does not exist is not a
+  path"* — described something that had actually happened.
+- **Dead copy.** The deletion receipt (`receiptTitle`/`receiptBody`) never
+  renders: the lifecycle gate re-runs on revalidation and interposes the
+  `deleting` screen first. Both gates correct. A copy decision for the owner.
+- **The suite made its own orphans.** The suspension journey's teardown deleted
+  the auth row before the storage — the mechanism behind the historical six —
+  and produced two new objects on its first run. Fixed (storage first, the
+  executor's ordering), cleaned, re-verified back to exactly six.
+
+### Do not, on resuming
+
+Everything in §19's list still stands, plus:
+
+- **Do not delete the six orphaned objects.** The manifest is now *taken*, which
+  makes deletion look like the obvious next step. It is not: it is irreversible,
+  owner-only, and gated on SH-GD.2. The owner's backup report is carried as an
+  **attestation**, not a measurement — this side could not verify it.
+- **Do not spend `202608040075` before the rate limits are read back.** That is
+  this stop.
+- **Do not consume the `ONLINE_AUTH_TEST_EMAIL` account.** It is the shared
+  online fixture, not a disposable.
+- **Do not "fix" the unreachable receipt copy by asserting it renders.** It does
+  not, and the reason is a gate working correctly.
+- **Do not treat the drilled runbook as battle-tested.** Three sections were
+  drilled once, by an agent, against an account it created.
+
+### State at this stop
+
+`main` synchronized, tree clean. Hosted: 2 accounts (owner + online fixture),
+both `active`; 6 storage objects, the historical orphans, untouched; signup
+**disabled** and untouched. Every disposable account created during the run was
+removed. Phase 2G/2H not started.

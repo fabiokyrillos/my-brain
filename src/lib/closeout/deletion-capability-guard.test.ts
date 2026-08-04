@@ -46,6 +46,19 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
   "e2e/byok-settings-journey.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
   "e2e/editable-candidate-confirmation.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
   "e2e/online-auth.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
+  "e2e/online-account-deletion.spec.ts": {
+    class: "e2e-teardown",
+    reason:
+      "SH.2 deployed acceptance: the journey provisions its own disposable account and the product deletes it; this call is the net for a run that failed before reaching that point",
+  },
+  "e2e/online-account-suspension.spec.ts": {
+    class: "e2e-teardown",
+    reason: "SH.3 deployed acceptance: disposable-account teardown after the reactivation evidence is captured",
+  },
+  "e2e/online-consent-interposition.spec.ts": {
+    class: "e2e-teardown",
+    reason: "SH.4 deployed acceptance: disposable-account teardown, one account per locale",
+  },
   "scripts/local-task-command-creation-race.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/phase-2f-command-funnel-reader.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/phase-2f-gate3-exact-title-reuse.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
@@ -131,13 +144,26 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
     expect(holders.filter((file) => file.startsWith("src/"))).toEqual([]);
   });
 
-  it("the non-product classes are exactly the pre-SH.2 surface the census recorded", () => {
+  it("the non-product classes are the recorded census plus the SH.2-4 acceptance journeys", () => {
     // e2e teardown and operator scripts held this before SH.2 and are listed
     // rather than skipped. If one is ever deleted or a new one appears, the
     // both-directions assertions above name it.
+    //
+    // The three deployed-acceptance journeys added when SH.2-SH.4 were accepted
+    // against the hosted project are counted separately from the pre-SH.2 five,
+    // because "how many files hold this" is only a useful number if it is also
+    // clear *why* it grew. Teardown is the honest class for them: each one
+    // provisions its own disposable account and removes it, and none touches an
+    // account it did not create.
     const byClass = (name: CapabilityClass) =>
       Object.entries(DELETION_CAPABILITY_ALLOWLIST).filter(([, entry]) => entry.class === name);
-    expect(byClass("e2e-teardown")).toHaveLength(5);
+
+    const teardown = byClass("e2e-teardown").map(([file]) => file);
+    const acceptanceJourneys = teardown.filter((file) =>
+      /^e2e\/online-(account-deletion|account-suspension|consent-interposition)\.spec\.ts$/.test(file),
+    );
+    expect(acceptanceJourneys).toHaveLength(3);
+    expect(teardown).toHaveLength(5 + acceptanceJourneys.length);
     expect(byClass("operator-script")).toHaveLength(14);
   });
 
