@@ -19,7 +19,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
 import { createClient } from "@/lib/supabase/server";
 import { getDeletionCopy } from "./deletion-copy";
-import { idleDeletionRequestState, requestAccountDeletion } from "./actions";
+import { requestAccountDeletion } from "./actions";
+import { idleDeletionRequestState } from "./deletion-request-state";
 
 const USER = { id: "user-1", email: "owner@example.test" };
 

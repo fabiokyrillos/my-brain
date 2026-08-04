@@ -28,24 +28,7 @@ import { assertActiveAccount } from "@/lib/auth/require-user";
 import { isLocale, type Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { getDeletionCopy } from "./deletion-copy";
-
-export type DeletionRequestState = {
-  readonly status: "idle" | "error" | "started";
-  readonly code:
-    | null
-    | "session"
-    | "password"
-    | "phrase"
-    | "lifecycle"
-    | "failed";
-  readonly message: string | null;
-};
-
-export const idleDeletionRequestState: DeletionRequestState = {
-  status: "idle",
-  code: null,
-  message: null,
-};
+import type { DeletionRequestState } from "./deletion-request-state";
 
 const requestSchema = z.object({
   locale: z.string().refine(isLocale),
