@@ -1051,6 +1051,14 @@ hazard exists only at the hosted boundary, behind SH-GD.1 as planned.
 ### SH.1 — CLOSED. PR #74, merge `3c227f6`, merge-SHA CI `30910079676` green on all
 three jobs; PR-head CI `30909345700` green on the first attempt. Branch preserved.
 
+### SH.2 — CLOSED. PR #75, merge `947bb26`, merge-SHA CI `30914160291` green on all
+three jobs; branch preserved. PR-head runs: `30912845317` (two pgTAP failures, both
+guards catching their own author — recorded in the acceptance §3.8, not squashed),
+`30913298153` (all three green, all four Signup Hardening pgTAP suites `ok`),
+`30913748841` (docs-only, green).
+
+**THE LOOP STOPS HERE — see §19.**
+
 ### SH.2 — built on branch `codex/sh-slice-2` (1 migration, head -> `202608040072`)
 
 Delivered: `202608040072` (`account_deletion_log` de-identified by construction —
@@ -1092,3 +1100,89 @@ refusal, SH-EXPOSURE-004 (`handle_new_user` EXECUTE revoke — the census skelet
 pin flips in the same slice), SH-WORKER-003 SQL-reachability parity, SH-COPY-001. Both
 migrations update `AUTHORIZED_MIGRATION_HEAD` in the same commit and carry the
 SH-EXPOSURE-008 DEFINER catalog assertions.
+
+---
+
+## 19. The fourth stop — 2026-08-04, after SH.2. **This supersedes §18's "Next".**
+
+Last updated **2026-08-04**, at the SH.2 merge. §18 remains the record of SH.0–SH.2;
+act on this section.
+
+### Where the initiative stands
+
+| Slice | State | Merge | Merge-SHA CI |
+| --- | --- | --- | --- |
+| **SH.0** — census, drill, gates | **CLOSED** | `a05cfb5` (PR #73) | `30905402273`, all three green |
+| **SH.1** — account lifecycle | **CLOSED** | `3c227f6` (PR #74) | `30910079676`, all three green |
+| **SH.2** — deletion | **CLOSED** | `947bb26` (PR #75) | `30914160291`, all three green |
+| SH.3–SH.7 | not started | — | — |
+
+Migration head **`202608040072`**; three of the eight budgeted migrations spent
+(SH.1 two, SH.2 one), each slice moving the head by exactly its allocation.
+`main` is clean and synchronized. Branches `codex/sh-slice-0`, `codex/sh-slice-1`,
+`codex/sh-slice-2` are preserved.
+
+**The load-bearing gate passed.** SH-DELETE-001's cascade drill executed against a
+row-complete account on its very first CI run: the bulk `delete from auth.users` is
+**not** blocked by the 43 composite `NO ACTION` foreign keys. The plan's declared
+schema-blocker stop condition did not trigger, and no ninth migration was needed.
+
+### Why the loop stops here, and what it is NOT
+
+**This is a true stop condition, not an incomplete slice.** SH.2's repository work is
+complete, merged and green. What remains in SH.2 cannot be done by an agent:
+
+**1. SH-DELETE-015 — the six orphaned storage objects. OWNER DECISION.**
+`docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md` holds a **read-only** procedure and a
+deliberately **UNFILLED** manifest table. Two steps, in this order:
+
+  a. *Take the manifest* (read-only, no risk, but needs the deployed project and the
+     service-role key): `npm run verify:storage:orphans`. Record its output verbatim
+     into the manifest table and commit that.
+  b. *Then, and only then, decide.* Deleting the objects is **irreversible**,
+     **owner-only**, and **gated on SH-GD.2** (a verified restorable backup).
+
+  **Do not fill the manifest from the five older documents.** "Six objects, all
+  2026-07-16" is currently inherited belief, not a measurement. A different count, a
+  different date, or any object in the `cross-owner` or `unparseable` class **is itself
+  the finding** and stops the procedure.
+
+**2. The deployment-tier gates are now genuinely blocking, for the first time.**
+SH.0–SH.2 were fully buildable behind them; SH.3 is not. Its acceptance requires
+executing suspension and worker enforcement **against the deployment** on disposable
+accounts (SH-WORKER-004/005, SH-SUSPEND-002).
+
+| Gate | What the owner does | Blocks |
+| --- | --- | --- |
+| **SH-GD.1** | read back and record the hosted Auth config (`disable_signup` still `true`, `site_url`, redirect allowlist, `mailer_autoconfirm`, password policy, GoTrue rate limits) | applying any SH migration to the hosted project; SH.5's hosted half |
+| **SH-GD.2** | restore the production backup to a disposable project once, record the transcript | **any** destructive step: the six orphans, SH.6's first live purge |
+| **SH-GD.3** | provision two disposable accounts (admin-created; signup stays closed) | SH.2's deployed journey, SH.3's suspension journeys |
+| **SH-GD.4** | record the hosting/SMTP decision (recorded, not built) | SH.4/SH.5 email journeys |
+
+**3. Deployment ordering, which is an outage risk if reversed.** Migrations
+`202608040070`, `202608040071` and `202608040072` must reach the hosted project
+**before** the app code of SH.1/SH.2 runs against it. Without `account_lifecycle`, the
+fail-closed lifecycle read sends **every** account — including the owner — to the
+account-state surface. Repository and CI are internally consistent; the hazard exists
+only at the hosted boundary.
+
+### What a resuming context may do without any owner action
+
+**SH.3 can be built and merged behind SH-GD.1/GD.3** — its migration, the admin
+transition functions, the operator CLI, the suspended surface, the worker
+re-verification, the three-vocabulary distinction, and every CI-provable test. Only its
+*deployed* acceptance (SH-WORKER-004/005) waits. Same for SH.4 (fully offline-testable)
+and SH.5's application half. If the owner prefers the loop to continue rather than wait,
+that is the path — and it is what the plan's gate tiering exists to permit.
+
+### Do not, on resuming
+
+- **Do not delete the six orphaned objects**, or fill their manifest from belief.
+- **Do not run any production purge.** The retention schedule is approved; no purge
+  exists yet and none is authorized until SH.6 ships dry-runs and the owner authorizes
+  the first live run.
+- **Do not apply migrations to the hosted project** — that is the owner's step, and it
+  is ordered before the app code, not after.
+- **Do not flip `disable_signup`**, start Phase 2G/2H, or absorb operator surfaces.
+- **Do not spend a ninth migration.** Five remain of the approved eight: SH.3 one,
+  SH.4 one, SH.5 one, SH.6 two. A slice needing more stops and asks.
