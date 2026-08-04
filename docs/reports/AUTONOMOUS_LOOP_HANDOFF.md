@@ -1207,7 +1207,7 @@ project, no ninth migration spent.
 | SH.1 | CLOSED | 2 (`…070`, `…071`) | `3c227f6` | `30910079676` green |
 | SH.2 | CLOSED | 1 (`…072`) | `947bb26` | `30914160291` green |
 | SH.3 | CLOSED | 1 (`…073`) | `3a0f4f7` | `30936842221` green on all three |
-| SH.4 | in PR #78 | 1 (`…074`) | — | — |
+| SH.4 | CLOSED | 1 (`…074`) | `66b2648` | `30941069995` green on all three |
 
 **Migration budget: five of eight spent. Three remain — SH.5 one, SH.6 two.** SH.7 is
 allocated zero. No slice has exceeded its allocation and none has asked to.
@@ -1246,7 +1246,7 @@ meets a written expectation instead of discovering it. Partial mitigation, state
 partial: such an account can neither capture nor have any job executed, so nothing
 reachable this way causes AI spend or queued work.
 
-### SH.4 — Terms, Privacy and versioned consent (branch `codex/sh-slice-4`, PR #78)
+### SH.4 — Terms, Privacy and versioned consent (branch `codex/sh-slice-4`, PR #78, merge `66b2648`)
 
 The slice turns on one decision (ADR-079). `SH-LEGAL-005` requires `authenticated` to
 hold a direct INSERT on `policy_acceptances`, so PostgREST is a real door — and a client
@@ -1319,3 +1319,104 @@ large and its acceptance is thin without the hosted half.
   reads as settled and nobody goes looking for it again.
 - **Do not remove the retention warning by editing the paragraph.** It is generated; the
   correct way to remove it is SH.6 flipping `sweepActive` per class as each sweep ships.
+
+---
+
+## 21. The fifth stop — 2026-08-04, after SH.4. **This supersedes §20's "Next".**
+
+Four implementation slices are closed and merged with the exact merge-SHA CI green
+on all three jobs. `main` is clean and synchronized at `66b2648`. **The loop stops
+here for a scope decision, not for a blocker** — and the difference matters,
+because everything it is stopping in front of is buildable.
+
+### The state, in one place
+
+| | |
+| --- | --- |
+| Migration head | `202608040074` |
+| Budget | **five of eight spent**; SH.5 one, SH.6 two, SH.7 zero remain |
+| Hosted project | still `202608010069` — **five SH migrations unapplied** |
+| Public signup | disabled, and untouched by this initiative |
+| Working tree | clean; branches `codex/sh-slice-0…4` preserved |
+| Destructive actions taken | **none** |
+
+### Why this is a stop, and what kind
+
+**SH.5 is the first slice whose acceptance is mostly not repository work.** Its
+requirements split unevenly:
+
+- *The application half* — the app-level signup gate defaulting closed, the
+  `signup_disabled` copy, the origin-not-header fix, the resend surface,
+  enumeration-uniform responses, `auth_event_attempts` with its throttle claim and
+  prune, the CAPTCHA widget wiring, the `safeAuthNext` guard-of-the-guard, the
+  session-fixation pins. All buildable and CI-provable today.
+- *The hosted half* — CAPTCHA **enforcement** (a GoTrue setting only the owner can
+  enable, and the thing that makes SH-CAPTCHA-002's "UI-only bypass is structurally
+  impossible" true rather than aspirational), the redirect allowlist and `site_url`
+  readbacks, `mailer_autoconfirm`, the password policy, and the GoTrue rate limits
+  the application ceilings must sit at or below. All SH-GD.1, all owner actions.
+
+The plan explicitly permits building the application half first. The reason to ask
+rather than assume is that **SH.5's application half is large and its acceptance is
+thin without the hosted half**: a CAPTCHA widget that passes a token nothing
+verifies, and throttle ceilings set below provider limits nobody has read back, are
+both merged code whose central claim stays unproven. That is a legitimate way to
+spend the sixth migration — it is also the kind of choice that should be made
+deliberately rather than by momentum.
+
+### The three things the owner can do, in increasing order of unblocking
+
+1. **Nothing.** Say "keep going" and the loop builds SH.5's application half behind
+   SH-GD.1, exactly as it built SH.3 and SH.4 behind SH-GD.1/GD.3, recording the
+   hosted half as NOT EXECUTED. This is the smallest possible action and it is a
+   legitimate answer.
+2. **Apply the migrations.** `202608040070`–`202608040074` to the hosted project,
+   **before** any SH.1–SH.4 app code runs against it. This is the single highest-value
+   owner action available, because it unblocks *every* deployed acceptance still
+   outstanding — SH.2's deletion journey, SH.3's suspension and worker journeys,
+   SH.4's consent journeys. See the ordering warning below; it is not optional.
+3. **Open SH-GD.1 and SH-GD.3.** Read back and record the hosted Auth configuration,
+   and provision two disposable accounts. Together with (2) these turn six recorded
+   NOT-EXECUTED rows into executable work.
+
+### The ordering warning, restated because it is now the most severe it has been
+
+Both new gates **fail closed by design, and both are correct to**:
+
+- without `account_lifecycle` (`…070`), the lifecycle read sends **every** account —
+  including the owner's — to the account-state surface;
+- without `policy_acceptances` (`…074`), the consent gate interposes **every**
+  account and none reaches the product.
+
+Apply the migrations **first**, then the app code. CI proves the whole chain from an
+empty database on every run; the hazard exists only at the hosted boundary, and only
+if the order is reversed.
+
+### What was NOT done, and must stay that way
+
+Everything in §19's "Do not, on resuming" list stands verbatim. Restated because two
+slices have passed since it was written:
+
+- The **six orphaned storage objects** are untouched and their manifest is still
+  **unfilled**. "Six, all 2026-07-16" remains inherited belief, not a measurement.
+  Taking the manifest is read-only (`npm run verify:storage:orphans`) and needs the
+  deployed project; deleting anything is irreversible, owner-only and gated on
+  SH-GD.2.
+- **No production purge exists or is authorized.** The retention schedule is
+  approved; SH.6 builds the sweeps with dry-runs first.
+- **No migration has been applied to the hosted project by this loop.**
+- **No ninth migration was spent**, and no slice asked for one.
+- `disable_signup` was never touched; Phase 2G/2H were never started; no operator
+  dashboard was absorbed.
+
+### The two open items SH.4 created — both values, neither blocking
+
+- **The four legal placeholders** (`OPERATOR_ENTITY`, `OPERATOR_CONTACT`,
+  `GOVERNING_LAW`, `JURISDICTION`) render as visibly unfilled markers. Supplying
+  them is an owner action. Removing the professional-legal-review banner is a named
+  rollout gate (SH-LEGAL-013), not an edit.
+- **The retention warning is load-bearing until SH.6.** The Privacy Policy states the
+  declared windows *and* says plainly the sweeps are not running. It is generated —
+  SH.6 removes it by flipping `sweepActive` per class in
+  `src/features/legal/retention.ts` as each sweep ships, and a test fails if the
+  paragraph and the flags ever disagree.
