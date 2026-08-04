@@ -103,7 +103,19 @@ Slice: **SH.2 — account deletion and zero-residue cleanup.** Branch
    guarantee is the CHECK constraint (`removed` rows carry no ciphertext) plus
    the cascade; the check here is a stop-if-unreadable, not a proof of erasure,
    and it says so.
-7. **RECORDED, deployment ordering:** as with SH.1, the migration must reach
+8. **FIXED, and both halves were a guard catching its author.** CI run
+   `30912845317` failed two pgTAP assertions. (a) The SH.0 grant census pins
+   the set of tables carrying zero `service_role` grants *precisely so it
+   cannot grow silently* — and SH.2's own `account_deletion_log` joined it. The
+   guard written two slices earlier caught this slice's new table; the expected
+   set is now the three RPC-only ledgers, declared with its migration anchor.
+   (b) The bystander assertion ran while still impersonating the deleted
+   account, so `account_lifecycle`'s select-own policy returned `NULL` and it
+   read as a failure about the bystander when it was RLS working correctly.
+   Moved after `reset role`, with the reason written into the file. Third time
+   in this initiative that pgTAP was the artifact to fail first in CI — the
+   no-local-Docker consequence the handoff has recorded since BYOK.
+9. **RECORDED, deployment ordering:** as with SH.1, the migration must reach
    the hosted project before the app code that calls `request_account_deletion`.
    The failure mode is milder here (a declared error, not a closed product),
    but it is stated rather than discovered.
@@ -114,8 +126,19 @@ Slice: **SH.2 — account deletion and zero-residue cleanup.** Branch
   the PR boundary; Deno worker suite **104/104** including the 15 new cases;
   `deno check` on the new entrypoint green (and wired into CI beside the other
   two).
-- PR, PR-head CI run, merge SHA and merge-SHA CI run: appended at the PR/merge
-  boundary.
+- **PR #75.** Two PR-head CI runs; the first failure is recorded in §3.8 rather
+  than squashed:
+  - `30912845317` (head `df91b05`): `app` and `worker` green; `database` red on
+    two pgTAP assertions — both of them guards working as designed (§3.8).
+  - **`30913298153` (head `ed5c727`): ALL THREE JOBS GREEN.** The `database`
+    job applied `202608040072` from an empty database and shows all four
+    Signup Hardening suites `ok`: `signup_hardening_account_deletion.sql`
+    (25/25), `signup_hardening_account_lifecycle.sql`,
+    `signup_hardening_cascade_drill.sql` and `signup_hardening_grant_census.sql`.
+    The `worker` job type-checked the new entrypoint and ran the 15 executor
+    cases.
+- Merge SHA and merge-SHA CI run: recorded in `AUTONOMOUS_LOOP_HANDOFF.md` at
+  the merge boundary, per the standing discipline.
 
 ## 5. What SH.2 does not claim
 
