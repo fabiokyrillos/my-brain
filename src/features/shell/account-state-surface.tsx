@@ -44,7 +44,10 @@ export function AccountStateSurface({
   const [formState, formAction, pending] = useActionState(signOut, idleSignOutState);
 
   return (
-    <main className="auth-page">
+    // `auth-stage`, not `auth-page`: SH.1 wrote a class name that exists in no
+    // stylesheet, so this surface rendered its card without the centred
+    // full-height stage. Found while building the sibling surfaces of SH.4.
+    <main className="auth-stage">
       <div className="auth-card">
         <h1>{stateCopy.title}</h1>
         <p>{stateCopy.body}</p>
