@@ -156,7 +156,24 @@ of the initiative's eight migrations are now spent.
   legal pages prerender as static HTML). Full vitest: the three known local-only
   failures unchanged from `main` — two `sql-reachability` assertions and the two
   `.mjs`-importing closeout suites' rolldown parse failure, all green in CI.
-- PR-head and exact merge-SHA CI runs: recorded at the PR boundary.
+- **PR #78. PR-head CI run `30940211856` (head `9660c14`): all three jobs
+  green** — `application`, `database and journey` and `edge worker`. The
+  `database` job applied `202608040074` from an empty database and ran all six
+  Signup Hardening pgTAP suites, including this slice's 21 assertions and the
+  cascade drill with its new `policy_acceptances` arm.
+- **One pgTAP defect was caught by static re-scrutiny before CI ever ran it**,
+  and it is the one worth recording: the suite read the current version through
+  a `pg_temp` SECURITY DEFINER wrapper and then called it from sections running
+  as `authenticated`. Calling a function in the session's temporary schema needs
+  USAGE on that schema, which `authenticated` does not hold — so sections 3 and
+  4 would have failed on a schema permission error that looks nothing like the
+  version guard they exist to test, which is the worst kind of red because it
+  points at the wrong thing. Replaced with transaction-local settings captured
+  as the superuser and read back with `current_setting`. **Second slice running
+  in which reading the artifact statically caught what a red run would only have
+  obscured** — the practice the no-local-Docker constraint forced.
+- Merge SHA and exact merge-SHA CI run: recorded in
+  `AUTONOMOUS_LOOP_HANDOFF.md` at the merge boundary.
 
 ## 5. What SH.4 does not claim
 
