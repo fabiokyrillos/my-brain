@@ -147,9 +147,19 @@ so CI is their first execution) and against the governance edits.
   This branch touches no code, only docs and two new SQL files.
 - PR-head CI (all three jobs, including the `database` job that executes both new pgTAP
   files against the full migration chain from empty): recorded below at PR time.
-- **PR and PR-head CI run ids: appended in this file's §7 once the runs exist.** Until the
-  `database` job executes both new files, SH-G0.2/SH-G0.3 are AUTHORED, not EXECUTED, and
-  this record says so rather than claiming ahead.
+- **PR #73.** Three PR-head CI runs, all three jobs each, every failure recorded in §4
+  finding 7 rather than squashed:
+  - `30903589273` (head `abf557a`'s predecessor `eaf7d17`): `app` green, `worker` green,
+    `database` **red on the census only** — `signup_hardening_cascade_drill.sql .. ok` on
+    its **first execution ever**, so **SH-G0.2 is EXECUTED: the bulk `auth.users` delete
+    of a row-complete account is NOT blocked by the 43 composite `NO ACTION` FKs**; census
+    tests 4–5 refused the hosted-posture pin.
+  - `30904179153` (head `abf557a`): drill ok again; census test 4 refused the zero-grants
+    over-correction, measuring 40/42 tables carrying `service_role` grants.
+  - **`30904706152` (head `7d4af4b`): ALL THREE JOBS GREEN** —
+    `signup_hardening_cascade_drill.sql .. ok` and
+    `signup_hardening_grant_census.sql .. ok` in the `database` job log. **SH-G0.2 and
+    SH-G0.3 are EXECUTED and green.**
 - **Merge SHA and merge-SHA CI run:** recorded in `AUTONOMOUS_LOOP_HANDOFF.md` §18 at the
   merge boundary, per the standing discipline.
 
