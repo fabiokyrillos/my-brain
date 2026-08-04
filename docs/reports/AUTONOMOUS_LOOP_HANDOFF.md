@@ -1425,6 +1425,10 @@ slices have passed since it was written:
 
 ## 22. The sixth stop — 2026-08-04, after the deployed acceptance. **This supersedes §21.**
 
+**Merged: PR #80, merge SHA `7767339`, merge-SHA CI run `30948714242` green on all
+three jobs** (application; edge worker; database and journey). `main` is
+synchronized at `7767339` and the tree is clean.
+
 The owner applied `202608040070`–`202608040074` to the hosted project. That was
 option (2) of §21 — the highest-value action available — and it unblocked every
 deployed acceptance the initiative had been carrying. All of it has now been
