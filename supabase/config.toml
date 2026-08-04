@@ -173,7 +173,18 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+#
+# SH-SIGNUP-003. FALSE, and it must stay false.
+#
+# `supabase config push` sends this whole file to the linked project. With
+# `true` here — the CLI template's default — that one routine command would
+# OPEN PUBLIC SIGNUP on the hosted project, silently, as a side effect of
+# pushing something else entirely. Opening signup is a post-initiative owner
+# decision gated on a green fail-closed rollout run (SH-ROLLOUT-005); it must
+# not be reachable as an accident of unrelated config work.
+#
+# `signup-config-guard.test.ts` fails if this ever returns to true.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -218,7 +229,9 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = true
+# SH-SIGNUP-003: false for the same reason as [auth].enable_signup above. Email
+# is the only enabled provider, so this is the one that would actually open.
+enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true

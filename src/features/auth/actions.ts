@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   authProviderErrorCode,
@@ -16,6 +15,7 @@ import { getAccountCopy } from "@/features/shell/account-copy";
 import type { Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { idleSignOutState, type SignOutState } from "./sign-out-state";
+import { configuredOriginFrom, isSignupOpenIn } from "./signup-policy";
 
 function safeLocale(value: FormDataEntryValue | null): Locale {
   return value === "en" ? "en" : "pt-BR";
@@ -25,8 +25,19 @@ function formValues(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
-async function requestOrigin() {
-  return (await headers()).get("origin") ?? "http://localhost:3000";
+/**
+ * SH-ORIGIN-001 — the origin is configured, never asked for.
+ *
+ * This replaced a read of the request's `Origin` header. That header is
+ * supplied by whoever makes the request, and it decided the host inside
+ * `emailRedirectTo` and `resetPasswordForEmail`'s `redirectTo` — so an attacker
+ * reaching either endpoint chose where a link in a mail the provider sends to a
+ * *real user* points. The provider's redirect allowlist would have refused most
+ * of that, but an allowlist is the backstop, not the control, and a backstop
+ * nobody has read back (SH-GD.1) is a backstop nobody has verified.
+ */
+function authOrigin() {
+  return configuredOriginFrom(process.env);
 }
 
 export async function signIn(formData: FormData) {
@@ -90,6 +101,19 @@ export async function signOut(
 
 export async function signUp(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
+
+  // SH-SIGNUP-001 — the application gate, checked FIRST and defaulting closed.
+  //
+  // Before any parsing, before the provider is touched, and before the consent
+  // refusal below can distinguish anything: when signup is closed there is
+  // nothing to tell the caller about their input, because their input was never
+  // going to be used. Checking this first is also what keeps a closed signup
+  // from being a probe surface — a malformed body and a well-formed one get the
+  // same answer.
+  if (!isSignupOpenIn(process.env)) {
+    redirect(`/${locale}/auth/register?error=signup-disabled`);
+  }
+
   const parsed = signUpSchema.safeParse(formValues(formData));
   if (!parsed.success) {
     // SH-LEGAL-007: the consent refusal is server-side and is told apart from a
@@ -103,7 +127,7 @@ export async function signUp(formData: FormData) {
     );
   }
 
-  const origin = await requestOrigin();
+  const origin = authOrigin();
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -126,7 +150,7 @@ export async function recoverPassword(formData: FormData) {
   const parsed = recoverySchema.safeParse(formValues(formData));
   if (!parsed.success) redirect(`/${locale}/auth/recover?error=invalid-form`);
 
-  const origin = await requestOrigin();
+  const origin = authOrigin();
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/auth/reset`),

@@ -36,6 +36,14 @@ const messages = {
     "pt-BR": "Não foi possível atualizar a senha. Tente novamente.",
     en: "We could not update the password. Try again.",
   },
+  // SH-SIGNUP-002. Honest, and deliberately not an apology for a fault: signup
+  // being closed is the product's current state, not an outage and not
+  // something the reader did wrong. It says so plainly and does not promise a
+  // date nobody has committed to.
+  "signup-disabled": {
+    "pt-BR": "As inscrições estão fechadas no momento. Este produto ainda não está aberto ao público.",
+    en: "Sign-ups are closed right now. This product is not open to the public yet.",
+  },
 } as const;
 
 export type AuthErrorCode = keyof typeof messages;
