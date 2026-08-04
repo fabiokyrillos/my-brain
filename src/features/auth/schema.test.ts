@@ -15,6 +15,10 @@ describe("authentication schemas", () => {
       email: "  FABIN@EXAMPLE.COM ",
       password: strongPassword,
       passwordConfirmation: strongPassword,
+      // SH-LEGAL-007: consent is a required field of the schema now, so a
+      // payload without it is not a valid signup payload at all. The refusal
+      // itself is `signup-consent.test.ts`.
+      acceptedPolicies: "on",
     });
 
     expect(result.success).toBe(true);

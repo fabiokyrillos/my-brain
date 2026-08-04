@@ -91,7 +91,17 @@ export async function signOut(
 export async function signUp(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
   const parsed = signUpSchema.safeParse(formValues(formData));
-  if (!parsed.success) redirect(`/${locale}/auth/register?error=invalid-form`);
+  if (!parsed.success) {
+    // SH-LEGAL-007: the consent refusal is server-side and is told apart from a
+    // malformed field, because "you have not agreed to the terms" is a
+    // different thing to say than "check your input".
+    const missingConsent = parsed.error.issues.some(
+      (issue) => issue.path[0] === "acceptedPolicies",
+    );
+    redirect(
+      `/${locale}/auth/register?error=${missingConsent ? "consent-required" : "invalid-form"}`,
+    );
+  }
 
   const origin = await requestOrigin();
   const supabase = await createClient();

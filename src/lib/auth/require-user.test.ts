@@ -20,14 +20,35 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { POLICY_VERSIONS } from "@/features/legal/versions";
 import { assertActiveAccount, requireUser } from "./require-user";
 
 type LifecycleAnswer = { data: { status: string } | null; error: { message: string } | null };
 
-function fakeClient(user: { id: string } | null, lifecycle: LifecycleAnswer) {
+/**
+ * SH.4 added a second gate behind the lifecycle one, so the double answers two
+ * tables now. `acceptances` defaults to "both documents accepted at the current
+ * version", which is what every pre-SH.4 case in this file assumes — the
+ * consent gate's own cases live in `features/legal/acceptance.test.ts`.
+ */
+function fakeClient(
+  user: { id: string } | null,
+  lifecycle: LifecycleAnswer,
+  acceptances: Array<{ document: string; version: string }> = [
+    { document: "terms", version: POLICY_VERSIONS.terms },
+    { document: "privacy", version: POLICY_VERSIONS.privacy },
+  ],
+) {
   return {
     auth: { getUser: vi.fn(async () => ({ data: { user } })) },
     from: vi.fn((table: string) => {
+      if (table === "policy_acceptances") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(async () => ({ data: acceptances, error: null })),
+          })),
+        };
+      }
       if (table !== "account_lifecycle") throw new Error(`unexpected table ${table}`);
       return {
         select: vi.fn(() => ({
@@ -119,5 +140,38 @@ describe("assertActiveAccount (the inline-auth modules' gate)", () => {
     await expect(
       assertActiveAccount(client as never, "user-1", "pt-BR"),
     ).rejects.toThrow("NEXT_REDIRECT:/pt-BR/account-state");
+  });
+});
+
+/**
+ * SH-LEGAL-008/009 — the consent gate sits behind the lifecycle gate, and the
+ * order is a decision rather than an accident.
+ */
+describe("requireUser consent gate", () => {
+  it("interposes an account that owes an acceptance", async () => {
+    const client = fakeClient({ id: "user-1" }, active, []);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("pt-BR")).rejects.toThrow("NEXT_REDIRECT:/pt-BR/consent");
+  });
+
+  it("interposes again when the accepted version is superseded", async () => {
+    const client = fakeClient({ id: "user-1" }, active, [
+      { document: "terms", version: "2020-01-01" },
+      { document: "privacy", version: "2020-01-01" },
+    ]);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("en")).rejects.toThrow("NEXT_REDIRECT:/en/consent");
+  });
+
+  it("sends a SUSPENDED account to the lifecycle surface, not to consent", async () => {
+    // The order matters: asking a suspended account to accept terms it could
+    // not then act under would be theatre, so the more specific state wins.
+    const client = fakeClient({ id: "user-1" }, suspended, []);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("pt-BR")).rejects.toThrow("NEXT_REDIRECT:/pt-BR/account-state");
+    expect(redirect).not.toHaveBeenCalledWith("/pt-BR/consent");
   });
 });

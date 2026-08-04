@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { signUp } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
+import { getLegalCopy } from "@/features/legal/copy";
+import { getLegalDocument } from "@/features/legal/documents";
+import { legalDocumentPath } from "@/features/legal/versions";
 import { isLocale } from "@/lib/preferences";
 
 export default async function RegisterPage({
@@ -16,6 +19,7 @@ export default async function RegisterPage({
   const locale = candidate;
   const { error } = await searchParams;
   const pt = locale === "pt-BR";
+  const consent = getLegalCopy(locale).consentControl;
 
   return (
     <div className="auth-card">
@@ -45,6 +49,27 @@ export default async function RegisterPage({
         <label>
           {pt ? "Confirme a senha" : "Confirm password"}
           <input name="passwordConfirmation" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+        </label>
+        {/*
+          SH-LEGAL-007. Unchecked by default and required: an unticked checkbox
+          submits nothing, so the server-side schema fails with its own code
+          whether the box was left alone or the input was removed in the
+          browser. The copy comes from `legal/copy.ts` rather than from another
+          inline ternary — the locale-ternary ceiling does not rise (SH-COPY-001).
+        */}
+        <label>
+          <input name="acceptedPolicies" required type="checkbox" value="on" />
+          <span>
+            {consent.leadIn}{" "}
+            <Link href={legalDocumentPath(locale, "terms")}>
+              {getLegalDocument(locale, "terms").title}
+            </Link>{" "}
+            {consent.conjunction}{" "}
+            <Link href={legalDocumentPath(locale, "privacy")}>
+              {getLegalDocument(locale, "privacy").title}
+            </Link>
+            {consent.trailer}
+          </span>
         </label>
         <button>{pt ? "Criar conta" : "Create account"}</button>
       </form>

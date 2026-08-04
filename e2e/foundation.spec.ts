@@ -9,9 +9,38 @@ test("unauthenticated users are sent to an accessible login", async ({ page }) =
   await expect(page.getByRole("button", { name: "Google" })).toHaveCount(0);
 });
 
+/**
+ * SH-LEGAL-001/012/013. The legal routes are the one part of this initiative
+ * that is genuinely public, so they are fully provable without credentials:
+ * reachable unauthenticated, exactly one `h1`, the professional-review banner
+ * present, and both locales served.
+ */
+test("the legal routes are public, in both locales, with one h1 and the review banner", async ({
+  page,
+}) => {
+  for (const [path, heading, banner] of [
+    ["/pt-BR/legal/terms", "Termos de Uso", /revis[ãa]o jur[ií]dica/i],
+    ["/pt-BR/legal/privacy", "Política de Privacidade", /revis[ãa]o jur[ií]dica/i],
+    ["/en/legal/terms", "Terms of Service", /legal review/i],
+    ["/en/legal/privacy", "Privacy Policy", /legal review/i],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page.locator("h1")).toHaveCount(1);
+    await expect(page.getByText(banner)).toBeVisible();
+  }
+});
+
 test("signup and password reset forms expose the complete validated fields", async ({ page }) => {
   await page.goto("/pt-BR/auth/register");
   await expect(page.getByLabel("Nome")).toBeVisible();
+  // SH-LEGAL-007: present, required, and unchecked by default.
+  const consent = page.locator('input[name="acceptedPolicies"]');
+  await expect(consent).toHaveAttribute("type", "checkbox");
+  await expect(consent).not.toBeChecked();
+  await expect(consent).toHaveAttribute("required", "");
+  await expect(page.getByRole("link", { name: "Termos de Uso" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Política de Privacidade" })).toBeVisible();
   await expect(page.getByLabel("Senha", { exact: true })).toHaveAttribute("minlength", "12");
   await expect(page.getByLabel("Confirme a senha")).toBeVisible();
 
