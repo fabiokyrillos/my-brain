@@ -11,10 +11,9 @@
  * silently and cannot go stale either.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { globSync } from "node:fs";
 
 const REPO = process.cwd();
 
@@ -64,12 +63,8 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
 };
 
 /** Scanned roots. `docs/` is excluded: prose may name what code may not do. */
-const SCAN_GLOBS = [
-  "src/**/*.{ts,tsx}",
-  "scripts/**/*.mjs",
-  "supabase/functions/**/*.ts",
-  "e2e/**/*.ts",
-];
+const SCAN_ROOTS = ["src", "scripts", "supabase/functions", "e2e"];
+const SCANNED_EXTENSIONS = [".ts", ".tsx", ".mjs"];
 
 const CAPABILITY_PATTERNS = [/auth\.admin\.deleteUser/, /admin\.deleteUser/];
 
@@ -81,19 +76,29 @@ function stripComments(source: string): string {
     .join("\n");
 }
 
-function holdersOfDeletionCapability(): string[] {
-  const holders: string[] = [];
-  for (const pattern of SCAN_GLOBS) {
-    for (const file of globSync(pattern, { cwd: REPO })) {
-      const normalized = file.replace(/\\/g, "/");
-      // A test file that asserts about the capability is not a holder of it;
-      // this guard is one such file, and so are the executor's own tests.
-      if (normalized.endsWith(".test.ts") || normalized.endsWith(".test.tsx")) continue;
-      const source = stripComments(readFileSync(join(REPO, file), "utf8"));
-      if (CAPABILITY_PATTERNS.some((rx) => rx.test(source))) holders.push(normalized);
+function walk(directory: string, found: string[]): void {
+  for (const entry of readdirSync(join(REPO, directory))) {
+    if (entry === "node_modules" || entry.startsWith(".")) continue;
+    const relative = `${directory}/${entry}`;
+    if (statSync(join(REPO, relative)).isDirectory()) {
+      walk(relative, found);
+      continue;
     }
+    if (SCANNED_EXTENSIONS.some((extension) => entry.endsWith(extension))) found.push(relative);
   }
-  return holders.sort();
+}
+
+function holdersOfDeletionCapability(): string[] {
+  const files: string[] = [];
+  for (const root of SCAN_ROOTS) walk(root, files);
+
+  return files
+    .filter((file) => !file.endsWith(".test.ts") && !file.endsWith(".test.tsx"))
+    .filter((file) => {
+      const source = stripComments(readFileSync(join(REPO, file), "utf8"));
+      return CAPABILITY_PATTERNS.some((pattern) => pattern.test(source));
+    })
+    .sort();
 }
 
 describe("SH-DELETE-013: deletion capability has exactly one home", () => {
