@@ -103,7 +103,14 @@ allocation; `AUTHORIZED_MIGRATION_HEAD` moved to `202608040071` in the same chan
   2F cleanup partition (`account_lifecycle` excused with its cascade anchor
   `202608040070:40`); `SECURITY.md`'s chain-head line moved to `202608040071` with the
   deployment-ordering hazard stated inline.
-- PR, PR-head CI run, merge SHA and merge-SHA CI run: appended at the PR/merge boundary.
+- **PR #74. PR-head CI run `30909345700` (head `3ceb2e5`): ALL THREE JOBS GREEN on the
+  first attempt** — the `database` job applied both migrations from an empty database and
+  shows `signup_hardening_account_lifecycle.sql .. ok` (28/28), alongside the SH.0 drill
+  and census (the drill now covering `account_lifecycle` via the trigger seed, T-32
+  exercised live). SH-LIFECYCLE-001…007 are therefore EXECUTED in CI, not merely
+  authored.
+- Merge SHA and merge-SHA CI run: recorded in `AUTONOMOUS_LOOP_HANDOFF.md` §18 at the
+  merge boundary, per the standing discipline.
 
 ## 5. What SH.1 does not claim
 
