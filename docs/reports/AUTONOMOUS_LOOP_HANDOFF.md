@@ -989,11 +989,15 @@ never repository implementation.
   `agent_preferences` are seeded by `handle_new_user`, and the completeness scan is what
   proves the trigger did it.
 - **`supabase/tests/signup_hardening_grant_census.sql`** — SH-EXPOSURE-002 skeleton / gate
-  SH-G0.3. anon zero explicit table/function grants (by name); the `service_role` full-DML
-  exception set pinned in both directions (`product_events`, `task_command_confirmations`)
-  — which also records the BYOK tables' grants as SH-EXPOSURE-001's before-the-revoke
-  baseline; forced RLS censused over all user-owned tables; F-18 and F-19 pinned by name as
-  recorded exposures awaiting SH.6 and SH.1.
+  SH-G0.3. anon zero explicit table/function grants (by name); **the chain grants
+  service_role zero table-level DML** (explicit ACLs — every capability is a DEFINER RPC),
+  plus named revoke-denial pins on the two RPC-only ledgers; forced RLS censused over all
+  user-owned tables; F-18 and F-19 pinned by name as recorded exposures awaiting SH.6 and
+  SH.1. **A session resuming here must know:** the census's first cut pinned the *hosted*
+  service_role posture (FINDINGS sec. 3.5, platform defaults) and CI run `30903589273`
+  correctly refused it — in the local stack service_role holds nothing anywhere (the
+  sec. 12.3 divergence). Do not "restore" a full-DML-except-two assertion; the hosted
+  layer's revoke is SH.6's, proven by migration postcondition + hosted readback.
 - **Governance:** ADR-077; PRD status + P-1; plan status + A-1; ADR-073…076 status lines;
   STATE.md, TODO.md, CHANGELOG.md, this file; acceptance report
   `docs/reports/SIGNUP_HARDENING_SLICE_00_ACCEPTANCE.md`.

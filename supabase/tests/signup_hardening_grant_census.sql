@@ -13,15 +13,19 @@
 --      table-creating migration revokes it, and a future table that forgets
 --      fails here by name.
 --   2. `anon` carries zero explicit function grants in `public`.
---   3. `service_role` holds platform-default full DML on every public table
---      EXCEPT exactly `product_events` and `task_command_confirmations` --
---      both directions: the exception set cannot shrink silently (a grant
---      appearing on those two) and cannot grow silently (a revoke landing
---      anywhere else). This is also SH-EXPOSURE-001's "grant seen before the
---      revoke" baseline: `user_ai_credentials` and
---      `credential_validation_attempts` are on the full-DML side TODAY, so
---      SH.6's revoke must move them into the exception list here -- a
---      non-vacuous, named change, not a catalog read taken on faith.
+--   3. The migration chain grants `service_role` ZERO table-level DML in
+--      `public` -- its every capability is an EXECUTE on a SECURITY DEFINER
+--      RPC. Asserted as explicit ACL entries (by name), because the platform
+--      posture differs by environment and the chain is what this suite can
+--      version: the hosted project's PLATFORM DEFAULTS layer full DML on top
+--      (FINDINGS sec. 3.5 measured it; sec. 12.3 records that CI cannot), and
+--      THAT layer is what SH-EXPOSURE-001 revokes in SH.6, proven there by a
+--      migration postcondition (denial is provable in every posture) plus a
+--      hosted readback. The first cut of this file pinned the hosted fact
+--      ("full DML everywhere except two ledgers") and CI correctly refused
+--      it: in the local stack the defaults never fired and `service_role`
+--      holds nothing anywhere. The census now pins the chain's truth, which
+--      is the stronger statement.
 --   4. Every user-owned table (runtime-enumerated, the drill's rule) has RLS
 --      enabled AND forced -- the multitenant trust boundary, censused rather
 --      than assumed, failing by name.
@@ -103,52 +107,38 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Property 3 -- the service_role full-DML exception set, both directions (2)
+-- Property 3 -- the chain grants service_role zero table-level DML (2)
 -- ---------------------------------------------------------------------------
-
-create function pg_temp.sh_service_role_gaps()
-returns text
-language plpgsql
-as $gaps$
-declare
-  scanned record;
-  gaps text[] := array[]::text[];
-begin
-  for scanned in
-    select table_name
-    from information_schema.tables
-    where table_schema = 'public'
-      and table_type = 'BASE TABLE'
-    order by table_name
-  loop
-    if not (
-      has_table_privilege('service_role', format('public.%I', scanned.table_name), 'select')
-      and has_table_privilege('service_role', format('public.%I', scanned.table_name), 'insert')
-      and has_table_privilege('service_role', format('public.%I', scanned.table_name), 'update')
-      and has_table_privilege('service_role', format('public.%I', scanned.table_name), 'delete')
-    ) then
-      gaps := gaps || scanned.table_name;
-    end if;
-  end loop;
-
-  return array_to_string(gaps, ', ');
-end;
-$gaps$;
+--
+-- Explicit ACL entries, not has_table_privilege: the effective posture
+-- depends on platform defaults that differ between the local stack and the
+-- hosted project, and the chain's own grants are the fact this suite can
+-- version. A migration that grants service_role direct DML on any table
+-- fails here by name and needs the SH-ADMIN/SH-EXPOSURE reasoning on record.
 
 select is(
-  pg_temp.sh_service_role_gaps(),
-  'product_events, task_command_confirmations',
-  'service_role lacks full DML on exactly the two ledgers the census recorded -- the exception set can neither shrink nor grow silently'
+  (
+    select coalesce(string_agg(distinct table_name, ', ' order by table_name), '')
+    from information_schema.role_table_grants
+    where table_schema = 'public'
+      and grantee = 'service_role'
+  ),
+  '',
+  'the migration chain grants service_role zero table-level DML in public -- every capability is a DEFINER RPC; offenders are named'
 );
 
--- The SH-EXPOSURE-001 baseline, named: the BYOK tables are on the full-DML
--- side today. SH.6's revoke moves them into the exception list above, and
--- this assertion flips in the same commit -- the "grant seen before revoked"
--- half of a non-vacuous revoke proof.
+-- The two RPC-only ledgers, denied by explicit revoke in their own
+-- migrations. Locally this is indistinguishable from never-granted; on the
+-- hosted project the revoke is what beats the platform default. Named here so
+-- SH.6's full matrix inherits the pins, and so a re-grant on either ledger is
+-- a named failure in every environment.
 select ok(
-  has_table_privilege('service_role', 'public.user_ai_credentials', 'select')
-  and has_table_privilege('service_role', 'public.credential_validation_attempts', 'select'),
-  'RECORDED EXPOSURE (census sec. 3.5): service_role still reads the BYOK tables -- revoked by SH-EXPOSURE-001 in SH.6'
+  not has_table_privilege('service_role', 'public.product_events', 'select')
+  and not has_table_privilege('service_role', 'public.product_events', 'insert')
+  and not has_table_privilege('service_role', 'public.task_command_confirmations', 'insert')
+  and not has_table_privilege('service_role', 'public.task_command_confirmations', 'update')
+  and not has_table_privilege('service_role', 'public.task_command_confirmations', 'delete'),
+  'the two RPC-only ledgers deny service_role -- the explicit-revoke posture their migrations declared'
 );
 
 -- ---------------------------------------------------------------------------

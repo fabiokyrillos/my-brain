@@ -67,15 +67,18 @@ environment.
 Pinning the full role-by-table matrix now would freeze grants SH.1–SH.5 legitimately
 change, so the skeleton pins the properties that must hold through every slice, each
 failing by name: `anon` zero explicit table grants and zero explicit function grants in
-`public`; the `service_role` full-DML exception set exactly
-`{product_events, task_command_confirmations}` **in both directions** (the set can neither
-shrink nor grow silently); RLS enabled **and forced** on every runtime-enumerated
-user-owned table. Two census findings are pinned as named facts so their closure is a
-visible diff, not a drift: **F-18** (`authenticated` still INSERTs `audit_logs`; SH.6
-dispositions it) and **F-19** (`handle_new_user` retains PUBLIC EXECUTE; SH.1 revokes it).
-The BYOK tables sit deliberately on the full-DML side of the exception assertion today —
-that is SH-EXPOSURE-001's executed "grant seen before revoked" baseline, so SH.6's revoke
-must move them into the exception list as a named, non-vacuous change.
+`public`; **the migration chain grants `service_role` zero table-level DML in `public`**
+(explicit ACL entries — every service_role capability is an EXECUTE on a SECURITY DEFINER
+RPC), with the two RPC-only ledgers' explicit-revoke denials additionally pinned by name;
+RLS enabled **and forced** on every runtime-enumerated user-owned table. Two census
+findings are pinned as named facts so their closure is a visible diff, not a drift:
+**F-18** (`authenticated` still INSERTs `audit_logs`; SH.6 dispositions it) and **F-19**
+(`handle_new_user` retains PUBLIC EXECUTE; SH.1 revokes it).
+
+**The hosted `service_role` exposure (FINDINGS §3.5) is a platform-defaults layer the CI
+stack cannot exhibit** — §12.3 recorded exactly this measurement gap. SH-EXPOSURE-001's
+revoke in SH.6 is therefore proven where each half is provable: the denial by a migration
+postcondition (true in every posture), the hosted before/after by readback.
 
 ## 4. Adversarial review — findings fixed or recorded, none argued down
 
@@ -109,7 +112,20 @@ so CI is their first execution) and against the governance edits.
 6. **FIXED DURING AUTHORING — the negative control was initially "bystander has rows".**
    Upgraded to "bystander is still row-complete" (the `sh_missing_rows` complement), because
    a cascade that over-reached exactly one table would have passed the weaker form.
-7. **RECORDED — the two governance status flips are edits to Status lines only.** Every
+7. **FIXED AFTER CI CAUGHT IT — the census's first cut pinned a hosted-platform fact the
+   local stack cannot exhibit.** It asserted `service_role` holds full DML on every public
+   table except the two RPC-only ledgers — FINDINGS §3.5's *hosted* measurement, produced
+   by the platform's default privileges. The CI `database` job refused it on the first run
+   (run `30903589273`: tests 4–5 of 9, failure output naming all 42 tables), because the
+   local chain replay never fires those defaults and `service_role` holds **nothing**
+   anywhere — precisely the local/hosted divergence FINDINGS §12.3 declared unmeasurable
+   from the repository. The fix pins the chain's own truth, which is stronger (zero
+   explicit table-level grants to `service_role`; every capability a DEFINER RPC), keeps
+   the two ledgers' denial pins, and moves the hosted-layer proof to where it is provable
+   (SH.6 migration postcondition + hosted readback). The cascade drill passed on the same
+   run — this failure was the census file only, and it is recorded here rather than
+   squashed into the retry.
+8. **RECORDED — the two governance status flips are edits to Status lines only.** Every
    ADR body, date and rationale is untouched; each flipped line carries both its Proposed
    date and the Accepted date with the `ADR-077` pointer, and `ADR-077` itself reproduces
    the approved values so the approval is self-contained.
