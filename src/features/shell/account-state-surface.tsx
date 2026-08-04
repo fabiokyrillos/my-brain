@@ -19,14 +19,25 @@ import { LogOut } from "lucide-react";
 import { signOut } from "@/features/auth/actions";
 import { idleSignOutState } from "@/features/auth/sign-out-state";
 import type { Locale } from "@/lib/preferences";
-import { type AccountStateKind, getLifecycleCopy } from "./lifecycle-copy";
+import {
+  type AccountStateKind,
+  getLifecycleCopy,
+  getSuspensionReasonLabel,
+} from "./lifecycle-copy";
 
 export function AccountStateSurface({
   locale,
   state,
+  reasonCode = null,
 }: {
   locale: Locale;
   state: AccountStateKind;
+  /**
+   * SH-COPY-002. The stored reason, rendered only as its public label and only
+   * for a suspension — a `deleting` or `unknown` surface says nothing about why,
+   * because there is nothing about why that belongs to the user there.
+   */
+  reasonCode?: string | null;
 }) {
   const copy = getLifecycleCopy(locale);
   const stateCopy = copy.states[state];
@@ -37,6 +48,8 @@ export function AccountStateSurface({
       <div className="auth-card">
         <h1>{stateCopy.title}</h1>
         <p>{stateCopy.body}</p>
+        {state === "suspended" ? <p>{getSuspensionReasonLabel(locale, reasonCode)}</p> : null}
+        {state === "suspended" ? <p>{copy.suspendedReminders}</p> : null}
         <p>{stateCopy.nextStep}</p>
 
         <form action={formAction}>
