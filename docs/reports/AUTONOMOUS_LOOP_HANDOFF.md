@@ -1048,6 +1048,41 @@ Without the table, the fail-closed lifecycle read sends every account — includ
 owner — to the account-state surface. Repository and CI are internally consistent; the
 hazard exists only at the hosted boundary, behind SH-GD.1 as planned.
 
+### SH.1 — CLOSED. PR #74, merge `3c227f6`, merge-SHA CI `30910079676` green on all
+three jobs; PR-head CI `30909345700` green on the first attempt. Branch preserved.
+
+### SH.2 — built on branch `codex/sh-slice-2` (1 migration, head -> `202608040072`)
+
+Delivered: `202608040072` (`account_deletion_log` de-identified by construction —
+the user_id/email/name columns do not exist — forced RLS with NO policy and no
+table grants, its DEFINER RPC the only writer; `request_account_deletion()` with
+no parameter, running through SH.1's audited machine, idempotent on retry;
+`account_owned_row_counts()` enumerating owned tables from the catalog at run
+time with `-1` for unscannable). The executor is
+`supabase/functions/delete-account/` — `executor.ts` holds the machine and
+`index.ts` the entrypoint, because `Deno.serve` binds a port at module scope and
+the worker suite runs with no `--allow-*` flags. Self-only by input shape;
+seven ordered steps; stop-on-unknown; storage by exact `<uid>/` prefix, verified
+empty before the account row is touched. Request surface: provider-validated
+re-authentication plus a typed phrase, both server-side, declared codes only.
+Scanner reports and cannot destroy. Capability guard classifies all 20
+`admin.deleteUser` holders (1 product, 5 e2e teardown, 14 operator scripts),
+both directions. Acceptance:
+`docs/reports/SIGNUP_HARDENING_SLICE_02_ACCEPTANCE.md`.
+
+**SH.2's true stop condition — the six 2026-07-16 orphaned storage objects.**
+`docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md` carries the read-only procedure
+and an explicitly UNFILLED manifest. A session resuming here must not fill it
+from belief or from the older records: run the scanner against the deployed
+project, record what it actually finds, and then **stop for owner
+authorization** — deletion is irreversible, owner-only, and gated on SH-GD.2's
+verified restorable backup. A count, date or class that disagrees with the prior
+records is itself the finding.
+
+**Deployment ordering, unchanged in kind from SH.1:** `202608040072` must reach
+the hosted project before the app code that calls `request_account_deletion`.
+Milder failure than SH.1's (a declared error, not a closed product), but stated.
+
 ### Next after SH.0 merges green
 
 **SH.1 — account lifecycle foundation**, 2 migrations (`account_lifecycle` + RLS/grants +

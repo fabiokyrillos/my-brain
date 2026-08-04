@@ -13,10 +13,13 @@
 --      table-creating migration revokes it, and a future table that forgets
 --      fails here by name.
 --   2. `anon` carries zero explicit function grants in `public`.
---   3. Exactly two public tables carry ZERO grants of any kind to
---      `service_role`: the two RPC-only ledgers whose migrations revoke it
+--   3. Exactly three public tables carry ZERO grants of any kind to
+--      `service_role`: the RPC-only ledgers whose migrations revoke it
 --      explicitly (`product_events` at `202607170024:76`,
---      `task_command_confirmations` at `202607260059`). Pinned in both
+--      `task_command_confirmations` at `202607260059`, and
+--      `account_deletion_log` at `202608040072` -- SH.2's own table joined the
+--      set, and this assertion is what forced it to be declared rather than
+--      arriving unnoticed). Pinned in both
 --      directions on explicit-grant PRESENCE, because presence is what is
 --      stable across environments: platform defaults grant `service_role`
 --      privileges on every chain table (run `30904179153` measured 40 of 42
@@ -135,8 +138,8 @@ select is(
           and grants.grantee = 'service_role'
       )
   ),
-  'product_events, task_command_confirmations',
-  'exactly the two RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  'account_deletion_log, product_events, task_command_confirmations',
+  'exactly the three RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -149,8 +152,10 @@ select ok(
   and not has_table_privilege('service_role', 'public.product_events', 'insert')
   and not has_table_privilege('service_role', 'public.task_command_confirmations', 'insert')
   and not has_table_privilege('service_role', 'public.task_command_confirmations', 'update')
-  and not has_table_privilege('service_role', 'public.task_command_confirmations', 'delete'),
-  'the two RPC-only ledgers deny service_role -- the explicit-revoke posture their migrations declared'
+  and not has_table_privilege('service_role', 'public.task_command_confirmations', 'delete')
+  and not has_table_privilege('service_role', 'public.account_deletion_log', 'insert')
+  and not has_table_privilege('service_role', 'public.account_deletion_log', 'select'),
+  'the three RPC-only ledgers deny service_role -- the explicit-revoke posture their migrations declared'
 );
 
 -- ---------------------------------------------------------------------------

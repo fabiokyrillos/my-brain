@@ -39,6 +39,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_log: {
+        Row: {
+          account_deleted_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          outcome: string
+          requested_at: string
+          requester_session_hash: string | null
+          stop_reason: string | null
+          storage_bytes_removed: number
+          storage_completed_at: string | null
+          storage_objects_removed: number
+          storage_started_at: string | null
+          table_row_counts: Json
+        }
+        Insert: {
+          account_deleted_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          outcome: string
+          requested_at: string
+          requester_session_hash?: string | null
+          stop_reason?: string | null
+          storage_bytes_removed?: number
+          storage_completed_at?: string | null
+          storage_objects_removed?: number
+          storage_started_at?: string | null
+          table_row_counts?: Json
+        }
+        Update: {
+          account_deleted_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          outcome?: string
+          requested_at?: string
+          requester_session_hash?: string | null
+          stop_reason?: string | null
+          storage_bytes_removed?: number
+          storage_completed_at?: string | null
+          storage_objects_removed?: number
+          storage_started_at?: string | null
+          table_row_counts?: Json
+        }
+        Relationships: []
+      }
       account_lifecycle: {
         Row: {
           changed_at: string
@@ -2482,6 +2530,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_owned_row_counts: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
       apply_reminder_command_v1: {
         Args: {
           p_command: Json
@@ -2899,6 +2953,21 @@ export type Database = {
         }
         Returns: string
       }
+      record_account_deletion: {
+        Args: {
+          p_account_deleted_at: string | null
+          p_outcome: string
+          p_requested_at: string
+          p_requester_session_hash: string | null
+          p_stop_reason: string | null
+          p_storage_bytes_removed: number
+          p_storage_completed_at: string | null
+          p_storage_objects_removed: number
+          p_storage_started_at: string | null
+          p_table_row_counts: Json
+        }
+        Returns: string
+      }
       record_product_event: {
         Args: {
           p_app_version: string
@@ -2959,6 +3028,10 @@ export type Database = {
           provider: string
           status: string
         }[]
+      }
+      request_account_deletion: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       resolve_own_ai_credential: {
         Args: Record<PropertyKey, never>
