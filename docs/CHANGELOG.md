@@ -3,6 +3,26 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-04 — Signup Hardening: SH.2–SH.4 accepted against the deployed project (0 migrations)
+
+**The hosted project reached parity `202608040074` and the gated evidence was executed.** Six rows that three slices had carried as NOT EXECUTED behind SH-GD.1/GD.2/GD.3 are closed. No migration was spent; five of eight remain.
+
+**Ordering was verified before any journey ran, because both new gates fail closed.** Parity compared row-by-row, `account_lifecycle` present with **zero stateless accounts**, `policy_acceptances` present, the owner `active` and consented, `disable_signup: true` read back from the deployed GoTrue. A reversed deployment would have been indistinguishable from a broken product, which is why this was a precondition and not a formality. Observed live along the way: accounts created after the migration are seeded by `handle_new_user` with `reason_code = 'initial_signup'`, against `'backfill'` on the two that predate it.
+
+**The journeys are re-runnable gates, not transcripts.** Each of the three provisions its own disposable account (SH-GD.3's admin-created strategy) and removes it, so the deletion journey — whose last act destroys its subject — can run more than once. `delete-account` is deployed (v1, ACTIVE).
+
+**Running them found a defect that review had not.** The consent decline path's "delete the account" link pointed at `/{locale}/app/settings`. Everything under `app/` runs the consent gate, so the only user that link exists for — someone declining — was sent back to the interposition. **The decline path was a loop.** SH.4 had built `/{locale}/account/delete` outside `app/` for exactly that caller and nothing pinned the link to it.
+
+**Two findings recorded rather than smoothed over.** The deletion **receipt copy is unreachable**: the moment the request lands the account leaves `active`, the Server Action's revalidation re-runs the lifecycle gate, and the `deleting` screen interposes before React paints the returned state. Both gates are correct and the copy is dead. And the suspension journey's own teardown **manufactured two new storage orphans** on its first run by deleting the auth row before the storage — the exact mechanism that produced the historical six. A suite written to prove deletion leaves no residue was leaving residue; the scanner caught it in the same session, which is the argument for owning the instrument.
+
+**The deletion log was verified by construction, not by reading it.** No role — including `service_role` — can `SELECT account_deletion_log`; the live attempt returns `permission denied`. That refusal *is* the verification: the table has no identifying column in its schema, and reading the row back would need the capability whose absence is the property under test.
+
+**The orphan manifest is taken and deletion is still unauthorized.** Six objects, all `absent-owner`, all 2026-07-16, zero `cross-owner`, zero `unparseable`. The second condition was measured independently per object rather than inferred from the class — `attachments` holds zero rows project-wide. Nothing was deleted.
+
+**The admin runbook is three-of-four drilled**, with administrative deletion-start left undrilled deliberately and saying so. Its "what this cannot claim" section was rewritten to two narrower claims: one drill by an agent against its own disposable account is not a runbook used in anger, and each closed reason vocabulary was walked for one value, not exhaustively.
+
+**SH.5 stops before its migration.** The application throttle ceilings must sit at or below the hosted GoTrue rate limits, and those need the Management API — an owner action. Spending `202608040075` on ceilings guessed against unread limits is exactly the silent budget spend the plan warns against.
+
 ## 2026-08-04 — Signup Hardening SH.4: Terms, Privacy, and consent that a client cannot forge (1 migration)
 
 **Migration `202608040074`; head moves to `202608040074`** — SH.4's whole budgeted allocation, five of eight now spent. `public.policy_acceptances` carries forced RLS and **exactly two policies**, select-own and insert-own: there is no `UPDATE` policy and no `DELETE` policy at all, so the append-only posture is the *absence* of a policy rather than a revoke somebody could undo, and a catalog postcondition asserts it.
