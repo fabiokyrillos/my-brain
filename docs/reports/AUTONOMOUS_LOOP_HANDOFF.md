@@ -1542,6 +1542,17 @@ removed. Phase 2G/2H not started.
 
 ## 23. The seventh stop — 2026-08-04, mid-SH.5. **This supersedes §22.**
 
+**Merged: PR #81 (orphan cleanup) at `e9948a7`, and PR #82 (SH.5 application
+half) at `6f0909f`, merge-SHA CI run `30953588680` green on all three jobs.**
+`main` is synchronized at `6f0909f` and the tree is clean.
+
+One CI failure was diagnosed and fixed rather than worked around, and it taught
+something: `[auth.email].enable_signup = false` made the local stack refuse
+sign-**in** (`email_provider_disabled`). That key gates the email provider
+itself, not just registration through it. The global `[auth].enable_signup` is
+the real signup control, and it matches the hosted readback — `external.email`
+true, `disable_signup` true.
+
 The owner authorized autonomous completion of Signup Hardening, including
 destructive cleanup of proven-disposable data and use of the authenticated CLI
 for hosted configuration. Two of those three things were done. The third has a
