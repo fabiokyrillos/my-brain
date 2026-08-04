@@ -2,6 +2,11 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceData, requireServiceSuccess } from "../_shared/result.ts";
 import { resolveJobCredential } from "../_shared/byok-adapter.ts";
 import {
+  deferJobForInactiveOwner,
+  deferredJobResponse,
+  verifyOwnerLifecycle,
+} from "../_shared/lifecycle-gate.ts";
+import {
   classifyJobFailure,
   classifyProviderResponse,
   classifyTransportError,
@@ -118,6 +123,21 @@ export async function processAttachmentJob(
       .eq("user_id", job.user_id)
       .single();
     if (error || !attachment) throw new JobFailure("subject_not_found");
+
+    // SH-WORKER-001/002, the same gate at the same place as the entry handler,
+    // through the same module — the two paths cannot disagree about what a
+    // suspended owner means, which is the whole point of it being one module.
+    const lifecycle = await verifyOwnerLifecycle(service, job.user_id);
+    if (lifecycle.kind === "terminal") throw new JobFailure(lifecycle.code);
+    if (lifecycle.kind === "defer") {
+      const deferred = await deferJobForInactiveOwner(service, { jobId: job.id, workerId });
+      if (!deferred) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
+      console.info("Attachment job deferred", {
+        jobId: job.id,
+        ownerStatus: lifecycle.ownerStatus,
+      });
+      return deferredJobResponse(lifecycle.ownerStatus);
+    }
 
     const existingInterpretation = requireServiceData(
       await service

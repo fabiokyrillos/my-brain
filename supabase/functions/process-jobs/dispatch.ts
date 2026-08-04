@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { DEFERRED_JOB_HTTP_STATUS } from "../_shared/lifecycle-gate.ts";
 import { processAttachmentJob } from "./attachment.ts";
 import { processEntryJob } from "./entry.ts";
 
@@ -43,6 +44,14 @@ export type DispatchDrainSummary = {
   processed: number;
   succeeded: number;
   failed: number;
+  /**
+   * SH-WORKER-001. Jobs returned to the queue because their owner stopped
+   * being active between the claim and the reload. Its own column rather than
+   * a share of `failed`, because a suspension is not a failure and folding it
+   * into the failure count is how an operator ends up investigating a healthy
+   * queue.
+   */
+  deferred: number;
 };
 
 // Unattended scheduled drain for interpret_entry jobs only. Attachments
@@ -54,7 +63,7 @@ export async function runEntryDispatchDrain(
   service: SupabaseClient,
 ): Promise<DispatchDrainSummary> {
   const startedAt = Date.now();
-  const summary: DispatchDrainSummary = { processed: 0, succeeded: 0, failed: 0 };
+  const summary: DispatchDrainSummary = { processed: 0, succeeded: 0, failed: 0, deferred: 0 };
 
   while (summary.processed < DISPATCH_MAX_JOBS && Date.now() - startedAt < DISPATCH_BUDGET_MS) {
     const workerId = `process-jobs:dispatch:${crypto.randomUUID()}`;
@@ -71,7 +80,8 @@ export async function runEntryDispatchDrain(
     summary.processed += 1;
     try {
       const response = await processEntryJob(service, job as JobRow, workerId);
-      if (response.ok) summary.succeeded += 1;
+      if (response.status === DEFERRED_JOB_HTTP_STATUS) summary.deferred += 1;
+      else if (response.ok) summary.succeeded += 1;
       else summary.failed += 1;
     } catch (processingError) {
       summary.failed += 1;

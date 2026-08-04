@@ -36,6 +36,11 @@ export const HISTORY_ENTITY_TYPES = [
   // there is no page for an account state; the place to see it is the state
   // surface the lifecycle read already routes to.
   "account_lifecycle",
+  // SH.3: `defer_job_for_inactive_owner` is the first writer to record a job as
+  // the subject of an audit row. Also not linkable — the Jobs page lists jobs
+  // but stamps no per-row anchor, so a link would be a guess (the rule
+  // `person_relationship` states below).
+  "job",
   "task",
   "entry",
   "entry_interpretation",
@@ -78,6 +83,12 @@ export const HISTORY_ACTION_TYPES = [
   // every state transition — the machine writes it unconditionally, so it is
   // in the table from the first suspension onward.
   "account_lifecycle_transition",
+  // SH.3: written by `defer_job_for_inactive_owner` (202608040073) when a job
+  // claimed while the account was active is returned to the queue because the
+  // account no longer is. Rare by construction — it needs the suspension to
+  // land between a claim and its reload — but it is an automatic action that
+  // moved the user's work, so it is auditable and therefore renderable.
+  "job_deferred_inactive_owner",
   "archive_memory",
   "associate_person_context",
   "associate_person_project",
@@ -154,6 +165,11 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // The account entered or left a state; nothing was created, changed or
   // undone — the same shape as `reminder_cancelled` and `end_person_project`.
   account_lifecycle_transition: "lifecycle",
+  // The job left `running` and went back to `pending`. Not `failed`: nothing
+  // failed, and filing a suspension under failures would put it in the list a
+  // user scans for things that went wrong — the same reasoning
+  // `entry_awaiting_ai_configuration` carries below.
+  job_deferred_inactive_owner: "lifecycle",
   archive_memory: "lifecycle",
   // A link created is a creation; a link ended is a lifecycle event, not a
   // change — the same split `reminder_cancelled` versus `reminder_edited` uses.
