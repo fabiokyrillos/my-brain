@@ -42,16 +42,16 @@ insert into auth.users (
 
 -- `private.current_policy_version` is executable by NO role -- which is correct,
 -- and means the authenticated sections below cannot call it to build their own
--- fixtures. A `pg_temp` DEFINER wrapper, created here as the session superuser,
--- lets the test read the version without weakening the production grant and
--- without hard-coding a literal that a future bump would silently invalidate.
--- The SH.0 drill's `pg_temp.sh_populate` is the same idiom.
-create function pg_temp.sh4_version(p_document text)
-returns text
-language sql
-security definer
-set search_path = ''
-as $$ select private.current_policy_version(p_document) $$;
+-- fixtures. Hard-coding the date instead would silently rot at the next bump.
+--
+-- So the versions are captured HERE, as the session superuser, into
+-- transaction-local settings that any role can read back. Deliberately NOT a
+-- `pg_temp` helper function: after `set local role authenticated`, calling one
+-- would need USAGE on this session's temp schema, which `authenticated` does
+-- not hold -- the assertion would fail on a schema permission that looks
+-- nothing like the thing it was testing.
+select set_config('sh4.terms_version', private.current_policy_version('terms'), true);
+select set_config('sh4.privacy_version', private.current_policy_version('privacy'), true);
 
 -- ---------------------------------------------------------------------------
 -- Section 1 -- the current version exists in SQL, for both documents (3)
@@ -103,7 +103,7 @@ select is(
     select version from public.policy_acceptances
     where user_id = '54000001-0000-4000-8000-000000000001' and document = 'terms'
   ),
-  pg_temp.sh4_version('terms'),
+  current_setting('sh4.terms_version'),
   'and it carries the CURRENT version -- which the caller never named'
 );
 
@@ -158,7 +158,7 @@ select lives_ok(
   $$ insert into public.policy_acceptances (user_id, document, version, surface)
      values (
        '54000001-0000-4000-8000-000000000001', 'privacy',
-       pg_temp.sh4_version('privacy'), 'interposition'
+       current_setting('sh4.privacy_version'), 'interposition'
      ) $$,
   'the direct INSERT of the CURRENT version is accepted -- the guard is a version check, not a wall'
 );
@@ -172,7 +172,7 @@ select throws_ok(
   $$ insert into public.policy_acceptances (user_id, document, version, surface)
      values (
        '54000002-0000-4000-8000-000000000002', 'terms',
-       pg_temp.sh4_version('terms'), 'interposition'
+       current_setting('sh4.terms_version'), 'interposition'
      ) $$,
   '42501',
   null,
