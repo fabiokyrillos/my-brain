@@ -103,7 +103,7 @@ after:
 - Anything prints a database message you did not expect → stop and record it.
   Do not re-run with `--apply` to "see if it works".
 
-**Execution record:** _not executed_.
+**Execution record:** **DRILLED 2026-08-04** against the deployed project at migration parity `202608040074`, on a disposable account. The dry run printed its refusal and changed nothing; `--apply` produced the readback above verbatim (`suspended` / `operator_suspension_abuse` / `operator`). The transcript was also asserted not to contain the email the operator supplied. Evidence: `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §3.
 
 ---
 
@@ -145,7 +145,7 @@ npm run account:lifecycle -- --reactivate --id <uuid> --reason operator_reactiva
 - The account's status is already `active` → the command reports `changed:false`
   and does nothing. That is not an error; it is the idempotent answer.
 
-**Execution record:** _not executed_.
+**Execution record:** **DRILLED 2026-08-04**, same run and same account. Reactivation restored `active`, the previously-skipped job became claimable without re-enqueue, and the owned-row census was identical to its pre-suspension state — suspension cost the account nothing. Evidence: `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §3.
 
 ---
 
@@ -201,7 +201,7 @@ path. Deletion is irreversible from that instant (SH-DELETE-014).
   the only identifier that matters; confirm it against something outside this
   terminal before `--apply`.
 
-**Execution record:** _not executed_.
+**Execution record:** _not executed_ — and deliberately so. Every other section here was drilled on 2026-08-04; this one was not, because drilling it means an operator-initiated destruction of a real account, and the deletion machinery it would exercise was already proven end-to-end by the **user-initiated** path (`SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §2). What stays untested is this section own command and reason vocabulary, not the executor. Recorded as the one gap rather than quietly counted as covered.
 
 ---
 
@@ -257,7 +257,7 @@ read **server-side on every request**, so an already-issued token stops working
 against the product on its next request (SH-SUSPEND-003). The two together are
 the whole control; neither alone is.
 
-**Execution record:** _not executed_.
+**Execution record:** **DRILLED 2026-08-04**. The ban was applied, `banned_until` read back non-null, and a fresh password sign-in was refused outright — the half of suspension the database cannot enforce. The ban was then lifted as its own step and sign-in succeeded again. Evidence: `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §3.
 
 ---
 
@@ -272,15 +272,31 @@ is recorded. Nothing in this runbook deletes a storage object.
 
 ## 6. What this runbook cannot claim
 
-- **No section has been drilled.** Every "expected readback" above is derived
-  from the function's own return shape and the CLI's own formatter (both unit-
-  and pgTAP-tested), not from a hosted execution.
-- **The deployed worker behavior is unproven.** SH-WORKER-004/005 — suspend a
-  disposable account with a queued job, watch the deployed drain skip it across
-  two ticks, reactivate, watch it complete; and the heartbeat skip across one
-  hourly tick — need a disposable account (SH-GD.3) and the migrations applied
-  to the hosted project. Both are recorded as NOT EXECUTED in
-  `SIGNUP_HARDENING_SLICE_03_ACCEPTANCE.md` §5.
-- **The provider-side ban is unexecuted**, so its exact response shape is from
-  the provider's documented admin API, not from a transcript. The first
-  execution records the real one here.
+**Rewritten 2026-08-04, after the first drill.** All three bullets below said
+"unproven"; two of them no longer can. What replaced them is narrower and, for
+that reason, worth reading rather than skimming.
+
+- **Three of four sections are drilled** — suspension, reactivation, and the
+  provider-side ban and its lift — against the deployed project at migration
+  parity `202608040074`, on a disposable account, with the readbacks recorded
+  in each section. **Administrative deletion-start (§3) is not**, by choice:
+  see its own execution record.
+- **The deployed worker behaviour is proven.** SH-WORKER-004 and SH-WORKER-005
+  were executed: the queued job was skipped across two ticks with no error and
+  **no attempt spent**, the heartbeat did not run and produced no notification,
+  and after reactivation the same job became claimable and left the queue with
+  no re-enqueue. Evidence: `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §3.
+- **The provider-side ban's shape is now from a transcript**, not from the
+  provider's documentation: `banned_until` reads back non-null and a fresh
+  password sign-in is refused outright while it holds.
+
+What still cannot be claimed:
+
+- **One drill is not a runbook that has been used in anger.** These executions
+  were performed by an agent against a disposable account it created, in a
+  session that knew what it expected to see. That is enough to prove the
+  commands and readbacks are real; it is not the same as an operator using this
+  under time pressure on an account that matters.
+- **The reason vocabularies were exercised for one value each**, not
+  exhaustively. The database enforces the closed sets and pgTAP covers them;
+  this drill walked one path through each.

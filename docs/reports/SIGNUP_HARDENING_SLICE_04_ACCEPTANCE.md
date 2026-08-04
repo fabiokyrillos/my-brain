@@ -196,3 +196,22 @@ of the initiative's eight migrations are now spent.
   bump and the decline path are unit-proven server-side; their rendered
   end-to-end behaviour on a real account needs SH-GD.3, like every other
   authenticated journey in this initiative.
+
+> **The last two bullets were superseded 2026-08-04.** All five SH migrations
+> reached the hosted project and the authenticated journeys ran against it:
+> `e2e/online-consent-interposition.spec.ts`, eight tests across **both
+> locales**, all passing — first-session interposition, acceptance in each
+> locale, forged-future and stale version refusals through PostgREST, the
+> gate's independence from client state, the decline path, and normal access
+> after acceptance. The version bump was simulated **per-account**; no global
+> policy version was bumped. Evidence:
+> `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §4.
+>
+> The journey also found a real defect this record did not: the decline path's
+> deletion link pointed at `/{locale}/app/settings`, inside the consent gate
+> being declined, so declining looped back to the interposition. SH.4 had built
+> `/{locale}/account/delete` outside `app/` for that exact caller and nothing
+> pinned the link to it. Fixed in `1eee716` with a regression test.
+>
+> The first two bullets — no professional legal review, no owner values — stand
+> unchanged. Both remain owner actions.

@@ -238,6 +238,17 @@ same change. Four of the initiative's eight migrations are now spent.
 
 ## 5. What SH.3 does not claim — the deployment-gated evidence, NOT EXECUTED
 
+> **Superseded 2026-08-04 — all five rows below have since been EXECUTED.**
+> The hosted project reached migration parity `202608040074` and the journey ran
+> against it: `e2e/online-account-suspension.spec.ts`, five tests, all passing.
+> SH-WORKER-004, SH-WORKER-005, SH-ADMIN-005 and SH-SUSPEND-002/008 are closed;
+> SH-ADMIN-006 is closed **except** the administrative-deletion section, which
+> remains written-but-not-drilled by choice. Evidence, including the exact
+> readbacks: `SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md` §3.
+>
+> The table is kept as written — it recorded the state accurately at the time,
+> and rewriting it would erase the fact that these were gated for two slices.
+
 Every claim in §1–§4 is repository-and-CI evidence. The following are recorded
 as **NOT EXECUTED**, each with its exact blocker:
 
