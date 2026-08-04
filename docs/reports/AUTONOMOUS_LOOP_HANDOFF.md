@@ -1537,3 +1537,118 @@ Everything in §19's list still stands, plus:
 both `active`; 6 storage objects, the historical orphans, untouched; signup
 **disabled** and untouched. Every disposable account created during the run was
 removed. Phase 2G/2H not started.
+
+---
+
+## 23. The seventh stop — 2026-08-04, mid-SH.5. **This supersedes §22.**
+
+The owner authorized autonomous completion of Signup Hardening, including
+destructive cleanup of proven-disposable data and use of the authenticated CLI
+for hosted configuration. Two of those three things were done. The third has a
+hard boundary that authorization does not remove, and this section is about
+where it is.
+
+### Done under this authorization
+
+- **SH-DELETE-015 is CLOSED.** The six historical orphans were re-verified
+  immediately before the act and removed; the scanner reports **zero** objects
+  of every class. Both protected accounts verified untouched afterwards. PR #81,
+  merge `e9948a7`. The tool (`scripts/sh-delete-015-remove-orphans.mjs`) is
+  single-use by construction — re-running it refuses, because the manifest it
+  reads now describes objects that do not exist.
+- **SH.5's application half.** The app-level signup gate defaulting closed, the
+  honest `signup-disabled` copy in both locales, the configured application
+  origin replacing request-`Origin` trust, and a `config.toml` that can no
+  longer open signup. No migration spent — **five of eight remain.**
+
+### The `config push` footgun, because it is the shape of the blocker
+
+`supabase/config.toml` carried `enable_signup = true` (the CLI template
+default). `supabase config push` sends that file **wholesale** to the linked
+project. So the standard command for changing any hosted Auth setting would
+have **opened public signup** as a side effect of unrelated work. That is now
+`false` in both tables with a guard test.
+
+Fixing it does not make `config push` usable, and understanding why is the
+whole stop.
+
+### Why hosted configuration cannot proceed, precisely
+
+The owner authorized "the normal authenticated Supabase CLI and Management API
+interfaces already available in the environment". Both were examined:
+
+1. **Reading** hosted Auth config (rate limits, redirect allowlist, `site_url`,
+   password policy, CAPTCHA state) requires the Management API, which requires a
+   personal access token. `SUPABASE_ACCESS_TOKEN` is unset and the CLI keeps its
+   token in the **Windows Credential Manager**
+   (`LegacyGeneric:target=Supabase CLI:supabase`). Extracting it is explicitly
+   forbidden. The public `GET /auth/v1/settings` endpoint exposes only
+   `disable_signup`, `mailer_autoconfirm`, enabled providers and `saml_enabled`
+   — **not** the rate limits SH.5 needs.
+2. **Writing** it has exactly one CLI path: `supabase config push`. The `config`
+   command has **one subcommand, `push`** — no `pull`, no `get`, no `--dry-run`
+   — verified on both the installed CLI (2.106) and latest (2.111). It is
+   all-or-nothing over the whole file, so rate limits cannot be changed without
+   simultaneously overwriting `site_url` and `additional_redirect_urls`.
+3. **`site_url` cannot be determined from repository truth.** SH-GD.4 (the
+   hosting/SMTP decision) is unresolved — there is no deployed application
+   origin. The repository's value is `http://127.0.0.1:3000`, a dev value.
+   Pushing it would point hosted auth emails at localhost; choosing anything
+   else would be **inventing** a production origin, which is precisely what the
+   configured-origin work exists to stop.
+
+So: the throttle ceilings cannot be chosen against a hosted limit nobody can
+read, and the hosted values cannot be written without collateral damage to
+settings whose correct values do not exist yet. Both stop conditions apply —
+*"provider configuration cannot be changed through the available authenticated
+administrative interface"* and *"the rollout requires real hosting … that does
+not yet exist."*
+
+### The smallest owner action, in order of what it unblocks
+
+1. **Make a personal access token available to the environment** — e.g. set
+   `SUPABASE_ACCESS_TOKEN` in the shell or CI secret store the loop runs in.
+   *Do not paste it into chat; it is never needed as a value here.* This alone
+   unblocks every hosted **readback**, which is what gates migration
+   `202608040075`.
+2. **Decide SH-GD.4** (hosting origin, and SMTP). That is what makes `site_url`
+   and the redirect allowlist writable to correct values rather than invented
+   ones — and `config push` safe to use at all.
+3. **Enable Turnstile** in the hosted GoTrue once (1) and (2) exist. Its secret
+   is a hosted setting; the widget and token plumbing can be built before it,
+   but SH-CAPTCHA-002's "UI-only bypass is structurally impossible" stays
+   aspirational until the provider enforces.
+
+### What is NOT delivered, stated plainly
+
+SH.5 is **partially** delivered. Not built: the database-locked auth throttles
+and migration `202608040075`, `auth_event_attempts` and its retention,
+genuine-concurrency boundary tests, confirmation resend, enumeration-uniform
+outcomes, the Turnstile widget and token plumbing, session-fixation regression
+evidence, and the deployed missing-/invalid-token probes. **SH.6 and SH.7 were
+not started.** No migration was spent by any of this work.
+
+The throttles were not built ahead of the readback on purpose: their ceilings
+must sit at or below the provider's, and shipping numbers chosen against unread
+limits — then spending a migration to lock them — is the silent budget spend
+the plan forbids and the checkpoint named as a precondition.
+
+### Do not, on resuming
+
+Everything in §22's list still stands, plus:
+
+- **Do not run `supabase config push`** until `site_url` and
+  `additional_redirect_urls` in `config.toml` hold the real hosted values. It is
+  all-or-nothing. The `enable_signup = false` guard means it can no longer open
+  signup, but it will still overwrite the hosted origin with a dev value.
+- **Do not set `SIGNUP_ENABLED=true`.** It is one half of a two-control gate;
+  opening signup needs both, deliberately, after a green rollout run.
+- **Do not invent an `APP_ORIGIN` or a `site_url`.** SH-GD.4 is the input.
+- **Do not re-point the orphan-removal tool.** It refuses by design now; making
+  it act again means rewriting the manifest, which is a reviewable act.
+
+### State at this stop
+
+`main` synchronized, tree clean. Hosted: 2 accounts (owner + online fixture),
+both `active`; **storage empty**; `disable_signup: true` and untouched; parity
+`202608040074`. Migration budget: **five of eight spent, none by this work.**
