@@ -13,19 +13,23 @@
 --      table-creating migration revokes it, and a future table that forgets
 --      fails here by name.
 --   2. `anon` carries zero explicit function grants in `public`.
---   3. The migration chain grants `service_role` ZERO table-level DML in
---      `public` -- its every capability is an EXECUTE on a SECURITY DEFINER
---      RPC. Asserted as explicit ACL entries (by name), because the platform
---      posture differs by environment and the chain is what this suite can
---      version: the hosted project's PLATFORM DEFAULTS layer full DML on top
---      (FINDINGS sec. 3.5 measured it; sec. 12.3 records that CI cannot), and
---      THAT layer is what SH-EXPOSURE-001 revokes in SH.6, proven there by a
---      migration postcondition (denial is provable in every posture) plus a
---      hosted readback. The first cut of this file pinned the hosted fact
---      ("full DML everywhere except two ledgers") and CI correctly refused
---      it: in the local stack the defaults never fired and `service_role`
---      holds nothing anywhere. The census now pins the chain's truth, which
---      is the stronger statement.
+--   3. Exactly two public tables carry ZERO grants of any kind to
+--      `service_role`: the two RPC-only ledgers whose migrations revoke it
+--      explicitly (`product_events` at `202607170024:76`,
+--      `task_command_confirmations` at `202607260059`). Pinned in both
+--      directions on explicit-grant PRESENCE, because presence is what is
+--      stable across environments: platform defaults grant `service_role`
+--      privileges on every chain table (run `30904179153` measured 40 of 42
+--      carrying grants in the CI stack), while WHICH privileges differ
+--      between the local stack and the hosted project (run `30903589273`
+--      measured that no local table gives it the full four-DML set, where
+--      FINDINGS sec. 3.5 measured full DML on the hosted project -- the
+--      sec. 12.3 divergence, live). The chain-versioned fact is the revoke
+--      carve-out, so that is the pin; the per-privilege matrix is SH.6's
+--      (SH-EXPOSURE-002 full form), proven beside the SH-EXPOSURE-001 revoke
+--      with its hosted readback. Two earlier cuts of this assertion pinned an
+--      environment-specific posture and CI refused both -- recorded in the
+--      SH.0 acceptance report, kept here so nobody restores either.
 --   4. Every user-owned table (runtime-enumerated, the drill's rule) has RLS
 --      enabled AND forced -- the multitenant trust boundary, censused rather
 --      than assumed, failing by name.
@@ -107,24 +111,32 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Property 3 -- the chain grants service_role zero table-level DML (2)
+-- Property 3 -- the service_role revoke carve-out, both directions (2)
 -- ---------------------------------------------------------------------------
 --
--- Explicit ACL entries, not has_table_privilege: the effective posture
--- depends on platform defaults that differ between the local stack and the
--- hosted project, and the chain's own grants are the fact this suite can
--- version. A migration that grants service_role direct DML on any table
--- fails here by name and needs the SH-ADMIN/SH-EXPOSURE reasoning on record.
+-- Explicit-grant PRESENCE, not has_table_privilege: which privileges the
+-- platform grants by default differs by environment, but a table carrying
+-- zero service_role ACL entries is a table whose migration revoked it, and
+-- that set is chain-versioned. Both directions: a re-grant on either ledger
+-- shrinks the set (named failure), and a future RPC-only table must join the
+-- expected list by name in its own slice.
 
 select is(
   (
-    select coalesce(string_agg(distinct table_name, ', ' order by table_name), '')
-    from information_schema.role_table_grants
-    where table_schema = 'public'
-      and grantee = 'service_role'
+    select coalesce(string_agg(tables.table_name, ', ' order by tables.table_name), '')
+    from information_schema.tables as tables
+    where tables.table_schema = 'public'
+      and tables.table_type = 'BASE TABLE'
+      and not exists (
+        select 1
+        from information_schema.role_table_grants as grants
+        where grants.table_schema = 'public'
+          and grants.table_name = tables.table_name
+          and grants.grantee = 'service_role'
+      )
   ),
-  '',
-  'the migration chain grants service_role zero table-level DML in public -- every capability is a DEFINER RPC; offenders are named'
+  'product_events, task_command_confirmations',
+  'exactly the two RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own

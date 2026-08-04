@@ -989,15 +989,18 @@ never repository implementation.
   `agent_preferences` are seeded by `handle_new_user`, and the completeness scan is what
   proves the trigger did it.
 - **`supabase/tests/signup_hardening_grant_census.sql`** — SH-EXPOSURE-002 skeleton / gate
-  SH-G0.3. anon zero explicit table/function grants (by name); **the chain grants
-  service_role zero table-level DML** (explicit ACLs — every capability is a DEFINER RPC),
-  plus named revoke-denial pins on the two RPC-only ledgers; forced RLS censused over all
-  user-owned tables; F-18 and F-19 pinned by name as recorded exposures awaiting SH.6 and
-  SH.1. **A session resuming here must know:** the census's first cut pinned the *hosted*
-  service_role posture (FINDINGS sec. 3.5, platform defaults) and CI run `30903589273`
-  correctly refused it — in the local stack service_role holds nothing anywhere (the
-  sec. 12.3 divergence). Do not "restore" a full-DML-except-two assertion; the hosted
-  layer's revoke is SH.6's, proven by migration postcondition + hosted readback.
+  SH-G0.3. anon zero explicit table/function grants (by name); **the service_role revoke
+  carve-out pinned in both directions** — exactly the two RPC-only ledgers carry zero
+  service_role grants, measured on explicit-grant presence — plus the ledgers'
+  effective-denial pins; forced RLS censused over all user-owned tables; F-18 and F-19
+  pinned by name as recorded exposures awaiting SH.6 and SH.1. **A session resuming here
+  must know the service_role pin took three cuts:** run `30903589273` refused the
+  hosted-posture pin (no local table grants the full four-DML set) and run `30904179153`
+  refused the zero-grants over-correction (40 of 42 local tables carry service_role
+  grants) — the platform defaults fire in both environments but grant different privilege
+  sets, the live form of FINDINGS sec. 12.3. Do not "restore" either earlier cut; the
+  per-privilege matrix belongs to SH.6 beside SH-EXPOSURE-001's revoke and its hosted
+  readback.
 - **Governance:** ADR-077; PRD status + P-1; plan status + A-1; ADR-073…076 status lines;
   STATE.md, TODO.md, CHANGELOG.md, this file; acceptance report
   `docs/reports/SIGNUP_HARDENING_SLICE_00_ACCEPTANCE.md`.

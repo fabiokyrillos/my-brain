@@ -67,10 +67,12 @@ environment.
 Pinning the full role-by-table matrix now would freeze grants SH.1–SH.5 legitimately
 change, so the skeleton pins the properties that must hold through every slice, each
 failing by name: `anon` zero explicit table grants and zero explicit function grants in
-`public`; **the migration chain grants `service_role` zero table-level DML in `public`**
-(explicit ACL entries — every service_role capability is an EXECUTE on a SECURITY DEFINER
-RPC), with the two RPC-only ledgers' explicit-revoke denials additionally pinned by name;
-RLS enabled **and forced** on every runtime-enumerated user-owned table. Two census
+`public`; **the `service_role` revoke carve-out pinned in both directions** — exactly the
+two RPC-only ledgers (`product_events`, `task_command_confirmations`) carry zero
+`service_role` grants, asserted on explicit-grant presence because *which* privileges the
+platform defaults grant differs by environment while the chain's revokes do not — plus the
+two ledgers' effective-denial pins; RLS enabled **and forced** on every runtime-enumerated
+user-owned table. Two census
 findings are pinned as named facts so their closure is a visible diff, not a drift:
 **F-18** (`authenticated` still INSERTs `audit_logs`; SH.6 dispositions it) and **F-19**
 (`handle_new_user` retains PUBLIC EXECUTE; SH.1 revokes it).
@@ -112,19 +114,22 @@ so CI is their first execution) and against the governance edits.
 6. **FIXED DURING AUTHORING — the negative control was initially "bystander has rows".**
    Upgraded to "bystander is still row-complete" (the `sh_missing_rows` complement), because
    a cascade that over-reached exactly one table would have passed the weaker form.
-7. **FIXED AFTER CI CAUGHT IT — the census's first cut pinned a hosted-platform fact the
-   local stack cannot exhibit.** It asserted `service_role` holds full DML on every public
-   table except the two RPC-only ledgers — FINDINGS §3.5's *hosted* measurement, produced
-   by the platform's default privileges. The CI `database` job refused it on the first run
-   (run `30903589273`: tests 4–5 of 9, failure output naming all 42 tables), because the
-   local chain replay never fires those defaults and `service_role` holds **nothing**
-   anywhere — precisely the local/hosted divergence FINDINGS §12.3 declared unmeasurable
-   from the repository. The fix pins the chain's own truth, which is stronger (zero
-   explicit table-level grants to `service_role`; every capability a DEFINER RPC), keeps
-   the two ledgers' denial pins, and moves the hosted-layer proof to where it is provable
-   (SH.6 migration postcondition + hosted readback). The cascade drill passed on the same
-   run — this failure was the census file only, and it is recorded here rather than
-   squashed into the retry.
+7. **FIXED AFTER CI CAUGHT IT TWICE — the service_role pin took three cuts, and both
+   refusals are data, not noise.** Cut 1 asserted FINDINGS §3.5's *hosted* posture (full
+   DML everywhere except the two RPC-only ledgers); run `30903589273` refused it, showing
+   **no** local table gives `service_role` the full four-DML set. Cut 2 over-corrected to
+   "the chain grants service_role zero table-level DML"; run `30904179153` refused that
+   too, showing **40 of 42** tables carry explicit `service_role` grants locally — the
+   platform defaults do fire in the local stack, they just grant a different privilege set
+   than the hosted project's. Together the two runs are a live measurement of exactly the
+   local/hosted divergence FINDINGS §12.3 declared unmeasurable from the repository. Cut 3
+   pins the fact that is chain-versioned and environment-stable: **exactly the two
+   RPC-only ledgers carry zero service_role grants** (the chain's explicit revoke
+   carve-out, `202607170024:76` and `202607260059`), asserted on grant *presence* in both
+   directions, with the per-privilege matrix left to SH.6 where the SH-EXPOSURE-001 revoke
+   and hosted readback make it provable. The cascade drill passed on the first run and was
+   untouched throughout; both refusals are recorded here rather than squashed into the
+   retry.
 8. **RECORDED — the two governance status flips are edits to Status lines only.** Every
    ADR body, date and rationale is untouched; each flipped line carries both its Proposed
    date and the Accepted date with the `ADR-077` pointer, and `ADR-077` itself reproduces
