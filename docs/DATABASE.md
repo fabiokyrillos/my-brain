@@ -258,3 +258,31 @@ O adiamento visível ao dono **move `remind_at` e mantém a linha `scheduled`**.
 ### Nove asserções pós-deploy
 
 Fail-closed, no idioma da Fase 2F: a revogação de `update`/`delete` da `202607300063` **reasserida** (se uma migration futura reconceder, esta reprova ao aplicar); `select`/`insert` retidos; `anon` sem nada; RLS `enable` **e** `force`; as quatro políticas por dono presentes; a função `security definer` com `search_path` vazio, executável por `authenticated` e não por `anon`; ausência do literal `'snoozed'` no corpo; handler registrado e resolvível na assinatura roteada; e os dois guardas de fonte de longa data (`40001`, formas especiais qualificadas) sobre o *bundle* de undo, que agora inclui o handler novo automaticamente.
+
+## Signup Hardening — ciclo de vida da conta, exclusão e fronteira administrativa (migrations `202608040070`–`202608040073`)
+
+Registrado no encerramento da SH.3, cobrindo as três slices juntas: a SH.1 e a SH.2 entregaram schema sem atualizar este documento, e a lacuna é fechada aqui em vez de crescer.
+
+### `public.account_lifecycle` (`202608040070`, SH.1)
+
+Uma linha por conta — `user_id` PK referenciando `auth.users on delete cascade` — com `status` num conjunto fechado (`active`, `suspended`, `deleting`), `reason_code` num vocabulário fechado, `changed_by` num conjunto fechado de atores (`system`, `user`, `operator`), `changed_at` e `created_at`. RLS `enable` **e** `force`; `authenticated` tem apenas `select` da própria linha; `anon` não tem nada; **nenhum papel cliente tem INSERT, UPDATE ou DELETE**. Duas triggers em `before`/`after update`: a primeira recusa qualquer transição fora da máquina declarada (`active↔suspended`, `active→deleting`, `suspended→deleting`, `deleting→active`) com SQLSTATE `P0001` e detail `ACCOUNT_LIFECYCLE_ILLEGAL_TRANSITION`, incluindo auto-transições; a segunda grava a linha de `audit_logs` **incondicionalmente**, na mesma instrução, de modo que uma transição sem auditoria é estruturalmente impossível. `handle_new_user` passa a semear a linha junto de `profiles` e `agent_preferences`, um backfill cobre todo usuário existente, e a migration **falha** se sobrar qualquer `auth.users` sem estado.
+
+### O predicado de ciclo de vida, ligado (`202608040071`, SH.1)
+
+Seis funções existentes são substituídas para carregar o mesmo predicado: `capture_entry_async` e `enqueue_entry_reprocessing` recusam uma conta não-`active` com `P0001` / `ACCOUNT_LIFECYCLE_NOT_ACTIVE` **antes de qualquer escrita**; os três caminhos de claim (`claim_entry_interpretation_job`, `claim_next_entry_interpretation_job`, `claim_attachment_job`) pulam jobs cujo dono não está `active` — texto de predicado byte-idêntico nos três, afirmado por teste de repositório, para que o claim direto e o drain agendado não possam divergir; e `run_user_heartbeat` pula antes de qualquer leitura dos dados do usuário, devolvendo `skipped/account-not-active` em vez de erro, para que a suspensão de um usuário nunca quebre o lote.
+
+### `public.account_deletion_log` e a exclusão (`202608040072`, SH.2)
+
+Ledger **desidentificado por construção**: as colunas `user_id`, e-mail e nome não existem. Guarda um id de evento opaco, timestamps por etapa, contagens, um conjunto fechado de desfechos (`completed`/`stopped`/`failed`), um vocabulário fechado de motivos de parada e o hash de 64 hex da sessão solicitante sob o mesmo contrato do `ip_hash` do BYOK. RLS `enable` e `force` **sem nenhuma política** e sem grants de tabela — nem para `service_role` — então a RPC `SECURITY DEFINER` é a única escritora. `request_account_deletion()` não recebe parâmetro (o dono é `auth.uid()`), transiciona pela máquina da SH.1 e é idempotente enquanto já `deleting`. `account_owned_row_counts(uuid)` enumera as tabelas com `user_id` **do catálogo em tempo de execução** e devolve `-1` para uma tabela que não conseguiu varrer, de modo que uma tabela criada por uma slice futura entra no detector de resíduo desconhecido sem ser convidada.
+
+### A fronteira administrativa (`202608040073`, SH.3)
+
+`suspend_account`, `reactivate_account` e `begin_account_deletion_admin` — `SECURITY DEFINER`, `search_path` vazio, `execute` concedido só a `service_role` e revogado de todo papel cliente, cada uma validando o motivo contra um conjunto fechado **por verbo** e escrevendo pela máquina da SH.1 (logo, auditoria incondicional). `reactivate_account` valida o motivo **contra o status atual**: `operator_reactivation` a partir de `suspended`, `deletion_reverted` a partir de `deleting` — reverter uma exclusão e levantar uma suspensão não são a mesma palavra. `admin_account_lifecycle_status(uuid, text)` é o readback do operador: resolve a conta por id ou e-mail (a resolução precisa de `auth.users`, que o PostgREST não expõe) e devolve status, motivo, ator e timestamp — sem e-mail, sem nome, sem dado de produto.
+
+`defer_job_for_inactive_owner(uuid, text)` devolve à fila um job cujo dono deixou de estar `active` depois do claim: volta para `pending` com lease limpo, **não** escreve `jobs.error`, **não** marca `failed`, não queima tentativa além da do próprio claim, grava sua própria linha de auditoria (`job_deferred_inactive_owner`) e **recusa quando o dono está ativo**, para que não vire uma primitiva genérica de devolução. Devolve `null` quando o lease não é mais do chamador — o mesmo sinal de `fail_job`.
+
+O vocabulário de motivos cresce em dois (`operator_suspension_abuse`, `operator_suspension_security`) porque a superfície de conta suspensa mostra o rótulo público do motivo; e `run_user_heartbeat` é substituída de novo para que lembretes vencidos durante a suspensão **não** sejam entregues retroativamente — as linhas de `reminders` ficam intactas e continuam `scheduled`; o que se retém é a notificação. O predicado é condicionado ao `reason_code` de reativação, então é inócuo para toda conta que nunca foi suspensa, inclusive as semeadas pelo backfill da SH.1. `ADR-078`.
+
+### Postconditions
+
+Cada uma das quatro migrations termina com um bloco `do $$` que reafirma, no catálogo: RLS habilitada **e** forçada nas tabelas novas; toda função criada ou substituída `security definer` com `search_path` vazio; e o conjunto exato de grants — nenhum papel cliente alcança as funções administrativas, `service_role` alcança todas elas, e nenhum papel cliente escreve `account_lifecycle` diretamente.

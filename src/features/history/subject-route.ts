@@ -61,6 +61,10 @@ export const HISTORY_SUBJECT_ROUTES = {
   // account state, and the state surface is reached by the lifecycle gate,
   // not by a history link.
   account_lifecycle: null,
+  // SH.3 — the Jobs page lists jobs but stamps no per-row anchor, so there is
+  // no destination that shows this subject. Left null rather than pointed at
+  // the list, on the rule the relationship types state below.
+  job: null,
   entry_interpretation: null,
   entry_task_candidate_resolution: null,
   pending_question: null,

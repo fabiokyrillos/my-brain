@@ -4,8 +4,16 @@
  * database said (the `unknown` state says "unavailable", not "suspended").
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type AccountStateKind, getLifecycleCopy } from "./lifecycle-copy";
+import {
+  type AccountStateKind,
+  getLifecycleCopy,
+  getSuspensionReasonLabel,
+  isSuspensionReasonCode,
+  SUSPENSION_REASON_CODES,
+} from "./lifecycle-copy";
 
 const locales = ["pt-BR", "en"] as const;
 const states: readonly AccountStateKind[] = ["suspended", "deleting", "unknown"];
@@ -47,6 +55,80 @@ describe("lifecycle copy", () => {
   it("the two locales are distinct texts, not one pasted twice", () => {
     expect(getLifecycleCopy("pt-BR").states.suspended.title).not.toBe(
       getLifecycleCopy("en").states.suspended.title,
+    );
+  });
+});
+
+/**
+ * SH-COPY-002 — the reason's public label, and the pin that keeps the label set
+ * and the database's CHECK from drifting.
+ */
+describe("suspension reasons (SH-COPY-002)", () => {
+  const migration = readFileSync(
+    join(process.cwd(), "supabase/migrations/202608040073_account_lifecycle_admin.sql"),
+    "utf8",
+  );
+
+  it("every stored suspension reason has a non-empty public label in both locales", () => {
+    for (const locale of locales) {
+      const copy = getLifecycleCopy(locale);
+      for (const code of SUSPENSION_REASON_CODES) {
+        expect(copy.suspensionReasons[code].trim(), `${locale}/${code}`).not.toBe("");
+      }
+      expect(Object.keys(copy.suspensionReasons).sort()).toEqual([...SUSPENSION_REASON_CODES].sort());
+    }
+  });
+
+  it("the label set is exactly the suspension vocabulary the migration accepts", () => {
+    // Both directions against the migration text: a code the database would
+    // accept but this file does not label would render the generic fallback
+    // silently, and a label for a code the database refuses is dead copy.
+    const suspensionCodesInMigration = [
+      ...new Set(
+        [...migration.matchAll(/'(operator_suspension[a-z_]*)'/g)].map((match) => match[1]),
+      ),
+    ].sort();
+    expect(suspensionCodesInMigration).toEqual([...SUSPENSION_REASON_CODES].sort());
+  });
+
+  it("no reason code renders raw: an unknown or absent code falls back to the generic label", () => {
+    for (const locale of locales) {
+      const copy = getLifecycleCopy(locale);
+      expect(getSuspensionReasonLabel(locale, null)).toBe(copy.suspensionReasons.operator_suspension);
+      expect(getSuspensionReasonLabel(locale, "operator_suspension_future_thing")).toBe(
+        copy.suspensionReasons.operator_suspension,
+      );
+      for (const code of SUSPENSION_REASON_CODES) {
+        expect(getSuspensionReasonLabel(locale, code)).not.toContain(code);
+      }
+    }
+  });
+
+  it("isSuspensionReasonCode accepts only the declared members", () => {
+    for (const code of SUSPENSION_REASON_CODES) expect(isSuspensionReasonCode(code)).toBe(true);
+    expect(isSuspensionReasonCode("operator_deletion_start")).toBe(false);
+    expect(isSuspensionReasonCode("deletion_reverted")).toBe(false);
+    expect(isSuspensionReasonCode(null)).toBe(false);
+    expect(isSuspensionReasonCode(42)).toBe(false);
+  });
+
+  it("the labels say what kind of suspension it is and nothing about who decided", () => {
+    for (const locale of locales) {
+      const copy = getLifecycleCopy(locale);
+      for (const label of Object.values(copy.suspensionReasons)) {
+        expect(label.toLowerCase()).not.toContain("service_role");
+        expect(label.toLowerCase()).not.toContain("operator_");
+        expect(label).not.toMatch(/@/);
+      }
+    }
+  });
+
+  it("SH-SUSPEND-005 is stated to the user, in both locales", () => {
+    for (const locale of locales) {
+      expect(getLifecycleCopy(locale).suspendedReminders.trim()).not.toBe("");
+    }
+    expect(getLifecycleCopy("pt-BR").suspendedReminders).not.toBe(
+      getLifecycleCopy("en").suspendedReminders,
     );
   });
 });

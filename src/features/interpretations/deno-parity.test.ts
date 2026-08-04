@@ -138,6 +138,14 @@ describe("Deno worker copies stay identical to their Node source", () => {
       // `src/lib/byok/rotation-parity.test.ts`, which also asserts that
       // asymmetry explicitly and pins the four environment names both may read.
       "byok-rotation.ts",
+      // SH.3's lifecycle gate is Deno-owned for the same reason `job-failure.ts`
+      // is: nothing in Node re-verifies a claimed job's owner, because nothing
+      // in Node executes jobs. Its Node-side counterpart is a different control
+      // at a different boundary — `requireUser`/`assertActiveAccount` gate a
+      // request, this gates work already in flight — so a parity pair would be
+      // comparing two things that are not copies of each other.
+      "lifecycle-gate.ts",
+      "lifecycle-gate.test.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

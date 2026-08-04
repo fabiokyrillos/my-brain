@@ -21,6 +21,30 @@ test("signup and password reset forms expose the complete validated fields", asy
   await expect(page.getByLabel("Confirme a nova senha")).toBeVisible();
 });
 
+/**
+ * SH-SUSPEND-002/008. The suspended surface itself needs a genuinely suspended
+ * account, which needs credentials — so its rendering is unit-proven
+ * (`account-menu.test.tsx` family) and its deployed journey is SH-WORKER-004's
+ * gate. What IS credential-free, and worth pinning here, is that the route
+ * exists and is not a public page: an unauthenticated visitor is sent to login
+ * exactly like a product route, so "account-state" can never become a surface
+ * that leaks whether an account is suspended to somebody who is not it.
+ */
+test("the account-state surface is authenticated-only in both locales", async ({ request }) => {
+  for (const [source, target] of [
+    ["/pt-BR/account-state", "/pt-BR/auth/login"],
+    ["/en/account-state", "/en/auth/login"],
+  ] as const) {
+    const response = await request.get(source, { maxRedirects: 0 });
+    // The redirect here is the page's own `redirect()` rather than the proxy's,
+    // so the status is asserted as "a redirect" rather than as one exact code.
+    expect([307, 308]).toContain(response.status());
+    const location = response.headers().location;
+    expect(location).toBeDefined();
+    expect(new URL(location!, "http://localhost:3000").pathname).toBe(target);
+  }
+});
+
 test("canonical and legacy daily routes remain protected in both locales", async ({ request }) => {
   for (const [source, target] of [
     ["/pt-BR/app/inbox?view=needs-you", "/pt-BR/auth/login"],

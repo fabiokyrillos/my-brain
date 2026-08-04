@@ -2536,6 +2536,13 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_account_lifecycle_status: {
+        Args: {
+          p_email: string | null
+          p_user_id: string | null
+        }
+        Returns: Json
+      }
       apply_reminder_command_v1: {
         Args: {
           p_command: Json
@@ -2554,6 +2561,13 @@ export type Database = {
           p_policy_version: string
           p_pre_state: Json
           p_task_id: string
+        }
+        Returns: Json
+      }
+      begin_account_deletion_admin: {
+        Args: {
+          p_reason_code: string
+          p_user_id: string
         }
         Returns: Json
       }
@@ -2695,6 +2709,13 @@ export type Database = {
           p_patch: Json
           p_policy_version: string
           p_title_words: string[]
+        }
+        Returns: Json
+      }
+      defer_job_for_inactive_owner: {
+        Args: {
+          p_job_id: string
+          p_worker_id: string
         }
         Returns: Json
       }
@@ -2933,6 +2954,13 @@ export type Database = {
         }
         Returns: Json
       }
+      reactivate_account: {
+        Args: {
+          p_reason_code: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
       prune_credential_validation_attempts: {
         Args: Record<PropertyKey, never>
@@ -3072,6 +3100,13 @@ export type Database = {
       save_profile_settings: {
         Args: { p_preferences: Json; p_profile: Json }
         Returns: undefined
+      }
+      suspend_account: {
+        Args: {
+          p_reason_code: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       task_command_fingerprint: {
         Args: {

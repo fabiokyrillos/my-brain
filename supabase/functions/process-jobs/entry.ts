@@ -12,6 +12,11 @@ import { normalizeExtractionInstants } from "../_shared/extraction-normalization
 import { resolveJobCredential } from "../_shared/byok-adapter.ts";
 import type { Secret } from "../_shared/byok-secret.ts";
 import {
+  deferJobForInactiveOwner,
+  deferredJobResponse,
+  verifyOwnerLifecycle,
+} from "../_shared/lifecycle-gate.ts";
+import {
   classifyJobFailure,
   classifyProviderResponse,
   classifyTransportError,
@@ -476,6 +481,24 @@ export async function processEntryJob(
       .single();
     if (entryError || !entry) throw new JobFailure("subject_not_found");
     eventLocale = entry.locale === "pt-BR" ? "pt-BR" : "en";
+
+    // SH-WORKER-001/002. The ownership reload is where the lifecycle is
+    // re-verified: the claim predicate already refused a non-active owner, so
+    // reaching here with one means the state changed between claim and
+    // execution. Above this line nothing has been written and no provider has
+    // been contacted — the same positional contract the credential resolution
+    // below carries, and the reason both checks sit here rather than later.
+    const lifecycle = await verifyOwnerLifecycle(service, job.user_id);
+    if (lifecycle.kind === "terminal") throw new JobFailure(lifecycle.code);
+    if (lifecycle.kind === "defer") {
+      const deferred = await deferJobForInactiveOwner(service, { jobId: job.id, workerId });
+      if (!deferred) return Response.json({ error: "Job lease is no longer active" }, { status: 409 });
+      console.info("Entry interpretation job deferred", {
+        jobId: job.id,
+        ownerStatus: lifecycle.ownerStatus,
+      });
+      return deferredJobResponse(lifecycle.ownerStatus);
+    }
 
     // `BYOK-JOBS-001` — resolved **here**, at execution time, from the claimed
     // row's owner, and before anything is mutated or spent.

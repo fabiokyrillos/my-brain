@@ -186,6 +186,7 @@ const ptBR: HistoryCopy = {
   actors: { user: "Você", agent: "O {agent}", system: "O sistema" },
   entityTypes: {
     account_lifecycle: "situação da conta",
+    job: "processamento",
     task: "tarefa",
     entry: "registro",
     entry_interpretation: "interpretação",
@@ -206,6 +207,10 @@ const ptBR: HistoryCopy = {
     // No `{subject}` placeholder: the subject is the account itself, and the
     // reason column already carries the from/to states in plain words.
     account_lifecycle_transition: "alterou a situação da conta",
+    // No `{subject}`: `entity_id` is the job's own id and a job has no name a
+    // reader would recognise. The sentence says what happened to the work, not
+    // which internal row it was.
+    job_deferred_inactive_owner: "devolveu um processamento à fila",
     archive_memory: "arquivou a memória[ “{subject}”]",
     // No `{subject}` placeholder in any of the eight below: `entity_id` is the
     // junction row's own id, so there is no name to fill it with — and inventing
@@ -352,6 +357,7 @@ const en: HistoryCopy = {
   actors: { user: "You", agent: "{agent}", system: "The system" },
   entityTypes: {
     account_lifecycle: "account status",
+    job: "processing",
     task: "task",
     entry: "record",
     entry_interpretation: "interpretation",
@@ -372,6 +378,7 @@ const en: HistoryCopy = {
     // No `{subject}` placeholder: the subject is the account itself, and the
     // reason column already carries the from/to states in plain words.
     account_lifecycle_transition: "changed the account status",
+    job_deferred_inactive_owner: "returned a processing job to the queue",
     archive_memory: "archived the memory[ “{subject}”]",
     associate_person_context: "linked a person to a context",
     associate_person_project: "linked a person to a project",

@@ -40,6 +40,12 @@ type Fixture = {
    * RPC returns for an entry that already carries an interpretation.
    */
   markRefuses?: boolean;
+  /**
+   * SH.3 (SH-WORKER-001/002): the job owner's lifecycle status at the ownership
+   * reload. Defaults to `active`, which is what every pre-SH.3 case in this file
+   * assumes — `null` means the row is absent entirely.
+   */
+  ownerLifecycle?: string | null;
 };
 
 function workerDouble(fixture: Fixture) {
@@ -87,6 +93,10 @@ function workerDouble(fixture: Fixture) {
         status: "uploaded",
       };
     }
+    if (table === "account_lifecycle") {
+      const status = fixture.ownerLifecycle === undefined ? "active" : fixture.ownerLifecycle;
+      return status === null ? null : { status };
+    }
     if (table === "attachment_interpretations") return null;
     if (table === "agent_preferences") return null;
     return null;
@@ -103,6 +113,11 @@ function workerDouble(fixture: Fixture) {
       if (name === "fail_job") return Promise.resolve({ data: { status: "failed" }, error: null });
       if (name === "mark_entry_awaiting_ai_configuration") {
         return Promise.resolve({ data: !fixture.markRefuses, error: null });
+      }
+      // SH.3: the real RPC's success shape. Answering it generically with
+      // `null` would look like a lost lease and hide the deferral.
+      if (name === "defer_job_for_inactive_owner") {
+        return Promise.resolve({ data: { status: "deferred" }, error: null });
       }
       return Promise.resolve({ data: null, error: null });
     },
@@ -388,6 +403,133 @@ Deno.test("the attachment is loaded by both id and the job's owner", async () =>
     assert(read);
     assertStrictEquals(read.filters.id, ATTACHMENT);
     assertStrictEquals(read.filters.user_id, OWNER);
+  } finally {
+    provider.restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// SH.3 — the lifecycle, re-verified at the handler's own ownership reload.
+// ---------------------------------------------------------------------------
+//
+// `_shared/lifecycle-gate.test.ts` proves the gate's verdicts in isolation.
+// These prove the two things only the handlers can: that the gate is actually
+// WIRED at the reload, and that reaching it stops the work before a provider is
+// contacted or a credential is resolved. The same `forbidProviderCalls`
+// inversion as everything above — the requirement is that nothing runs, and
+// only a fetch that cannot succeed can tell the difference.
+
+Deno.test("SH-WORKER-001: a suspended owner's entry job is deferred, not executed", async () => {
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({
+      ownerLifecycle: "suspended",
+      // A real, resolvable credential would be available: the deferral must not
+      // depend on there being nothing to run with.
+      credentialRows: [
+        { ciphertext: "x", iv: "y", key_version: 1, provider: "openai", status: "active" },
+      ],
+    });
+    const response = await processEntryJob(
+      service,
+      { id: "job-9", user_id: OWNER, attempts: 1, payload: { entry_id: ENTRY, mode: "initial" } },
+      "worker-9",
+    );
+
+    assertStrictEquals(response.status, 202);
+    assertEquals(await response.json(), {
+      deferred: true,
+      code: "owner_not_active",
+      ownerStatus: "suspended",
+    });
+    assertEquals(provider.attempts, []);
+
+    const names = rpcCalls.map((call) => call.name);
+    assert(names.includes("defer_job_for_inactive_owner"), "the job must be returned to the queue");
+    // Not a failure: nothing reaches `jobs.error`, and the entry is not moved
+    // into `interpreting` on behalf of an account that may not act.
+    assert(!names.includes("fail_job"));
+    assert(!names.includes("fail_job_terminal"));
+    assert(!names.includes("begin_entry_interpretation"));
+    assert(!names.includes("resolve_job_ai_credential"));
+  } finally {
+    provider.restore();
+  }
+});
+
+Deno.test("SH-WORKER-002: a deleting owner's entry job fails terminally and schedules nothing", async () => {
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({
+      ownerLifecycle: "deleting",
+      credentialRows: [
+        { ciphertext: "x", iv: "y", key_version: 1, provider: "openai", status: "active" },
+      ],
+    });
+    await processEntryJob(
+      service,
+      { id: "job-10", user_id: OWNER, attempts: 1, payload: { entry_id: ENTRY, mode: "initial" } },
+      "worker-10",
+    );
+
+    const terminal = rpcCalls.find((call) => call.name === "fail_job_terminal");
+    assert(terminal, "a deleting owner is terminal -- no retry brings the account back");
+    assertStrictEquals(terminal.args.p_error, "subject_not_found");
+    assertEquals(provider.attempts, []);
+    assert(!rpcCalls.some((call) => call.name === "defer_job_for_inactive_owner"));
+  } finally {
+    provider.restore();
+  }
+});
+
+Deno.test("SH-WORKER-001: the attachment handler carries the identical gate", async () => {
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({
+      ownerLifecycle: "suspended",
+      credentialRows: [
+        { ciphertext: "x", iv: "y", key_version: 1, provider: "openai", status: "active" },
+      ],
+    });
+    const response = await processAttachmentJob(
+      service,
+      { id: "job-11", user_id: OWNER, attempts: 1, payload: { attachment_id: ATTACHMENT } },
+      "worker-11",
+    );
+
+    assertStrictEquals(response.status, 202);
+    assertEquals(provider.attempts, []);
+    assert(rpcCalls.some((call) => call.name === "defer_job_for_inactive_owner"));
+    assert(!rpcCalls.some((call) => call.name === "fail_job"));
+  } finally {
+    provider.restore();
+  }
+});
+
+Deno.test("an owner with no lifecycle row at all is terminal, never deferred", async () => {
+  // Absence is not ambiguity here: `handle_new_user` seeds the row and the SH.1
+  // backfill covered every existing account, so no row means the account is
+  // gone. Deferring would leave the job cycling forever against an owner that
+  // will never come back.
+  const provider = forbidProviderCalls();
+  try {
+    const { service, rpcCalls } = workerDouble({
+      ownerLifecycle: null,
+      credentialRows: [
+        { ciphertext: "x", iv: "y", key_version: 1, provider: "openai", status: "active" },
+      ],
+    });
+    await processEntryJob(
+      service,
+      { id: "job-12", user_id: OWNER, attempts: 1, payload: { entry_id: ENTRY, mode: "initial" } },
+      "worker-12",
+    );
+
+    const terminal = rpcCalls.find((call) => call.name === "fail_job_terminal");
+    assert(terminal);
+    assertStrictEquals(terminal.args.p_error, "subject_not_found");
+    assert(!rpcCalls.some((call) => call.name === "defer_job_for_inactive_owner"));
+    assertEquals(provider.attempts, []);
   } finally {
     provider.restore();
   }

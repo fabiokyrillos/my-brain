@@ -31,7 +31,7 @@ export default async function AccountStatePage({
 
   const lifecycle = await supabase
     .from("account_lifecycle")
-    .select("status")
+    .select("status,reason_code")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -41,5 +41,14 @@ export default async function AccountStatePage({
   const state: AccountStateKind =
     status === "suspended" || status === "deleting" ? status : "unknown";
 
-  return <AccountStateSurface locale={locale} state={state} />;
+  // SH-COPY-002: the reason travels as the stored code and is turned into its
+  // public label by the copy module, which falls back to the generic label for
+  // anything it does not know. The code itself never reaches the page.
+  return (
+    <AccountStateSurface
+      locale={locale}
+      reasonCode={lifecycle.error ? null : lifecycle.data?.reason_code ?? null}
+      state={state}
+    />
+  );
 }
