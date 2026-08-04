@@ -44,6 +44,23 @@ const messages = {
     "pt-BR": "As inscrições estão fechadas no momento. Este produto ainda não está aberto ao público.",
     en: "Sign-ups are closed right now. This product is not open to the public yet.",
   },
+  // SH-ORIGIN-001. The deployment is missing `APP_ORIGIN`, so no auth email can
+  // be addressed safely.
+  //
+  // This exists because refusing to guess an origin is right and crashing is
+  // not: the first cut let the resolver throw, and a production deploy without
+  // the variable turned password recovery into a bare 500. The security
+  // property is unchanged — nothing is guessed, no mail is attempted — but the
+  // reader now gets a sentence instead of an error page, and the operator gets
+  // a declared code instead of a stack trace.
+  //
+  // It says "configuration" rather than naming the variable: the person reading
+  // it cannot fix it, and naming internals to someone who cannot act on them is
+  // just a smaller stack trace.
+  "auth-misconfigured": {
+    "pt-BR": "Este ambiente ainda não está configurado para enviar e-mails de autenticação. Avise o responsável pelo produto.",
+    en: "This environment is not configured to send authentication emails yet. Let the product owner know.",
+  },
 } as const;
 
 export type AuthErrorCode = keyof typeof messages;

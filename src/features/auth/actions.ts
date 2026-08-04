@@ -35,9 +35,24 @@ function formValues(formData: FormData) {
  * *real user* points. The provider's redirect allowlist would have refused most
  * of that, but an allowlist is the backstop, not the control, and a backstop
  * nobody has read back (SH-GD.1) is a backstop nobody has verified.
+ *
+ * It returns `null` rather than throwing when the deployment has no configured
+ * origin. Refusing to guess is the security property and it is unchanged;
+ * crashing was never part of it. The first cut let the resolver throw, and a
+ * production deploy without `APP_ORIGIN` turned password recovery into a bare
+ * 500 — the caller saw an error page, and the operator saw nothing declared.
+ * Now no mail is attempted, nothing is guessed, and both get something they can
+ * act on.
  */
-function authOrigin() {
-  return configuredOriginFrom(process.env);
+function authOrigin(): string | null {
+  try {
+    return configuredOriginFrom(process.env);
+  } catch {
+    // The message names an environment variable, so it is not forwarded. The
+    // declared error code is what leaves this process.
+    console.error("Auth origin is not configured; refusing to send an auth email");
+    return null;
+  }
 }
 
 export async function signIn(formData: FormData) {
@@ -128,6 +143,8 @@ export async function signUp(formData: FormData) {
   }
 
   const origin = authOrigin();
+  if (origin === null) redirect(`/${locale}/auth/register?error=auth-misconfigured`);
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -151,6 +168,8 @@ export async function recoverPassword(formData: FormData) {
   if (!parsed.success) redirect(`/${locale}/auth/recover?error=invalid-form`);
 
   const origin = authOrigin();
+  if (origin === null) redirect(`/${locale}/auth/recover?error=auth-misconfigured`);
+
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/auth/reset`),
