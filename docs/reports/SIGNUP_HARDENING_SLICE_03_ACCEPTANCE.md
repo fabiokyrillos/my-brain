@@ -174,7 +174,23 @@ same change. Four of the initiative's eight migrations are now spent.
   CRLF/line-ending consequence recorded in the handoff since BYOK).
 - Deno worker suite: **118 passed / 0 failed**, run locally; `deno check` green
   on all three deployed entrypoints.
-- PR-head and exact merge-SHA CI runs: recorded below at the PR boundary.
+- **PR #77. PR-head CI run `30935826445` (head `5883255`): ALL THREE JOBS GREEN
+  ON THE FIRST RUN.** `application (lint, types, unit, build)`,
+  `database and journey (migrations, pgTAP, db lint, foundation e2e)` and
+  `edge worker (deno types, deno tests)` all `success`. The `database` job
+  applied `202608040073` from an empty database and ran the five Signup
+  Hardening pgTAP suites, including this slice's 42 assertions.
+  **This is the first Signup Hardening slice whose `database` job passed on its
+  first execution** — SH.0, SH.1 and SH.2 each failed at least one pgTAP
+  assertion first, which is the no-local-Docker consequence the handoff has
+  recorded since BYOK. The two defects that would have caused it here (the
+  16-byte ciphertext fixture, the `found` variable) were caught by reading the
+  constraint and the language reference rather than by a red run — §3.5 and
+  §3.6. One green run is not a claim that the practice has changed; it is one
+  data point that reading the artifact statically is worth the time it costs.
+- Merge SHA and exact merge-SHA CI run: recorded in
+  `AUTONOMOUS_LOOP_HANDOFF.md` at the merge boundary, per the standing
+  discipline.
 
 ## 5. What SH.3 does not claim — the deployment-gated evidence, NOT EXECUTED
 
