@@ -1,7 +1,8 @@
 # SH-DELETE-015 — the six orphaned storage objects: procedure and manifest
 
-Status: **MANIFEST TAKEN 2026-08-04 against the deployed project. DELETION STILL
-NOT AUTHORIZED — the loop stops here and asks.**
+Status: **CLOSED 2026-08-04. Manifest taken, owner authorization given, the six
+objects removed, and the scanner re-run to zero.** The execution record is §6;
+everything above it is preserved as written.
 
 Six objects under `user-files/<uuid>/…` have been recorded in five documents
 since 2026-07-16. They were found by the BYOK fixture sweep and deliberately
@@ -138,3 +139,97 @@ built in SH.2 removes storage for every account deleted **from now on**, and
 the scanner is wired into future deletion acceptance and the rollout gate
 (SH-STORAGE-002), so this class of residue cannot silently reappear. The six
 are a historical debt with a procedure attached, not an open leak.
+
+---
+
+## 6. Execution record — 2026-08-04
+
+**Authorization.** The owner authorized deletion of the six measured objects,
+conditional on the agent independently re-verifying, immediately before the act,
+that every object still satisfied all of: owner prefix resolves to no live auth
+user; no live attachment references it; no cross-owner classification; no
+unclassifiable state; and the measured set matches this committed manifest. The
+owner also recorded that the project has not begun real production use and that
+its data is development/test/disposable, with named protected exceptions.
+
+**Tool.** `scripts/sh-delete-015-remove-orphans.mjs`, dry-run by default,
+`--apply` to act. It is a separate file from the scanner on purpose: the scanner
+must keep holding no destructive call, and a test asserts their absence by name
+over its source. This tool imports the scanner's own `classifyObject` rather
+than reimplementing it, so the classifier that authorizes a deletion cannot
+disagree with the classifier that reported the orphan.
+
+**Age and filename were not criteria.** Both are explicitly asserted absent from
+the tool's executable source by `src/lib/closeout/orphan-removal-guard.test.ts`.
+Every object was re-classified structurally, at run time, seconds before removal.
+
+### Pre-deletion verification (dry run)
+
+```
+objects measured:  6
+manifest expects:  6
+live auth users:   2 (all excluded — none owns a listed object)
+  absent-owner   0a32a853-…/f5de5671-…-nota.txt  36 bytes
+  absent-owner   0e18c6b6-…/f9197af4-…-nota.txt  36 bytes
+  absent-owner   10b77789-…/c6cb26bd-…-nota.txt  36 bytes
+  absent-owner   510e038d-…/f4ef12cd-…-nota.txt  36 bytes
+  absent-owner   68c2c4bb-…/ccfced78-…-nota.txt  36 bytes
+  absent-owner   78d41c0f-…/2082088f-…-nota.txt  36 bytes
+
+All preconditions hold:
+  - every object re-classified absent-owner, structurally, just now
+  - no object's prefix is a live auth user
+  - no object is referenced by any live attachment row
+  - the measured set equals the committed manifest exactly
+```
+
+**Protected accounts, proven excluded.** The two live accounts — the owner's and
+the shared `ONLINE_AUTH_TEST_EMAIL` online-suite fixture — were enumerated from
+`auth.users` at run time and neither owns any listed object. The exclusion is
+structural rather than a hard-coded skip list: the tool refuses any object whose
+prefix resolves to *any* live user, so a protected account cannot be removed
+from the guard by editing a uuid out of a file.
+
+### Execution and postcondition
+
+```
+Removed 6 object(s).
+  objects remaining in bucket: 0
+  of the manifest set still present: 0
+```
+
+Independent re-run of `npm run verify:storage:orphans`:
+
+```
+objects: 0
+live 0 | absent-owner 0 | absent-row 0 | cross-owner 0 | unparseable 0
+```
+
+**Zero historical orphans remain.** Negative control: both protected accounts
+are still present and `active`, with their lifecycle rows intact and no bans.
+
+### The tool is now single-use by construction
+
+Re-running it refuses, because the bucket no longer matches the manifest:
+
+```
+REFUSED. The world does not match the manifest:
+  - manifest paths absent from the bucket: …
+Nothing was removed.
+```
+
+That is the intended end state. This document's table is the authority the tool
+reads, and the authority now describes objects that no longer exist — so the
+tool cannot be pointed at anything else without someone rewriting the manifest,
+which is a visible, reviewable act rather than a flag.
+
+### What this does not claim
+
+- **No restore drill was performed.** The owner recorded the platform backup as
+  an attestation and explicitly declined to have restore evidence fabricated.
+  Deleting data proven disposable under this authorization did not require one,
+  but the absence of a tested restore path **remains a rollout-gate limitation**
+  and is carried into the residual-risk register rather than closed here.
+- **Nothing was recovered or is recoverable.** Object storage has no undo here
+  and these bytes were the last copy. That was true when the manifest was taken
+  and it is why the manifest was taken first.
