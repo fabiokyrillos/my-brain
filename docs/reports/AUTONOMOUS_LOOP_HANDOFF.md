@@ -1186,3 +1186,136 @@ that is the path — and it is what the plan's gate tiering exists to permit.
 - **Do not flip `disable_signup`**, start Phase 2G/2H, or absorb operator surfaces.
 - **Do not spend a ninth migration.** Five remain of the approved eight: SH.3 one,
   SH.4 one, SH.5 one, SH.6 two. A slice needing more stops and asks.
+
+---
+
+## 20. SH.3 and SH.4 — the loop continued rather than idled. **This supersedes §19's "Next" and its "Where the initiative stands".**
+
+2026-08-04. §19 recorded a stop at SH.2 and named, in its own words, what a resuming
+context was permitted to do without any owner action: *"SH.3 can be built and merged
+behind SH-GD.1/GD.3 … Same for SH.4 … If the owner prefers the loop to continue rather
+than wait, that is the path."* The owner chose that path. This section records what it
+produced. **Nothing in §19's "Do not, on resuming" list was done** — no orphan deleted,
+no manifest filled from belief, no production purge, no migration applied to the hosted
+project, no ninth migration spent.
+
+### Where the initiative stands now
+
+| Slice | State | Migrations | Merge | Merge-SHA CI |
+| --- | --- | --- | --- | --- |
+| SH.0 | CLOSED | 0 | `a05cfb5` | `30905402273` green |
+| SH.1 | CLOSED | 2 (`…070`, `…071`) | `3c227f6` | `30910079676` green |
+| SH.2 | CLOSED | 1 (`…072`) | `947bb26` | `30914160291` green |
+| SH.3 | CLOSED | 1 (`…073`) | `3a0f4f7` | `30936842221` green on all three |
+| SH.4 | in PR #78 | 1 (`…074`) | — | — |
+
+**Migration budget: five of eight spent. Three remain — SH.5 one, SH.6 two.** SH.7 is
+allocated zero. No slice has exceeded its allocation and none has asked to.
+
+Migration head: `202608040074`. Public signup: still disabled. Hosted project: still at
+`202608010069` — **five SH migrations are unapplied**, and that number is the one to
+carry forward.
+
+### SH.3 — suspension and the administrative boundary (branch `codex/sh-slice-3`)
+
+The administrative boundary is `service_role` SQL and an operator CLI (ADR-075): three
+DEFINER transition functions with per-verb closed reason sets and the unconditional
+audit write, a readback that returns a state and no user content, and
+`npm run account:lifecycle` — dry-run by default, pinned in both directions as the only
+executable caller (T-10). `defer_job_for_inactive_owner` answers SH-WORKER-001 without
+`fail_job`: a job whose owner stopped being active goes back to `pending`, no
+`jobs.error`, no extra attempt burned. One shared worker gate wired into both handlers
+also closes **SH-WORKER-002**, which SH.2 scoped and did not deliver. Reminders that come
+due during a suspension are never delivered retroactively and are never touched
+(ADR-078). Evidence: 42 pgTAP, 118 Deno, 37 unit. **Its `database` job was the first in
+this initiative to pass on its first run** — the two defects that would have failed it
+were caught by reading the BYOK ciphertext constraint and the plpgsql reference instead.
+
+**SH.3's adversarial review found one substantive residual and recorded it with a
+destination rather than arguing it down:** the lifecycle predicate covers the paths the
+PRD names — capture, reprocessing, the three claim paths, the heartbeat — but **not every
+`authenticated`-executable RPC**. Verified, not assumed: only the SH migrations mention
+`account_lifecycle`, so `confirm_entry_task_candidates_v6`, `resolve_pending_question_v3`,
+`create_task_command`, `apply_reminder_command_v1`, `correct_entry_interpretation` and
+`undo_operation` carry none, and a suspended account holding a valid JWT could reach them
+through PostgREST. Not fixed inside SH.3's migration because six-plus further
+`create or replace`s inside a migration allocated for the admin boundary is exactly the
+silent scope growth `ADR-071` exists to stop. **Destination: SH-EXPOSURE-007's re-census
+(SH.7) and SH-EXPOSURE-002's matrix (SH.6)**, written into `TODO.md` so the re-census
+meets a written expectation instead of discovering it. Partial mitigation, stated as
+partial: such an account can neither capture nor have any job executed, so nothing
+reachable this way causes AI spend or queued work.
+
+### SH.4 — Terms, Privacy and versioned consent (branch `codex/sh-slice-4`, PR #78)
+
+The slice turns on one decision (ADR-079). `SH-LEGAL-005` requires `authenticated` to
+hold a direct INSERT on `policy_acceptances`, so PostgREST is a real door — and a client
+able to write `version = '9999-12-31'` would **pre-accept every future policy it has
+never been shown**, after which no bump would ever re-interpose it. No Server Action
+validation closes that. So the current version is stated in SQL as well as TypeScript,
+a `BEFORE INSERT` trigger refuses anything else, the two literal sets are pinned to each
+other in both directions, and `record_policy_acceptance` takes **no version parameter at
+all**. **Consequence carried forward: bumping a policy version is a migration plus the
+constant in the same commit.**
+
+The retention section of the Privacy Policy is **generated** from
+`src/features/legal/retention.ts`, and it tells the truth about itself: each class
+carries `sweepActive`, the document renders a plain warning while any declared window has
+no active sweep, and a test asserts the warning is present *exactly while* one is.
+**SH.6 removes that paragraph by flipping the flags, not by remembering to delete it.**
+
+**SH.4 closed two residuals it found rather than routing around them.** SH.2 had shipped
+`requestAccountDeletion` with **no UI consumer at all**, so SH-LEGAL-010's decline path
+had nowhere to point — the deletion surface is built here over the already-merged action.
+And SH.1's account-state surface used `auth-page`, a class present in no stylesheet.
+
+### The owner gates SH.4 creates — values, not blockers
+
+Four legal facts render as **visibly unfilled markers** carrying their own names:
+`OPERATOR_ENTITY`, `OPERATOR_CONTACT`, `GOVERNING_LAW`, `JURISDICTION`. A test asserts
+each appears in both documents and none has been quietly filled with prose. Supplying
+them is an owner action; removing the professional-legal-review banner is a named
+rollout gate (SH-LEGAL-013). **Neither blocks any remaining slice.**
+
+### Deployment ordering — now the most severe it has been
+
+Five migrations (`202608040070`–`202608040074`) must reach the hosted project **before**
+the app code of SH.1–SH.4 runs against it. The failure modes compound:
+
+- without `account_lifecycle`, the fail-closed lifecycle read sends **every** account to
+  the account-state surface;
+- without `policy_acceptances`, the fail-closed consent gate interposes **every** account
+  and none can reach the product.
+
+Both gates fail closed by design and both are correct to; the hazard is entirely at the
+hosted boundary and does not exist in CI, which applies the whole chain from empty.
+
+### Deployment-gated evidence, recorded as NOT EXECUTED with exact blockers
+
+| Requirement | Not executed | Blocker |
+| --- | --- | --- |
+| SH-WORKER-004 | suspend a disposable account with a queued job, watch the deployed drain skip it across two ticks, reactivate, watch it complete | SH-GD.3 + hosted migration parity |
+| SH-WORKER-005 | the heartbeat skip across one hourly tick | same |
+| SH-ADMIN-005 | the provider-side sign-in ban and its `banned_until` readback | owner action; exact command and readback in the admin runbook |
+| SH-ADMIN-006 | every runbook section's first execution — it is marked **written, not drilled** | same |
+| SH-DELETE-012 | the end-to-end deletion journey | SH-GD.2 + SH-GD.3 |
+| SH-LEGAL-008/009/010 | the rendered interposition, version-bump and decline journeys on a real account | SH-GD.3 |
+
+### Next
+
+**SH.5 is the next slice, and it is the first one this loop should not simply start.**
+Its deployed half depends on decisions the repository cannot make: the CAPTCHA provider
+is chosen (Cloudflare Turnstile, ADR-076) but its enforcement is a **hosted setting the
+owner enables**, and the hosted readbacks (redirect allowlist, `site_url`,
+`mailer_autoconfirm`, password policy, GoTrue rate limits) are SH-GD.1. The plan permits
+building the application half first and says so; whoever resumes should confirm that is
+still wanted before spending the sixth migration, because SH.5's application half is
+large and its acceptance is thin without the hosted half.
+
+### Do not, on resuming — unchanged from §19, plus two
+
+- Everything in §19's list still stands, verbatim.
+- **Do not fill the four legal placeholders with plausible values.** A plausible value
+  reads as settled and nobody goes looking for it again.
+- **Do not remove the retention warning by editing the paragraph.** It is generated; the
+  correct way to remove it is SH.6 flipping `sweepActive` per class as each sweep ships.
