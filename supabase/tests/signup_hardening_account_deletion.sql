@@ -274,15 +274,20 @@ select is(
   'a second request is idempotent rather than an error -- the surface may be retried'
 );
 
+reset role;
+
 -- The neighbour is untouched by any of it: the request took no target.
+-- Read AFTER `reset role`, deliberately: `account_lifecycle` is select-own, so
+-- asking this question as the doomed user returns NULL -- which would look
+-- like a failed assertion about the bystander when it is really RLS doing its
+-- job. (CI caught exactly that; the first draft asked while still
+-- impersonating.)
 select is(
   (select status from public.account_lifecycle
    where user_id = 'd2000002-0000-4000-8000-000000000002'),
   'active',
   'the bystander account is still active -- the request surface accepts no target'
 );
-
-reset role;
 
 -- ---------------------------------------------------------------------------
 -- Section 5 -- writes are already blocked while deleting (2)
