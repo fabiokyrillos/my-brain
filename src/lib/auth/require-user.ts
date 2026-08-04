@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasAcceptedCurrentPolicies } from "@/features/legal/acceptance";
 import type { Locale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -58,6 +59,17 @@ export async function requireUser(locale: Locale) {
 
   if (lifecycle.error || lifecycle.data?.status !== "active") {
     redirect(`/${locale}/account-state`);
+  }
+
+  // SH-LEGAL-008/009. The consent gate sits AFTER the lifecycle gate, and the
+  // order is a decision: a suspended account is not asked to accept terms it
+  // could not then act under, so the more specific state wins. The gate reads
+  // `policy_acceptances` — never a cookie, never a session claim — so clearing
+  // browser state changes nothing about enforcement (SH-LEGAL-011), and a
+  // version bump re-interposes every account by the same code path that
+  // interposes a new one.
+  if (!(await hasAcceptedCurrentPolicies(supabase, user.id))) {
+    redirect(`/${locale}/consent`);
   }
 
   return { supabase, user };

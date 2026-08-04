@@ -367,6 +367,15 @@ begin
     values (p_user, v_person, v_proj);
   exception when others then failures := failures || ('person_projects: ' || sqlerrm); end;
 
+  -- SH.4. The version is NOT written literally here: the row must satisfy
+  -- `private.enforce_current_policy_version`, and a literal would make the
+  -- drill fail on the next policy bump for a reason that has nothing to do
+  -- with cascading. Reading the current version is what keeps this arm honest.
+  begin
+    insert into public.policy_acceptances (user_id, document, version, surface)
+    values (p_user, 'terms', private.current_policy_version('terms'), 'interposition');
+  exception when others then failures := failures || ('policy_acceptances: ' || sqlerrm); end;
+
   begin
     insert into public.jobs (user_id, type, payload, idempotency_key)
     values (

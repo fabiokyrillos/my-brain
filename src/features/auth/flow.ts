@@ -25,6 +25,13 @@ const messages = {
     "pt-BR": "O link não é mais válido. Solicite um novo.",
     en: "This link is no longer valid. Request a new one.",
   },
+  // SH-LEGAL-007. Its own code rather than `invalid-form`: "you missed a
+  // required field" and "you have not agreed to the terms" are different facts,
+  // and the second one is the whole point of the control.
+  "consent-required": {
+    "pt-BR": "É preciso aceitar os Termos de Uso e a Política de Privacidade para criar a conta.",
+    en: "You must accept the Terms of Service and the Privacy Policy to create an account.",
+  },
   "password-update-failed": {
     "pt-BR": "Não foi possível atualizar a senha. Tente novamente.",
     en: "We could not update the password. Try again.",

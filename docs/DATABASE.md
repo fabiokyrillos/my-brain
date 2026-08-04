@@ -286,3 +286,13 @@ O vocabulário de motivos cresce em dois (`operator_suspension_abuse`, `operator
 ### Postconditions
 
 Cada uma das quatro migrations termina com um bloco `do $$` que reafirma, no catálogo: RLS habilitada **e** forçada nas tabelas novas; toda função criada ou substituída `security definer` com `search_path` vazio; e o conjunto exato de grants — nenhum papel cliente alcança as funções administrativas, `service_role` alcança todas elas, e nenhum papel cliente escreve `account_lifecycle` diretamente.
+
+### `public.policy_acceptances` e o consentimento versionado (`202608040074`, SH.4)
+
+Uma linha por conta, documento e versão aceita, com a superfície de aceite num conjunto fechado (`signup`, `interposition`) e a versão em formato de data imposta por CHECK. RLS `enable` **e** `force`, com **exatamente duas políticas**: `select` da própria linha e `insert` da própria linha. **Não existe política de `update` nem de `delete`** — a postura append-only é a *ausência* de política, e não uma revogação que uma migration futura possa desfazer sem que se perceba; uma postcondition de catálogo afirma que nenhuma política fora de `SELECT`/`INSERT` existe.
+
+O INSERT direto por `authenticated` é exigido pelo `SH-LEGAL-005` e, portanto, o PostgREST é uma porta real. É por isso que a versão corrente é declarada **também em SQL**: `private.current_policy_version(text)`, executável por nenhum papel, e um trigger `before insert` que recusa qualquer versão que não seja a corrente com `22023` / `POLICY_VERSION_NOT_CURRENT`. Sem isso, um cliente poderia gravar `version = '9999-12-31'` e pré-aceitar toda política futura que nunca viu — e nenhuma validação de Server Action fecharia isso, porque a Server Action não é a única porta. A paridade entre os literais em SQL e a constante `src/features/legal/versions.ts` é fixada nos dois sentidos por `version-parity.test.ts`, no padrão de `extraction-parity.test.ts`. **Consequência declarada (ADR-079): mudar a versão de um documento é uma migration mais a constante no mesmo commit.**
+
+`public.record_policy_acceptance(p_document, p_surface)` é `SECURITY DEFINER` com `search_path` vazio, executável apenas por `authenticated`, e **não recebe versão**: quem não pode nomear uma versão não pode nomear a errada. É idempotente por `on conflict (user_id, document, version) do nothing`.
+
+A tabela entra automaticamente no drill de cascade da SH.0 e no censo de grants — o braço do populador lê a versão corrente pela própria função em vez de fixar um literal, para que um bump de versão não faça o drill falhar por um motivo que nada tem a ver com cascata.
