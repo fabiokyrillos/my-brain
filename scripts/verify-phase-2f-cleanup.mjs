@@ -181,6 +181,8 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   entity_tags: "polymorphic tag link, no Phase 2F proof writes it; cascades at 202607160009:54",
   attachment_interpretations: "attachment worker output, no Phase 2F proof writes it; cascades at 202607160012:3",
   entity_aliases: "Phase 2B alias store, no Phase 2F proof writes it; cascades at 202607170020:118",
+  account_lifecycle:
+    "SH.1 state row seeded by handle_new_user, one per account like profiles, not an independent fixture; cascades at 202608040070:40",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */

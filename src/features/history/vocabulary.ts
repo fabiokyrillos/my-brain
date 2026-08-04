@@ -31,6 +31,11 @@ export type HistoryActor = (typeof HISTORY_ACTORS)[number];
 
 /** What kind of object the change was about. */
 export const HISTORY_ENTITY_TYPES = [
+  // SH.1: the lifecycle audit rows carry the account itself as the subject.
+  // Not linkable in `subject-route.ts` — `entity_id` is the user's own id and
+  // there is no page for an account state; the place to see it is the state
+  // surface the lifecycle read already routes to.
+  "account_lifecycle",
   "task",
   "entry",
   "entry_interpretation",
@@ -69,6 +74,10 @@ export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
  * version are still in the table and still have to render as something.
  */
 export const HISTORY_ACTION_TYPES = [
+  // SH.1: written by the account_lifecycle audit trigger (202608040070) on
+  // every state transition — the machine writes it unconditionally, so it is
+  // in the table from the first suspension onward.
+  "account_lifecycle_transition",
   "archive_memory",
   "associate_person_context",
   "associate_person_project",
@@ -142,6 +151,9 @@ export const HISTORY_CATEGORIES = [
 export type HistoryCategory = (typeof HISTORY_CATEGORIES)[number];
 
 export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, HistoryCategory>> = {
+  // The account entered or left a state; nothing was created, changed or
+  // undone — the same shape as `reminder_cancelled` and `end_person_project`.
+  account_lifecycle_transition: "lifecycle",
   archive_memory: "lifecycle",
   // A link created is a creation; a link ended is a lifecycle event, not a
   // change — the same split `reminder_cancelled` versus `reminder_edited` uses.

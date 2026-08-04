@@ -1027,6 +1027,27 @@ sec. 12.3 local/hosted privilege divergence, not noise.
   reds on a blocked delete, that is a finding and an owner decision (budget amendment), not
   a fix-in-branch.
 
+### SH.1 — built on branch `codex/sh-slice-1` (2 migrations, head -> `202608040071`)
+
+Delivered: `202608040070` (account_lifecycle: table, machine trigger + unconditional
+audit, handle_new_user seed + backfill, SH-EXPOSURE-004 revoke with the census F-19 pin
+flipped in the same slice) and `202608040071` (the predicate in capture, reprocessing,
+all three claim paths — byte-identical, SH-WORKER-003 test over the migration text — and
+the heartbeat skip). App side: `requireUser` resolves lifecycle per request and routes
+non-active accounts to `/[locale]/account-state` (no product surface, exactly sign-out);
+`assertActiveAccount` gates the 19 inline-auth action sites across seven feature
+modules; all fail-closed. pgTAP `signup_hardening_account_lifecycle.sql` (28 assertions,
+lifecycle-only discriminating fixture). History vocabulary gained
+`account_lifecycle_transition`/`account_lifecycle` (the audit trigger is a new SQL
+writer); the 2F cleanup partition and SECURITY.md's head line were updated by the same
+cause. Acceptance: `docs/reports/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`.
+
+**Deployment-ordering hazard, recorded (the A-1.2 class):** apply `202608040070` and
+`202608040071` to the hosted project BEFORE running this slice's app code against it.
+Without the table, the fail-closed lifecycle read sends every account — including the
+owner — to the account-state surface. Repository and CI are internally consistent; the
+hazard exists only at the hosted boundary, behind SH-GD.1 as planned.
+
 ### Next after SH.0 merges green
 
 **SH.1 — account lifecycle foundation**, 2 migrations (`account_lifecycle` + RLS/grants +
