@@ -45,6 +45,7 @@
     "docs:egc:traceability": "node scripts/generate-egc-traceability.mjs",
     "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
     "verify:storage:orphans": "node scripts/verify-storage-orphans.mjs",
+    "account:lifecycle": "node scripts/account-lifecycle-admin.mjs",
     "byok:interop": "node scripts/byok-crypto-interop.mjs",
     "byok:verify-runtime": "node scripts/byok-verify-runtime-parity.mjs",
     "byok:rotate-master-key": "node scripts/byok-rotate-master-key.mjs",
