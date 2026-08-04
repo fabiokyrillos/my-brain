@@ -229,9 +229,20 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-# SH-SIGNUP-003: false for the same reason as [auth].enable_signup above. Email
-# is the only enabled provider, so this is the one that would actually open.
-enable_signup = false
+#
+# SH-SIGNUP-003: this stays TRUE, and that is not an oversight.
+#
+# It was set to false in the first cut of this guard, on the reading that a key
+# named `enable_signup` under the email provider must be a signup switch. CI
+# disproved it: the local stack came up refusing sign-IN with
+# `email_provider_disabled` / "Email logins are disabled". In practice this key
+# gates the email provider itself, not just registration through it.
+#
+# The global `[auth].enable_signup = false` above is the control that actually
+# closes signup, and it closes it for every provider. This also matches the
+# hosted project's own readback, where `external.email` is true while
+# `disable_signup` is true -- the provider is enabled and signup is shut.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
