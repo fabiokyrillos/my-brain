@@ -10,6 +10,7 @@ import { getByokCopy } from "@/features/byok/copy";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordAIUsage } from "@/lib/ai/usage";
@@ -124,6 +125,7 @@ export async function createReminder(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: reminderMessages.session };
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
   const { error } = await supabase
     .from("reminders")
     .insert({
@@ -342,6 +344,7 @@ export async function resolvePendingQuestion(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return questionResolutionFailure("session_expired", copy.session, false);
+  await assertActiveAccount(supabase, user.id, locale);
 
   // Slice 2D.3 — server-owned suggestion provenance. The browser submits only
   // a bounded suggestion id; the deterministic options are regenerated here
@@ -518,6 +521,7 @@ export async function undoQuestionResolution(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: copy.session };
+  await assertActiveAccount(supabase, user.id, locale);
 
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
   if (error) return { status: "error", message: mapUndoOperationFailure(error, locale, copy.undoFailed) };
@@ -545,6 +549,7 @@ export async function markNotification(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
   const result = await supabase
     .from("notifications")
     .update({
@@ -586,6 +591,7 @@ export async function uploadAttachment(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: uploadMessages.session };
+  await assertActiveAccount(supabase, user.id, locale.data);
   const safeName = file.name
     .normalize("NFKD")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
@@ -703,6 +709,7 @@ export async function retryAttachmentJob(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: messages.session };
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")
@@ -802,6 +809,7 @@ export async function generateReview(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: messages.session };
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
   const now = new Date();
   let start = new Date(now);
   if (parsed.data.period === "daily") start.setHours(0, 0, 0, 0);

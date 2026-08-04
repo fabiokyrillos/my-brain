@@ -6,6 +6,7 @@ import { z } from "zod";
 import { resolveDailyCycleLifecycle } from "@/features/daily-cycle/lifecycle";
 import { toCaptureReceipt } from "@/features/daily-cycle/projection-mappers";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -55,6 +56,7 @@ export async function captureEntry(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: "error", code: "unauthenticated", message: sessionExpiredMessage[locale] };
+  await assertActiveAccount(supabase, user.id, locale);
 
   const startedAt = Date.now();
   const { data, error } = await supabase.rpc("capture_entry_async", {

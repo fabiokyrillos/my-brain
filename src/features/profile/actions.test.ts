@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Like real Next, the mocked redirect throws so the action aborts server-side.
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
 function queryStub(data: unknown) {
@@ -52,10 +57,11 @@ describe("updateProfile", () => {
       background_model: "gpt-5-mini",
       privacy_default: "private",
     });
+    const lifecycle = queryStub({ status: "active" });
     const rpc = vi.fn(async () => ({ error: null }));
     vi.mocked(createClient).mockResolvedValue({
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1", user_metadata: { display_name: "Fallback" } } }, error: null })) },
-      from: vi.fn((table: string) => table === "profiles" ? profile : preferences),
+      from: vi.fn((table: string) => table === "account_lifecycle" ? lifecycle : table === "profiles" ? profile : preferences),
       rpc,
     } as never);
 
@@ -73,5 +79,21 @@ describe("updateProfile", () => {
         personality: "analytical",
       }),
     }));
+  });
+
+  // SH-LIFECYCLE-009: a non-active account is refused server-side before any write.
+  it("redirects a suspended account to the account-state surface before saving anything", async () => {
+    const lifecycle = queryStub({ status: "suspended" });
+    const rpc = vi.fn(async () => ({ error: null }));
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1", user_metadata: { display_name: "Fallback" } } }, error: null })) },
+      from: vi.fn(() => lifecycle),
+      rpc,
+    } as never);
+
+    await expect(updateProfile({ status: "idle", message: "" }, operationalFormData())).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/\/account-state$/));
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { after } from "next/server";
 import {
   createProductEventIdempotencyKey,
@@ -10,6 +11,10 @@ import * as taskActions from "./actions";
 import { confirmEntryTasks, undoAgentAction } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Like real Next, the mocked redirect throws so the action aborts server-side.
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
+}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/features/product-analytics/server", () => ({
@@ -79,15 +84,25 @@ async function resolveCandidates(formData: FormData) {
   return action?.(idleState, formData);
 }
 
-function clientWithRpc(result: { data: unknown; error: RpcError | null }) {
+function clientWithRpc(
+  result: { data: unknown; error: RpcError | null },
+  lifecycleRow: { status: string } | null = { status: "active" },
+) {
   const rpc = vi.fn(async (name: string, args: unknown) => {
     void name;
     void args;
     return result;
   });
+  const lifecycleQuery = {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: lifecycleRow, error: null })),
+  };
+  const from = vi.fn(() => lifecycleQuery);
   return {
     client: {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
+      from,
       rpc,
     },
     rpc,
@@ -111,6 +126,17 @@ describe("confirmEntryTasks", () => {
 
     expect(result).toMatchObject({ status: "error", code: "validation_failed", retryable: false });
     expect(createClient).not.toHaveBeenCalled();
+  });
+
+  // SH-LIFECYCLE-009: a non-active account is refused server-side before any write.
+  it("redirects a suspended account to the account-state surface before the confirmation RPC", async () => {
+    const { client, rpc } = clientWithRpc({ data: null, error: null }, { status: "suspended" });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(confirmEntryTasks(idleState, confirmForm())).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/\/account-state$/));
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("requires a UUID idempotency key", async () => {

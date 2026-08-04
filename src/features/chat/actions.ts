@@ -7,6 +7,7 @@ import { getByokCopy } from "@/features/byok/copy";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
@@ -105,6 +106,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: copy.sessionExpired };
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
   let conversationId = parsed.data.conversationId || undefined;
 
   if (conversationId) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { encryptCredential, requireMasterKey, requireFingerprintPepper, requireRateLimitPepper } from "@/lib/byok/crypto";
 import { computeFingerprint } from "@/lib/byok/fingerprint";
 import { hashClientIp } from "@/lib/byok/ip";
@@ -129,6 +130,7 @@ export async function saveAiCredential(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: copy.messages.credentialRequired };
+  await assertActiveAccount(supabase, user.id, resolveLocale(formData.get("locale")));
 
   const key = parseApiKey(formData.get("apiKey"));
   if (!key) return { status: "error", message: copy.shapeInvalid };
@@ -214,6 +216,7 @@ export async function removeAiCredential(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: copy.messages.credentialRequired };
+  await assertActiveAccount(supabase, user.id, resolveLocale(formData.get("locale")));
 
   const { error } = await supabase
     .from("user_ai_credentials")
@@ -274,6 +277,7 @@ export async function interpretPendingEntries(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: copy.messages.credentialRequired };
+  await assertActiveAccount(supabase, user.id, locale);
 
   // The gate, and it is checked here rather than inferred from the entries.
   // `resolve_own_ai_credential` would also answer, but it returns ciphertext this

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -49,6 +50,7 @@ export async function correctInterpretation(
   if (!user) {
     return { status: "error", message: localized(locale.data, "Sua sessão expirou. Entre novamente.", "Your session expired. Sign in again.") };
   }
+  await assertActiveAccount(supabase, user.id, locale.data);
 
   const { entryId, expectedVersion, operationKey, correctionReason, ...patch } = parsed.data;
   const correctionHistory = await supabase
@@ -110,6 +112,7 @@ export async function undoInterpretationCorrection(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
+  await assertActiveAccount(supabase, user.id, locale.data);
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
   if (error) return { status: "error", message: localized(locale.data, "Não foi possível desfazer.", "Could not undo.") };
   refreshEntry(locale.data, entryId.data);
@@ -132,6 +135,7 @@ export async function reprocessEntry(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
+  await assertActiveAccount(supabase, user.id, locale.data);
 
   const { data, error } = await supabase.rpc("enqueue_entry_reprocessing", {
     p_entry_id: entryId.data,
