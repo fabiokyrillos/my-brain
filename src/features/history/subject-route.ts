@@ -57,6 +57,10 @@ export const HISTORY_SUBJECT_ROUTES = {
   // is linked because its page exists, never because a link would look tidier.
   organization: (locale, id) => `/${locale}/app/organizations/${id}`,
   context: (locale, id) => `/${locale}/app/contexts/${id}`,
+  // SH.1 — `entity_id` is the account's own user id; there is no page for an
+  // account state, and the state surface is reached by the lifecycle gate,
+  // not by a history link.
+  account_lifecycle: null,
   entry_interpretation: null,
   entry_task_candidate_resolution: null,
   pending_question: null,

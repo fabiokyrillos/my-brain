@@ -50,6 +50,13 @@ function createSupabaseMock(initialJob: object | null, finalJob?: object | null)
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
+  const lifecycleQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: { status: "active" }, error: null }),
+  };
+  lifecycleQuery.select.mockReturnValue(lifecycleQuery);
+  lifecycleQuery.eq.mockReturnValue(lifecycleQuery);
   const invoke = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
   return {
     client: {
@@ -60,7 +67,7 @@ function createSupabaseMock(initialJob: object | null, finalJob?: object | null)
           error: null,
         }),
       },
-      from: vi.fn().mockReturnValue(query),
+      from: vi.fn((table: string) => (table === "account_lifecycle" ? lifecycleQuery : query)),
       functions: { invoke },
     },
     invoke,

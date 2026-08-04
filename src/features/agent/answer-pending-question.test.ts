@@ -78,8 +78,14 @@ function futureInstant(offsetMs = 86_400_000): string {
 type RpcOutcome = { data: unknown; error: unknown };
 
 function resolutionClient(outcome: RpcOutcome, user: { id: string } | null = { id: "user-1" }) {
+  const lifecycleQuery = {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: { status: "active" }, error: null })),
+  };
   return {
     auth: { getUser: vi.fn(async () => ({ data: { user } })) },
+    from: vi.fn(() => lifecycleQuery),
     rpc: vi.fn(async () => outcome),
   };
 }

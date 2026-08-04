@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
@@ -7,6 +8,10 @@ import { createProductEventIdempotencyKey, recordProductEvent } from "@/features
 import { captureEntry } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Like real Next, the mocked redirect throws so the action aborts server-side.
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
+}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
@@ -38,12 +43,14 @@ function clientMock(options: {
   rpc?: { data: unknown; error: unknown };
   entryRow?: { status: string } | null;
   jobRow?: { id: string; status: string; next_attempt_at: string | null } | null;
+  lifecycleRow?: { status: string } | null;
   authenticated?: boolean;
 } = {}) {
   const {
     rpc: rpcResult = { data: { entry_id: entryId, status: "saved", replayed: false }, error: null },
     entryRow = { status: "saved" },
     jobRow = { id: jobId, status: "pending", next_attempt_at: null },
+    lifecycleRow = { status: "active" },
     authenticated = true,
   } = options;
 
@@ -57,7 +64,15 @@ function clientMock(options: {
     eq: vi.fn(function (this: unknown) { return this; }),
     maybeSingle: vi.fn(async () => ({ data: jobRow, error: null })),
   };
-  const from = vi.fn((table: string) => (table === "entries" ? entriesQuery : jobsQuery));
+  const lifecycleQuery = {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: lifecycleRow, error: null })),
+  };
+  const from = vi.fn((table: string) => {
+    if (table === "account_lifecycle") return lifecycleQuery;
+    return table === "entries" ? entriesQuery : jobsQuery;
+  });
   const rpc = vi.fn(async () => rpcResult);
   const client = {
     auth: {
@@ -217,6 +232,17 @@ describe("captureEntry", () => {
       "capture_save_failed",
       "9b1f6a2a-9d0e-4a3f-8f9a-1a2b3c4d5e6f",
     );
+  });
+
+  // SH-LIFECYCLE-009: a non-active account is refused server-side before any write.
+  it("redirects a suspended account to the account-state surface without persisting anything", async () => {
+    const { client, rpc } = clientMock({ lifecycleRow: { status: "suspended" } });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(captureEntry({ status: "idle" }, form())).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/\/account-state$/));
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("records successful outcomes even when the non-critical worker nudge rejects", async () => {

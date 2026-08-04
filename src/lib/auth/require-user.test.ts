@@ -1,0 +1,123 @@
+/**
+ * SH-LIFECYCLE-008/009/010 — the central gate, called directly.
+ *
+ * `requireUser` is the one authenticated entry point (192 call sites), so its
+ * lifecycle behavior is the app-side enforcement for every page and for the
+ * action modules that use it; `assertActiveAccount` is the same gate for the
+ * modules that authenticate inline. Both are fail-closed: an unreadable or
+ * absent lifecycle row is treated as non-active, and the redirect target is
+ * the dedicated account-state surface, never a product route.
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((target: string) => {
+    throw new Error(`NEXT_REDIRECT:${target}`);
+  }),
+}));
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { assertActiveAccount, requireUser } from "./require-user";
+
+type LifecycleAnswer = { data: { status: string } | null; error: { message: string } | null };
+
+function fakeClient(user: { id: string } | null, lifecycle: LifecycleAnswer) {
+  return {
+    auth: { getUser: vi.fn(async () => ({ data: { user } })) },
+    from: vi.fn((table: string) => {
+      if (table !== "account_lifecycle") throw new Error(`unexpected table ${table}`);
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => lifecycle) })),
+        })),
+      };
+    }),
+  };
+}
+
+const active: LifecycleAnswer = { data: { status: "active" }, error: null };
+const suspended: LifecycleAnswer = { data: { status: "suspended" }, error: null };
+const deleting: LifecycleAnswer = { data: { status: "deleting" }, error: null };
+const absent: LifecycleAnswer = { data: null, error: null };
+const unreadable: LifecycleAnswer = { data: null, error: { message: "boom" } };
+
+beforeEach(() => {
+  vi.mocked(redirect).mockClear();
+  vi.mocked(createClient).mockReset();
+});
+
+describe("requireUser lifecycle gate", () => {
+  it("returns the session for an active account", async () => {
+    const client = fakeClient({ id: "user-1" }, active);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await requireUser("pt-BR");
+
+    expect(result.user.id).toBe("user-1");
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("still sends a signed-out visitor to login, before any lifecycle read", async () => {
+    const client = fakeClient(null, active);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("en")).rejects.toThrow("NEXT_REDIRECT:/en/auth/login");
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["suspended", suspended],
+    ["deleting", deleting],
+  ])("redirects a %s account to the account-state surface", async (_label, lifecycle) => {
+    const client = fakeClient({ id: "user-1" }, lifecycle);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("pt-BR")).rejects.toThrow(
+      "NEXT_REDIRECT:/pt-BR/account-state",
+    );
+  });
+
+  it("fails closed when the lifecycle row is absent", async () => {
+    const client = fakeClient({ id: "user-1" }, absent);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("en")).rejects.toThrow("NEXT_REDIRECT:/en/account-state");
+  });
+
+  it("fails closed when the lifecycle row cannot be read", async () => {
+    const client = fakeClient({ id: "user-1" }, unreadable);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    await expect(requireUser("en")).rejects.toThrow("NEXT_REDIRECT:/en/account-state");
+  });
+});
+
+describe("assertActiveAccount (the inline-auth modules' gate)", () => {
+  it("passes silently for an active account", async () => {
+    const client = fakeClient({ id: "user-1" }, active);
+
+    await expect(
+      assertActiveAccount(client as never, "user-1", "pt-BR"),
+    ).resolves.toBeUndefined();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("redirects a suspended account and never returns", async () => {
+    const client = fakeClient({ id: "user-1" }, suspended);
+
+    await expect(
+      assertActiveAccount(client as never, "user-1", "en"),
+    ).rejects.toThrow("NEXT_REDIRECT:/en/account-state");
+  });
+
+  it("fails closed on an unreadable row", async () => {
+    const client = fakeClient({ id: "user-1" }, unreadable);
+
+    await expect(
+      assertActiveAccount(client as never, "user-1", "pt-BR"),
+    ).rejects.toThrow("NEXT_REDIRECT:/pt-BR/account-state");
+  });
+});

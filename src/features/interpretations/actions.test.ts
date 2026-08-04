@@ -40,6 +40,14 @@ function correctionForm() {
   return form;
 }
 
+function lifecycleQuery() {
+  return {
+    select: vi.fn(function (this: unknown) { return this; }),
+    eq: vi.fn(function (this: unknown) { return this; }),
+    maybeSingle: vi.fn(async () => ({ data: { status: "active" }, error: null })),
+  };
+}
+
 function authenticatedClient() {
   const rpc = vi.fn(async () => ({ data: { version: 3, undo_id: "4b3700f0-3300-452a-af18-70427f788ff7" }, error: null }));
   const history = vi.fn(async () => ({ data: null, count: 2, error: null }));
@@ -47,7 +55,9 @@ function authenticatedClient() {
     client: {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
       rpc,
-      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) })),
+      from: vi.fn((table: string) => table === "account_lifecycle"
+        ? lifecycleQuery()
+        : { select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) }),
     },
     rpc,
   };
@@ -108,7 +118,9 @@ describe("interpretation actions", () => {
     const client = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
       rpc,
-      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) })),
+      from: vi.fn((table: string) => table === "account_lifecycle"
+        ? lifecycleQuery()
+        : { select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: history })) })) }),
     };
     vi.mocked(createClient).mockResolvedValue(client as never);
 
@@ -144,7 +156,7 @@ describe("interpretation actions", () => {
     const client = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
       rpc,
-      from: vi.fn(() => jobsQuery),
+      from: vi.fn((table: string) => (table === "account_lifecycle" ? lifecycleQuery() : jobsQuery)),
     };
     vi.mocked(createClient).mockResolvedValue(client as never);
     const form = new FormData();
@@ -176,7 +188,7 @@ describe("interpretation actions", () => {
     const client = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
       rpc,
-      from: vi.fn(),
+      from: vi.fn((table: string) => (table === "account_lifecycle" ? lifecycleQuery() : undefined)),
     };
     vi.mocked(createClient).mockResolvedValue(client as never);
     const form = new FormData();
@@ -190,7 +202,7 @@ describe("interpretation actions", () => {
       status: "error",
       message: "Não foi possível reinterpretar agora. O original foi preservado.",
     });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalledWith("jobs");
     await flushAfter();
     expect(recordProductEvent).not.toHaveBeenCalled();
   });

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { profileSchema } from "./schema";
 import { buildSettingsPayload } from "./settings-payload";
@@ -28,6 +29,7 @@ export async function updateProfile(
   if (userError || !user) {
     return { status: "error", message: localized(parsed.data.locale, "Sua sessão expirou. Entre novamente.", "Your session expired. Sign in again.") };
   }
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
 
   const [profileResult, preferencesResult] = await Promise.all([
     supabase.from("profiles").select("display_name,locale").eq("user_id", user.id).maybeSingle(),

@@ -185,6 +185,7 @@ const ptBR: HistoryCopy = {
   intro: "Quem fez o quê, quando e sobre qual objeto.",
   actors: { user: "Você", agent: "O {agent}", system: "O sistema" },
   entityTypes: {
+    account_lifecycle: "situação da conta",
     task: "tarefa",
     entry: "registro",
     entry_interpretation: "interpretação",
@@ -202,6 +203,9 @@ const ptBR: HistoryCopy = {
     person_project: "vínculo com projeto",
   },
   actions: {
+    // No `{subject}` placeholder: the subject is the account itself, and the
+    // reason column already carries the from/to states in plain words.
+    account_lifecycle_transition: "alterou a situação da conta",
     archive_memory: "arquivou a memória[ “{subject}”]",
     // No `{subject}` placeholder in any of the eight below: `entity_id` is the
     // junction row's own id, so there is no name to fill it with — and inventing
@@ -347,6 +351,7 @@ const en: HistoryCopy = {
   intro: "Who did what, when, and to which object.",
   actors: { user: "You", agent: "{agent}", system: "The system" },
   entityTypes: {
+    account_lifecycle: "account status",
     task: "task",
     entry: "record",
     entry_interpretation: "interpretation",
@@ -364,6 +369,9 @@ const en: HistoryCopy = {
     person_project: "project link",
   },
   actions: {
+    // No `{subject}` placeholder: the subject is the account itself, and the
+    // reason column already carries the from/to states in plain words.
+    account_lifecycle_transition: "changed the account status",
     archive_memory: "archived the memory[ “{subject}”]",
     associate_person_context: "linked a person to a context",
     associate_person_project: "linked a person to a project",

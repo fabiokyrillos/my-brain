@@ -977,6 +977,14 @@ configuration, a boundary that would need weakening, or a PRD/plan/repository
 contradiction). Deployment gates SH-GD.1…SH-GD.4 block shared-environment execution only —
 never repository implementation.
 
+### SH.0 — CLOSED. PR #73, merge SHA `a05cfb5`, merge-SHA CI run `30905402273` green on
+all three jobs; branch `codex/sh-slice-0` preserved. Four PR-head runs: `30903589273`
+(drill ok on its FIRST execution — the bulk delete is NOT blocked by the 43 composite
+`NO ACTION` FKs; census cut 1 refused), `30904179153` (census cut 2 refused),
+`30904706152` (all green), `30905060309` (docs-only, all green). Both census refusals are
+recorded in the acceptance report §4.7 — they are a live measurement of the FINDINGS
+sec. 12.3 local/hosted privilege divergence, not noise.
+
 ### SH.0 — delivered in this slice (branch `codex/sh-slice-0`, 0 migrations)
 
 - **`supabase/tests/signup_hardening_cascade_drill.sql`** — SH-DELETE-001 / gate SH-G0.2.
@@ -1018,6 +1026,27 @@ never repository implementation.
 - **Do not spend a ninth migration or convert a NO ACTION FK silently** — if the drill ever
   reds on a blocked delete, that is a finding and an owner decision (budget amendment), not
   a fix-in-branch.
+
+### SH.1 — built on branch `codex/sh-slice-1` (2 migrations, head -> `202608040071`)
+
+Delivered: `202608040070` (account_lifecycle: table, machine trigger + unconditional
+audit, handle_new_user seed + backfill, SH-EXPOSURE-004 revoke with the census F-19 pin
+flipped in the same slice) and `202608040071` (the predicate in capture, reprocessing,
+all three claim paths — byte-identical, SH-WORKER-003 test over the migration text — and
+the heartbeat skip). App side: `requireUser` resolves lifecycle per request and routes
+non-active accounts to `/[locale]/account-state` (no product surface, exactly sign-out);
+`assertActiveAccount` gates the 19 inline-auth action sites across seven feature
+modules; all fail-closed. pgTAP `signup_hardening_account_lifecycle.sql` (28 assertions,
+lifecycle-only discriminating fixture). History vocabulary gained
+`account_lifecycle_transition`/`account_lifecycle` (the audit trigger is a new SQL
+writer); the 2F cleanup partition and SECURITY.md's head line were updated by the same
+cause. Acceptance: `docs/reports/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`.
+
+**Deployment-ordering hazard, recorded (the A-1.2 class):** apply `202608040070` and
+`202608040071` to the hosted project BEFORE running this slice's app code against it.
+Without the table, the fail-closed lifecycle read sends every account — including the
+owner — to the account-state surface. Repository and CI are internally consistent; the
+hazard exists only at the hosted boundary, behind SH-GD.1 as planned.
 
 ### Next after SH.0 merges green
 

@@ -62,6 +62,11 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
   insertedAssistantMessage = null;
 
   const from = vi.fn((table: string) => {
+    if (table === "account_lifecycle") {
+      return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { status: "active" }, error: null }) }) }),
+      };
+    }
     if (table === "conversations") {
       return {
         insert: () => ({

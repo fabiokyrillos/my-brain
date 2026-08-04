@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import { assertActiveAccount } from "@/lib/auth/require-user";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -170,6 +171,7 @@ export async function confirmEntryTasks(
       false,
     );
   }
+  await assertActiveAccount(supabase, user.id, locale);
 
   const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v4", {
     p_entry_id: parsed.data.entryId,
@@ -248,6 +250,7 @@ export async function resolveEntryTaskCandidates(
       false,
     );
   }
+  await assertActiveAccount(supabase, user.id, locale);
 
   const { data, error } = await supabase.rpc("confirm_entry_task_candidates_v6", {
     p_entry_id: parsed.data.entryId,
@@ -330,6 +333,7 @@ export async function undoAgentAction(
       message: pt ? "Sua sessão expirou. Entre novamente." : "Your session expired. Sign in again.",
     };
   }
+  await assertActiveAccount(supabase, user.id, locale);
 
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
   if (error) {
