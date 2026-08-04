@@ -1,6 +1,7 @@
 # Signup Hardening — implementation plan
 
-Status: **Proposed — awaiting owner approval.** Governs the requirements in
+Status: **Approved — owner approval 2026-08-04, recorded in `ADR-077` and Amendment `A-1`.**
+Drafted 2026-08-02 as Proposed (that history stands). Governs the requirements in
 `docs/SIGNUP_HARDENING_PRD.md`, on the evidence in
 `docs/reports/SIGNUP_HARDENING_FINDINGS.md` and the threats in
 `docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md`. Baseline `main` = `b007ffa`, head
@@ -394,4 +395,23 @@ Findings from this review are already folded into the requirements above; none w
 
 ## 10. Amendments
 
-None yet. Numbered `A-1`, `A-2`, …, append-only.
+Numbered `A-1`, `A-2`, …, append-only.
+
+### A-1 — Owner approval; SH-G0.4 satisfied; implementation begins at SH.0 (2026-08-04)
+
+`ADR-077` records the owner's approval of this plan, the PRD, the supporting reports,
+ADR-073…ADR-076 (now Accepted), the §1 eight-migration budget, the SH.0–SH.7 sequence, the
+PRD §20 value sheet as proposed, the §7 retention schedule as proposed, the ADR-074/075/076
+architecture decisions, the v1 no-malware-scanner posture, and the Phase 2H destination for
+the operator surfaces. Consequences for this plan:
+
+- **SH-G0.4 is satisfied.** The remaining §0.1 all-implementation gates (SH-G0.2 drill
+  green in CI, SH-G0.3 census skeleton) are SH.0 deliverables proven by the CI `database`
+  job on SH.0's own PR.
+- **The §0.2 deployment gates (SH-GD.1…SH-GD.4) remain open owner actions** — they block
+  shared-environment execution at each slice's point of use, never repository work.
+- Public signup stays disabled throughout; SH-ROLLOUT-005 stays post-initiative and
+  owner-only, gated by one successful fail-closed rollout-gate run.
+- Approval of the retention schedule is not authorization for any production purge; the
+  six 2026-07-16 orphaned storage objects still require manifest-then-owner-authorization
+  (SH-DELETE-015).

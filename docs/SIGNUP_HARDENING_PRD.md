@@ -1,6 +1,7 @@
 # Signup Hardening — PRD
 
-Status: **Proposed — awaiting owner approval.** Drafted 2026-08-02 against `main` = `b007ffa`,
+Status: **Approved — owner approval 2026-08-04, recorded in `ADR-077` and Amendment `P-1`.**
+Drafted 2026-08-02 as Proposed (that history stands). Drafted against `main` = `b007ffa`,
 migration head `202608010069`, on the evidence in
 `docs/reports/SIGNUP_HARDENING_FINDINGS.md`. Authorized as an initiative by `ADR-068`; **nothing
 in this document authorizes implementation** — the implementation plan's pre-code gates do that,
@@ -343,4 +344,23 @@ pre-code gate for SH.6.**
 
 ## 21. Amendments
 
-None yet. Amendments are numbered `P-1`, `P-2`, … and append-only.
+Amendments are numbered `P-1`, `P-2`, … and append-only.
+
+### P-1 — Owner approval of the package and the §20 value sheet (2026-08-04)
+
+The owner approved this PRD, the implementation plan, the findings, the threat model, the
+rollout gate definition, ADR-073…ADR-076, the eight-migration budget, and the SH.0–SH.7
+sequence — recorded in `ADR-077`, which reproduces the approved quota and retention values
+in full. Consequences for this document:
+
+- **SH-G0.4 is satisfied**: the §20 quota/retention table is owner-signed **as proposed** —
+  no value changed between proposal and approval. The values are repository constants under
+  the SH-QUOTA-010 parity contract; changing one later is a constants change plus an
+  amendment here, never a migration.
+- **SH-CAPTCHA-001 is satisfied**: Cloudflare Turnstile, per ADR-076, now Accepted.
+- **SH-RETENTION-001 is owner-accepted**; approval of the schedule is **not** authorization
+  to execute a production purge (SH-RETENTION-008's dry-run/transcript/owner-authorization
+  chain stands for every destructive sweep).
+- **SH-STORAGE-006 is a recorded decision**: no malware scanner in v1, compensating
+  controls declared, the rollout-gate open item retained.
+- The status header flips to Approved; nothing else in §1–§20 is edited.
