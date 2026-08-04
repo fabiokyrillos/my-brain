@@ -3,6 +3,20 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-04 — Signup Hardening: SH-DELETE-015 closed, and SH.5's application half (0 migrations)
+
+**The six historical orphans are gone.** Under explicit owner authorization, re-verified immediately before the act — every object re-classified structurally, no live owner, no referencing attachment row, and the measured set equal to the committed manifest in both directions — then removed. The scanner now reports **zero objects of every class**. Both protected accounts verified untouched afterwards. Age and filename are asserted *absent* from the tool's executable source, so "it looked old" can never become the reason. The tool is single-use by construction: re-running it refuses, because the manifest it reads describes objects that no longer exist.
+
+**A live footgun was closed.** `supabase/config.toml` carried `enable_signup = true` — the CLI template's default — and `supabase config push` sends that file **wholesale** to the linked project. The standard command for changing any hosted Auth setting would have **opened public signup** as a silent side effect of unrelated work. Now `false` in both tables, guarded by a test over the raw file that also pins anonymous sign-ins and manual linking off.
+
+**Signup is now refused twice, independently.** It had exactly one enforcement point: `disable_signup` on the hosted GoTrue — one setting, one dashboard, and nothing here would notice it flipping. `signUp()` now refuses **before parsing**, because when signup is closed there is nothing to say about input that was never going to be used, and a malformed body and a well-formed one deserve the same answer. The gate defaults closed strictly: `1`, `yes`, `on` and `TRUE` are all closed, each pinned by test, because a gate that opens on a loosely-typed value opens by accident.
+
+**The auth origin is configured, not asked for.** `requestOrigin()` read the request's `Origin` header and fed it to `emailRedirectTo` and the recovery `redirectTo` — a caller-supplied value deciding the host inside a link the provider mails to a real user. The allowlist is the backstop, not the control. Now: https required except localhost, any path discarded, and in production an unset value **throws** rather than guessing.
+
+**Shape note.** The first cut put `server-only` on the env-reading module; that propagated the marker through `auth/actions.ts` into every suite importing it, breaking unrelated tests while protecting nothing — neither variable is `NEXT_PUBLIC_`, so a client bundle sees `undefined`, which reads as closed. The readers take the environment as a parameter instead.
+
+**SH.5 is partial and the rest is blocked.** Not built: the database-locked throttles and migration `202608040075`, `auth_event_attempts` and retention, concurrency boundary tests, confirmation resend, enumeration-uniform outcomes, Turnstile plumbing, session-fixation evidence, deployed probes. The throttles were deliberately not built ahead of the hosted readback: their ceilings must sit at or below the provider's, and shipping guessed numbers then spending a migration to lock them is the silent budget spend the plan forbids.
+
 ## 2026-08-04 — Signup Hardening: SH.2–SH.4 accepted against the deployed project (0 migrations)
 
 **The hosted project reached parity `202608040074` and the gated evidence was executed.** Six rows that three slices had carried as NOT EXECUTED behind SH-GD.1/GD.2/GD.3 are closed. No migration was spent; five of eight remain.
