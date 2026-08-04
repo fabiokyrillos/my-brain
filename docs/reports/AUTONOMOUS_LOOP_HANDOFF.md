@@ -4,9 +4,10 @@
 authorized roadmap stands so a fresh context can resume without re-deriving anything.
 **Update it at every merge boundary.**
 
-Last updated: **2026-08-02**, at the **Signup Hardening planning merge**. **§17 supersedes §16's
-"Next", which supersedes §15, which supersedes §14, which supersedes §13.** BYOK's close is §16;
-what comes next is §17, and §17 is the section a resuming context acts on first.
+Last updated: **2026-08-04**, during **Signup Hardening SH.0**. **§18 supersedes §17, which
+supersedes §16's "Next", which supersedes §15, which supersedes §14, which supersedes §13.**
+BYOK's close is §16; the planning merge is §17; the owner approval and the running
+implementation are §18, and §18 is the section a resuming context acts on first.
 §13 and §14 are retained as the record of the first two stops; every owner action either
 listed has since been performed.
 
@@ -942,3 +943,88 @@ vendor / SMTP / hosting decisions at their slice's point of use.
 **Roadmap, explicit:** Signup Hardening → Phase 2G (Conversational Creation) → Phase 2H
 (Deploy and Operate, which absorbs the operator-surface residual) → open self-service signup.
 Public signup is a gate proven by a checklist, never a scheduled step.
+
+---
+
+## 18. Signup Hardening — APPROVED and IN IMPLEMENTATION. **This supersedes §17.**
+
+Last updated **2026-08-04**, during SH.0. §17 remains the record of the planning merge;
+act on this section.
+
+**The owner approved the planning package in full on 2026-08-04**, and the approval is
+recorded append-only: `ADR-077` (the decision record, reproducing the approved quota and
+retention values verbatim), PRD Amendment `P-1`, plan Amendment `A-1`, and ADR-073…ADR-076
+flipped Proposed → **Accepted** with their proposal history retained on the status lines.
+Approved: all five planning documents; the eight-migration budget; the SH.0–SH.7 sequence;
+the PRD §20 quota values **as proposed**; the plan §7 retention schedule **as proposed**
+(approval ≠ purge authorization — SH-RETENTION-008's dry-run/transcript/owner chain stands);
+the ADR-074 deletion executor (self-only, resumable Edge Function); the ADR-075 admin
+boundary (operator CLI, no product admin UI, no service-role HTTP endpoint); Cloudflare
+Turnstile (ADR-076); the v1 no-malware-scanner posture with compensating controls
+(SH-STORAGE-006); the Phase 2H destination for operator dashboard/alerting/health views.
+**Public signup stays disabled throughout; opening it is post-initiative, owner-only, gated
+by one green fail-closed rollout run.**
+
+### The execution mode this loop is running under
+
+One branch and PR per slice (splits only where the approved plan permits, measured against
+the diff); per PR: three jobs green on PR-head, exact merge-SHA CI green, preserved branch,
+acceptance report, adversarial review, updated handoff, synchronized clean `main`. The loop
+does not pause on a completed slice; it pauses only on the true stop conditions (an
+unbudgeted-migration finding from the drill, an owner-only action at its point of use, a
+backup requirement before an irreversible step, disposable accounts, CAPTCHA platform
+configuration, a boundary that would need weakening, or a PRD/plan/repository
+contradiction). Deployment gates SH-GD.1…SH-GD.4 block shared-environment execution only —
+never repository implementation.
+
+### SH.0 — delivered in this slice (branch `codex/sh-slice-0`, 0 migrations)
+
+- **`supabase/tests/signup_hardening_cascade_drill.sql`** — SH-DELETE-001 / gate SH-G0.2.
+  Two accounts populated by one populator across every runtime-enumerated user-owned table
+  (41 at head `202608010069`); population failures fail by table name; a completeness scan
+  fails by name on any enumerated table with zero fixture rows (so a future table joins the
+  drill unasked, T-32); `delete from auth.users` executed through the 43 composite
+  `NO ACTION` FKs; zero residue schema-wide plus byte-level ciphertext checks; negative
+  control requires the bystander to stay **row-complete**. `profiles` and
+  `agent_preferences` are seeded by `handle_new_user`, and the completeness scan is what
+  proves the trigger did it.
+- **`supabase/tests/signup_hardening_grant_census.sql`** — SH-EXPOSURE-002 skeleton / gate
+  SH-G0.3. anon zero explicit table/function grants (by name); **the service_role revoke
+  carve-out pinned in both directions** — exactly the two RPC-only ledgers carry zero
+  service_role grants, measured on explicit-grant presence — plus the ledgers'
+  effective-denial pins; forced RLS censused over all user-owned tables; F-18 and F-19
+  pinned by name as recorded exposures awaiting SH.6 and SH.1. **A session resuming here
+  must know the service_role pin took three cuts:** run `30903589273` refused the
+  hosted-posture pin (no local table grants the full four-DML set) and run `30904179153`
+  refused the zero-grants over-correction (40 of 42 local tables carry service_role
+  grants) — the platform defaults fire in both environments but grant different privilege
+  sets, the live form of FINDINGS sec. 12.3. Do not "restore" either earlier cut; the
+  per-privilege matrix belongs to SH.6 beside SH-EXPOSURE-001's revoke and its hosted
+  readback.
+- **Governance:** ADR-077; PRD status + P-1; plan status + A-1; ADR-073…076 status lines;
+  STATE.md, TODO.md, CHANGELOG.md, this file; acceptance report
+  `docs/reports/SIGNUP_HARDENING_SLICE_00_ACCEPTANCE.md`.
+
+### What the next context must not do
+
+- **Do not treat the drill passing as permission to skip SH.2's stop-on-unknown design** —
+  the drill proves the cascade completes today; SH.2 still stops rather than forces on
+  anything unclassifiable.
+- **Do not delete the six 2026-07-16 orphaned storage objects.** Manifest first (SH.2),
+  separate owner authorization after (SH-DELETE-015).
+- **Do not run any production purge.** The retention schedule is approved; no purge is
+  authorized until SH.6 ships dry-runs and the owner authorizes the first live run.
+- **Do not flip `disable_signup`, start Phase 2G/2H, or absorb operator surfaces.**
+- **Do not spend a ninth migration or convert a NO ACTION FK silently** — if the drill ever
+  reds on a blocked delete, that is a finding and an owner decision (budget amendment), not
+  a fix-in-branch.
+
+### Next after SH.0 merges green
+
+**SH.1 — account lifecycle foundation**, 2 migrations (`account_lifecycle` + RLS/grants +
+`handle_new_user` seed/backfill; lifecycle predicate wired into capture/reprocess, all
+three claim paths, and the heartbeat), the app-shell status read, server-side action
+refusal, SH-EXPOSURE-004 (`handle_new_user` EXECUTE revoke — the census skeleton's F-19
+pin flips in the same slice), SH-WORKER-003 SQL-reachability parity, SH-COPY-001. Both
+migrations update `AUTHORIZED_MIGRATION_HEAD` in the same commit and carry the
+SH-EXPOSURE-008 DEFINER catalog assertions.
