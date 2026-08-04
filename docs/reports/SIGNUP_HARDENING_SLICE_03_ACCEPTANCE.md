@@ -159,7 +159,51 @@ same change. Four of the initiative's eight migrations are now spent.
    (SH-SUSPEND-003). Blocking authentication itself is the provider-side ban —
    an owner step with the admin API key, recorded in the runbook with its exact
    command and readback, and **unexecuted**.
-9. **RECORDED, deployment ordering, third slice running:** `202608040073` must
+9. **RECORDED, and it is the most substantive finding of this review: the
+   lifecycle predicate does not cover every `authenticated`-executable RPC.**
+   Attacking SH-SUSPEND-002 ("a suspended account cannot use the product") past
+   its literal wording: the requirement is satisfied as written — every product
+   Server Action refuses and every product route renders only the suspended
+   surface — but a suspended account still holds a valid JWT, and PostgREST
+   exposes the `authenticated` RPC surface directly. Verified rather than
+   assumed: only the four SH migrations mention `account_lifecycle`, so
+   `confirm_entry_task_candidates_v6`, `resolve_pending_question_v3`,
+   `create_task_command`, `apply_reminder_command_v1`,
+   `correct_entry_interpretation` and `undo_operation` carry **no** lifecycle
+   predicate. A suspended user calling one of them directly would succeed.
+
+   **Not fixed here, and the reason is the allocation rather than the
+   difficulty.** SH.1's two migrations were budgeted for exactly the wiring the
+   PRD names — SH-LIFECYCLE-005 names `capture_entry_async` and
+   `enqueue_entry_reprocessing`; SH-LIFECYCLE-006 names the three claim paths;
+   SH-LIFECYCLE-007 names the heartbeat — which is the set that spends money and
+   queues work. Extending the predicate to the rest would `create or replace`
+   six or more further functions inside a migration allocated for the
+   administrative boundary, which is precisely the kind of silent scope growth
+   `ADR-071` exists to stop.
+
+   **Destination, named rather than left implied:** SH-EXPOSURE-007 re-censuses
+   the whole PostgREST-reachable surface in SH.7, and SH-EXPOSURE-002's full
+   grant matrix lands in SH.6. This residual is recorded in `TODO.md` against
+   those, so the re-census meets a written expectation instead of discovering
+   it. The mitigation that exists today is real but partial and is stated as
+   such: the suspended account can neither capture nor have any job executed,
+   so nothing it could reach through a direct RPC call causes AI spend or
+   queued work.
+
+10. **RECORDED, and it is a property of holding the key rather than a hole:**
+    `service_role` retains platform-default DML on `account_lifecycle` (SH.1's
+    migration says so deliberately — the zero-grant carve-out is pinned to the
+    RPC-only ledgers, and the platform-defaults layer is SH.6's
+    SH-EXPOSURE-001/002 territory). A direct `update` would therefore bypass the
+    DEFINER functions — but **not** the triggers: the transition-legality check
+    and the unconditional audit write both still fire, so even that path cannot
+    produce an unaudited or illegal transition. Anyone holding the service-role
+    key already holds the database; what SH-ADMIN-004 must guarantee is that no
+    administrative transition escapes the audit trail, and the trigger — not the
+    function — is what guarantees it.
+
+11. **RECORDED, deployment ordering, third slice running:** `202608040073` must
    reach the hosted project before this slice's app code runs against it. The
    failure mode is milder than SH.1's (the CLI's RPCs simply would not exist) but
    it is stated rather than discovered.
