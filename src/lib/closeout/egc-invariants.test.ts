@@ -41,7 +41,8 @@ const REPO = resolve(__dirname, "../../..");
  * is tracked here as it is spent: SH.1 by two (`202608040070` the lifecycle
  * table, `202608040071` the predicate wiring), SH.2 by one (`202608040072` the
  * deletion log and start transition), SH.3 by one (`202608040073` the
- * administrative boundary) — four of eight.
+ * administrative boundary), SH.4 by one (`202608040074` versioned consent) —
+ * five of eight.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -49,7 +50,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608040073";
+const AUTHORIZED_MIGRATION_HEAD = "202608040074";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

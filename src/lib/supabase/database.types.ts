@@ -1745,6 +1745,36 @@ export type Database = {
           },
         ]
       }
+      policy_acceptances: {
+        Row: {
+          accepted_at: string
+          created_at: string
+          document: string
+          id: string
+          surface: string
+          user_id: string
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          created_at?: string
+          document: string
+          id?: string
+          surface: string
+          user_id: string
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          created_at?: string
+          document?: string
+          id?: string
+          surface?: string
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
       product_events: {
         Row: {
           app_version: string
@@ -2951,6 +2981,13 @@ export type Database = {
           p_patch: Json
           p_policy_version: string
           p_title_words: string[]
+        }
+        Returns: Json
+      }
+      record_policy_acceptance: {
+        Args: {
+          p_document: string
+          p_surface: string
         }
         Returns: Json
       }

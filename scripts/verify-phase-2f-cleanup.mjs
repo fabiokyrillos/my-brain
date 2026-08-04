@@ -183,6 +183,8 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   entity_aliases: "Phase 2B alias store, no Phase 2F proof writes it; cascades at 202607170020:118",
   account_lifecycle:
     "SH.1 state row seeded by handle_new_user, one per account like profiles, not an independent fixture; cascades at 202608040070:40",
+  policy_acceptances:
+    "SH.4 consent record written only by the account itself through record_policy_acceptance; no Phase 2F proof writes it; cascades at 202608040074:74",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */
