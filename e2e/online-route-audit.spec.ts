@@ -28,7 +28,7 @@ const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
 const fixtureEmailDomain = process.env.ONLINE_AUTH_TEST_EMAIL_DOMAIN?.trim() || "example.com";
 const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
 
-const EVIDENCE = "docs/reports/ux-evidence/slice-h";
+const EVIDENCE = "docs/reports/product-ux/ux-evidence/slice-h";
 
 const VIEWPORTS = [
   { name: "desktop-1440", width: 1440, height: 900, phone: false },

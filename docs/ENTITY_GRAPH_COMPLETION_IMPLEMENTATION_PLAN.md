@@ -117,12 +117,12 @@ defect, the fix is filed and made, and the slice says so rather than staying "cl
 | --- | --- | --- |
 | 3.1 | **The reachability assertion.** Every card component rendering a relationship or association collection is enumerated (from G-0.2, refreshed) and each must name the control or route that writes it. Run over the whole route inventory, ADR-066's shape | This is EGC-INVARIANT-004. The PRD's review (attack 8) established it is assertable only as an enumerated inventory |
 | 3.2 | Locale-ternary **non-increase guard**, committed as a permanent test | The guard the UX audit proposed and nobody built. Ships here even though the sweep stays deferred |
-| 3.3 | `scripts/generate-egc-traceability.mjs` → `docs/reports/EGC_TRACEABILITY_MATRIX.md`, fail-closed on PRD drift | EGC-OPERATIONS-001 |
+| 3.3 | `scripts/generate-egc-traceability.mjs` → `docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md`, fail-closed on PRD drift | EGC-OPERATIONS-001 |
 | 3.4 | `scripts/verify-egc-cleanup.mjs` — zero fixture residue across the five tables plus `audit_logs` | EGC-OPERATIONS-002 |
 | 3.5 | **Serialized** full authenticated journey run (the P1 method), reported independently | EGC-OPERATIONS-003. Serialization is what stopped shared-project auth rate-limiting during Slice H |
 | 3.6 | `SECURITY.md` section: the extended write surface, the self-reported audit posture, and the explicit "no grant or policy changed" statement with its pgTAP citation | EGC-OPERATIONS-004, EGC-AUDIT-003 |
 | 3.7 | Convergence audit: one contract per relationship table, one copy module, one vocabulary, no duplicated selector logic between Person and Project | The Phase 2C/2D/2E/2F closeout precedent. **File what it finds; smooth nothing** |
-| 3.8 | `docs/reports/EGC_REPORT.md` — final accounting, every requirement delivered or traceably deferred |
+| 3.8 | `docs/reports/entity-graph/EGC_REPORT.md` — final accounting, every requirement delivered or traceably deferred |
 
 ### Acceptance gates
 

@@ -41,7 +41,7 @@ const REPO = resolve(__dirname, "../../..");
 /**
  * The G-0.4 baseline: measured, not assumed.
  *
- * `docs/reports/EGC_G04_LOCALE_TERNARY_BASELINE.md` records the measurement and
+ * `docs/reports/entity-graph/EGC_G04_LOCALE_TERNARY_BASELINE.md` records the measurement and
  * the command that produced it, taken from `main` before the first line of
  * Entity Graph Completion code.
  */

@@ -66,7 +66,7 @@ secure 32 random bytes, base64, **all four pairwise distinct**, written to `.env
 The values are never displayed, committed, logged, printed to CI, or recorded as hashes or
 prefixes in any repository artifact. What may be recorded is only: presence, valid base64,
 decoded length of 32 bytes, and pairwise distinctness. Evidence:
-[`BYOK_G03_MASTER_KEY_PROCEDURE.md`](./reports/BYOK_G03_MASTER_KEY_PROCEDURE.md) §7.
+[`BYOK_G03_MASTER_KEY_PROCEDURE.md`](./reports/byok/BYOK_G03_MASTER_KEY_PROCEDURE.md) §7.
 
 #### A-1.2 — Preview and production provisioning (deferred to point of use)
 
@@ -359,7 +359,7 @@ BYOK-OPERATIONS-001…006.
 | 6.6 | Traceability generator + matrix, fail-closed on PRD drift |
 | 6.7 | `SECURITY.md`: the new boundary, the operator-decryption reality, the guard inventory, the classified exceptions; line 59 moves from *required* to *delivered* with its evidence |
 | 6.8 | Convergence audit — one adapter per runtime, one crypto module per runtime, one resolver per path, one copy module. **File what it finds; smooth nothing** |
-| 6.9 | `docs/reports/BYOK_REPORT.md` |
+| 6.9 | `docs/reports/byok/BYOK_REPORT.md` |
 
 ### Acceptance gates
 

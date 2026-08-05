@@ -65,7 +65,7 @@ Signup Hardening closes.
   on. **This is the single shared reason for every deferred acceptance item in both §9 and
   §10.**
 - **Hosted signup: DISABLED and verified** (gate G-0.5).
-  Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+  Evidence: `docs/reports/byok/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
 
 ### Merged this loop
 
@@ -112,7 +112,7 @@ recorded as repository maintenance in `PRODUCT_UX_CLOSEOUT.md` §8.
 ## 4. BYOK — gate status: all five satisfied
 
 Governing artifacts exist and are approved: `docs/BYOK_PRD.md`,
-`docs/BYOK_IMPLEMENTATION_PLAN.md`, `docs/reports/BYOK_SECURITY_DEFINITION.md`.
+`docs/BYOK_IMPLEMENTATION_PLAN.md`, `docs/reports/byok/BYOK_SECURITY_DEFINITION.md`.
 
 The plan declared **five pre-code gates** under one absolute rule. **On 2026-08-01 the
 owner amended that rule to a dependency-specific one** — `ADR-069`, recorded as append-only
@@ -121,9 +121,9 @@ status:
 
 | Gate | Status |
 | --- | --- |
-| **G-0.1** — provider call-site census, re-measured against `main` | **DONE.** `docs/reports/BYOK_G01_PROVIDER_CENSUS.md`, measured at `961feeb` |
-| **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **DONE and executed.** Node 22.18.0 ↔ Deno 2.9.4, both directions, 7/7. `npm run byok:interop`; evidence in `docs/reports/BYOK_G02_CRYPTO_INTEROP_EVIDENCE.md` |
-| **G-0.3** — procedure | **DONE.** `docs/reports/BYOK_G03_MASTER_KEY_PROCEDURE.md` |
+| **G-0.1** — provider call-site census, re-measured against `main` | **DONE.** `docs/reports/byok/BYOK_G01_PROVIDER_CENSUS.md`, measured at `961feeb` |
+| **G-0.2** — crypto interop proof, Node ↔ Deno, identical AAD | **DONE and executed.** Node 22.18.0 ↔ Deno 2.9.4, both directions, 7/7. `npm run byok:interop`; evidence in `docs/reports/byok/BYOK_G02_CRYPTO_INTEROP_EVIDENCE.md` |
+| **G-0.3** — procedure | **DONE.** `docs/reports/byok/BYOK_G03_MASTER_KEY_PROCEDURE.md` |
 | **G-0.3** — `local` / `test` provisioning | **DONE and verified.** Now **three** secrets per environment, not two: `ADR-070` added `BYOK_RATE_LIMIT_PEPPER`. 6/6 present, valid base64, 32 bytes; **15/15 pairs distinct**; 1007 tracked files scanned, **0 matches**. Evidence: `BYOK_G03_MASTER_KEY_PROCEDURE.md` §7 and §8 |
 | **G-0.3** — `preview` / `production` provisioning | **DEFERRED to point of use** (Amendment A-1.2), for all three secrets. Gates *deployment*. **Owner action** when it arrives |
 | **G-0.4** — dedicated low-limit OpenAI validation key | **SATISFIED and its lane EXECUTED** (`ADR-070`). Dedicated project and key, USD 2 budget **alert** (soft, not a cap), restricted models, lowest practical limits, acceptance-lane-only. `npm run test:byok:validation` — 4 passed, three real round trips. Evidence: `BYOK_SLICE_03_ACCEPTANCE.md` §2 |
@@ -206,7 +206,7 @@ The three questions this file previously carried are now closed:
 - Reports state what failed. The two CRLF failures are reported as failures every time
   rather than folded into a "green" claim.
 - Factual corrections to a PRD are **recorded**, not folded in. Entity Graph Completion
-  produced six; they are listed in `docs/reports/EGC_REPORT.md` §5.
+  produced six; they are listed in `docs/reports/entity-graph/EGC_REPORT.md` §5.
 
 ---
 
@@ -215,10 +215,10 @@ The three questions this file previously carried are now closed:
 | Question | File |
 | --- | --- |
 | What is the current phase and what is authorized? | `docs/STATE.md` |
-| What did Entity Graph Completion deliver and cost? | `docs/reports/EGC_REPORT.md` |
-| Which requirement is evidenced by what? | `docs/reports/EGC_TRACEABILITY_MATRIX.md` |
+| What did Entity Graph Completion deliver and cost? | `docs/reports/entity-graph/EGC_REPORT.md` |
+| Which requirement is evidenced by what? | `docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md` |
 | What is BYOK supposed to be? | `docs/BYOK_PRD.md`, `docs/BYOK_IMPLEMENTATION_PLAN.md` |
-| What can BYOK never claim? | `docs/reports/BYOK_SECURITY_DEFINITION.md` |
+| What can BYOK never claim? | `docs/reports/byok/BYOK_SECURITY_DEFINITION.md` |
 | What is still outstanding? | `docs/TODO.md` |
 
 ---
@@ -334,7 +334,7 @@ schedule an outage.
 
 **Closed:** PR #61, merge SHA `2c70784`, merge-SHA CI run `30711977571`, green on all three
 jobs. Migration `202608010067`. Acceptance record:
-`docs/reports/BYOK_SLICE_03_ACCEPTANCE.md`.
+`docs/reports/byok/BYOK_SLICE_03_ACCEPTANCE.md`.
 
 ### What exists now that did not before
 
@@ -390,7 +390,7 @@ precisely so this cannot be forgotten.
 **by exactly two** — the whole of BYOK.4's approved budget, and the last of the
 initiative's five.
 
-**Acceptance record:** `docs/reports/BYOK_SLICE_04_ACCEPTANCE.md` — all fourteen gates,
+**Acceptance record:** `docs/reports/byok/BYOK_SLICE_04_ACCEPTANCE.md` — all fourteen gates,
 with two recorded as NOT CLAIMED and one requirement deviation named.
 
 ### What is closed now
@@ -492,7 +492,7 @@ privileged in the credential-resolution contract.
 
 **Branch:** `codex/byok-slice-5`, from `main` at `81b1110`. **Migrations: 0.**
 **Merged as `41240ab` (PR #64), merge-SHA CI run `30723026363`, all three jobs green.**
-**Acceptance record:** `docs/reports/BYOK_SLICE_05_ACCEPTANCE.md`.
+**Acceptance record:** `docs/reports/byok/BYOK_SLICE_05_ACCEPTANCE.md`.
 
 **This is a true stop condition**, not an incomplete slice. Three gates need
 platform access; one needs a credential typed into an authenticated product
@@ -584,7 +584,7 @@ BYOK.6's deliverables split in two, and the split is the whole story:
   four negative-control assertions prove a second account's identical rows
   survive — because "everything is gone" is trivially satisfied by a cascade that
   reached too far.
-- `docs/reports/BYOK_INCIDENT_RUNBOOK.md` — master-key rotation, loss and
+- `docs/reports/byok/BYOK_INCIDENT_RUNBOOK.md` — master-key rotation, loss and
   compromise; pepper rotation; the validation key's lifecycle. **Marked "written,
   not drilled" at the top of the file and of every section**, because a runbook
   nobody has run is a hypothesis with formatting.
@@ -668,7 +668,7 @@ since been performed. Do not act on §13's list. Act on this one.
 ### What the deployment proved
 
 Verified against the deployment rather than reported. Full record:
-`docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md`.
+`docs/reports/byok/BYOK_DEPLOYED_ACCEPTANCE.md`.
 
 - Parity `202608010069` both sides; `process-jobs` version 20, **16/16 files
   byte-identical** to `abef6e4`; **zero** executable project-key references in the
@@ -742,7 +742,7 @@ performed and **verified rather than believed**. Do not act on §14's list.
 
 ### What the remediation proved
 
-Full record, appended not edited: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md` §10.
+Full record, appended not edited: `docs/reports/byok/BYOK_DEPLOYED_ACCEPTANCE.md` §10.
 
 - `npm run byok:verify-runtime` → **IN PARITY**, 5/0/0, digest control included.
 - The owner's stored credential **opens under the Node runtime's master key** — verified
@@ -901,10 +901,10 @@ initiative is authorized to be *planned*, and it now is. The package:
   migration expectation, trust boundary, owner/shared-env flags, evidence class.
 - `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` — slices SH.0–SH.7, eight-migration budget,
   tiered pre-code gates, the BYOK-OPERATIONS/Phase 2H boundary.
-- `docs/reports/SIGNUP_HARDENING_FINDINGS.md` — the four-agent census (the evidence base).
-- `docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md` — 35 threats with prevention/detection/test/
+- `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md` — the four-agent census (the evidence base).
+- `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md` — 35 threats with prevention/detection/test/
   residual.
-- `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` — the fail-closed public-signup checklist.
+- `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` — the fail-closed public-signup checklist.
 - ADR-073…ADR-076 (Proposed).
 
 **What the census changed about the assumed scope** — measured, not inferred:
@@ -1011,7 +1011,7 @@ sec. 12.3 local/hosted privilege divergence, not noise.
   readback.
 - **Governance:** ADR-077; PRD status + P-1; plan status + A-1; ADR-073…076 status lines;
   STATE.md, TODO.md, CHANGELOG.md, this file; acceptance report
-  `docs/reports/SIGNUP_HARDENING_SLICE_00_ACCEPTANCE.md`.
+  `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_00_ACCEPTANCE.md`.
 
 ### What the next context must not do
 
@@ -1040,7 +1040,7 @@ modules; all fail-closed. pgTAP `signup_hardening_account_lifecycle.sql` (28 ass
 lifecycle-only discriminating fixture). History vocabulary gained
 `account_lifecycle_transition`/`account_lifecycle` (the audit trigger is a new SQL
 writer); the 2F cleanup partition and SECURITY.md's head line were updated by the same
-cause. Acceptance: `docs/reports/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`.
+cause. Acceptance: `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`.
 
 **Deployment-ordering hazard, recorded (the A-1.2 class):** apply `202608040070` and
 `202608040071` to the hosted project BEFORE running this slice's app code against it.
@@ -1076,10 +1076,10 @@ re-authentication plus a typed phrase, both server-side, declared codes only.
 Scanner reports and cannot destroy. Capability guard classifies all 20
 `admin.deleteUser` holders (1 product, 5 e2e teardown, 14 operator scripts),
 both directions. Acceptance:
-`docs/reports/SIGNUP_HARDENING_SLICE_02_ACCEPTANCE.md`.
+`docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_02_ACCEPTANCE.md`.
 
 **SH.2's true stop condition — the six 2026-07-16 orphaned storage objects.**
-`docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md` carries the read-only procedure
+`docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md` carries the read-only procedure
 and an explicitly UNFILLED manifest. A session resuming here must not fill it
 from belief or from the older records: run the scanner against the deployed
 project, record what it actually finds, and then **stop for owner
@@ -1133,7 +1133,7 @@ schema-blocker stop condition did not trigger, and no ninth migration was needed
 complete, merged and green. What remains in SH.2 cannot be done by an agent:
 
 **1. SH-DELETE-015 — the six orphaned storage objects. OWNER DECISION.**
-`docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md` holds a **read-only** procedure and a
+`docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md` holds a **read-only** procedure and a
 deliberately **UNFILLED** manifest table. Two steps, in this order:
 
   a. *Take the manifest* (read-only, no risk, but needs the deployed project and the

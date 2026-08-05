@@ -63,7 +63,7 @@
 
 Google OAuth e callbacks públicos serão configurados somente quando o usuário retomar essa integração.
 
-**Endereçamento planejado (2026-08-02).** A maioria dos itens acima é agora escopada — mas **não implementada** — pelo pacote de planejamento de **Signup Hardening** (`docs/SIGNUP_HARDENING_PRD.md`, `..._IMPLEMENTATION_PLAN.md`, `docs/reports/SIGNUP_HARDENING_{FINDINGS,THREAT_MODEL}.md`, `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md`, ADR-073…ADR-076 *Proposed*). O mapeamento: rate limiting distribuído de IA/upload e caps → `SH-QUOTA` + `SH-THROTTLE`; CSP/HSTS no domínio final → gate de rollout `RG-DEP-2`; detecção de assinatura real/AV/worker isolado → decisão registrada `SH-STORAGE-006` (v1 não escaneia; controles compensatórios nomeados; permanece item aberto do gate de rollout); exclusão de conta, política de retenção e purge de `product_events` (180 dias) → `SH-DELETE` + `SH-RETENTION`; BYOK com rotação → **entregue** no fechamento do BYOK. **Nenhum desses controles foi construído por este pacote de planejamento;** ele define, ameaça-modela e sequencia o trabalho, e a abertura do signup público permanece um gate provado por checklist fail-closed, nunca uma data (ADR-068, `SIGNUP_ROLLOUT_GATE_DEFINITION.md`).
+**Endereçamento planejado (2026-08-02).** A maioria dos itens acima é agora escopada — mas **não implementada** — pelo pacote de planejamento de **Signup Hardening** (`docs/SIGNUP_HARDENING_PRD.md`, `..._IMPLEMENTATION_PLAN.md`, `docs/reports/SIGNUP_HARDENING_{FINDINGS,THREAT_MODEL}.md`, `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md`, ADR-073…ADR-076 *Proposed*). O mapeamento: rate limiting distribuído de IA/upload e caps → `SH-QUOTA` + `SH-THROTTLE`; CSP/HSTS no domínio final → gate de rollout `RG-DEP-2`; detecção de assinatura real/AV/worker isolado → decisão registrada `SH-STORAGE-006` (v1 não escaneia; controles compensatórios nomeados; permanece item aberto do gate de rollout); exclusão de conta, política de retenção e purge de `product_events` (180 dias) → `SH-DELETE` + `SH-RETENTION`; BYOK com rotação → **entregue** no fechamento do BYOK. **Nenhum desses controles foi construído por este pacote de planejamento;** ele define, ameaça-modela e sequencia o trabalho, e a abertura do signup público permanece um gate provado por checklist fail-closed, nunca uma data (ADR-068, `SIGNUP_ROLLOUT_GATE_DEFINITION.md`).
 
 ## Evidência de segurança do encerramento 2X
 
@@ -162,7 +162,7 @@ O comentário de `202607170028:33` afirma que `authenticated` não tem INSERT em
 | Nenhuma RPC de autoria de lembrete existe | definição OpenAPI do PostgREST (um GET; não alcança função alguma) | `create_reminder` ausente, asserido |
 | Nenhum `create_task_command_v2` existe | idem | ausente, asserido |
 | `ai_usage_events` não tem coluna de proveniência | padrão aplicado sobre o **conjunto real de colunas** que o PostgREST publica, não sobre um nome adivinhado | nenhuma coluna casa |
-| O portão de reabertura do ADR-057 está intacto | `scripts/phase-2f-gate1-record-ai-usage-dry-run.sql` presente e **nenhum** transcript de execução em `docs/reports/` | intacto |
+| O portão de reabertura do ADR-057 está intacto | `scripts/phase-2f-gate1-record-ai-usage-dry-run.sql` presente e **nenhum** transcript de execução em `docs/reports/` (varredura recursiva) | intacto |
 
 ### O que nenhuma credencial deste repositório consegue observar — dito, não implícito
 
@@ -223,7 +223,7 @@ Cada transição grava uma linha em `public.audit_logs` com `entity_type = 'remi
 - **Sign-in continua funcional** (token emitido para um usuário existente) e a contagem de usuários não mudou por causa do teste.
 - **Nenhuma credencial da Management API foi acessada ou extraída.** `supabase config push` foi recusado por publicar o `config.toml` local inteiro — que define `enable_signup = true` e URLs de redirecionamento de localhost.
 
-Evidência completa: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+Evidência completa: `docs/reports/byok/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
 
 **Isto não é mitigação de BYOK e não substitui o endurecimento de cadastro.** O cadastro público permanece bloqueado por BYOK mais os controles de infraestrutura; três pré-requisitos não existem: exclusão de conta, suspensão administrativa, e termos/política de privacidade (ADR-068).
 
@@ -233,7 +233,7 @@ Uma conta gerada em 2026-07-16, confirmada, usada por três minutos e nunca mais
 
 **O detector anterior não a via, e isso é o achado.** Dois artefatos de aceitação (`PHASE_2F_SLICE_06_ACCEPTANCE.md:99`, `PHASE_2F_SLICE_05_ACCEPTANCE.md:155`) rodaram um detector de 20 prefixos de fixture e a classificaram como **usuário real** — corretamente pela própria regra, já que nenhum criador de fixture deste repositório gera aquele prefixo. **O proxy era mais estreito que a propriedade**, a mesma classe de achado que o ADR-067 corrige no guarda A13.
 
-A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro pré-exclusão não nomeava (`audit_logs`, `entry_interpretations`), encontradas por ampliar a varredura. `public.product_events` é ilegível para `service_role` **por desenho** — a mesma recusa asserida na Slice 2F.6 — então a ausência ali é provada como composição declarada, e nenhuma afirmação mais forte é feita. Restam duas contas reais. Evidência: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
+A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro pré-exclusão não nomeava (`audit_logs`, `entry_interpretations`), encontradas por ampliar a varredura. `public.product_events` é ilegível para `service_role` **por desenho** — a mesma recusa asserida na Slice 2F.6 — então a ausência ali é provada como composição declarada, e nenhuma afirmação mais forte é feita. Restam duas contas reais. Evidência: `docs/reports/byok/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
 
 ## Slice EGC.1 — a superfície de escrita de organizações e contextos (2026-07-31)
 
@@ -247,7 +247,7 @@ A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro 
 
 **Nenhum controle de exclusão foi entregue (EGC-DEC-1),** e a razão é lida do catálogo em vez de escrita em prosa: `person_contexts` e `task_contexts` ainda têm chave estrangeira em cascata a partir de `contexts`, de modo que um botão de excluir destruiria associações silenciosamente. `people` e `projects` apenas fazem `SET NULL` a partir de `organizations` — não destruiriam nada, mas desvinculariam em silêncio, o que também é uma mudança que esta fatia não faz.
 
-**Uma correção de segurança de entrada.** `createOrganizationForSubject` executa duas escritas e não desfaz a primeira. O `subjectId` chegava a uma escrita sem validação de UUID, então uma requisição malformada deixava uma organização persistida que o dono nunca pediu, reportada como sucesso parcial. Agora os dois campos de roteamento são validados **antes** da criação. Registro completo: `docs/reports/EGC_SLICE_01_ACCEPTANCE.md`.
+**Uma correção de segurança de entrada.** `createOrganizationForSubject` executa duas escritas e não desfaz a primeira. O `subjectId` chegava a uma escrita sem validação de UUID, então uma requisição malformada deixava uma organização persistida que o dono nunca pediu, reportada como sucesso parcial. Agora os dois campos de roteamento são validados **antes** da criação. Registro completo: `docs/reports/entity-graph/EGC_SLICE_01_ACCEPTANCE.md`.
 
 ## Slice EGC.2 — relações e vínculos de pessoas (2026-07-31)
 
@@ -263,7 +263,7 @@ A cascata foi verificada em 16 tabelas legíveis, incluindo duas que o registro 
 
 **Isolamento entre donos, provado duas vezes.** As chaves compostas de `202607170016` levantam `23503` para um contexto, projeto ou pessoa de outro dono, e a política de inserção levanta `42501` para um `user_id` alheio — dois controles distintos, asseridos separadamente, com um controle positivo ao final para que as quatro recusas sejam sobre propriedade e não sobre inserções quebradas.
 
-**Uma correção factual com consequência de segurança.** `person_relationships` **não tem índice único algum além da chave primária**. A recusa de duplicata é, portanto, apenas da aplicação e sofre corrida; o cabeçalho de `relationships.ts` diz isso em vez de sugerir uma garantia que o banco não dá. Perder a corrida produz uma segunda linha viva, que a superfície mostra e o dono pode encerrar — resultado melhor do que acrescentar uma migração a uma iniciativa cujo invariante de zero migrações é o ponto. Registro completo: `docs/reports/EGC_SLICE_02_ACCEPTANCE.md`.
+**Uma correção factual com consequência de segurança.** `person_relationships` **não tem índice único algum além da chave primária**. A recusa de duplicata é, portanto, apenas da aplicação e sofre corrida; o cabeçalho de `relationships.ts` diz isso em vez de sugerir uma garantia que o banco não dá. Perder a corrida produz uma segunda linha viva, que a superfície mostra e o dono pode encerrar — resultado melhor do que acrescentar uma migração a uma iniciativa cujo invariante de zero migrações é o ponto. Registro completo: `docs/reports/entity-graph/EGC_SLICE_02_ACCEPTANCE.md`.
 
 ## Encerramento da Entity Graph Completion — a superfície de escrita estendida (EGC-OPERATIONS-004)
 
@@ -309,7 +309,7 @@ Esta seção é a declaração que o `EGC-AUDIT-003` exige: **nenhum grant e nen
 
 **Grants exatos, e o revoke antes do grant.** `create function` concede EXECUTE a PUBLIC por padrão, então o revoke não é decoração: sem ele as duas funções são chamáveis por qualquer papel que alcance o banco. A síncrona é de `authenticated`; a assíncrona é de `service_role` **e de mais ninguém** — `authenticated` e `anon` são recusados, asseridos no catálogo e **executados** logo depois de a mesma função ter funcionado para `service_role` na mesma transação, para que o que recusa seja o privilégio e não outra coisa.
 
-**Uma contradição do PRD, resolvida na direção que a matriz executa.** `BYOK-RESOLVER-006` pede o mesmo `P0002` para um job "que o chamador não pode ver" e para um job inexistente; a matriz §20 caso 8 diz que um job de B devolve a credencial **de B**. As duas convivem porque descrevem situações disjuntas: a função é de `service_role`, que vê todo job, então "um job que o chamador não pode ver" é o **conjunto vazio** para o único chamador que existe, e a única falha restante é "não há tal linha". O caso 8 governa job alheio; `P0002` fica para id que não casa com nada. Registrado em `docs/reports/BYOK_SLICE_02_ACCEPTANCE.md` em vez de resolvido em silêncio.
+**Uma contradição do PRD, resolvida na direção que a matriz executa.** `BYOK-RESOLVER-006` pede o mesmo `P0002` para um job "que o chamador não pode ver" e para um job inexistente; a matriz §20 caso 8 diz que um job de B devolve a credencial **de B**. As duas convivem porque descrevem situações disjuntas: a função é de `service_role`, que vê todo job, então "um job que o chamador não pode ver" é o **conjunto vazio** para o único chamador que existe, e a única falha restante é "não há tal linha". O caso 8 governa job alheio; `P0002` fica para id que não casa com nada. Registrado em `docs/reports/byok/BYOK_SLICE_02_ACCEPTANCE.md` em vez de resolvido em silêncio.
 
 ## BYOK.3 — o adaptador Node, o Settings e a validação (migration `202608010067`)
 
@@ -327,7 +327,7 @@ Esta seção é a declaração que o `EGC-AUDIT-003` exige: **nenhum grant e nen
 
 **Retenção limitada.** Trinta dias, com função de varredura que **nenhum papel-cliente** pode executar — um grant ali seria alavanca de negação de serviço, apagando a evidência de que um teto está sendo alcançado.
 
-**O que esta fatia não prova, dito como não provado.** A concorrência real do throttle (pgTAP é sessão única), a rotação simultânea, os casos 1–3 da matriz e as jornadas de Settings em desktop e Pixel 7. Todos dependem de um banco compartilhado com estas migrations aplicadas, e **nenhuma das três migrations do BYOK foi aplicada a ambiente compartilhado**. Registro completo: `docs/reports/BYOK_SLICE_03_ACCEPTANCE.md` §4.
+**O que esta fatia não prova, dito como não provado.** A concorrência real do throttle (pgTAP é sessão única), a rotação simultânea, os casos 1–3 da matriz e as jornadas de Settings em desktop e Pixel 7. Todos dependem de um banco compartilhado com estas migrations aplicadas, e **nenhuma das três migrations do BYOK foi aplicada a ambiente compartilhado**. Registro completo: `docs/reports/byok/BYOK_SLICE_03_ACCEPTANCE.md` §4.
 
 ## BYOK.4 — o adaptador Deno, os jobs e a captura (migrations `202608010068` e `202608010069`)
 
@@ -347,6 +347,6 @@ Esta seção é a declaração que o `EGC-AUDIT-003` exige: **nenhum grant e nen
 
 **Nada é processado em massa quando uma chave é ativada.** O desenho óbvio — perceber a credencial e enfileirar tudo que espera — é o desenho que cobra duzentas interpretações de alguém porque colou uma chave. Gastar o dinheiro de um usuário sem ato explícito é a mesma classe de erro que uma escrita de IA não confirmada, então não há gancho no caminho de gravação e um guard afirma a ausência.
 
-**O que esta fatia não prova, dito como não provado.** Os casos de matriz assíncronos contra a função **implantada** e a comparação do bundle implantado. Ambos dependem de um worker implantado que consiga decifrar uma credencial, e **nenhuma das cinco migrations do BYOK foi aplicada a ambiente compartilhado** — não são casos pulados, são casos sem onde rodar. Registro completo, com riscos residuais numerados: `docs/reports/BYOK_SLICE_04_ACCEPTANCE.md` §4 e §6.
+**O que esta fatia não prova, dito como não provado.** Os casos de matriz assíncronos contra a função **implantada** e a comparação do bundle implantado. Ambos dependem de um worker implantado que consiga decifrar uma credencial, e **nenhuma das cinco migrations do BYOK foi aplicada a ambiente compartilhado** — não são casos pulados, são casos sem onde rodar. Registro completo, com riscos residuais numerados: `docs/reports/byok/BYOK_SLICE_04_ACCEPTANCE.md` §4 e §6.
 
 **Três riscos residuais ficam abertos e nomeados.** `fail_job` ainda aceita texto livre no nível do banco, seguro hoje só porque `_shared/job-failure.ts` é seu único chamador; `reap_expired_jobs` escreve o literal fixo `'Worker lease expired'`, que não carrega segredo nem texto de provedor mas também não é membro do vocabulário; e `attachments.processing_error` continua só em português, lacuna preexistente que a BYOK.4 igualou em vez de alargar.

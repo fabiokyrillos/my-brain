@@ -1,6 +1,6 @@
 # Phase 2C — Editable Candidate Tasks and Transactional Materialization — Closeout Report
 
-Phase 2C is complete through Slice 2C.6. This report is the phase-level handoff. It is authoritative for the completed behavior; per-slice execution evidence remains in `docs/reports/PHASE_2C_SLICE_0*_REPORT.md`, and the full requirement mapping is in `docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md`.
+Phase 2C is complete through Slice 2C.6. This report is the phase-level handoff. It is authoritative for the completed behavior; per-slice execution evidence remains in `docs/reports/PHASE_2C_SLICE_0*_REPORT.md`, and the full requirement mapping is in `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md`.
 
 ## Completion decision
 
@@ -50,7 +50,7 @@ Migration list parity through `202607220045`; `db lint --level error` clean (two
 
 ## Requirement traceability
 
-`docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md` maps all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates — 83 rows — each to its owning slice(s) and durable evidence. The generator (`npm run docs:phase-2c:traceability`) fails closed if the PRD inventory drifts. Two requirements are explicitly not green: `2C-STRUCTURE-004` (deferred) and `2C-UNDO-004` (resolved for `correct_entry_interpretation`; `undo_operation`'s own `40001` risk documented).
+`docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md` maps all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates — 83 rows — each to its owning slice(s) and durable evidence. The generator (`npm run docs:phase-2c:traceability`) fails closed if the PRD inventory drifts. Two requirements are explicitly not green: `2C-STRUCTURE-004` (deferred) and `2C-UNDO-004` (resolved for `correct_entry_interpretation`; `undo_operation`'s own `40001` risk documented).
 
 ## Cleanup verification
 

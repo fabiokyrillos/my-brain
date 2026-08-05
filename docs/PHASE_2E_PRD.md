@@ -81,7 +81,7 @@ Verified absent. Each is something Phase 2E must build or explicitly exclude.
 | `docs/DATABASE.md:29` "apenas os 19 eventos"; `docs/TODO.md:189` "17 instrumented events" | 22, per `src/features/product-analytics/contracts.ts` and migration `202607230050:1036-1058` |
 | `scripts/remote-product-events-smoke.mjs:20-40` hard-codes 19 names as "the canonical taxonomy" | The script does not import `contracts.ts`, so TypeScript drift does not red it |
 | `docs/PHASE_2D_IMPLEMENTATION_PLAN.md:9`, `scripts/generate-phase-2d-traceability.mjs:86` reference `next-intl` | Removed by ADR-036; absent from `package.json` |
-| `docs/reports/SLICE_REPORT_TEMPLATE.md` | Dead. Phase 2E follows `docs/reports/PHASE_2D_SLICE_04_REPORT.md` |
+| `docs/reports/shared/governance/SLICE_REPORT_TEMPLATE.md` | Dead. Phase 2E follows `docs/reports/phase-2d/PHASE_2D_SLICE_04_REPORT.md` |
 | `202607170028:33` comment asserting `authenticated` has no INSERT on `audit_logs` | Only `update, delete` were revoked (`202607170016:196`) |
 
 ## 4. Product goals
@@ -550,7 +550,7 @@ Phase 2F should also decide whether "activity" deserves a genuine entity distinc
 - Reminder consistency was scoped to due-date changes only, and would have been implemented as an in-place update the heartbeat cannot honour (§11.3, 2E-UPDATE-011).
 - `no_change`, the clarification continuation, multi-target refusal, the closed `2E_*` error vocabulary, the undo-window disclosure, the `ai_usage_events` and `product_events` allowlist gaps, the audit-actor mechanism, and the `tasks_no_due_consistency_check` interaction were all missing.
 
-Nineteen further findings were refuted with evidence. ~~They are recorded in the Slice 2E.8 convergence report rather than acted upon.~~ **This promise was not kept, and revision 4 corrects it rather than leaving the sentence standing: the nineteen refutations were never persisted to the repository, so Slice 2E.8 could not record them without inventing them.** See `docs/reports/PHASE_2E_FINAL_REPORT.md` §9.
+Nineteen further findings were refuted with evidence. ~~They are recorded in the Slice 2E.8 convergence report rather than acted upon.~~ **This promise was not kept, and revision 4 corrects it rather than leaving the sentence standing: the nineteen refutations were never persisted to the repository, so Slice 2E.8 could not record them without inventing them.** See `docs/reports/phase-2e/PHASE_2E_FINAL_REPORT.md` §9.
 
 **Revision 3 (2026-07-25)** incorporates 21 problems found by a verification pass over revision 2 — one of them a hole revision 2 itself opened:
 

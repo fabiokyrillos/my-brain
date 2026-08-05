@@ -26,8 +26,8 @@ import { describe, expect, it } from "vitest";
 const ROOT = process.cwd();
 const read = (relative: string) => readFileSync(path.join(ROOT, relative), "utf8");
 
-const FINDINGS = "docs/reports/PRODUCT_UX_FINDINGS.md";
-const CLOSEOUT = "docs/reports/PRODUCT_UX_CLOSEOUT.md";
+const FINDINGS = "docs/reports/product-ux/PRODUCT_UX_FINDINGS.md";
+const CLOSEOUT = "docs/reports/product-ux/PRODUCT_UX_CLOSEOUT.md";
 const STATE = "docs/STATE.md";
 const TODO = "docs/TODO.md";
 const CHANGELOG = "docs/CHANGELOG.md";

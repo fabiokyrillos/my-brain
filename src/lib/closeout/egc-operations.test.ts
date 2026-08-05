@@ -179,7 +179,7 @@ describe("EGC-OPERATIONS-001: the traceability generator", () => {
     const second = generate(REPO, { write: false });
     expect(first.content).toBe(second.content);
     // And the file on disk matches, so the committed matrix is the current one.
-    expect(readFileSync(join(REPO, "docs/reports/EGC_TRACEABILITY_MATRIX.md"), "utf8").replace(/\r\n/g, "\n"))
+    expect(readFileSync(join(REPO, "docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md"), "utf8").replace(/\r\n/g, "\n"))
       .toBe(first.content);
   });
 });

@@ -75,7 +75,7 @@ type RouteEntry = {
 };
 
 /**
- * The inventory. Derived from `docs/reports/EGC_G02_REACHABILITY_INVENTORY.md`
+ * The inventory. Derived from `docs/reports/entity-graph/EGC_G02_REACHABILITY_INVENTORY.md`
  * and refreshed against the tree as EGC.1 and EGC.2 landed.
  *
  * A route with `sections: []` is asserting something real: *this page renders no

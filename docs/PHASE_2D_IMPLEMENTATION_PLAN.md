@@ -118,7 +118,7 @@ Reuse the Phase 2C fingerprint mechanism and `undo_operations.request_fingerprin
 Create `src/features/agent/question-resolution-contract.ts` with a discriminated `QuestionResolutionCommand` whose 2D.1 variant is `{ questionId: string; kind: "answer"; answer: string }` (the discriminant leaves room for later kinds without a new module), a strict Zod schema, a normalizer that serializes the closed `p_resolution` JSON, and unit tests for empty/whitespace/overlong/valid/unknown-kind. Extend the action result to a discriminated code: `validation_error`, `session_expired`, `stale_interpretation`, `not_open`, `idempotency_mismatch`, `retryable_failure`, `resolution_succeeded`. Rewrite `answerPendingQuestion` (retaining the exported name until cutover) to parse the command, call `resolve_pending_question_v1`, map failures to stable codes/copy, preserve the operation key on retry, revalidate `/questions` (and Needs Attention/Home), and keep telemetry outside domain authority.
 
 ### 4.6 Likely files
-Create: the migration; `supabase/tests/resolve_pending_question.sql`; `scripts/remote-question-resolution-smoke.mjs`; `src/features/agent/question-resolution-contract.ts` (+ test); `docs/reports/PHASE_2D_SLICE_01_REPORT.md`.
+Create: the migration; `supabase/tests/resolve_pending_question.sql`; `scripts/remote-question-resolution-smoke.mjs`; `src/features/agent/question-resolution-contract.ts` (+ test); `docs/reports/phase-2d/PHASE_2D_SLICE_01_REPORT.md`.
 Modify: `src/features/agent/actions.ts` (+ `answer-pending-question.test.ts`); `src/features/agent/forms.tsx` (+ test) for the new result codes/live regions; `src/lib/supabase/database.types.ts` after linked migration; `scripts/remote-supabase-smoke.mjs` only to add the focused aggregate after the dedicated smoke is green; `e2e/intelligent-capture.spec.ts` (pending-question scenario); `package.json` (`test:remote:2d:resolution`); permanent docs after evidence exists.
 
 ### 4.7 Test-first execution tasks
@@ -147,7 +147,7 @@ The user can resolve an open question without answering it: defer it to a chosen
 - Extend the **same** resolution family by bumping to `resolve_pending_question_v2`, whose closed `p_resolution` adds `{ kind: 'deferred', snoozedUntil }`, `{ kind: 'dismissed' }`, and `{ kind: 'not_relevant' }` alongside the existing `answer` kind; reuse the `undo_operations` fingerprint and the single `resolve-v1:`/`resolve-v2:` namespace. Do not create a separate disposition RPC family.
 - Decide `not_relevant` representation (open decision #1 in the PRD). **Plan default:** reuse the existing `dismissed` status and record the distinct `not_relevant` kind on the resolution/audit evidence, avoiding a `status` `CHECK` migration; if product requires a first-class status, add an additive `CHECK` change and regenerate types.
 - Add deterministic snooze reactivation. **Plan default:** compute reactivation at read time in the projections (a `snoozed` question with `snoozed_until <= now()` is treated as `open`), plus an optional heartbeat-aligned sweep; avoid a new cron in this slice.
-- Update the questions page/forms, Needs Attention/queue projections, generated types, product-event allowlist (proposed `question_resolved` with bounded `kind` only), pgTAP, remote smoke, E2E, `docs/reports/PHASE_2D_SLICE_02_REPORT.md`.
+- Update the questions page/forms, Needs Attention/queue projections, generated types, product-event allowlist (proposed `question_resolved` with bounded `kind` only), pgTAP, remote smoke, E2E, `docs/reports/phase-2d/PHASE_2D_SLICE_02_REPORT.md`.
 
 ### Boundaries / security / idempotency / analytics
 - Only `open → deferred|dismissed|not_relevant` and automatic `snoozed → open`; reject terminal-to-terminal.
@@ -172,7 +172,7 @@ The user sees where a question came from and one-tap AI-suggested answers, plus 
 ### Contract work
 - Suggested answers (confirmed decision #2). **Default: deterministic generation, no AI schema change.** Add a pure `src/features/agent/question-suggestions.ts` module that maps the question's type/shape (e.g. yes-no, which-date, which-person/project, which-context) plus existing owned domain context (the user's projects/people/contexts and the entry's own extracted candidates) to a bounded, closed set of suggested-answer options, with a safe empty fallback. No provider, worker, or extraction-schema change. An additive, optional, Zod + Structured-Outputs-validated `suggestedAnswers` schema field is a **later fallback only** if deterministic suggestions prove insufficient, and only under separate authorization.
 - Add an owner-scoped, read-only preview projection (`src/features/agent/question-preview-projection.ts`) returning bounded DTOs for source + predicted effect; never persists.
-- Update the question components for suggestion chips (accept → populate editable answer + provenance flag; never auto-submit) and the source/effect panel; product-event `question_effect_previewed` (no properties, best-effort, session-deduplicated); pgTAP/remote/E2E; `docs/reports/PHASE_2D_SLICE_03_REPORT.md`.
+- Update the question components for suggestion chips (accept → populate editable answer + provenance flag; never auto-submit) and the source/effect panel; product-event `question_effect_previewed` (no properties, best-effort, session-deduplicated); pgTAP/remote/E2E; `docs/reports/phase-2d/PHASE_2D_SLICE_03_REPORT.md`.
 
 ### Boundaries / security / idempotency / analytics
 - Suggested answers are bounded/closed and inserted as untrusted data; they cannot inject instructions into the resolution path.
@@ -198,7 +198,7 @@ Answering can trigger exactly one bounded consequence — reinterpretation — a
 ### Contract work
 - Bump the same resolution family to `resolve_pending_question_v3`, whose closed `p_resolution` carries an optional `consequence` from the closed enum (`none`, `reinterpret`), reusing the deployed reprocessing/correction path inside the same transaction boundary; do not add a new engine/queue/worker or a separate consequence RPC family.
 - **Hard gate:** resolve the `undo_operation` SQLSTATE `40001` residual (`2C-UNDO-004`) — forward-fix to `55P03` mirroring ADR-026 — or prove the reinterpretation undo path safe, before remote acceptance.
-- Update result surfacing (no internal ids as instructions), generated types, product-event `question_reinterpret_applied` (boolean-by-existence), pgTAP, remote smoke, E2E, `docs/reports/PHASE_2D_SLICE_04_REPORT.md`.
+- Update result surfacing (no internal ids as instructions), generated types, product-event `question_reinterpret_applied` (boolean-by-existence), pgTAP, remote smoke, E2E, `docs/reports/phase-2d/PHASE_2D_SLICE_04_REPORT.md`.
 
 ### Boundaries / security / idempotency / analytics
 - Consequence is user-initiated only; bounded/closed enum; idempotent and never double-applied on replay/concurrency; no reinterpretation loop (dedupe via existing reprocessing idempotency).
@@ -223,7 +223,7 @@ Questions render and resolve identically in Chat and the "Precisa de você" queu
 ### Contract work
 - Render questions in `src/features/chat/*` from bounded server-side DTOs; question/answer text inserted as data, never instructions; reuse the resolution Server Action.
 - Add a deterministic surfacing/cooldown module aligned with the heartbeat's per-user local-time discipline (quiet hours, `max_followups_per_day`, rolling cooldown, `important_reminder_override`, failure isolation). **Plan default:** pull-based surfacing gated by this module; no new cron/notification channel unless separately authorized.
-- Update Chat/queue components, product-event `needs_attention_item_opened` reuse where applicable, pgTAP/remote/E2E, `docs/reports/PHASE_2D_SLICE_05_REPORT.md`.
+- Update Chat/queue components, product-event `needs_attention_item_opened` reuse where applicable, pgTAP/remote/E2E, `docs/reports/phase-2d/PHASE_2D_SLICE_05_REPORT.md`.
 
 ### Boundaries / security / idempotency / analytics
 - Prompt-injection boundary preserved; suggested answers and questions are data.
@@ -247,7 +247,7 @@ Question resolution behaves consistently across the questions page, Chat, Needs 
 
 ### Contract work
 - Update daily-cycle/question projections only where cross-surface drift is found; add no new lifecycle source.
-- Create `scripts/generate-phase-2d-traceability.mjs`, `scripts/verify-phase-2d-cleanup.mjs`, `docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md`, `docs/reports/PHASE_2D_SLICE_06_REPORT.md`, `docs/PHASE_2D_REPORT.md` (following the Phase 2C closeout pattern).
+- Create `scripts/generate-phase-2d-traceability.mjs`, `scripts/verify-phase-2d-cleanup.mjs`, `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md`, `docs/PHASE_2D_REPORT.md` (following the Phase 2C closeout pattern).
 - Add a fail-fast `test:remote:2d` aggregate after every focused smoke is independently green.
 - Update permanent current-state/architecture/database/security/AI docs only with deployed, verified behavior; never rewrite historical Phase 2X/2C evidence.
 

@@ -102,7 +102,7 @@ async function makeFixtureRoot(): Promise<string> {
   // built on content the checks cannot accept is not a control at all.
   for (const [ordinal, suffixes] of Object.entries(SLICE_ARTIFACTS)) {
     for (const suffix of suffixes) {
-      const relative = `docs/reports/PHASE_2F_SLICE_${ordinal}_${suffix}.md`;
+      const relative = `docs/reports/phase-2f/PHASE_2F_SLICE_${ordinal}_${suffix}.md`;
       const source = join(REPO, relative);
       if (existsSync(source)) {
         mkdirSync(dirname(join(root, relative)), { recursive: true });
@@ -167,7 +167,7 @@ describe("2F-OPERATIONS-003: the generator runs against the real repository in C
     const committed = readFileSync(join(REPO, MATRIX_OUTPUT_PATH), "utf8").replace(/\r\n/g, "\n");
     expect(
       rendered,
-      "docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md is stale or hand-edited — run `npm run docs:phase-2f:traceability`",
+      "docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md is stale or hand-edited — run `npm run docs:phase-2f:traceability`",
     ).toBe(committed);
   });
 
@@ -350,7 +350,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
   it("fails when a slice loses its only acceptance-bearing artifact", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    rmSync(join(root, "docs/reports/PHASE_2F_SLICE_01_REPORT.md"));
+    rmSync(join(root, "docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md"));
     expect(() => buildPhase2fTraceability({ root }))
       .toThrow(/slice 2F\.1 has no acceptance-bearing artifact in docs\/reports\//);
   });
@@ -537,8 +537,8 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     // Strip every acceptance-bearing artifact for 2F.6, which §10 marks on four
     // rows. Both must go: the slice has a report and an acceptance record, and the
     // check asks whether *any* bearing artifact exists.
-    rmSync(join(root, "docs/reports/PHASE_2F_SLICE_06_REPORT.md"));
-    rmSync(join(root, "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md"));
+    rmSync(join(root, "docs/reports/phase-2f/PHASE_2F_SLICE_06_REPORT.md"));
+    rmSync(join(root, "docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md"));
     expect(() => buildPhase2fTraceability({ root }))
       .toThrow(/§10 marks gate [\s\S]*? executed \([^)]*\) for 2F\.6, which has no/);
   });

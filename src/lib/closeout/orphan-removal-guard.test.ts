@@ -74,7 +74,7 @@ describe("the removal tool cannot act by accident", () => {
 
 describe("the manifest parser reads the committed document", () => {
   const markdown = readFileSync(
-    join(REPO, "docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md"),
+    join(REPO, "docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md"),
     "utf8",
   );
 

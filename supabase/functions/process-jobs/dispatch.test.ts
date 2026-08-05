@@ -1,6 +1,6 @@
 // Deno test suite for the dispatcher's type-routing guard. This file was
 // written for `deno test` but could not be executed on this workstation:
-// no Deno runtime is installed (see docs/reports/PHASE_2X_SLICE_04_REPORT.md
+// no Deno runtime is installed (see docs/reports/phase-2x/PHASE_2X_SLICE_04_REPORT.md
 // for the equivalent verification that was actually run — deployment plus
 // the remote smoke). Kept deliberately free of network/database
 // dependencies so it stays runnable in CI once a Deno step exists.

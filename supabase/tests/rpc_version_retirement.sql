@@ -16,7 +16,7 @@ select plan(26);
 
 -- Retained: every version a governing document says must stay callable -------
 -- confirm_entry_task_candidates family — GATE-03,
--- docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md.
+-- docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md.
 -- resolve_pending_question family — PHASE_2D_PRD.md §21 item 7 and ADR-034
 -- decision 2 defer retirement to a separately authorized step.
 

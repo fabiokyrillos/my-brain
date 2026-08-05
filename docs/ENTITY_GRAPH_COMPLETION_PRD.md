@@ -4,8 +4,8 @@
 
 **Status — AWAITING OWNER APPROVAL. Not authorized for implementation.**
 
-- **Governing evidence** — [`reports/ENTITY_GRAPH_FINDINGS.md`](./reports/ENTITY_GRAPH_FINDINGS.md) (EG-01…EG-09, verified).
-- **Phase boundary** — [`reports/PHASE_2G_DEFINITION.md`](./reports/PHASE_2G_DEFINITION.md) §20, Decision 11 (revised).
+- **Governing evidence** — [`reports/ENTITY_GRAPH_FINDINGS.md`](./reports/entity-graph/ENTITY_GRAPH_FINDINGS.md) (EG-01…EG-09, verified).
+- **Phase boundary** — [`reports/PHASE_2G_DEFINITION.md`](./reports/phase-2g/PHASE_2G_DEFINITION.md) §20, Decision 11 (revised).
 - **Position in the roadmap** — first. Deterministic, independent of BYOK, independent of Phase 2G.
 - **Requirement prefix** — `EGC-`.
 - **Slices** — EGC.1 Organizations and Contexts · EGC.2 Person Relationships and Associations · EGC.3 Convergence and Closeout.

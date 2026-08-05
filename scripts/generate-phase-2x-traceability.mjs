@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const prdPath = resolve(repositoryRoot, "docs/PHASE_2X_PRD.md");
-const outputPath = resolve(repositoryRoot, "docs/reports/PHASE_2X_TRACEABILITY_MATRIX.md");
+const outputPath = resolve(repositoryRoot, "docs/reports/phase-2x/PHASE_2X_TRACEABILITY_MATRIX.md");
 const prd = readFileSync(prdPath, "utf8");
 
 const evidenceByFamily = {

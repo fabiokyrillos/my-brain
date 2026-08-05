@@ -4,7 +4,7 @@
 --
 -- Why this file exists: the Gate 3 behavioural probe observed 26 rows returned
 -- for a null-title query under the default limit of 25
--- (`docs/reports/PHASE_2F_PRE_CODE_GATE_REPORT.md` §6.4), which is the
+-- (`docs/reports/phase-2f/PHASE_2F_PRE_CODE_GATE_REPORT.md` §6.4), which is the
 -- documented `limit + 1` overflow probe — but "the clamping semantics of
 -- `effective_limit` are not what a reader would assume", and 2F.2 must not
 -- build any "did we see everything?" claim on `p_limit` without these pins.

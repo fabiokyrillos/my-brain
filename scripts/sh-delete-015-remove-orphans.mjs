@@ -15,7 +15,7 @@
  *
  * ## The manifest is the authority, and it is read rather than trusted
  *
- * The committed manifest (`docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md`) is
+ * The committed manifest (`docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md`) is
  * parsed at run time and its path set must match the live bucket **exactly** —
  * no extra object, no missing one. That is deliberate: the alternative is a
  * hard-coded list in this file, which would let the document and the act drift
@@ -45,7 +45,7 @@ import { manifestPaths } from "./sh-delete-015-manifest.mjs";
 
 const BUCKET = "user-files";
 const PAGE_SIZE = 100;
-const MANIFEST = new URL("../docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md", import.meta.url);
+const MANIFEST = new URL("../docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md", import.meta.url);
 
 async function listPrefix(service, prefix) {
   const found = [];

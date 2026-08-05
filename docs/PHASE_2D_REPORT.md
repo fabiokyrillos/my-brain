@@ -1,6 +1,6 @@
 # Phase 2D — Conversational Pending Questions — Closeout Report
 
-Phase 2D is complete through Slice 2D.6. This report is the phase-level handoff. It is authoritative for the completed behavior; per-slice execution evidence remains in `docs/reports/PHASE_2D_SLICE_0*_REPORT.md`, and the full requirement mapping is in `docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md`.
+Phase 2D is complete through Slice 2D.6. This report is the phase-level handoff. It is authoritative for the completed behavior; per-slice execution evidence remains in `docs/reports/PHASE_2D_SLICE_0*_REPORT.md`, and the full requirement mapping is in `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md`.
 
 ## Completion decision
 
@@ -53,7 +53,7 @@ Migration list parity through `202607230051`; `db lint --level error` clean (two
 
 ## Requirement traceability
 
-`docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md` maps all 58 functional/non-functional requirement IDs (15 families), 6 per-epic acceptance criteria, and 5 global gates — 69 rows — each to its owning slice(s) and durable evidence. The generator (`npm run docs:phase-2d:traceability`) fails closed if the PRD inventory drifts. No requirement is left non-green: the phasing "unavailable-before-slice-N" constraints held and shipped, the deterministic suggested-answer path satisfies its requirement (the AI-schema fallback is deferred and was not needed), and the `2C-UNDO-004` hard gate is resolved.
+`docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md` maps all 58 functional/non-functional requirement IDs (15 families), 6 per-epic acceptance criteria, and 5 global gates — 69 rows — each to its owning slice(s) and durable evidence. The generator (`npm run docs:phase-2d:traceability`) fails closed if the PRD inventory drifts. No requirement is left non-green: the phasing "unavailable-before-slice-N" constraints held and shipped, the deterministic suggested-answer path satisfies its requirement (the AI-schema fallback is deferred and was not needed), and the `2C-UNDO-004` hard gate is resolved.
 
 ## Cleanup verification
 
