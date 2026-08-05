@@ -2,7 +2,7 @@
 
 Status: **Proposal — Revision 2, not approved, not a PRD.** Written 2026-07-28, immediately after the Phase 2E release (`phase-2e-complete` on `b54b833`, remote parity `202607280061`). Author role: Lead Software Architect. No code, SQL, or migrations are specified here; database and contract changes are described conceptually only.
 
-**Revision 2 (2026-07-28)** resolves the five blocking findings of `docs/reports/PHASE_2F_PROPOSAL_ADVERSARIAL_REVIEW.md` (F1–F5) and nothing else. Every section the review did not block is preserved verbatim, including the major and moderate findings (F6–F13), which remain open against Revision 2 and are listed in §15 as work the PRD must still absorb. Scope did not grow: no new table, no new mutation RPC, no new read RPC, and no new query shape is introduced by any of the five resolutions. Two of the five (F4, F5) turned out to be resolvable by *using what already exists* rather than by building; one (F1) costs one additional literal inside a migration the proposal already planned; two (F2, F3) are argument and gate corrections that cost no code. §15 is the resolution matrix.
+**Revision 2 (2026-07-28)** resolves the five blocking findings of `docs/reports/phase-2f/PHASE_2F_PROPOSAL_ADVERSARIAL_REVIEW.md` (F1–F5) and nothing else. Every section the review did not block is preserved verbatim, including the major and moderate findings (F6–F13), which remain open against Revision 2 and are listed in §15 as work the PRD must still absorb. Scope did not grow: no new table, no new mutation RPC, no new read RPC, and no new query shape is introduced by any of the five resolutions. Two of the five (F4, F5) turned out to be resolvable by *using what already exists* rather than by building; one (F1) costs one additional literal inside a migration the proposal already planned; two (F2, F3) are argument and gate corrections that cost no code. §15 is the resolution matrix.
 
 Repository truth consulted before writing: `PHASE_2E_FINAL_REPORT.md` (including the release addendum), `STATE.md`, `CHANGELOG.md`, `TODO.md`, ADR-053 and its context (ADR-044–052), `PHASE_2E_PRD.md` revision 4 (§5, §16.4, §22, §23), `PHASE_2_PLAN.md` §Phase 2F, and the live code for every direct write path named below. Where documents disagreed with the code, the code won.
 
@@ -241,7 +241,7 @@ Revisions made after this review: rollback-tested-before-revocation added to 2F.
 
 ## 15. Blocking findings resolution matrix (Revision 2)
 
-Against `docs/reports/PHASE_2F_PROPOSAL_ADVERSARIAL_REVIEW.md`. All five blockers are agreed; none was disputed on evidence.
+Against `docs/reports/phase-2f/PHASE_2F_PROPOSAL_ADVERSARIAL_REVIEW.md`. All five blockers are agreed; none was disputed on evidence.
 
 | Finding | Status | Resolution | PRD sections changed |
 |---|---|---|---|

@@ -33,7 +33,7 @@
 --
 -- PostgREST schema-cache convergence and the Deno worker call are NOT provable
 -- from SQL. They are steps 8 and 9 of the gate and are run from the shell after
--- this script; see `docs/reports/PHASE_2F_PRE_CODE_GATE_REPORT.md` §3.
+-- this script; see `docs/reports/phase-2f/PHASE_2F_PRE_CODE_GATE_REPORT.md` §3.
 
 \set ON_ERROR_STOP on
 

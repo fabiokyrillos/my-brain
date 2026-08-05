@@ -3,8 +3,8 @@
 Status: **Approved — owner approval 2026-08-04, recorded in `ADR-077` and Amendment `A-1`.**
 Drafted 2026-08-02 as Proposed (that history stands). Governs the requirements in
 `docs/SIGNUP_HARDENING_PRD.md`, on the evidence in
-`docs/reports/SIGNUP_HARDENING_FINDINGS.md` and the threats in
-`docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md`. Baseline `main` = `b007ffa`, head
+`docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md` and the threats in
+`docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md`. Baseline `main` = `b007ffa`, head
 `202608010069`.
 
 Append-only once approved; changes are numbered amendments (`A-1`, `A-2`, …).
@@ -22,7 +22,7 @@ integrates CAPTCHA, not the deletion work.
 
 | Gate | What proves it | Owner action? |
 | --- | --- | --- |
-| **SH-G0.1 — owned-data and storage census complete** | `docs/reports/SIGNUP_HARDENING_FINDINGS.md` merged; the table matrix and storage inventory are its §3/§7 | no (done in this PR) |
+| **SH-G0.1 — owned-data and storage census complete** | `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md` merged; the table matrix and storage inventory are its §3/§7 | no (done in this PR) |
 | **SH-G0.2 — deletion-cascade drill authored and green in CI** | SH-DELETE-001 pgtap builds a row-complete fixture, deletes `auth.users`, asserts zero residue; green in the `database` job | no |
 | **SH-G0.3 — privileged-boundary inventory** | FINDINGS §3–§4 grant/RPC/DEFINER matrix; SH-EXPOSURE-002 census test skeleton | no |
 | **SH-G0.4 — quota/retention value sheet owner-signed** | PRD §20 table approved (owner decision recorded as an amendment or ADR) | **yes** |
@@ -44,7 +44,7 @@ executed against the shared environment until they pass)
 ### 0.3 Gates that block PUBLIC SIGNUP only (the rollout gate; nothing in the initiative waits on
 these)
 
-The full list is `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md`. It is generated and fail-closed
+The full list is `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md`. It is generated and fail-closed
 (SH-ROLLOUT-001/002). No slice is blocked by it — it is the *output* the initiative produces.
 
 ### 0.4 Vendor / owner decisions required up front
@@ -307,7 +307,7 @@ statically and hard before pushing, the BYOK lesson.
   every ceiling.
 
 ## 6. Rollout register (the gate content, summarized; the authority is
-`docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md`)
+`docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md`)
 
 BYOK closed and green; no project-key fallback; account deletion executed with zero residue
 including storage; suspension and reactivation executed; worker suspension enforcement executed;

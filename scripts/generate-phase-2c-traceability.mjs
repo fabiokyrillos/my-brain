@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const prdPath = resolve(repositoryRoot, "docs/PHASE_2C_PRD.md");
-const outputPath = resolve(repositoryRoot, "docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md");
+const outputPath = resolve(repositoryRoot, "docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md");
 const prd = readFileSync(prdPath, "utf8");
 
 // Phase 2C PRD does not use the numeric/`-A01` acceptance-ID convention of Phase 2X.

@@ -124,6 +124,16 @@ A feature or vertical slice is complete only when all applicable items are true:
 7. External pending work is not hidden behind a successful local result. Record the dependency, impact, evidence, workaround, and exact completion condition.
 8. A skipped test is acceptable only when the reason is stable, explicit in output, and tracked if it represents unfinished product coverage.
 
+## Reports and evidence placement
+
+1. Every new phase or initiative receives its own `docs/reports/<name>/` subdirectory — lowercase kebab-case — **before** its first report is committed.
+2. Every slice files into the owning phase or initiative directory. Slices do not receive directories of their own; the filename carries the slice.
+3. Acceptance, deployment, adversarial review, gate and evidence artifacts stay grouped with their slice's initiative, next to the report they support.
+4. No new report goes directly in `docs/reports/`. That root holds only intentionally cross-phase files: the taxonomy index and durable loop handoff state, named in `src/lib/closeout/reports-taxonomy-guard.test.ts`.
+5. Filename and folder placement are part of review and guard coverage. The guard fails the `application` job with the expected path when a report lands at the root, and rejects a non-kebab-case directory at any depth. It reads the filesystem only, so it works where git history is unavailable.
+6. A generator that writes or scans reports points at the owning initiative's directory, not at the reports root. Directory scans that must see the whole tree — start-signal detectors, reopening gates — walk it recursively rather than listing one level.
+7. `docs/reports/README.md` is the index: it states the taxonomy, which directory is historical and which initiative is active, and where durable handoff state lives. It is updated in the same change that adds a directory.
+
 ## Enforcement and exceptions
 
 - Reviewers and agentic workers must check this document before planning and before completion claims.

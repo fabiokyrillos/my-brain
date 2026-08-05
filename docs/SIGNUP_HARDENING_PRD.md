@@ -3,7 +3,7 @@
 Status: **Approved — owner approval 2026-08-04, recorded in `ADR-077` and Amendment `P-1`.**
 Drafted 2026-08-02 as Proposed (that history stands). Drafted against `main` = `b007ffa`,
 migration head `202608010069`, on the evidence in
-`docs/reports/SIGNUP_HARDENING_FINDINGS.md`. Authorized as an initiative by `ADR-068`; **nothing
+`docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md`. Authorized as an initiative by `ADR-068`; **nothing
 in this document authorizes implementation** — the implementation plan's pre-code gates do that,
 slice by slice.
 
@@ -41,7 +41,7 @@ flip.
   CSP headers), this initiative defines the control, implements the repository half, and gates
   **rollout** — not its own slices — on the platform half.
 - **No opening of self-service signup.** The rollout gate definition
-  (`docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md`) is the only path to that, and it is
+  (`docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md`) is the only path to that, and it is
   executed after this initiative closes, not by it.
 - **No professional legal review.** The Terms and Privacy drafts are product documents written
   from repository truth; professional review before commercial launch is a named rollout gate
@@ -297,7 +297,7 @@ migration); the requirements below fix the mechanisms.
 
 | ID | Requirement | Slice | Mig | Boundary | Flags | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| **SH-ROLLOUT-001** | `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` defines every gate with: the property, the exact readback or artifact that proves it, and the failure rule. **A missing artifact or unreadable configuration fails the gate** — absence is failure, never skip. | SH.0 | no | docs | — | doc |
+| **SH-ROLLOUT-001** | `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` defines every gate with: the property, the exact readback or artifact that proves it, and the failure rule. **A missing artifact or unreadable configuration fails the gate** — absence is failure, never skip. | SH.0 | no | docs | — | doc |
 | **SH-ROLLOUT-002** | A gate-verification script (`scripts/verify-signup-rollout.mjs` family) executes every machine-checkable gate: artifact presence, hosted config readbacks, residue scanner, deployed-behavior probes — and exits non-zero on the first unprovable gate, printing gate names and no secrets. | SH.7 | no | ops | — | unit (script tests) + script |
 | **SH-ROLLOUT-003** | The synthetic end-to-end journey exists and is executed at rollout time: signup (gate open in a controlled window or via admin-created account until then) → confirm → accept terms → capture with BYOK key → process → delete account → zero residue including storage. Its transcript is a required gate artifact. | SH.7 | no | ops | O + S | script + journey |
 | **SH-ROLLOUT-004** | The gate list includes every item in the plan's §6 rollout register (BYOK still closed and green; no project-key fallback; deletion executed; suspension executed; worker enforcement executed; legal + consent enforced; confirmation, CAPTCHA, throttles, quotas active; PostgREST and Edge reviews recorded; redirects verified; SMTP/domain ready; backup/restore verified; monitoring adequate; production smoke green). The script and the document enumerate the same set — a parity test compares them. | SH.7 | no | ops | — | unit |

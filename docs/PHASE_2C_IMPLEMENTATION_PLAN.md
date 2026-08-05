@@ -297,7 +297,7 @@ Create:
 - `src/features/tasks/candidate-due-date.test.ts`;
 - `src/features/tasks/candidate-editor.tsx`;
 - `src/features/tasks/candidate-editor.test.tsx`;
-- `docs/reports/PHASE_2C_SLICE_01_REPORT.md`.
+- `docs/reports/phase-2c/PHASE_2C_SLICE_01_REPORT.md`.
 
 Modify:
 
@@ -438,7 +438,7 @@ The user can optionally set a planned date, manual priority, or an intentional a
 ### Likely files and contract work
 
 - Add a new append-only migration that versions the RPC again rather than widening v2 in place if old generated clients are deployed.
-- Extend `candidate-edit-contract.ts`, `candidate-editor.tsx`, `TaskCandidateForm`, actions, review/Work/Needs Attention projections, generated types, product-event allowlists, focused pgTAP, remote smoke, E2E, and `docs/reports/PHASE_2C_SLICE_02_REPORT.md`.
+- Extend `candidate-edit-contract.ts`, `candidate-editor.tsx`, `TaskCandidateForm`, actions, review/Work/Needs Attention projections, generated types, product-event allowlists, focused pgTAP, remote smoke, E2E, and `docs/reports/phase-2c/PHASE_2C_SLICE_02_REPORT.md`.
 - Reuse existing `tasks.planned_at`, `manual_priority`, `intentional_no_due`, and `no_due_reason`; do not create a draft table.
 
 ### Boundaries, security, idempotency, and analytics
@@ -473,7 +473,7 @@ The user can intentionally relate a candidate to owned project, context, person,
 ### Likely files and contract work
 
 - Reuse `projects`, `contexts`, `people`, `task_projects`, `task_contexts`, `task_people`, and the existing waiting/task domain representation after verifying its current source of truth.
-- Add versioned RPC/migration only if the prior signature cannot evolve compatibly; update generated types, edit contract/editor, owner-scoped relation projection, action, Work/review display, pgTAP, remote smoke, E2E, analytics allowlist, and `docs/reports/PHASE_2C_SLICE_03_REPORT.md`.
+- Add versioned RPC/migration only if the prior signature cannot evolve compatibly; update generated types, edit contract/editor, owner-scoped relation projection, action, Work/review display, pgTAP, remote smoke, E2E, analytics allowlist, and `docs/reports/phase-2c/PHASE_2C_SLICE_03_REPORT.md`.
 - Do not copy every `entry_entities` row to every task; accept only explicit owned IDs selected for that candidate.
 
 ### Boundaries, security, idempotency, and analytics
@@ -511,7 +511,7 @@ The user can explicitly confirm, reject, retain as record, or dismiss a suggesti
 
 - Prove whether existing task/audit/undo rows can represent non-materializing decisions. If lifecycle needs persisted non-task resolution, add one narrow owner/entry/interpretation/candidate-index resolution table containing only the closed disposition enum, operation provenance, and timestamps — never copied title, description, due date, labels, or candidate text.
 - Preserve deployed confirmation RPCs. Add a new versioned confirmation RPC only if persisting `confirmed` cannot be composed safely with the current version, and add a separate closed non-confirming disposition RPC only when that keeps confirmation from being reimplemented or weakened.
-- Add generated types, disposition contract/control, review/Needs Attention/Inbox projections, actions, bounded audit/undo evidence, pgTAP, remote smoke, E2E, and `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
+- Add generated types, disposition contract/control, review/Needs Attention/Inbox projections, actions, bounded audit/undo evidence, pgTAP, remote smoke, E2E, and `docs/reports/phase-2c/PHASE_2C_SLICE_04_REPORT.md`.
 - Never introduce a candidate draft or duplicate candidate content.
 
 ### Boundaries, security, idempotency, and analytics
@@ -540,7 +540,7 @@ The user can explicitly confirm, reject, retain as record, or dismiss a suggesti
 - Reused the existing undo architecture to delete the exact resolution batch, cancel only tasks from the same operation, and restore candidates to pending; reconfirmation after supported undo is explicitly covered.
 - Reused only the existing aggregate `task_candidates_confirmed` event for non-idempotent batches containing at least one confirmation. No disposition category, reason, content, or identity enters analytics.
 - Executed evidence: linked pgTAP 290/290 across seven relevant suites; disposable remote smoke 24/24 with zero fixture residue and preserved pre-existing counts/Auth IDs; Playwright 4/4 (PT-BR/en × desktop/Pixel 7); Vitest 693/693; lint, typecheck, production build, migration parity, linked error-level DB lint, and byte-stable linked generated types all green.
-- Independent final review found no Critical/Important issue. Full evidence and non-blocking notes are recorded in `docs/reports/PHASE_2C_SLICE_04_REPORT.md`.
+- Independent final review found no Critical/Important issue. Full evidence and non-blocking notes are recorded in `docs/reports/phase-2c/PHASE_2C_SLICE_04_REPORT.md`.
 - No push, PR, merge, application deployment, Phase 2C.5 capability, Product Audit artifact, or other adjacent scope is included.
 
 ## 8. Phase 2C.5 — Subtasks, Dependencies and Split/Merge
@@ -559,7 +559,7 @@ The user can materialize a reviewed task graph — including parents, dependenci
 
 - Reuse `tasks.parent_task_id` and `task_dependencies`; add only constraints/indexes/RPC versions needed for atomic graph materialization and cycle safety.
 - Add dedicated graph command/schema modules and components rather than expanding `candidate-editor.tsx` into a monolith.
-- Update generated types, task graph projections, actions, audit/undo, pgTAP, remote smoke, Playwright, product-event counts, and `docs/reports/PHASE_2C_SLICE_05_REPORT.md`.
+- Update generated types, task graph projections, actions, audit/undo, pgTAP, remote smoke, Playwright, product-event counts, and `docs/reports/phase-2c/PHASE_2C_SLICE_05_REPORT.md`.
 
 ### Boundaries, security, idempotency, and analytics
 
@@ -592,7 +592,7 @@ Editable candidates and every later Phase 2C decision behave consistently in Nee
 ### Likely files and contract work
 
 - Update daily-cycle projections/components only where cross-surface drift is found; add no new lifecycle source.
-- Create `scripts/generate-phase-2c-traceability.mjs`, `scripts/verify-phase-2c-cleanup.mjs`, `docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md`, `docs/reports/PHASE_2C_SLICE_06_REPORT.md`, and `docs/PHASE_2C_REPORT.md` if the established Phase 2X closeout pattern remains current.
+- Create `scripts/generate-phase-2c-traceability.mjs`, `scripts/verify-phase-2c-cleanup.mjs`, `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md`, and `docs/PHASE_2C_REPORT.md` if the established Phase 2X closeout pattern remains current.
 - Add a fail-fast `test:remote:2c` aggregate after every focused smoke is independently green.
 - Update permanent current-state/architecture/database/security docs only with deployed, verified behavior; never rewrite historical Phase 2X evidence.
 

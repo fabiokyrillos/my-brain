@@ -269,12 +269,24 @@ export function isFixtureStorageObject(name) {
   return name === "remote-smoke.txt" || name.endsWith("-remote-smoke.txt");
 }
 
+/** Every file name at or below `dir`, basenames only. Absent directory reads as empty. */
+function reportNamesUnder(dir) {
+  if (!existsSync(dir)) return [];
+  const names = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) names.push(...reportNamesUnder(join(dir, entry.name)));
+    else names.push(entry.name);
+  }
+  return names;
+}
+
 /** The ADR-057 reopening gate: the dry-run script present, no transcript of it recorded. */
 export function readProvenanceReopeningGate(root = REPOSITORY_ROOT) {
   const script = "scripts/phase-2f-gate1-record-ai-usage-dry-run.sql";
-  const reportsDir = join(root, "docs/reports");
-  const reports = existsSync(reportsDir) ? readdirSync(reportsDir) : [];
-  const transcripts = reports.filter((name) => /record[-_]?ai[-_]?usage.*dry[-_]?run/i.test(name));
+  // Recursive: `docs/reports/` is a per-phase taxonomy, and a transcript filed
+  // under the phase that reopens the work must still open this gate.
+  const transcripts = reportNamesUnder(join(root, "docs/reports"))
+    .filter((name) => /record[-_]?ai[-_]?usage.*dry[-_]?run/i.test(name));
   return {
     scriptPresent: existsSync(join(root, script)),
     script,

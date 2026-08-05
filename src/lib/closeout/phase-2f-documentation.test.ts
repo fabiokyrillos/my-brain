@@ -116,7 +116,7 @@ describe("2F-OPERATIONS-006: the phase PRD's gate matrix reflects what actually 
     expect(cells).toHaveLength(8);
     expect(cells[5], "the 2F.4 journeys cell claims an execution its acceptance record does not name")
       .not.toContain("●");
-    const acceptance = read("docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md");
+    const acceptance = read("docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md");
     expect(acceptance).not.toMatch(/playwright/i);
   });
 
@@ -211,7 +211,7 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
   });
 
   it("keeps cross-scope comparison of the two baselines prohibited wherever they are quoted", () => {
-    for (const document of ["docs/STATE.md", "docs/CHANGELOG.md", "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md"]) {
+    for (const document of ["docs/STATE.md", "docs/CHANGELOG.md", "docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md"]) {
       expect(read(document), `${document} quotes both baselines without the prohibition`)
         .toMatch(/cross-scope comparison/i);
     }
@@ -232,7 +232,7 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  * filename ban was the blunter half, and it was blunter than the property: it
  * could not tell an implementation-governing artifact from a definition study
  * commissioned to decide whether the phase should exist at all. The owner
- * authorized narrowing it after `docs/reports/PHASE_2G_DEFINITION.md` — a study
+ * authorized narrowing it after `docs/reports/phase-2g/PHASE_2G_DEFINITION.md` — a study
  * that declares no requirement, plans no work and states in its own header that
  * Phase 2G remains unauthorized — tripped it.
  *
@@ -263,12 +263,24 @@ const GOVERNING_ARTIFACT_ROLE = /^PHASE_2G_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMEN
 const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
 const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2g/i;
 
+/**
+ * Every markdown file at or below `dir`, named relative to `dir`. The walk is
+ * recursive because `docs/reports/` is a taxonomy of per-phase subdirectories:
+ * a flat listing would let a Phase 2G declaration hide one directory down,
+ * which is exactly the signal this detector exists to catch.
+ */
 function markdownFilesIn(root: string, dir: string): string[] {
   const absolute = join(root, dir);
   if (!existsSync(absolute)) return [];
-  return readdirSync(absolute, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-    .map((entry) => entry.name);
+  const found: string[] = [];
+  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      found.push(...markdownFilesIn(root, `${dir}/${entry.name}`).map((name) => `${entry.name}/${name}`));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      found.push(entry.name);
+    }
+  }
+  return found;
 }
 
 function filesIn(root: string, dir: string): string[] {
@@ -285,7 +297,8 @@ function phase2GStartSignals(root: string): Phase2GStartSignal[] {
 
   for (const dir of ["docs", "docs/reports"]) {
     for (const name of markdownFilesIn(root, dir)) {
-      if (GOVERNING_ARTIFACT_ROLE.test(name)) {
+      const basename = name.slice(name.lastIndexOf("/") + 1);
+      if (GOVERNING_ARTIFACT_ROLE.test(basename)) {
         signals.push({ kind: "governing-artifact", where: `${dir}/${name}` });
       }
       if (DECLARED_2G_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
@@ -321,7 +334,7 @@ function phase2GStartSignals(root: string): Phase2GStartSignal[] {
 /** A throwaway repository root carrying only what the detector reads. */
 function makeDetectorRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "a13-"));
-  for (const dir of ["docs", "docs/reports", "supabase/migrations", "src/features", "src/lib"]) {
+  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2g", "supabase/migrations", "src/features", "src/lib"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
@@ -354,7 +367,7 @@ describe("A13: Phase 2G is not started", () => {
   it("permits the definition study, its candidate labels and an unauthorized-status amendment", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/PHASE_2G_DEFINITION.md"),
+      join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md"),
       [
         "# Phase 2G Definition Study",
         "",
@@ -389,12 +402,12 @@ describe("A13: Phase 2G is not started", () => {
   it("fails when a Phase 2G requirement is declared, whatever the file is called", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/PHASE_2G_DEFINITION.md"),
+      join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md"),
       "# Study\n\n- **2G-READINESS-001:** rate limiting ships here.\n",
     );
     expect(phase2GStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
-      where: "docs/reports/PHASE_2G_DEFINITION.md",
+      where: "docs/reports/phase-2g/PHASE_2G_DEFINITION.md",
     });
   });
 
@@ -445,7 +458,7 @@ describe("A13: Phase 2G is not started", () => {
     const root = detectorRoot();
     // A path that `readdirSync` reports and `readFileSync` cannot open: on both
     // platforms, replacing the file with a directory of the same name does it.
-    const listed = join(root, "docs/reports/PHASE_2G_DEFINITION.md");
+    const listed = join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md");
     writeFileSync(listed, "# Study\n");
     expect(phase2GStartSignals(root)).toEqual([]);
     rmSync(listed);

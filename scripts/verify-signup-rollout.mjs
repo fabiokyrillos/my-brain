@@ -3,7 +3,7 @@
  *
  * ## What this is for
  *
- * `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` is the authority on what must
+ * `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` is the authority on what must
  * be true before public self-service signup opens. This script executes the
  * machine-checkable half of it. Opening signup is the output of one green run of
  * this script, an owner flipping `disable_signup`, and a second green run
@@ -87,7 +87,7 @@ export function fileContains(root, relativePath, needle) {
 /** Gate ids parsed out of the definition document — the other half of SH-ROLLOUT-004. */
 export function declaredGateIds(root) {
   const text = readFileSync(
-    join(root, "docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md"),
+    join(root, "docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md"),
     "utf8",
   );
   return [...new Set([...text.matchAll(/\*\*(RG-[A-Z]+-\d+)\*\*/g)].map((m) => m[1]))].sort();
@@ -112,7 +112,7 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
 
   return {
     "RG-BYOK-1": () => ({
-      verdict: fileExists(root, "docs/reports/BYOK_TRACEABILITY_MATRIX.md") ? PASS : FAIL,
+      verdict: fileExists(root, "docs/reports/byok/BYOK_TRACEABILITY_MATRIX.md") ? PASS : FAIL,
       reason: "BYOK closeout traceability matrix present",
     }),
     "RG-BYOK-2": () => ({
@@ -132,7 +132,7 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
       reason: "the ADR-072 project-key guard is present and runs in CI",
     }),
     "RG-DEL-1": () => ({
-      verdict: fileExists(root, "docs/reports/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md") ? PASS : FAIL,
+      verdict: fileExists(root, "docs/reports/signup-hardening/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md") ? PASS : FAIL,
       reason: "deployed deletion acceptance transcript present",
     }),
     "RG-DEL-2": () => ({
@@ -144,7 +144,7 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
       reason: "storage-orphan scanner present",
     }),
     "RG-DEL-4": () => ({
-      verdict: fileExists(root, "docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md") ? PASS : FAIL,
+      verdict: fileExists(root, "docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md") ? PASS : FAIL,
       reason: "the 2026-07-16 orphan manifest is recorded",
     }),
     "RG-SUS-1": () => ({
@@ -213,7 +213,7 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
       // hard way: sweeps that exist but are not scheduled are not active, and a
       // recorded dry-run alone does not make them so.
       const built = migrations().some((n) => n.includes("retention_and_exposure"));
-      const transcript = fileExists(root, "docs/reports/SIGNUP_HARDENING_SH6_DEPLOYMENT.md");
+      const transcript = fileExists(root, "docs/reports/signup-hardening/SIGNUP_HARDENING_SH6_DEPLOYMENT.md");
       const scheduled = hosted?.retentionSweepsScheduled === true;
       if (!built || !transcript) {
         return { verdict: FAIL, reason: "retention sweeps or their dry-run transcript are missing" };
@@ -246,11 +246,11 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
       reason: "production SMTP configured (readback)",
     }),
     "RG-DEP-2": () => ({
-      verdict: fileExists(root, "docs/reports/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md") ? PASS : FAIL,
+      verdict: fileExists(root, "docs/reports/signup-hardening/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md") ? PASS : FAIL,
       reason: "production domain and CSP verification recorded",
     }),
     "RG-DEP-3": () => ({
-      verdict: fileExists(root, "docs/reports/SIGNUP_HARDENING_BACKUP_RESTORE.md") ? PASS : FAIL,
+      verdict: fileExists(root, "docs/reports/signup-hardening/SIGNUP_HARDENING_BACKUP_RESTORE.md") ? PASS : FAIL,
       reason: "backup restored to a disposable project and recorded",
     }),
     "RG-DEP-4": () => ({ verdict: OWNER, reason: "monitoring adequacy is an owner signature" }),

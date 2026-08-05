@@ -4,10 +4,14 @@ Append-only. Newest section last. Each section records what a loop actually
 left behind — not what it intended — so the next one can start from repository
 truth instead of from a summary.
 
-> **This file did not exist before §33.** Earlier prompts referenced it as if it
-> did, and several loops recorded their handoff in `docs/STATE.md` instead.
-> Nothing has been reconstructed here: §33 is the first entry, and STATE.md
-> remains the authority for everything before it.
+> **§1–§32 are in
+> [`docs/reports/AUTONOMOUS_LOOP_HANDOFF.md`](docs/reports/AUTONOMOUS_LOOP_HANDOFF.md).**
+> This file continues that log from §33. Its original note said the handoff "did
+> not exist before §33" — that was written by a loop that did not find the older
+> file, and it is corrected here rather than deleted, because the mistake is the
+> reason `docs/reports/` is now indexed. Nothing was reconstructed: §33 is the
+> first entry *at this path*, and `docs/STATE.md` remains the authority for what
+> is currently true.
 
 ---
 
@@ -29,7 +33,7 @@ truth instead of from a summary.
 
 ### What is proven, and where the evidence is
 
-`docs/reports/SIGNUP_HARDENING_SH6_DEPLOYMENT.md` holds every readback. The
+`docs/reports/signup-hardening/SIGNUP_HARDENING_SH6_DEPLOYMENT.md` holds every readback. The
 headline results:
 
 - Quota ceilings hold under **genuine concurrency** on the deployed database:
@@ -184,3 +188,82 @@ No repository work is waiting. What remains is owner judgment or configuration:
 **Phase 2G — Conversational Creation** is the roadmap successor (ADR-073, plan
 §8: Signup Hardening → 2G → 2H → open signup). It is **not authorised** by
 anything written so far and needs an owner decision to begin.
+
+---
+
+## §35 — `docs/reports/` is a taxonomy, and placement is now guarded (2026-08-05)
+
+### What changed
+
+**Documentation and repository organization only.** No runtime behavior,
+migration, hosted configuration, rollout gate, signup posture, retention
+schedule or product code was touched. Signup Hardening remains closed at SH.7,
+public signup remains closed, no purge has run, and Phase 2G has not started.
+
+`docs/reports/` held 128 markdown files flat at one level. They are now filed
+under the phase or initiative that governed them:
+
+`phase-2x/` (25) · `phase-2c/` (13) · `phase-2d/` (7) · `pre-2e/` (1) ·
+`phase-2e/` (13) · `phase-2f/` (21) · `phase-2g/` (1) · `product-ux/` (3 +
+`ux-evidence/`) · `entity-graph/` (8) · `byok/` (14) · `signup-hardening/` (20) ·
+`shared/governance/` (1).
+
+Nothing was renamed and no conclusion was edited; the moves are pure renames and
+`git log --follow` reaches through them.
+
+### The two handoff files were one log at two paths
+
+§33 opened this file at the repository root recording that the handoff "did not
+exist before §33". `docs/reports/AUTONOMOUS_LOOP_HANDOFF.md` held §1–§32 the
+whole time — a 143 KB file the loop did not find, in the directory this section
+reorganizes. That is the concrete cost of a flat directory, and it is why the
+index exists. Both files are preserved and now point at each other; the root
+file's preamble is corrected in place rather than rewritten.
+
+`docs/reports/AUTONOMOUS_LOOP_HANDOFF.md` deliberately did **not** move. It is a
+durable global handoff, and burying it under `shared/governance/` would recreate
+the failure it documents.
+
+### What is enforced, not just written
+
+- **`src/lib/closeout/reports-taxonomy-guard.test.ts`** fails the `application`
+  job when a markdown file lands directly in `docs/reports/`. Only `README.md`
+  and `AUTONOMOUS_LOOP_HANDOFF.md` are allowed there, the allowlist is itself
+  checked for staleness, and the failure message prints the path the file should
+  have used. It also rejects a non-kebab-case directory at any depth and an
+  initiative directory created with no report in it. Filesystem-only — no git
+  history, so it holds in every job.
+- **The same file proves every repository-local markdown link resolves** (0
+  broken across 180 markdown files), and carries a negative test so the checker
+  cannot silently degrade into always-passing.
+- **`docs/ENGINEERING_STANDARDS.md` §"Reports and evidence placement"** is the
+  written rule the guard mechanizes.
+- **`docs/reports/README.md`** is the index: taxonomy, per-directory contents,
+  which directories are closed, and the fact that no initiative is active.
+
+### Two guards would have quietly weakened, and did not
+
+Both scanned `docs/reports/` one level deep, so subdirectories would have become
+invisible to them:
+
+- The **A13 Phase-2G start detector** (`phase-2f-documentation.test.ts`) now
+  walks the tree recursively. A 2G declaration one directory down is still a
+  start signal.
+- The **ADR-057 provenance reopening gate**
+  (`scripts/verify-phase-2f-cleanup.mjs`) now walks recursively too, so a
+  transcript filed under its owning phase still opens the gate.
+
+Every traceability generator was repointed at its own phase directory and all
+seven matrices were regenerated; the byte-equality tests that pin them pass.
+
+### One reference was deliberately left stale
+
+`supabase/migrations/202607250054_pre_2e_rpc_version_retirement.sql:26` cites
+the old path in a comment. Migrations are append-only and already applied — the
+citation was not rewritten. It is recorded at the end of
+`docs/reports/README.md` instead.
+
+### Next
+
+Unchanged from §34: **Phase 2G is the roadmap successor and is not authorised.**
+The owner actions listed in §34 are still outstanding and none of them moved.

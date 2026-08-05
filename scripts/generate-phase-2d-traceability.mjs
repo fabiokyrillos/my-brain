@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const prdPath = resolve(repositoryRoot, "docs/PHASE_2D_PRD.md");
-const outputPath = resolve(repositoryRoot, "docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md");
+const outputPath = resolve(repositoryRoot, "docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md");
 const prd = readFileSync(prdPath, "utf8");
 
 // The Phase 2D PRD states its testable requirements as `2D-<FAMILY>-NNN` bullets in

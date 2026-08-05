@@ -1,7 +1,7 @@
 /**
  * Entity Graph Completion traceability generator (EGC-OPERATIONS-001, Slice EGC.3).
  *
- * Writes `docs/reports/EGC_TRACEABILITY_MATRIX.md` from
+ * Writes `docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md` from
  * `docs/ENTITY_GRAPH_COMPLETION_PRD.md`, from the implementation plan's own
  * slice-ownership declarations, and from the repository artifacts the matrix
  * claims as evidence.
@@ -198,7 +198,7 @@ export const EVIDENCE = {
     "scripts/verify-egc-cleanup.mjs",
     "src/lib/closeout/egc-reachability.test.ts",
     "docs/SECURITY.md",
-    "docs/reports/EGC_REPORT.md",
+    "docs/reports/entity-graph/EGC_REPORT.md",
   ],
   "EGC-DEC": [
     "docs/ENTITY_GRAPH_COMPLETION_PRD.md",
@@ -309,7 +309,7 @@ export function generate(root = DEFAULT_ROOT, { write = true } = {}) {
   if (built.problems.length > 0) return { ok: false, problems: built.problems, content: null };
 
   const content = renderMatrix(built);
-  if (write) writeFileSync(join(root, "docs/reports/EGC_TRACEABILITY_MATRIX.md"), content, "utf8");
+  if (write) writeFileSync(join(root, "docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md"), content, "utf8");
   return { ok: true, problems: [], content };
 }
 
@@ -322,5 +322,5 @@ if (invokedDirectly) {
     console.error("EGC traceability generation failed:\n" + result.problems.map((p) => `  - ${p}`).join("\n"));
     process.exit(1);
   }
-  console.log("docs/reports/EGC_TRACEABILITY_MATRIX.md regenerated.");
+  console.log("docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md regenerated.");
 }

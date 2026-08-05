@@ -1,7 +1,7 @@
 /**
  * Phase 2F traceability generator (PRD `2F-OPERATIONS-003`, Slice 2F.6).
  *
- * Writes `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md` from `docs/PHASE_2F_PRD.md`
+ * Writes `docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md` from `docs/PHASE_2F_PRD.md`
  * and from the repository artifacts the matrix claims as evidence.
  *
  * How this differs from the four generators before it, and why
@@ -29,7 +29,7 @@
  *     `npm run` gate is resolved in `package.json`;
  *   * migrations are read out of `supabase/migrations/` and attributed;
  *   * ADR coverage is read out of `docs/DECISIONS.md`;
- *   * per-slice acceptance artifacts are read out of `docs/reports/`;
+ *   * per-slice acceptance artifacts are read out of `docs/reports/phase-2f/`;
  *   * CI gates resolve two different ways — a job-level gate to a workflow job
  *     *and step*, a suite-level gate to a file on disk that is *inside a path
  *     the workflow actually executes*. The second leg is what makes ADR-059's
@@ -52,7 +52,7 @@ import { fileURLToPath } from "node:url";
 export const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The generator's own output, and the one evidence path it cannot require to pre-exist. */
-export const MATRIX_OUTPUT_PATH = "docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md";
+export const MATRIX_OUTPUT_PATH = "docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md";
 
 /** The inventory the phase PRD declares for itself (§6, §14 Revision 4 "B2"). */
 export const EXPECTED_REQUIREMENT_TOTAL = 68;
@@ -110,7 +110,7 @@ export const EVIDENCE_KEYS = Object.freeze({
     ],
     verification: "red-first defective fixtures; tasks/reminders allowlists compared by exact equality in both directions",
     gates: [{ kind: "suite", file: "src/lib/supabase/direct-write-guard.test.ts" }],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_01_REPORT.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md"],
   },
   "E-DECISION": {
     source: "PRD §6.2",
@@ -118,8 +118,8 @@ export const EVIDENCE_KEYS = Object.freeze({
     verification: "ADR headings and requirement-ID citations derived from DECISIONS.md; the dated expiry entry re-computed by expiryDateFromGoLive",
     gates: [{ kind: "suite", file: "src/lib/closeout/phase-2f-documentation.test.ts" }],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_01_REPORT.md",
-      "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md",
     ],
   },
   "E-PRECOND": {
@@ -137,7 +137,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "suite", file: "src/features/task-commands/work-surface-reuse.test.ts" },
       { kind: "pgtap", file: "supabase/tests/phase_2f_effective_limit.sql" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_01_REPORT.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md"],
   },
   "E-SURFACE": {
     source: "PRD §6.4, §5",
@@ -153,7 +153,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "suite", file: "src/features/operations/task-list.test.tsx" },
       { kind: "session", slice: "2F.2", note: "authenticated journeys 32/32, desktop+mobile × pt-BR+en" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_02_ACCEPTANCE.md"],
   },
   "E-CREATE": {
     source: "PRD §6.5, §6.5a",
@@ -168,7 +168,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "pgtap", file: "supabase/tests/phase_2e_task_command_creation.sql" },
       { kind: "session", slice: "2F.3", note: "21 deployment-session gates" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md"],
   },
   "E-REMINDER": {
     source: "PRD §6.6",
@@ -185,8 +185,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "npm", script: "test:remote:2f:census" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md",
     ],
   },
   "E-REVOKE": {
@@ -207,7 +207,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       },
       { kind: "session", slice: "2F.4", note: "16 deployment-acceptance gates" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md"],
   },
   "E-TESTMIG": {
     source: "PRD §6.8, §9",
@@ -226,7 +226,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "ci-step", job: "database", step: "Run the pgTAP suite (post-revocation posture)" },
       { kind: "session", slice: "2F.4", note: "full remote suite, exit 0 from merged content" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md"],
   },
   "E-MEASURE": {
     source: "PRD §6.9",
@@ -242,7 +242,7 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "npm", script: "test:remote:2f:funnel" },
       { kind: "npm", script: "test:remote:2f:baseline" },
     ],
-    acceptance: ["docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md"],
+    acceptance: ["docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md"],
   },
   "E-OWNERSHIP": {
     source: "PRD §6.10",
@@ -256,8 +256,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "session", slice: "2F.3", note: "two-owner creation probe" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md",
     ],
   },
   "E-ANALYTICS": {
@@ -272,8 +272,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "suite", file: "src/features/product-analytics/contracts.test.ts" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md",
     ],
   },
   "E-OPERATIONS": {
@@ -282,10 +282,10 @@ export const EVIDENCE_KEYS = Object.freeze({
     verification: "parity recorded before and after every deploying slice by `npx supabase migration list --linked`; CI conclusions read off the exact merge SHA with `gh run view`",
     gates: [{ kind: "session", slice: "2F.4", note: "parity 202607290062 → 202607300063" }],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md",
     ],
   },
   "E-MERGE-CI": {
@@ -297,17 +297,17 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "ci-step", job: "database", step: "Run the pgTAP suite (post-revocation posture)" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_02_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md",
-      "docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md",
     ],
   },
   "E-TRACE": {
     source: "PRD §6.12",
     artifacts: [
       "scripts/generate-phase-2f-traceability.mjs",
-      "docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md",
+      "docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md",
     ],
     verification: "fixture-root drift runs, one per declared failure class, each with a positive control proving the guard passes on correct content",
     gates: [
@@ -319,8 +319,8 @@ export const EVIDENCE_KEYS = Object.freeze({
     // PR is open; the acceptance PR adds the acceptance record beside it. The same
     // two-PR shape Slices 2F.4 and 2F.5 used, for the same reason.
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
-      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md",
     ],
   },
   "E-CLEAN": {
@@ -336,8 +336,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "npm", script: "test:remote:2f:cleanup" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
-      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md",
     ],
   },
   "E-CENSUS": {
@@ -349,8 +349,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       { kind: "npm", script: "test:remote:2f:census" },
     ],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
-      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md",
     ],
   },
   "E-DOCS": {
@@ -364,13 +364,13 @@ export const EVIDENCE_KEYS = Object.freeze({
       "docs/DATABASE.md",
       "docs/PHASE_2_PLAN.md",
       "docs/PHASE_2F_PRD.md",
-      "docs/reports/PHASE_2F_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_REPORT.md",
     ],
     verification: "documentation-convergence cases that read the documents they assert about, including the dated expiry recomputed from go-live and the cross-document status contradiction scan",
     gates: [{ kind: "suite", file: "src/lib/closeout/phase-2f-documentation.test.ts" }],
     acceptance: [
-      "docs/reports/PHASE_2F_SLICE_06_REPORT.md",
-      "docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_REPORT.md",
+      "docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md",
     ],
   },
 });
@@ -663,7 +663,7 @@ export function readAdrCoverage(root) {
 export const ACCEPTANCE_BEARING_SUFFIXES = Object.freeze(["ACCEPTANCE", "REPORT"]);
 
 /**
- * Per-slice artifact inventory, read off `docs/reports/`. A slice needs **at
+ * Per-slice artifact inventory, read off `docs/reports/phase-2f/`. A slice needs **at
  * least one** acceptance-bearing artifact; requiring a file named
  * `…_ACCEPTANCE.md` specifically would fail on Slice 2F.1 (which has only a
  * report) and, symmetrically, Slice 2F.3 has no report — a naming asymmetry
@@ -671,7 +671,7 @@ export const ACCEPTANCE_BEARING_SUFFIXES = Object.freeze(["ACCEPTANCE", "REPORT"
  * proposed. The inventory is reported as fact rather than normalised away.
  */
 export function readSliceArtifacts(root) {
-  const dir = join(root, "docs/reports");
+  const dir = join(root, "docs/reports/phase-2f");
   const names = existsSync(dir) ? readdirSync(dir) : [];
   const bySlice = new Map();
   for (const slice of SLICES) {
@@ -1176,7 +1176,7 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
     const bearing = found.filter((name) => ACCEPTANCE_BEARING_SUFFIXES.includes(name));
     if (bearing.length === 0) {
       fail(
-        `slice ${slice} has no acceptance-bearing artifact in docs/reports/ `
+        `slice ${slice} has no acceptance-bearing artifact in docs/reports/phase-2f/ `
         + `(found: ${found.length ? found.join(", ") : "nothing"}). One of `
         + `${ACCEPTANCE_BEARING_SUFFIXES.join(" or ")} is required.`,
       );
@@ -1309,7 +1309,7 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
       const provenByCi = /\bCI\b/.test(row.executesIn);
       const ordinal = String(Number(slice.split(".")[1])).padStart(2, "0");
       const named = provenByCi || subject === null || bearing.some((suffix) => {
-        const path = join(root, `docs/reports/PHASE_2F_SLICE_${ordinal}_${suffix}.md`);
+        const path = join(root, `docs/reports/phase-2f/PHASE_2F_SLICE_${ordinal}_${suffix}.md`);
         return existsSync(path) && subject.test(readFileSync(path, "utf8"));
       });
       if (!named) {
@@ -1423,7 +1423,7 @@ export function renderPhase2fTraceability(model) {
     "4. **Every `npm run` gate resolved in `package.json`.**",
     "5. **Migrations** read out of `supabase/migrations/` and attributed; a third fails the run.",
     "6. **ADR coverage** read out of `docs/DECISIONS.md`; an ADR naming an undeclared `2F-` ID fails.",
-    "7. **Per-slice acceptance artifacts** read out of `docs/reports/`.",
+    "7. **Per-slice acceptance artifacts** read out of `docs/reports/phase-2f/`.",
     "8. **CI gates resolved two ways** — a job-level gate to a workflow job *and step*; a suite-level gate",
     "   to a file that is inside a path the workflow actually executes (`vitest.config.ts`'s include minus",
     `   its exclude for Vitest; ${pgTapPaths.map((p) => `\`${p}\``).join(", ")} for pgTAP). A committed-but-unexecuted suite fails.`,
@@ -1488,7 +1488,7 @@ export function renderPhase2fTraceability(model) {
     "`PHASE_2F_SLICE_04_PLAN.md:99` with no action proposed. The gate requires at least one",
     "acceptance-bearing artifact per slice, not a particular filename.",
     "",
-    "| Slice | Artifacts in `docs/reports/` |",
+    "| Slice | Artifacts in `docs/reports/phase-2f/` |",
     "| --- | --- |",
     ...SLICES.map((slice) => `| ${slice} | ${(sliceArtifacts.get(slice) ?? []).join(", ") || "—"} |`),
     "",

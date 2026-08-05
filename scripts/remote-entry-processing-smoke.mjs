@@ -422,7 +422,7 @@ try {
   console.log(
     "BLOCKED past this point: end-to-end interpretation, product events and the unattended dispatch drain all "
     + "need a credential the worker can decrypt AND authenticate against the provider. A disposable account "
-    + "cannot hold one. See docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md.",
+    + "cannot hold one. See docs/reports/byok/BYOK_DEPLOYED_ACCEPTANCE.md.",
   );
   process.exitCode = 0;
   throw new SmokeBlocked();

@@ -29,11 +29,11 @@ const REPO = REPOSITORY_ROOT;
 
 function fixture(mutate: (root: string) => void = () => {}): string {
   const root = mkdtempSync(join(tmpdir(), "sh-trace-"));
-  mkdirSync(join(root, "docs/reports"), { recursive: true });
+  mkdirSync(join(root, "docs/reports/signup-hardening"), { recursive: true });
   mkdirSync(join(root, "supabase/migrations"), { recursive: true });
   cpSync(join(REPO, "docs/SIGNUP_HARDENING_PRD.md"), join(root, "docs/SIGNUP_HARDENING_PRD.md"));
   for (const slice of ["00", "01", "02", "03", "04", "05", "06"]) {
-    writeFileSync(join(root, `docs/reports/SIGNUP_HARDENING_SLICE_${slice}_ACCEPTANCE.md`), "# fixture\n");
+    writeFileSync(join(root, `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_${slice}_ACCEPTANCE.md`), "# fixture\n");
   }
   writeFileSync(join(root, "supabase/migrations/202608050077_retention_and_exposure.sql"), "-- fixture\n");
   mutate(root);
@@ -95,7 +95,7 @@ describe("the generator refuses to print past a defect", () => {
 
   it("catches a missing acceptance artifact", () => {
     withFixture(
-      (root) => rmSync(join(root, "docs/reports/SIGNUP_HARDENING_SLICE_03_ACCEPTANCE.md")),
+      (root) => rmSync(join(root, "docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_03_ACCEPTANCE.md")),
       (root) => {
         expect(findings(root).some((f) => f.includes("SLICE_03_ACCEPTANCE"))).toBe(true);
       },

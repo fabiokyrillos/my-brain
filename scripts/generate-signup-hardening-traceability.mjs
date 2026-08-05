@@ -1,7 +1,7 @@
 /**
  * Signup Hardening traceability generator — SH-OPERATIONS-001, SH-OPERATIONS-005.
  *
- * Writes `docs/reports/SIGNUP_HARDENING_TRACEABILITY_MATRIX.md` from
+ * Writes `docs/reports/signup-hardening/SIGNUP_HARDENING_TRACEABILITY_MATRIX.md` from
  * `docs/SIGNUP_HARDENING_PRD.md` and from the artifacts the repository actually
  * holds.
  *
@@ -49,7 +49,7 @@ import { fileURLToPath } from "node:url";
 
 export const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-export const MATRIX_OUTPUT_PATH = "docs/reports/SIGNUP_HARDENING_TRACEABILITY_MATRIX.md";
+export const MATRIX_OUTPUT_PATH = "docs/reports/signup-hardening/SIGNUP_HARDENING_TRACEABILITY_MATRIX.md";
 
 /** The slices the implementation plan §1 budget table declares. */
 export const DECLARED_SLICES = Object.freeze([
@@ -160,7 +160,7 @@ export function findings(root) {
 
   // Every acceptance report the initiative claims must exist.
   for (const slice of ["00", "01", "02", "03", "04", "05", "06"]) {
-    const path = `docs/reports/SIGNUP_HARDENING_SLICE_${slice}_ACCEPTANCE.md`;
+    const path = `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_${slice}_ACCEPTANCE.md`;
     if (!existsSync(join(root, path))) problems.push(`missing acceptance artifact: ${path}`);
   }
 

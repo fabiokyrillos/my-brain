@@ -218,7 +218,7 @@ const corpus: { name: string; input: unknown }[] = [
   // The four divergence classes an independent review of this branch found
   // after the first corpus passed. Each was a real gap where the worker
   // validator and the Zod schema disagreed; none of them can regress silently
-  // now. See docs/reports/PRE_2E_FOUNDATION_HARDENING_REPORT.md.
+  // now. See docs/reports/pre-2e/PRE_2E_FOUNDATION_HARDENING_REPORT.md.
 
   // 1. Timezone offset range. `[+-]\d{2}:\d{2}` alone accepts nonsense offsets.
   // PostgreSQL caps a timestamptz offset at ±15:59, so the storable bound — not

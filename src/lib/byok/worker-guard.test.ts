@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
  *     provider without one — is asserted here, where reading files is allowed.
  *
  * Together they are stronger than the single Deno test the requirement
- * described. Recorded in `docs/reports/BYOK_SLICE_04_ACCEPTANCE.md` as a
+ * described. Recorded in `docs/reports/byok/BYOK_SLICE_04_ACCEPTANCE.md` as a
  * deviation with its reason, not as a satisfied requirement.
  */
 

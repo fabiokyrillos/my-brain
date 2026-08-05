@@ -38,11 +38,11 @@ function emptyRepo(): string {
 function repoWith(omit: string[] = []): string {
   const root = emptyRepo();
   const needed = [
-    "docs/reports/BYOK_TRACEABILITY_MATRIX.md",
-    "docs/reports/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md",
-    "docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md",
-    "docs/reports/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md",
-    "docs/reports/SIGNUP_HARDENING_SH6_DEPLOYMENT.md",
+    "docs/reports/byok/BYOK_TRACEABILITY_MATRIX.md",
+    "docs/reports/signup-hardening/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md",
+    "docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md",
+    "docs/reports/signup-hardening/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md",
+    "docs/reports/signup-hardening/SIGNUP_HARDENING_SH6_DEPLOYMENT.md",
     "supabase/tests/signup_hardening_cascade_drill.sql",
     "supabase/tests/signup_hardening_suspension_admin.sql",
     "supabase/tests/signup_hardening_grant_census.sql",
@@ -140,11 +140,11 @@ describe("fail-closed: an empty repository proves nothing", () => {
 
 describe("each gate fails when its own artifact is missing", () => {
   const cases: ReadonlyArray<readonly [string, string]> = [
-    ["RG-BYOK-1", "docs/reports/BYOK_TRACEABILITY_MATRIX.md"],
-    ["RG-DEL-1", "docs/reports/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md"],
+    ["RG-BYOK-1", "docs/reports/byok/BYOK_TRACEABILITY_MATRIX.md"],
+    ["RG-DEL-1", "docs/reports/signup-hardening/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md"],
     ["RG-DEL-2", "supabase/tests/signup_hardening_cascade_drill.sql"],
     ["RG-DEL-3", "scripts/verify-storage-orphans.mjs"],
-    ["RG-DEL-4", "docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md"],
+    ["RG-DEL-4", "docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md"],
     ["RG-SUS-1", "supabase/tests/signup_hardening_suspension_admin.sql"],
     ["RG-SUS-2", "supabase/functions/_shared/lifecycle-gate.ts"],
     ["RG-LEG-1", "src/features/legal/documents.ts"],
@@ -159,7 +159,7 @@ describe("each gate fails when its own artifact is missing", () => {
     ["RG-EXP-1", "supabase/tests/signup_hardening_grant_census.sql"],
     ["RG-EXP-2", "src/lib/closeout/heartbeat-disposition.test.ts"],
     ["RG-EXP-4", "src/proxy.ts"],
-    ["RG-DEP-2", "docs/reports/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md"],
+    ["RG-DEP-2", "docs/reports/signup-hardening/SIGNUP_HARDENING_ORIGIN_VERIFICATION.md"],
   ];
 
   it.each(cases)("%s fails without %s", (gate, artifact) => {
