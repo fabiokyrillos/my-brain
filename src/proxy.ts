@@ -23,12 +23,49 @@ import type { Locale } from "@/lib/preferences";
  */
 const NO_STORE = "no-store, max-age=0, must-revalidate";
 
+/**
+ * SH-EXPOSURE-006 — the fail-open on missing configuration, bounded.
+ *
+ * Absent Supabase configuration used to mean `return response`: the request
+ * passed straight through, unauthenticated, into whatever `app/` route it asked
+ * for. In development that is a convenience — you can start the server before
+ * filling in `.env.local` and see the shell. In production it is the whole auth
+ * boundary disappearing because an environment variable was missing, which is
+ * the most ordinary deployment mistake there is.
+ *
+ * So the behaviour now splits, and the split is explicit rather than a
+ * side-effect of some other flag. Production refuses `app/` routes; everything
+ * else, in every mode, still passes through — the login page, the legal pages
+ * and the static shell must remain reachable, or a misconfigured deployment
+ * would have no way to display that it is misconfigured.
+ *
+ * `NODE_ENV` is the discriminator because Next sets it to `production` in a
+ * production build and `development` under `next dev`, so this cannot be
+ * switched on by a request, a header or a cookie.
+ */
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
     ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return response;
+  if (!url || !key) {
+    const unconfiguredParts = request.nextUrl.pathname.split("/");
+    if (isProductionRuntime() && unconfiguredParts[2] === "app") {
+      // 503 and not a redirect to login: login cannot work either, and sending
+      // someone to a form that cannot submit is a worse answer than saying the
+      // deployment is not configured. Nothing here names a variable.
+      const refused = new NextResponse("Service unavailable", {
+        status: 503,
+        headers: { "Cache-Control": NO_STORE, "Content-Type": "text/plain; charset=utf-8" },
+      });
+      return refused;
+    }
+    return response;
+  }
 
   const supabase = createServerClient(url, key, {
     cookies: {
