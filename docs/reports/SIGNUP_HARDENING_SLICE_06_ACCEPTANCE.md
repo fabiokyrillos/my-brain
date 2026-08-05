@@ -39,7 +39,7 @@ fully spent and was not exceeded.**
 | SH-EXPOSURE-006 | Proxy refuses `app/` routes in production when unconfigured | `proxy.test.ts` (6 new cases) |
 | SH-COPY-006 | No surface promises what the schedule contradicts | `documents.test.ts` |
 
-## 2. Three defects this slice's own adversarial review found
+## 2. Four defects, three caught by review and one by CI
 
 Recorded because the review is worth more as a record of what it caught than as
 an assertion that it happened.
@@ -70,6 +70,24 @@ count".
 expected the DEFINER resolvers to be the only users of the `service_role` grant.
 Two real callers were not: the deletion executor and the master-key rotation.
 The closure was not weakened; both were routed through narrow named functions.
+
+**The grant matrix pinned platform defaults, and CI refused it** — the fourth
+defect, and the only one review missed. The first cut of Property 5 compared the
+whole privilege set. `authenticated` also carries REFERENCES, TRIGGER and
+TRUNCATE on most tables, not from anything in this chain but from the platform's
+default privileges: the FINDINGS §12.3 local/hosted divergence, live. Pinning
+them would have produced an assertion green in CI and meaningless about
+production — precisely the failure Property 3's own comment is a monument to,
+after two earlier cuts of *that* assertion were refused the same way. The matrix
+now filters to DML, which is what SH-EXPOSURE-002 asks for in its own words.
+
+The same run also proved two expected values wrong:
+`entry_task_candidate_resolutions` and `task_command_confirmations` hold SELECT
+rather than nothing. Derived from the migration text they looked like `(none)`,
+because the grant they inherit is not written in any migration — which is the
+whole reason a census reads the catalog rather than the chain, and a reminder
+that deriving an expectation from the same source the code came from proves
+less than it appears to.
 
 ## 3. Three residuals, named
 
