@@ -2250,3 +2250,108 @@ path as the subject, changing one variable — is what turned "no token, cause
 unknown" into a named defect in one run. Two earlier attempts at this question
 produced only more description. When a probe keeps returning ambiguity, add a
 control rather than more instrumentation.
+
+---
+
+## 29. The twelfth stop — 2026-08-05, SH-CAPTCHA-002 satisfied. **This supersedes §27 and §28.**
+
+`main` at `974cdd4`. PRs #85–#89 merged, each with merge-SHA CI green on all
+three jobs, branches preserved. Hosted parity `202608040075`.
+
+### SH-CAPTCHA-002 is satisfied, by execution
+
+The owner enabled hosted CAPTCHA with Turnstile. Read back before probing:
+`security_captcha_enabled = true`, `security_captcha_provider = "turnstile"`,
+secret present, `disable_signup` still `true`.
+
+`scripts/sh5-captcha-enforcement-probes.mjs`, against the deployed project as
+`anon`:
+
+| Probe | Result |
+| --- | --- |
+| raw `/recover`, no token | `400 captcha_failed` |
+| raw `/recover`, invalid token | `400 captcha_failed` |
+| empty string / `null` token | `400 captcha_failed` |
+| token at the top level, not in `gotrue_meta_security` | `400 captcha_failed` |
+| meta object absent entirely | `400 captcha_failed` |
+| raw `/signup`, no token | `400 captcha_failed` |
+| refusal for a **known** vs an **unknown** address | **identical** |
+
+**UI-only enforcement is structurally impossible** — the requirement's exact
+words, and T-18 closes with it. The uniform refusal matters as much: a captcha
+refusal that varied by whether the account existed would have been a fresh
+enumeration channel wearing a security control's clothes.
+
+The application path was checked too: with no token, `/pt-BR/auth/recover` and
+`/pt-BR/auth/login` both land on `?error=captcha-failed` — its own declared
+code, not `invalid-credentials` and not `recovery-failed`. Requirement 11
+verified on the deployment.
+
+### What is still NOT proven, and it is one thing
+
+**That a real client can currently solve the challenge.**
+
+- Probes 3 and 5 (valid token) are **SKIPPED, not passed**. Turnstile declines
+  to serve a challenge to an automated browser, headless or headed. That is the
+  product working as designed; a probe that cannot run has proven nothing.
+- The auth log is **ambiguous**: three `grant_type=password → 200` at
+  15:59–16:00 UTC, but the earliest provably post-enablement refusal is 16:11,
+  so they cannot be placed inside the enforced window. `refresh_token` traffic
+  is excluded — it is not captcha-protected, and counting it would let a refresh
+  storm masquerade as proof.
+- The organization **audit log endpoint returns 404** on this plan, so the
+  enablement instant cannot be pinned. That avenue is closed.
+
+**What settles it:** one interactive sign-in at
+`https://my-brain-dusky.vercel.app/pt-BR/auth/login`, then a
+`/token?grant_type=password → 200` in `auth_logs` timestamped after 16:11. Its
+absence would mean auth is refused for everyone — an outage, not a control, and
+the rollback is to disable CAPTCHA protection in the Supabase dashboard.
+
+The timing is *consistent* with the owner's report (enable → test → sign in at
+15:59 → message), and consistency is not proof. It is recorded as unproven.
+
+### Three wrong conclusions in one investigation, and the reason
+
+This question produced three published readings before it settled:
+
+1. §26/§27 — "no token; points at automation and local DNS". Wrong.
+2. §28 (PR #88) — "the site key does not work on this hostname; a genuine
+   defect". Wrong.
+3. Now — the site key is fine; Turnstile simply refuses automated browsers.
+
+The common cause is one control. Cloudflare's `1x00000000000000000000AA` is
+documented to pass **regardless of client**, so it never controlled for bot
+detection — the single variable that actually differed. It proved the
+environment could run Turnstile's happy path, and nothing whatever about a key
+subject to bot detection.
+
+**A control exempt from the mechanism under test is not a control.** That is the
+transferable lesson, and it cost two corrections to learn.
+
+### Where SH.5 stands
+
+Everything repository-provable is **done and merged**. SH-CAPTCHA-002 is
+**satisfied as specified**. Remaining, and named rather than counted:
+
+- **SH-SIGNUP-007** hosted password policy — owner dashboard, not attempted.
+- **SH-SIGNUP-005** confirmation-required's behavioural half — needs SMTP.
+- **SH-SIGNUP-011's timing residual — NOT MEASURED**, and not measurable now:
+  sampling it would exhaust the very ceilings under test. Carried to the rollout
+  gate.
+- Both delivered-link journeys — deployment-blocked on custom SMTP.
+- The one confirmation above.
+
+**SH.6 is not started.** Public signup is closed at both layers. No retention
+purge has been executed.
+
+### Do not, on resuming
+
+Everything in §26's list still stands, plus:
+
+- **Do not mark probes 3 and 5 passed** on the strength of the log evidence. It
+  is ambiguous and is recorded as such.
+- **Do not use an always-passes test key as a control** for anything involving
+  bot detection. It is exempt from the mechanism.
+- **Do not conclude the widget is broken** because automation cannot solve it.
+  That is Turnstile working.
