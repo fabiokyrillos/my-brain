@@ -105,6 +105,17 @@ export const INTENDED_HOSTED_AUTH = {
   external_email_enabled: true,
   mailer_autoconfirm: false,
   external_anonymous_users_enabled: false,
+  // SH-SIGNUP-007. The hosted minimum matches the application's Zod policy,
+  // because Zod guards the Server Actions and the Server Actions are not the
+  // only door -- `PUT /auth/v1/user` is validated by GoTrue alone.
+  //
+  // `password_required_characters` is deliberately NOT here. It is a closed
+  // enum whose four-class member contains a literal double backslash, and a
+  // hand-written copy was rejected as 97 characters where the API wanted 98.
+  // A constant that can be wrong in a way nobody can see by reading it is worse
+  // than no constant, so that field is set by reading the provider's own enum
+  // and is verified by readback rather than by declaration.
+  password_min_length: 12,
 };
 
 function accessToken() {
