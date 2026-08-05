@@ -144,6 +144,14 @@ Verified live after deploy: the auth route now serves
 `script-src … https://challenges.cloudflare.com` with matching `frame-src` and
 `connect-src`; the product route serves none of them.
 
+### The question is no longer open, and the earlier reading was wrong
+
+> **Corrected 2026-08-05.** The section below concluded that the missing token
+> "points at automation and local DNS rather than at a misconfiguration". A
+> discriminating experiment settled it the other way. The text is kept because
+> the reasoning that produced the wrong answer is worth seeing, but **the
+> conclusion is superseded by §4c.**
+
 ### The open question: no token in an automated browser
 
 After the fix, the widget **loads, renders and communicates**:
@@ -167,6 +175,55 @@ open an auth page in an ordinary browser and confirm the widget visibly
 completes **before** enabling hosted CAPTCHA. Enabling enforcement while no
 token is produced would lock every account out of the product, and the account
 that would fix it is one of the locked-out ones.
+
+---
+
+## 4c. The site key does not work on this hostname — a second lockout-class defect
+
+Cloudflare publishes site keys with fixed behaviour for exactly this question.
+All three were rendered on the **live page**, in the same browser, through the
+same CSP, in one session — only the key varied.
+
+| Site key | Result |
+| --- | --- |
+| `1x00000000000000000000AA` (always passes) | **token, 21 chars** |
+| `2x00000000000000000000AB` (always blocks) | **`error-callback` fired, code `600010`** |
+| `0x4AAAAAAEHELS4NcaQk8Whr` (the real one, from `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | **timeout, 0 iframes, no callback** |
+
+Two things follow, and the second one is why the first is trustworthy:
+
+1. **This environment can complete a Turnstile challenge.** The always-passes
+   key produced a real token through the deployed CSP. So automation, headless
+   Chromium and local DNS are all **exonerated** — the earlier reading in §4b
+   was wrong.
+2. **Error callbacks do fire and do propagate here.** The always-blocks key
+   returned `600010`. So the real key's silence is not a swallowed error; the
+   widget genuinely never starts.
+
+**Conclusion: the configured site key does not render a widget on
+`my-brain-dusky.vercel.app`.** The overwhelmingly likely cause is the widget's
+**hostname allowlist** in the Cloudflare dashboard — a Turnstile widget only
+serves the domains registered against it, and a key created for a different
+hostname (or before this one existed) behaves exactly like this.
+
+### Why this had to be found before enabling, not after
+
+This is the *second* defect on this path that is invisible until the switch is
+flipped, and it has the same consequence: with hosted CAPTCHA on and no token
+obtainable, **every sign-in, signup, recovery and resend is refused** — and the
+owner account that would turn the setting back off is one of the locked-out
+ones.
+
+### The owner action this creates, and it comes first
+
+In the **Cloudflare dashboard → Turnstile → the widget for this site**, confirm
+the **Hostnames** list contains `my-brain-dusky.vercel.app` (add it if not), and
+confirm the site key it shows is the one in
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`. The site key is public; the secret key is not
+needed for this check and must not be pasted anywhere.
+
+Re-run `node scripts/…` — or simply reload an auth page — until the widget
+visibly completes. **Only then** enable hosted CAPTCHA.
 
 ---
 

@@ -2196,3 +2196,57 @@ false`, provider still `hcaptcha`, no custom SMTP, 2 accounts both `active`.
 Production healthy; the auth routes serve the Turnstile-permitting CSP and the
 product routes do not. Public signup closed at both layers. No retention purge
 has been executed.
+
+### §27 addendum — the open question is closed, and §27's reading of it was wrong
+
+§27 recorded the missing token as "points at automation and local DNS rather
+than at a misconfiguration… not proof". A discriminating experiment settled it
+the other way, and the correction matters because it changes the owner's next
+action from *"look at it"* to *"fix the widget registration"*.
+
+Cloudflare publishes site keys with fixed behaviour for exactly this question.
+All three were rendered **on the live page, in one browser session, through the
+deployed CSP** — only the key varied:
+
+| Site key | Result |
+| --- | --- |
+| `1x00000000000000000000AA` (always passes) | **token, 21 chars** |
+| `2x00000000000000000000AB` (always blocks) | **`error-callback` `600010`** |
+| the configured `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | **timeout, 0 iframes, no callback** |
+
+Two conclusions, the second of which is what makes the first trustworthy:
+
+1. **The environment can complete a Turnstile challenge.** Automation, headless
+   Chromium and local DNS are exonerated — §27's reading was wrong.
+2. **Error callbacks fire and propagate here.** The real key's silence is not a
+   swallowed error; the widget never starts.
+
+**So the configured site key does not render on `my-brain-dusky.vercel.app`.**
+The likeliest cause by far is the widget's **hostname allowlist** in Cloudflare:
+a Turnstile widget serves only its registered domains, and a key created for a
+different hostname behaves exactly like this.
+
+**This is the second defect on this path that is invisible until the switch is
+flipped**, and it has the same consequence as the first: with hosted CAPTCHA on
+and no obtainable token, every sign-in, signup, recovery and resend is refused —
+and the owner account that would turn it back off is one of the locked-out ones.
+
+### The corrected owner sequence
+
+1. **Cloudflare dashboard → Turnstile → this widget.** Confirm **Hostnames**
+   contains `my-brain-dusky.vercel.app`; confirm the displayed **site key**
+   matches `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. The site key is public. The secret
+   key is not needed for this and must not be pasted anywhere.
+2. Reload an auth page and confirm the widget **visibly completes**.
+3. Only then: Supabase → **Authentication → Attack Protection → CAPTCHA
+   protection** → enable → **Provider: Turnstile** → paste the Secret Key.
+4. Then the six enforcement probes. **SH-CAPTCHA-002 stays unclaimed until they
+   execute.**
+
+### Method note worth keeping
+
+The discriminator — run a known-good and a known-bad control through the *same*
+path as the subject, changing one variable — is what turned "no token, cause
+unknown" into a named defect in one run. Two earlier attempts at this question
+produced only more description. When a probe keeps returning ambiguity, add a
+control rather than more instrumentation.
