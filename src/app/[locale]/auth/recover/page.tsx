@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { recoverPassword } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
+import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
 export default async function RecoverPage({
@@ -29,6 +30,7 @@ export default async function RecoverPage({
           E-mail
           <input name="email" type="email" required maxLength={254} autoComplete="email" />
         </label>
+        <TurnstileWidget />
         <button>{pt ? "Enviar link" : "Send link"}</button>
       </form>
       <Link href={`/${locale}/auth/login`}>{pt ? "Voltar ao login" : "Back to sign in"}</Link>

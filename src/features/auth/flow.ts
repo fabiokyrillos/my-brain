@@ -61,6 +61,36 @@ const messages = {
     "pt-BR": "Este ambiente ainda não está configurado para enviar e-mails de autenticação. Avise o responsável pelo produto.",
     en: "This environment is not configured to send authentication emails yet. Let the product owner know.",
   },
+  // SH-THROTTLE-003 / SH-SIGNUP-011. **One code for every throttled branch**,
+  // and that is the requirement rather than a convenience: if an address that
+  // exists were told something different from one that does not, the refusal
+  // itself would answer the question the uniform copy exists to refuse. It says
+  // "too many attempts" without saying too many attempts *at what*, because
+  // naming the account would be the same leak in gentler words.
+  //
+  // Deliberately distinct from `email-rate-limited`, which is the provider's
+  // ceiling and is only reachable once a mail was actually attempted.
+  throttled: {
+    "pt-BR": "Muitas tentativas. Aguarde um pouco e tente novamente.",
+    en: "Too many attempts. Wait a little and try again.",
+  },
+  // The throttle could not be consulted. Its own code, because "we could not
+  // check" is not "you did something wrong" and is not "you are over a limit".
+  // The action refuses rather than proceeding unthrottled — a control that fails
+  // open is one an attacker can switch off by inducing errors, and nothing would
+  // report it. Same honesty as `auth-misconfigured`, same reason.
+  "auth-unavailable": {
+    "pt-BR": "Não foi possível concluir a verificação de segurança agora. Tente novamente em instantes.",
+    en: "The security check could not be completed right now. Try again shortly.",
+  },
+  // SH-CAPTCHA-003. Distinct from credential, throttle and configuration
+  // failures: a failed challenge is a thing the reader can actually retry, and
+  // telling them "invalid email or password" when the real problem was an
+  // expired widget token sends them to reset a password that was never wrong.
+  "captcha-failed": {
+    "pt-BR": "A verificação anti-robô falhou. Recarregue a página e tente novamente.",
+    en: "The anti-bot check failed. Reload the page and try again.",
+  },
 } as const;
 
 export type AuthErrorCode = keyof typeof messages;

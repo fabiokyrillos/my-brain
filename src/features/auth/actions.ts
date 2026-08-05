@@ -14,8 +14,10 @@ import {
 import { getAccountCopy } from "@/features/shell/account-copy";
 import type { Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
+import { isCaptchaError, readCaptchaToken } from "./captcha";
 import { idleSignOutState, type SignOutState } from "./sign-out-state";
 import { configuredOriginFrom, isSignupOpenIn } from "./signup-policy";
+import { admitAuthEvent, finalizeAuthEvent } from "./throttle";
 
 function safeLocale(value: FormDataEntryValue | null): Locale {
   return value === "en" ? "en" : "pt-BR";
@@ -55,15 +57,58 @@ function authOrigin(): string | null {
   }
 }
 
+/**
+ * The refusal a throttle produced, as a redirect code.
+ *
+ * One helper so all four surfaces answer identically: a ceiling and an
+ * unreachable throttle are different facts (SH-COPY-004), and neither may vary
+ * with whether the identifier exists (SH-SIGNUP-011).
+ */
+function throttleErrorCode(reason: "throttled" | "unavailable") {
+  return reason === "throttled" ? "throttled" : "auth-unavailable";
+}
+
 export async function signIn(formData: FormData) {
   const locale = safeLocale(formData.get("locale"));
   const parsed = signInSchema.safeParse(formValues(formData));
   if (!parsed.success) redirect(`/${locale}/auth/login?error=invalid-form`);
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) redirect(`/${locale}/auth/login?error=invalid-credentials`);
 
+  // SH-THROTTLE-003 — admission BEFORE the provider call, so a brute-force run
+  // is refused by this application rather than by GoTrue. Ours is the refusal
+  // with uniform copy; the provider's differs between an address that exists
+  // and one that does not, which is the distinction we are erasing.
+  //
+  // **The ceiling counts attempts, not only failures, and that is stricter than
+  // the `signin_failure` kind name suggests.** `claim_auth_event_slot` reserves
+  // by inserting — that atomicity is what makes it correct under concurrency —
+  // so there is no way to consult a ceiling without recording against it, and
+  // no way to withdraw the row after a success (no client role holds DELETE, by
+  // design). The `outcome` column still tells the two apart for anyone reading
+  // the ledger; what it does not do is exempt successes from the count. The
+  // failure direction is toward more throttling, never less, and the ceiling is
+  // set where a human never reaches it.
+  const admission = await admitAuthEvent(supabase, "signin_failure", parsed.data.email);
+  if (!admission.admitted) {
+    redirect(`/${locale}/auth/login?error=${throttleErrorCode(admission.reason)}`);
+  }
+
+  const captchaToken = readCaptchaToken(formData.get("captchaToken"));
+  const { error } = await supabase.auth.signInWithPassword({
+    ...parsed.data,
+    options: { captchaToken },
+  });
+
+  if (error) {
+    await finalizeAuthEvent(supabase, admission.attemptId, "refused");
+    // A failed challenge is not a wrong password. Conflating them sends someone
+    // to reset a credential that was never the problem.
+    const code = isCaptchaError(error) ? "captcha-failed" : "invalid-credentials";
+    redirect(`/${locale}/auth/login?error=${code}`);
+  }
+
+  await finalizeAuthEvent(supabase, admission.attemptId, "succeeded");
   redirect(`/${locale}/app`);
 }
 
@@ -146,19 +191,40 @@ export async function signUp(formData: FormData) {
   if (origin === null) redirect(`/${locale}/auth/register?error=auth-misconfigured`);
 
   const supabase = await createClient();
+
+  // SH-THROTTLE-003, and note the order relative to the gate above: the closed
+  // signup gate still refuses FIRST (SH-SIGNUP-001). Consulting a ceiling for a
+  // request that was never going to reach a provider would spend a real slot on
+  // a refusal the caller could trigger for free, turning a closed door into a
+  // way to exhaust someone else's allowance.
+  const admission = await admitAuthEvent(supabase, "signup", parsed.data.email);
+  if (!admission.admitted) {
+    redirect(`/${locale}/auth/register?error=${throttleErrorCode(admission.reason)}`);
+  }
+
+  const captchaToken = readCaptchaToken(formData.get("captchaToken"));
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { display_name: parsed.data.displayName },
       emailRedirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/app`),
+      captchaToken,
     },
   });
 
   if (error) {
+    await finalizeAuthEvent(supabase, admission.attemptId, "provider_error");
+    if (isCaptchaError(error)) redirect(`/${locale}/auth/register?error=captcha-failed`);
     const code = authProviderErrorCode(error, "signup-failed");
     redirect(`/${locale}/auth/register?error=${code}`);
   }
+
+  await finalizeAuthEvent(supabase, admission.attemptId, "succeeded");
+  // SH-SIGNUP-011: identical for an address that already exists and one that
+  // does not. GoTrue is uniform here by design — an existing confirmed address
+  // returns a user with no identities rather than an error — and this branch
+  // must not undo that by inspecting the response and saying something else.
   redirect(`/${locale}/auth/login?message=check-email`);
 }
 
@@ -171,15 +237,85 @@ export async function recoverPassword(formData: FormData) {
   if (origin === null) redirect(`/${locale}/auth/recover?error=auth-misconfigured`);
 
   const supabase = await createClient();
+
+  const admission = await admitAuthEvent(supabase, "recovery", parsed.data.email);
+  if (!admission.admitted) {
+    redirect(`/${locale}/auth/recover?error=${throttleErrorCode(admission.reason)}`);
+  }
+
+  const captchaToken = readCaptchaToken(formData.get("captchaToken"));
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/auth/reset`),
+    captchaToken,
   });
 
   if (error) {
+    await finalizeAuthEvent(supabase, admission.attemptId, "provider_error");
+    if (isCaptchaError(error)) redirect(`/${locale}/auth/recover?error=captcha-failed`);
     const code = authProviderErrorCode(error, "recovery-failed");
     redirect(`/${locale}/auth/recover?error=${code}`);
   }
+
+  await finalizeAuthEvent(supabase, admission.attemptId, "succeeded");
   redirect(`/${locale}/auth/login?message=recovery-sent`);
+}
+
+/**
+ * SH-SIGNUP-008 — a fresh confirmation email, from its own surface.
+ *
+ * Re-registering was the only way to get one, and that is wrong twice: it runs
+ * the whole signup path (consent, password policy, the gate) to achieve a
+ * resend, and when signup is closed it is not available at all — so an account
+ * created before the gate closed could never confirm.
+ *
+ * It carries **its own ceiling**, tighter than the others, because this is the
+ * one surface whose entire purpose is to cause a message to be delivered to
+ * somebody else's inbox (T-15). That ceiling is currently marked provisional:
+ * the binding provider limit is a default-SMTP artefact, not a product decision.
+ *
+ * Uniform by construction: GoTrue's `resend` answers the same way for an
+ * address that has nothing to confirm as for one that does, and this action adds
+ * nothing that could tell them apart — the throttle is consulted before the
+ * provider, its refusal is the shared code, and the success message is fixed.
+ */
+export async function resendConfirmation(formData: FormData) {
+  const locale = safeLocale(formData.get("locale"));
+  const parsed = recoverySchema.safeParse(formValues(formData));
+  if (!parsed.success) redirect(`/${locale}/auth/resend?error=invalid-form`);
+
+  const origin = authOrigin();
+  if (origin === null) redirect(`/${locale}/auth/resend?error=auth-misconfigured`);
+
+  const supabase = await createClient();
+
+  const admission = await admitAuthEvent(supabase, "resend", parsed.data.email);
+  if (!admission.admitted) {
+    redirect(`/${locale}/auth/resend?error=${throttleErrorCode(admission.reason)}`);
+  }
+
+  const captchaToken = readCaptchaToken(formData.get("captchaToken"));
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: parsed.data.email,
+    options: {
+      emailRedirectTo: buildAuthCallbackUrl(origin, locale, `/${locale}/app`),
+      captchaToken,
+    },
+  });
+
+  if (error) {
+    await finalizeAuthEvent(supabase, admission.attemptId, "provider_error");
+    if (isCaptchaError(error)) redirect(`/${locale}/auth/resend?error=captcha-failed`);
+    // `authProviderErrorCode` maps the provider's own rate limit to its shared
+    // code. Everything else becomes one generic failure rather than being
+    // forwarded, because a provider message here can distinguish an address
+    // that exists from one that does not.
+    const code = authProviderErrorCode(error, "recovery-failed");
+    redirect(`/${locale}/auth/resend?error=${code}`);
+  }
+
+  await finalizeAuthEvent(supabase, admission.attemptId, "succeeded");
+  redirect(`/${locale}/auth/login?message=check-email`);
 }
 
 export async function updatePassword(formData: FormData) {

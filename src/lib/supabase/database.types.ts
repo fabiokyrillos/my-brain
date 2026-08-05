@@ -524,6 +524,33 @@ export type Database = {
           },
         ]
       }
+      auth_event_attempts: {
+        Row: {
+          attempted_at: string
+          id: string
+          identifier_hash: string | null
+          ip_hash: string | null
+          kind: string
+          outcome: string
+        }
+        Insert: {
+          attempted_at?: string
+          id?: string
+          identifier_hash?: string | null
+          ip_hash?: string | null
+          kind: string
+          outcome?: string
+        }
+        Update: {
+          attempted_at?: string
+          id?: string
+          identifier_hash?: string | null
+          ip_hash?: string | null
+          kind?: string
+          outcome?: string
+        }
+        Relationships: []
+      }
       contexts: {
         Row: {
           created_at: string
@@ -2062,7 +2089,7 @@ export type Database = {
           operation_key: string
           request_fingerprint: string
           status: string
-          task_id: string
+          task_id: string | null
           user_id: string
         }
         Insert: {
@@ -2073,7 +2100,7 @@ export type Database = {
           operation_key: string
           request_fingerprint: string
           status?: string
-          task_id: string
+          task_id?: string | null
           user_id: string
         }
         Update: {
@@ -2084,7 +2111,7 @@ export type Database = {
           operation_key?: string
           request_fingerprint?: string
           status?: string
-          task_id?: string
+          task_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2560,17 +2587,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      account_owned_row_counts: {
-        Args: {
-          p_user_id: string
-        }
-        Returns: Json
-      }
+      account_owned_row_counts: { Args: { p_user_id: string }; Returns: Json }
       admin_account_lifecycle_status: {
-        Args: {
-          p_email: string | null
-          p_user_id: string | null
-        }
+        Args: { p_email: string; p_user_id: string }
         Returns: Json
       }
       apply_reminder_command_v1: {
@@ -2595,10 +2614,7 @@ export type Database = {
         Returns: Json
       }
       begin_account_deletion_admin: {
-        Args: {
-          p_reason_code: string
-          p_user_id: string
-        }
+        Args: { p_reason_code: string; p_user_id: string }
         Returns: Json
       }
       begin_entry_interpretation: {
@@ -2631,6 +2647,17 @@ export type Database = {
           p_worker_id: string
         }
         Returns: Json
+      }
+      claim_auth_event_slot: {
+        Args: {
+          p_identifier_ceiling: number
+          p_identifier_hash: string
+          p_ip_ceiling: number
+          p_ip_hash: string
+          p_kind: string
+          p_window: string
+        }
+        Returns: string
       }
       claim_credential_validation_slot: {
         Args: {
@@ -2743,10 +2770,7 @@ export type Database = {
         Returns: Json
       }
       defer_job_for_inactive_owner: {
-        Args: {
-          p_job_id: string
-          p_worker_id: string
-        }
+        Args: { p_job_id: string; p_worker_id: string }
         Returns: Json
       }
       element_trust_evidence: { Args: { p_element_trust: Json }; Returns: Json }
@@ -2788,22 +2812,19 @@ export type Database = {
         Returns: Json
       }
       fail_job_terminal: {
-        Args: {
-          p_error: string
-          p_job_id: string
-          p_worker_id: string
-        }
+        Args: { p_error: string; p_job_id: string; p_worker_id: string }
         Returns: Json
+      }
+      finalize_auth_event_attempt: {
+        Args: { p_attempt_id: string; p_outcome: string }
+        Returns: undefined
+      }
+      finalize_credential_validation_attempt: {
+        Args: { p_attempt_id: string; p_outcome: string }
+        Returns: undefined
       }
       get_ai_cost_summary: { Args: { p_timezone?: string }; Returns: Json }
       get_job_queue_metrics: { Args: never; Returns: Json }
-      finalize_credential_validation_attempt: {
-        Args: {
-          p_attempt_id: string
-          p_outcome: string
-        }
-        Returns: undefined
-      }
       interpretation_lifecycle_status: {
         Args: {
           p_element_trust: Json
@@ -2811,17 +2832,6 @@ export type Database = {
           p_record_only?: boolean
         }
         Returns: string
-      }
-      issue_task_command_creation_confirmation: {
-        Args: {
-          p_action: string
-          p_observed_before: string
-          p_operation_key: string
-          p_patch: Json
-          p_policy_version: string
-          p_title_words: string[]
-        }
-        Returns: Json
       }
       issue_task_command_confirmation: {
         Args: {
@@ -2832,6 +2842,17 @@ export type Database = {
           p_policy_version: string
           p_pre_state: Json
           p_task_id: string
+        }
+        Returns: Json
+      }
+      issue_task_command_creation_confirmation: {
+        Args: {
+          p_action: string
+          p_observed_before: string
+          p_operation_key: string
+          p_patch: Json
+          p_policy_version: string
+          p_title_words: string[]
         }
         Returns: Json
       }
@@ -2905,10 +2926,7 @@ export type Database = {
         }[]
       }
       mark_entry_awaiting_ai_configuration: {
-        Args: {
-          p_entry_id: string
-          p_service_user_id: string
-        }
+        Args: { p_entry_id: string; p_service_user_id: string }
         Returns: boolean
       }
       match_internal_knowledge: {
@@ -2984,24 +3002,27 @@ export type Database = {
         }
         Returns: Json
       }
-      record_policy_acceptance: {
-        Args: {
-          p_document: string
-          p_surface: string
-        }
-        Returns: Json
-      }
+      prune_auth_event_attempts: { Args: never; Returns: number }
+      prune_credential_validation_attempts: { Args: never; Returns: number }
       reactivate_account: {
-        Args: {
-          p_reason_code: string
-          p_user_id: string
-        }
+        Args: { p_reason_code: string; p_user_id: string }
         Returns: Json
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
-      prune_credential_validation_attempts: {
-        Args: Record<PropertyKey, never>
-        Returns: number
+      record_account_deletion: {
+        Args: {
+          p_account_deleted_at: string
+          p_outcome: string
+          p_requested_at: string
+          p_requester_session_hash: string
+          p_stop_reason: string
+          p_storage_bytes_removed: number
+          p_storage_completed_at: string
+          p_storage_objects_removed: number
+          p_storage_started_at: string
+          p_table_row_counts: Json
+        }
+        Returns: string
       }
       record_ai_usage: {
         Args: {
@@ -3018,20 +3039,9 @@ export type Database = {
         }
         Returns: string
       }
-      record_account_deletion: {
-        Args: {
-          p_account_deleted_at: string | null
-          p_outcome: string
-          p_requested_at: string
-          p_requester_session_hash: string | null
-          p_stop_reason: string | null
-          p_storage_bytes_removed: number
-          p_storage_completed_at: string | null
-          p_storage_objects_removed: number
-          p_storage_started_at: string | null
-          p_table_row_counts: Json
-        }
-        Returns: string
+      record_policy_acceptance: {
+        Args: { p_document: string; p_surface: string }
+        Returns: Json
       }
       record_product_event: {
         Args: {
@@ -3072,7 +3082,28 @@ export type Database = {
           recorded: boolean
         }[]
       }
+      request_account_deletion: { Args: never; Returns: Json }
       request_heartbeat: { Args: never; Returns: Json }
+      resolve_job_ai_credential: {
+        Args: { p_job_id: string }
+        Returns: {
+          ciphertext: string
+          iv: string
+          key_version: number
+          provider: string
+          status: string
+        }[]
+      }
+      resolve_own_ai_credential: {
+        Args: never
+        Returns: {
+          ciphertext: string
+          iv: string
+          key_version: number
+          provider: string
+          status: string
+        }[]
+      }
       resolve_owned_entity_exact: {
         Args: {
           p_entity_type: string
@@ -3081,32 +3112,6 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
-      }
-      resolve_job_ai_credential: {
-        Args: {
-          p_job_id: string
-        }
-        Returns: {
-          ciphertext: string
-          iv: string
-          key_version: number
-          provider: string
-          status: string
-        }[]
-      }
-      request_account_deletion: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      resolve_own_ai_credential: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          ciphertext: string
-          iv: string
-          key_version: number
-          provider: string
-          status: string
-        }[]
       }
       resolve_pending_question_v1: {
         Args: {
@@ -3139,10 +3144,7 @@ export type Database = {
         Returns: undefined
       }
       suspend_account: {
-        Args: {
-          p_reason_code: string
-          p_user_id: string
-        }
+        Args: { p_reason_code: string; p_user_id: string }
         Returns: Json
       }
       task_command_fingerprint: {
