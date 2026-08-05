@@ -28,6 +28,9 @@ type FakeOptions = {
   census?: Record<string, number>;
   censusAfter?: Record<string, number>;
   censusError?: boolean;
+  /** SH-EXPOSURE-001: the narrow credential status RPC's answer. */
+  credentialStatus?: string | null;
+  credentialError?: boolean;
   objects?: Record<string, { name: string; size: number }[]>;
   objectsAfterRemoval?: Record<string, { name: string; size: number }[]>;
   listError?: boolean;
@@ -108,13 +111,10 @@ function fakeService(options: FakeOptions) {
           }),
         };
       }
-      if (table === "user_ai_credentials") {
-        return {
-          select: () => ({
-            eq: () => ({ maybeSingle: async () => ({ data: { status: "removed" }, error: null }) }),
-          }),
-        };
-      }
+      // `user_ai_credentials` is deliberately absent: `service_role` no longer
+      // holds DML on it, so an executor that reached for the table here would
+      // throw `unexpected table` rather than quietly working in the fixture and
+      // failing against the real grants.
       throw new Error(`unexpected table ${table}`);
     },
 
@@ -170,6 +170,16 @@ function fakeService(options: FakeOptions) {
       if (name === "record_account_deletion") {
         recorder.recorded.push(args);
         return { data: "00000000-0000-4000-8000-000000000001", error: null };
+      }
+      // SH-EXPOSURE-001: the credential residue check reads one column through
+      // a narrow RPC now, because `service_role` lost DML on
+      // `user_ai_credentials` — the grant was a service key that could read
+      // every user's envelope with one `select *`. The stub returns a status
+      // and, deliberately, nothing else: if the executor ever starts needing
+      // ciphertext from here, this fixture will not be able to give it.
+      if (name === "admin_credential_status") {
+        if (options.credentialError) return { data: null, error: { message: "boom" } };
+        return { data: options.credentialStatus ?? "removed", error: null };
       }
       throw new Error(`unexpected rpc ${name}`);
     },
