@@ -116,7 +116,7 @@ wrong thing reports a sufficiency that is not there either.
 
 ## 5. What this initiative found, across all slices
 
-Nine defects were caught by mechanisms rather than by reading, and the causes
+Ten defects were caught by mechanisms rather than by reading, and the causes
 generalise:
 
 1. A `BEFORE ... FOR EACH ROW` trigger cannot see its own statement's earlier
