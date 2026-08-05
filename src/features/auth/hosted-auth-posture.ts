@@ -93,4 +93,38 @@ export const INTENDED_HOSTED_AUTH = {
   mailer_autoconfirm: false,
   /** A second door into account creation the signup gate would not see. */
   external_anonymous_users_enabled: false,
+
+  /**
+   * SH-SIGNUP-007 — the hosted policy matches the application's Zod policy.
+   *
+   * Until 2026-08-05 this was `6` with no character requirement, while
+   * `schema.ts` demanded twelve characters across four classes. That gap was
+   * not theoretical: the Zod schema guards the Server Actions, and the Server
+   * Actions are not the only door. An authenticated caller reaching
+   * `PUT /auth/v1/user` through PostgREST is validated by GoTrue alone, so a
+   * six-character password was reachable by anyone willing to skip the form.
+   *
+   * `password_required_characters` is a **closed set**, not free text, and the
+   * four-class member contains a literal double backslash. It is read from the
+   * provider's own enum by `scripts/hosted-auth-config.mjs` rather than
+   * transcribed here — a hand-escaped copy was rejected as a 97-character
+   * string where the API wanted 98, and a constant that can be wrong in a way
+   * nobody can see by reading it is worse than no constant.
+   */
+  password_min_length: 12,
+} as const;
+
+/**
+ * The application-side policy, stated once so the parity test can compare it to
+ * `schema.ts` and to the hosted readback without re-deriving it from a regex.
+ *
+ * The app policy remains the **first** line, not the only one: it fails faster,
+ * in the user's language, before a network call. The hosted policy is what
+ * makes it true at the boundary the form does not own.
+ */
+export const APPLICATION_PASSWORD_POLICY = {
+  minLength: 12,
+  maxLength: 128,
+  /** lower, upper, digit, symbol — the four classes `schema.ts` requires. */
+  requiredClasses: 4,
 } as const;
