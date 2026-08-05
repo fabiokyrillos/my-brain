@@ -1,6 +1,20 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — `docs/` separates the canon from the initiative, and the pairing is guarded (0 migrations)
+
+**The reports reorganization exposed the same problem one level up.** `docs/` held 33 markdown files at one level, mixing the eleven documents that are always current — `STATE.md`, `ENGINEERING_STANDARDS.md`, `DATABASE.md` and their kin — with twenty-two PRDs, implementation plans and phase reports belonging to work that closed weeks ago. A reader could not tell, from the listing alone, which files were the contract and which were history.
+
+**Governing artifacts now live in `docs/initiatives/<name>/`, under the same directory name their records use in `docs/reports/<name>/`.** `initiatives/byok/` states what BYOK was supposed to do; `reports/byok/` holds what it did. Knowing one path gives the other, and the guard asserts the pairing rather than trusting it: an initiative that reported without a governing directory fails the build, with three named exceptions that each have a stated reason — `pre-2e` answered a review rather than a PRD, `phase-2g` is an unauthorized definition study, and `shared` is initiative-independent by construction.
+
+**The `docs/` root is now a closed list of twelve.** `src/lib/closeout/docs-taxonomy-guard.test.ts` fails the `application` job on a thirteenth, and prints the initiative directory the file should have used — `PHASE_2H_PRD.md` is told to go to `docs/initiatives/phase-2h/`. It also rejects a governing artifact left directly in `docs/initiatives/`, a non-kebab-case directory at any depth, and an initiative directory created with no document in it. It reads the filesystem only and constrains nothing inside an initiative directory.
+
+**The A13 Phase-2G start detector got the widening this made necessary.** It scanned `docs/` one level deep, so a `PHASE_2G_PRD.md` filed under `docs/initiatives/phase-2g/` would have stopped being a start signal — the guard would have gone quiet precisely where the risk moved. It now walks `docs/` recursively from a single root, which also removes the double-reporting the previous two-directory list produced.
+
+`docs/product/` became `docs/initiatives/product-ux/` so the audit-to-roadmap-to-design-system chain sits under the same name as the `reports/product-ux/` record it produced. Nothing was renamed, no conclusion was edited, and every repository-local markdown link still resolves — now 101 links across 181 files, checked in CI.
+
+No runtime behavior, migration, hosted configuration, rollout gate, signup posture or retention schedule changed. Phase 2G still has no governing artifact and must not acquire one without owner authorization.
+
 ## 2026-08-05 — `docs/reports/` becomes a taxonomy, and placement becomes a guard (0 migrations)
 
 **128 report files were filed flat at one level, and the cost was measurable rather than aesthetic.** §33 of the loop handoff was opened at the repository root recording that the handoff "did not exist before §33" — while `docs/reports/AUTONOMOUS_LOOP_HANDOFF.md`, holding §1 through §32, sat unfound in the very directory the report was about. A directory nobody can navigate produces a log nobody can find, and then a second log.
@@ -213,7 +227,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **Scope was measured before it was declared.** A four-agent read-only census (auth surfaces; database privileged boundaries; storage, workers and Edge Functions; product surfaces and doc conventions) produced `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md`. It corrected the shape of the work rather than confirming a preliminary list: row-level cascade from `auth.users` is **already complete** (41/41 user-owned tables, zero exceptions), so the deletion gaps are **storage objects** (six live orphans from 2026-07-16, which do not cascade) and the **untested** 43 composite `NO ACTION` foreign keys that sit in a bulk-delete's path; **no account-lifecycle state exists anywhere**, so deletion and suspension are built on one foundation, not two; `service_role` still holds platform-default DML on the two BYOK tables; and the only retention sweep in the whole database is BYOK's 30-day validation-attempt prune.
 
-**The package.** `docs/SIGNUP_HARDENING_PRD.md` (16 `SH-*` families, ~120 mechanically-testable requirements, each carrying its slice, migration expectation, trust boundary, owner/shared-env flags and evidence class); `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` (seven slices SH.0–SH.7, an eight-migration budget, tiered pre-code gates, and the BYOK-OPERATIONS/Phase 2H boundary reasoning); `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md` (35 threats T-01…T-35 with prevention, detection, test and residual); `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` (a fail-closed checklist where an absent artifact is a failed gate, never a skip); and ADR-073…ADR-076 (Proposed) — the initiative shape and `SH-*` namespace, the self-only deletion executor, the operator-CLI admin boundary, and provider-enforced CAPTCHA.
+**The package.** `docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md` (16 `SH-*` families, ~120 mechanically-testable requirements, each carrying its slice, migration expectation, trust boundary, owner/shared-env flags and evidence class); `docs/initiatives/signup-hardening/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` (seven slices SH.0–SH.7, an eight-migration budget, tiered pre-code gates, and the BYOK-OPERATIONS/Phase 2H boundary reasoning); `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md` (35 threats T-01…T-35 with prevention, detection, test and residual); `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` (a fail-closed checklist where an absent artifact is a failed gate, never a skip); and ADR-073…ADR-076 (Proposed) — the initiative shape and `SH-*` namespace, the self-only deletion executor, the operator-CLI admin boundary, and provider-enforced CAPTCHA.
 
 **The requirement namespace is `SH-*`, deliberately not a phase prefix**, because `ADR-067`'s phase-start guard fails the build on a declared `2G-`-shaped requirement family. The pre-code gates are tiered per `ADR-069`'s lesson so no single external dependency (a CAPTCHA vendor, hosted Auth config, SMTP) blocks unrelated slices. Deletion, suspension and rollout are specified never to share a PR. `disable_signup` stays `true` throughout; the initiative's output is the rollout gate that would *prove* readiness, not the flip.
 
@@ -658,7 +672,7 @@ All sixteen acceptance gates passed. Live posture verified against the deployed 
 
 ## 2026-07-29 — Phase 2F Slice 2F.4: task grant revocation and test-suite semantic migration (one migration, no application source change)
 
-Implemented on branch `codex/phase-2f-slice-4` under `docs/PHASE_2F_PRD.md` Revision 4.2. Exactly one migration; **no file under `src/` changed**, which is itself the verification — since Slice 2F.3 no application module issued the writes this revokes, so what is removed is a permission, not a caller.
+Implemented on branch `codex/phase-2f-slice-4` under `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4.2. Exactly one migration; **no file under `src/` changed**, which is itself the verification — since Slice 2F.3 no application module issued the writes this revokes, so what is removed is a permission, not a caller.
 
 - **Migration `202607300063_phase_2f_task_grant_revocation.sql`** (2F-REVOKE-001): `revoke insert, update, delete on public.tasks from authenticated` and `revoke update, delete on public.reminders from authenticated`. Its post-deploy block asserts, fail-closed, all nine required properties — the three task denials, task SELECT retained, the two reminder denials, reminder SELECT and INSERT retained, `anon` empty-handed on both tables, RLS still `enable` **and** `force`, all eight owner-scoped policies present, all six user triggers present, and `create_due_task_reminder` still `security invoker`. No policy, trigger, signature, RPC or row was touched, and no grant widened.
 - **The 2F-REMINDER-003 determination is written, and it is a revocation** (owner decision A4, recorded in `SECURITY.md`). Evidence, not judgement: no production module issues a reminder UPDATE or DELETE; every surviving UPDATE runs inside `apply_task_command`, `run_user_heartbeat` or a definer-routed `private.undo_*` handler; and **no `delete` against `public.reminders` exists anywhere in the repository**, so rows go only by cascade. `insert` is retained — the Option C exception is unchanged.
@@ -679,7 +693,7 @@ Implemented on branch `codex/phase-2f-slice-4` under `docs/PHASE_2F_PRD.md` Revi
 
 ## 2026-07-29 — Phase 2F Slice 2F.2: Work-surface mutation convergence (code only, no migration)
 
-Implemented on branch `codex/phase-2f-slice-2` under `docs/PHASE_2F_PRD.md` Revision 4. **No SQL, no migration, no grant change, no new RPC, no change to `list_task_command_candidates`** — Gate 3 proved none was needed. Single revert boundary.
+Implemented on branch `codex/phase-2f-slice-2` under `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4. **No SQL, no migration, no grant change, no new RPC, no change to `list_task_command_candidates`** — Gate 3 proved none was needed. Single revert boundary.
 
 - **The four Work buttons route through `public.apply_task_command`** (2F-SURFACE-001). `src/features/task-commands/work-command.ts` is the whole mechanism: map the Work verb to its taxonomy action, build the command through `validateTaskCommand`, resolve through `loadTaskCandidates` with the rendered title as the query hint, select the row **by clicked id out of the whole result**, project the nineteen-key pre-state, derive the canonical patch, and hand the five bound values to the shared `buildApplyPayload`. One read, one row, one database-derived `observed_before`.
 - **`persistTaskStatus` and `updateTaskStatus` are deleted** (2F-SURFACE-012/013), and with them the eight-status `statusSchema` that made the Work surface an unconfirmed route to `cancelled`. The destination is now the taxonomy's, bounded by `set_status`'s `allowedTargetValues`. `direct-write-guard.test.ts`'s `tasks` allowlist drops to the single `createRecord` insert; the gate compares by exact equality, so the entry could not be left behind.
@@ -692,7 +706,7 @@ Implemented on branch `codex/phase-2f-slice-2` under `docs/PHASE_2F_PRD.md` Revi
 
 ## 2026-07-29 — Phase 2F Slice 2F.1: guardrails, decisions and preconditions (no migration, no behaviour change)
 
-Implemented on branch `codex/phase-2f-slice-1` under the approved `docs/PHASE_2F_PRD.md` Revision 4. Tests and documents only — nothing deployed, no production behaviour touched.
+Implemented on branch `codex/phase-2f-slice-1` under the approved `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4. Tests and documents only — nothing deployed, no production behaviour touched.
 
 - **`src/lib/supabase/sql-grammar-guard.test.ts`** (2F-GUARD-001) — scans every migration for the two plpgsql grammar traps that each cost a CI round trip in Phase 2E: schema-qualified `coalesce`/`nullif`/`greatest`/`least` (no `pg_proc` entry, unresolvable under `search_path = ''`) and a depth-zero `case` inside an `if` condition (`42601`, the migration does not apply). Comments and string literals are stripped first, because the chain legitimately names both patterns in post-deploy guards and prose. The two superseded historical `pg_catalog.greatest(` sites (`202607220041:1524`, `202607220044:1506`) are allowlisted by exact equality, so a third occurrence fails and so does allowlist rot. **Proven red-first:** a deliberately defective fixture migration made both chain assertions fail, naming the fixture, before it was deleted.
 - **`src/lib/supabase/direct-write-guard.test.ts`** (2F-GUARD-002/003) — the architecture regression gate: walks every non-test module under `src/`, extracts each PostgREST chain from `.from("tasks"|"reminders")` into a DML method, and requires the found writers to equal the allowlists exactly — tasks: `createRecord` insert (leaves in 2F.3) and `persistTaskStatus` update (leaves in 2F.2), empty at 2F.4; reminders: `createReminder` insert, the permanent Option C exception (PRD §2 item 6). **Proven red-first:** a fixture module adding a `tasks` delete and a `reminders` update failed both assertions before removal.
@@ -733,7 +747,7 @@ Two documentation commits were made during merge preparation and are part of the
 
 ## 2026-07-28 — Phase 2E Slice 2E.8: convergence and closeout (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/phase-2e/PHASE_2E_FINAL_REPORT.md` and `docs/reports/phase-2e/PHASE_2E_SLICE_08_REPORT.md`.
+Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/phase-2e/PHASE_2E_FINAL_REPORT.md` and `docs/reports/phase-2e/PHASE_2E_SLICE_08_REPORT.md`.
 
 ### Added
 
@@ -752,11 +766,11 @@ Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no
 
 ### Changed
 
-- **`docs/PHASE_2E_PRD.md` revision 4** makes two corrections, both of them admissions rather than redefinitions. (1) **`2E-COMMAND-012` is reclassified to Phase 2F and is not delivered by Phase 2E.** Recording prompt and strategy versions on the operation requires changing the argument list of `apply_task_command`, `create_task_command` or `record_ai_usage` — impossible by `create or replace`, since a different argument list is a different function in PostgreSQL and the surviving overload makes every existing call ambiguous. Each needs `drop function` plus a full re-declaration: ~1,460 lines for `apply_task_command`, and `record_ai_usage` is shared by every AI path in the product and pinned by two `::regprocedure` casts and a `has_function` type array across two pgTAP files, hand-written types and the Deno worker. Residual risk: attribution now requires joining `ai_usage_events.created_at` to the deploy history. (2) **Revision 2's promise that nineteen refuted PRD-round findings would be recorded at closeout is withdrawn as unkeepable** — they were never persisted to the repository and reconstructing them would be fabrication.
+- **`docs/initiatives/phase-2e/PHASE_2E_PRD.md` revision 4** makes two corrections, both of them admissions rather than redefinitions. (1) **`2E-COMMAND-012` is reclassified to Phase 2F and is not delivered by Phase 2E.** Recording prompt and strategy versions on the operation requires changing the argument list of `apply_task_command`, `create_task_command` or `record_ai_usage` — impossible by `create or replace`, since a different argument list is a different function in PostgreSQL and the surviving overload makes every existing call ambiguous. Each needs `drop function` plus a full re-declaration: ~1,460 lines for `apply_task_command`, and `record_ai_usage` is shared by every AI path in the product and pinned by two `::regprocedure` casts and a `has_function` type array across two pgTAP files, hand-written types and the Deno worker. Residual risk: attribution now requires joining `ai_usage_events.created_at` to the deploy history. (2) **Revision 2's promise that nineteen refuted PRD-round findings would be recorded at closeout is withdrawn as unkeepable** — they were never persisted to the repository and reconstructing them would be fabrication.
 
 ## 2026-07-28 — Phase 2E Slice 2E.7: conversational and task-surface integration (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/phase-2e/PHASE_2E_SLICE_07_REPORT.md`.
+Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/phase-2e/PHASE_2E_SLICE_07_REPORT.md`.
 
 ### Added
 
@@ -789,7 +803,7 @@ Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E
 
 ## 2026-07-27 — Phase 2E Slice 2E.6: no-match activity creation (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `291cc75`, which touched only `PHASE_2E_PROGRESS.md` and that slice's report — so this entry, and the `STATE.md`/`TODO.md` entries beside it, are Slice 2E.7's documentation catch-up rather than same-commit records. The gap is stated rather than backdated. Migration `202607270060` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.7, §12.4, §12.5, §19.1 (Epic 2E-F). See `docs/reports/phase-2e/PHASE_2E_SLICE_06_REPORT.md`.
+Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `291cc75`, which touched only `PHASE_2E_PROGRESS.md` and that slice's report — so this entry, and the `STATE.md`/`TODO.md` entries beside it, are Slice 2E.7's documentation catch-up rather than same-commit records. The gap is stated rather than backdated. Migration `202607270060` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.7, §12.4, §12.5, §19.1 (Epic 2E-F). See `docs/reports/phase-2e/PHASE_2E_SLICE_06_REPORT.md`.
 
 ### Added
 
@@ -807,7 +821,7 @@ Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `2
 
 ## 2026-07-27 — Phase 2E Slice 2E.5: destructive actions and confirmation (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `cancel_task` is gated on a server-issued, single-use confirmation the database enforces; `restore_task` is gated on two collision guards. **Still no UI, route, Server Action, product event or model call** — nothing calls either RPC; the consumer is Slice 2E.7. Migration `202607260059` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.6, §11.2, §11.3, §12.3, §19.1 (Epic 2E-E). See ADR-047, ADR-048, ADR-049 and `docs/reports/phase-2e/PHASE_2E_SLICE_05_REPORT.md`.
+Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `cancel_task` is gated on a server-issued, single-use confirmation the database enforces; `restore_task` is gated on two collision guards. **Still no UI, route, Server Action, product event or model call** — nothing calls either RPC; the consumer is Slice 2E.7. Migration `202607260059` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.6, §11.2, §11.3, §12.3, §19.1 (Epic 2E-E). See ADR-047, ADR-048, ADR-049 and `docs/reports/phase-2e/PHASE_2E_SLICE_05_REPORT.md`.
 
 ### Added
 
@@ -840,7 +854,7 @@ Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `ca
 - **`2E_CANDIDATE_REMATERIALIZED`, `private.task_candidate_slot_taken`, both collision guards, both `unique_violation` traps, and the pgTAP section that exercised them.** The slice briefly claimed a *second* collision: that `202607220040` made candidate identity unique only over non-cancelled rows and `confirm_entry_task_candidates_v6` writes no ledger row for a confirmed candidate, so cancelling frees the candidate slot and a re-confirmed duplicate makes the later restore a bare `23505`. The second half is true of the RPC and **false of the system** — `public.record_entry_task_candidate_confirmation` (`202607220041:299-364`) is an `after insert or update` trigger on `public.tasks` that writes exactly that row, which is why v6 does not; it survives the cancellation and `2C_TERMINAL_DISPOSITION` reads it, so the duplicate cannot be created. The one path that frees the slot is a creation-undo, already refused earlier by `2E_CREATION_UNDONE`. A five-lens adversarial review of the shipped code found it, four lenses independently. Removed rather than kept as defence in depth, per ADR-049 — the doctrine this same slice wrote. In its place both the migration and the suite assert that the trigger still exists, since it is now the load-bearing reason no guard is needed. See ADR-048's withdrawal note.
 ## 2026-07-26 — Phase 2E Slice 2E.4: reversible non-destructive updates (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-D. **The first RPC in this codebase that mutates an existing task.** Thirteen of the fifteen actions are enabled; `cancel_task` and `restore_task` are refused with the declared code `2E_ACTION_NOT_ENABLED` (Slice 2E.5). **Still no UI, route, Server Action, product event or model call** — nothing calls the RPC; its consumer is Slice 2E.7. Migration `202607260058` is **local only**; remote parity stays at `202607250054`. All three CI jobs green on `bfa28a1` (run `30227374101`), pgTAP `Files=28, Tests=1059, Result: PASS`. Normative contract: `docs/PHASE_2E_PRD.md` §13.5, §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D). See ADR-044, ADR-045, ADR-046 and `docs/reports/phase-2e/PHASE_2E_SLICE_04_REPORT.md`. **Acceptance is pending one owed review round** — see that report's §9.3 and §11.
+Epic 2E-D. **The first RPC in this codebase that mutates an existing task.** Thirteen of the fifteen actions are enabled; `cancel_task` and `restore_task` are refused with the declared code `2E_ACTION_NOT_ENABLED` (Slice 2E.5). **Still no UI, route, Server Action, product event or model call** — nothing calls the RPC; its consumer is Slice 2E.7. Migration `202607260058` is **local only**; remote parity stays at `202607250054`. All three CI jobs green on `bfa28a1` (run `30227374101`), pgTAP `Files=28, Tests=1059, Result: PASS`. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.5, §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D). See ADR-044, ADR-045, ADR-046 and `docs/reports/phase-2e/PHASE_2E_SLICE_04_REPORT.md`. **Acceptance is pending one owed review round** — see that report's §9.3 and §11.
 
 ### Added
 
@@ -880,7 +894,7 @@ Five lenses over the migration, the pgTAP suite and the TypeScript together, eve
 
 ## 2026-07-26 — Phase 2E Slice 2E.3: disambiguation and read-only preview (branch `codex/phase-2e-natural-language-task-updates`)
 
-The projection half of Epic 2E-C. **No mutation, no UI, no route, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the preview, the disambiguation projection or the fingerprint; their consumers are Slices 2E.4/2E.5/2E.7. `202607250056` was **amended in place, twice** — the window Slice 2E.2 deliberately kept open for its first consumer, now **closed by exhaustion**; `202607250057` is new. Both are **local only** — remote parity stays at `202607250054`, and deployment stays deliberately deferred. Normative contract: `docs/PHASE_2E_PRD.md` §13.3, §13.4, §19.1 (Epic 2E-C), §11.2, §11.3. See ADR-042, ADR-043 and `docs/reports/phase-2e/PHASE_2E_SLICE_03_REPORT.md`. **The `database` job passed on `c50960b` but has not been executed on `4f9aff8`, so the slice verdict is conditional on that gate.**
+The projection half of Epic 2E-C. **No mutation, no UI, no route, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the preview, the disambiguation projection or the fingerprint; their consumers are Slices 2E.4/2E.5/2E.7. `202607250056` was **amended in place, twice** — the window Slice 2E.2 deliberately kept open for its first consumer, now **closed by exhaustion**; `202607250057` is new. Both are **local only** — remote parity stays at `202607250054`, and deployment stays deliberately deferred. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.3, §13.4, §19.1 (Epic 2E-C), §11.2, §11.3. See ADR-042, ADR-043 and `docs/reports/phase-2e/PHASE_2E_SLICE_03_REPORT.md`. **The `database` job passed on `c50960b` but has not been executed on `4f9aff8`, so the slice verdict is conditional on that gate.**
 
 ### Added
 
@@ -916,7 +930,7 @@ The review also named the two assertions that let both Criticals hide: the relat
 
 ## 2026-07-25 - Phase 2E Slice 2E.2: deterministic matching and margins (branch `codex/phase-2e-natural-language-task-updates`)
 
-The read half of natural-language task matching. **No mutation, no UI, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the new RPC; its first consumer is Slice 2E.3's preview. Migration `202607250056` is **local only** - remote parity stays at `202607250054`, and deployment is deliberately deferred until the first consumer proves the projection sufficient (`42P13` makes a `RETURNS TABLE` shape permanent once deployed). Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-B. See ADR-040, ADR-041 and `docs/reports/phase-2e/PHASE_2E_SLICE_02_REPORT.md`.
+The read half of natural-language task matching. **No mutation, no UI, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the new RPC; its first consumer is Slice 2E.3's preview. Migration `202607250056` is **local only** - remote parity stays at `202607250054`, and deployment is deliberately deferred until the first consumer proves the projection sufficient (`42P13` makes a `RETURNS TABLE` shape permanent once deployed). Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` Epic 2E-B. See ADR-040, ADR-041 and `docs/reports/phase-2e/PHASE_2E_SLICE_02_REPORT.md`.
 
 ### Added
 
@@ -937,7 +951,7 @@ The read half of natural-language task matching. **No mutation, no UI, no Server
 
 ## 2026-07-25 - Phase 2E Slice 2E.1: bounded task command contract (branch `codex/phase-2e-natural-language-task-updates`)
 
-The first slice of Phase 2E - Natural-Language Task Updates. **Contract only: no task search, no matching, no mutation, no RPC, no UI, no Server Action, no product event, and no user-visible behaviour change.** `AIProvider.parseTaskCommand` has no production caller yet; its first consumer is Slice 2E.7. Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-A. See ADR-039 and `docs/reports/phase-2e/PHASE_2E_SLICE_01_REPORT.md`.
+The first slice of Phase 2E - Natural-Language Task Updates. **Contract only: no task search, no matching, no mutation, no RPC, no UI, no Server Action, no product event, and no user-visible behaviour change.** `AIProvider.parseTaskCommand` has no production caller yet; its first consumer is Slice 2E.7. Normative contract: `docs/initiatives/phase-2e/PHASE_2E_PRD.md` Epic 2E-A. See ADR-039 and `docs/reports/phase-2e/PHASE_2E_SLICE_01_REPORT.md`.
 
 ### Added
 
@@ -1013,7 +1027,7 @@ One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md
 - `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md` — 69 generated rows (58 requirements + 6 epics + 5 gates). No requirement is represented as non-green: the deterministic suggested-answer path fully satisfies `2D-SUGGEST-002`/`2D-OPERATIONS-003` (the AI extraction-schema field they name is an explicitly deferred, separately-authorized fallback that was not needed), and the `2C-UNDO-004` hard gate behind `2D-ACTION-006`/`2D-UNDO-003` is resolved by migration `202607230050`.
 - `scripts/verify-phase-2d-cleanup.mjs` (`npm run test:remote:2d:cleanup`) — fail-closed residual-data check across Auth users (Phase 2D fixture prefixes `phase-2d-resolution-`/`-preview-`/`-reinterpret-` plus adjacent smoke prefixes), 14 owner-scoped tables (adding `entry_interpretations` to the Phase 2C set — `pending_questions` was already scanned — since reinterpretation appends an immutable interpretation revision), and remote-smoke storage objects.
 - `test:remote:2d` aggregate (`remote-supabase-smoke.mjs --phase-2d`) — a deterministic, fail-fast sequence: question-resolution (v1/v2 answer + dispositions), suggested-answer/preview, reinterpretation (v3), content-free resolution analytics, and residual-data cleanup. The daily-cycle smoke is intentionally excluded (its needs-attention section claims an `interpret_entry` job that races the unattended `pg_cron` drain) and remains runnable standalone and inside `test:remote:2x`.
-- `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md` (this slice's acceptance report) and `docs/PHASE_2D_REPORT.md` (phase-level closeout handoff).
+- `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md` (this slice's acceptance report) and `docs/initiatives/phase-2d/PHASE_2D_REPORT.md` (phase-level closeout handoff).
 
 ### Changed
 
@@ -1124,10 +1138,10 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 ### Added
 
-- `scripts/generate-phase-2c-traceability.mjs` (`npm run docs:phase-2c:traceability`) parses `docs/PHASE_2C_PRD.md` and emits `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md` — 83 rows mapping all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates to owning slice(s) and durable evidence. Fails closed if the PRD inventory or any per-family count drifts, and never marks the two non-green requirements (`2C-STRUCTURE-004` deferred split/merge, `2C-UNDO-004` `undo_operation` residual risk) as complete.
+- `scripts/generate-phase-2c-traceability.mjs` (`npm run docs:phase-2c:traceability`) parses `docs/initiatives/phase-2c/PHASE_2C_PRD.md` and emits `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md` — 83 rows mapping all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates to owning slice(s) and durable evidence. Fails closed if the PRD inventory or any per-family count drifts, and never marks the two non-green requirements (`2C-STRUCTURE-004` deferred split/merge, `2C-UNDO-004` `undo_operation` residual risk) as complete.
 - `scripts/verify-phase-2c-cleanup.mjs` (`npm run test:remote:2c:cleanup`) — fail-closed residual-data check across Auth users, 13 owner-scoped tables (including the Phase 2C `task_projects`/`task_contexts`/`task_people`/`task_dependencies`/`entry_task_candidate_resolutions` tables), and `user-files` storage.
 - `test:remote:2c` aggregate (`remote-supabase-smoke.mjs --phase-2c`): a deterministic, fail-fast sequence of editable-candidate confirmation (v2–v6), candidate-analytics product events, and residual-data cleanup, plus the focused `test:remote:2c:confirmation` alias.
-- `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md` and `docs/PHASE_2C_REPORT.md` (phase-level closeout).
+- `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md` and `docs/initiatives/phase-2c/PHASE_2C_REPORT.md` (phase-level closeout).
 
 ### Changed
 
@@ -1340,8 +1354,8 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 ### Added
 
-- `docs/PHASE_2C_PRD.md`, the canonical product contract for Editable Candidate Tasks and Transactional Materialization, including stable requirement IDs, exact 2C.1 semantics, UX, security/privacy, analytics, acceptance, risks, rollout, rollback, and full-phase Definition of Done.
-- `docs/PHASE_2C_IMPLEMENTATION_PLAN.md`, the ordered 2C.1–2C.6 execution plan with an exact versioned RPC direction, transient edit command, atomic transaction, compatibility boundary, test matrix, per-slice gates, and authorization stops.
+- `docs/initiatives/phase-2c/PHASE_2C_PRD.md`, the canonical product contract for Editable Candidate Tasks and Transactional Materialization, including stable requirement IDs, exact 2C.1 semantics, UX, security/privacy, analytics, acceptance, risks, rollout, rollback, and full-phase Definition of Done.
+- `docs/initiatives/phase-2c/PHASE_2C_IMPLEMENTATION_PLAN.md`, the ordered 2C.1–2C.6 execution plan with an exact versioned RPC direction, transient edit command, atomic transaction, compatibility boundary, test matrix, per-slice gates, and authorization stops.
 - ADR-031, accepting transient candidate edits, immutable suggestion provenance, a persistent task as the sole edited truth, and a versioned materialization contract while preserving the legacy RPC.
 
 ### Changed
@@ -1361,7 +1375,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - `test:remote:2x`, a sequential fail-fast aggregate covering jobs, interpretation revisions, product events, entry processing, daily-cycle behavior, the complete Supabase baseline, and residual-data cleanup.
 - `test:remote:2x:cleanup`, a read-only linked verifier for disposable Auth prefixes, owner-row orphans, and storage leftovers.
 - Remote entry-worker assertions for persisted completion events, same-attempt deduplication, distinct reprocessing-attempt events, and unattended scheduled drain when the worker secret is not locally readable.
-- A reproducible 283-row PRD traceability annex plus sanitized deployment/parity/Auth/cleanup evidence, alongside `docs/reports/phase-2x/PHASE_2X_SLICE_18_REPORT.md` and the complete `docs/PHASE_2X_REPORT.md` crosswalk.
+- A reproducible 283-row PRD traceability annex plus sanitized deployment/parity/Auth/cleanup evidence, alongside `docs/reports/phase-2x/PHASE_2X_SLICE_18_REPORT.md` and the complete `docs/initiatives/phase-2x/PHASE_2X_REPORT.md` crosswalk.
 
 ### Changed
 
@@ -1456,7 +1470,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - A static capability registry that records each authenticated product promise as operational, informational, advanced, or future, with its visible surface and consumer evidence.
 - Owner-scoped server-only Settings and Reviews projections that return localized product DTOs and fail closed on unsupported persisted values.
 - Home operational status derived from the existing Inbox and Needs Attention projections, plus PT-BR/English lexical and product-contract tests.
-- The permanent capability inventory in `docs/PHASE_2X_REPORT.md` and execution evidence in `docs/reports/phase-2x/PHASE_2X_SLICE_14_REPORT.md`.
+- The permanent capability inventory in `docs/initiatives/phase-2x/PHASE_2X_REPORT.md` and execution evidence in `docs/reports/phase-2x/PHASE_2X_SLICE_14_REPORT.md`.
 
 ### Changed
 

@@ -267,3 +267,72 @@ citation was not rewritten. It is recorded at the end of
 
 Unchanged from §34: **Phase 2G is the roadmap successor and is not authorised.**
 The owner actions listed in §34 are still outstanding and none of them moved.
+
+---
+
+## §36 — `docs/` separates the canon from the initiative (2026-08-05)
+
+### What changed
+
+**Documentation and repository organization only**, on the same terms as §35.
+No runtime behavior, migration, hosted configuration, rollout gate, signup
+posture, retention schedule or product code moved. Signup Hardening is still
+closed at SH.7, public signup is still closed, no purge has run, Phase 2G has
+not started.
+
+§35 filed the *records*. This files the *contracts*. `docs/` held 33 markdown
+files at one level, mixing eleven documents that are always current with
+twenty-two PRDs, plans and phase reports belonging to closed work. The listing
+gave a reader no way to tell which was which.
+
+The `docs/` root is now a **closed list of twelve**: `README.md`, `STATE.md`,
+`TODO.md`, `DECISIONS.md`, `CHANGELOG.md`, `ENGINEERING_STANDARDS.md`,
+`ARCHITECTURE.md`, `DATABASE.md`, `AI_AGENT.md`, `SECURITY.md`, `PRD.md`,
+`IMPLEMENTATION_PLAN.md`.
+
+Everything else moved into `docs/initiatives/<name>/`: `phase-2` (3),
+`phase-2x` (3), `phase-2c` (3), `phase-2d` (3), `phase-2e` (1), `phase-2f` (2),
+`sprint-1-5` (1), `entity-graph` (2), `byok` (2), `signup-hardening` (2), and
+`product-ux` (3, formerly `docs/product/`). Twenty-five pure renames.
+
+### The rule a successor needs
+
+**`docs/initiatives/<name>/` says what the work was supposed to do.
+`docs/reports/<name>/` says what it did. Same directory name in both.**
+
+Create both before the initiative's first file. `docs/README.md` is the index;
+`ENGINEERING_STANDARDS.md` §"Documentation placement" is the written rule.
+
+### What is enforced
+
+`src/lib/closeout/docs-taxonomy-guard.test.ts` fails the `application` job on:
+
+- a markdown file added to the `docs/` root, with the initiative directory it
+  should have used printed in the message;
+- a governing artifact left directly in `docs/initiatives/` (a `README.md`
+  index there is permitted);
+- a non-kebab-case directory anywhere under `docs/`;
+- an initiative directory created with no document in it;
+- **an initiative that reported without a governing directory** — the pairing is
+  asserted, not trusted. Three exceptions are named with reasons rather than
+  omitted: `pre-2e` answered a review rather than a PRD, `phase-2g` is an
+  unauthorized definition study, `shared` is initiative-independent.
+
+### The guard that would have gone quiet
+
+The **A13 Phase-2G start detector** scanned `docs/` one level deep. A
+`PHASE_2G_PRD.md` filed under `docs/initiatives/phase-2g/` would have stopped
+being a start signal — the guard would have fallen silent exactly where the risk
+moved. It now walks `docs/` recursively from a single root, which also removes
+the double-reporting its previous two-directory list produced.
+
+**This is the second time in two sections that a reorganization would have
+silently narrowed a guard.** When moving files, check what scans the directory
+before checking what links to it: a broken link is visible, a narrowed scan is
+not.
+
+### Next
+
+Unchanged from §34. **Phase 2G is the roadmap successor and is not authorised**,
+and it still has no governing artifact — which is now a guarded property rather
+than an observation.

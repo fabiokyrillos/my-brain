@@ -124,6 +124,14 @@ A feature or vertical slice is complete only when all applicable items are true:
 7. External pending work is not hidden behind a successful local result. Record the dependency, impact, evidence, workaround, and exact completion condition.
 8. A skipped test is acceptable only when the reason is stable, explicit in output, and tracked if it represents unfinished product coverage.
 
+## Documentation placement
+
+1. `docs/` separates three kinds of document, and the separation is enforced: the **living canon** at the `docs/` root (`STATE.md`, `TODO.md`, `DECISIONS.md`, `CHANGELOG.md`, `ENGINEERING_STANDARDS.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_AGENT.md`, `SECURITY.md`, `PRD.md`, `IMPLEMENTATION_PLAN.md`, `README.md`), **governing artifacts** in `docs/initiatives/<name>/`, and **records** in `docs/reports/<name>/`.
+2. A PRD, implementation plan, proposal or phase-closing report is a governing artifact and goes in `docs/initiatives/<name>/`. It never goes at the `docs/` root — that list is closed.
+3. An initiative uses **the same directory name** in `initiatives/` and `reports/`, so knowing one path gives the other.
+4. `src/lib/closeout/docs-taxonomy-guard.test.ts` fails the `application` job for a document added to the `docs/` root, a governing artifact left directly in `docs/initiatives/`, a non-kebab-case directory, an empty initiative directory, or an initiative that reported without a governing directory.
+5. `docs/README.md` is the index and is updated in the same change that adds an initiative.
+
 ## Reports and evidence placement
 
 1. Every new phase or initiative receives its own `docs/reports/<name>/` subdirectory — lowercase kebab-case — **before** its first report is committed.
