@@ -6,6 +6,8 @@ import { z } from "zod";
 import { resolveDailyCycleLifecycle } from "@/features/daily-cycle/lifecycle";
 import { toCaptureReceipt } from "@/features/daily-cycle/projection-mappers";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
+import { quotaRefusalMessage } from "@/features/quotas/copy";
+import { quotaRefusal } from "@/features/quotas/refusal";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { resolveLocale } from "@/lib/preferences";
@@ -68,6 +70,14 @@ export async function captureEntry(
 
   if (error || !isCaptureAsyncRow(data)) {
     const saveDurationMs = Math.min(Date.now() - startedAt, 86_400_000);
+    // SH-QUOTA-001/009. A ceiling firing is a normal outcome with its own
+    // honest copy, not the generic failure — telling someone "this could not be
+    // completed right now" when they have simply reached today's limit is the
+    // product lying by vagueness.
+    //
+    // The product event stays content-free either way: `failureKind` is a
+    // closed vocabulary and carries no text, no ceiling and no entry.
+    const refusal = quotaRefusal(error);
     after(() => {
       recordProductEvent({
         name: "capture_save_failed",
@@ -76,9 +86,20 @@ export async function captureEntry(
         viewportClass: "unknown",
         appVersion: "server",
         idempotencyKey: createProductEventIdempotencyKey("capture_save_failed", idempotencyKey),
-        properties: { captureSource, durationMs: saveDurationMs, failureKind: "storage" },
+        properties: {
+          captureSource,
+          durationMs: saveDurationMs,
+          failureKind: refusal ? "quota" : "storage",
+        },
       }).catch(() => {});
     });
+    if (refusal) {
+      return {
+        status: "error",
+        code: "quota_exceeded",
+        message: quotaRefusalMessage(locale, refusal),
+      };
+    }
     return { status: "error", code: "operation_failed", message: actionFailedMessage[locale] };
   }
 
