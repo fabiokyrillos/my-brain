@@ -1970,3 +1970,127 @@ route around it. `main` is unchanged at `8ed69ed`; the four commits live on
 So the next context inherits a branch, not a merged slice. Merge it (or have the
 owner merge it) before treating `202608040075` as repository truth, and
 **re-check the merge-SHA CI run** as every prior slice in this loop has done.
+
+---
+
+## 26. The tenth stop — 2026-08-05, SH.5's repository work complete. **This supersedes §25.**
+
+PR #84 merged at `34fc621` with its merge-SHA CI green on all three jobs, and
+the branch preserved. This section covers what came after.
+
+### The reported state was verified, and one claim was false
+
+Everything the owner reported held **except** the one the whole task depended
+on: `202608040075` was on `main` but **not on the hosted project**. Hosted head
+was `202608040074` and `claim_auth_event_slot` answered `PGRST202`.
+
+That mattered because Vercel auto-deploys `main` and the throttle **fails
+closed** by design. Merging the wiring first would have taken production
+authentication down. The migration was applied under explicit owner
+authorization, with five pre-flight checks and six post-apply verifications —
+`SIGNUP_HARDENING_MIGRATION_075_DEPLOYMENT.md`.
+
+**Hosted head is now `202608040075`.** `db push` changed schema and only
+schema: the full Auth configuration was read back before and after and diffed
+**byte-identical**, so `disable_signup` and the allow list are provably
+untouched. Worth knowing: `db push` is migrations only — `config push` is the
+one that would have sent `config.toml` wholesale.
+
+### The verification that could not fail, and had to be redone
+
+The first check that the refused probes wrote no row asked PostgREST as
+`service_role` and got `403`. That is *correct* — ADR-080 grants no table
+privilege to any role, `service_role` included — but it made the check compare
+`"?"` with `"?"` and report a pass. The real count came from the Management API
+query endpoint, which runs as `postgres`: **0 rows after four refused probes**.
+
+Keep the instinct: a verification whose failure mode is indistinguishable from
+its success mode is not a verification.
+
+### Concurrency: demonstrated, finally
+
+`scripts/sh5-throttle-concurrency.mjs`, against the deployed project as `anon`.
+
+| Ceiling | Simultaneous claims | Admitted |
+| --- | --- | --- |
+| 3 | 10 | **3** |
+| 5 | 20 | **5** |
+
+§25 recorded this as argued-not-demonstrated. It is now demonstrated. A pgTAP
+file is one session, and a sequential test passes whether the advisory locks
+exist or not — this script is the only thing that can tell the two designs
+apart.
+
+### Three decisions inside the wiring
+
+1. **The sign-in ceiling counts attempts, not only failures.** The claim
+   reserves *by inserting*, so a ceiling cannot be consulted without recording
+   against it, and no client role holds DELETE to withdraw the row after a
+   success. Stricter than the `signin_failure` name implies; written at the call
+   site so nobody has to rediscover it.
+2. **An unreachable throttle refuses.** Failing open would make the control one
+   an attacker can switch off by inducing errors, with nothing reporting it.
+3. **The Turnstile widget is on the sign-in form**, which SH-CAPTCHA-003 does
+   not name. Supabase's CAPTCHA switch is per-project and GoTrue applies it to
+   the password grant too — enabling it without a widget there would lock every
+   existing account out, the owner's included.
+
+### Three regressions this slice caused, each fixed at the cause
+
+- `actions.ts` now reaches `server-only` transitively through the crypto core,
+  which broke `sign-out.test.ts` and `app-shell.test.tsx`. **This repository hit
+  that exact trap once before.** Stubbed in the tests with
+  `vi.mock("server-only", () => ({}))`; the marker is a build-time guard and
+  `npm run build` in CI enforces it, so the source marker stays.
+- The resend page pushed the inline locale-ternary count from 266 to 267, a
+  guarded ceiling. Fixed the way the guard names — a typed `auth/copy.ts` — not
+  by raising the baseline.
+- The captcha suite's directory scan needed a real `readdirSync`.
+
+### Where SH.5 stops, and it is one action
+
+**Everything repository-provable is done.** The only thing between SH.5 and its
+close is the owner enabling Turnstile:
+
+> Supabase Dashboard → **Authentication → Attack Protection → CAPTCHA
+> protection** → enable → **Provider = Turnstile** (currently `hcaptcha`) →
+> paste the existing **Secret Key**. The site key is already public in Vercel as
+> `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+Then six deployed probes run: missing token refused, invalid token refused,
+valid token reaches the normal path, a raw API call cannot bypass enforcement,
+signup still disabled even with a valid CAPTCHA, and recovery/resend still
+enumeration-uniform. **SH-CAPTCHA-002 is not claimed until those execute.**
+
+### Not done, named rather than counted
+
+- **SH-SIGNUP-007** hosted password policy — owner dashboard action.
+- **SH-SIGNUP-005** confirmation-required's behavioural half — needs SMTP.
+- **SH-SIGNUP-011's timing residual — NOT MEASURED.** The requirement says to
+  measure it once and record it. It has not been. Carried to the rollout gate.
+- Both delivered-link journeys — deployment-blocked on custom SMTP.
+
+### Do not, on resuming
+
+Everything in §25's list still stands, plus:
+
+- **Do not claim SH-CAPTCHA-002 from a green CI run.** CI has no site key, so no
+  widget and no token; that is deliberate (SH-CAPTCHA-005) and means CI can
+  never evidence the hosted control.
+- **Do not remove `AUTH_EVENT_CEILINGS.resend.provisional`** until custom SMTP
+  exists and the readback is redone. A test asserts the marker.
+- **Do not make the throttle fail open** to fix a transient error. That is the
+  one change that would quietly turn this control off.
+- **Do not remove `server-only` from the crypto core** to fix a test import.
+  Stub it in the test; the marker is what `npm run build` enforces.
+- **Do not run `supabase config push`.** Still all-or-nothing. `db push` is
+  migrations only and is the safe one.
+
+### State at this stop
+
+Branch `codex/sh-slice-5-wiring`. Lint and typecheck zero, production build
+passes, vitest **3852 passing** with the four known pre-existing local-only
+failures. Hosted: parity **`202608040075`**, `site_url` the Vercel origin, 12
+enumerated redirect URLs, `disable_signup: true`, `security_captcha_enabled:
+false`, no custom SMTP, 2 accounts both `active`, ledger empty. Production
+deployment healthy; public signup closed at both layers.

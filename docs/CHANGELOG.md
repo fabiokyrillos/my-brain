@@ -1,6 +1,29 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — Signup Hardening: SH.5's repository work completes and its migration reaches the hosted project (0 new migrations)
+
+**The migration went first, and the ordering was not a formality.** `202608040075` was applied to the hosted project before a line of wiring shipped, because the throttle fails **closed** by design — application code calling a `claim_auth_event_slot` that did not exist would have taken production authentication down rather than degrading. Five pre-flight checks, six post-apply verifications, and a proof that `db push` changed schema and only schema: the full 239-field Auth configuration was read back before and after and diffed **byte-identical**, so `disable_signup` and the redirect allow list are provably untouched.
+
+**The throttle is consulted before every provider call.** Signup, recovery, sign-in and the new confirmation-resend surface each claim a slot before touching GoTrue. That ordering *is* the requirement: ours is the refusal with uniform copy, and the provider's differs between an address that exists and one that does not. The signup gate still refuses **before** the throttle, so a closed door cannot be turned into a way to exhaust somebody else's allowance.
+
+**The ceiling holds under a genuine race, and now that is demonstrated rather than argued.** A pgTAP file is one session, so it can only show that the Nth call succeeds and the N+1th is refused *in sequence* — which passes identically whether the advisory locks exist or not. The new deployed script fires simultaneous claims at one fresh bucket as `anon`: 10 racers on a ceiling of 3 admitted exactly 3; 20 on a ceiling of 5 admitted exactly 5.
+
+**An unreachable throttle refuses, and that was the decision rather than the default.** Letting requests through when the RPC errors is the tempting behaviour and the wrong direction: a control that fails open is one an attacker can switch off by inducing errors, and when it is off nothing says so — flood, email bombing and recovery abuse all become unbounded silently. An outage is loud and bounded.
+
+**The sign-in ceiling counts attempts, not only failures**, and that is stricter than the `signin_failure` name suggests. `claim_auth_event_slot` reserves *by inserting* — the atomicity is what makes it correct under concurrency — so a ceiling cannot be consulted without recording against it, and the row cannot be withdrawn after a success because no client role holds DELETE by design. The `outcome` column still tells the two apart for anyone reading the ledger.
+
+**Four refusals stay four facts.** A ceiling, an unreachable throttle, a failed challenge and a wrong password each get their own code and their own sentence in both locales. Telling someone "invalid email or password" when a widget token expired sends them to reset a credential that was never the problem.
+
+**Turnstile ships on four forms, including sign-in — which the requirement does not name.** SH-CAPTCHA-003 lists register, recover and resend. Supabase's CAPTCHA protection is a per-project switch GoTrue applies to the password grant as well, so enabling it with no widget on the sign-in form would lock **every existing account out of the product**, the owner's included, the moment the setting is flipped. Reading the requirement as a floor is the only reading that survives the rollout it was written for.
+
+**SH-CAPTCHA-002 is not claimed.** Hosted CAPTCHA is off; the application collects and forwards a token the provider currently ignores. That is the intended intermediate state, and `captcha.ts` deliberately exposes no `verifyToken` so no caller can come to believe otherwise. Enforcement is provable only by deployed probes, and those have not run.
+
+**Writing the guard-of-the-guard found the guard broken.** `safeAuthNext` returned `/en/app/../../evil` verbatim; a browser resolves it to `/evil`. Not an open redirect — it cannot leave the origin — but it defeated the subtree pin the allowlist exists for. Fixed in the guard.
+
+**Three regressions this slice caused and repaired**, each recorded because it is a trap rather than an accident: `actions.ts` now reaches `server-only` transitively and broke two unrelated suites, which this repository had hit once before; the resend page pushed the inline locale-ternary count past its guarded ceiling, fixed with a typed `auth/copy.ts` rather than a raised baseline; and the first ledger-emptiness check asked PostgREST as `service_role`, got a correct `403`, and thereby compared `"?"` with `"?"` and reported a pass.
+
+**Blocked on custom SMTP and carried to the rollout gate.** No production email readiness is claimed. `rate_limit_email_sent = 2/hour` is the default Supabase SMTP value, never presented as a product ceiling; the `resend` ceiling keeps its `provisional` marker with a test asserting it; and both delivered-link journeys are recorded as deployment-blocked. SH-SIGNUP-011's **timing** residual is recorded as unmeasured rather than argued away.
 
 ## 2026-08-04 — Signup Hardening: the origin verified at the provider, and SH.5's throttle mechanism (1 migration, `202608040075`)
 
