@@ -23,11 +23,12 @@ import { requireSupabaseData } from "@/lib/supabase/result";
 import type { CreateRecordState } from "./inline-create-form";
 import { idleWorkItemActionState, type WorkItemActionState } from "./work-action-state";
 import { getWorkActionsCopy } from "./work-actions-copy";
+import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const createSchema = z.object({
   kind: z.enum(["task", "project", "person", "memory"]),
   locale: z.enum(locales),
-  name: z.string().trim().min(1).max(240),
+  name: z.string().trim().min(1).max(AI_INPUT_BOUNDS.entityName),
 });
 
 type CreateRecordCopy = {
@@ -228,7 +229,7 @@ const workItemActionSchema = z.object({
   taskId: z.string().uuid(),
   locale: z.enum(locales),
   action: z.enum(WORK_SURFACE_ACTIONS),
-  title: z.string().max(4000),
+  title: z.string().max(AI_INPUT_BOUNDS.workItemTitle),
   operationKey: z.string().uuid(),
 });
 

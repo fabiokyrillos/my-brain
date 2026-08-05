@@ -7,7 +7,10 @@ import { createProductEventIdempotencyKey, recordProductEvent } from "@/features
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
 import { taskCommandUndoErrorDetailFor } from "@/features/task-commands/errors";
 import { getByokCopy } from "@/features/byok/copy";
+import { quotaRefusalMessage } from "@/features/quotas/copy";
+import { quotaRefusal, type QuotaDetail } from "@/features/quotas/refusal";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
+import { ATTACHMENT_LIMITS, QUOTAS } from "@/lib/quotas";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 import { assertActiveAccount } from "@/lib/auth/require-user";
@@ -563,16 +566,10 @@ export async function markNotification(formData: FormData) {
   revalidatePath(`/${parsed.data.locale}/app`);
 }
 
-const allowedMimeTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-  "text/plain",
-  "text/csv",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
+// SH-QUOTA-006: the allowlist is not defined here any more. `ATTACHMENT_LIMITS`
+// is the source, and `attachment-limits-parity.test.ts` proves the bucket and
+// the CHECK constraint still agree with it.
+const allowedMimeTypes = new Set<string>(ATTACHMENT_LIMITS.mimeAllowlist);
 export async function uploadAttachment(
   _state: AgentFormState,
   formData: FormData,
@@ -582,7 +579,7 @@ export async function uploadAttachment(
   const file = formData.get("file");
   if (!locale.success || !(file instanceof File) || file.size === 0)
     return { status: "error", message: uploadMessages.selectFile };
-  if (file.size > 26214400)
+  if (file.size > ATTACHMENT_LIMITS.maxBytes)
     return { status: "error", message: uploadMessages.tooLarge };
   if (!allowedMimeTypes.has(file.type))
     return { status: "error", message: uploadMessages.unsupported };
@@ -592,6 +589,43 @@ export async function uploadAttachment(
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: uploadMessages.session };
   await assertActiveAccount(supabase, user.id, locale.data);
+
+  // SH-QUOTA-004: the refusal PRECEDES the storage write, which is the half of
+  // the ceiling a database trigger cannot deliver. The trigger on `attachments`
+  // would refuse the metadata row a moment later, but by then the object is
+  // already in the bucket and only the compensation below removes it — and a
+  // compensation that fails leaves exactly the orphan SH-DELETE-015 had to
+  // clean up by hand. Refusing before the bytes move means there is nothing to
+  // compensate.
+  //
+  // The aggregate is read from `attachments`, the same table the trigger counts,
+  // so the two cannot disagree about what is stored. It is a check, not a lock:
+  // two simultaneous uploads could both pass here, and the trigger — which does
+  // hold an advisory lock — is what makes the ceiling true under concurrency.
+  // This one exists to stop the ordinary case from writing an object it will
+  // have to delete.
+  const usage = await supabase
+    .from("attachments")
+    .select("size_bytes, created_at")
+    .eq("user_id", user.id);
+  if (usage.error) return { status: "error", message: uploadMessages.uploadFailed };
+  const rows = usage.data ?? [];
+  const utcDayStart = new Date();
+  utcDayStart.setUTCHours(0, 0, 0, 0);
+  const storedBytes = rows.reduce((total, row) => total + (row.size_bytes ?? 0), 0);
+  const today = rows.filter((row) => new Date(row.created_at) >= utcDayStart).length;
+
+  const refusedBy: QuotaDetail | null =
+    storedBytes + file.size > QUOTAS.storageBytesPerUser
+      ? "QUOTA_STORAGE_BYTES"
+      : rows.length >= QUOTAS.storageObjectsPerUser
+        ? "QUOTA_STORAGE_OBJECTS"
+        : today >= QUOTAS.attachmentsPerDay
+          ? "QUOTA_ATTACHMENTS_PER_DAY"
+          : null;
+  if (refusedBy)
+    return { status: "error", message: quotaRefusalMessage(locale.data, refusedBy) };
+
   const safeName = file.name
     .normalize("NFKD")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
@@ -615,11 +649,22 @@ export async function uploadAttachment(
     .select("id")
     .single();
   if (error || !attachment) {
+    // SH-QUOTA-004's compensation, verified rather than assumed: a failed
+    // metadata write must not leave the object behind, and a failed *cleanup*
+    // must be loud, because that is the only moment at which an orphan is
+    // created and the only moment at which it is cheap to notice.
     const cleanup = await supabase.storage.from("user-files").remove([path]);
-    if (cleanup.error) console.error("Attachment cleanup failed", cleanup.error.message);
+    if (cleanup.error)
+      console.error("Attachment cleanup failed", { path, code: cleanup.error.name });
+
+    // The trigger refuses under a race the pre-check could not see. Saying so
+    // is more honest than "could not register the file".
+    const refusal = quotaRefusal(error);
     return {
       status: "error",
-      message: uploadMessages.registerFailed,
+      message: refusal
+        ? quotaRefusalMessage(locale.data, refusal)
+        : uploadMessages.registerFailed,
     };
   }
   const { data: job, error: jobError } = await supabase
@@ -632,11 +677,17 @@ export async function uploadAttachment(
     })
     .select("id")
     .single();
-  if (jobError || !job)
+  if (jobError || !job) {
+    // SH-QUOTA-002 reaches this insert too — `jobs` carries the same trigger —
+    // so a full queue reads as a full queue rather than as a failure to queue.
+    const refusal = quotaRefusal(jobError);
     return {
       status: "error",
-      message: uploadMessages.notQueued,
+      message: refusal
+        ? quotaRefusalMessage(locale.data, refusal)
+        : uploadMessages.notQueued,
     };
+  }
   const {
     data: { session },
     error: sessionError,

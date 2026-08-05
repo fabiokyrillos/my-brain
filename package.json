@@ -49,7 +49,8 @@
     "byok:interop": "node scripts/byok-crypto-interop.mjs",
     "byok:verify-runtime": "node scripts/byok-verify-runtime-parity.mjs",
     "byok:rotate-master-key": "node scripts/byok-rotate-master-key.mjs",
-    "test:remote": "node scripts/remote-supabase-smoke.mjs"
+    "test:remote": "node scripts/remote-supabase-smoke.mjs",
+    "sh6:quota-concurrency": "node scripts/sh6-quota-concurrency.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

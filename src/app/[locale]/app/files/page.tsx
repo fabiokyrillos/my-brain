@@ -9,6 +9,7 @@ import { PaginationLinks } from "@/features/shell/pagination-links";
 import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
+import { ATTACHMENT_LIMITS } from "@/lib/quotas";
 import { isLocale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -155,9 +156,11 @@ export default async function FilesPage({
       paginated.items.length
         ? supabase.storage
             .from("user-files")
+            // SH-STORAGE-004: the duration is a named constant with one home,
+            // so this call site and the worker's cannot drift apart.
             .createSignedUrls(
               paginated.items.map((file) => file.storage_path),
-              600,
+              ATTACHMENT_LIMITS.signedUrlSeconds,
             )
         : { data: [], error: null },
       failedAttachmentIds.length

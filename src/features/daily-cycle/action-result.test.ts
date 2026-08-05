@@ -31,6 +31,10 @@ describe("daily cycle action result", () => {
       "version_conflict",
       "action_unavailable",
       "retry_not_available",
+      // SH-QUOTA-009 (SH.6). Added rather than substituted: a ceiling firing
+      // used to arrive as `operation_failed`, which told a user whose day was
+      // simply full that something had gone wrong.
+      "quota_exceeded",
       "operation_failed",
     ]);
   });

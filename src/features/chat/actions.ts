@@ -14,9 +14,10 @@ import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/resu
 import { isMemoryInForce } from "@/features/memories/lifecycle";
 import type { ChatState } from "./chat-state";
 import { getAgentName } from "@/features/profile/agent-identity";
+import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const chatInputSchema = z.object({
-  question: z.string().trim().min(1).max(12000),
+  question: z.string().trim().min(1).max(AI_INPUT_BOUNDS.chatQuestion),
   locale: z.enum(locales),
   conversationId: z.union([z.string().uuid(), z.literal("")]).optional(),
 });

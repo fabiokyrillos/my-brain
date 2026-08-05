@@ -56,6 +56,50 @@ export const QUOTAS = {
 } as const;
 
 /**
+ * The attachment contract — SH-QUOTA-006, SH-STORAGE-004.
+ *
+ * FINDINGS F-22 counted three independent copies of the size limit and the MIME
+ * allowlist: the `storage.buckets` row, the `attachments.size_bytes` CHECK, and
+ * a `Set` literal inside the upload action. Three copies of one rule is two
+ * chances for it to drift, and the drift is silent — a bucket that accepts what
+ * the CHECK rejects produces an orphaned object every time.
+ *
+ * This is the source. `attachment-limits-parity.test.ts` reads the other three
+ * out of the migration and the worker and fails if any disagrees. The two SQL
+ * copies still exist because they are enforcement points that must hold against
+ * a caller that never runs this code — but they are no longer *definitions*.
+ */
+export const ATTACHMENT_LIMITS = {
+  /** 25 MiB, the value the bucket and the CHECK constraint both carry. */
+  maxBytes: 25 * MIB,
+
+  /**
+   * SH-STORAGE-004 — how long a download link stays valid.
+   *
+   * Ten minutes, the approved maximum. Long enough for a slow connection to
+   * finish a 25 MiB file, short enough that a link pasted somewhere it should
+   * not have been stops working the same morning.
+   */
+  signedUrlSeconds: 600,
+
+  /** SH-STORAGE-004's ceiling on the above, so the constant cannot drift up. */
+  maxSignedUrlSeconds: 600,
+
+  mimeAllowlist: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ],
+} as const;
+
+export type AllowedMimeType = (typeof ATTACHMENT_LIMITS.mimeAllowlist)[number];
+
+/**
  * Retention windows, in days.
  *
  * `null` means **retained deliberately**, not "not yet decided" —

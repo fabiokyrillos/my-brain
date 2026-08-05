@@ -20,6 +20,41 @@ const PRD = readFileSync(
   "utf8",
 );
 
+/**
+ * The third corner of the same triangle (SH-QUOTA-010).
+ *
+ * The PRD is what the owner signed and `quotas.ts` is what the product reads,
+ * but the number that actually refuses a capture is the one seeded into
+ * `private.quota_ceilings`. Two of the three agreeing proves nothing about the
+ * third, and the failure that matters — a page promising 300 while the database
+ * refuses at 250 — lives exactly in that gap.
+ */
+const QUOTA_MIGRATION = readFileSync(
+  join(process.cwd(), "supabase/migrations/202608050076_quota_enforcement.sql"),
+  "utf8",
+).replace(/\r\n/g, "\n");
+
+/** The seeded ceilings, as `key -> value`, read out of the migration's INSERT. */
+function seededCeilings(): Map<string, number> {
+  const start = QUOTA_MIGRATION.indexOf(
+    "insert into private.quota_ceilings (key, value, note) values",
+  );
+  expect(start, "the quota migration must seed its ceilings").toBeGreaterThan(-1);
+  const block = QUOTA_MIGRATION.slice(start, QUOTA_MIGRATION.indexOf("\n\n", start));
+  const seeded = new Map<string, number>();
+  for (const [, key, value] of block.matchAll(/\('([a-z_]+)',\s*(\d+),/g)) {
+    seeded.set(key, Number(value));
+  }
+  return seeded;
+}
+
+const SEEDED = seededCeilings();
+
+/** `entriesPerDay` -> `entries_per_day`, the naming contract between the two. */
+function snakeCase(name: string): string {
+  return name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
 /** The §20 value sheet, as `label -> raw value cell`. */
 function valueSheet(): Map<string, string> {
   const start = PRD.indexOf("| Control | Proposed default | Rationale |");
@@ -82,6 +117,47 @@ describe("SH-QUOTA-010: the constants are the signed §20 values", () => {
       expect(Number.isInteger(value), `${name} must be an integer`).toBe(true);
       expect(value, `${name} must be positive`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("SH-QUOTA-010: the database enforces the number the product states", () => {
+  it("parses a seed that is not vacuous", () => {
+    expect(SEEDED.size).toBe(7);
+  });
+
+  it("every constant is seeded into private.quota_ceilings with the same value", () => {
+    for (const [name, value] of Object.entries(QUOTAS)) {
+      const key = snakeCase(name);
+      expect(SEEDED.has(key), `the migration must seed "${key}"`).toBe(true);
+      expect(SEEDED.get(key), `${name} disagrees with its seeded ceiling`).toBe(value);
+    }
+  });
+
+  it("every seeded ceiling maps back to a constant", () => {
+    // The other direction, and the one that catches a ceiling the database
+    // enforces but no surface knows about — a limit users hit with no copy to
+    // explain it.
+    const fromConstants = new Set(Object.keys(QUOTAS).map(snakeCase));
+    for (const key of SEEDED.keys()) {
+      expect(fromConstants.has(key), `seeded ceiling "${key}" has no constant`).toBe(true);
+    }
+  });
+
+  it("the mechanism reads every ceiling it seeds", () => {
+    // A seeded row nothing reads is a number that looks enforced and is not.
+    for (const key of SEEDED.keys()) {
+      expect(
+        QUOTA_MIGRATION.includes(`private.quota_ceiling('${key}')`),
+        `nothing reads the seeded ceiling "${key}"`,
+      ).toBe(true);
+    }
+  });
+
+  it("an absent ceiling refuses rather than admitting", () => {
+    // The failure direction is the whole design: a quota system whose broken
+    // state is "no limit" is not a quota system.
+    expect(QUOTA_MIGRATION).toContain("QUOTA_CEILING_MISSING");
+    expect(QUOTA_MIGRATION).not.toMatch(/coalesce\(\s*ceiling\s*,/);
   });
 });
 

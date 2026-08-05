@@ -26,6 +26,10 @@ export const dailyCycleActionFailureCodes = [
   "version_conflict",
   "action_unavailable",
   "retry_not_available",
+  // SH-QUOTA-009: a ceiling firing is its own outcome, not a failure. Folding
+  // it into `operation_failed` is what made capture say "this could not be
+  // completed right now" to someone who had simply reached today's limit.
+  "quota_exceeded",
   "operation_failed",
 ] as const;
 
