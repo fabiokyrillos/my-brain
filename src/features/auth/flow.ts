@@ -86,9 +86,30 @@ export function authProviderErrorCode(
     : fallback;
 }
 
+/**
+ * The post-callback destination, reduced to the two shapes the allowlist
+ * permits (SH-SIGNUP-010).
+ *
+ * The `..` and backslash rejections were added when SH-SIGNUP-010's
+ * guard-of-the-guard test was written, because the guard did not hold:
+ * `/en/app/../../evil` passed the `startsWith("/en/app/")` branch and was
+ * returned verbatim, and a browser resolves it to `/evil`. That is not an open
+ * redirect — it cannot leave the origin, so T-20 was never reachable this way —
+ * but it defeated the thing the allowlist is *for*, which is pinning the caller
+ * inside a known subtree, and a traversal sequence surviving a redirect guard
+ * is a component of the next bug rather than a curiosity.
+ *
+ * A backslash is rejected for the neighbouring reason: browsers treat `\` as a
+ * path separator, so `/\evil.example` is read as protocol-relative even though
+ * it starts with a slash — the same class as the `//` case already handled.
+ */
 export function safeAuthNext(value: string | null, locale: Locale) {
   const fallback = `/${locale}/app`;
   if (!value || value.startsWith("//")) return fallback;
+  if (value.includes("\\")) return fallback;
+  // Segment-wise, not `includes("..")`: a path may legitimately contain two
+  // dots inside a segment, and only a whole `..` segment climbs.
+  if (value.split("/").includes("..")) return fallback;
   if (value === `/${locale}/auth/reset`) return value;
   if (value === fallback || value.startsWith(`${fallback}/`)) return value;
   return fallback;
