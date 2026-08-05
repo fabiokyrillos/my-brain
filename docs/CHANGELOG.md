@@ -1,6 +1,24 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — Signup Hardening: SH.6 deploys, and the deployment finds the defect the review did not (0 new migrations)
+
+**Both migrations are live and the budget is spent.** `202608050076` went first because `main` carried only that migration at the time — the ordering was enforced by repository truth rather than by care. Hosted parity is `202608050077`, signup stayed disabled throughout, and the full 242-field Auth configuration read back unchanged after each apply.
+
+**The ceilings hold under a real race, and now that is measured rather than argued.** Sixty simultaneous inserts by one owner against a ceiling of fifty admitted exactly fifty — and the assertion is the number of rows *stored*, not the number of responses that looked successful. A count-then-insert design over-admits there and passes every sequential test ever written for it.
+
+**A migration that schedules a destructive sweep has already authorized it.** This is the defect the deployment found and the review did not. `202608050077` ends with a `cron.schedule` block, so applying it scheduled all seven purges — five that had never run against production, none authorized. The first would have executed at 04:11 UTC the next morning, and the dry-run transcript whose entire purpose is to *precede* that decision would have arrived afterwards to describe a deletion that had already happened. The gate was not bypassed by anyone; it was removed by the same migration that documented it.
+
+Nothing was lost, because every class measured zero eligible rows. That is a fact about how young this database is rather than about the design — the oldest `heartbeat_runs` row crosses its thirty-day line within a fortnight. The five new schedules and a duplicate of BYOK's own sweep were removed the same day; SH.5's and BYOK's authorized ones were left exactly as they were, because undoing those would be reversing a decision somebody else had already made.
+
+**Deployed is not enforced.** The retention flags stay false and the Privacy Policy keeps its honest-notice warning, for a better reason than before: a window whose sweep is not scheduled is not being applied to anyone, and a flag claiming otherwise would be T-31 in its purest form — a policy sentence false about the very database it describes.
+
+**T-26 is closed on the table and narrowed everywhere else.** `service_role` now gets 403 on both BYOK tables. The probe that mattered most was the one that could have looked like success: `admin_list_credential_envelopes` still returns a real envelope, so master-key rotation works. A closure that had quietly broken rotation would have read green on every other check.
+
+**The heartbeat Edge Function is gone.** It wrapped an RPC that `pg_cron` already calls inside the database, so it was an internet-reachable endpoint holding a service-role client for a caller that did not exist. Undeployed and reading back 404; the hourly in-database path never noticed.
+
+**The first live production purge remains NOT AUTHORIZED and NOT EXECUTED**, and `scripts/sh6-retention-schedule.mjs --enable` is now the single, readable, reversible act that would change that.
+
 ## 2026-08-05 — Signup Hardening: SH.6 puts the ceilings on the tables and builds retention it deliberately does not run (2 migrations, budget fully spent)
 
 **The ceiling belongs to the table, not to the RPC.** `authenticated` holds INSERT on `entries`, `jobs`, `attachments` and `entity_attachments`, granted in bulk back in `202607160003` and `202607160007`. A quota written only inside `capture_entry_async` would therefore be a quota any client walks around with one POST — the same class of mistake as a CAPTCHA enforced only in the browser. So all five ceilings sit on the tables, and the pgTAP proves the grant is real before proving the ceiling holds against it, because otherwise it would be guarding a door nobody can reach.

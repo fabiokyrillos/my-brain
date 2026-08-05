@@ -104,9 +104,16 @@ async function boundary(entry, cutoff) {
   const response = await fetch(query, {
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
   });
-  if (!response.ok) return null;
+  // Three outcomes, and they must stay three. Collapsing "unreadable" into
+  // "empty" would print "(none in window)" for a table this role is REFUSED on
+  // — which reads as evidence and is the absence of it. SH-EXPOSURE-001 makes
+  // that case real rather than hypothetical: `service_role` lost its grants on
+  // both BYOK tables in the same slice that added this script.
+  if (!response.ok) {
+    return { readable: false, reason: `HTTP ${response.status}`, oldest: null };
+  }
   const rows = await response.json();
-  return rows?.[0]?.[entry.column] ?? null;
+  return { readable: true, reason: null, oldest: rows?.[0]?.[entry.column] ?? null };
 }
 
 const now = new Date();
@@ -128,7 +135,9 @@ for (const entry of CLASSES) {
     cutoff,
     measuredOn: `${entry.table}.${entry.column}`,
     prunable: count,
-    oldestSurviving: count === null ? null : await boundary(entry, cutoff),
+    boundary: count === null
+      ? { readable: false, reason: "twin unavailable", oldest: null }
+      : await boundary(entry, cutoff),
     twin: entry.twin,
     error,
   });
@@ -146,7 +155,11 @@ if (asJson) {
     console.log(`  cutoff          : ${row.cutoff}`);
     console.log(`  measured on     : ${row.measuredOn}`);
     console.log(`  prunable rows   : ${row.error ? `UNAVAILABLE (${row.error})` : row.prunable}`);
-    console.log(`  oldest surviving: ${row.oldestSurviving ?? "(none in window)"}`);
+    console.log(`  oldest surviving: ${
+      row.boundary.readable
+        ? (row.boundary.oldest ?? "(no row inside the window)")
+        : `NOT READABLE (${row.boundary.reason})`
+    }`);
     console.log(`  function        : ${row.twin}\n`);
   }
   const total = report.reduce((sum, row) => sum + (row.prunable ?? 0), 0);

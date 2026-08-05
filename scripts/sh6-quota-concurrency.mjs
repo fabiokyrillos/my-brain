@@ -110,13 +110,34 @@ const userId = (await created.json()).id;
 
 let exitCode = 1;
 try {
-  const signedIn = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+  // A session WITHOUT signing in, because a password grant needs a CAPTCHA
+  // token: SH.5 enabled Turnstile on this project, so `grant_type=password`
+  // answers 400 to any caller that has not solved a widget. `generate_link`
+  // mints a recovery token and `/verify` exchanges it, which is the same
+  // CAPTCHA-free path `sh5-password-policy-probe.mjs` established.
+  //
+  // `hashed_token` with `token_hash` -- NOT `token` + `email`, which is the
+  // raw-OTP shape and answers `otp_expired` for a hash it cannot match.
+  const link = await fetch(`${url}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type: "recovery", email }),
+  }).then((r) => r.json());
+
+  const hashedToken = link.hashed_token
+    ?? new URL(link.action_link ?? `${url}/?token=`).searchParams.get("token");
+  const verified = await fetch(`${url}/auth/v1/verify`, {
     method: "POST",
     headers: { apikey: publishableKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ type: "recovery", token_hash: hashedToken }),
   });
-  if (!signedIn.ok) throw new Error(`sign-in failed: ${signedIn.status}`);
-  const accessToken = (await signedIn.json()).access_token;
+  if (!verified.ok) throw new Error(`session exchange failed: ${verified.status}`);
+  const accessToken = (await verified.json()).access_token;
+  if (!accessToken) throw new Error("session exchange returned no access token");
 
   async function insertJob(index) {
     const started = Date.now();

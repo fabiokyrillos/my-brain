@@ -19,22 +19,32 @@
  * flags and the warning disappears by construction rather than by somebody
  * remembering to delete a paragraph.
  *
- * ## Why SH.6 built the sweeps and did NOT flip the flags
+ * ## Why SH.6 built the sweeps, DEPLOYED them, and still did not flip the flags
  *
- * `202608050077` creates all seven sweeps and schedules them. The flags stay
- * `false` anyway, because they describe whether a window is enforced *for the
- * people reading the policy* — and that becomes true when the migration is
- * applied to the shared environment, not when it is merged. A policy that
- * announced enforcement on the strength of a merged file would be T-31 with
- * extra steps: the sentence would be false for exactly as long as the gap
- * between merge and deploy, which is the window in which nobody is looking.
+ * `202608050077` creates all seven sweeps and is applied to the hosted project
+ * as of 2026-08-05. The flags stay `false` anyway, and the reason changed
+ * during the deployment rather than surviving it unexamined.
+ *
+ * The migration's own `cron.schedule` block scheduled every sweep at apply
+ * time. That silently removed the gate SH-RETENTION-008 exists to hold open:
+ * the first live purge would have run at 04:11 UTC the next morning, and the
+ * dry-run transcript meant to PRECEDE that decision would have described a
+ * deletion that had already happened. The five new schedules were removed from
+ * the hosted project the same day (`scripts/sh6-retention-schedule.mjs`,
+ * ADR-082), leaving the two that pre-date SH.6 and were already authorized.
+ *
+ * So the deployed state is: the functions exist, no client or service role can
+ * execute them, and **nothing is scheduled to run them**. A window whose sweep
+ * is not scheduled is not enforced, whatever the migration chain says — and a
+ * flag that claimed otherwise would be T-31 in its purest form, a policy
+ * sentence that is false about the very database it describes.
  *
  * `documents.test.ts` pins the distinction: every unenforced window must
  * nonetheless have a sweep and a dry-run twin built for it in the chain, so
- * "not implemented" and "implemented, not yet deployed" cannot be confused.
- * Flipping these is a one-line change made after the deployment readback, and
- * the test that says "at least one window is genuinely unenforced" is deleted
- * in the same commit.
+ * "not implemented" and "implemented but not enforced" cannot be confused.
+ * These flip when `npm run sh6:retention-schedule -- --enable` has run and the
+ * owner has authorized the first purge — not before — and the test that says
+ * "at least one window is genuinely unenforced" is deleted in the same commit.
  */
 
 import type { Locale } from "@/lib/preferences";
