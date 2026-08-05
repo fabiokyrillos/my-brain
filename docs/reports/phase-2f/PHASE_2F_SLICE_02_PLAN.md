@@ -1,7 +1,7 @@
 # Phase 2F — Slice 2F.2 execution plan: Work-surface mutation convergence
 
 Branch `codex/phase-2f-slice-2`, cut from `main` at `8c59c1d` (the 2F.1 merge of accepted `c7e03b3`).
-Normative: `docs/PHASE_2F_PRD.md` Revision 4 · the accepted 2F.1 artifacts and guards · `docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md`.
+Normative: `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4 · the accepted 2F.1 artifacts and guards · `docs/reports/phase-2f/PHASE_2F_SLICE_01_REPORT.md`.
 
 **Scope lock.** Code only. No SQL, no migration, no grant change, no new RPC, no change to
 `list_task_command_candidates`, no touch of the manual creation path (`createRecord`'s task

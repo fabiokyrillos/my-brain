@@ -111,8 +111,8 @@ recorded as repository maintenance in `PRODUCT_UX_CLOSEOUT.md` §8.
 
 ## 4. BYOK — gate status: all five satisfied
 
-Governing artifacts exist and are approved: `docs/BYOK_PRD.md`,
-`docs/BYOK_IMPLEMENTATION_PLAN.md`, `docs/reports/byok/BYOK_SECURITY_DEFINITION.md`.
+Governing artifacts exist and are approved: `docs/initiatives/byok/BYOK_PRD.md`,
+`docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md`, `docs/reports/byok/BYOK_SECURITY_DEFINITION.md`.
 
 The plan declared **five pre-code gates** under one absolute rule. **On 2026-08-01 the
 owner amended that rule to a dependency-specific one** — `ADR-069`, recorded as append-only
@@ -217,7 +217,7 @@ The three questions this file previously carried are now closed:
 | What is the current phase and what is authorized? | `docs/STATE.md` |
 | What did Entity Graph Completion deliver and cost? | `docs/reports/entity-graph/EGC_REPORT.md` |
 | Which requirement is evidenced by what? | `docs/reports/entity-graph/EGC_TRACEABILITY_MATRIX.md` |
-| What is BYOK supposed to be? | `docs/BYOK_PRD.md`, `docs/BYOK_IMPLEMENTATION_PLAN.md` |
+| What is BYOK supposed to be? | `docs/initiatives/byok/BYOK_PRD.md`, `docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md` |
 | What can BYOK never claim? | `docs/reports/byok/BYOK_SECURITY_DEFINITION.md` |
 | What is still outstanding? | `docs/TODO.md` |
 
@@ -897,9 +897,9 @@ record of BYOK's close; act on this section for what comes next.
 `ADR-068` ordered Signup Hardening after BYOK's close; BYOK closed on `b007ffa`, so the
 initiative is authorized to be *planned*, and it now is. The package:
 
-- `docs/SIGNUP_HARDENING_PRD.md` — 16 `SH-*` families, ~120 requirements, each with slice,
+- `docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md` — 16 `SH-*` families, ~120 requirements, each with slice,
   migration expectation, trust boundary, owner/shared-env flags, evidence class.
-- `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` — slices SH.0–SH.7, eight-migration budget,
+- `docs/initiatives/signup-hardening/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` — slices SH.0–SH.7, eight-migration budget,
   tiered pre-code gates, the BYOK-OPERATIONS/Phase 2H boundary.
 - `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md` — the four-agent census (the evidence base).
 - `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md` — 35 threats with prevention/detection/test/

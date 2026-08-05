@@ -2,7 +2,7 @@
 
 Status: **Approved — owner approval 2026-08-04, recorded in `ADR-077` and Amendment `A-1`.**
 Drafted 2026-08-02 as Proposed (that history stands). Governs the requirements in
-`docs/SIGNUP_HARDENING_PRD.md`, on the evidence in
+`docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md`, on the evidence in
 `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md` and the threats in
 `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md`. Baseline `main` = `b007ffa`, head
 `202608010069`.

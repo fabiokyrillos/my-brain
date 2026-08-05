@@ -2,7 +2,7 @@
  * Signup Hardening traceability generator — SH-OPERATIONS-001, SH-OPERATIONS-005.
  *
  * Writes `docs/reports/signup-hardening/SIGNUP_HARDENING_TRACEABILITY_MATRIX.md` from
- * `docs/SIGNUP_HARDENING_PRD.md` and from the artifacts the repository actually
+ * `docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md` and from the artifacts the repository actually
  * holds.
  *
  * ## Fail-closed, and what that means for a traceability matrix specifically
@@ -67,7 +67,7 @@ export const DECLARED_SLICES = Object.freeze([
  * make the inventory grow every time somebody wrote a sentence.
  */
 export function parseRequirements(root) {
-  const prd = readFileSync(join(root, "docs/SIGNUP_HARDENING_PRD.md"), "utf8");
+  const prd = readFileSync(join(root, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md"), "utf8");
   const rows = [];
   for (const line of prd.split(/\r?\n/)) {
     const match = /^\|\s*\*\*(SH-[A-Z]+-\d+)\*\*\s*\|(.*)$/.exec(line);

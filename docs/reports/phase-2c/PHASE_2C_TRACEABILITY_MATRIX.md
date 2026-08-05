@@ -1,6 +1,6 @@
 # Phase 2C requirement traceability matrix
 
-Generated from `docs/PHASE_2C_PRD.md` by `scripts/generate-phase-2c-traceability.mjs` during Slice 2C.6 closeout. Do not edit by hand — run `npm run docs:phase-2c:traceability` to regenerate.
+Generated from `docs/initiatives/phase-2c/PHASE_2C_PRD.md` by `scripts/generate-phase-2c-traceability.mjs` during Slice 2C.6 closeout. Do not edit by hand — run `npm run docs:phase-2c:traceability` to regenerate.
 
 Inventory: 72 functional/non-functional requirement IDs across 14 families, 6 per-epic acceptance criteria, and 5 global gates: 83 individually mapped rows. Evidence is referenced by durable artifact and executable gate rather than copied test output.
 

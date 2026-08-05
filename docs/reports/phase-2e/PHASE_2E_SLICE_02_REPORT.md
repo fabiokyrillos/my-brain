@@ -18,7 +18,7 @@
 | Deployed workers | `process-jobs` v15, `heartbeat` v4 — unchanged; this slice touches no worker code |
 | Generated types | `list_task_command_candidates` added **by hand**. Not regenerated — see §7 and ADR-041 |
 | Publication | Draft PR [#18](https://github.com/fabiokyrillos/my-brain/pull/18), CI evidence only. Not merged, not deployed, not tagged. |
-| Governing documents | `docs/PHASE_2E_PRD.md` §9 (Epic 2E-B), §13.2, §19.1, §21; `docs/ENGINEERING_STANDARDS.md`; ADR-037, ADR-040, ADR-041 |
+| Governing documents | `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §9 (Epic 2E-B), §13.2, §19.1, §21; `docs/ENGINEERING_STANDARDS.md`; ADR-037, ADR-040, ADR-041 |
 
 Slices 2E.3–2E.8 have not started. They proceed under the approved PRD without further authorization.
 

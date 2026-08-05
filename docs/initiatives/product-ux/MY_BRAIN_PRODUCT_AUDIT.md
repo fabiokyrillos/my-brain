@@ -42,7 +42,7 @@ The audit reconciled the requested product documents with the current implementa
 
 Reviewed sources included:
 
-- `CLAUDE.md`, `README.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/PHASE_2_PLAN.md`, the Phase 2C/2X PRDs and reports, `docs/STATE.md`, `docs/DECISIONS.md`, `docs/TODO.md`, and engineering standards.
+- `CLAUDE.md`, `README.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/initiatives/phase-2/PHASE_2_PLAN.md`, the Phase 2C/2X PRDs and reports, `docs/STATE.md`, `docs/DECISIONS.md`, `docs/TODO.md`, and engineering standards.
 - All `page.tsx`, layouts, the authenticated error boundary, redirects, route-level forms, and detail routes under `src/app`.
 - The application shell, capability registry, navigation, home projection, daily-cycle projections, capture, entry review, candidate editor, task list, settings, file, cost, and operational components.
 - All application CSS files and their responsive rules at 600, 700, 760, 850, and 900 pixels.

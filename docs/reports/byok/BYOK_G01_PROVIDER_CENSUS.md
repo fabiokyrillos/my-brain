@@ -1,6 +1,6 @@
 # BYOK G-0.1 — provider call-site census
 
-**Pre-code gate G-0.1** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../BYOK_IMPLEMENTATION_PLAN.md).
+**Pre-code gate G-0.1** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md).
 Every module that reaches an AI provider, and every place the project key is read.
 
 **Re-measured 2026-08-01 against `main` at `961feeb`** — not inherited from the definition

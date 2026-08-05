@@ -5,7 +5,7 @@ new surfaces this initiative itself adds (deletion executor, admin boundary, con
 ledger). Baseline: `main` = `b007ffa`, on `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md`.
 
 Each threat carries likelihood, impact, the prevention requirement(s) from
-`docs/SIGNUP_HARDENING_PRD.md`, how it is detected, the test that proves the mitigation, and the
+`docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md`, how it is detected, the test that proves the mitigation, and the
 residual risk that remains after mitigation. Likelihood/impact are **Low/Med/High**, assessed for
 the *post-open-signup* world (the world these controls exist for), not today's owner-only reality.
 

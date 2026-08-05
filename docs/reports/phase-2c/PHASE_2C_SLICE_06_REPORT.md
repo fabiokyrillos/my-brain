@@ -27,7 +27,7 @@ Delivered (`2C-UX`, `2C-I18N`, `2C-A11Y`, `2C-ANALYTICS`, `2C-OPERATIONS` aggreg
 - **`docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md`** — 83 generated rows. Two requirements carry an explicit non-`complete` status and are never shown green: `2C-STRUCTURE-004` (deferred split/merge, issue #8) and `2C-UNDO-004` (resolved for `correct_entry_interpretation`; `undo_operation`'s own `40001` raise recorded as a documented non-blocking risk).
 - **`scripts/verify-phase-2c-cleanup.mjs`** — fail-closed residual-data check across Auth users, 13 owner-scoped tables (including the Phase 2C `task_projects`/`task_contexts`/`task_people`/`task_dependencies`/`entry_task_candidate_resolutions` tables), and storage. Wired as `npm run test:remote:2c:cleanup`.
 - **`test:remote:2c` aggregate** (`remote-supabase-smoke.mjs --phase-2c`) — a deterministic, fail-fast sequence: editable-candidate confirmation (v2–v6), candidate-analytics product events, and residual-data cleanup. Wired as `npm run test:remote:2c`, with `npm run test:remote:2c:confirmation` for the focused smoke.
-- **Reports**: this slice report, `docs/PHASE_2C_REPORT.md` (phase closeout), and reconciled `STATE.md`/`TODO.md`/`CHANGELOG.md`/`DECISIONS.md`.
+- **Reports**: this slice report, `docs/initiatives/phase-2c/PHASE_2C_REPORT.md` (phase closeout), and reconciled `STATE.md`/`TODO.md`/`CHANGELOG.md`/`DECISIONS.md`.
 
 Explicitly excluded and untouched:
 

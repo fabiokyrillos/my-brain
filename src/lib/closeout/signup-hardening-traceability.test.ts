@@ -31,7 +31,7 @@ function fixture(mutate: (root: string) => void = () => {}): string {
   const root = mkdtempSync(join(tmpdir(), "sh-trace-"));
   mkdirSync(join(root, "docs/reports/signup-hardening"), { recursive: true });
   mkdirSync(join(root, "supabase/migrations"), { recursive: true });
-  cpSync(join(REPO, "docs/SIGNUP_HARDENING_PRD.md"), join(root, "docs/SIGNUP_HARDENING_PRD.md"));
+  cpSync(join(REPO, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md"), join(root, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md"));
   for (const slice of ["00", "01", "02", "03", "04", "05", "06"]) {
     writeFileSync(join(root, `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_${slice}_ACCEPTANCE.md`), "# fixture\n");
   }
@@ -78,7 +78,7 @@ describe("the generator refuses to print past a defect", () => {
   it("catches a requirement claiming a slice the plan does not declare", () => {
     withFixture(
       (root) => {
-        const path = join(root, "docs/SIGNUP_HARDENING_PRD.md");
+        const path = join(root, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md");
         writeFileSync(
           path,
           readFileSync(path, "utf8").replace("| **SH-QUOTA-001** |", "| **SH-QUOTA-001** |").replace(
@@ -116,7 +116,7 @@ describe("the generator refuses to print past a defect", () => {
     // list comes back nearly empty, and the report describes nothing while
     // looking complete.
     withFixture(
-      (root) => writeFileSync(join(root, "docs/SIGNUP_HARDENING_PRD.md"), "# empty\n"),
+      (root) => writeFileSync(join(root, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md"), "# empty\n"),
       (root) => {
         expect(findings(root).some((f) => f.includes("implausibly small"))).toBe(true);
       },
@@ -128,7 +128,7 @@ describe("the generator refuses to print past a defect", () => {
     // the not-delivered map would otherwise keep being reported as accounted for.
     withFixture(
       (root) => {
-        const path = join(root, "docs/SIGNUP_HARDENING_PRD.md");
+        const path = join(root, "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md");
         writeFileSync(
           path,
           readFileSync(path, "utf8").replace("| **SH-STORAGE-006**", "| **SH-STORAGE-996**"),

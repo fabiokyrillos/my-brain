@@ -1,8 +1,8 @@
 # EGC.2 — Person Relationships and Associations · Acceptance record
 
 **Slice EGC.2 of Entity Graph Completion.** Governed by
-[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../ENTITY_GRAPH_COMPLETION_PRD.md) and
-[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md)
+[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md) and
+[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md)
 §"Slice EGC.2".
 
 Branch `codex/egc-slice-2`, branched from `main` at `840da99` (EGC.1's merge SHA).

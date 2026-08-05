@@ -155,7 +155,7 @@ Docker is unavailable, so local pgTAP was not run. Linked DB lint, migration/typ
 
 ## Traceability and completion
 
-The summary PRD/epic/slice/evidence crosswalk is in `docs/PHASE_2X_REPORT.md`; `docs/reports/phase-2x/PHASE_2X_TRACEABILITY_MATRIX.md` provides the durable per-ID annex for all 195 functional/non-functional IDs, 58 family acceptance IDs, and 30 global criteria (283 rows). The conceptual seven PRD delivery groups are explicitly reconciled to the implementation plan's 18 official slices. Seventeen prior official slice commits plus this closeout form the official sequence; five supporting/hotfix commits remain separately identified. Deployment, parity, redacted Auth diagnosis, and cleanup evidence is retained in `docs/reports/phase-2x/PHASE_2X_SLICE_18_EVIDENCE.md`.
+The summary PRD/epic/slice/evidence crosswalk is in `docs/initiatives/phase-2x/PHASE_2X_REPORT.md`; `docs/reports/phase-2x/PHASE_2X_TRACEABILITY_MATRIX.md` provides the durable per-ID annex for all 195 functional/non-functional IDs, 58 family acceptance IDs, and 30 global criteria (283 rows). The conceptual seven PRD delivery groups are explicitly reconciled to the implementation plan's 18 official slices. Seventeen prior official slice commits plus this closeout form the official sequence; five supporting/hotfix commits remain separately identified. Deployment, parity, redacted Auth diagnosis, and cleanup evidence is retained in `docs/reports/phase-2x/PHASE_2X_SLICE_18_EVIDENCE.md`.
 
 Phase 2X is complete with documented external limitations. The provider-email skip, absent Deno/Docker execution, existing heartbeat lint warnings, and lack of static screenshots are not represented as green. No next phase was started.
 

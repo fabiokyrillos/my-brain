@@ -1,6 +1,6 @@
 # Phase 2F — One Write Path: final phase report
 
-**Verdict: complete.** Six slices, 68 requirements, two migrations, one removed write-path family, one documented exception, and a measurement instrument that makes the next expensive decision decidable on data. Governed by `docs/PHASE_2F_PRD.md` Revision 4.3.
+**Verdict: complete.** Six slices, 68 requirements, two migrations, one removed write-path family, one documented exception, and a measurement instrument that makes the next expensive decision decidable on data. Governed by `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4.3.
 
 All six slices are accepted and merged. Slice 2F.6 merged as **PR #33 → `7e3e5f0`** on 2026-07-30, with **merge-SHA CI run `30520514810` green on all three jobs on the first attempt**, and every closeout gate re-executed from merged `main` content. `main` is clean and synchronized with `origin`; parity is `202607300063` before and after. The per-gate ledger is `docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md` §4.
 
@@ -179,7 +179,7 @@ The verifier's scope is stated exactly rather than rounded: **zero orphans acros
 - Two Phase 2F migrations, both applied; no third.
 - `tasks` direct-write allowlist empty; `reminders` allowlist holds exactly the Option C exception.
 - 68-row traceability matrix generated and regenerable byte-stably.
-- **Phase 2G not started**: named only as a recommendation in `docs/PHASE_2F_PROPOSAL.md`; no PRD, plan, ADR, requirement ID, migration, script, test or document section exists for it, established by scoped grep and asserted by a CI case.
+- **Phase 2G not started**: named only as a recommendation in `docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md`; no PRD, plan, ADR, requirement ID, migration, script, test or document section exists for it, established by scoped grep and asserted by a CI case.
 
 ## 15. Final production state
 

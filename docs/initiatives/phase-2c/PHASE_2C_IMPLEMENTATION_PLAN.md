@@ -312,7 +312,7 @@ Modify:
 - `e2e/intelligent-capture.spec.ts`;
 - `src/app/operations.css` for candidate-editor responsive/error/edited states;
 - `package.json` with `test:remote:2c:confirmation` and, at closeout, `test:remote:2c`;
-- `docs/STATE.md`, `docs/TODO.md`, `docs/CHANGELOG.md`, `docs/DECISIONS.md`, `docs/PHASE_2_PLAN.md`, `docs/DATABASE.md`, and `docs/SECURITY.md` after implementation evidence exists.
+- `docs/STATE.md`, `docs/TODO.md`, `docs/CHANGELOG.md`, `docs/DECISIONS.md`, `docs/initiatives/phase-2/PHASE_2_PLAN.md`, `docs/DATABASE.md`, and `docs/SECURITY.md` after implementation evidence exists.
 
 No Edge Function file is expected to change.
 
@@ -592,7 +592,7 @@ Editable candidates and every later Phase 2C decision behave consistently in Nee
 ### Likely files and contract work
 
 - Update daily-cycle projections/components only where cross-surface drift is found; add no new lifecycle source.
-- Create `scripts/generate-phase-2c-traceability.mjs`, `scripts/verify-phase-2c-cleanup.mjs`, `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md`, and `docs/PHASE_2C_REPORT.md` if the established Phase 2X closeout pattern remains current.
+- Create `scripts/generate-phase-2c-traceability.mjs`, `scripts/verify-phase-2c-cleanup.mjs`, `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md`, and `docs/initiatives/phase-2c/PHASE_2C_REPORT.md` if the established Phase 2X closeout pattern remains current.
 - Add a fail-fast `test:remote:2c` aggregate after every focused smoke is independently green.
 - Update permanent current-state/architecture/database/security docs only with deployed, verified behavior; never rewrite historical Phase 2X evidence.
 

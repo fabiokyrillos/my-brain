@@ -220,12 +220,12 @@ Playwright/remote-smoke run).
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| `candidate_edit_started` event | Grep across `src/` (code) and test files: no occurrence outside `docs/PHASE_2C_PRD.md` and `docs/PHASE_2C_IMPLEMENTATION_PLAN.md` | **FAIL (not implemented)** |
+| `candidate_edit_started` event | Grep across `src/` (code) and test files: no occurrence outside `docs/initiatives/phase-2c/PHASE_2C_PRD.md` and `docs/initiatives/phase-2c/PHASE_2C_IMPLEMENTATION_PLAN.md` | **FAIL (not implemented)** |
 | `candidate_edit_reset` event | Same grep result | **FAIL (not implemented)** |
 | `task_candidates_confirmed` includes `editedCandidateCount`/`editedFieldCount` | C: `actions.ts:146` sends only `{ candidateCount }` | **PARTIAL** (event fires, but without the two edit-count properties the PRD specifies) |
 
 This maps to implementation-plan Task 5 ("Analytics and convergence"), whose
-checklist items are unchecked in `docs/PHASE_2C_IMPLEMENTATION_PLAN.md:357-360`.
+checklist items are unchecked in `docs/initiatives/phase-2c/PHASE_2C_IMPLEMENTATION_PLAN.md:357-360`.
 It is best-effort, fail-open telemetry with no bearing on correctness, security,
 or data integrity — see §19 for the recommended fast-follow.
 

@@ -170,7 +170,7 @@ An independent probe against the deployed project after all six remote runs: **z
 
 ## 13. Deferred work
 
-Reason-level refusal granularity (needs an allowlist widening, post-2F); an emitter for the three unreachable preview categories; a UI surface for the funnel; the offline replay spike the spike tier may authorize; the privileged distinct-user read, performed at evaluation time; a command identifier enabling per-intent counting; `product_events` retention/purge; the `docs/PHASE_2F_PRD.md` §10 `database`-cell correction (`2F-OPERATIONS-006`); and every other Slice 2F.6 item.
+Reason-level refusal granularity (needs an allowlist widening, post-2F); an emitter for the three unreachable preview categories; a UI surface for the funnel; the offline replay spike the spike tier may authorize; the privileged distinct-user read, performed at evaluation time; a command identifier enabling per-intent counting; `product_events` retention/purge; the `docs/initiatives/phase-2f/PHASE_2F_PRD.md` §10 `database`-cell correction (`2F-OPERATIONS-006`); and every other Slice 2F.6 item.
 
 ## 14. Confirmation that Slice 2F.6 was not started
 

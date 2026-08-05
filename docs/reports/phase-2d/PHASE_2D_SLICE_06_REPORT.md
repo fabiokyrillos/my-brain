@@ -35,7 +35,7 @@ Delivered (`2D-UX`, `2D-I18N`, `2D-A11Y`, `2D-ANALYTICS`, `2D-OPERATIONS` aggreg
 - **`docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md`** — 69 generated rows. No requirement is shown non-green (see §6).
 - **`scripts/verify-phase-2d-cleanup.mjs`** — fail-closed residual-data check across Auth users (Phase 2D fixture prefixes plus adjacent smoke prefixes), 14 owner-scoped tables (adding `entry_interpretations` to the Phase 2C set — `pending_questions` was already scanned — since reinterpretation appends an immutable interpretation revision), and storage. Wired as `npm run test:remote:2d:cleanup`.
 - **`test:remote:2d` aggregate** (`remote-supabase-smoke.mjs --phase-2d`) — a deterministic, fail-fast sequence: question-resolution (v1/v2 answer + dispositions), suggested-answer/preview, reinterpretation (v3), content-free resolution analytics, and residual-data cleanup. Wired as `npm run test:remote:2d`.
-- **Reports**: this slice report, `docs/PHASE_2D_REPORT.md` (phase closeout), ADR-034, and reconciled `STATE.md`/`TODO.md`/`CHANGELOG.md`/`SECURITY.md`.
+- **Reports**: this slice report, `docs/initiatives/phase-2d/PHASE_2D_REPORT.md` (phase closeout), ADR-034, and reconciled `STATE.md`/`TODO.md`/`CHANGELOG.md`/`SECURITY.md`.
 
 Explicitly excluded and untouched:
 

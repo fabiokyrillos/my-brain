@@ -7,7 +7,7 @@ added by the closeout**.
 ## 0. What this measures, and what it does not
 
 It measures **id-traceability**: for each requirement id declared in
-`docs/BYOK_PRD.md`, whether that id appears in shipped code, tests, migrations,
+`docs/initiatives/byok/BYOK_PRD.md`, whether that id appears in shipped code, tests, migrations,
 journeys or CI.
 
 It does **not** measure implementation. A requirement can be fully implemented

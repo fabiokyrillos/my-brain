@@ -10,7 +10,7 @@ definition and a PRD is written against it.
 - **Migration parity** — `202607310064`, local and remote.
 - **Date** — 2026-07-31.
 - **Governing precedents** — `docs/STATE.md`, `docs/TODO.md`, `docs/DECISIONS.md`,
-  `docs/SECURITY.md`, `docs/PHASE_2F_PROPOSAL.md`, `docs/reports/phase-2f/PHASE_2F_REPORT.md`,
+  `docs/SECURITY.md`, `docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md`, `docs/reports/phase-2f/PHASE_2F_REPORT.md`,
   `docs/reports/product-ux/PRODUCT_UX_CLOSEOUT.md`, `docs/reports/product-ux/PRODUCT_UX_FINDINGS.md`.
 
 > **AMENDED 2026-07-31 — see §20.** New evidence from real owner use (the "Camila"

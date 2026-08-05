@@ -25,7 +25,7 @@ const read = (path: string) => readFileSync(join(REPO, path), "utf8");
 
 const CONSENT_MIGRATION = read("supabase/migrations/202608040074_policy_acceptances.sql");
 const DELETION_MIGRATION = read("supabase/migrations/202608040072_account_deletion.sql");
-const PLAN = read("docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md");
+const PLAN = read("docs/initiatives/signup-hardening/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md");
 
 describe("SH-LEGAL-004: the version constant is one constant", () => {
   /** The `when '<document>' then '<version>'` arms of `current_policy_version`. */

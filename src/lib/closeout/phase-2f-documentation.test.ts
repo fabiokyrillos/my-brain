@@ -95,7 +95,7 @@ describe("2F-OPERATIONS-006 / A5: ADR-055's expiry is a date a verifier can reco
 
 describe("2F-OPERATIONS-006: the phase PRD's gate matrix reflects what actually executed", () => {
   it("marks the database job executed for Slice 2F.5, whose three pgTAP assertions run there", () => {
-    const prd = read("docs/PHASE_2F_PRD.md");
+    const prd = read("docs/initiatives/phase-2f/PHASE_2F_PRD.md");
     const row = prd.split("\n").find((line) => line.includes("Empty-DB chain + full pgTAP + db lint"));
     expect(row, "PRD §10 no longer carries the empty-DB chain row").toBeDefined();
     const cells = row!.split("|").slice(1, -1).map((cell) => cell.trim());
@@ -109,7 +109,7 @@ describe("2F-OPERATIONS-006: the phase PRD's gate matrix reflects what actually 
   it("does not claim an executed authenticated-journeys gate for Slice 2F.4", () => {
     // 2F.4's sixteen acceptance gates contain no Playwright journey, and §10's own
     // rule is that a cell counts only when executed (2F-PRECOND-003).
-    const prd = read("docs/PHASE_2F_PRD.md");
+    const prd = read("docs/initiatives/phase-2f/PHASE_2F_PRD.md");
     const row = prd.split("\n").find((line) => line.includes("Authenticated journeys desktop+mobile"));
     expect(row).toBeDefined();
     const cells = row!.split("|").slice(1, -1).map((cell) => cell.trim());
@@ -121,7 +121,7 @@ describe("2F-OPERATIONS-006: the phase PRD's gate matrix reflects what actually 
   });
 
   it("records the correction as a revision entry rather than editing silently", () => {
-    const prd = read("docs/PHASE_2F_PRD.md");
+    const prd = read("docs/initiatives/phase-2f/PHASE_2F_PRD.md");
     expect(prd).toContain("Revision 4.3");
   });
 });
@@ -159,17 +159,17 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     // contradicted the executing phase is "exactly how a future session builds the
     // wrong thing". A test naming a fixed revision goes stale the moment the PRD is
     // revised, which is the same failure one level up.
-    const header = read("docs/PHASE_2F_PRD.md")
+    const header = read("docs/initiatives/phase-2f/PHASE_2F_PRD.md")
       .split(/\r?\n/)
       .find((line) => line.startsWith("**Revision "));
     expect(header, "the PRD no longer opens with a bold revision line").toBeDefined();
     const governing = header!.match(/\*\*Revision (\d+(?:\.\d+)?)/)?.[1];
     expect(governing, "could not read the governing revision from the PRD header").toBeDefined();
-    for (const document of ["docs/PHASE_2_PLAN.md", "docs/TODO.md"]) {
+    for (const document of ["docs/initiatives/phase-2/PHASE_2_PLAN.md", "docs/TODO.md"]) {
       expect(read(document), `${document} does not cite Revision ${governing}`)
         .toContain(`Revision ${governing}`);
     }
-    expect(read("docs/PHASE_2_PLAN.md"), "the plan still points at the superseded Revision 4")
+    expect(read("docs/initiatives/phase-2/PHASE_2_PLAN.md"), "the plan still points at the superseded Revision 4")
       .not.toMatch(/PHASE_2F_PRD\.md` \(Revision 4\)/);
     expect(read("docs/TODO.md")).not.toMatch(/approved `docs\/PHASE_2F_PRD\.md` Revision 4 \(/);
   });
@@ -295,7 +295,10 @@ function filesIn(root: string, dir: string): string[] {
 function phase2GStartSignals(root: string): Phase2GStartSignal[] {
   const signals: Phase2GStartSignal[] = [];
 
-  for (const dir of ["docs", "docs/reports"]) {
+  // One recursive walk from `docs/`. It subsumes `docs/reports/` and reaches
+  // `docs/initiatives/`, where a Phase 2G PRD would now be filed; listing the
+  // two separately would double-report anything under reports.
+  for (const dir of ["docs"]) {
     for (const name of markdownFilesIn(root, dir)) {
       const basename = name.slice(name.lastIndexOf("/") + 1);
       if (GOVERNING_ARTIFACT_ROLE.test(basename)) {
@@ -359,7 +362,7 @@ describe("A13: Phase 2G is not started", () => {
 
   it("keeps Phase 2G recorded as future work rather than declared", () => {
     // A mention as future work is a record; a declared requirement would be a start.
-    const proposal = read("docs/PHASE_2F_PROPOSAL.md");
+    const proposal = read("docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md");
     expect(proposal).toMatch(/Phase 2G/);
     expect(proposal).not.toMatch(DECLARED_2G_REQUIREMENT);
   });

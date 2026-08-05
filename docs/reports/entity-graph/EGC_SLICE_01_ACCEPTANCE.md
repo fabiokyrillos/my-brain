@@ -1,8 +1,8 @@
 # EGC.1 — Organizations and Contexts · Acceptance record
 
 **Slice EGC.1 of Entity Graph Completion.** Governed by
-[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../ENTITY_GRAPH_COMPLETION_PRD.md) and
-[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md)
+[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md) and
+[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md)
 §"Slice EGC.1", on the evidence in
 [`ENTITY_GRAPH_FINDINGS.md`](./ENTITY_GRAPH_FINDINGS.md).
 

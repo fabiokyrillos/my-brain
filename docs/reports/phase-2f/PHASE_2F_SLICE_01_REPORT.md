@@ -1,6 +1,6 @@
 # Phase 2F — Slice 2F.1 Report: Guardrails, decisions and preconditions
 
-Branch: `codex/phase-2f-slice-1` (base: `main` at `b54b833`). Governed by `docs/PHASE_2F_PRD.md` Revision 4 (approved). Implemented 2026-07-29.
+Branch: `codex/phase-2f-slice-1` (base: `main` at `b54b833`). Governed by `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4 (approved). Implemented 2026-07-29.
 
 **This slice ships no migration, deploys nothing, and changes no behaviour.** Every artifact is a test, a document, or a preserved pre-code gate artifact. The rollback boundary is the branch/PR itself — a pure revert with no data or deployment consequence.
 
@@ -13,7 +13,7 @@ Branch: `codex/phase-2f-slice-1` (base: `main` at `b54b833`). Governed by `docs/
 | 2F-GUARD-003 | same file, detector suite | The gate extracts call sites from source text; synthetic-source cases prove every DML method detected and reads/other-table/later-chain traffic ignored |
 | 2F-DECISION-001 | `docs/DECISIONS.md` ADR-054 | Activity remains a task; reopening condition named |
 | 2F-DECISION-002 | ADR-055 | Both tiers with exact thresholds; `no_match` = {`still_unmatched`, `creation_offered`}; five non-authorizing metrics; by-construction exclusion mechanism; 90-day expiry with the dated `TODO.md` entry mechanism |
-| 2F-DECISION-003 | ADR-056 + `docs/PHASE_2_PLAN.md` §Phase 2F + `docs/TODO.md` line 28 | Both stale definitions re-pointed at the PRD; displaced scope preserved as unscheduled future work gated on M11 |
+| 2F-DECISION-003 | ADR-056 + `docs/initiatives/phase-2/PHASE_2_PLAN.md` §Phase 2F + `docs/TODO.md` line 28 | Both stale definitions re-pointed at the PRD; displaced scope preserved as unscheduled future work gated on M11 |
 | 2F-DECISION-004 | ADR-057 + `docs/TODO.md` deferral entry | Provenance deferral recorded with the executed-dry-run reopening gate; nothing implemented |
 | 2F-PRECOND-001 | This branch tracks all gate artifacts | `phase-2f-writer-inventory.mjs`, `phase-2f-reminder-census.mjs`, `phase-2f-gate3-exact-title-reuse.mjs`, `phase-2f-gate1-record-ai-usage-dry-run.sql` (unrun by design), both gate reports, both reviews, proposal, PRD; `work-surface-reuse.test.ts` matches `vitest.config.ts`'s `src/**/*.test.{ts,tsx}` include and therefore runs in every CI `app` job |
 | 2F-PRECOND-002 | `supabase/tests/phase_2f_effective_limit.sql` | 7 assertions pinning the `effective_limit + 1` row laws, the no-phantom-row case, the negative clamp, and the query-scalar property; the clamp bounds already pinned at `phase_2e_task_command_matching.sql:424-443` are cited, not restated. **Execution site: CI `database` job** — Docker is unavailable on this workstation, so no local pgTAP run is claimed |

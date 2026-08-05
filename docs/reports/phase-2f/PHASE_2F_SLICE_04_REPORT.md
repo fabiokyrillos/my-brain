@@ -2,7 +2,7 @@
 
 **Task grant revocation and test-suite semantic migration.** Implemented, **undeployed**. No acceptance report exists yet and none may be written until deployment evidence exists.
 
-Governed by `docs/PHASE_2F_PRD.md` **Revision 4.2**. Frozen scope as authorized: `2F-REVOKE-001…008`, `2F-TESTMIG-001…008`, `2F-REMINDER-003`, plus owner-approved corrections A1–A5. A8 (early census re-run) remains deferred and was not executed.
+Governed by `docs/initiatives/phase-2f/PHASE_2F_PRD.md` **Revision 4.2**. Frozen scope as authorized: `2F-REVOKE-001…008`, `2F-TESTMIG-001…008`, `2F-REMINDER-003`, plus owner-approved corrections A1–A5. A8 (early census re-run) remains deferred and was not executed.
 
 ---
 
@@ -41,7 +41,7 @@ Change sets are reported against the slice base `2a13d07`, not against `main`. A
 | `scripts/remote-phase-2e-smoke.mjs` | fixture seeding → `admin` |
 | `scripts/remote-editable-candidate-confirmation-smoke.mjs` | cross-owner fixture → `admin` |
 | `scripts/remote-supabase-smoke.mjs` | fixture → `admin`; read-side RLS evidence added |
-| `docs/PHASE_2F_PRD.md` | Revision 4.2 (A1–A3) |
+| `docs/initiatives/phase-2f/PHASE_2F_PRD.md` | Revision 4.2 (A1–A3) |
 | `docs/SECURITY.md` | 2F-REVOKE-007 closure, the written determination, unreachable-policy record |
 | `docs/DATABASE.md` | final grants, retained-but-unreachable policies, provenance, prose correction |
 | `docs/STATE.md` | 2F.2/2F.3 merged+deployed, 2F.3 parity recorded, allowlist empty, current posture 2F.4 |

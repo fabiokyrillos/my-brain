@@ -8,7 +8,7 @@
 
 **Phase 2E is released. All three authorizations — merge, deployment, release — are given and discharged.**
 
-This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
+This file is the handoff between execution sessions. It is authoritative for *where the work stands*; `docs/initiatives/phase-2e/PHASE_2E_PRD.md` remains authoritative for *what the work is*.
 
 ## Repository state
 

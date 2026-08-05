@@ -247,7 +247,7 @@ Question resolution behaves consistently across the questions page, Chat, Needs 
 
 ### Contract work
 - Update daily-cycle/question projections only where cross-surface drift is found; add no new lifecycle source.
-- Create `scripts/generate-phase-2d-traceability.mjs`, `scripts/verify-phase-2d-cleanup.mjs`, `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md`, `docs/PHASE_2D_REPORT.md` (following the Phase 2C closeout pattern).
+- Create `scripts/generate-phase-2d-traceability.mjs`, `scripts/verify-phase-2d-cleanup.mjs`, `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md`, `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md`, `docs/initiatives/phase-2d/PHASE_2D_REPORT.md` (following the Phase 2C closeout pattern).
 - Add a fail-fast `test:remote:2d` aggregate after every focused smoke is independently green.
 - Update permanent current-state/architecture/database/security/AI docs only with deployed, verified behavior; never rewrite historical Phase 2X/2C evidence.
 

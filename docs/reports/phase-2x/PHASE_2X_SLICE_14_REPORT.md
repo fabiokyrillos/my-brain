@@ -45,7 +45,7 @@ After:
 - Settings boundary: `settings-contracts.ts`, `settings-form.tsx`, `schema.ts`, `settings-view.ts`, `settings-payload.ts`, `actions.ts`, Settings page and CSS.
 - Reviews boundary: `src/features/reviews/review-presentation.ts`, `review-list.ts`, and the Reviews page.
 - Browser coverage: intelligent capture, authenticated Settings persistence, and authenticated desktop/mobile navigation journeys.
-- Durable product inventory: `docs/PHASE_2X_REPORT.md`.
+- Durable product inventory: `docs/initiatives/phase-2x/PHASE_2X_REPORT.md`.
 
 ## Data flows
 

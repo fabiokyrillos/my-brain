@@ -6,7 +6,7 @@
 - **Slice HEAD:** `bfa28a1`
 - **Phase base:** `2e2acfd`
 - **Draft PR:** [#18](https://github.com/fabiokyrillos/my-brain/pull/18) — CI evidence only, **must not be merged before Slice 2E.8**
-- **Normative contract:** `docs/PHASE_2E_PRD.md` §13.5 (`2E-UPDATE-001..018`), §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D)
+- **Normative contract:** `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §13.5 (`2E-UPDATE-001..018`), §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D)
 - **New ADRs:** ADR-044, ADR-045, ADR-046
 - **Verdict:** **READY WITH NON-BLOCKING NOTES.** See §11.
 
