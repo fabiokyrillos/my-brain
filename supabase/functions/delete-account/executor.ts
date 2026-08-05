@@ -215,11 +215,12 @@ export async function executeDeletion(
   // carry no ciphertext by CHECK; an `active` row still holding material is a
   // stop, because the cascade in step 6 is what erases it and a stop here
   // means something is wrong before that point.
-  const credential = await service
-    .from("user_ai_credentials")
-    .select("status")
-    .eq("user_id", userId)
-    .maybeSingle();
+  // SH-EXPOSURE-001: through the narrow RPC rather than the table.
+  // `service_role` no longer holds DML on `user_ai_credentials` — the grant was
+  // a service key that could read every user's envelope in one statement — and
+  // `admin_credential_status` returns exactly the one column this check needs
+  // and never ciphertext.
+  const credential = await service.rpc("admin_credential_status", { p_user_id: userId });
   if (credential.error) {
     return await stop(
       "credential_not_erased",

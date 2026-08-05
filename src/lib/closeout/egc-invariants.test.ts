@@ -43,8 +43,9 @@ const REPO = resolve(__dirname, "../../..");
  * deletion log and start transition), SH.3 by one (`202608040073` the
  * administrative boundary), SH.4 by one (`202608040074` versioned consent),
  * SH.5 by one (`202608040075` the auth abuse ledger and its ceilings), SH.6 by
- * the first of its two (`202608050076` the quota and fairness mechanism) — seven
- * of eight.
+ * both of its two (`202608050076` the quota and fairness mechanism,
+ * `202608050077` retention and the exposure closures) — eight of eight, the
+ * budget fully spent and not exceeded.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -52,7 +53,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608050076";
+const AUTHORIZED_MIGRATION_HEAD = "202608050077";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

@@ -179,15 +179,72 @@ describe("no authenticated response may be stored (UX-26, requirement 4)", () =>
   });
 });
 
-describe("without provider configuration", () => {
-  it("passes the request through rather than locking everyone out", async () => {
-    process.env = { ...ORIGINAL_ENV };
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+/**
+ * SH-EXPOSURE-006 — the fail-open, bounded to development.
+ *
+ * The old behaviour was one branch for both modes, and it was written for the
+ * development case: start the server before filling in `.env.local` and the
+ * shell still renders. Applied to production it is the entire auth boundary
+ * disappearing because an environment variable was missing — the most ordinary
+ * deployment mistake there is, and one that produces no error, just an open
+ * door.
+ */
+function unconfigure(mode: "development" | "production") {
+  process.env = { ...ORIGINAL_ENV };
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // `NODE_ENV` is read-only in the ambient types but writable on the object.
+  Object.defineProperty(process.env, "NODE_ENV", { value: mode, configurable: true });
+}
+
+describe("without provider configuration, in development", () => {
+  it("passes the request through rather than locking the developer out", async () => {
+    unconfigure("development");
 
     const response = await proxy(request("/pt-BR/app"));
     expect(response.status).toBe(200);
     expect(vi.mocked(createServerClient)).not.toHaveBeenCalled();
+  });
+});
+
+describe("without provider configuration, in production", () => {
+  it("refuses app routes instead of serving them unauthenticated", async () => {
+    unconfigure("production");
+
+    const response = await proxy(request("/pt-BR/app"));
+    expect(response.status).toBe(503);
+    expect(vi.mocked(createServerClient)).not.toHaveBeenCalled();
+  });
+
+  it("refuses every app route, not only the shell root", async () => {
+    unconfigure("production");
+    for (const path of ["/pt-BR/app/settings", "/en/app/work/abc", "/en/app/costs"]) {
+      expect((await proxy(request(path))).status, path).toBe(503);
+    }
+  });
+
+  it("still serves login, legal and the marketing page", async () => {
+    // A misconfigured deployment that refused everything could not display that
+    // it is misconfigured, and the login page cannot work either way — so the
+    // refusal is scoped to the surface that would otherwise leak.
+    unconfigure("production");
+    for (const path of ["/", "/pt-BR/auth/login", "/pt-BR/legal/privacy"]) {
+      expect((await proxy(request(path))).status, path).toBe(200);
+    }
+  });
+
+  it("does not let the refusal be cached", async () => {
+    // A cached 503 would outlive the misconfiguration that produced it.
+    unconfigure("production");
+    const response = await proxy(request("/pt-BR/app"));
+    expect(response.headers.get("cache-control") ?? "").toContain("no-store");
+  });
+
+  it("names no environment variable in what it returns", async () => {
+    unconfigure("production");
+    const body = await (await proxy(request("/pt-BR/app"))).text();
+    expect(body).not.toContain("SUPABASE");
+    expect(body).not.toContain("NEXT_PUBLIC");
   });
 });

@@ -18,6 +18,23 @@
  * test asserts that warning is present **exactly while** one is. SH.6 flips the
  * flags and the warning disappears by construction rather than by somebody
  * remembering to delete a paragraph.
+ *
+ * ## Why SH.6 built the sweeps and did NOT flip the flags
+ *
+ * `202608050077` creates all seven sweeps and schedules them. The flags stay
+ * `false` anyway, because they describe whether a window is enforced *for the
+ * people reading the policy* — and that becomes true when the migration is
+ * applied to the shared environment, not when it is merged. A policy that
+ * announced enforcement on the strength of a merged file would be T-31 with
+ * extra steps: the sentence would be false for exactly as long as the gap
+ * between merge and deploy, which is the window in which nobody is looking.
+ *
+ * `documents.test.ts` pins the distinction: every unenforced window must
+ * nonetheless have a sweep and a dry-run twin built for it in the chain, so
+ * "not implemented" and "implemented, not yet deployed" cannot be confused.
+ * Flipping these is a one-line change made after the deployment readback, and
+ * the test that says "at least one window is genuinely unenforced" is deleted
+ * in the same commit.
  */
 
 import type { Locale } from "@/lib/preferences";

@@ -55,6 +55,30 @@ function snakeCase(name: string): string {
   return name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
+/** The retention half of the same triangle, seeded by the second SH.6 migration. */
+const RETENTION_MIGRATION = readFileSync(
+  join(process.cwd(), "supabase/migrations/202608050077_retention_and_exposure.sql"),
+  "utf8",
+).replace(/\r\n/g, "\n");
+
+function seededWindows(): Map<string, number> {
+  const start = RETENTION_MIGRATION.indexOf(
+    "insert into private.retention_windows (key, days, note) values",
+  );
+  expect(start, "the retention migration must seed its windows").toBeGreaterThan(-1);
+  const block = RETENTION_MIGRATION.slice(
+    start,
+    RETENTION_MIGRATION.indexOf("\n\nalter table", start),
+  );
+  const seeded = new Map<string, number>();
+  for (const [, key, days] of block.matchAll(/\('([a-z_]+)',\s*(\d+),/g)) {
+    seeded.set(key, Number(days));
+  }
+  return seeded;
+}
+
+const WINDOWS = seededWindows();
+
 /** The §20 value sheet, as `label -> raw value cell`. */
 function valueSheet(): Map<string, string> {
   const start = PRD.indexOf("| Control | Proposed default | Rationale |");
@@ -192,6 +216,44 @@ describe("SH-RETENTION-001: the retention windows are the signed §20 windows", 
     const all = Object.keys(RETENTION_DAYS).sort();
     const accounted = [...SWEPT_CLASSES, ...Object.keys(RETAINED_CLASSES)].sort();
     expect(accounted).toEqual(all);
+  });
+
+  it("every swept class is seeded into private.retention_windows with the same window", () => {
+    // The third corner again: the PRD is the promise, `quotas.ts` is what the
+    // product reads, and the seeded row is what actually deletes. A privacy
+    // policy promising 180 days over a sweep set to 30 is the failure that
+    // matters, and it lives exactly in this gap.
+    expect(WINDOWS.size).toBe(SWEPT_CLASSES.length);
+    for (const name of SWEPT_CLASSES) {
+      const key = snakeCase(name);
+      expect(WINDOWS.has(key), `the migration must seed "${key}"`).toBe(true);
+      expect(WINDOWS.get(key), `${name} disagrees with its seeded window`).toBe(
+        RETENTION_DAYS[name],
+      );
+    }
+  });
+
+  it("no retained class has a window, and no seeded window lacks a class", () => {
+    // A retained class with a row would be a purge nobody decided on; a seeded
+    // window with no class would be a deletion no surface knows about.
+    for (const name of Object.keys(RETAINED_CLASSES)) {
+      expect(WINDOWS.has(snakeCase(name)), `${name} is retained and must not be swept`).toBe(false);
+    }
+    const swept = new Set(SWEPT_CLASSES.map(snakeCase));
+    for (const key of WINDOWS.keys()) {
+      expect(swept.has(key), `seeded window "${key}" has no declared class`).toBe(true);
+    }
+  });
+
+  it("each swept class has a sweep AND a count-only twin", () => {
+    // SH-RETENTION-008. A sweep without a twin is a purge that can only be
+    // learned about by running it.
+    const sweeps = [...RETENTION_MIGRATION.matchAll(/create or replace function public\.(prune_\w+)\(\)/g)]
+      .map((match) => match[1]);
+    const twins = [...RETENTION_MIGRATION.matchAll(/create or replace function public\.count_(prunable_\w+)\(\)/g)]
+      .map((match) => match[1]);
+    expect(sweeps.length).toBe(WINDOWS.size);
+    expect(new Set(twins).size).toBe(sweeps.length);
   });
 
   it("undo_operations is measured past EXPIRY, not past creation", () => {
