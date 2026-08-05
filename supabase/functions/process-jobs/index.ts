@@ -4,6 +4,7 @@ import {
   requireMasterKey,
 } from "../_shared/byok-envelope.ts";
 import { isSupportedJobType, processClaimedJob, runEntryDispatchDrain } from "./dispatch.ts";
+import { readBoundedBody } from "./request-bounds.ts";
 
 const JOB_LEASE_SECONDS = 300;
 
@@ -52,10 +53,16 @@ Deno.serve(async (request) => {
       { status: 503 },
     );
   }
+  // SH-QUOTA-008. Before the client is built and before anything is parsed:
+  // an oversized body must cost this function as little as possible, and the
+  // 413 says only that, naming no limit, no field and no caller.
+  const body = await readBoundedBody(request);
+  if (body === null)
+    return Response.json({ error: "Payload too large", code: "body_too_large" }, { status: 413 });
+
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const service = createClient(url, serviceRole, { auth: { persistSession: false } });
-  const body = await request.json().catch(() => ({}));
 
   // Unattended scheduled dispatch: secret-authenticated, no end-user
   // session. Drains eligible interpret_entry jobs across all owners.

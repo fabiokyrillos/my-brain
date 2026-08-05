@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 /**
  * The validated shape of every memory write this slice adds (UX-10, DEC-5).
@@ -34,7 +35,7 @@ export const MEMORY_SENSITIVITIES = ["normal", "private", "highly_sensitive"] as
 export type MemorySensitivity = (typeof MEMORY_SENSITIVITIES)[number];
 
 /** `char_length(content) between 1 and 4000`. */
-const memoryContent = z.string().trim().min(1).max(4000);
+const memoryContent = z.string().trim().min(1).max(AI_INPUT_BOUNDS.memoryContent);
 
 /**
  * A relation that may be cleared.
