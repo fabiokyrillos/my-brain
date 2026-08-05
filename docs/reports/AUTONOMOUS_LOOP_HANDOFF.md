@@ -2094,3 +2094,105 @@ failures. Hosted: parity **`202608040075`**, `site_url` the Vercel origin, 12
 enumerated redirect URLs, `disable_signup: true`, `security_captcha_enabled:
 false`, no custom SMTP, 2 accounts both `active`, ledger empty. Production
 deployment healthy; public signup closed at both layers.
+
+---
+
+## 27. The eleventh stop — 2026-08-05, at the Turnstile activation boundary. **This supersedes §26.**
+
+`main` at `9ce5154`. **PR #85** (SH.5 wiring) and **PR #86** (the CSP fix) are
+both merged with merge-SHA CI green on all three jobs, branches preserved.
+Migration `202608040075` is applied to the hosted project.
+
+**Every repository-provable SH.5 item is done.** What remains is one owner
+action and the probes that follow it.
+
+### The deployment probe earned its keep
+
+It found a defect **no test in this repository would have caught**: the CSP
+blocked `challenges.cloudflare.com`, so the widget rendered, the site key was
+right, the field name was right — and Turnstile never injected its response
+input. **No token could exist.**
+
+That failure is invisible while hosted CAPTCHA is off, and switching it on turns
+it into *every sign-in refused for a missing token* — locking out every account,
+the owner's included.
+
+**The trap inside the fix:** two `Content-Security-Policy` headers on one
+response are enforced as an **intersection**. A looser `/auth` policy layered
+over the global strict one would have changed nothing while looking exactly like
+a fix. The two sources are now mutually exclusive by construction, and
+`csp.test.ts` asserts every route matches exactly one — including the direction
+nobody checks, where a route matches *neither* and silently loses its CSP.
+
+### What is still unknown, stated as unknown
+
+After the fix the widget **loads, renders and communicates**: `window.turnstile`
+defined, `render()` returns a widget id, the response input is injected, ~20
+challenge-platform requests return `200`, **zero CSP violations**.
+
+**But no token materialised** in 15–20s, headless or headed, at any size
+including the default; and two requests to `brunhild.challenges.cloudflare.com`
+failed `ERR_NAME_NOT_RESOLVED` **in this environment**.
+
+That points at automation and local DNS, not misconfiguration — a wrong hostname
+or bad site key fires `error-callback` with a code, and none fired. **It is not
+proof.** Do not record it as either a pass or a defect.
+
+`data-size="flexible"` was suspected and **cleared by experiment**: the default
+size behaves identically, so it is not the differentiator. It was left alone
+rather than changed on a hunch.
+
+### The owner action, and the ordering is not optional
+
+**First** — open `https://my-brain-dusky.vercel.app/pt-BR/auth/login` in an
+ordinary browser and confirm the widget visibly appears and completes. If it
+does not, stop: enabling enforcement would lock every account out, and the
+account that would fix it is one of the locked-out ones.
+
+**Then** — Supabase Dashboard → **Authentication → Attack Protection → CAPTCHA
+protection** → enable → **Provider: Turnstile** (currently `hcaptcha`) → paste
+the existing **Secret Key**. Never paste it into a chat or a commit. The site
+key is already public in Vercel as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+**Then** — the six probes, none of which have run:
+
+1. missing token is refused;
+2. invalid token is refused;
+3. valid token reaches the normal auth path;
+4. a raw API request cannot bypass provider enforcement;
+5. signup stays disabled even with a valid CAPTCHA;
+6. recovery and resend stay enumeration-uniform.
+
+**SH-CAPTCHA-002 is not claimed until those execute.** A green CI run can never
+evidence it — CI has no site key by design (SH-CAPTCHA-005), so it renders no
+widget and sends no token.
+
+### Still not done, named rather than counted
+
+- **SH-SIGNUP-007** hosted password policy — owner dashboard.
+- **SH-SIGNUP-005** confirmation-required's behavioural half — needs SMTP.
+- **SH-SIGNUP-011's timing residual — NOT MEASURED.**
+- Both delivered-link journeys — deployment-blocked on custom SMTP.
+
+### Do not, on resuming
+
+Everything in §26's list still stands, plus:
+
+- **Do not enable hosted CAPTCHA before a human has seen the widget complete.**
+  The lockout is total and self-locking.
+- **Do not "fix" the missing token by changing `data-size`.** Tested; the
+  default behaves identically.
+- **Do not add a second CSP header** to loosen something. Headers intersect;
+  scope the source instead.
+- **Do not treat `ERR_NAME_NOT_RESOLVED` on a Cloudflare challenge host as a
+  product defect.** It was observed in this environment only.
+
+### State at this stop
+
+`main` at `9ce5154`, tree clean. Lint and typecheck zero, build passes, vitest
+**3859 passing** with the four known pre-existing local-only failures. Hosted:
+parity `202608040075`, `disable_signup: true`, `security_captcha_enabled:
+false`, provider still `hcaptcha`, no custom SMTP, 2 accounts both `active`.
+Production healthy; the auth routes serve the Turnstile-permitting CSP and the
+product routes do not. Public signup closed at both layers. No retention purge
+has been executed.
