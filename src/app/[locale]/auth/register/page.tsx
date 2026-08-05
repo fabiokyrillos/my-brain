@@ -5,6 +5,7 @@ import { authErrorMessage } from "@/features/auth/flow";
 import { getLegalCopy } from "@/features/legal/copy";
 import { getLegalDocument } from "@/features/legal/documents";
 import { legalDocumentPath } from "@/features/legal/versions";
+import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
 export default async function RegisterPage({
@@ -71,6 +72,7 @@ export default async function RegisterPage({
             {consent.trailer}
           </span>
         </label>
+        <TurnstileWidget />
         <button>{pt ? "Criar conta" : "Create account"}</button>
       </form>
       <Link href={`/${locale}/auth/login`}>{pt ? "Já tenho conta" : "I already have an account"}</Link>

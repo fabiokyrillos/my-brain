@@ -13,6 +13,12 @@ import { mobileBarCentreIndex, mobileBarSlots, mobileDemotedKeys } from "./capab
  * point of demoting Registros: a phone user standing in it must still see the
  * disclosure that now contains it marked active.
  */
+// The shell reaches the auth actions, which now reach the throttle and through
+// it the BYOK crypto core's `server-only` marker. Under jsdom that module
+// resolves to its client build and throws on import. The marker is a BUILD-time
+// guard and `npm run build` in CI is what enforces it; stubbing it here removes
+// nothing real. The idiom `ip.test.ts` established.
+vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/pt-BR/app"),
   useSearchParams: () => new URLSearchParams(),

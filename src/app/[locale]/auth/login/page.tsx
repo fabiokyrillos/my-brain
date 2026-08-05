@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
+import { getResendCopy } from "@/features/auth/copy";
+import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
 const successMessages = {
@@ -58,11 +60,23 @@ export default async function LoginPage({
           {pt ? "Senha" : "Password"}
           <input name="password" type="password" autoComplete="current-password" required maxLength={128} />
         </label>
+        {/*
+          SH-CAPTCHA-003 names register, recover and resend. Sign-in is here
+          anyway, and deliberately: Supabase's CAPTCHA protection is a
+          per-project switch that GoTrue applies to the password grant as well
+          as to signup and recovery. Enabling it with no widget on this form
+          would lock **every existing account out of the product**, the owner's
+          included, the moment the setting is flipped. Reading the requirement
+          as a floor rather than a ceiling is the only reading that survives the
+          rollout it was written for.
+        */}
+        <TurnstileWidget />
         <button>{pt ? "Entrar" : "Sign in"}</button>
       </form>
       <div className="auth-links">
         <Link href={`/${locale}/auth/recover`}>{pt ? "Esqueci minha senha" : "Forgot password"}</Link>
         <Link href={`/${locale}/auth/register`}>{pt ? "Criar conta" : "Create account"}</Link>
+        <Link href={`/${locale}/auth/resend`}>{getResendCopy(locale).linkFromLogin}</Link>
       </div>
     </div>
   );
