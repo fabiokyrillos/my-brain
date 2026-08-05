@@ -1,6 +1,6 @@
 # BYOK G-0.3 — master-key generation and distribution procedure
 
-**Pre-code gate G-0.3** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../BYOK_IMPLEMENTATION_PLAN.md):
+**Pre-code gate G-0.3** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md):
 *"The written procedure, and four distinct keys provisioned (production, preview, test,
 local), none in the repository."*
 

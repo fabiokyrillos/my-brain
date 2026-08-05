@@ -16,7 +16,7 @@ import { QUOTAS, RETAINED_CLASSES, RETENTION_DAYS, SWEPT_CLASSES } from "./quota
  */
 
 const PRD = readFileSync(
-  join(process.cwd(), "docs/SIGNUP_HARDENING_PRD.md"),
+  join(process.cwd(), "docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md"),
   "utf8",
 );
 

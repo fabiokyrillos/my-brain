@@ -5,7 +5,7 @@
 - **Posição no roadmap:** entre 2B e 2C
 - **Status do documento:** PRD detalhado para revisão do produto; implementação não iniciada
 - **Data:** 2026-07-17
-- **Fonte principal:** `docs/PHASE_2_ARCHITECTURE_REVIEW.md`
+- **Fonte principal:** `docs/initiatives/phase-2/PHASE_2_ARCHITECTURE_REVIEW.md`
 - **Branch de referência:** `codex/phase-2-intelligent-capture`
 
 ---
@@ -1589,7 +1589,7 @@ Ao encerrar a implementação da 2X, devem ser atualizados:
 - `docs/DECISIONS.md` com novos ADRs relevantes;
 - `docs/ARCHITECTURE.md`;
 - `docs/DATABASE.md` se houver contrato persistido novo;
-- `docs/PHASE_2_PLAN.md` inserindo a 2X entre 2B e 2C;
+- `docs/initiatives/phase-2/PHASE_2_PLAN.md` inserindo a 2X entre 2B e 2C;
 - relatório final próprio da 2X;
 - evidência de testes e limitações reais.
 

@@ -15,7 +15,7 @@
  * It fails loudly rather than falling back. A silent empty list would turn the
  * smoke green while asserting nothing, which is the precise failure mode
  * 2E-ANALYTICS-006 exists to prevent — and is what the previous hard-coded
- * nineteen names did in slow motion: `docs/PHASE_2E_PRD.md §3.4` records them
+ * nineteen names did in slow motion: `docs/initiatives/phase-2e/PHASE_2E_PRD.md §3.4` records them
  * having drifted three names behind the contracts module without anything going
  * red.
  *

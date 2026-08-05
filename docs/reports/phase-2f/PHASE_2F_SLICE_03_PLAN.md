@@ -1,6 +1,6 @@
 # Phase 2F — Slice 2F.3 implementation plan and inventory
 
-Branch base: `main` at `08bf5bc` (Slice 2F.2 accepted and closed). Governed by `docs/PHASE_2F_PRD.md` Revision 4 and the accepted 2F.1/2F.2 artifacts.
+Branch base: `main` at `08bf5bc` (Slice 2F.2 accepted and closed). Governed by `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4 and the accepted 2F.1/2F.2 artifacts.
 
 **This plan is complete, and completing it surfaced one blocker that must be resolved before any code is written.** It is stated in §0 and everything after it is written as if the blocker were resolved.
 

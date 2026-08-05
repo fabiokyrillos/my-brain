@@ -158,7 +158,7 @@
 **Files:**
 - Modify only files required to fix failures.
 - Finalize: `docs/STATE.md`, `docs/DECISIONS.md`, `docs/CHANGELOG.md`, `docs/TODO.md`.
-- Create: `docs/SPRINT_1_5_REPORT.md`.
+- Create: `docs/initiatives/sprint-1-5/SPRINT_1_5_REPORT.md`.
 
 **Interfaces:**
 - Produces: fresh verification evidence, exact final state, remaining-risk inventory, and a Phase 2 recommendation.

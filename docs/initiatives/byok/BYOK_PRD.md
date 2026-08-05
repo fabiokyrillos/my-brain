@@ -4,7 +4,7 @@
 
 **Status — AWAITING OWNER APPROVAL. Not authorized for implementation.**
 
-- **Architectural basis** — [`reports/BYOK_SECURITY_DEFINITION.md`](./reports/byok/BYOK_SECURITY_DEFINITION.md), accepted, with owner decisions BYOK-DEC-1 … BYOK-DEC-11.
+- **Architectural basis** — [`reports/BYOK_SECURITY_DEFINITION.md`](../../reports/byok/BYOK_SECURITY_DEFINITION.md), accepted, with owner decisions BYOK-DEC-1 … BYOK-DEC-11.
 - **Position in the roadmap** — second, after Entity Graph Completion, before signup hardening and Phase 2G.
 - **Requirement prefix** — `BYOK-`.
 - **Separation** — separate branches, separate commits, separate PRs from Entity Graph Completion. No shared branch at any point.

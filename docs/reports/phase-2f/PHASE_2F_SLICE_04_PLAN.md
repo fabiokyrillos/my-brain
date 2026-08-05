@@ -388,7 +388,7 @@ Out of Slice 2F.4, each for a stated reason:
 - `scripts/remote-supabase-smoke.mjs` (`:258` redesigned, preserving the `:265-270` cross-owner proof; `:286` untouched)
 
 **Documentation**
-- `docs/PHASE_2F_PRD.md` — Revision 4.2: C1 (§12), C2 (§9 → 13 rows), C3 (line anchors), + revision-history entry **(owner authorization required)**
+- `docs/initiatives/phase-2f/PHASE_2F_PRD.md` — Revision 4.2: C1 (§12), C2 (§9 → 13 rows), C3 (line anchors), + revision-history entry **(owner authorization required)**
 - `docs/SECURITY.md` — 2F-REVOKE-007 task closure + reminders determination outcome
 - `docs/DATABASE.md` — grant posture, the now-unreachable `_update_own`/`_delete_own` policies, `snoozed` dormancy cross-reference
 - `docs/STATE.md` — posture, slice status, C4's missing 2F.3 parity line

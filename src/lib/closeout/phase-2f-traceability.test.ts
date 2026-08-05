@@ -36,7 +36,7 @@ afterAll(() => {
 
 /** Files copied verbatim, because the generator *parses* them. */
 const COPIED = [
-  "docs/PHASE_2F_PRD.md",
+  "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
   "docs/DECISIONS.md",
   "package.json",
   "vitest.config.ts",
@@ -51,7 +51,7 @@ const COPIED = [
 const SYNTHETIC_STATE = {
   "docs/STATE.md": "# State\n\nPhase 2F is complete through Slice 2F.6.\n",
   "docs/TODO.md": "# Backlog\n\n- [x] Phase 2F complete.\n",
-  "docs/PHASE_2_PLAN.md": "# Plan\n\nPhase 2F is defined by docs/PHASE_2F_PRD.md.\n",
+  "docs/initiatives/phase-2/PHASE_2_PLAN.md": "# Plan\n\nPhase 2F is defined by docs/initiatives/phase-2f/PHASE_2F_PRD.md.\n",
 };
 
 /** The per-slice report inventory the real repository has, reproduced as placeholders. */
@@ -212,7 +212,7 @@ describe("2F-OPERATIONS-003: the traceability generator passes on correct conten
     // sentences: PRD section 6 references 2E-COMMAND-012 and 2E-MATCH-018 to
     // carry the ADR-053/ADR-057 and 2E-MATCH-018 chains.
     const { buildPhase2fTraceability, PERMITTED_FOREIGN_REFERENCES } = await load();
-    const prd = readFileSync(join(REPO, "docs/PHASE_2F_PRD.md"), "utf8");
+    const prd = readFileSync(join(REPO, "docs/initiatives/phase-2f/PHASE_2F_PRD.md"), "utf8");
     for (const id of Object.keys(PERMITTED_FOREIGN_REFERENCES)) {
       expect(prd).toContain(id);
     }
@@ -249,7 +249,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
   it("fails when the requirement count drifts", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    patch(root, "docs/PHASE_2F_PRD.md", "- **2F-GUARD-003:**", "- (removed) 2F-GUARD-003:");
+    patch(root, "docs/initiatives/phase-2f/PHASE_2F_PRD.md", "- **2F-GUARD-003:**", "- (removed) 2F-GUARD-003:");
     // Asserted on the inventory message specifically. The generator accumulates
     // every finding into one thrown message, so an alternation could be satisfied
     // by a collateral failure and prove nothing about the check under test.
@@ -262,7 +262,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(
       root,
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "- **2F-GUARD-003:**",
       "- **2F-GUARD-001:** duplicated on purpose\n- **2F-GUARD-003:**",
     );
@@ -272,14 +272,14 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
   it("fails when a requirement is claimed by no slice in section 7", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    patch(root, "docs/PHASE_2F_PRD.md", "| SURFACE 1–14 |", "| SURFACE 1–13 |");
+    patch(root, "docs/initiatives/phase-2f/PHASE_2F_PRD.md", "| SURFACE 1–14 |", "| SURFACE 1–13 |");
     expect(() => buildPhase2fTraceability({ root })).toThrow(/2F-SURFACE-014 is claimed by no slice/);
   });
 
   it("fails when two slices claim ownership of the same requirement", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    patch(root, "docs/PHASE_2F_PRD.md", "| MEASURE 1–7 |", "| MEASURE 1–7, SURFACE 1 |");
+    patch(root, "docs/initiatives/phase-2f/PHASE_2F_PRD.md", "| MEASURE 1–7 |", "| MEASURE 1–7, SURFACE 1 |");
     expect(() => buildPhase2fTraceability({ root })).toThrow(/is owned by both/);
   });
 
@@ -386,7 +386,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(
       root,
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "- **2F-GUARD-001:**",
       "- **2G-READINESS-001:** rate limiting ships here.\n- **2F-GUARD-001:**",
     );
@@ -399,7 +399,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(
       root,
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "The 2F-GUARD-002 `tasks` allowlist",
       "The 2F-GUARD-099 `tasks` allowlist",
     );
@@ -477,7 +477,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     // 2F.4's four acceptance-bearing artifacts mention no Playwright journey.
     patch(
       root,
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | — (see 4.3-c) | — | ● |",
       "| Authenticated journeys desktop+mobile, pt-BR+en | Deployment session | — | ● | ● | ● regression | — | ● |",
     );
@@ -490,7 +490,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
     const root = await makeFixtureRoot();
     patch(
       root,
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "| Full existing remote suite | 2F.4 deployment session |",
       "| Full existing remote suite, renamed | 2F.4 deployment session |",
     );
@@ -554,7 +554,7 @@ describe("2F-OPERATIONS-003: the generator detects each declared drift class", (
   it("fails when a status override names an ID the PRD does not declare", async () => {
     const { buildPhase2fTraceability } = await load();
     const root = await makeFixtureRoot();
-    patch(root, "docs/PHASE_2F_PRD.md", "- **2F-MEASURE-005:**", "- **2F-MEASURE-105:**");
+    patch(root, "docs/initiatives/phase-2f/PHASE_2F_PRD.md", "- **2F-MEASURE-005:**", "- **2F-MEASURE-105:**");
     expect(() => buildPhase2fTraceability({ root }))
       .toThrow(/STATUS_OVERRIDES names 2F-MEASURE-005, which the PRD does not declare/);
   });

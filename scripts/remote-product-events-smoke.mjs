@@ -22,7 +22,7 @@ const createdClients = [];
 // rather than restated here, so a name added in TypeScript cannot drift from
 // this smoke. The nineteen names that used to be written out below had already
 // fallen three behind the contracts module without anything going red
-// (`docs/PHASE_2E_PRD.md §3.4`), which is the defect this closes.
+// (`docs/initiatives/phase-2e/PHASE_2E_PRD.md §3.4`), which is the defect this closes.
 const { eventNames: expectedEventNames, surfaces: expectedSurfaces } =
   readProductEventVocabulary();
 

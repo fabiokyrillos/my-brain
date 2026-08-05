@@ -1,6 +1,6 @@
 # Phase 2F PRD Revision 3 — final delta review
 
-Reviewed 2026-07-29 against the normative hierarchy: repository truth at `b54b833` (remote parity `202607280061`) → `docs/reports/phase-2f/PHASE_2F_PRE_CODE_GATE_REPORT.md` → the four fixed owner decisions → `docs/PHASE_2F_PRD.md` Revision 3.
+Reviewed 2026-07-29 against the normative hierarchy: repository truth at `b54b833` (remote parity `202607280061`) → `docs/reports/phase-2f/PHASE_2F_PRE_CODE_GATE_REPORT.md` → the four fixed owner decisions → `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 3.
 
 The four owner decisions are treated as fixed and are not reopened. No finding below proposes a cleaner architecture; every correction is the smallest one that preserves the decisions and the Gate 3-proven mechanism.
 

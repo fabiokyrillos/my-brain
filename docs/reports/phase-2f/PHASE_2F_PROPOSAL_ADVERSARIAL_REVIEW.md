@@ -1,4 +1,4 @@
-# Adversarial review — `docs/PHASE_2F_PROPOSAL.md`
+# Adversarial review — `docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md`
 
 Reviewer role: independent architecture review. Posture: the proposal is assumed incorrect; the objective is invalidation, not redesign. No alternative architecture is offered. Every criticism cites the proposal requirement it attacks and the repository evidence that decides it.
 

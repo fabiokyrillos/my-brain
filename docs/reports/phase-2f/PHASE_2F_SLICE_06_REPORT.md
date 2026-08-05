@@ -15,7 +15,7 @@
 | `2F-OPERATIONS-003` | `scripts/generate-phase-2f-traceability.mjs` → `docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md`; `npm run docs:phase-2f:traceability` | delivered |
 | `2F-OPERATIONS-004` | `scripts/verify-phase-2f-cleanup.mjs`; `npm run test:remote:2f:cleanup`; `supabase/tests/phase_2f_task_write_grants.sql` §8 | delivered |
 | `2F-OPERATIONS-005` | `scripts/phase-2f-reminder-census.mjs` corrected and wired as `npm run test:remote:2f:census` | delivered, executed clear |
-| `2F-OPERATIONS-006` | `docs/PHASE_2F_PRD.md` (Rev 4.3), `PHASE_2_PLAN.md`, `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md` (ADR-061…063), `SECURITY.md`, `DATABASE.md` | delivered |
+| `2F-OPERATIONS-006` | `docs/initiatives/phase-2f/PHASE_2F_PRD.md` (Rev 4.3), `PHASE_2_PLAN.md`, `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md` (ADR-061…063), `SECURITY.md`, `DATABASE.md` | delivered |
 | whole-phase convergence audit | §5 below; `docs/reports/phase-2f/PHASE_2F_REPORT.md` | delivered, three defects filed |
 
 ## 2. The traceability generator, and why it is not the fourth of its kind
@@ -38,7 +38,7 @@ This one derives what it can and resolves what it declares. Eleven checks, each 
 
 `src/lib/closeout/phase-2f-traceability.test.ts` proves each in both directions: one fixture root per drift class, plus positive controls, because a guard proven only in the failing direction may be refusing everything. The fixture root is built from the generator's **own declarations**, so a newly declared artifact gets a placeholder automatically instead of silently weakening the fixture.
 
-**Two of those checks exist because the design review proved the draft's versions could not run against merged content.** A single-relation ownership rule fires seven false failures; a Phase-2G guard keyed on appearance reds the build on `docs/PHASE_2F_PRD.md:88` and `:184`, two owner-authorized sentences that carry the ADR-053/ADR-057 and 2E-MATCH-018 chains. Both are recorded as blocking findings B1 and B2 in the definitive PRD §26.
+**Two of those checks exist because the design review proved the draft's versions could not run against merged content.** A single-relation ownership rule fires seven false failures; a Phase-2G guard keyed on appearance reds the build on `docs/initiatives/phase-2f/PHASE_2F_PRD.md:88` and `:184`, two owner-authorized sentences that carry the ADR-053/ADR-057 and 2E-MATCH-018 chains. Both are recorded as blocking findings B1 and B2 in the definitive PRD §26.
 
 ## 3. The cleanup verifier, and what it refuses to claim
 
@@ -126,8 +126,8 @@ A1–A15 of the definitive PRD §14. Verified by execution, not by reading:
 
 | Document | Change |
 |---|---|
-| `docs/PHASE_2F_PRD.md` | Revision 4.3: three §10 cells corrected, each with its evidence; §14 entry |
-| `docs/PHASE_2_PLAN.md` | Phase 2F recorded complete with its delivered scope; pointer `Revision 4` → `Revision 4.2`/`4.3` |
+| `docs/initiatives/phase-2f/PHASE_2F_PRD.md` | Revision 4.3: three §10 cells corrected, each with its evidence; §14 entry |
+| `docs/initiatives/phase-2/PHASE_2_PLAN.md` | Phase 2F recorded complete with its delivered scope; pointer `Revision 4` → `Revision 4.2`/`4.3` |
 | `docs/STATE.md` | Slice 2F.6 section; Phase 2F complete; run-id citation corrected; the pre-deployment leftover corrected; `## Phase history` and `## Status summary` given a supersession preamble and the "Current phase: Phase 2E" line re-labelled as a checkpoint |
 | `docs/TODO.md` | header and active-milestone line rewritten; Phase 2F box checked; `Revision 4` → `4.2`/`4.3`; run-id corrected; the new flake added; the three open items left open |
 | `docs/CHANGELOG.md` | Slice 2F.6 entry |

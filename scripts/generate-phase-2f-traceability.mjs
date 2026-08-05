@@ -1,7 +1,7 @@
 /**
  * Phase 2F traceability generator (PRD `2F-OPERATIONS-003`, Slice 2F.6).
  *
- * Writes `docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md` from `docs/PHASE_2F_PRD.md`
+ * Writes `docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md` from `docs/initiatives/phase-2f/PHASE_2F_PRD.md`
  * and from the repository artifacts the matrix claims as evidence.
  *
  * How this differs from the four generators before it, and why
@@ -362,8 +362,8 @@ export const EVIDENCE_KEYS = Object.freeze({
       "docs/DECISIONS.md",
       "docs/SECURITY.md",
       "docs/DATABASE.md",
-      "docs/PHASE_2_PLAN.md",
-      "docs/PHASE_2F_PRD.md",
+      "docs/initiatives/phase-2/PHASE_2_PLAN.md",
+      "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
       "docs/reports/phase-2f/PHASE_2F_REPORT.md",
     ],
     verification: "documentation-convergence cases that read the documents they assert about, including the dated expiry recomputed from go-live and the cross-document status contradiction scan",
@@ -825,8 +825,8 @@ export function readPgTapPaths(root) {
 export const CURRENT_STATE_DOCUMENTS = Object.freeze([
   "docs/STATE.md",
   "docs/TODO.md",
-  "docs/PHASE_2_PLAN.md",
-  "docs/PHASE_2F_PRD.md",
+  "docs/initiatives/phase-2/PHASE_2_PLAN.md",
+  "docs/initiatives/phase-2f/PHASE_2F_PRD.md",
   // §13 requires both of these to state the *current* posture, and the closeout
   // edited both, so a stale status in either is exactly the class this scan is for.
   "docs/SECURITY.md",
@@ -1046,8 +1046,8 @@ export function buildPhase2fTraceability({ root = REPOSITORY_ROOT } = {}) {
   const failures = [];
   const fail = (message) => failures.push(message);
 
-  const prdPath = join(root, "docs/PHASE_2F_PRD.md");
-  if (!existsSync(prdPath)) throw new Error("docs/PHASE_2F_PRD.md does not exist");
+  const prdPath = join(root, "docs/initiatives/phase-2f/PHASE_2F_PRD.md");
+  if (!existsSync(prdPath)) throw new Error("docs/initiatives/phase-2f/PHASE_2F_PRD.md does not exist");
   const prd = readFileSync(prdPath, "utf8");
 
   // ---- inventory (F2) ----
@@ -1401,7 +1401,7 @@ export function renderPhase2fTraceability(model) {
   const lines = [
     "# Phase 2F requirement traceability matrix",
     "",
-    "Generated from `docs/PHASE_2F_PRD.md` and the repository artifacts it names, by",
+    "Generated from `docs/initiatives/phase-2f/PHASE_2F_PRD.md` and the repository artifacts it names, by",
     "`scripts/generate-phase-2f-traceability.mjs` during Slice 2F.6 closeout. **Do not edit by hand** —",
     "run `npm run docs:phase-2f:traceability` to regenerate.",
     "",

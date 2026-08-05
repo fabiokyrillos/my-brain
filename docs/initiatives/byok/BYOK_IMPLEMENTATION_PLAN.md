@@ -66,7 +66,7 @@ secure 32 random bytes, base64, **all four pairwise distinct**, written to `.env
 The values are never displayed, committed, logged, printed to CI, or recorded as hashes or
 prefixes in any repository artifact. What may be recorded is only: presence, valid base64,
 decoded length of 32 bytes, and pairwise distinctness. Evidence:
-[`BYOK_G03_MASTER_KEY_PROCEDURE.md`](./reports/byok/BYOK_G03_MASTER_KEY_PROCEDURE.md) §7.
+[`BYOK_G03_MASTER_KEY_PROCEDURE.md`](../../reports/byok/BYOK_G03_MASTER_KEY_PROCEDURE.md) §7.
 
 #### A-1.2 — Preview and production provisioning (deferred to point of use)
 

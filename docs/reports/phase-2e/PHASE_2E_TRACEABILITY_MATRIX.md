@@ -1,6 +1,6 @@
 # Phase 2E requirement traceability matrix
 
-Generated from `docs/PHASE_2E_PRD.md` by `scripts/generate-phase-2e-traceability.mjs` during Slice 2E.8 closeout. Do not edit by hand — run `npm run docs:phase-2e:traceability` to regenerate.
+Generated from `docs/initiatives/phase-2e/PHASE_2E_PRD.md` by `scripts/generate-phase-2e-traceability.mjs` during Slice 2E.8 closeout. Do not edit by hand — run `npm run docs:phase-2e:traceability` to regenerate.
 
 Inventory: 122 functional/non-functional requirement IDs across 16 families, 8 per-epic acceptance criteria, and 5 global gates: 135 individually mapped rows. Evidence is referenced by durable artifact and executable gate rather than copied test output.
 

@@ -56,7 +56,7 @@ flip.
 **Requirement format.** Every requirement states one mechanically testable property. The columns
 carry the metadata the initiative's quality rule demands:
 
-- **Slice** — owning slice (`docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md`).
+- **Slice** — owning slice (`docs/initiatives/signup-hardening/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md`).
 - **Mig** — `yes` if the requirement is expected to consume part of a migration, else `no`.
 - **Boundary** — the trust boundary the requirement changes or defends: `db` (schema/RLS/grant/
   RPC), `edge` (Edge Function), `action` (Server Action/proxy), `ui`, `hosted` (dashboard/Auth

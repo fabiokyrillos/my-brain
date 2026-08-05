@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const prdPath = resolve(repositoryRoot, "docs/PHASE_2E_PRD.md");
+const prdPath = resolve(repositoryRoot, "docs/initiatives/phase-2e/PHASE_2E_PRD.md");
 const outputPath = resolve(repositoryRoot, "docs/reports/phase-2e/PHASE_2E_TRACEABILITY_MATRIX.md");
 const prd = readFileSync(prdPath, "utf8");
 
@@ -311,7 +311,7 @@ const totalRows = requirements.length + epics.length + globalGates.length;
 const matrix = [
   "# Phase 2E requirement traceability matrix",
   "",
-  "Generated from `docs/PHASE_2E_PRD.md` by `scripts/generate-phase-2e-traceability.mjs` during Slice 2E.8 closeout. Do not edit by hand — run `npm run docs:phase-2e:traceability` to regenerate.",
+  "Generated from `docs/initiatives/phase-2e/PHASE_2E_PRD.md` by `scripts/generate-phase-2e-traceability.mjs` during Slice 2E.8 closeout. Do not edit by hand — run `npm run docs:phase-2e:traceability` to regenerate.",
   "",
   `Inventory: ${requirements.length} functional/non-functional requirement IDs across ${Object.keys(expectedFamilyCounts).length} families, ${epics.length} per-epic acceptance criteria, and ${globalGates.length} global gates: ${totalRows} individually mapped rows. Evidence is referenced by durable artifact and executable gate rather than copied test output.`,
   "",

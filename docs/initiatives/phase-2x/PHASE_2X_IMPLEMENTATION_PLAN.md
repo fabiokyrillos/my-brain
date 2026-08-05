@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Este plano implementa exclusivamente `docs/PHASE_2X_PRD.md`, formalmente aprovado em 2026-07-17.
+- Este plano implementa exclusivamente `docs/initiatives/phase-2x/PHASE_2X_PRD.md`, formalmente aprovado em 2026-07-17.
 - A 2X é convergência do produto, não expansão funcional.
 - Não implementar editor avançado de candidatos, dependências, subtarefas, split/merge, perguntas conversacionais completas, NLP para atualização de tarefas, onboarding, automações do piloto ou hardening específico do MVP.
 - Preservar original imutável, revisões append-only, ponteiro atual, ownership, RLS, audit, undo, idempotência, leases e proteção contra worker stale.
@@ -1081,7 +1081,7 @@ Falha em qualquer gate impede o commit e o início do slice seguinte.
 - modificar páginas/componentes de Settings e Reviews;
 - modificar `src/features/profile/settings-form.tsx`, payload/schema e testes quando controles forem ocultados;
 - revisar `src/i18n/messages.ts` e copy local de features;
-- criar seção de inventário em `docs/PHASE_2X_REPORT.md` durante a execução.
+- criar seção de inventário em `docs/initiatives/phase-2x/PHASE_2X_REPORT.md` durante a execução.
 
 **Ordem de execução:**
 
@@ -1196,8 +1196,8 @@ Falha em qualquer gate impede o commit e o início do slice seguinte.
 - finalizar `scripts/remote-entry-processing-smoke.mjs`;
 - finalizar `scripts/remote-daily-cycle-smoke.mjs`;
 - modificar `scripts/remote-supabase-smoke.mjs` e `package.json` para o gate agregado;
-- atualizar `docs/PHASE_2_PLAN.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_AGENT.md`, `SECURITY.md`, `ENGINEERING_STANDARDS.md`, `DECISIONS.md`, `STATE.md`, `CHANGELOG.md` e `TODO.md`;
-- criar `docs/PHASE_2X_REPORT.md`.
+- atualizar `docs/initiatives/phase-2/PHASE_2_PLAN.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_AGENT.md`, `SECURITY.md`, `ENGINEERING_STANDARDS.md`, `DECISIONS.md`, `STATE.md`, `CHANGELOG.md` e `TODO.md`;
+- criar `docs/initiatives/phase-2x/PHASE_2X_REPORT.md`.
 
 **Ordem de execução:**
 

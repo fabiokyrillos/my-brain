@@ -9,11 +9,11 @@
 | Status | Approved product scope; implementation not started |
 | Date | 2026-07-23 (approved 2026-07-23 with the deterministic-suggestions and single-resolution-RPC adjustments) |
 | Predecessor | Phase 2C — Editable Candidate Tasks and Transactional Materialization, complete through Slice 2C.6 |
-| Governing roadmap | [`PHASE_2_PLAN.md`](./PHASE_2_PLAN.md) §7 (line 118–120), §16 architecture review "Perguntas que resolvem, não apenas fecham" |
+| Governing roadmap | [`PHASE_2_PLAN.md`](../phase-2/PHASE_2_PLAN.md) §7 (line 118–120), §16 architecture review "Perguntas que resolvem, não apenas fecham" |
 | Owner | My Brain Product and Engineering |
 | Implementation status | Planned only; no Phase 2D code, migration, deployment, or remote mutation exists |
 | Canonical implementation plan | [`PHASE_2D_IMPLEMENTATION_PLAN.md`](./PHASE_2D_IMPLEMENTATION_PLAN.md) |
-| Governing decision | ADR-033 (accepted; see [`DECISIONS.md`](./DECISIONS.md)) |
+| Governing decision | ADR-033 (accepted; see [`DECISIONS.md`](../../DECISIONS.md)) |
 
 Source of truth, in order: current application code; applied and local Supabase migrations; generated database types; permanent current-state documentation; this PRD and its implementation plan. Historical Phase 2X and Phase 2C plans and reports remain evidence of their own delivery and must not be overridden or rewritten.
 

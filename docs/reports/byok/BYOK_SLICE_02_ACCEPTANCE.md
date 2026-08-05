@@ -1,6 +1,6 @@
 # BYOK.2 — Resolvers: acceptance record
 
-**Date: 2026-08-01.** Governs `docs/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.2, delivering
+**Date: 2026-08-01.** Governs `docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.2, delivering
 `BYOK-RESOLVER-001…008`.
 
 **One migration: `202608010066`.** Parity moves from `202608010065` by exactly one, the

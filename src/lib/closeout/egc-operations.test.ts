@@ -28,7 +28,7 @@ const REPO = resolve(__dirname, "../../..");
 function fixtureRepo(overrides: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), "egc-trace-"));
   const files: Record<string, string> = {
-    "docs/ENTITY_GRAPH_COMPLETION_PRD.md": [
+    "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md": [
       "## 5. Requirements",
       "",
       "### EGC-ORG — organizations",
@@ -43,7 +43,7 @@ function fixtureRepo(overrides: Record<string, string> = {}) {
       "### EGC-DEC-1 — deletion of organizations and contexts",
       "",
     ].join("\n"),
-    "docs/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md": [
+    "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md": [
       "## Slice EGC.1 — Organizations and Contexts",
       "",
       "**Delivers:** EGC-ORG-001…002, and",
@@ -89,7 +89,7 @@ describe("EGC-OPERATIONS-001: the traceability generator", () => {
 
   it("expands both the range and the slash-list notations the plan uses", () => {
     const root = fixtureRepo({
-      "docs/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md": [
+      "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md": [
         "## Slice EGC.3 — Convergence",
         "",
         "**Delivers:** EGC-ORG-001…002, EGC-INVARIANT-001/002/005.",
@@ -118,8 +118,8 @@ describe("EGC-OPERATIONS-001: the traceability generator", () => {
     const crlf = fixtureRepo();
     try {
       for (const path of [
-        "docs/ENTITY_GRAPH_COMPLETION_PRD.md",
-        "docs/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md",
+        "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md",
+        "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md",
       ]) {
         const content = readFileSync(join(crlf, path), "utf8").replace(/\n/g, "\r\n");
         writeFileSync(join(crlf, path), content, "utf8");
@@ -137,7 +137,7 @@ describe("EGC-OPERATIONS-001: the traceability generator", () => {
 
   it("fails closed on a dangling requirement reference", () => {
     const root = fixtureRepo({
-      "docs/ENTITY_GRAPH_COMPLETION_PRD.md": [
+      "docs/initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md": [
         "| ID | Requirement |",
         "| --- | --- |",
         "| **EGC-ORG-001** | Organizations get a list route, see EGC-ORG-999. |",

@@ -145,7 +145,7 @@ acceptances for slices 1 and 2, `ENTITY_GRAPH_FINDINGS.md`, `EGC_REPORT.md` and
 
 Gates `G01` (provider census), `G02` (crypto interop), `G03` (master-key
 procedure) and `G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md` — G-0.5 of
-`docs/BYOK_IMPLEMENTATION_PLAN.md`, which also gated the start of Entity Graph
+`docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md`, which also gated the start of Entity Graph
 Completion. `GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md` is the owner-authorized
 follow-on to that gate's §7. Then `BYOK_SECURITY_DEFINITION.md`, acceptances for
 slices 1–5, `BYOK_DEPLOYED_ACCEPTANCE.md`, `BYOK_INCIDENT_RUNBOOK.md` (the live

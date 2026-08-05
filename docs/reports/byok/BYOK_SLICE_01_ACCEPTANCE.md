@@ -1,6 +1,6 @@
 # BYOK.1 — Credential store and crypto core: acceptance record
 
-**Date: 2026-08-01.** Governs `docs/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.1, delivering
+**Date: 2026-08-01.** Governs `docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.1, delivering
 `BYOK-SCHEMA-001…007`, `BYOK-CRYPTO-001…007`, `BYOK-MASTER-001…012`,
 `BYOK-FINGERPRINT-001…005`, `BYOK-GUARD-005`.
 

@@ -80,7 +80,7 @@ Verified absent. Each is something Phase 2E must build or explicitly exclude.
 |---|---|
 | `docs/DATABASE.md:29` "apenas os 19 eventos"; `docs/TODO.md:189` "17 instrumented events" | 22, per `src/features/product-analytics/contracts.ts` and migration `202607230050:1036-1058` |
 | `scripts/remote-product-events-smoke.mjs:20-40` hard-codes 19 names as "the canonical taxonomy" | The script does not import `contracts.ts`, so TypeScript drift does not red it |
-| `docs/PHASE_2D_IMPLEMENTATION_PLAN.md:9`, `scripts/generate-phase-2d-traceability.mjs:86` reference `next-intl` | Removed by ADR-036; absent from `package.json` |
+| `docs/initiatives/phase-2d/PHASE_2D_IMPLEMENTATION_PLAN.md:9`, `scripts/generate-phase-2d-traceability.mjs:86` reference `next-intl` | Removed by ADR-036; absent from `package.json` |
 | `docs/reports/shared/governance/SLICE_REPORT_TEMPLATE.md` | Dead. Phase 2E follows `docs/reports/phase-2d/PHASE_2D_SLICE_04_REPORT.md` |
 | `202607170028:33` comment asserting `authenticated` has no INSERT on `audit_logs` | Only `update, delete` were revoked (`202607170016:196`) |
 

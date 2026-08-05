@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const prdPath = resolve(repositoryRoot, "docs/PHASE_2X_PRD.md");
+const prdPath = resolve(repositoryRoot, "docs/initiatives/phase-2x/PHASE_2X_PRD.md");
 const outputPath = resolve(repositoryRoot, "docs/reports/phase-2x/PHASE_2X_TRACEABILITY_MATRIX.md");
 const prd = readFileSync(prdPath, "utf8");
 
@@ -487,7 +487,7 @@ function rowFor({ id, description, family }, evidenceSourceId = id, evidenceOver
 const matrix = [
   "# Phase 2X requirement traceability matrix",
   "",
-  "Generated from `docs/PHASE_2X_PRD.md` by `scripts/generate-phase-2x-traceability.mjs` during Slice 2X.18 closeout.",
+  "Generated from `docs/initiatives/phase-2x/PHASE_2X_PRD.md` by `scripts/generate-phase-2x-traceability.mjs` during Slice 2X.18 closeout.",
   "",
   "Inventory: 195 functional/non-functional requirement IDs, 58 family acceptance IDs, and all 30 numbered global acceptance criteria (given stable `GAC-01`–`GAC-30` traceability labels here): 283 individually mapped rows. Evidence is intentionally referenced by durable artifact and executable gate rather than copied test output.",
   "",

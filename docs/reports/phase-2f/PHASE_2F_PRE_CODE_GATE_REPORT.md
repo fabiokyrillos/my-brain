@@ -1,6 +1,6 @@
 # Phase 2F — pre-code gate package report
 
-Baseline: `docs/PHASE_2F_PROPOSAL.md` Revision 2, accepted as design baseline; implementation not authorized.
+Baseline: `docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md` Revision 2, accepted as design baseline; implementation not authorized.
 Executed 2026-07-28/29 against repository truth at `b54b833` and the linked project `ulvwzqlpsjyrnqzfxmck` (remote parity `202607280061`).
 No Phase 2F slice was implemented. No production migration was written. No application behaviour was changed.
 

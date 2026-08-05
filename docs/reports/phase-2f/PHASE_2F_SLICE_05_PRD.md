@@ -2,7 +2,7 @@
 
 **Status:** definitive. Supersedes the initial draft after one independent adversarial review cycle (§23).
 **Owns:** `2F-MEASURE-001` … `2F-MEASURE-007` (epic 2F-E) plus the cross-cutting `2F-OPERATIONS-002`.
-**Authority:** `docs/PHASE_2F_PRD.md` Revision 4.2 §6.9, §7, §8, §10, §11, §12; `docs/DECISIONS.md` ADR-052, ADR-055.
+**Authority:** `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4.2 §6.9, §7, §8, §10, §11, §12; `docs/DECISIONS.md` ADR-052, ADR-055.
 **Excludes:** every Slice 2F.6 requirement (`2F-OPERATIONS-003…006` and the whole-phase convergence audit) — see §22.
 
 ---
@@ -41,7 +41,7 @@ Phase 2E shipped a complete task-command surface and, in Slice 2E.7, seventeen p
 | E4 | `src/features/task-commands/outcomes.ts:24-49` — the twelve outcome members (`still_unmatched:38`, `creation_offered:40`, `unsupported:42`) | §6, §10 |
 | E5 | `src/features/task-commands/analytics.ts` — `TASK_COMMAND_APPLY_ROUTES`, `TASK_COMMAND_ORIGINS`, `TASK_COMMAND_UNDO_RESULTS`, `TASK_COMMAND_PREVIEWED_OUTCOMES:121-124` (a spread) | §6, §10 |
 | E6 | `docs/DECISIONS.md` ADR-055 — both tiers, the nine numbers, the **final-outcome** `no_match` definition, the five permanent non-authorizers, the expiry mechanism | §6, §17, §23 |
-| E7 | `docs/PHASE_2F_PRD.md` §6.9 (`:178-184`), §7 (`:214,217`), §8 2F.5 (`:229`), §10 (`:263-278`), §11 (`:286`), §12 (`:290-296`) | all |
+| E7 | `docs/initiatives/phase-2f/PHASE_2F_PRD.md` §6.9 (`:178-184`), §7 (`:214,217`), §8 2F.5 (`:229`), §10 (`:263-278`), §11 (`:286`), §12 (`:290-296`) | all |
 | E8 | `src/features/task-commands/match-baseline.test.ts` + `docs/reports/phase-2e/PHASE_2E_FINAL_REPORT.md` §3 (lines 56–70) and line 145 — the retained scoring-layer baseline and its cross-scope prohibition | §6, §10, D5 |
 | E9 | `scripts/product-event-vocabulary.mjs:42-45,60-66,74-82` — the parser accepts only `export const X = [ … ] as const` flat string arrays and **throws** on a spread; `readProductEventVocabulary` returns exactly `{eventNames, surfaces}`. `src/features/task-commands/smoke-taxonomy-reader.test.ts:25,31,41,54` — Vitest importing `scripts/*.mjs` | §9, §11, D2, M2 |
 | E10 | `scripts/remote-product-events-smoke.mjs:41,284,367,379` — every smoke marks its traffic `p_is_synthetic: true` and asserts it; `:426-428` names its controls; `:431-434` deletes fixture users | D4, §18 |
@@ -50,11 +50,11 @@ Phase 2E shipped a complete task-command surface and, in Slice 2E.7, seventeen p
 | E13 | `vitest.config.ts:9-10` — `include: ["src/**/*.test.{ts,tsx}"]`, so a new `*.test.ts` under `src/` runs in the `app` job (`.github/workflows/ci.yml:31`) unless excluded. `eslint.config.mjs` ignores only build output; `tsconfig.json:25-32` covers `**/*.ts` with `allowJs` | D5, §13, K6 |
 | E14 | `docs/TODO.md:30` — the undated expiry placeholder naming Slice 2F.5 as its dater | §6, §17, D7 |
 | E15 | `docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md:182,188-189` — 2F.5 and 2F.6 confirmed not started; no reader, no baseline, no traceability generator, no cleanup verifier exists | §1, §22 |
-| E16 | `docs/PHASE_2F_PRD.md:292` + `202607300063:90` — after 2F.4 `authenticated` holds **SELECT only** on `public.tasks`, so nothing this slice adds may attempt an authenticated task write | §7, §18 |
+| E16 | `docs/initiatives/phase-2f/PHASE_2F_PRD.md:292` + `202607300063:90` — after 2F.4 `authenticated` holds **SELECT only** on `public.tasks`, so nothing this slice adds may attempt an authenticated task write | §7, §18 |
 | E17 | `src/features/task-commands/actions.ts:347-358` and `:719-726` — both `unsupported` paths return **before** any emit exists (`report` is defined at `:400`; the second returns before a session exists) | §6, §10, B3 |
 | E18 | `src/features/task-commands/actions.ts:411,466,546,558,573,615-623,979-989` — the emitted preview categories and the `applyRoute: 'created'` apply; `:746-777` — the disambiguation re-round emits a **second** previewed row | §6, §10, B2, M6 |
 | E19 | `supabase/tests/product_events.sql` — the existing pgTAP file for this table, where the cascade assertion belongs | §18, B4 |
-| E20 | `src/lib/supabase/direct-write-guard.test.ts`, `sql-grammar-guard.test.ts`, `work-surface-reuse.test.ts` — the CI tests behind the two §10 gate cells 2F.5 carries (`docs/PHASE_2F_PRD.md:265-266`) | §17, §18, Mo9 |
+| E20 | `src/lib/supabase/direct-write-guard.test.ts`, `sql-grammar-guard.test.ts`, `work-surface-reuse.test.ts` — the CI tests behind the two §10 gate cells 2F.5 carries (`docs/initiatives/phase-2f/PHASE_2F_PRD.md:265-266`) | §17, §18, Mo9 |
 
 ## 4. Goals
 
@@ -409,7 +409,7 @@ One independent adversarial review of the initial draft produced 23 findings (4 
 | **Mo6** — "service-role denial load-bearing, never executed" | **CONFIRMED** | §18.14 asserts it. |
 | **Mo7** — "fail-closed timezone diverges from production's fallback" | **CONFIRMED** | S5-R6 records `actions.ts:214-224`'s fallback and why the reader deliberately does not copy it. |
 | **Mo8** — "D4 widens a merged requirement; `is_synthetic` is client-settable" | **CONFIRMED** | The ADR is recorded **before** implementation, and K8 states that `is_synthetic` is a hygiene filter rather than a trust boundary, unlike mechanisms (i)–(iii). |
-| **Mo9** — "2F.5 carries §10 gate cells the PRD never claims" | **CONFIRMED** | Verified `docs/PHASE_2F_PRD.md:265-266` both show ● for 2F.5. A13 and §18.12 now name `direct-write-guard.test.ts`, `sql-grammar-guard.test.ts` and `work-surface-reuse.test.ts`. |
+| **Mo9** — "2F.5 carries §10 gate cells the PRD never claims" | **CONFIRMED** | Verified `docs/initiatives/phase-2f/PHASE_2F_PRD.md:265-266` both show ● for 2F.5. A13 and §18.12 now name `direct-write-guard.test.ts`, `sql-grammar-guard.test.ts` and `work-surface-reuse.test.ts`. |
 | **Mi1** — "'§145' is a line number" | **CONFIRMED** | Cited as §3 (lines 56–70) and line 145. |
 | **Mi2** — "D7 deserves an ADR" | **CONFIRMED** | D7 joins D4 and D5 as a recorded ADR (§21.5). |
 | **Mi3** — "tier verdict vocabulary has no shape in §10" | **CONFIRMED** | §10 now declares `EvidenceTierEvaluation`. |
@@ -452,7 +452,7 @@ An independent review of PR #31 at `3e17664` produced 10 findings, one **BLOCKIN
 | **R7** — `isSynthetic` is the one input the "fails loudly everywhere" reader accepts silently | **CONFIRMED** | `null` or `"true"` would have counted disposable traffic into the gate. Now `requireBoolean`. |
 | **R8** — `readCommandFunnelOutcomes` reads `outcomes.ts` through a parser whose messages hard-code `contracts.ts` | **CONFIRMED** | Re-thrown against the file actually read, without touching the shared script two other smokes depend on. |
 | **R9** — §18.5 overstates the boundary coverage the suite delivers | **CONFIRMED** | Fixed by adding the cases rather than narrowing the claim: one-above for both spike floors, one-below for both planning floors, and the window-compatibility case. |
-| **R10** — assorted staleness | **CONFIRMED** | `COMMAND_FUNNEL_NON_AUTHORIZING` now names the report's own key paths so a consumer can cross-reference them mechanically; the CHANGELOG date matches the ADRs. **Handover, not fixed here:** `docs/PHASE_2F_PRD.md` §10 marks the `database` cell `—` for 2F.5, which this slice's three pgTAP assertions make stale. Correcting the phase PRD is `2F-OPERATIONS-006`'s reconciliation, so it is recorded for Slice 2F.6 rather than edited now; A13 states the cell 2F.5 carries in fact. |
+| **R10** — assorted staleness | **CONFIRMED** | `COMMAND_FUNNEL_NON_AUTHORIZING` now names the report's own key paths so a consumer can cross-reference them mechanically; the CHANGELOG date matches the ADRs. **Handover, not fixed here:** `docs/initiatives/phase-2f/PHASE_2F_PRD.md` §10 marks the `database` cell `—` for 2F.5, which this slice's three pgTAP assertions make stale. Correcting the phase PRD is `2F-OPERATIONS-006`'s reconciliation, so it is recorded for Slice 2F.6 rather than edited now; A13 states the cell 2F.5 carries in fact. |
 
 ### 23.3 Fourth cycle — verification of the fix commit
 

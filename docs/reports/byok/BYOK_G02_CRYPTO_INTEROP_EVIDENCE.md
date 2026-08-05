@@ -1,6 +1,6 @@
 # BYOK G-0.2 — crypto interop proof
 
-**Pre-code gate G-0.2** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../BYOK_IMPLEMENTATION_PLAN.md):
+**Pre-code gate G-0.2** of [`BYOK_IMPLEMENTATION_PLAN.md`](../../initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md):
 *"An executed demonstration that a payload encrypted in Node 22 decrypts in Deno and vice
 versa, with identical AAD composition."*
 

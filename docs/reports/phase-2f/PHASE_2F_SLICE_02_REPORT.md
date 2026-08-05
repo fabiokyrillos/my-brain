@@ -1,6 +1,6 @@
 # Phase 2F — Slice 2F.2 Report: Work-surface mutation convergence
 
-Branch `codex/phase-2f-slice-2`, cut from `main` at `8c59c1d` (the merge of accepted `c7e03b3`). Governed by `docs/PHASE_2F_PRD.md` Revision 4. Implemented 2026-07-29. Execution plan: `docs/reports/phase-2f/PHASE_2F_SLICE_02_PLAN.md`.
+Branch `codex/phase-2f-slice-2`, cut from `main` at `8c59c1d` (the merge of accepted `c7e03b3`). Governed by `docs/initiatives/phase-2f/PHASE_2F_PRD.md` Revision 4. Implemented 2026-07-29. Execution plan: `docs/reports/phase-2f/PHASE_2F_SLICE_02_PLAN.md`.
 
 **This slice ships no SQL, no migration, no grant change, no new RPC and no change to `list_task_command_candidates`.** It does not touch the manual-creation path. It is a single-concern, mechanically revertible PR.
 

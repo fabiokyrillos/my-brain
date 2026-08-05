@@ -1,8 +1,8 @@
 # Entity Graph Completion — final report
 
 **The initiative is complete.** Three slices, governed by
-[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../ENTITY_GRAPH_COMPLETION_PRD.md) and
-[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md),
+[`ENTITY_GRAPH_COMPLETION_PRD.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_PRD.md) and
+[`ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md`](../../initiatives/entity-graph/ENTITY_GRAPH_COMPLETION_IMPLEMENTATION_PLAN.md),
 on the evidence in [`ENTITY_GRAPH_FINDINGS.md`](./ENTITY_GRAPH_FINDINGS.md).
 
 | Slice | PR | Merge SHA | Merge-SHA CI |

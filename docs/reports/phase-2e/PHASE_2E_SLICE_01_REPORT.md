@@ -15,7 +15,7 @@
 | Migrations | `202607250055_phase_2e_task_command_ai_usage.sql` — **local only, not applied to the linked project** |
 | Generated types | Unchanged, and unchangeable by this migration (see §7) |
 | Publication | Draft PR [#18](https://github.com/fabiokyrillos/my-brain/pull/18), CI evidence only. Not merged, not deployed, not tagged. |
-| Governing documents | `docs/PHASE_2E_PRD.md` §9 (Epic 2E-A), §11.2, §13.1, §19.1; `docs/ENGINEERING_STANDARDS.md`; ADR-035–ADR-039 |
+| Governing documents | `docs/initiatives/phase-2e/PHASE_2E_PRD.md` §9 (Epic 2E-A), §11.2, §13.1, §19.1; `docs/ENGINEERING_STANDARDS.md`; ADR-035–ADR-039 |
 
 Slices 2E.2–2E.8 have not started. They proceed under the approved PRD without further authorization.
 

@@ -9,7 +9,7 @@
 | Status | Approved product scope; implementation not started |
 | Date | 2026-07-19 |
 | Predecessor | Phase 2X — Daily Product Convergence, complete through Slice 2X.18 |
-| Governing roadmap | [`PHASE_2_PLAN.md`](./PHASE_2_PLAN.md) |
+| Governing roadmap | [`PHASE_2_PLAN.md`](../phase-2/PHASE_2_PLAN.md) |
 | Owner | My Brain Product and Engineering |
 | Implementation status | Planned only; no Phase 2C code, migration, deployment, or remote mutation exists |
 | Canonical implementation plan | [`PHASE_2C_IMPLEMENTATION_PLAN.md`](./PHASE_2C_IMPLEMENTATION_PLAN.md) |

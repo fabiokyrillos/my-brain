@@ -1,8 +1,8 @@
 # Signup Hardening — repository findings (the pre-planning census)
 
 Date: **2026-08-02**. Measured at `main` = `b007ffa` (BYOK close), migration head `202608010069`,
-working tree clean. This document is the evidence base for `docs/SIGNUP_HARDENING_PRD.md` and
-`docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md`. Every claim below was measured against the
+working tree clean. This document is the evidence base for `docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md` and
+`docs/initiatives/signup-hardening/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md`. Every claim below was measured against the
 repository at that commit — nothing is inferred from memory of earlier phases. Where a claim
 depends on hosted (dashboard) state rather than repository state, that is said explicitly, because
 the two have already diverged once in this project's history (G05 attempt 1).
@@ -251,7 +251,7 @@ The only real retention mechanism in the database is BYOK's 30-day validation-at
 
 ## 11. Defects and gaps found by this census, with owners
 
-Each row becomes one or more requirements in `docs/SIGNUP_HARDENING_PRD.md`; the family column is
+Each row becomes one or more requirements in `docs/initiatives/signup-hardening/SIGNUP_HARDENING_PRD.md`; the family column is
 the owner.
 
 | # | Finding | Family |

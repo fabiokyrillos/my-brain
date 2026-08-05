@@ -1,6 +1,6 @@
 # BYOK.3 — Node adapter, Settings and validation: acceptance record
 
-**Date: 2026-08-01.** Governs `docs/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.3 as amended by
+**Date: 2026-08-01.** Governs `docs/initiatives/byok/BYOK_IMPLEMENTATION_PLAN.md` Slice BYOK.3 as amended by
 `ADR-070` / Amendment A-2, delivering `BYOK-ADAPTER-001/002/006/007` (Node),
 `BYOK-LIFECYCLE-001…009`, `BYOK-VALIDATE-001…007`, `BYOK-ROTATE-001…004`,
 `BYOK-GUARD-001/002/004/006` (Node scope), `BYOK-COPY-001…007`, `BYOK-QUOTA-003` (Node),

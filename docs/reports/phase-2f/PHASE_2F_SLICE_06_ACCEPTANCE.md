@@ -141,7 +141,7 @@ A1–A15 verified (details in the implementation report §5). The audit filed **
 
 ## 10. Files changed
 
-24 files: `scripts/generate-phase-2f-traceability.mjs` (new), `scripts/verify-phase-2f-cleanup.mjs` (new), `scripts/phase-2f-reminder-census.mjs` (corrected), four new `src/lib/closeout/*.test.ts`, `supabase/tests/phase_2f_task_write_grants.sql` (+1 assertion, `plan(27)`→`plan(28)`), `package.json` (+3 scripts), `docs/PHASE_2F_PRD.md`, `PHASE_2_PLAN.md`, `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md`, `SECURITY.md`, `DATABASE.md`, and five reports including the new traceability matrix.
+24 files: `scripts/generate-phase-2f-traceability.mjs` (new), `scripts/verify-phase-2f-cleanup.mjs` (new), `scripts/phase-2f-reminder-census.mjs` (corrected), four new `src/lib/closeout/*.test.ts`, `supabase/tests/phase_2f_task_write_grants.sql` (+1 assertion, `plan(27)`→`plan(28)`), `package.json` (+3 scripts), `docs/initiatives/phase-2f/PHASE_2F_PRD.md`, `PHASE_2_PLAN.md`, `STATE.md`, `TODO.md`, `CHANGELOG.md`, `DECISIONS.md`, `SECURITY.md`, `DATABASE.md`, and five reports including the new traceability matrix.
 
 **No migration. No product code. No grant, policy, RPC, trigger, index or view.**
 
@@ -195,7 +195,7 @@ Verified by scoped grep over `docs/ src/ scripts/ supabase/ e2e/ .github/` and b
 - No `PHASE_2G*` document exists.
 - No `2G-` requirement is declared anywhere. The single `2G-READINESS-001` string in the repository is the **negative-control fixture** inside `phase-2f-traceability.test.ts` that proves the guard fires.
 - No Phase 2G plan, ADR, migration, script or product artifact exists.
-- Phase 2G is named only as a recommendation in `docs/PHASE_2F_PROPOSAL.md`, with C1 as its named first item.
+- Phase 2G is named only as a recommendation in `docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md`, with C1 as its named first item.
 - **C1 is re-raised, not implemented** — the obligation `PHASE_2F_PROPOSAL.md:218` placed on this closeout, discharged in `SECURITY.md` and the final phase report. Phase 2F added no AI spend path.
 - No requirement deferred out of Phase 2F was implemented here.
 

@@ -8,7 +8,7 @@ Remote infrastructure change: none
 
 ## Scope delivered
 
-Slice 2X.17, exactly as scoped by `docs/PHASE_2X_IMPLEMENTATION_PLAN.md` (Slice 2X.17 section):
+Slice 2X.17, exactly as scoped by `docs/initiatives/phase-2x/PHASE_2X_IMPLEMENTATION_PLAN.md` (Slice 2X.17 section):
 
 - Reorganized `e2e/intelligent-capture.spec.ts` from one 379-line serial `test()` into deterministic, independently-attributable scenarios by contract, inside two `test.describe` blocks.
 - Added the three coverage areas the plan's own execution order named that the prior monolith did not exercise at all: basic pending question, recoverable retry, and terminal retry — all previously unreachable through real AI extraction, now covered through deterministic direct-RPC fixtures.
