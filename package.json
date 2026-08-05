@@ -53,7 +53,9 @@
     "sh6:quota-concurrency": "node scripts/sh6-quota-concurrency.mjs",
     "sh6:retention-dry-run": "node scripts/sh6-retention-dry-run.mjs",
     "sh6:retention-schedule": "node scripts/sh6-retention-schedule.mjs",
-    "sh6:quota-acceptance": "node scripts/sh6-quota-acceptance.mjs"
+    "sh6:quota-acceptance": "node scripts/sh6-quota-acceptance.mjs",
+    "rollout:verify": "node scripts/verify-signup-rollout.mjs",
+    "docs:signup-hardening:traceability": "node scripts/generate-signup-hardening-traceability.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
