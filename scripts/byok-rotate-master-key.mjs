@@ -169,11 +169,33 @@ console.log(`previous key available: ${ring.previous !== null}`);
 const { url, serviceRoleKey } = getLinkedSupabaseCredentials();
 const db = createClient(url, serviceRoleKey, { auth: { persistSession: false } });
 
-const { data: rows, error } = await db
-  .from("user_ai_credentials")
-  .select("user_id,status,provider,key_version,ciphertext,iv")
-  .eq("status", "active");
-if (error) throw new Error(`credential read failed: ${error.code ?? error.message}`);
+/**
+ * SH-EXPOSURE-001 — the envelopes come from an RPC now, not from the table.
+ *
+ * `service_role` lost DML on `user_ai_credentials`, because that grant was a
+ * service key able to read every user's envelope with one `select *`. Rotation
+ * genuinely needs the ciphertext — the master key lives here in the operator's
+ * environment and never in the database, so the envelope has to leave the
+ * database to be rewrapped — and `admin_list_credential_envelopes` is the one
+ * named function that still allows it. That residual is recorded rather than
+ * pretended away; what changed is that the capability is greppable and
+ * separately revocable instead of an ambient property of a table grant.
+ *
+ * Paged, because the RPC caps a page at 1000 and a rotation must not depend on
+ * how many accounts exist.
+ */
+const PAGE = 500;
+const rows = [];
+for (let offset = 0; ; offset += PAGE) {
+  const { data: page, error } = await db.rpc("admin_list_credential_envelopes", {
+    p_limit: PAGE,
+    p_offset: offset,
+  });
+  if (error) throw new Error(`credential read failed: ${error.code ?? error.message}`);
+  if (!page?.length) break;
+  rows.push(...page);
+  if (page.length < PAGE) break;
+}
 
 function summarize(all) {
   let atCurrent = 0;
@@ -255,19 +277,28 @@ for (const row of rows) {
   );
   plaintext.fill(0);
 
-  const { error: writeError } = await db
-    .from("user_ai_credentials")
-    // One statement: a row must never exist with a new ciphertext and an old
-    // version, which is the state that would make it permanently unreadable.
-    .update({
-      ciphertext: toStoredBytes(new Uint8Array(sealed)),
-      iv: toStoredBytes(iv),
-      key_version: ring.currentVersion,
-    })
-    .eq("user_id", row.user_id)
-    .eq("key_version", row.key_version);
+  // The compare-and-set lives in the RPC now (SH-EXPOSURE-001). Same guarantee
+  // as the `.eq("key_version", …)` predicate it replaces — a row must never
+  // exist with a new ciphertext and an old version, which is the state that
+  // would make it permanently unreadable — except that a row which moved
+  // returns false rather than silently updating nothing.
+  const { data: rewrapped, error: writeError } = await db.rpc(
+    "admin_rewrap_credential_envelope",
+    {
+      p_user_id: row.user_id,
+      p_expected_key_version: row.key_version,
+      p_ciphertext: toStoredBytes(new Uint8Array(sealed)),
+      p_iv: toStoredBytes(iv),
+      p_key_version: ring.currentVersion,
+    },
+  );
   if (writeError) {
     console.log(`  ${row.user_id.slice(0, 8)}… write refused (${writeError.code}) — skipped`);
+    skipped += 1;
+    continue;
+  }
+  if (rewrapped !== true) {
+    console.log(`  ${row.user_id.slice(0, 8)}… row moved during rotation — skipped`);
     skipped += 1;
     continue;
   }
@@ -276,11 +307,17 @@ for (const row of rows) {
   console.log(`  ${row.user_id.slice(0, 8)}… re-sealed at version ${ring.currentVersion}`);
 }
 
-const { data: after } = await db
-  .from("user_ai_credentials")
-  .select("user_id,key_version")
-  .eq("status", "active");
-const progress = summarize(after ?? []);
+const after = [];
+for (let offset = 0; ; offset += PAGE) {
+  const { data: page } = await db.rpc("admin_list_credential_envelopes", {
+    p_limit: PAGE,
+    p_offset: offset,
+  });
+  if (!page?.length) break;
+  after.push(...page);
+  if (page.length < PAGE) break;
+}
+const progress = summarize(after);
 
 console.log(`\nre-sealed: ${resealed} | skipped: ${skipped}`);
 console.log(
