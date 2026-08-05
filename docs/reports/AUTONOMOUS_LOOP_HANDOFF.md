@@ -2437,3 +2437,100 @@ Everything in §26 and §29 still stands, plus:
 - **Do not hand-write `password_required_characters`.** Read the enum.
 - **Do not use `process.exit()` inside a `try` that owns cleanup.**
 - **Do not borrow a migration from another slice for SH.6.** Two is the budget.
+
+---
+
+## 31. SH.6 — STARTED, at its foundation. **This supersedes §30's "Next".**
+
+SH.5 is closed (§30). SH.6 is the active slice, with **two migrations budgeted
+and none spent**. This section records what exists and, more usefully, what the
+next context must not re-derive.
+
+### What is built
+
+**`src/lib/quotas.ts` — the SH-QUOTA-010 single source**, plus
+`quotas-parity.test.ts` (17 cases) comparing it to PRD §20 **in both
+directions**. That table is what the owner signed (amendment P-1: "no value
+changed between proposal and approval"), so the parity is against the approval
+itself rather than against a restatement of it.
+
+Both directions matter here in the usual way: the one-directional version passes
+when somebody deletes the constant it was guarding. The test also asserts its own
+parse is **not vacuous** (≥15 rows), because a regex that silently matched
+nothing would make every comparison below it pass by having nothing to compare.
+
+`SWEPT_CLASSES` and `RETAINED_CLASSES` are asserted to **partition** the schedule
+with nothing left over — a data class that is neither swept nor deliberately
+retained is one nobody decided about, which is the state SH-RETENTION-001 exists
+to forbid.
+
+### The decisions already made, so they are not remade
+
+- **Ceilings are constants, not DDL.** SH-QUOTA-010 says so in as many words
+  ("changing them is a constants change, not a migration"), and it is the same
+  reasoning ADR-080 recorded for the auth throttle: the migrations carry the
+  *mechanism*, the application supplies the *numbers*. Both SH.6 migrations must
+  therefore take their limits as **parameters**, and — per ADR-057 — their
+  argument lists have to be right on the first attempt, because
+  `create or replace` cannot extend one.
+- **`undoOperationsPastExpiry` is measured past `expires_at`, not past
+  creation.** SH-RETENTION-005's whole content. A sweep written against
+  `created_at` would silently destroy live undo capability.
+- **Retained ≠ undecided.** `null` in `RETENTION_DAYS` means deliberately
+  retained, and each has a recorded reason in `RETAINED_CLASSES`
+  (SH-RETENTION-006), disclosed in the Privacy Policy per SH-LEGAL-014.
+
+### What SH.6 still needs — the honest list
+
+Nothing below is started.
+
+**Migration 1 (quotas):** `capture_entry_async` entry ceiling (same-transaction,
+concurrency-safe — the advisory-lock shape `claim_auth_event_slot` uses);
+live-jobs ceiling at all three enqueue points; per-owner drain claim limit with a
+**two-user fairness fixture** proving both make progress.
+
+**Migration 2 (retention):** sweeps for `product_events` (180d),
+terminal `jobs` (90d), `notifications` (180d), `heartbeat_runs` (30d),
+`undo_operations` (30d **past expiry**). Each needs: scheduler-only execution
+(executable by no role), bounded per invocation, a returned deleted-count, a
+**count-only dry-run twin** with the identical predicate, and a boundary test
+proving off-by-one in **both** directions.
+
+**Application half:** storage byte/object ceilings before the storage write;
+attachment per-entry/per-day ceilings; the single-source 25 MiB + MIME
+constants with the three-way contract test (bucket definition, CHECK, TS
+constant — FINDINGS F-22); AI input bounds per action; `process-jobs` body bound
+before JSON parse (F-20); a quota refusal vocabulary **distinct from throttle
+and lifecycle** (three vocabularies, SH-SUSPEND-009); signed-URL duration
+constant pinning both call sites.
+
+**Exposure closures:** `service_role` DML revoke on the two BYOK tables with
+**non-vacuous** probes (grant seen before, refused after); the full role×table
+grant matrix census; the `audit_logs` direct-INSERT disposition as an ADR;
+`heartbeat` Edge Function disposition with a readback; proxy fail-open bounded
+to development.
+
+**Then:** acceptance report and adversarial review (T-21 through T-27, T-31).
+
+### The purge boundary — not negotiable
+
+Approval of the retention *schedule* is **not** approval of a purge. For every
+sweep: build the live function, build the identical count-only dry-run, add
+non-vacuous boundary tests, prove scheduler-only execution, record the
+shared-environment dry-run transcript, and **stop before the first live
+production deletion**. That first deletion needs its own explicit owner
+authorization (ADR-057 dry-run discipline, SH-RETENTION-008).
+
+**No production purge has been executed.**
+
+### Do not, on resuming
+
+Everything in §30 still stands, plus:
+
+- **Do not spend a third migration.** Two is the budget and none is spent; if the
+  work genuinely needs more, stop and amend the plan by owner decision rather
+  than renegotiating inside a branch.
+- **Do not put a ceiling in DDL.** They are parameters.
+- **Do not sweep `undo_operations` by `created_at`.**
+- **Do not let a dry-run and its live twin drift.** Same predicate or the
+  transcript means nothing.
