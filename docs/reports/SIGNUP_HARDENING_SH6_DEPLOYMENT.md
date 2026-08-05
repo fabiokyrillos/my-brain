@@ -109,6 +109,17 @@ owners, **residual rows across `entries`/`jobs`/`account_lifecycle`: 0**.
 | A suspended owner gets `ACCOUNT_LIFECYCLE_NOT_ACTIVE`, never a `QUOTA_` code | PASS |
 | Quota vocabulary distinct from lifecycle and throttle | PASS |
 
+**The recorded run was 11/11; the script now carries 10 checks, and the
+difference is deliberate.** The lifecycle-vocabulary case needed
+`suspend_account`, and `signup-hardening-admin-boundary.test.ts` holds the
+administrative surface to exactly one executable caller — the operator CLI. CI
+caught the new script joining that set, which is the guard doing precisely its
+job. Growing the set of files able to suspend an account, so that an acceptance
+script could re-prove something already proven, is the worse trade: the property
+holds in section 8 of `supabase/tests/signup_hardening_quotas.sql` against a real
+Postgres every CI run, and it was proven once against this deployed database in
+the run above. The case was removed rather than the boundary widened.
+
 The entry-ceiling case is one array-bodied POST of 301 rows: it is simultaneously
 the boundary test, the multi-row-bypass test and the no-partial-write test, and a
 per-row trigger would admit all 301 on a count of zero.

@@ -6,8 +6,8 @@
  * question: does the advisory lock hold under genuine contention. This file
  * answers the rest of the lane on the same deployed database — the ceilings, the
  * multi-row bypass, the exhausted-job behaviour, the no-partial-write rule, the
- * per-owner drain fairness with two owners, and the three refusal vocabularies
- * staying three.
+ * per-owner drain fairness with two owners, and the quota refusal vocabulary
+ * standing apart from the other two.
  *
  * ## Why every case here is a single HTTP request
  *
@@ -283,38 +283,24 @@ try {
   );
 
   // -------------------------------------------------------------------------
-  console.log("\n4. three refusal vocabularies stay three");
+  console.log("\n4. the quota vocabulary is its own");
   // -------------------------------------------------------------------------
-  const suspended = await rpcAsService("suspend_account", {
-    p_user_id: ownerB.id, p_reason_code: "operator_suspension",
-  });
-  if (suspended.ok) {
-    const capture = await fetch(`${url}/rest/v1/rpc/capture_entry_async`, {
-      method: "POST",
-      headers: asOwner(ownerB),
-      body: JSON.stringify({
-        p_original_content: "texto qualquer", p_locale: "pt-BR", p_source: "web",
-        p_idempotency_key: `sh6-acc-vocab-${nonce}`,
-      }),
-    });
-    const captureDetail = detailOf(await capture.text());
-    record(
-      "a suspended owner gets the LIFECYCLE code, not a quota code",
-      captureDetail.includes("ACCOUNT_LIFECYCLE_NOT_ACTIVE") && !captureDetail.includes("QUOTA_"),
-      "lifecycle and quota vocabularies do not collide",
-    );
-    await rpcAsService("reactivate_account", {
-      p_user_id: ownerB.id, p_reason_code: "operator_reactivation",
-    });
-  } else {
-    record("a suspended owner gets the LIFECYCLE code", false, `suspend_account: HTTP ${suspended.status}`);
-  }
-
-  const quotaCodes = results.some((r) => r.name.includes("ceiling+1"));
+  // The LIFECYCLE half of SH-QUOTA-009 is deliberately NOT probed here.
+  // Proving it needs `suspend_account`, and the admin-boundary guard holds that
+  // surface to exactly one executable caller -- the operator CLI. Growing that
+  // set so an acceptance script can suspend an account is a worse trade than
+  // proving the same property where it is already proven: section 8 of
+  // `supabase/tests/signup_hardening_quotas.sql` against a real Postgres in CI,
+  // and once against this deployed database in the run recorded in
+  // SIGNUP_HARDENING_SH6_DEPLOYMENT.md.
+  //
+  // What remains is the half this script can prove without holding a capability
+  // it has no business holding.
+  const quotaSeen = results.find((entry) => entry.name.includes("ceiling+1"));
   record(
-    "the quota vocabulary is prefixed QUOTA_ and shares nothing with the others",
-    quotaCodes,
-    "QUOTA_ENTRIES_PER_DAY observed; distinct from ACCOUNT_LIFECYCLE_NOT_ACTIVE and AUTH_EVENT_THROTTLED",
+    "the quota vocabulary is prefixed QUOTA_ and shares no prefix with the others",
+    Boolean(quotaSeen?.passed),
+    "QUOTA_ENTRIES_PER_DAY observed live; distinct from ACCOUNT_LIFECYCLE_NOT_ACTIVE and AUTH_EVENT_THROTTLED",
   );
 
   exitCode = results.every((r) => r.passed) ? 0 : 1;
