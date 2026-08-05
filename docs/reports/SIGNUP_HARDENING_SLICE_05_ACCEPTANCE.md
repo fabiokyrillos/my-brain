@@ -19,7 +19,7 @@ footnote.
 | SH-SIGNUP-004 allowlist readback, no wildcard | **done** | 12 exact URLs; a preview host was offered and **rewritten** |
 | SH-SIGNUP-005 confirmation required | **partial** | `mailer_autoconfirm=false` read back. The behavioural half needs a delivered mail → **blocked on SMTP** |
 | SH-SIGNUP-006 `config.toml` convergence | **done** (SH.5a) | config guard test |
-| SH-SIGNUP-007 hosted password policy | **not done** | owner dashboard action; app-side Zod policy is in force |
+| SH-SIGNUP-007 hosted password policy | **done** | raised 6→12 + four classes by targeted PATCH (2 of 242 fields changed, 0 unintended); verified behaviourally 6/6 on a disposable account — §5d |
 | SH-SIGNUP-008 dedicated resend surface | **done** | `/[locale]/auth/resend`, `resendConfirmation`, own ceiling |
 | SH-SIGNUP-009 recovery still works | **done** | deployed probe → `?message=recovery-sent`, zero 5xx |
 | SH-SIGNUP-010 callback allowlist guard-of-the-guard | **done** | `throttle-policy.test.ts`; **found a real defect** — see §3 |
@@ -27,7 +27,7 @@ footnote.
 | SH-SIGNUP-012 session fixation | **done** | `captcha.test.ts` pins |
 | SH-SIGNUP-013 disposable-email posture | **done** | recorded in `throttle-policy.ts`; v1 accepts them |
 | SH-CAPTCHA-001 vendor by ADR | **done** | ADR-076 |
-| SH-CAPTCHA-002 provider enforcement | **SATISFIED** as specified | deployed probes 2026-08-05: missing token, invalid token and four bypass shapes all `400 captcha_failed`; refusal identical for known vs unknown — §5. Residual: the valid-token probes could not run from automation and are SKIPPED, not passed |
+| SH-CAPTCHA-002 provider enforcement | **COMPLETE** | deployed probes: missing token, invalid token and four bypass shapes all `400 captcha_failed`; refusal identical for known vs unknown (§5). Probes 3 and 5 initially SKIPPED, then **executed and passed interactively** by the owner (§5c) |
 | SH-CAPTCHA-003 widget + token | **done** | four forms; `captcha.test.ts` |
 | SH-CAPTCHA-004 one external origin, absent from product | **done** | repo-wide scan asserts the offender list exactly |
 | SH-CAPTCHA-005 CI never claims the hosted control | **done** | no site key in CI → no widget, no token |
@@ -323,6 +323,116 @@ register, recover and resend. Supabase's CAPTCHA protection is a per-project
 switch GoTrue applies to the password grant as well; enabling it with no widget
 on sign-in would lock every existing account out of the product, the owner's
 included, the moment the setting is flipped.
+
+---
+
+## 5c. The interactive valid-token proof — APPENDED, not a rewrite of §5
+
+§5 recorded probes 3 and 5 as **SKIPPED**, because Turnstile declines to serve a
+challenge to an automated browser and a probe that cannot run proves nothing.
+That record stands as written. This section adds what closed it.
+
+**2026-08-05 — owner-executed interactive sign-in** at
+`https://my-brain-dusky.vercel.app/pt-BR/auth/login`, reported observation:
+
+- the Turnstile widget rendered;
+- the widget completed successfully;
+- credentials were accepted;
+- an authenticated session was created;
+- the application was reached normally;
+- **no** `captcha-failed` error appeared;
+- **no** login loop occurred;
+- hosted CAPTCHA remained enabled and public signup remained disabled.
+
+**Probes 3 and 5 are therefore recorded EXECUTED and PASSED**, by interactive
+means:
+
+| # | Probe | How it was executed |
+| --- | --- | --- |
+| 3 | a valid token reaches the normal auth path | interactive sign-in: widget completed, session created, product reached |
+| 5 | signup stays disabled even with a valid CAPTCHA | `disable_signup = true` held throughout an interaction that carried a valid token; the application gate additionally refuses before any provider call |
+
+### Three kinds of evidence, kept distinct
+
+The distinction is worth preserving because they answer different questions and
+one is not a substitute for another:
+
+1. **Provider-enforced CAPTCHA** (§5) — automated, repeatable, adversarial. Every
+   raw-request shape that skips the widget is refused. This is what makes
+   UI-only enforcement structurally impossible.
+2. **Interactive valid-token proof** (this section) — human, one-shot,
+   not repeatable by CI. It shows the enforced path is *passable*, which no
+   bypass probe can show.
+3. **Automated bypass probes** — the negative space. They can only ever
+   demonstrate refusal; a green run of them is compatible with a product that
+   refuses everyone.
+
+**Nothing beyond that exact interaction is inferred.** It is one sign-in, by one
+person, in one browser, at one moment. It does not establish that every browser
+or network can complete the challenge, and it is not a substitute for the
+rollout gate's own monitoring.
+
+---
+
+## 5d. SH-SIGNUP-007 — the hosted password policy, applied and verified
+
+**Applied 2026-08-05 by targeted Management API PATCH.** No `config push`.
+
+| Field | Before | After |
+| --- | --- | --- |
+| `password_min_length` | `6` | **`12`** |
+| `password_required_characters` | `""` | the provider's four-class member (lower : upper : digits : symbols) |
+
+**242 fields compared before and after; exactly 2 changed; 0 unintended.**
+Twelve postconditions asserted and held: `disable_signup` still `true`,
+`mailer_autoconfirm` still `false`, Turnstile still enabled with provider
+`turnstile`, `site_url` unchanged, allow list unchanged (12 entries, no
+wildcard, no preview host), SMTP posture unchanged (`smtp_host` still `null`),
+and no rate limit moved.
+
+### The gap this closed was real, not theoretical
+
+Zod demanded twelve characters across four classes; the hosted policy demanded
+six and no classes. Zod guards the Server Actions, and **the Server Actions are
+not the only door** — an authenticated caller reaching `PUT /auth/v1/user`
+through PostgREST is validated by GoTrue alone. A six-character password was
+reachable by anyone willing to skip the form, and nothing in the product would
+have looked unusual.
+
+### Verified behaviourally, on a disposable account
+
+`scripts/sh5-password-policy-probe.mjs` — **6/6**:
+
+| Check | Result |
+| --- | --- |
+| a session is obtainable for the disposable account | recovery token exchanged (sign-in is CAPTCHA-gated, so `generate_link` + `/verify` is the path) |
+| a password the **old** policy allowed is now refused | `422 weak_password` |
+| a policy-compliant password reaches the normal path | `200` |
+| the refusal names the policy rather than failing generically | `weak_password`, message enumerates the four classes |
+| direct Auth API usage cannot downgrade below the policy | `422` again, retried **after** a successful compliant change — so the refusal is the policy, not session state or ordering |
+| the disposable account is removed | delete `200`, re-read `404` |
+
+The negative case is deliberately not garbage: eleven lowercase letters plus a
+digit is **exactly what the previous configuration would have accepted**.
+
+`password-policy-parity.test.ts` pins the two sides together in both
+directions — raising Zod alone re-opens the direct-API door; raising the hosted
+policy alone moves the refusal from a localized message to an unreadable
+provider error.
+
+### Two mistakes made and corrected while doing this
+
+1. **A hand-escaped enum value was rejected.** `password_required_characters` is
+   a closed set whose four-class member contains a *literal double backslash*;
+   the transcription produced 97 characters where the API wanted 98. The value
+   is now **read from the provider's own enum** rather than written down, which
+   removes the whole class of bug. The rejected PATCH was verified to be a
+   no-op — `password_min_length` was still `6` afterwards.
+2. **The first probe run left a disposable account behind.** `process.exit()`
+   inside a `try` terminates immediately and **skips the `finally`**, so the
+   cleanup never ran. Fixed to throw instead, and the orphan was removed
+   (delete `200`, re-read `404`, project back to its two real accounts). A
+   cleanup path that only runs on the happy path is not a cleanup path.
 
 ---
 

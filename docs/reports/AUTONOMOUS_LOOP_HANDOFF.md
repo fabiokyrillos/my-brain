@@ -2355,3 +2355,85 @@ Everything in §26's list still stands, plus:
   bot detection. It is exempt from the mechanism.
 - **Do not conclude the widget is broken** because automation cannot solve it.
   That is Turnstile working.
+
+---
+
+## 30. SH.5 is CLOSED — 2026-08-05. **This supersedes §29.**
+
+`main` at `56b6660` + this branch. PRs #85–#90 merged, **all six merge SHAs
+green on all three jobs** (re-verified this session, not taken on trust).
+Hosted parity `202608040075`, local head the same.
+
+### The two hosted items that closed it
+
+**SH-CAPTCHA-002 is COMPLETE.** §5's automated probes proved provider
+enforcement — every raw-request shape that skips the widget is refused
+`400 captcha_failed`, and the refusal is identical for a known and an unknown
+address. Probes 3 and 5 were recorded **SKIPPED**, and that record is preserved
+rather than rewritten; §5c *appends* the owner's interactive sign-in that closed
+them.
+
+Three kinds of evidence are deliberately kept apart, because one is not a
+substitute for another:
+
+1. **provider-enforced CAPTCHA** — automated, repeatable, adversarial;
+2. **interactive valid-token proof** — human, one-shot, not repeatable by CI;
+3. **automated bypass probes** — negative space only; a green run of them is
+   compatible with a product that refuses *everyone*.
+
+That third point is why the interactive leg mattered and why it must not be
+folded into the others.
+
+**SH-SIGNUP-007 is DONE.** Hosted policy raised `6 → 12` with four character
+classes by targeted PATCH: **242 fields compared, exactly 2 changed, 0
+unintended**, twelve postconditions held. Verified behaviourally 6/6 on a
+disposable account — a password the *old* policy would have accepted is refused
+`422 weak_password`, a compliant one is accepted, the refusal survives a retry
+after a successful compliant change, and the account is deleted (`404` on
+re-read).
+
+The gap was real: Zod guards the Server Actions and the Server Actions are not
+the only door — `PUT /auth/v1/user` is validated by GoTrue alone, so a
+six-character password was reachable by skipping the form.
+
+### Two mistakes worth carrying
+
+- **`password_required_characters` is a closed enum containing a literal double
+  backslash.** A hand-escaped copy was 97 characters where the API wanted 98 and
+  was rejected. The value is now **read from the provider's own enum**. The
+  rejected PATCH was verified a no-op.
+- **`process.exit()` inside a `try` skips the `finally`.** The first probe run
+  left a disposable account on the production project. Fixed to throw; orphan
+  removed; project back to its two real accounts. *A cleanup path that only runs
+  on the happy path is not a cleanup path.*
+
+### What remains open, and none of it is repository work
+
+All SMTP-blocked, all carried to the rollout gate:
+
+- confirmation-required's **behavioural** half (SH-SIGNUP-005);
+- the delivered **confirmation-link** journey;
+- the delivered **recovery-link** journey;
+- **SH-SIGNUP-011's timing residual** — still unmeasured, and not measurable
+  without exhausting the ceilings under test;
+- the **final resend ceiling** — `AUTH_EVENT_CEILINGS.resend` keeps its
+  `provisional` marker, and `rate_limit_email_sent = 2` remains a default-SMTP
+  artefact that is never presented as a product ceiling.
+
+**No SMTP readiness is claimed.** No sending domain, sender address or
+credential has been invented.
+
+### Migration budget
+
+**Six of eight spent.** SH.5 used exactly its one (`202608040075`). **Two
+remain, and both belong to SH.6.**
+
+### Do not, on resuming
+
+Everything in §26 and §29 still stands, plus:
+
+- **Do not fold the interactive proof into the automated probes.** They answer
+  different questions; §5c says so explicitly.
+- **Do not hand-write `password_required_characters`.** Read the enum.
+- **Do not use `process.exit()` inside a `try` that owns cleanup.**
+- **Do not borrow a migration from another slice for SH.6.** Two is the budget.
