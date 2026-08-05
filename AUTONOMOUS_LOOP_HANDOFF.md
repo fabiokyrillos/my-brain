@@ -118,3 +118,69 @@ Carried forward from earlier slices, unchanged and not SH.6's:
 SH.7 — rollout gates and convergence, **0 migrations**. It may build and run
 every non-destructive gate. It must not open public signup, execute a purge,
 claim SMTP readiness, or start Phase 2G/2H.
+
+*(§33's "Next" is answered by §34 below.)*
+
+---
+
+## §34 — SH.7 closed: the initiative is complete and the gate says no (2026-08-05)
+
+### Where things stand
+
+- **Signup Hardening is COMPLETE, SH.0 through SH.7.** Zero migrations in SH.7;
+  the chain head stays `202608050077` and hosted parity matches it.
+- **Public signup is closed and this initiative did not open it.** SH-ROLLOUT-005
+  is post-initiative and owner-only by design.
+
+### The output
+
+`npm run rollout:verify` — **25 pass · 3 fail · 2 owner-signature** against the
+deployed project. A failed or unsigned gate is a closed door, and the script has
+no path that reports otherwise.
+
+The remaining distance, all honest:
+
+| Gate | Why it is red |
+| --- | --- |
+| RG-QUO-3 | retention sweeps deliberately unscheduled (ADR-082) |
+| RG-DEP-1 | production SMTP not configured |
+| RG-DEP-3 | backup restore to a disposable project never performed (SH-GD.2) |
+| RG-LEG-4 | professional legal review — owner signature |
+| RG-DEP-4 | monitoring adequacy — owner signature |
+
+Opening signup is one green run of that script, an owner flip of
+`disable_signup`, then a second green run against the open state.
+
+### What a successor should not redo
+
+- **The gate's fail-closed direction is tested** — 30 cases, the decisive one
+  being that no gate passes against an empty repository. Do not "simplify" a
+  gate into a skip; that is the whole failure mode it was built against.
+- **The traceability matrix is generated, not written.**
+  `npm run docs:signup-hardening:traceability` fails rather than print an
+  unresolved claim, so hand-editing the matrix produces a claim nothing checked.
+- **The re-census delta is measured and bounded.** Hosted grants `anon` EXECUTE
+  on eight pre-existing trigger functions CI does not show; all eight were
+  probed and are unreachable through PostgREST (`404 PGRST202`, and `0A000` for
+  the event-trigger one). A catalog difference, not a reachable one. Revoking
+  them needs a migration nobody budgeted and would remove zero exposure.
+
+### Owner actions outstanding
+
+No repository work is waiting. What remains is owner judgment or configuration:
+
+1. **Enable the retention schedule** if the sweeps should run:
+   `npm run sh6:retention-dry-run` then
+   `npm run sh6:retention-schedule -- --enable`. Enabling **is** the
+   authorization of the first live purge; purged rows are unrecoverable.
+2. **Configure custom SMTP** (Resend) — closes RG-DEP-1 and unblocks the three
+   SMTP-deferred SH.5 requirements.
+3. **Restore a backup to a disposable project** and record it — closes RG-DEP-3.
+4. **Sign the two judgment gates**: professional legal review, and monitoring and
+   incident-handling adequacy.
+
+### Next
+
+**Phase 2G — Conversational Creation** is the roadmap successor (ADR-073, plan
+§8: Signup Hardening → 2G → 2H → open signup). It is **not authorised** by
+anything written so far and needs an owner decision to begin.

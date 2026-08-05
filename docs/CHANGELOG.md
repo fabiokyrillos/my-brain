@@ -1,6 +1,20 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — Signup Hardening closes: the gate exists, runs, and says no (0 migrations)
+
+**The initiative's output is not an open door — it is the mechanism that decides whether the door may open.** `npm run rollout:verify` executes every machine-checkable gate against the deployed project and reads 25 pass, 3 fail, 2 owner-signature. It refuses to open signup, and the three failures are the honest remaining distance: retention sweeps deliberately unscheduled, SMTP unconfigured, and a backup restore nobody has performed.
+
+**Going red when the evidence is missing is the whole point.** Going green when it is there is easy and every verifier does it; the property that makes a green run mean anything is the one a verifier loses the first time somebody adds a try/catch for convenience. A gate whose artifact is absent fails, a gate whose readback cannot be performed fails, and a gate that throws fails with the reason attached. The decisive test asserts that **no gate passes against an empty directory** — because a verifier that skips what it cannot check reports success on a machine with nothing on it.
+
+**The four owner-signature gates hold the run red rather than pretending to be automated.** A gate on documents rather than on configuration is exactly the failure the threat model names, and legal review is not something a script can perform.
+
+**Every requirement is accounted for, by a generator that fails rather than print an unresolved claim.** 137 requirements: 131 delivered, 3 deferred with a destination, 3 not delivered and named. It caught two defects in its own input on the first run — a slice value missing from the declared set, and a classification naming a requirement id that does not exist.
+
+**The re-census found one delta and measured it instead of assuming.** The hosted catalog grants `anon` EXECUTE on eight pre-existing trigger functions that CI does not show. All eight were called: seven answer `404` because PostgREST does not expose trigger-returning functions at all, and the eighth refuses. A catalog difference, not a reachable one — recorded with a destination rather than closed with a migration nobody budgeted and that would remove no exposure.
+
+**Public signup remains closed, and this initiative did not open it.** That was never its job.
+
 ## 2026-08-05 — Signup Hardening: SH.6 deploys, and the deployment finds the defect the review did not (0 new migrations)
 
 **Both migrations are live and the budget is spent.** `202608050076` went first because `main` carried only that migration at the time — the ordering was enforced by repository truth rather than by care. Hosted parity is `202608050077`, signup stayed disabled throughout, and the full 242-field Auth configuration read back unchanged after each apply.
