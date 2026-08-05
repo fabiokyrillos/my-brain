@@ -1,6 +1,22 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — `docs/reports/` becomes a taxonomy, and placement becomes a guard (0 migrations)
+
+**128 report files were filed flat at one level, and the cost was measurable rather than aesthetic.** §33 of the loop handoff was opened at the repository root recording that the handoff "did not exist before §33" — while `docs/reports/AUTONOMOUS_LOOP_HANDOFF.md`, holding §1 through §32, sat unfound in the very directory the report was about. A directory nobody can navigate produces a log nobody can find, and then a second log.
+
+**Every report now lives under the phase or initiative that governed it**: `phase-2x/`, `phase-2c/`, `phase-2d/`, `pre-2e/`, `phase-2e/`, `phase-2f/`, `phase-2g/`, `product-ux/`, `entity-graph/`, `byok/`, `signup-hardening/`, `shared/governance/`. Nothing was renamed, no conclusion was edited, and every move is a pure rename that `git log --follow` reads through. Classification is by governing initiative, not by filename: `G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md` files under `byok/` because BYOK's plan is what commissioned it, and `SLICE_G5_REMINDER_INVESTIGATION.md` files under `product-ux/` because that is the initiative whose Slice G5 it is.
+
+**The rule is enforced rather than described.** `src/lib/closeout/reports-taxonomy-guard.test.ts` fails the `application` job when a markdown file lands directly in `docs/reports/` — allowlist of two, `README.md` and `AUTONOMOUS_LOOP_HANDOFF.md` — and prints the path the file should have used. It also rejects a non-kebab-case directory at any depth, refuses an allowlist entry naming a file that no longer exists, and constrains nothing inside an initiative directory, so no historical tree is frozen. It reads the filesystem only, because git history is not available in every job and "where a file is" is the actual property.
+
+**Two guards would have silently narrowed, and were widened instead.** The A13 Phase-2G start detector and the ADR-057 provenance reopening gate both listed `docs/reports/` one level deep. Subdirectories would have become invisible to them — a 2G declaration filed under `phase-2g/` would have stopped being a start signal. Both now walk the tree recursively, which is a stronger guard than the one they replaced.
+
+**A link checker now proves what the reorganization could most easily have broken**: every repository-local markdown link resolves, 0 broken across 180 files, with a negative test so the checker cannot degrade into always-passing.
+
+**One reference was deliberately left stale.** `supabase/migrations/202607250054_pre_2e_rpc_version_retirement.sql:26` cites the old path in a comment. Migrations are append-only and already applied to a shared environment; the citation was not rewritten, and the exception is recorded in `docs/reports/README.md` rather than hidden.
+
+No runtime behavior, migration, hosted configuration, rollout gate, signup posture or retention schedule changed. Signup Hardening remains closed at SH.7, public signup remains closed, and Phase 2G has not started.
+
 ## 2026-08-05 — Signup Hardening closes: the gate exists, runs, and says no (0 migrations)
 
 **The initiative's output is not an open door — it is the mechanism that decides whether the door may open.** `npm run rollout:verify` executes every machine-checkable gate against the deployed project and reads 25 pass, 3 fail, 2 owner-signature. It refuses to open signup, and the three failures are the honest remaining distance: retention sweeps deliberately unscheduled, SMTP unconfigured, and a backup restore nobody has performed.
@@ -159,7 +175,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **Two guards written earlier caught this slice's new writers**, recorded rather than smoothed (acceptance §3): the History vocabulary test named the new audit action and its entity type before they could render as the neutral fallback, and the Deno parity test named the two new `_shared/` files. Two more defects were caught by static review before CI: a pgTAP fixture with 16 bytes of ciphertext where the BYOK CHECK floors it at 17, and a plpgsql variable named `found` shadowing the language's own special variable.
 
-**The deployed half is recorded as NOT EXECUTED with its exact blocker** — suspending a real disposable account, watching the deployed drain skip its queued job and complete it after reactivation (SH-WORKER-004/005), and the provider-side sign-in ban (SH-ADMIN-005) all need the migrations applied to the hosted project and a disposable account. The runbook (`docs/reports/SIGNUP_HARDENING_ADMIN_RUNBOOK.md`) carries every command and readback and is marked **written, not drilled**, with empty per-section execution records.
+**The deployed half is recorded as NOT EXECUTED with its exact blocker** — suspending a real disposable account, watching the deployed drain skip its queued job and complete it after reactivation (SH-WORKER-004/005), and the provider-side sign-in ban (SH-ADMIN-005) all need the migrations applied to the hosted project and a disposable account. The runbook (`docs/reports/signup-hardening/SIGNUP_HARDENING_ADMIN_RUNBOOK.md`) carries every command and readback and is marked **written, not drilled**, with empty per-section execution records.
 
 ## 2026-08-04 — Signup Hardening SH.2: account deletion, zero-residue cleanup, and the orphan procedure (1 migration)
 
@@ -171,7 +187,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **Four defects found and fixed while building, recorded rather than smoothed** (acceptance §3): the `Deno.serve` import problem above; a "crash-resume" test asserting a scenario that **cannot occur** (after `auth.users` is deleted the Bearer token no longer authenticates, so the machine is never re-entered) — replaced with the two reachable cases and the limit stated; the scanner's own prose tripping its no-destructive-call guard (the fourth occurrence of that trap, comments now stripped); and the scanner running `main()` on import. A fifth, caught by the repository's own guard: a `"use server"` module may export only async functions, so the idle state moved to `deletion-request-state.ts`, the split `auth/sign-out-state.ts` already uses.
 
-**The six 2026-07-16 orphaned objects are untouched.** `docs/reports/SH_DELETE_015_ORPHAN_MANIFEST.md` carries the read-only procedure and an explicitly **unfilled** manifest — deleting them is irreversible, owner-only, and gated on SH-GD.2's verified backup. That is SH.2's stop condition.
+**The six 2026-07-16 orphaned objects are untouched.** `docs/reports/signup-hardening/SH_DELETE_015_ORPHAN_MANIFEST.md` carries the read-only procedure and an explicitly **unfilled** manifest — deleting them is irreversible, owner-only, and gated on SH-GD.2's verified backup. That is SH.2's stop condition.
 
 ## 2026-08-04 — Signup Hardening SH.1: the account lifecycle foundation (2 migrations)
 
@@ -179,7 +195,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **The predicate lives where the trust lives.** `capture_entry_async` and `enqueue_entry_reprocessing` refuse non-active accounts with the declared vocabulary (`ACCOUNT_LIFECYCLE_NOT_ACTIVE`); all three claim paths — direct, drain, attachment — carry the byte-identical owner-active predicate (SH-WORKER-003 pins the identity over the migration text; `claim_attachment_job`'s FROM gained the alias `job` to make it literal); the heartbeat skips a non-active user before reading any of their data. Six functions reproduced in full, no signature changes.
 
-**The app refuses server-side, everywhere, fail-closed.** `requireUser` resolves lifecycle per request and sends every non-active account to the new `/[locale]/account-state` surface (no product surface, exactly sign-out — SH-LIFECYCLE-008/010); `assertActiveAccount` carries the same gate into the 19 inline-auth action sites across seven feature modules (SH-LIFECYCLE-009). Unreadable or absent rows are treated as non-active, and the surface says "unavailable" rather than inventing a suspension. Copy ships as a typed module in both locales; the locale-ternary ceiling did not move. Evidence: 28 pgTAP assertions over a fixture that discriminates on lifecycle alone; direct-call refusal tests in capture/tasks/profile; 12 gate cases; the SH-WORKER-003 identity test. Acceptance record: `docs/reports/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`, including the recorded deployment-ordering hazard (apply both migrations to the hosted project before running updated app code against it).
+**The app refuses server-side, everywhere, fail-closed.** `requireUser` resolves lifecycle per request and sends every non-active account to the new `/[locale]/account-state` surface (no product surface, exactly sign-out — SH-LIFECYCLE-008/010); `assertActiveAccount` carries the same gate into the 19 inline-auth action sites across seven feature modules (SH-LIFECYCLE-009). Unreadable or absent rows are treated as non-active, and the surface says "unavailable" rather than inventing a suspension. Copy ships as a typed module in both locales; the locale-ternary ceiling did not move. Evidence: 28 pgTAP assertions over a fixture that discriminates on lifecycle alone; direct-call refusal tests in capture/tasks/profile; 12 gate cases; the SH-WORKER-003 identity test. Acceptance record: `docs/reports/signup-hardening/SIGNUP_HARDENING_SLICE_01_ACCEPTANCE.md`, including the recorded deployment-ordering hazard (apply both migrations to the hosted project before running updated app code against it).
 
 ## 2026-08-04 — Signup Hardening SH.0: owner approval recorded; the cascade drill and the grant census enter CI (0 migrations)
 
@@ -195,9 +211,9 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **Documentation only. Zero product code, zero migrations; the head stays at `202608010069`.** This is the planning initiative `ADR-068` ordered after BYOK's close, and BYOK closed earlier today, so the package is authorized to exist. **It authorizes no implementation** — the plan's per-slice pre-code gates do that.
 
-**Scope was measured before it was declared.** A four-agent read-only census (auth surfaces; database privileged boundaries; storage, workers and Edge Functions; product surfaces and doc conventions) produced `docs/reports/SIGNUP_HARDENING_FINDINGS.md`. It corrected the shape of the work rather than confirming a preliminary list: row-level cascade from `auth.users` is **already complete** (41/41 user-owned tables, zero exceptions), so the deletion gaps are **storage objects** (six live orphans from 2026-07-16, which do not cascade) and the **untested** 43 composite `NO ACTION` foreign keys that sit in a bulk-delete's path; **no account-lifecycle state exists anywhere**, so deletion and suspension are built on one foundation, not two; `service_role` still holds platform-default DML on the two BYOK tables; and the only retention sweep in the whole database is BYOK's 30-day validation-attempt prune.
+**Scope was measured before it was declared.** A four-agent read-only census (auth surfaces; database privileged boundaries; storage, workers and Edge Functions; product surfaces and doc conventions) produced `docs/reports/signup-hardening/SIGNUP_HARDENING_FINDINGS.md`. It corrected the shape of the work rather than confirming a preliminary list: row-level cascade from `auth.users` is **already complete** (41/41 user-owned tables, zero exceptions), so the deletion gaps are **storage objects** (six live orphans from 2026-07-16, which do not cascade) and the **untested** 43 composite `NO ACTION` foreign keys that sit in a bulk-delete's path; **no account-lifecycle state exists anywhere**, so deletion and suspension are built on one foundation, not two; `service_role` still holds platform-default DML on the two BYOK tables; and the only retention sweep in the whole database is BYOK's 30-day validation-attempt prune.
 
-**The package.** `docs/SIGNUP_HARDENING_PRD.md` (16 `SH-*` families, ~120 mechanically-testable requirements, each carrying its slice, migration expectation, trust boundary, owner/shared-env flags and evidence class); `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` (seven slices SH.0–SH.7, an eight-migration budget, tiered pre-code gates, and the BYOK-OPERATIONS/Phase 2H boundary reasoning); `docs/reports/SIGNUP_HARDENING_THREAT_MODEL.md` (35 threats T-01…T-35 with prevention, detection, test and residual); `docs/reports/SIGNUP_ROLLOUT_GATE_DEFINITION.md` (a fail-closed checklist where an absent artifact is a failed gate, never a skip); and ADR-073…ADR-076 (Proposed) — the initiative shape and `SH-*` namespace, the self-only deletion executor, the operator-CLI admin boundary, and provider-enforced CAPTCHA.
+**The package.** `docs/SIGNUP_HARDENING_PRD.md` (16 `SH-*` families, ~120 mechanically-testable requirements, each carrying its slice, migration expectation, trust boundary, owner/shared-env flags and evidence class); `docs/SIGNUP_HARDENING_IMPLEMENTATION_PLAN.md` (seven slices SH.0–SH.7, an eight-migration budget, tiered pre-code gates, and the BYOK-OPERATIONS/Phase 2H boundary reasoning); `docs/reports/signup-hardening/SIGNUP_HARDENING_THREAT_MODEL.md` (35 threats T-01…T-35 with prevention, detection, test and residual); `docs/reports/signup-hardening/SIGNUP_ROLLOUT_GATE_DEFINITION.md` (a fail-closed checklist where an absent artifact is a failed gate, never a skip); and ADR-073…ADR-076 (Proposed) — the initiative shape and `SH-*` namespace, the self-only deletion executor, the operator-CLI admin boundary, and provider-enforced CAPTCHA.
 
 **The requirement namespace is `SH-*`, deliberately not a phase prefix**, because `ADR-067`'s phase-start guard fails the build on a declared `2G-`-shaped requirement family. The pre-code gates are tiered per `ADR-069`'s lesson so no single external dependency (a CAPTCHA vendor, hosted Auth config, SMTP) blocks unrelated slices. Deletion, suspension and rollout are specified never to share a PR. `disable_signup` stays `true` throughout; the initiative's output is the rollout gate that would *prove* readiness, not the flip.
 
@@ -221,7 +237,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 **The acceptance lane found three product defects no unit test could reach**, each fixed with a regression test. `formatFingerprint` — the parse-don't-trust guard that renders an out-of-shape stored value as `unknown` rather than echoing it — shipped with BYOK.1 and had **no production consumer**; the panel rendered the stored column directly, so the guarantee was written and not in force. The feedback line reported the wrong action: `useActionState` retains its result forever, so after any successful save a later **removal** kept showing "Key replaced and validated" directly beside a status reading "No key configured". And a save following a removal announced itself as a *replacement*, because the staleness witness was picking the message as well as driving the mechanism. A fourth finding was the harness's, not the product's, and is recorded as such.
 
-**What is not closed is named, not counted as delivered.** `BYOK-OPERATIONS` (6 requirements) is not built — no operator dashboard, no alerting, unchanged from `2F-OPERATIONS-002`. The production master-key rotation has never been run: owner-authorised, and there is **no undo**. Six orphaned storage objects from **2026-07-16** predate this work and show that database rows cascade on account deletion while storage objects do not — that is Signup Hardening's account-deletion requirement, found by this sweep. Three OpenAI keys should be revoked. And 47 of 131 requirement ids are untraced, dispositioned family by family in the new `docs/reports/BYOK_TRACEABILITY_MATRIX.md`, which is careful to measure id-traceability rather than claim it measures implementation.
+**What is not closed is named, not counted as delivered.** `BYOK-OPERATIONS` (6 requirements) is not built — no operator dashboard, no alerting, unchanged from `2F-OPERATIONS-002`. The production master-key rotation has never been run: owner-authorised, and there is **no undo**. Six orphaned storage objects from **2026-07-16** predate this work and show that database rows cascade on account deletion while storage objects do not — that is Signup Hardening's account-deletion requirement, found by this sweep. Three OpenAI keys should be revoked. And 47 of 131 requirement ids are untraced, dispositioned family by family in the new `docs/reports/byok/BYOK_TRACEABILITY_MATRIX.md`, which is careful to measure id-traceability rather than claim it measures implementation.
 
 ## 2026-08-02 — one optional field could take down an entry: the candidate due-date contract, fixed where it was actually wrong
 
@@ -252,7 +268,7 @@ Nothing was lost, because every class measured zero eligible rows. That is a fac
 
 ## 2026-08-02 — the owner cutover succeeded, and two remote smokes were still asserting the fallback BYOK deleted
 
-**Zero migrations; the head stays at `202608010069`. BYOK still does NOT close**, and is not recorded as closed. Full record, appended and not edited: `docs/reports/BYOK_DEPLOYED_ACCEPTANCE.md` §10.
+**Zero migrations; the head stays at `202608010069`. BYOK still does NOT close**, and is not recorded as closed. Full record, appended and not edited: `docs/reports/byok/BYOK_DEPLOYED_ACCEPTANCE.md` §10.
 
 **The remediation is verified, not believed.** `npm run byok:verify-runtime` prints `IN PARITY` — 5 pass, 0 fail, 0 unverifiable, digest-algorithm control included, no value and no digest printed. The owner's stored credential **opens under the Node runtime's master key**, checked read-only against the row's own AAD with a passing round-trip control and a rejecting wrong-AAD control; the plaintext length was observed and the value never read. **OWNER-ASYNC now passes on the deployed worker** through the unattended `pg_cron` drain: job `completed`, attempts 1, one interpretation persisted, `ai_usage_events` 8 → 10. The probe entry was deleted; the two ledger rows are genuine usage and correctly stay.
 
@@ -457,7 +473,7 @@ What is recorded is only presence, base64 validity, decoded length and distinctn
 
 **Serialized authenticated evidence:** the EGC journey set 16/16 and the route-audit sweep 18/18, both on desktop and Pixel 7 across both locales, run with `--workers=1` per the P1 method — and residue re-verified as zero afterwards.
 
-Full accounting, including the six factual corrections to the governing documents and all twenty-seven review findings: `docs/reports/EGC_REPORT.md`.
+Full accounting, including the six factual corrections to the governing documents and all twenty-seven review findings: `docs/reports/entity-graph/EGC_REPORT.md`.
 
 ## 2026-07-31 — EGC.2: the Camila scenario becomes possible
 
@@ -481,7 +497,7 @@ Two HIGH findings were real application defects. `updateOwnerRelationship` had n
 
 Also fixed: the Project page's People panel said "no linked projects" under a "People" heading; an owner whose projects were all archived was told to create one (the `EG-04` shape again, via the archived filter); the in-row edit forms never closed and never confirmed on success, with no live region at all; the "no privileged boundary" pgTAP assertion was vacuous and pattern-blind to two of the three tables; row controls shared accessible names, so a person with a spouse and a sibling gave a screen-reader user two identical buttons; two module headers cited a test file that does not exist; `origin` was documented in four places as steering revalidation, which it does not, and `endPersonProject` required it while never reading it; three `expect(stub.delete).toBeUndefined()` assertions were true by construction; and the association select had no remount key, so a refusal silently reverted the selection.
 
-**Verification:** lint 0, typecheck 0, build exit 0, Vitest 3321 passed, `online-relationships.spec.ts` **8/8 serialized** on desktop and Pixel 7 in both locales, including the Camila scenario end to end. The two `sql-reachability` assertions that fail on this Windows checkout fail identically on `main` — the CRLF fragility Slice H diagnosed, left to repository maintenance. Full record: `docs/reports/EGC_SLICE_02_ACCEPTANCE.md`.
+**Verification:** lint 0, typecheck 0, build exit 0, Vitest 3321 passed, `online-relationships.spec.ts` **8/8 serialized** on desktop and Pixel 7 in both locales, including the Camila scenario end to end. The two `sql-reachability` assertions that fail on this Windows checkout fail identically on `main` — the CRLF fragility Slice H diagnosed, left to repository maintenance. Full record: `docs/reports/entity-graph/EGC_SLICE_02_ACCEPTANCE.md`.
 
 ## 2026-07-31 — EGC.1: organizations and contexts get the write path they never had
 
@@ -499,25 +515,25 @@ Also fixed: the Project page's People panel said "no linked projects" under a "P
 
 **Removed:** `EntityEditState.createdId`. It had no consumer anywhere, and the comment justifying it described a mechanism that does not exist — what actually selects a newly created company is `revalidatePath` re-rendering the server component with the stored `organization_id`, which remounts the `<select>` through its `key`. That is the stronger mechanism, since a value that never reached storage cannot appear selected.
 
-**Verification:** lint 0, typecheck 0, build exit 0, Vitest 3249 passed, locale ternaries **266** (the G-0.4 baseline exactly), `online-entity-graph.spec.ts` 8/8 and `online-route-audit.spec.ts` 18/18 against the deployed environment on desktop and Pixel 7 in both locales. Two `sql-reachability.test.ts` assertions fail on this Windows checkout and fail identically on `main`, whose CI is green — the CRLF fragility Slice H diagnosed, left to repository maintenance rather than mixed into a feature branch. Full record: `docs/reports/EGC_SLICE_01_ACCEPTANCE.md`.
+**Verification:** lint 0, typecheck 0, build exit 0, Vitest 3249 passed, locale ternaries **266** (the G-0.4 baseline exactly), `online-entity-graph.spec.ts` 8/8 and `online-route-audit.spec.ts` 18/18 against the deployed environment on desktop and Pixel 7 in both locales. Two `sql-reachability.test.ts` assertions fail on this Windows checkout and fail identically on `main`, whose CI is green — the CRLF fragility Slice H diagnosed, left to repository maintenance rather than mixed into a feature branch. Full record: `docs/reports/entity-graph/EGC_SLICE_01_ACCEPTANCE.md`.
 
 ## 2026-07-31 — Documentation and gates: hosted signup closed, A13 corrected, two initiatives authorized
 
 **No product source, no migration, no grant, no policy, no RPC.** Migration parity stays `202607310064` on both sides. The product UX ledger is untouched: 35 findings, 30 RESOLVED, 4 RETAINED, 1 DEFERRED.
 
-**Hosted signup is disabled and verified (G-0.5).** `disable_signup: true` on `ulvwzqlpsjyrnqzfxmck`, proven by three cache-busted reads plus a signup attempt returning `422 signup_disabled`. **The positive control is the point:** the same address domain had successfully created a user two minutes earlier, which excludes provider address validation as the cause of the refusal. An earlier probe using a `.invalid` address returned `400` with an empty body — indistinguishable from a refusal, and in fact `email_address_invalid` evaluated *before* signup policy. Accepting it would have reported the gate green while signup was open. The method rule now recorded: a refusal is proof only when the response is attributable to signup policy, from a domain the provider is observed to accept. Evidence: `docs/reports/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
+**Hosted signup is disabled and verified (G-0.5).** `disable_signup: true` on `ulvwzqlpsjyrnqzfxmck`, proven by three cache-busted reads plus a signup attempt returning `422 signup_disabled`. **The positive control is the point:** the same address domain had successfully created a user two minutes earlier, which excludes provider address validation as the cause of the refusal. An earlier probe using a `.invalid` address returned `400` with an empty body — indistinguishable from a refusal, and in fact `email_address_invalid` evaluated *before* signup policy. Accepting it would have reported the gate green while signup was open. The method rule now recorded: a refusal is proof only when the response is attributable to signup policy, from a domain the provider is observed to accept. Evidence: `docs/reports/byok/G05_HOSTED_SIGNUP_CLOSURE_EVIDENCE.md`.
 
 **A13's phase-start guard was corrected — a fix to its proxy, not a relaxation of its invariant.** `phase-2f-documentation.test.ts` banned any `docs/**` filename matching `/PHASE_2G/i`. Its own comment already drew the right line ("a mention as future work is a record; a declared requirement would be a start"), and its companion assertion enforced exactly that; the filename ban was the blunter half and could not tell an implementation-governing artifact from a definition study commissioned to decide whether the phase should exist. It now detects four signals — a governing artifact **by role**, a **declared** requirement family in this repository's declaration shape, an **accepted** Phase 2G ADR, and an implementation-marked migration or source file — with **eight executed mutation cases** proving each fires and that the definition study, candidate labels `2G-1`…`2G-4`, future-work mentions and unauthorized-status amendments all pass. The deliberate `2G-READINESS-001` negative-control fixture in `phase-2f-traceability.test.ts` remains a non-match, by using the same declaration shape that test relies on. See ADR-067.
 
-**Entity Graph Completion is authorized; implementation has not started.** Nine owner-observed findings (EG-01…EG-09) recorded in `docs/reports/ENTITY_GRAPH_FINDINGS.md`: the Person page reads four relationship surfaces — relationship to owner, contexts, tasks, projects — from tables `authenticated` can already fully write under forced RLS with composite-FK ownership proof, and **no write surface exists for any of them**; `public.person_relationships` has never been written by anything. The requested lifecycle needs **zero migrations, zero grants and zero new privileged boundaries**.
+**Entity Graph Completion is authorized; implementation has not started.** Nine owner-observed findings (EG-01…EG-09) recorded in `docs/reports/entity-graph/ENTITY_GRAPH_FINDINGS.md`: the Person page reads four relationship surfaces — relationship to owner, contexts, tasks, projects — from tables `authenticated` can already fully write under forced RLS with composite-FK ownership proof, and **no write surface exists for any of them**; `public.person_relationships` has never been written by anything. The requested lifecycle needs **zero migrations, zero grants and zero new privileged boundaries**.
 
-**BYOK design is approved; implementation has not started.** `docs/reports/BYOK_SECURITY_DEFINITION.md` plus PRD and plan. The project key is read in exactly two places and is already a parameter downstream in both, so BYOK is a credential-resolution change at two injection points. The study states plainly what no storage choice can provide: the unattended `pg_cron` drain requires the operator's worker to decrypt user keys, so four specific security claims are forbidden in copy.
+**BYOK design is approved; implementation has not started.** `docs/reports/byok/BYOK_SECURITY_DEFINITION.md` plus PRD and plan. The project key is read in exactly two places and is already a parameter downstream in both, so BYOK is a credential-resolution change at two injection points. The study states plainly what no storage choice can provide: the unattended `pg_cron` drain requires the operator's worker to decrypt user keys, so four specific security claims are forbidden in copy.
 
 **Phase 2G remains unauthorized and unstarted.** Public signup remains blocked on BYOK plus signup hardening, three of whose prerequisites do not exist: account deletion, admin suspension, terms and privacy policy.
 
-**One production account removed** as abandoned test residue, owner-authorized. Full cascade verified across 16 readable tables — including two (`audit_logs`, `entry_interpretations`) the pre-deletion record had not named, found by widening the sweep. `product_events` is unreadable to `service_role` **by design**, so its absence is proven as a declared composition rather than claimed. It had accumulated **358 `heartbeat_runs` rows**, one per hour since 2026-07-16 — exactly the growth `SECURITY.md:171` cited when Phase 2F's closeout refused to mint a fixture user in production. Two real accounts remain. Evidence: `docs/reports/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
+**One production account removed** as abandoned test residue, owner-authorized. Full cascade verified across 16 readable tables — including two (`audit_logs`, `entry_interpretations`) the pre-deletion record had not named, found by widening the sweep. `product_events` is unreadable to `service_role` **by design**, so its absence is proven as a declared composition rather than claimed. It had accumulated **358 `heartbeat_runs` rows**, one per hour since 2026-07-16 — exactly the growth `SECURITY.md:171` cited when Phase 2F's closeout refused to mint a fixture user in production. Two real accounts remain. Evidence: `docs/reports/byok/GENERATED_ACCOUNT_CLEANUP_EVIDENCE.md`.
 
-**G-0.4 baseline re-measured, not inherited:** 266 locale ternaries across 34 files, confirming the closeout's figure. `docs/reports/EGC_G04_LOCALE_TERNARY_BASELINE.md`.
+**G-0.4 baseline re-measured, not inherited:** 266 locale ternaries across 34 files, confirming the closeout's figure. `docs/reports/entity-graph/EGC_G04_LOCALE_TERNARY_BASELINE.md`.
 
 
 ## 2026-07-31 — Slice H — the product UX remediation's closeout (UX-04, UX-21, UX-22, UX-27, UX-32, UX-33, UX-34, UX-35)
@@ -542,7 +558,7 @@ Also fixed: the Project page's People panel said "no linked projects" under a "P
 
 **Windows CRLF fragility — diagnosed, deliberately not fixed here.** `core.autocrlf = true` with no `.gitattributes` leaves the working copy of `202607260059` with 3256 CRLF pairs and zero bare LF, against two test patterns that need consecutive LF-anchored lines. `*.sql text eol=lf` is proposed for a **separate maintenance PR**.
 
-**Closeout artifacts** — `docs/reports/PRODUCT_UX_CLOSEOUT.md` (counts, slice/PR/merge table, before/after IA, known limitations, deferred debt, Phase 2G recommendation) and `docs/reports/ux-evidence/slice-h/`.
+**Closeout artifacts** — `docs/reports/product-ux/PRODUCT_UX_CLOSEOUT.md` (counts, slice/PR/merge table, before/after IA, known limitations, deferred debt, Phase 2G recommendation) and `docs/reports/product-ux/ux-evidence/slice-h/`.
 
 ## 2026-07-31 — Slice G5 — the reminder lifecycle command boundary (UX-12, DEC-6, DEC-7)
 
@@ -580,7 +596,7 @@ Slice 2F.6 merged as **PR #33 → `7e3e5f0`**; **merge-SHA CI run `30520514810` 
 
 **The phase closes at 68 of 68 requirements delivered, eleven carrying a recorded note, and one operational partial.** `2F-OPERATIONS-002` is partial: reading every Phase 2F merge commit's CI directly found nine of ten green — one only after this closeout re-ran a run the workflow's own concurrency group had cancelled — and one, `6628b02`, a documentation-only acceptance merge, that never went green across two runs on two different pre-existing component flakes. The requirement says every slice PR's merge SHA, so the ledger says partial rather than complete.
 
-**`public.tasks` has exactly one validated write path in both the application and the database**, and `public.reminders` carries one bounded documented exception — both now held by a guard that reds the build if either becomes false. See `docs/reports/PHASE_2F_REPORT.md` and `docs/reports/PHASE_2F_SLICE_06_ACCEPTANCE.md`.
+**`public.tasks` has exactly one validated write path in both the application and the database**, and `public.reminders` carries one bounded documented exception — both now held by a guard that reds the build if either becomes false. See `docs/reports/phase-2f/PHASE_2F_REPORT.md` and `docs/reports/phase-2f/PHASE_2F_SLICE_06_ACCEPTANCE.md`.
 
 **Three deferrals proven to have held**, not assumed: no `create_reminder` RPC, no `_v2` of `create_task_command`, and `record_ai_usage` still at its ten unchanged arguments — the last read from PostgREST's published signature, because ADR-053 establishes that every route to persisted provenance runs through a signature change. ADR-057's reopening gate is intact.
 
@@ -588,9 +604,9 @@ Slice 2F.6 merged as **PR #33 → `7e3e5f0`**; **merge-SHA CI run `30520514810` 
 
 ## 2026-07-30 — Phase 2F Slice 2F.6: convergence and closeout (no migration, no deployment, no production write)
 
-Implemented on branch `codex/phase-2f-slice-6` under `docs/reports/PHASE_2F_SLICE_06_PRD.md`. Delivers `2F-OPERATIONS-003` through `006`, the whole-phase convergence audit and the phase's closeout record. **No migration, no RPC, no view, no grant, no policy, no trigger, no product module, no UI, no i18n key, and no write to any environment.** Remote parity `202607300063` before and after. The only SQL added is read-only pgTAP assertions inside a Phase 2F test file that already existed.
+Implemented on branch `codex/phase-2f-slice-6` under `docs/reports/phase-2f/PHASE_2F_SLICE_06_PRD.md`. Delivers `2F-OPERATIONS-003` through `006`, the whole-phase convergence audit and the phase's closeout record. **No migration, no RPC, no view, no grant, no policy, no trigger, no product module, no UI, no i18n key, and no write to any environment.** Remote parity `202607300063` before and after. The only SQL added is read-only pgTAP assertions inside a Phase 2F test file that already existed.
 
-- **`scripts/generate-phase-2f-traceability.mjs`** (`2F-OPERATIONS-003`) → the 68-row `docs/reports/PHASE_2F_TRACEABILITY_MATRIX.md`. It is the first generator in this repository that resolves what it declares rather than printing it: the inventory is parsed from PRD §6 by a declaration-anchored rule; ownership is derived from §7 as **two relations**, because the "Owns" column covers 61 of 68 and seven requirements are cross-cutting-only by design; every artifact path is resolved on disk and every `npm run` gate in `package.json`; migrations, ADR coverage and per-slice acceptance artifacts are read out of the repository; and CI gates resolve two ways — job-level to a workflow job *and step*, suite-level to a file that sits inside a path the workflow actually executes. That second leg makes ADR-059's hazard mechanical: a suite swept out of `vitest.config.ts` now reds the build instead of sitting committed and unexecuted.
+- **`scripts/generate-phase-2f-traceability.mjs`** (`2F-OPERATIONS-003`) → the 68-row `docs/reports/phase-2f/PHASE_2F_TRACEABILITY_MATRIX.md`. It is the first generator in this repository that resolves what it declares rather than printing it: the inventory is parsed from PRD §6 by a declaration-anchored rule; ownership is derived from §7 as **two relations**, because the "Owns" column covers 61 of 68 and seven requirements are cross-cutting-only by design; every artifact path is resolved on disk and every `npm run` gate in `package.json`; migrations, ADR coverage and per-slice acceptance artifacts are read out of the repository; and CI gates resolve two ways — job-level to a workflow job *and step*, suite-level to a file that sits inside a path the workflow actually executes. That second leg makes ADR-059's hazard mechanical: a suite swept out of `vitest.config.ts` now reds the build instead of sitting committed and unexecuted.
 - **`scripts/verify-phase-2f-cleanup.mjs`** (`2F-OPERATIONS-004`) — verification only and **write-free**. It states what each check can prove: every scanned table cascades from `auth.users`, so an orphan is structurally impossible and the scan detects only a dropped or `NOT VALID` key — now asserted in CI pgTAP so the impossibility is guarded rather than claimed. The load-bearing detectors are named instead: zero surviving fixture-prefix users, zero fixture objects in `user-files` (the storage scan the Phase 2E verifier had and the closeout draft had dropped), and per-table read reachability so "zero" can never mean "asked nothing". Fixture prefixes are read off the minting scripts — including `phase2f-gate3-`, which has no hyphen after `phase2f` and which a naive `phase-2f-` prefix would have missed. Both posture-protected tables must **refuse** a `service_role` read, and a successful read fails the run.
 - **Deferrals are proven to have held.** Through PostgREST's own OpenAPI definition — a GET reaching no function — `create_reminder` and `create_task_command_v2` are absent, and `ai_usage_events` carries no provenance column, checked as a pattern over the **live column set** rather than against a guessed name, because no provenance column name was ever declared. ADR-057's reopening gate is intact: script present, no transcript.
 - **The census needed a correction before it could be a stop-gate** (`2F-OPERATIONS-005`). It paged with `.range()` and no `order`, and `taskById` is what the two *blocking* buckets join against — so a skipped task page turned a real bucket-1 row into `TERMINAL_TASK_STATUSES.has(undefined)` and the gate failed **open**. Slice 2F.5 had fixed the same defect class in the funnel reader. Now a total order on the primary key with exhaustion asserted, bucket predicates extracted as pure functions with CI cases in both directions, a case asserting the file still issues no write, and the read-atomicity limitation printed by the census itself — two independent reads joined in memory are not a snapshot, so a nonzero blocking bucket needs a second confirming run before it escalates. Executed 2026-07-30T02:39:48Z: **buckets 1 and 2 zero**, bucket 7 zero and informational.
@@ -611,11 +627,11 @@ Merged as PR #31 → `2ae2606`; merge-SHA CI run `30506608871` green on all thre
 
 **ADR-055's expiry is dated.** Go-live is 2026-07-29, the merge date ADR-060 anchors on (`git show -s --format=%cs 2ae2606`), and the expiry is **2026-10-27** — computed by `expiryDateFromGoLive` rather than written by hand, and carried in `docs/TODO.md` for `2F-OPERATIONS-006` to verify at closeout. The slice needed two pull requests for exactly this reason: the merge date is not a fact while the implementation PR is open.
 
-Four independent adversarial review cycles are recorded in the PRD (§23, §23.1, §23.2, §23.3). The third found a blocking defect CI could not see — the end-to-end corpus never reached prefilter tier 2, and the case that was supposed to guarantee tier coverage asserted its own hand-written label. The fourth verified that fix in each of its six sub-checks and found five more accuracy defects. Zero fixture residue in the deployed project, proven by an independent probe. See `docs/reports/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
+Four independent adversarial review cycles are recorded in the PRD (§23, §23.1, §23.2, §23.3). The third found a blocking defect CI could not see — the end-to-end corpus never reached prefilter tier 2, and the case that was supposed to guarantee tier coverage asserted its own hand-written label. The fourth verified that fix in each of its six sub-checks and found five more accuracy defects. Zero fixture residue in the deployed project, proven by an independent probe. See `docs/reports/phase-2f/PHASE_2F_SLICE_05_ACCEPTANCE.md`.
 
 ## 2026-07-29 — Phase 2F Slice 2F.5: the command-funnel reader and the end-to-end match baseline (no migration)
 
-Implemented on branch `codex/phase-2f-slice-5` under `docs/reports/PHASE_2F_SLICE_05_PRD.md`. **No migration, no RPC, no view, no grant, no policy, no new product event, no allowlist change, no production module change, no UI, no i18n key.** `src/` gained exactly two test files. Remote parity is unchanged at `202607300063`.
+Implemented on branch `codex/phase-2f-slice-5` under `docs/reports/phase-2f/PHASE_2F_SLICE_05_PRD.md`. **No migration, no RPC, no view, no grant, no policy, no new product event, no allowlist change, no production module change, no UI, no i18n key.** `src/` gained exactly two test files. Remote parity is unchanged at `202607300063`.
 
 - **`scripts/phase-2f-command-funnel.mjs`** (2F-MEASURE-001…006) — owner-scoped, content-free aggregates over the already-emitted `task_command_*` events, plus both ADR-055 tiers and the expiry arithmetic. It lives in plain Node because it has two callers that cannot otherwise share one implementation: the Vitest suite that runs in CI with no network, and the runner that reads the deployed project. The twelve outcome members and the four event names are **read** out of TypeScript through the existing vocabulary parser; origins, apply routes and undo results are **mirrored**, because all three are declared on a single line and the shared parser needs one entry per line — a concession stated with a test that fails if a future edit makes them readable.
 - **The gate's arithmetic is exact where it matters.** `windowDays` is a ceiling, so fifty commands spread over a year cannot reach the reader's only authorizing verdict. `no_match` follows ADR-055's *final-outcome* definition through `min(creationOffered, created)`, which keeps the creation rate inside its own denominator and reports out-of-window creations as skew instead of a rate above 100%. Replayed creations are excluded — a double-submit must not move a gate. Both rate gates are decided by integer multiplication against declared fractions, and a zero denominator never satisfies one. The planning tier has **no branch** that returns `met`: `distinctUsers` is out of an owner-scoped reader's range and is reported as `null`, never inferred as one.
@@ -636,7 +652,7 @@ Implemented on branch `codex/phase-2f-slice-5` under `docs/reports/PHASE_2F_SLIC
 
 Migration `202607300063` applied to the linked project **18:38:20Z–18:38:28Z** via `npx supabase db push --linked` — exactly one migration, no manual intervention, all nine post-deploy assertion groups held. **Remote parity `202607290062` → `202607300063`.** Merged as PR #28 → `c174f8f`; merge-SHA CI run `30479818771` green on all three jobs.
 
-All sixteen acceptance gates passed. Live posture verified against the deployed project: `authenticated` holds `SELECT` only on `public.tasks` and `SELECT` + `INSERT` on `public.reminders`; `anon` holds nothing; RLS still enabled **and** forced with all 8 policies and 6 triggers intact; `create_due_task_reminder` still SECURITY INVOKER. Direct task INSERT/UPDATE/DELETE and reminder UPDATE/DELETE all return `42501` through PostgREST — **on a stale pre-migration session as well as a fresh one**, closing by measurement the schema-cache residual CI could not reach. 14/14 production-flow checks passed, including the retained Option C reminder INSERT, the cross-owner `23503` proof, read-side RLS in both directions, and the decisive juxtaposition: the same caller that creates a task through the validated contract is refused a direct INSERT. **No rollback was required or executed; the slice has no data residual.** See `docs/reports/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
+All sixteen acceptance gates passed. Live posture verified against the deployed project: `authenticated` holds `SELECT` only on `public.tasks` and `SELECT` + `INSERT` on `public.reminders`; `anon` holds nothing; RLS still enabled **and** forced with all 8 policies and 6 triggers intact; `create_due_task_reminder` still SECURITY INVOKER. Direct task INSERT/UPDATE/DELETE and reminder UPDATE/DELETE all return `42501` through PostgREST — **on a stale pre-migration session as well as a fresh one**, closing by measurement the schema-cache residual CI could not reach. 14/14 production-flow checks passed, including the retained Option C reminder INSERT, the cross-owner `23503` proof, read-side RLS in both directions, and the decisive juxtaposition: the same caller that creates a task through the validated contract is refused a direct INSERT. **No rollback was required or executed; the slice has no data residual.** See `docs/reports/phase-2f/PHASE_2F_SLICE_04_ACCEPTANCE.md`.
 
 **Gate 9 required a separate prerequisite fix, and the attribution matters.** Two assertions in `scripts/remote-supabase-smoke.mjs` were written by `5099f81` for a one-event AI-usage fixture and never updated when `6c4a907` (Slice 2E.1) added a second legitimate event — so the script aborted before reaching the downstream checks this slice depends on. **The defect predates Slice 2F.4**, which only made those checks matter for acceptance. Corrected in PR #29 → `ba63204`: one file, every value kept an exact equality, and the ownership check the stale count had rendered permanently unreachable now actually executes. No production source, database object, grant, RLS policy, trigger, RPC or pricing logic changed. `npm run test:remote` then passed exit 0 from merged main content, with zero residue.
 
@@ -659,7 +675,7 @@ Implemented on branch `codex/phase-2f-slice-4` under `docs/PHASE_2F_PRD.md` Revi
 
 - **Migration `202607290062_phase_2f_creation_origin.sql`** extends `public.create_task_command` with a trailing `p_created_by text default 'agent'` bounded to the column's closed domain, by drop-and-recreate under the same name in one transaction — not a `_v2`, because a trailing defaulted parameter is a compatible extension and a versioned pair would leave two live creation write paths. `private.undo_create_task_command`'s integrity guard widens body-only from `is distinct from 'agent'` to the bounded domain, so a user-created task's undo is functional rather than cosmetic. The same migration admits one bare-creation action, `create_title_only`, whose expected patch-key set is empty — the manual form expresses a title and nothing else, and all seven qualifier-bearing actions require their exact patch key.
 - **`createRecord`'s task branch routes through the creation family** and its direct INSERT is deleted, taking the architecture gate's `tasks` allowlist to **empty**.
-- **Deployed 2026-07-29**, moving remote parity `202607280061` → `202607290062`. All 21 deployment-session gates executed and passed, including manual creation through the rendered form persisting `created_by = 'user'` with audit actor `'user'`, an executed undo of a user-origin task, the two-owner creation probe, replay idempotency, and zero fixture residue. See `docs/reports/PHASE_2F_SLICE_03_ACCEPTANCE.md`.
+- **Deployed 2026-07-29**, moving remote parity `202607280061` → `202607290062`. All 21 deployment-session gates executed and passed, including manual creation through the rendered form persisting `created_by = 'user'` with audit actor `'user'`, an executed undo of a user-origin task, the two-owner creation probe, replay idempotency, and zero fixture residue. See `docs/reports/phase-2f/PHASE_2F_SLICE_03_ACCEPTANCE.md`.
 
 ## 2026-07-29 — Phase 2F Slice 2F.2: Work-surface mutation convergence (code only, no migration)
 
@@ -717,11 +733,11 @@ Two documentation commits were made during merge preparation and are part of the
 
 ## 2026-07-28 — Phase 2E Slice 2E.8: convergence and closeout (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/PHASE_2E_FINAL_REPORT.md` and `docs/reports/PHASE_2E_SLICE_08_REPORT.md`.
+Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no migration is added** — its database footprint is zero, which is why the pgTAP count is expected to hold at `Files=30, Tests=1277`. Normative contract: `docs/PHASE_2E_PRD.md` §9 (Epic 2E-H), §13.14, §19.1, §19.3. See `docs/reports/phase-2e/PHASE_2E_FINAL_REPORT.md` and `docs/reports/phase-2e/PHASE_2E_SLICE_08_REPORT.md`.
 
 ### Added
 
-- **`scripts/generate-phase-2e-traceability.mjs` and `docs/reports/PHASE_2E_TRACEABILITY_MATRIX.md`** — 135 mapped rows: 122 requirement IDs across 16 families, 8 epic acceptance criteria, 5 global gates. **Phase 2E closes with 118 of 122 delivered and 4 not** — `2E-COMMAND-012` reclassified to Phase 2F, and `2E-OPERATIONS-003`/`2E-OPERATIONS-004`/`2E-OWNERSHIP-004`'s remote half blocked on deployment authorization. `2E-MATCH-018` is counted as delivered and carries a scope note, because its own text is satisfied. The generator fails closed on any inventory drift, and that was **tested rather than asserted**: four tamper runs (drop a requirement, add one to a family, introduce a new family, remove an epic bullet) all threw, with the PRD byte-identical afterwards. Phase 2E is the first phase whose families carry digits (`2E-I18N`, `2E-A11Y`), so the family regex is `[A-Z0-9]+` — a letters-only class silently drops seven requirements and still emits a well-formed matrix, which is why the expected total is 122 and not 115.
+- **`scripts/generate-phase-2e-traceability.mjs` and `docs/reports/phase-2e/PHASE_2E_TRACEABILITY_MATRIX.md`** — 135 mapped rows: 122 requirement IDs across 16 families, 8 epic acceptance criteria, 5 global gates. **Phase 2E closes with 118 of 122 delivered and 4 not** — `2E-COMMAND-012` reclassified to Phase 2F, and `2E-OPERATIONS-003`/`2E-OPERATIONS-004`/`2E-OWNERSHIP-004`'s remote half blocked on deployment authorization. `2E-MATCH-018` is counted as delivered and carries a scope note, because its own text is satisfied. The generator fails closed on any inventory drift, and that was **tested rather than asserted**: four tamper runs (drop a requirement, add one to a family, introduce a new family, remove an epic bullet) all threw, with the PRD byte-identical afterwards. Phase 2E is the first phase whose families carry digits (`2E-I18N`, `2E-A11Y`), so the family regex is `[A-Z0-9]+` — a letters-only class silently drops seven requirements and still emits a well-formed matrix, which is why the expected total is 122 and not 115.
 - **`scripts/verify-phase-2e-cleanup.mjs`** — residual-data check over 18 owned tables, adding `task_command_confirmations`, `reminders`, `undo_operations` and `ai_usage_events` to the inherited set. Passes against the live linked project.
 - **`scripts/remote-phase-2e-smoke.mjs`** — the aggregate two-owner remote smoke (2E-OPERATIONS-003/004). Drain-safe by construction: it creates **no entries**, so no `interpret_entry` job is enqueued and the per-minute `pg_cron`/`pg_net` drain has nothing to race. Its preflight runs today and exits **2** with `BLOCKED ON DEPLOYMENT`, deliberately distinct from an assertion failure (exit 1).
 - **npm scripts** `docs:phase-2e:traceability`, `test:remote:2e`, `test:remote:2e:cleanup`.
@@ -740,7 +756,7 @@ Epic 2E-H, and the last slice of Phase 2E. **No product behaviour changes and no
 
 ## 2026-07-28 — Phase 2E Slice 2E.7: conversational and task-surface integration (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/PHASE_2E_SLICE_07_REPORT.md`.
+Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E.6 built the schema, the matcher, the preview, the mutation RPC, the confirmation ledger and the creation RPC, and left every one of them without a production caller. This slice is that caller. Migration `202607280061` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.12, §13.13, §12.1–12.7, §19.1 (Epic 2E-G). See ADR-050, ADR-051, ADR-052 and `docs/reports/phase-2e/PHASE_2E_SLICE_07_REPORT.md`.
 
 ### Added
 
@@ -773,7 +789,7 @@ Epic 2E-G. **The phase gets its first user-visible behaviour.** Slices 2E.1–2E
 
 ## 2026-07-27 — Phase 2E Slice 2E.6: no-match activity creation (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `291cc75`, which touched only `PHASE_2E_PROGRESS.md` and that slice's report — so this entry, and the `STATE.md`/`TODO.md` entries beside it, are Slice 2E.7's documentation catch-up rather than same-commit records. The gap is stated rather than backdated. Migration `202607270060` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.7, §12.4, §12.5, §19.1 (Epic 2E-F). See `docs/reports/PHASE_2E_SLICE_06_REPORT.md`.
+Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `291cc75`, which touched only `PHASE_2E_PROGRESS.md` and that slice's report — so this entry, and the `STATE.md`/`TODO.md` entries beside it, are Slice 2E.7's documentation catch-up rather than same-commit records. The gap is stated rather than backdated. Migration `202607270060` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.7, §12.4, §12.5, §19.1 (Epic 2E-F). See `docs/reports/phase-2e/PHASE_2E_SLICE_06_REPORT.md`.
 
 ### Added
 
@@ -791,7 +807,7 @@ Epic 2E-F. **Recorded late.** Slice 2E.6 was accepted on 2026-07-27 in commit `2
 
 ## 2026-07-27 — Phase 2E Slice 2E.5: destructive actions and confirmation (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `cancel_task` is gated on a server-issued, single-use confirmation the database enforces; `restore_task` is gated on two collision guards. **Still no UI, route, Server Action, product event or model call** — nothing calls either RPC; the consumer is Slice 2E.7. Migration `202607260059` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.6, §11.2, §11.3, §12.3, §19.1 (Epic 2E-E). See ADR-047, ADR-048, ADR-049 and `docs/reports/PHASE_2E_SLICE_05_REPORT.md`.
+Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `cancel_task` is gated on a server-issued, single-use confirmation the database enforces; `restore_task` is gated on two collision guards. **Still no UI, route, Server Action, product event or model call** — nothing calls either RPC; the consumer is Slice 2E.7. Migration `202607260059` is **local only**; remote parity stays at `202607250054`. Normative contract: `docs/PHASE_2E_PRD.md` §13.6, §11.2, §11.3, §12.3, §19.1 (Epic 2E-E). See ADR-047, ADR-048, ADR-049 and `docs/reports/phase-2e/PHASE_2E_SLICE_05_REPORT.md`.
 
 ### Added
 
@@ -824,7 +840,7 @@ Epic 2E-E. **All fifteen actions of PRD §11.2 are now enabled on one RPC.** `ca
 - **`2E_CANDIDATE_REMATERIALIZED`, `private.task_candidate_slot_taken`, both collision guards, both `unique_violation` traps, and the pgTAP section that exercised them.** The slice briefly claimed a *second* collision: that `202607220040` made candidate identity unique only over non-cancelled rows and `confirm_entry_task_candidates_v6` writes no ledger row for a confirmed candidate, so cancelling frees the candidate slot and a re-confirmed duplicate makes the later restore a bare `23505`. The second half is true of the RPC and **false of the system** — `public.record_entry_task_candidate_confirmation` (`202607220041:299-364`) is an `after insert or update` trigger on `public.tasks` that writes exactly that row, which is why v6 does not; it survives the cancellation and `2C_TERMINAL_DISPOSITION` reads it, so the duplicate cannot be created. The one path that frees the slot is a creation-undo, already refused earlier by `2E_CREATION_UNDONE`. A five-lens adversarial review of the shipped code found it, four lenses independently. Removed rather than kept as defence in depth, per ADR-049 — the doctrine this same slice wrote. In its place both the migration and the suite assert that the trigger still exists, since it is now the load-bearing reason no guard is needed. See ADR-048's withdrawal note.
 ## 2026-07-26 — Phase 2E Slice 2E.4: reversible non-destructive updates (branch `codex/phase-2e-natural-language-task-updates`)
 
-Epic 2E-D. **The first RPC in this codebase that mutates an existing task.** Thirteen of the fifteen actions are enabled; `cancel_task` and `restore_task` are refused with the declared code `2E_ACTION_NOT_ENABLED` (Slice 2E.5). **Still no UI, route, Server Action, product event or model call** — nothing calls the RPC; its consumer is Slice 2E.7. Migration `202607260058` is **local only**; remote parity stays at `202607250054`. All three CI jobs green on `bfa28a1` (run `30227374101`), pgTAP `Files=28, Tests=1059, Result: PASS`. Normative contract: `docs/PHASE_2E_PRD.md` §13.5, §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D). See ADR-044, ADR-045, ADR-046 and `docs/reports/PHASE_2E_SLICE_04_REPORT.md`. **Acceptance is pending one owed review round** — see that report's §9.3 and §11.
+Epic 2E-D. **The first RPC in this codebase that mutates an existing task.** Thirteen of the fifteen actions are enabled; `cancel_task` and `restore_task` are refused with the declared code `2E_ACTION_NOT_ENABLED` (Slice 2E.5). **Still no UI, route, Server Action, product event or model call** — nothing calls the RPC; its consumer is Slice 2E.7. Migration `202607260058` is **local only**; remote parity stays at `202607250054`. All three CI jobs green on `bfa28a1` (run `30227374101`), pgTAP `Files=28, Tests=1059, Result: PASS`. Normative contract: `docs/PHASE_2E_PRD.md` §13.5, §13.8–§13.11, §11.2, §11.3, §19.1 (Epic 2E-D). See ADR-044, ADR-045, ADR-046 and `docs/reports/phase-2e/PHASE_2E_SLICE_04_REPORT.md`. **Acceptance is pending one owed review round** — see that report's §9.3 and §11.
 
 ### Added
 
@@ -864,7 +880,7 @@ Five lenses over the migration, the pgTAP suite and the TypeScript together, eve
 
 ## 2026-07-26 — Phase 2E Slice 2E.3: disambiguation and read-only preview (branch `codex/phase-2e-natural-language-task-updates`)
 
-The projection half of Epic 2E-C. **No mutation, no UI, no route, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the preview, the disambiguation projection or the fingerprint; their consumers are Slices 2E.4/2E.5/2E.7. `202607250056` was **amended in place, twice** — the window Slice 2E.2 deliberately kept open for its first consumer, now **closed by exhaustion**; `202607250057` is new. Both are **local only** — remote parity stays at `202607250054`, and deployment stays deliberately deferred. Normative contract: `docs/PHASE_2E_PRD.md` §13.3, §13.4, §19.1 (Epic 2E-C), §11.2, §11.3. See ADR-042, ADR-043 and `docs/reports/PHASE_2E_SLICE_03_REPORT.md`. **The `database` job passed on `c50960b` but has not been executed on `4f9aff8`, so the slice verdict is conditional on that gate.**
+The projection half of Epic 2E-C. **No mutation, no UI, no route, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the preview, the disambiguation projection or the fingerprint; their consumers are Slices 2E.4/2E.5/2E.7. `202607250056` was **amended in place, twice** — the window Slice 2E.2 deliberately kept open for its first consumer, now **closed by exhaustion**; `202607250057` is new. Both are **local only** — remote parity stays at `202607250054`, and deployment stays deliberately deferred. Normative contract: `docs/PHASE_2E_PRD.md` §13.3, §13.4, §19.1 (Epic 2E-C), §11.2, §11.3. See ADR-042, ADR-043 and `docs/reports/phase-2e/PHASE_2E_SLICE_03_REPORT.md`. **The `database` job passed on `c50960b` but has not been executed on `4f9aff8`, so the slice verdict is conditional on that gate.**
 
 ### Added
 
@@ -900,7 +916,7 @@ The review also named the two assertions that let both Criticals hide: the relat
 
 ## 2026-07-25 - Phase 2E Slice 2E.2: deterministic matching and margins (branch `codex/phase-2e-natural-language-task-updates`)
 
-The read half of natural-language task matching. **No mutation, no UI, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the new RPC; its first consumer is Slice 2E.3's preview. Migration `202607250056` is **local only** - remote parity stays at `202607250054`, and deployment is deliberately deferred until the first consumer proves the projection sufficient (`42P13` makes a `RETURNS TABLE` shape permanent once deployed). Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-B. See ADR-040, ADR-041 and `docs/reports/PHASE_2E_SLICE_02_REPORT.md`.
+The read half of natural-language task matching. **No mutation, no UI, no Server Action, no product event, no model call, and no user-visible behaviour change.** Nothing calls the new RPC; its first consumer is Slice 2E.3's preview. Migration `202607250056` is **local only** - remote parity stays at `202607250054`, and deployment is deliberately deferred until the first consumer proves the projection sufficient (`42P13` makes a `RETURNS TABLE` shape permanent once deployed). Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-B. See ADR-040, ADR-041 and `docs/reports/phase-2e/PHASE_2E_SLICE_02_REPORT.md`.
 
 ### Added
 
@@ -921,7 +937,7 @@ The read half of natural-language task matching. **No mutation, no UI, no Server
 
 ## 2026-07-25 - Phase 2E Slice 2E.1: bounded task command contract (branch `codex/phase-2e-natural-language-task-updates`)
 
-The first slice of Phase 2E - Natural-Language Task Updates. **Contract only: no task search, no matching, no mutation, no RPC, no UI, no Server Action, no product event, and no user-visible behaviour change.** `AIProvider.parseTaskCommand` has no production caller yet; its first consumer is Slice 2E.7. Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-A. See ADR-039 and `docs/reports/PHASE_2E_SLICE_01_REPORT.md`.
+The first slice of Phase 2E - Natural-Language Task Updates. **Contract only: no task search, no matching, no mutation, no RPC, no UI, no Server Action, no product event, and no user-visible behaviour change.** `AIProvider.parseTaskCommand` has no production caller yet; its first consumer is Slice 2E.7. Normative contract: `docs/PHASE_2E_PRD.md` Epic 2E-A. See ADR-039 and `docs/reports/phase-2e/PHASE_2E_SLICE_01_REPORT.md`.
 
 ### Added
 
@@ -952,7 +968,7 @@ All found by independent review, all proven by executing the code, all introduce
 
 ## 2026-07-25 — Pre-Phase-2E foundation hardening (branch `codex/pre-2e-foundation-hardening`)
 
-One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md`, between Phase 2D and Phase 2E. **No Phase 2E product functionality.** Full finding-by-finding disposition — accepted, modified, deferred, rejected — in `docs/reports/PRE_2E_FOUNDATION_HARDENING_REPORT.md`. ADR-035 (undo handler architecture), ADR-036 (canonical localization), ADR-037 (RPC retirement policy), ADR-038 (CI database/worker verification).
+One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md`, between Phase 2D and Phase 2E. **No Phase 2E product functionality.** Full finding-by-finding disposition — accepted, modified, deferred, rejected — in `docs/reports/pre-2e/PRE_2E_FOUNDATION_HARDENING_REPORT.md`. ADR-035 (undo handler architecture), ADR-036 (canonical localization), ADR-037 (RPC retirement policy), ADR-038 (CI database/worker verification).
 
 ### Added
 
@@ -994,10 +1010,10 @@ One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md
 ### Added
 
 - `scripts/generate-phase-2d-traceability.mjs` (`npm run docs:phase-2d:traceability`) — parses the PRD's 58 `2D-<FAMILY>-NNN` functional/non-functional requirement IDs (15 families), 6 per-epic acceptance criteria (§19.1), and 5 global gates (§19.2), maps each to its owning slice(s) and durable evidence, and **fails closed** if the inventory or any per-family count drifts. Verified: a deliberately injected extra requirement makes it exit non-zero (59 ≠ 58), and the PRD restores byte-identical.
-- `docs/reports/PHASE_2D_TRACEABILITY_MATRIX.md` — 69 generated rows (58 requirements + 6 epics + 5 gates). No requirement is represented as non-green: the deterministic suggested-answer path fully satisfies `2D-SUGGEST-002`/`2D-OPERATIONS-003` (the AI extraction-schema field they name is an explicitly deferred, separately-authorized fallback that was not needed), and the `2C-UNDO-004` hard gate behind `2D-ACTION-006`/`2D-UNDO-003` is resolved by migration `202607230050`.
+- `docs/reports/phase-2d/PHASE_2D_TRACEABILITY_MATRIX.md` — 69 generated rows (58 requirements + 6 epics + 5 gates). No requirement is represented as non-green: the deterministic suggested-answer path fully satisfies `2D-SUGGEST-002`/`2D-OPERATIONS-003` (the AI extraction-schema field they name is an explicitly deferred, separately-authorized fallback that was not needed), and the `2C-UNDO-004` hard gate behind `2D-ACTION-006`/`2D-UNDO-003` is resolved by migration `202607230050`.
 - `scripts/verify-phase-2d-cleanup.mjs` (`npm run test:remote:2d:cleanup`) — fail-closed residual-data check across Auth users (Phase 2D fixture prefixes `phase-2d-resolution-`/`-preview-`/`-reinterpret-` plus adjacent smoke prefixes), 14 owner-scoped tables (adding `entry_interpretations` to the Phase 2C set — `pending_questions` was already scanned — since reinterpretation appends an immutable interpretation revision), and remote-smoke storage objects.
 - `test:remote:2d` aggregate (`remote-supabase-smoke.mjs --phase-2d`) — a deterministic, fail-fast sequence: question-resolution (v1/v2 answer + dispositions), suggested-answer/preview, reinterpretation (v3), content-free resolution analytics, and residual-data cleanup. The daily-cycle smoke is intentionally excluded (its needs-attention section claims an `interpret_entry` job that races the unattended `pg_cron` drain) and remains runnable standalone and inside `test:remote:2x`.
-- `docs/reports/PHASE_2D_SLICE_06_REPORT.md` (this slice's acceptance report) and `docs/PHASE_2D_REPORT.md` (phase-level closeout handoff).
+- `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md` (this slice's acceptance report) and `docs/PHASE_2D_REPORT.md` (phase-level closeout handoff).
 
 ### Changed
 
@@ -1007,7 +1023,7 @@ One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md
 
 ### Notes
 
-- **No migration, RPC, or product/UI source change.** The convergence audit confirmed every actionable-question reader already shares `actionablePendingQuestionFilter` (mirrored in SQL by `list_needs_attention`) and the single `resolvePendingQuestion`/`undoQuestionResolution` contract, so no drift required a product fix. The closeout scripts are node-only with no runtime coupling. Local/remote parity is preserved through `202607230051`; generated types are unchanged. Branch `codex/phase-2d-slice-6`, base `62883af` (Slice 2D.5 merge / PR #15). See `docs/reports/PHASE_2D_SLICE_06_REPORT.md` and ADR-034.
+- **No migration, RPC, or product/UI source change.** The convergence audit confirmed every actionable-question reader already shares `actionablePendingQuestionFilter` (mirrored in SQL by `list_needs_attention`) and the single `resolvePendingQuestion`/`undoQuestionResolution` contract, so no drift required a product fix. The closeout scripts are node-only with no runtime coupling. Local/remote parity is preserved through `202607230051`; generated types are unchanged. Branch `codex/phase-2d-slice-6`, base `62883af` (Slice 2D.5 merge / PR #15). See `docs/reports/phase-2d/PHASE_2D_SLICE_06_REPORT.md` and ADR-034.
 
 ## 2026-07-24 — Phase 2D Slice 2D.5: conversational surfacing (Chat + queue) and cooldown (branch, not merged)
 
@@ -1025,7 +1041,7 @@ One consolidated initiative against `docs/reviews/ARCHITECTURE_REVIEW_2026_07.md
 
 ### Notes
 
-- **No migration.** No table, column, RPC, constraint, or product-event name/surface changed; generated types are unchanged; local/remote parity is preserved through `202607230051`. The resolution, reinterpretation, undo, and analytics contracts of 2D.1–2D.4 are reused byte-for-byte. Verified: ESLint clean, TypeScript clean, Vitest 902/902, production build green, linked DB lint (`--level error`) clean, authenticated Playwright desktop + Pixel 7 green (new journey + regressions). Branch `codex/phase-2d-slice-5`, base `218e56e` — not pushed, no PR, not deployed. See `docs/reports/PHASE_2D_SLICE_05_REPORT.md`.
+- **No migration.** No table, column, RPC, constraint, or product-event name/surface changed; generated types are unchanged; local/remote parity is preserved through `202607230051`. The resolution, reinterpretation, undo, and analytics contracts of 2D.1–2D.4 are reused byte-for-byte. Verified: ESLint clean, TypeScript clean, Vitest 902/902, production build green, linked DB lint (`--level error`) clean, authenticated Playwright desktop + Pixel 7 green (new journey + regressions). Branch `codex/phase-2d-slice-5`, base `218e56e` — not pushed, no PR, not deployed. See `docs/reports/phase-2d/PHASE_2D_SLICE_05_REPORT.md`.
 
 ## 2026-07-24 — Phase 2D Slice 2D.4: confirmed consequence / reinterpretation (branch, not merged)
 
@@ -1108,10 +1124,10 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 ### Added
 
-- `scripts/generate-phase-2c-traceability.mjs` (`npm run docs:phase-2c:traceability`) parses `docs/PHASE_2C_PRD.md` and emits `docs/reports/PHASE_2C_TRACEABILITY_MATRIX.md` — 83 rows mapping all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates to owning slice(s) and durable evidence. Fails closed if the PRD inventory or any per-family count drifts, and never marks the two non-green requirements (`2C-STRUCTURE-004` deferred split/merge, `2C-UNDO-004` `undo_operation` residual risk) as complete.
+- `scripts/generate-phase-2c-traceability.mjs` (`npm run docs:phase-2c:traceability`) parses `docs/PHASE_2C_PRD.md` and emits `docs/reports/phase-2c/PHASE_2C_TRACEABILITY_MATRIX.md` — 83 rows mapping all 72 functional/non-functional requirement IDs (14 families), 6 per-epic acceptance criteria, and 5 global gates to owning slice(s) and durable evidence. Fails closed if the PRD inventory or any per-family count drifts, and never marks the two non-green requirements (`2C-STRUCTURE-004` deferred split/merge, `2C-UNDO-004` `undo_operation` residual risk) as complete.
 - `scripts/verify-phase-2c-cleanup.mjs` (`npm run test:remote:2c:cleanup`) — fail-closed residual-data check across Auth users, 13 owner-scoped tables (including the Phase 2C `task_projects`/`task_contexts`/`task_people`/`task_dependencies`/`entry_task_candidate_resolutions` tables), and `user-files` storage.
 - `test:remote:2c` aggregate (`remote-supabase-smoke.mjs --phase-2c`): a deterministic, fail-fast sequence of editable-candidate confirmation (v2–v6), candidate-analytics product events, and residual-data cleanup, plus the focused `test:remote:2c:confirmation` alias.
-- `docs/reports/PHASE_2C_SLICE_06_REPORT.md` and `docs/PHASE_2C_REPORT.md` (phase-level closeout).
+- `docs/reports/phase-2c/PHASE_2C_SLICE_06_REPORT.md` and `docs/PHASE_2C_REPORT.md` (phase-level closeout).
 
 ### Changed
 
@@ -1147,7 +1163,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - The new 34-assertion pgTAP suite passed 34/34 online; seven earlier relevant candidate suites were re-run and passed after the two stale-bound assertions were corrected. The disposable remote smoke passed 29/29 with zero remaining users/fixtures and preserved pre-existing Auth IDs/table counts.
 - Vitest passed 85 files/714 tests (up from 693); lint, typecheck, and the production build passed. The deterministic disposition Playwright spec (now exercising the v6 live path) passed 4/4 (PT-BR/en × desktop/Pixel 7). The full real-AI serial `intelligent-capture` journey and the `online-auth`/`online-mobile-navigation` specs continue to fail from pre-existing causes unchanged from `main` (worker/OpenAI latency and auth rate-limiting) — none touch the graph confirmation path.
 - Independent review of the complete branch diff found no Critical/Important issue. The branch remains local: no push, PR, merge, or application deployment.
-- See `docs/reports/PHASE_2C_SLICE_05_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
+- See `docs/reports/phase-2c/PHASE_2C_SLICE_05_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
 
 ## 2026-07-22 — Phase 2C Slice 2C.4: candidate dispositions (branch, not merged)
 
@@ -1178,7 +1194,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Seven relevant linked pgTAP suites passed 290/290. The disposable remote smoke passed 24/24 with zero remaining users/fixtures and preserved pre-existing Auth IDs/table counts.
 - Playwright passed 4/4 (PT-BR/en × desktop/Pixel 7). Vitest passed 85 files/693 tests; lint, typecheck, and the production build passed.
 - Independent final review approved the complete branch diff with no Critical/Important finding. The branch remains local: no push, PR, merge, or application deployment.
-- See `docs/reports/PHASE_2C_SLICE_04_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
+- See `docs/reports/phase-2c/PHASE_2C_SLICE_04_REPORT.md` for the complete contract, evidence, rollback state, and non-blocking notes.
 
 ## 2026-07-22 — Phase 2C Slice 2C.3: owned relations (branch, not merged)
 
@@ -1311,7 +1327,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 ### Known gap
 
-- The PRD §14 / implementation-plan Task 5 analytics extension — `candidate_edit_started`, `candidate_edit_reset` events, and `editedCandidateCount`/`editedFieldCount` on `task_candidates_confirmed` — was not implemented in this slice; `task_candidates_confirmed` currently records only `candidateCount`. See `docs/reports/PHASE_2C_SLICE_01_FINAL_ACCEPTANCE.md`.
+- The PRD §14 / implementation-plan Task 5 analytics extension — `candidate_edit_started`, `candidate_edit_reset` events, and `editedCandidateCount`/`editedFieldCount` on `task_candidates_confirmed` — was not implemented in this slice; `task_candidates_confirmed` currently records only `candidateCount`. See `docs/reports/phase-2c/PHASE_2C_SLICE_01_FINAL_ACCEPTANCE.md`.
 
 ### Verification
 
@@ -1345,7 +1361,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - `test:remote:2x`, a sequential fail-fast aggregate covering jobs, interpretation revisions, product events, entry processing, daily-cycle behavior, the complete Supabase baseline, and residual-data cleanup.
 - `test:remote:2x:cleanup`, a read-only linked verifier for disposable Auth prefixes, owner-row orphans, and storage leftovers.
 - Remote entry-worker assertions for persisted completion events, same-attempt deduplication, distinct reprocessing-attempt events, and unattended scheduled drain when the worker secret is not locally readable.
-- A reproducible 283-row PRD traceability annex plus sanitized deployment/parity/Auth/cleanup evidence, alongside `docs/reports/PHASE_2X_SLICE_18_REPORT.md` and the complete `docs/PHASE_2X_REPORT.md` crosswalk.
+- A reproducible 283-row PRD traceability annex plus sanitized deployment/parity/Auth/cleanup evidence, alongside `docs/reports/phase-2x/PHASE_2X_SLICE_18_REPORT.md` and the complete `docs/PHASE_2X_REPORT.md` crosswalk.
 
 ### Changed
 
@@ -1370,7 +1386,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 - Deterministic coverage for basic pending question, recoverable retry, and terminal retry in `e2e/intelligent-capture.spec.ts` — previously entirely absent, since these entry states are not reliably reachable through real, unambiguous AI extraction. Uses already-granted `authenticated` RPCs (`begin_entry_interpretation`, `fail_entry_interpretation`, `persist_entry_interpretation`, `begin_entry_reprocessing`, `persist_reprocessed_entry_interpretation`) to force the exact state directly, the same technique the existing suite already used for forcing an unconfirmed candidate.
 - Keyboard/focus/live-region/touch-target assertions on the entry-review page's progressive disclosure (native `<details>` technical panel, retry control).
-- `docs/reports/PHASE_2X_SLICE_17_REPORT.md` with full scope, RED/GREEN evidence, and rollback.
+- `docs/reports/phase-2x/PHASE_2X_SLICE_17_REPORT.md` with full scope, RED/GREEN evidence, and rollback.
 
 ### Changed
 
@@ -1392,7 +1408,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 - `src/features/daily-cycle/home-projection.ts` (`loadHomeSupplementalProjection`): a minimal `server-only` module owning Home's waiting-count and newest-open-question queries, explicitly owner-scoped.
 - `src/features/daily-cycle/architecture.test.ts`: a table-driven architecture guardrail asserting forbidden/required source patterns (no `database.types`, no raw `.from()` table calls, no raw enum/score rendering) across Home, Caixa, Work, the entry review, and the candidate-confirmation form.
-- `docs/reports/PHASE_2X_SLICE_16_REPORT.md` with full scope, evidence, and rollback.
+- `docs/reports/phase-2x/PHASE_2X_SLICE_16_REPORT.md` with full scope, evidence, and rollback.
 
 ### Changed
 
@@ -1417,7 +1433,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - A closed browser interaction boundary for capture intent, confirmed views, item opens and technical disclosure, with per-tab session identity, logical deduplication and no arbitrary client event names.
 - Deterministic UUID idempotency keys for domain and worker outcomes, plus owner-scoped worker emission after persisted completion/failure.
 - Complete focused tests, a 17-event authenticated remote smoke, safe bounded conversion/latency checks and owner-token-only Playwright event-name/count assertions.
-- The durable trigger/subject/payload/failure inventory in `docs/reports/PHASE_2X_SLICE_15_REPORT.md`.
+- The durable trigger/subject/payload/failure inventory in `docs/reports/phase-2x/PHASE_2X_SLICE_15_REPORT.md`.
 
 ### Changed
 
@@ -1440,7 +1456,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - A static capability registry that records each authenticated product promise as operational, informational, advanced, or future, with its visible surface and consumer evidence.
 - Owner-scoped server-only Settings and Reviews projections that return localized product DTOs and fail closed on unsupported persisted values.
 - Home operational status derived from the existing Inbox and Needs Attention projections, plus PT-BR/English lexical and product-contract tests.
-- The permanent capability inventory in `docs/PHASE_2X_REPORT.md` and execution evidence in `docs/reports/PHASE_2X_SLICE_14_REPORT.md`.
+- The permanent capability inventory in `docs/PHASE_2X_REPORT.md` and execution evidence in `docs/reports/phase-2x/PHASE_2X_SLICE_14_REPORT.md`.
 
 ### Changed
 
@@ -1583,7 +1599,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 
 ### Fixed
 
-- The architecture review of Slices 2X.5–2X.8 (`docs/reports/PHASE_2X_SLICES_2X5_2X8_ARCHITECTURE_REVIEW.md`, finding F1) found that `hasMaterializedTaskForCandidates` — the lifecycle input that decides whether an entry's `productState` can resolve to `ready` — was computed entry-wide in both `src/features/daily-cycle/inbox-projection.ts` and `src/features/daily-cycle/review-projection.ts` ("does any non-cancelled task exist for this entry") instead of interpretation/candidate-scoped ("does every one of the current interpretation's task candidates already have a matching materialized task"). Confirming only one of two candidates from a single, uncorrected interpretation made the entry read `ready` on Inbox/Home/entry-detail while the still-unconfirmed second candidate remained visible in `TaskCandidateForm` — a status badge, an available-actions list, and a rendered form disagreeing about the same entry. `lifecycle.ts` itself was already correctly specified (verified by its own unit tests); only the two loaders computed its input incorrectly.
+- The architecture review of Slices 2X.5–2X.8 (`docs/reports/phase-2x/PHASE_2X_SLICES_2X5_2X8_ARCHITECTURE_REVIEW.md`, finding F1) found that `hasMaterializedTaskForCandidates` — the lifecycle input that decides whether an entry's `productState` can resolve to `ready` — was computed entry-wide in both `src/features/daily-cycle/inbox-projection.ts` and `src/features/daily-cycle/review-projection.ts` ("does any non-cancelled task exist for this entry") instead of interpretation/candidate-scoped ("does every one of the current interpretation's task candidates already have a matching materialized task"). Confirming only one of two candidates from a single, uncorrected interpretation made the entry read `ready` on Inbox/Home/entry-detail while the still-unconfirmed second candidate remained visible in `TaskCandidateForm` — a status badge, an available-actions list, and a rendered form disagreeing about the same entry. `lifecycle.ts` itself was already correctly specified (verified by its own unit tests); only the two loaders computed its input incorrectly.
 - Both loaders now derive `hasMaterializedTaskForCandidates` from the same interpretation-scoped source `review-projection.ts` already used correctly for `actionableCandidates`: a new pure helper `hasUnconfirmedTaskCandidates(candidateCount, unavailableCandidateIndexes)` (`src/features/interpretations/data.ts`, colocated with `computeUnavailableCandidateIndexes`) returns whether any candidate index in `[0, candidateCount)` is missing from the already-covered set. `review-projection.ts`'s `loadEntryReviewProjection` now feeds it the `unavailableCandidateIndexes` `loadInterpretationReview` already computes. `inbox-projection.ts`'s `tasks` query now additionally selects `source_interpretation_id`/`candidate_index` (previously only `source_entry_id`), groups tasks per entry, and runs `computeUnavailableCandidateIndexes` per entry against that entry's `current_interpretation_id` before the same helper decides coverage. Neither `lifecycle.ts`, `resolveDailyCycleLifecycle`'s contract, candidate confirmation semantics, `TaskCandidateForm`, nor any RPC/migration changed.
 
 ### Added
@@ -1599,7 +1615,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Offline Playwright (`desktop`+`mobile`): 4/4 passing, 10 expected online skips — unchanged from the Slice 2X.8 baseline.
 - No migration, RPC, or schema change — `tasks.source_interpretation_id`/`candidate_index` already existed and were already read by `interpretations/data.ts`. Local/remote migrations remain synchronized through `029`.
 - `git diff --check`: clean (only pre-existing LF/CRLF advisories).
-- Full report: `docs/reports/PHASE_2X_CANDIDATE_LIFECYCLE_HOTFIX_REPORT.md`.
+- Full report: `docs/reports/phase-2x/PHASE_2X_CANDIDATE_LIFECYCLE_HOTFIX_REPORT.md`.
 
 ## 2026-07-18 — Phase 2X Slice 2X.8 separated review and technical-details projections
 
@@ -1638,7 +1654,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - `src/features/interpretations/actions.test.ts`: a new case asserting the `55P03` conflict maps to the same localized "reload and retry" message.
 - `supabase/tests/interpretation_revisions.sql`: two new pgTAP assertions (plan raised to 46) confirming `correct_entry_interpretation`'s published body raises `55P03` for the version-conflict message and no longer contains an `errcode = '40001'` raise.
 - `scripts/remote-interpretation-revisions-smoke.mjs`: the existing concurrent-correction race now asserts a bounded elapsed time (< 15s, actually observed ~530ms), the `55P03` SQLSTATE on the losing call, that the interpretation-row count advanced by exactly one (no partial write from the rejected side), and that the current-interpretation pointer was not overwritten by the losing correction.
-- `docs/reports/PHASE_2X_CORRECTION_CONFLICT_HOTFIX_REPORT.md`: official hotfix report.
+- `docs/reports/phase-2x/PHASE_2X_CORRECTION_CONFLICT_HOTFIX_REPORT.md`: official hotfix report.
 
 ### Verification
 
@@ -1705,7 +1721,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - `src/lib/jobs/entry-worker.ts` (`kickEntryInterpretationWorker`): shared, fire-and-forget nudge that invokes the deployed `process-jobs` worker for a given job id using the caller's own authenticated session (same `{ jobId }` contract as existing direct invocation); every internal error is swallowed since the `pg_cron` drain (Slice 2X.4) is the correctness backstop, not this nudge.
 - `src/features/daily-cycle/capture-receipt.tsx` (`CaptureReceiptView`): renders a `CaptureReceipt` as a `role="status"` region with the localized save/replay message and, when the Action supplied one, a safe "Ver registro"/"View record" link. First production consumer of the previously-unconsumed `toCaptureReceipt` projection mapper.
 - `retryProcessingJob` in `src/features/agent/actions.ts`: generalizes manual retry to `interpret_entry` jobs. A `failed` job whose backoff has elapsed only gets a worker kick (it is still automatically re-claimed by the dispatch drain); an `exhausted` job gets a fresh `enqueue_entry_reprocessing` job, since exhausted work is never re-claimed. `retryAttachmentJob` is untouched. No UI consumes this Action yet — it lands with the Needs-Attention slices (2X.10–2X.11).
-- Official Slice 2X.5 evidence report at `docs/reports/PHASE_2X_SLICE_05_REPORT.md`.
+- Official Slice 2X.5 evidence report at `docs/reports/phase-2x/PHASE_2X_SLICE_05_REPORT.md`.
 - `docs/DECISIONS.md` ADR-023: the `after()` mechanism, the entry-retry generalization, and the `interpret-entry.ts` removal.
 
 ### Changed
@@ -1745,7 +1761,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - `supabase/tests/entry_interpretation_worker.sql`: pgTAP contract for the migration `026` signature/privilege surface and a full service-role initial/reprocess/failure round trip.
 - Extended `scripts/remote-entry-processing-smoke.mjs` with real end-to-end worker coverage: direct invocation (initial and reprocess), an incorrect-dispatch-secret denial, and the unattended dispatch drain processing a fixture job with no `jobId` supplied.
 - Migration `027`: fixes a Slice 2X.3 regression (see below) by replacing a CHECK constraint with a `SECURITY DEFINER` trigger, gated by `WHEN (new.type = 'interpret_entry')`.
-- Official Slice 2X.4 evidence report at `docs/reports/PHASE_2X_SLICE_04_REPORT.md`.
+- Official Slice 2X.4 evidence report at `docs/reports/phase-2x/PHASE_2X_SLICE_04_REPORT.md`.
 
 ### Fixed
 
@@ -1773,7 +1789,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Migration `025` with a bounded `interpret_entry` payload contract, lookup/active-job indexes, and atomic authenticated RPCs `capture_entry_async` and `enqueue_entry_reprocessing`.
 - Service-role-only `claim_entry_interpretation_job` and `claim_next_entry_interpretation_job` contracts with type/payload/ownership guards, retry eligibility, attempts, leases, and `SKIP LOCKED` concurrency control; existing attachment claim, completion, failure, and reaper contracts remain unchanged.
 - Linked Supabase-generated types, pgTAP contract at `supabase/tests/entry_processing_jobs.sql`, and disposable remote smoke at `npm run test:remote:entry-processing`.
-- Official Slice 2X.3 evidence report at `docs/reports/PHASE_2X_SLICE_03_REPORT.md`.
+- Official Slice 2X.3 evidence report at `docs/reports/phase-2x/PHASE_2X_SLICE_03_REPORT.md`.
 
 ### Changed
 
@@ -1794,7 +1810,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Pure mappers in `daily-cycle` for `CaptureReceipt`, `InboxItemView`, `NeedsAttentionItemView`, and `WorkItemView`, plus serializable source contracts for future server-side adapters.
 - Immutable product DTO outputs with cloned/frozen action data, strict required-field validation, safe local destinations, internal task-status-to-human-state conversion, and `null` fail-closed results for invalid or unknown inputs.
 - Focused architecture tests that prohibit React, Supabase, `database.types`, direct table access, and RPC calls in the projection mapper boundary.
-- Prework evidence report at `docs/reports/PHASE_2X_PROJECTIONS_PREWORK_REPORT.md`.
+- Prework evidence report at `docs/reports/phase-2x/PHASE_2X_PROJECTIONS_PREWORK_REPORT.md`.
 
 ### Changed
 
@@ -1816,7 +1832,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Dedicated security-definer RPCs: `record_product_event` derives the authenticated owner; `record_product_event_for_user` accepts only service-role callers. Both validate the closed taxonomy, event-specific property allowlists, opaque subject ownership, and forbidden free-content fields.
 - Pure serializable TypeScript contracts for all 17 events, closed surfaces/properties, safe parser, and discriminated telemetry result; a server-only best-effort boundary and thin acknowledgement Server Action expose no raw Supabase errors.
 - Focused Vitest suites, pgTAP contract at `supabase/tests/product_events.sql`, generated `Database` schema, and a disposable remote product-events smoke command.
-- Slice evidence report at `docs/reports/PHASE_2X_SLICE_02_REPORT.md`.
+- Slice evidence report at `docs/reports/phase-2x/PHASE_2X_SLICE_02_REPORT.md`.
 
 ### Changed
 
@@ -1837,7 +1853,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 - Typed PT-BR and English product copy for states, attention reasons, actions, and Action-result messages.
 - One deterministic, fail-closed internal-lifecycle-to-product-state mapper covering the eight known entry states, job status, retry scheduling, questions, candidates, record-only entries, materialized tasks, and consistency fallbacks.
 - Four colocated Vitest suites, including an architectural source guard that prevents React, Supabase, database types, and UI-module imports in the new boundary.
-- Slice evidence report at `docs/reports/PHASE_2X_SLICE_01_REPORT.md`.
+- Slice evidence report at `docs/reports/phase-2x/PHASE_2X_SLICE_01_REPORT.md`.
 
 ### Changed
 
@@ -1855,7 +1871,7 @@ Closeout slice — no migration, no RPC, and no product/UI source change. Slices
 ### Added
 
 - Approved architecture review, PRD, and detailed implementation plan for Phase 2X, positioned between Phase 2B and Phase 2C.
-- Reusable slice report template at `docs/reports/SLICE_REPORT_TEMPLATE.md`.
+- Reusable slice report template at `docs/reports/shared/governance/SLICE_REPORT_TEMPLATE.md`.
 
 ### Changed
 
