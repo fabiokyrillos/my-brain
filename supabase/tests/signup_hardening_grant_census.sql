@@ -1,7 +1,15 @@
 -- Signup Hardening SH.0 -- the privileged-boundary census skeleton
 -- (SH-EXPOSURE-002, gate SH-G0.3), executed.
 --
--- WHAT A SKELETON IS, AND WHAT IT IS NOT
+-- NO LONGER A SKELETON, AS OF SH.6
+-- ---------------------------------------------------------------------------
+-- Property 5 at the bottom of this file is the FULL role-by-table matrix
+-- SH-EXPOSURE-002 asked for, added once SH.6's revokes landed. The
+-- service_role carve-out (Property 3) grew from four tables to six, and the
+-- `audit_logs` exposure below is now dispositioned rather than merely recorded.
+-- Everything above Property 5 is the original skeleton, unchanged.
+--
+-- WHAT A SKELETON WAS, AND WHAT IT WAS NOT
 -- ---------------------------------------------------------------------------
 -- SH.6 pins the FULL role-by-table DML matrix, after its revokes land
 -- (SH-EXPOSURE-001/003). Pinning the full matrix now would freeze grants that
@@ -52,7 +60,7 @@
 -- Written in pure ASCII, following `signup_hardening_cascade_drill.sql`.
 
 begin;
-select plan(9);
+select plan(11);
 
 set local timezone to 'UTC';
 
@@ -161,8 +169,15 @@ select is(
   -- not even the two that can execute its functions -- and `service_role` is
   -- additionally denied EXECUTE on the claim, because a service-role path to a
   -- ceiling is a way around the ceiling.
-  'account_deletion_log, auth_event_attempts, product_events, task_command_confirmations',
-  'exactly the four RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  --
+  -- `credential_validation_attempts` and `user_ai_credentials` join in SH.6
+  -- (`202608050077`, SH-EXPOSURE-001). BYOK left `service_role` with table DML
+  -- on both, which was a service key that could read every user's envelope with
+  -- one `select *` -- T-26 exactly. The two callers that genuinely needed it are
+  -- routed through `admin_credential_status` and
+  -- `admin_list_credential_envelopes` instead of the closure being weakened.
+  'account_deletion_log, auth_event_attempts, credential_validation_attempts, product_events, task_command_confirmations, user_ai_credentials',
+  'exactly the six RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -212,7 +227,7 @@ select is(
 
 select ok(
   has_table_privilege('authenticated', 'public.audit_logs', 'insert'),
-  'RECORDED EXPOSURE (census F-18): authenticated can still INSERT audit_logs directly -- dispositioned by SH-EXPOSURE-003 in SH.6'
+  'DISPOSITIONED (census F-18, ADR-081): the authenticated INSERT on audit_logs is RETAINED by decision -- append-only still holds, RLS confines every row to its own writer, and the writer inventory is guarded by src/lib/closeout/audit-log-writers.test.ts'
 );
 
 select ok(
@@ -225,6 +240,145 @@ select ok(
   not has_function_privilege('anon', 'public.handle_new_user()', 'execute')
   and not has_function_privilege('authenticated', 'public.handle_new_user()', 'execute'),
   'F-19 CLOSED by SH-EXPOSURE-004 (202608040070): handle_new_user is executable by no client role; the trigger still fires as owner'
+);
+
+-- ---------------------------------------------------------------------------
+-- Property 5 -- the full role-by-table matrix, as norm plus named exceptions (2)
+-- ---------------------------------------------------------------------------
+-- SH-EXPOSURE-002.
+--
+-- WHY NOT ONE ENORMOUS LITERAL
+--
+-- "Pin the full matrix" read literally means aggregating roughly four hundred
+-- grant rows into one string and comparing it. That artifact is unreviewable,
+-- and an unreviewable pin is one people regenerate rather than read -- which
+-- makes it worse than nothing, because it converts a real drift into a diff
+-- nobody looks at.
+--
+-- The matrix is instead expressed as it was actually designed: a NORM plus the
+-- exceptions. `authenticated` holds SELECT, INSERT, UPDATE, DELETE on a
+-- user-owned table, granted in bulk by 202607160003 and 202607160007, and every
+-- deviation from that is a deliberate revoke in a named migration. The
+-- assertion compares the deviation set, so a re-grant, a new revoke or a new
+-- table with the wrong shape all fail BY TABLE AND BY PRIVILEGE, which is what
+-- the requirement is actually for.
+--
+-- `anon` is covered by Property 1 (it must hold nothing anywhere).
+-- `service_role` is covered by Property 3 by grant PRESENCE rather than by
+-- privilege set, deliberately: which privileges the platform grants it by
+-- default differs between a local `db reset` and the hosted project, so an
+-- exact-set assertion would be green in CI and meaningless about production,
+-- while "this table carries zero service_role ACL entries" is true in both.
+
+select is(
+  (
+    select coalesce(string_agg(deviation, E'\n' order by deviation), '')
+    from (
+      select
+        tables.table_name || ' -> ' || coalesce(
+          (
+            select string_agg(grants.privilege_type, ',' order by grants.privilege_type)
+            from information_schema.role_table_grants as grants
+            where grants.table_schema = 'public'
+              and grants.table_name = tables.table_name
+              and grants.grantee = 'authenticated'
+          ),
+          '(none)'
+        ) as deviation
+      from information_schema.tables as tables
+      where tables.table_schema = 'public'
+        and tables.table_type = 'BASE TABLE'
+        and coalesce(
+          (
+            select string_agg(grants.privilege_type, ',' order by grants.privilege_type)
+            from information_schema.role_table_grants as grants
+            where grants.table_schema = 'public'
+              and grants.table_name = tables.table_name
+              and grants.grantee = 'authenticated'
+          ),
+          '(none)'
+        ) <> 'DELETE,INSERT,SELECT,UPDATE'
+    ) as deviations
+  ),
+  -- Twenty-seven of the forty-six public base tables deviate from the norm, and
+  -- every one of them deviates because a named migration said so. The five
+  -- shapes, so a reader can check a line against an intent rather than against
+  -- a memory:
+  --
+  --   (none)                 RPC-only: no client touches the table at all --
+  --                          account_deletion_log, auth_event_attempts,
+  --                          entry_task_candidate_resolutions,
+  --                          task_command_confirmations
+  --   SELECT                 read-only to the client: it is written by an RPC,
+  --                          a trigger or the platform -- account_lifecycle,
+  --                          ai_model_pricing, ai_usage_events,
+  --                          attachment_interpretations, entity_attachments,
+  --                          entry_entities, entry_interpretations,
+  --                          heartbeat_runs, product_events, tasks,
+  --                          undo_operations
+  --   INSERT,SELECT          append-only to the client -- attachments,
+  --                          audit_logs (ADR-081's retained grant),
+  --                          conversation_messages,
+  --                          credential_validation_attempts, jobs,
+  --                          policy_acceptances, reminders
+  --   SELECT,UPDATE          the client may change state but not create or
+  --                          destroy -- notifications, pending_questions
+  --   no DELETE              everything else the client owns, minus the right
+  --                          to erase history -- entry_embeddings, summaries,
+  --                          user_ai_credentials (which additionally lost every
+  --                          service_role grant in SH.6)
+  --
+  -- `entries` is deliberately NOT here: the original is protected by the
+  -- `protect_entry_original` trigger rather than by a revoke, so its grant is
+  -- the norm and the immutability lives one layer down. A line appearing for it
+  -- would mean that trigger had been replaced by a grant change.
+  E'account_deletion_log -> (none)\n'
+  || E'account_lifecycle -> SELECT\n'
+  || E'ai_model_pricing -> SELECT\n'
+  || E'ai_usage_events -> SELECT\n'
+  || E'attachment_interpretations -> SELECT\n'
+  || E'attachments -> INSERT,SELECT\n'
+  || E'audit_logs -> INSERT,SELECT\n'
+  || E'auth_event_attempts -> (none)\n'
+  || E'conversation_messages -> INSERT,SELECT\n'
+  || E'credential_validation_attempts -> INSERT,SELECT\n'
+  || E'entity_attachments -> SELECT\n'
+  || E'entry_embeddings -> INSERT,SELECT,UPDATE\n'
+  || E'entry_entities -> SELECT\n'
+  || E'entry_interpretations -> SELECT\n'
+  || E'entry_task_candidate_resolutions -> (none)\n'
+  || E'heartbeat_runs -> SELECT\n'
+  || E'jobs -> INSERT,SELECT\n'
+  || E'notifications -> SELECT,UPDATE\n'
+  || E'pending_questions -> SELECT,UPDATE\n'
+  || E'policy_acceptances -> INSERT,SELECT\n'
+  || E'product_events -> SELECT\n'
+  || E'reminders -> INSERT,SELECT\n'
+  || E'summaries -> INSERT,SELECT,UPDATE\n'
+  || E'task_command_confirmations -> (none)\n'
+  || E'tasks -> SELECT\n'
+  || E'undo_operations -> SELECT\n'
+  || E'user_ai_credentials -> INSERT,SELECT,UPDATE',
+  'SH-EXPOSURE-002: the authenticated matrix is the norm plus exactly these named exceptions -- drift fails by table and by privilege'
+);
+
+-- The narrow replacements SH-EXPOSURE-001 introduced, so the closure cannot be
+-- read as "the capability went away". It did not; it became three named
+-- functions, and this is where their reachability is pinned.
+select is(
+  (
+    select count(*)::int
+    from unnest(array[
+      'public.admin_credential_status(uuid)',
+      'public.admin_list_credential_envelopes(integer, integer)',
+      'public.admin_rewrap_credential_envelope(uuid, smallint, bytea, bytea, smallint)'
+    ]) as signature
+    where has_function_privilege('service_role', signature, 'execute')
+      and not has_function_privilege('anon', signature, 'execute')
+      and not has_function_privilege('authenticated', signature, 'execute')
+  ),
+  3,
+  'SH-EXPOSURE-001: the three narrow replacements are reachable by the operator and by nobody else'
 );
 
 select * from finish();
