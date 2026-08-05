@@ -151,6 +151,15 @@ stays down until `APP_ORIGIN` is set in Vercel Production — an owner action (�
 
 ## 5. Configured but NOT behaviourally verified
 
+> **Superseded on 2026-08-04** by
+> `SIGNUP_HARDENING_ORIGIN_VERIFICATION.md` §2. This section claimed the allow
+> list could not be exercised without SMTP. That was wrong, and the correction
+> is worth keeping visible: `admin/generate_link` composes the link GoTrue
+> *would* send **without sending it**, so the allow list was exercised with no
+> sender configured. A preview host and an attacker host were both offered and
+> both rewritten to `site_url`. The paragraphs below are left as written; read
+> them as the state of knowledge before that probe, not as current truth.
+
 **The redirect allow list has not been exercised**, and cannot be yet: verifying
 it requires a delivered confirmation or recovery email, and **no custom SMTP is
 configured** (`smtp_host` is `null`). The default Supabase SMTP sends 2 mails per
@@ -164,13 +173,17 @@ The verification step, once SMTP exists: request a password reset for a real
 disposable account, open the delivered link, and confirm it lands on the
 callback route and completes the session.
 
+What genuinely still needs a delivered mail is narrower than this section
+assumed: not whether the allow list is right, but whether a link, once
+delivered, completes a session end to end.
+
 ---
 
 ## 6. Owner actions still open
 
 | Action | Why it is owner-only | What it unblocks |
 | --- | --- | --- |
-| Set `APP_ORIGIN=https://my-brain-dusky.vercel.app` in **Vercel Production**, then redeploy | The Vercel CLI here is unauthenticated and its login is an interactive OAuth device flow this session cannot complete | Password recovery, which is currently refusing |
+| ~~Set `APP_ORIGIN` in **Vercel Production**, then redeploy~~ — **DONE 2026-08-04**, verified at the provider (`SIGNUP_HARDENING_ORIGIN_VERIFICATION.md` §1) | The Vercel CLI here is unauthenticated and its login is an interactive OAuth device flow this session cannot complete | Password recovery, which now completes |
 | Configure **Resend** custom SMTP in Supabase | Requires a sending domain, DNS records and credentials that do not exist | Every email-dependent journey, and the allow-list verification in §5 |
 | Enable **Turnstile** in hosted Auth | `security_captcha_enabled` is `false` and the provider is still `hcaptcha`; the secret is a hosted setting | Provider-enforced CAPTCHA (SH-CAPTCHA-002) |
 

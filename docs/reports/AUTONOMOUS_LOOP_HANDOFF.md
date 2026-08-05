@@ -1768,3 +1768,205 @@ Everything in §23's list still stands, plus:
 `202608040074`; `site_url` is the Vercel origin; 12 enumerated redirect URLs;
 `disable_signup: true`; storage empty; 2 accounts, both `active`. Production
 deployment healthy, recovery refusing honestly, signup closed on both sides.
+
+---
+
+## 25. The ninth stop — 2026-08-04, after the origin verification and SH.5's migration. **This supersedes §24.**
+
+The owner set `APP_ORIGIN`, redeployed, and reported it. Verifying rather than
+accepting that turned out to matter twice, and the migration §24 was waiting on
+turned out not to be blocked at all.
+
+`main` was clean at `8ed69ed`; this work is on `codex/sh-slice-5-throttle`.
+
+### The origin, checked where it lands rather than where it was set
+
+All seven points the owner asked about hold. Six were straightforward. The
+seventh — *which* origin the deployment actually sends — could not be settled
+the obvious way, and the obvious way is the trap:
+
+**A successful recovery does not prove the origin is right.**
+`resolveConfiguredOrigin` accepts any https origin **and** accepts localhost,
+and localhost is on the redirect allow list for the online suite. So
+`recovery-sent` is consistent with `APP_ORIGIN` being wrong.
+
+Vercel's CLI here is unauthenticated (still owner-only), but the provider that
+*receives* the value logs it. The Management API's `logs.all` endpoint over
+`auth_logs` returned the deployment's own `/recover` calls with
+`redirect_to = https://my-brain-dusky.vercel.app/pt-BR/auth/callback?next=%2Fpt-BR%2Fauth%2Freset`
+— the value itself, not an inference about it. Note the endpoint defaults to a
+very narrow window; pass `iso_timestamp_start`/`iso_timestamp_end` or it returns
+almost nothing and looks like an empty result.
+
+### §24's "needs SMTP" was wrong, and the correction is the more useful finding
+
+§24 recorded the allow list as correct-by-construction and unverifiable without
+a delivered email. `admin/generate_link` composes the link GoTrue *would* send
+**without sending it**, so no sender is required. Run against the online test
+fixture account (never the owner's), printing only the resolved `redirect_to`:
+
+| offered | composed |
+| --- | --- |
+| the production callback | **preserved exactly** |
+| `https://attacker.example.com/...` | `https://my-brain-dusky.vercel.app` |
+| `https://my-brain-dusky-git-preview.vercel.app/...` | `https://my-brain-dusky.vercel.app` |
+
+**Enforcement is silent rewriting, not refusal.** `POST /auth/v1/recover`
+returns **200** for a disallowed `redirect_to`. Two consequences the next
+context must carry:
+
+1. `site_url` is the actual backstop — its being the production origin is
+   load-bearing, not cosmetic.
+2. **A mis-set `APP_ORIGIN` fails invisibly.** Mail still arrives, pointing at
+   the wrong host, and nothing in the application can detect it. Re-check at the
+   provider after any change to the deployment's environment.
+
+### SMTP and Turnstile — read, not asked
+
+The brief left both as unfilled `[CONFIGURED / NOT CONFIGURED]` placeholders.
+The hosted configuration answers both without ambiguity:
+
+- **SMTP: NOT CONFIGURED.** `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`,
+  `smtp_admin_email`, `smtp_sender_name` are **all null**. No verified sending
+  domain, because there is no sender. `rate_limit_email_sent = 2/hour` is
+  therefore a default-SMTP artefact.
+- **Turnstile: NOT CONFIGURED.** `security_captcha_enabled = false`, and
+  `security_captcha_provider` is still `hcaptcha` against ADR-076's Turnstile.
+
+### The migration was not blocked, and why that is a structural fact
+
+The instruction was to stop only where `202608040075` would need an unsettled
+provider-dependent value. It does not, and the reason is in the pattern the
+plan already names: `claim_credential_validation_slot` takes its ceilings as
+**function parameters**, and SH-THROTTLE-002 requires them changeable without a
+migration. So the migration carries the mechanism and the application carries
+the numbers. The pending SMTP ceiling lives in `throttle-policy.ts`, marked
+`provisional`, with a test asserting the marker so un-marking it is a reviewable
+deletion rather than a quiet edit.
+
+**Migration `202608040075` is spent — six of eight. Two remain, both SH.6's.**
+
+### ADR-080 — the three decisions the plan left open
+
+The plan says "follow `claim_credential_validation_slot`". It cannot be
+followed literally: that function's first act is `auth.uid()`, and **every event
+this table throttles happens before there is a session.**
+
+1. **`anon` holds `execute`** — the first anonymous `execute` grant in this
+   database. The alternative was a service-role client in the Next.js runtime,
+   which trades a bounded hash-blinded insert for a credential that bypasses RLS
+   on every table, in the most exposed process — and would have made recovery
+   depend on a new production secret, the exact failure SH-ORIGIN-001 had just
+   finished repairing. What bounds the anonymous path is the **pepper, which is
+   not in the database**: a direct caller cannot compute a victim's hash, so
+   identifier-stuffing cannot lock anyone out.
+2. **Ceilings are required parameters, no defaults**, clamped by
+   `private.auth_event_ceiling_cap()`. The argument list is fixed on the first
+   attempt deliberately — `create or replace` cannot extend one (ADR-057).
+3. **Auth hashes are domain-separated from BYOK's** (`auth:` tag) so the two
+   ledgers cannot be joined on the same address.
+
+### A guard that did not hold
+
+Writing SH-SIGNUP-010's guard-of-the-guard found `safeAuthNext` returning
+`/en/app/../../evil` verbatim — it passed the `startsWith("/en/app/")` branch,
+and a browser resolves it to `/evil`. **Not** an open redirect (it cannot leave
+the origin, so T-20 was never reachable this way), but it defeated the subtree
+pin the allowlist exists for. Fixed in the guard, with a backslash rejected
+alongside it.
+
+### Three pgTAP traps caught statically, since there is no local Docker
+
+- `isnt(claim(...), null)` leaves pgTAP's `anyelement` undecidable — it fails to
+  *resolve*, not to assert. Use `ok(... is not null)`.
+- An "outside the window" case that shrinks the window to a microsecond proves
+  nothing: `now()` is **transaction start time**, so every row the file writes
+  shares one `attempted_at`. Backdate the rows instead.
+- `has_table_privilege` with the role coming from `unnest` is cast `::name`;
+  only the one-variable form is precedented here.
+
+### What is NOT done — SH.5 cannot close
+
+The Server Actions **do not call the throttle**, so SH-THROTTLE-003 and the
+enumeration-uniform refusal are not in force. Also missing: the
+confirmation-resend surface (SH-SIGNUP-008), Turnstile widget and token plumbing
+(SH-CAPTCHA-003/004), session-fixation pins (SH-SIGNUP-012), a regenerated
+`database.types.ts` for the two new RPCs, the genuine-concurrency script, and
+the SH.5 acceptance report. **SH.6 and SH.7 are not started.**
+
+The wiring must fit the mechanism already shipped: **SH.5 has no migration
+left.**
+
+### Do not, on resuming
+
+Everything in §24's list still stands, plus:
+
+- **Do not treat a green recovery as proof of the origin.** It is not; §25's
+  first section is why. Read `auth_logs` at the provider.
+- **Do not expect a disallowed `redirect_to` to error.** It returns 200 and is
+  silently rewritten, so no test may assert enforcement by expecting a failure.
+- **Do not un-mark `AUTH_EVENT_CEILINGS.resend.provisional`** until the
+  post-SMTP readback has run. Its assertion exists to make that deliberate.
+- **Do not add a ceiling above `private.auth_event_ceiling_cap()`** — the RPC
+  refuses it at runtime, in the auth path, in production.
+- **Do not grant `service_role` on the throttle RPCs.** A postcondition and a
+  pgTAP assertion both forbid it; it would be a way to bypass a ceiling.
+
+### State at this stop
+
+Branch `codex/sh-slice-5-throttle`, three commits, tree clean. Lint and
+typecheck zero; production build passes; the vitest suite is green except the
+**four pre-existing local-only failures** (three `.mjs` shebang import errors
+and `sql-reachability`'s two CRLF assertions) which were failing identically
+before this work and are green in CI. Hosted: parity `202608040074` —
+**`202608040075` is NOT deployed** — `site_url` is the Vercel origin, 12
+enumerated redirect URLs, `disable_signup: true`, no custom SMTP, CAPTCHA off,
+2 accounts both `active`, storage empty. Production deployment healthy, recovery
+working, signup closed on both sides.
+
+### §25 addendum — what CI found that static review did not, and where the branch actually stands
+
+The first CI run **failed the `database` job**, and the shape of the failure is
+the useful part: the new suite (`signup_hardening_auth_throttle.sql`, 46
+assertions) passed in full, and three **pre-existing** census assertions failed
+on the new migration.
+
+| Assertion | Why the migration tripped it |
+| --- | --- |
+| `BYOK-SCHEMA-013: ip_hash exists on exactly one table` | `auth_event_attempts.ip_hash` is a second one |
+| SH.0: `no public function carries an explicit grant to anon` | the two throttle RPCs are the first ever |
+| SH.0: `exactly the three RPC-only ledgers carry zero service_role grants` | the new ledger is a fourth |
+
+Each is a declared-set assertion whose own comment requires a new member to
+"join the expected list **by name in its own slice**". All three were widened by
+name with ADR-080 as the citation — **not loosened**.
+
+The `ip_hash` one had a tempting wrong fix worth naming: rename the column and
+the assertion passes untouched. That was refused, because the value *is* an IP
+hash and renaming it would slip past a guard whose entire purpose is to notice
+this. The defensible answer is on the requirement's own terms — its stated
+concern is "a second retention surface and a second thing to forget to prune",
+and `auth_event_attempts` is swept on the same 30-day window by its own
+scheduler-only function; and Decision 3's `auth:` domain tag means the two
+columns are not the same value for the same address, which is what stops the two
+ledgers being joinable on one.
+
+**ADR-080 was corrected where it was wrong about timing.** It said the *SH.6*
+grant-matrix census "must treat these two functions as a declared exception", as
+though the census were a future event. It runs every CI cycle and failed within
+minutes. A census that only ran at SH.6 would have let three declared invariants
+drift for two slices.
+
+**Second run: all five checks green** — `application`, `database and journey`,
+`edge worker`, and both Vercel checks (run `30971441702`).
+
+### Where this actually stops
+
+**PR #84 is open and green at `d9c5ff9`. It is NOT merged** — the merge was
+declined by the environment's permission classifier, and no attempt was made to
+route around it. `main` is unchanged at `8ed69ed`; the four commits live on
+`codex/sh-slice-5-throttle`.
+
+So the next context inherits a branch, not a merged slice. Merge it (or have the
+owner merge it) before treating `202608040075` as repository truth, and
+**re-check the merge-SHA CI run** as every prior slice in this loop has done.

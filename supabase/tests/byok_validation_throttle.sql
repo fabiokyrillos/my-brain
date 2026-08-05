@@ -64,8 +64,23 @@ select has_index(
   'and the per-user index from 202608010065 survives'
 );
 
--- BYOK-SCHEMA-013: `ip_hash` appears on this table and nowhere else. A second
+-- BYOK-SCHEMA-013: `ip_hash` appears only where a throttle needs it. A second
 -- copy is a second retention surface and a second thing to forget to prune.
+--
+-- SH.5 (`202608040075`, ADR-080) added the second one, and it joins this list by
+-- name rather than by the assertion being loosened -- which is what the list is
+-- for. Two things make it a widening rather than a breach:
+--
+--   1. The concern in the sentence above is retention, and
+--      `auth_event_attempts` is swept on the same 30-day window by its own
+--      scheduler-only `prune_auth_event_attempts()`. There is no unpruned copy.
+--   2. The two columns are **not the same value for the same address**. ADR-080
+--      Decision 3 adds an `auth:` domain tag to the HMAC input, precisely so
+--      that reading both tables cannot correlate a named BYOK user with an
+--      anonymous auth attempt -- the join the pepper exists to prevent, which
+--      reusing the pepper without a tag would have reintroduced.
+--
+-- A third member must earn its place here the same way.
 select is(
   (
     select coalesce(string_agg(table_name, ', ' order by table_name), '')
@@ -73,8 +88,8 @@ select is(
     where table_schema = 'public'
       and column_name = 'ip_hash'
   ),
-  'credential_validation_attempts',
-  'BYOK-SCHEMA-013: ip_hash exists on exactly one table'
+  'auth_event_attempts, credential_validation_attempts',
+  'BYOK-SCHEMA-013: ip_hash exists on exactly the two throttle ledgers'
 );
 
 -- ---------------------------------------------------------------------------
