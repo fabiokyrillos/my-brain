@@ -258,10 +258,22 @@ create trigger entries_quota_after_insert
 -- 3. SH-QUOTA-002 -- live jobs per user
 -- ---------------------------------------------------------------------------
 --
--- The live statuses are `pending`, `running` and `failed` -- the same three the
--- claim predicate and `enqueue_entry_reprocessing`'s in-flight check already
--- treat as unfinished work. `completed` and `cancelled` are terminal and never
--- count, so a busy user is bounded by their *backlog*, not by their history.
+-- WHAT COUNTS AS LIVE, AND THE TRAP IN THE OBVIOUS ANSWER
+--
+-- The obvious answer is `status in ('pending', 'running', 'failed')`, matching
+-- `enqueue_entry_reprocessing`'s in-flight check. It is wrong, and wrong in a
+-- way that only shows up after weeks of ordinary use: this schema has no
+-- `exhausted` status, so a job that has burned every attempt sits in `failed`
+-- forever. Counting those, a user who accumulated fifty permanently-dead jobs
+-- would be refused every capture from then on -- and the copy would tell them
+-- their queue was full while nothing whatsoever was running. A ceiling that can
+-- never be got back under is not a ceiling, it is a lockout.
+--
+-- So live means claimable-or-running, which is exactly the claim predicate:
+-- `pending` and `running`, plus `failed` only while attempts remain. An
+-- exhausted job is dead work and is swept by SH-RETENTION-003 rather than
+-- counted here. A busy user is bounded by their *backlog*, never by their
+-- history.
 --
 -- Applies to every inserter including `service_role`. Nothing in this system
 -- enqueues as the service role today (the five insert sites are the two capture
@@ -293,7 +305,10 @@ begin
     into used
     from public.jobs as job
     where job.user_id = owner
-      and job.status in ('pending', 'running', 'failed');
+      and (
+        job.status in ('pending', 'running')
+        or (job.status = 'failed' and job.attempts < job.max_attempts)
+      );
 
     if used > ceiling then
       raise exception 'Queued work quota reached'
@@ -306,7 +321,7 @@ end;
 $$;
 
 comment on function private.enforce_live_job_quota() is
-  'SH-QUOTA-002: refuses a job insert once the owner holds more than the ceiling in pending/running/failed. Terminal rows never count.';
+  'SH-QUOTA-002: refuses a job insert once the owner holds more than the ceiling of claimable-or-running jobs. Completed, cancelled and exhausted rows never count -- an exhausted job is dead work, not a queue slot.';
 
 revoke all on function private.enforce_live_job_quota()
   from public, anon, authenticated, service_role;

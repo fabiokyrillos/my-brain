@@ -20,7 +20,7 @@
 -- Genuine concurrency. A pgTAP file is one session, so "two concurrent captures
 -- at the ceiling admit exactly one" cannot be proven here -- the sections below
 -- prove the sequential ceiling, which is necessary and not sufficient. The
--- concurrency half is `scripts/quota-concurrency.mjs`, run against a shared
+-- concurrency half is `scripts/sh6-quota-concurrency.mjs`, run against a shared
 -- environment, and until it has run the advisory-lock serialization is argued
 -- rather than demonstrated. This is the same boundary `signup_hardening_auth_-
 -- throttle.sql` draws for the throttle claim.
@@ -28,7 +28,7 @@
 -- Written in pure ASCII.
 
 begin;
-select plan(41);
+select plan(44);
 
 set local timezone to 'UTC';
 
@@ -300,7 +300,7 @@ select is(
 update private.quota_ceilings set value = 300 where key = 'entries_per_day';
 
 -- ---------------------------------------------------------------------------
--- Section 5 -- SH-QUOTA-002, the live-job ceiling (5)
+-- Section 5 -- SH-QUOTA-002, the live-job ceiling (8)
 -- ---------------------------------------------------------------------------
 -- `process_attachment` jobs, because they carry no payload contract and no
 -- one-active-per-entry unique index -- the ceiling under test is the count, and
@@ -351,6 +351,47 @@ select lives_ok(
     select 'c1000002-0000-4000-8000-000000000002', 'process_attachment', '{}'::jsonb, 'sh6-live-b-' || generation
     from generate_series(1, 3) as generation$$,
   'the ceiling is per owner: B still has its full queue'
+);
+
+-- An EXHAUSTED job is dead work, not a queue slot. This schema has no
+-- `exhausted` status, so a job that burned every attempt sits in `failed`
+-- forever -- and counting those would mean an owner who accumulated the ceiling
+-- in permanently-dead jobs could never capture again, while the copy told them
+-- their queue was full and nothing was running. A ceiling nobody can get back
+-- under is a lockout.
+delete from public.jobs;
+
+select lives_ok(
+  $$insert into public.jobs (user_id, type, payload, idempotency_key, status, attempts, max_attempts)
+    select 'c1000001-0000-4000-8000-000000000001', 'process_attachment', '{}'::jsonb,
+           'sh6-exhausted-' || generation, 'failed', 5, 5
+    from generate_series(1, 6) as generation$$,
+  'six exhausted jobs are admitted at a ceiling of three -- they are not live'
+);
+
+select lives_ok(
+  $$insert into public.jobs (user_id, type, payload, idempotency_key)
+    values ('c1000001-0000-4000-8000-000000000001', 'process_attachment', '{}'::jsonb, 'sh6-after-exhausted')$$,
+  'a new job is still admitted behind six exhausted ones -- no lockout'
+);
+
+-- The other half, and the one that stops "exhausted does not count" from
+-- decaying into "failed does not count": a failed job with attempts left is
+-- work the drain will pick up again, so it holds its slot.
+delete from public.jobs;
+update private.quota_ceilings set value = 1 where key = 'live_jobs_per_user';
+
+insert into public.jobs (user_id, type, payload, idempotency_key, status, attempts, max_attempts)
+values ('c1000001-0000-4000-8000-000000000001', 'process_attachment', '{}'::jsonb,
+        'sh6-retryable', 'failed', 1, 5);
+
+select is(
+  (pg_temp.refusal(
+    $$insert into public.jobs (user_id, type, payload, idempotency_key)
+      values ('c1000001-0000-4000-8000-000000000001', 'process_attachment', '{}'::jsonb, 'sh6-behind-retryable')$$
+  ))[2],
+  'QUOTA_LIVE_JOBS',
+  'a RETRYABLE failed job still holds its slot -- only exhausted work is free'
 );
 
 update private.quota_ceilings set value = 50 where key = 'live_jobs_per_user';
