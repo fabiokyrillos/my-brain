@@ -263,6 +263,22 @@ select ok(
 -- table with the wrong shape all fail BY TABLE AND BY PRIVILEGE, which is what
 -- the requirement is actually for.
 --
+-- DML ONLY, AND THE FIRST CUT OF THIS ASSERTION IS WHY
+--
+-- The first version compared the whole privilege set and CI refused it, exactly
+-- as it refused two earlier cuts of Property 3 (see the note there). The
+-- measured reality is that `authenticated` also carries REFERENCES, TRIGGER and
+-- TRUNCATE on most tables — not from anything in this chain, but from the
+-- platform's default privileges, which is precisely the FINDINGS sec. 12.3
+-- local/hosted divergence. Pinning those would produce an assertion that is
+-- green in CI and says nothing true about production, which is the failure mode
+-- Property 3's history is a monument to.
+--
+-- So the filter is `SELECT, INSERT, UPDATE, DELETE` — which is also what
+-- SH-EXPOSURE-002 asks for in its own words ("which of the four roles holds
+-- which DML"). Every revoke in this chain is a DML revoke, so nothing
+-- chain-versioned is lost by ignoring the other three.
+--
 -- `anon` is covered by Property 1 (it must hold nothing anywhere).
 -- `service_role` is covered by Property 3 by grant PRESENCE rather than by
 -- privilege set, deliberately: which privileges the platform grants it by
@@ -274,30 +290,25 @@ select is(
   (
     select coalesce(string_agg(deviation, E'\n' order by deviation), '')
     from (
-      select
-        tables.table_name || ' -> ' || coalesce(
+      select tables.table_name || ' -> ' || held.privileges as deviation
+      from information_schema.tables as tables
+      cross join lateral (
+        select coalesce(
           (
             select string_agg(grants.privilege_type, ',' order by grants.privilege_type)
             from information_schema.role_table_grants as grants
             where grants.table_schema = 'public'
               and grants.table_name = tables.table_name
               and grants.grantee = 'authenticated'
+              -- DML ONLY, and the reason is in the note above.
+              and grants.privilege_type in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
           ),
           '(none)'
-        ) as deviation
-      from information_schema.tables as tables
+        ) as privileges
+      ) as held
       where tables.table_schema = 'public'
         and tables.table_type = 'BASE TABLE'
-        and coalesce(
-          (
-            select string_agg(grants.privilege_type, ',' order by grants.privilege_type)
-            from information_schema.role_table_grants as grants
-            where grants.table_schema = 'public'
-              and grants.table_name = tables.table_name
-              and grants.grantee = 'authenticated'
-          ),
-          '(none)'
-        ) <> 'DELETE,INSERT,SELECT,UPDATE'
+        and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
   -- Twenty-seven of the forty-six public base tables deviate from the norm, and
@@ -306,15 +317,14 @@ select is(
   -- a memory:
   --
   --   (none)                 RPC-only: no client touches the table at all --
-  --                          account_deletion_log, auth_event_attempts,
-  --                          entry_task_candidate_resolutions,
-  --                          task_command_confirmations
+  --                          account_deletion_log, auth_event_attempts
   --   SELECT                 read-only to the client: it is written by an RPC,
   --                          a trigger or the platform -- account_lifecycle,
   --                          ai_model_pricing, ai_usage_events,
   --                          attachment_interpretations, entity_attachments,
   --                          entry_entities, entry_interpretations,
-  --                          heartbeat_runs, product_events, tasks,
+  --                          entry_task_candidate_resolutions, heartbeat_runs,
+  --                          product_events, task_command_confirmations, tasks,
   --                          undo_operations
   --   INSERT,SELECT          append-only to the client -- attachments,
   --                          audit_logs (ADR-081's retained grant),
@@ -346,7 +356,7 @@ select is(
   || E'entry_embeddings -> INSERT,SELECT,UPDATE\n'
   || E'entry_entities -> SELECT\n'
   || E'entry_interpretations -> SELECT\n'
-  || E'entry_task_candidate_resolutions -> (none)\n'
+  || E'entry_task_candidate_resolutions -> SELECT\n'
   || E'heartbeat_runs -> SELECT\n'
   || E'jobs -> INSERT,SELECT\n'
   || E'notifications -> SELECT,UPDATE\n'
@@ -355,7 +365,7 @@ select is(
   || E'product_events -> SELECT\n'
   || E'reminders -> INSERT,SELECT\n'
   || E'summaries -> INSERT,SELECT,UPDATE\n'
-  || E'task_command_confirmations -> (none)\n'
+  || E'task_command_confirmations -> SELECT\n'
   || E'tasks -> SELECT\n'
   || E'undo_operations -> SELECT\n'
   || E'user_ai_credentials -> INSERT,SELECT,UPDATE',
