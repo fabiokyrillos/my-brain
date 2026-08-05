@@ -159,11 +159,17 @@ Proven before acting:
 Metadata before removal: slug `heartbeat`, status `ACTIVE`, version 8,
 `verify_jwt: false`, id `9a2cc514-9132-4f6f-831d-65db87d4649e`.
 
-**Undeployed 2026-08-05.** Readback: `functions list` now returns only
-`process-jobs` and `delete-account`; `POST /functions/v1/heartbeat` answers
+**Undeployed 2026-08-05 at ~20:47 UTC.** Readback: `functions list` now returns
+only `process-jobs` and `delete-account`; `POST /functions/v1/heartbeat` answers
 **404**. The source stays in the repository — deleting it would make the
 deployment un-auditable, and it is what a redeploy would use if the disposition
 is ever reversed.
+
+**No scheduled work regressed, verified by waiting rather than by reasoning.**
+The next hourly tick after the undeploy ran at **`2026-08-05T21:00:00Z`, status
+`completed`**. The argument that an HTTP wrapper cannot affect a `pg_cron` job
+calling a SQL function is sound, and it is still an argument; the 21:00 row is
+the observation.
 
 ## 8. The defect this deployment found (see ADR-082)
 

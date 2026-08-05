@@ -40,8 +40,9 @@ headline results:
 - **T-26 closed on the table**: `service_role` is refused (403) on
   `user_ai_credentials` and `credential_validation_attempts`, with master-key
   rotation proven still working through `admin_list_credential_envelopes`.
-- The `heartbeat` Edge Function is **undeployed** and reads back 404; the
-  in-database hourly path is unaffected.
+- The `heartbeat` Edge Function is **undeployed** and reads back 404; the next
+  hourly in-database tick ran `completed` at `21:00:00Z`, so the disposition is
+  observed and not merely argued.
 
 ### The one thing a successor must not misread
 
