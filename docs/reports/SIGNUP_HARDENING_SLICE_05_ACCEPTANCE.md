@@ -109,6 +109,67 @@ gate rather than counted as done.
 
 ---
 
+## 4b. The deployed Turnstile boundary — one defect found and fixed, one question open
+
+The deployment probe was not a formality. It found a defect that **no test in
+this repository would have caught**, and it left one question that automation
+cannot settle.
+
+### The defect: CSP blocked the widget's script
+
+Every static check passed — widget markup on all five auth forms, correct site
+key, correct response-field name, zero secret-shaped strings across ten served
+chunks — and the browser said:
+
+```
+Loading the script 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+violates the following Content Security Policy directive:
+"script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+```
+
+So Turnstile never injected its response input and **no token could exist**.
+The failure is silent while hosted CAPTCHA is off, and the moment it is switched
+on it becomes *every sign-in refused for a missing token* — locking out every
+account including the owner's.
+
+Fixed in `next.config.ts`, route-scoped. The obvious implementation would not
+have worked: **two `Content-Security-Policy` headers on one response are
+enforced as an intersection**, so a looser policy layered on the global strict
+one changes nothing while looking exactly like a fix. The sources are mutually
+exclusive by construction and `csp.test.ts` asserts every route matches exactly
+one — including the case where a route matches *neither* and silently loses its
+CSP.
+
+Verified live after deploy: the auth route now serves
+`script-src … https://challenges.cloudflare.com` with matching `frame-src` and
+`connect-src`; the product route serves none of them.
+
+### The open question: no token in an automated browser
+
+After the fix, the widget **loads, renders and communicates**:
+`window.turnstile` is defined, `turnstile.render()` returns a widget id
+(`cf-chl-widget-…`), the response input is injected, roughly twenty
+challenge-platform requests return `200`, and **zero CSP violations** are
+recorded.
+
+But no token materialised within 15–20 seconds, in headless *or* headed
+Chromium, at any widget size including the default — and two requests to
+`brunhild.challenges.cloudflare.com` failed with `ERR_NAME_NOT_RESOLVED` **in
+this environment**.
+
+That evidence points at automation and local DNS rather than at a
+misconfiguration: a wrong hostname or an invalid site key produces an
+`error-callback` with a code, and none fired. It is **not proof either way**,
+and it is recorded as an open question rather than resolved by assertion.
+
+**Consequence for the rollout order, and it is not optional:** the owner should
+open an auth page in an ordinary browser and confirm the widget visibly
+completes **before** enabling hosted CAPTCHA. Enabling enforcement while no
+token is produced would lock every account out of the product, and the account
+that would fix it is one of the locked-out ones.
+
+---
+
 ## 5. SH-CAPTCHA-002 is NOT claimed
 
 Hosted CAPTCHA is **off** (`security_captcha_enabled = false`, provider still
