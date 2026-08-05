@@ -99,6 +99,24 @@ select is(
 -- PUBLIC execute implicitly, and that case is exposure 6 below, carried by
 -- name rather than folded in here.
 
+-- SH.5 (`202608040075`, ADR-080) made this list non-empty for the first time,
+-- and that is a decision rather than a drift, so the two functions are named.
+--
+-- Why `anon` at all: every event the auth throttle counts -- signup, recovery,
+-- resend, sign-in failure -- happens BEFORE there is a session. The BYOK
+-- pattern's `auth.uid()` identity is unavailable, and this application holds no
+-- service-role client anywhere; ADR-080 declines to grow one, because removing
+-- an anonymous INSERT path by installing an RLS-bypassing credential in the
+-- Next.js runtime is a strictly worse trade.
+--
+-- What keeps it bounded: the identifier and IP hashes are HMAC'd under a pepper
+-- that lives in the application environment and NOT in this database, so a
+-- direct caller cannot compute the hash of an address it wants to attack. The
+-- table itself grants nothing to anyone (Property 1 above still passes for it),
+-- these two functions are its only path, and a claimed slot sends no mail,
+-- creates no account and authenticates nobody.
+--
+-- A third name appearing here without an ADR is a finding.
 select is(
   (
     select coalesce(string_agg(distinct proc.proname, ', ' order by proc.proname), '')
@@ -109,8 +127,8 @@ select is(
     where namespace.nspname = 'public'
       and acl.grantee = 'anon'::regrole::oid
   ),
-  '',
-  'no public function carries an explicit grant to anon -- offenders are named'
+  'claim_auth_event_slot, finalize_auth_event_attempt',
+  'exactly the two pre-session throttle RPCs carry an explicit anon grant -- offenders are named'
 );
 
 -- ---------------------------------------------------------------------------
@@ -138,8 +156,13 @@ select is(
           and grants.grantee = 'service_role'
       )
   ),
-  'account_deletion_log, product_events, task_command_confirmations',
-  'exactly the three RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  -- `auth_event_attempts` joins in SH.5 (`202608040075`): it is RPC-only in the
+  -- strictest sense in this chain -- no role holds ANY table privilege on it,
+  -- not even the two that can execute its functions -- and `service_role` is
+  -- additionally denied EXECUTE on the claim, because a service-role path to a
+  -- ceiling is a way around the ceiling.
+  'account_deletion_log, auth_event_attempts, product_events, task_command_confirmations',
+  'exactly the four RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
