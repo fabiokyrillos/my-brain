@@ -22,6 +22,14 @@ import { signOut } from "./actions";
 import { idleSignOutState } from "./sign-out-state";
 import { accountCopy } from "@/features/shell/account-copy";
 
+// `actions.ts` reaches the auth throttle, which reaches the BYOK crypto core,
+// which carries `server-only` -- and under jsdom that module resolves to its
+// client build and throws on import. The marker is a BUILD-time guard against a
+// client component importing server code; it has no runtime meaning in a test,
+// and `npm run build` in CI is what actually enforces it. Stubbed here rather
+// than removed at the source, because the source marker is the real protection.
+// The idiom `ip.test.ts` established.
+vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Map()) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));

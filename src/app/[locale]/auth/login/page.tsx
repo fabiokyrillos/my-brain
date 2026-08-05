@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
+import { getResendCopy } from "@/features/auth/copy";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
@@ -75,7 +76,7 @@ export default async function LoginPage({
       <div className="auth-links">
         <Link href={`/${locale}/auth/recover`}>{pt ? "Esqueci minha senha" : "Forgot password"}</Link>
         <Link href={`/${locale}/auth/register`}>{pt ? "Criar conta" : "Create account"}</Link>
-        <Link href={`/${locale}/auth/resend`}>{pt ? "Reenviar confirmação" : "Resend confirmation"}</Link>
+        <Link href={`/${locale}/auth/resend`}>{getResendCopy(locale).linkFromLogin}</Link>
       </div>
     </div>
   );
