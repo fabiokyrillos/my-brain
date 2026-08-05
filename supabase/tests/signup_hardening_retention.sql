@@ -278,22 +278,26 @@ select is(
 -- composite FK from 202607220041 is NO ACTION, so the delete would raise and
 -- take the whole batch with it.
 
+-- `action_type` must be a REGISTERED handler: `202607250052` puts a BEFORE
+-- INSERT trigger on this table so an operation can never be recorded without a
+-- compensation to reverse it. `confirm_entry_task_candidates` is used
+-- throughout, which is also the action_type the FK carve-out below is about.
 insert into public.undo_operations
   (id, user_id, action_type, entity_type, after_state, created_at, expires_at)
 values
   -- Expired long enough ago: goes.
   ('d1700001-0000-4000-8000-000000000001', 'd1000001-0000-4000-8000-000000000001',
-   'test', 'task', '{}'::jsonb, now() - interval '400 days',
+   'confirm_entry_task_candidates', 'task', '{}'::jsonb, now() - interval '400 days',
    now() - interval '30 days' - interval '1 second'),
   -- Expiry exactly at the cutoff: stays.
   ('d1700002-0000-4000-8000-000000000002', 'd1000001-0000-4000-8000-000000000001',
-   'test', 'task', '{}'::jsonb, now() - interval '400 days',
+   'confirm_entry_task_candidates', 'task', '{}'::jsonb, now() - interval '400 days',
    now() - interval '30 days'),
   -- ANCIENT by creation and still live by expiry. Under a created_at window it
   -- would be swept; under the correct one it must not be. This is the assertion
   -- that tells the two windows apart.
   ('d1700003-0000-4000-8000-000000000003', 'd1000001-0000-4000-8000-000000000001',
-   'test', 'task', '{}'::jsonb, now() - interval '400 days',
+   'confirm_entry_task_candidates', 'task', '{}'::jsonb, now() - interval '400 days',
    now() + interval '1 hour');
 
 select is(
@@ -343,7 +347,7 @@ values ('d1a00001-0000-4000-8000-000000000001', 'd1000001-0000-4000-8000-0000000
 insert into public.undo_operations
   (id, user_id, action_type, entity_type, after_state, created_at, expires_at)
 values ('d1700004-0000-4000-8000-000000000004', 'd1000001-0000-4000-8000-000000000001',
-        'test', 'task', '{}'::jsonb, now() - interval '400 days',
+        'confirm_entry_task_candidates', 'task', '{}'::jsonb, now() - interval '400 days',
         now() - interval '400 days');
 
 insert into public.entry_task_candidate_resolutions
