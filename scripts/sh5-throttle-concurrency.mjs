@@ -83,7 +83,6 @@ const digest = (label) =>
   createHmac("sha256", randomBytes(32)).update(`${label}:${nonce}`).digest("hex");
 
 const identifierHash = digest("identifier");
-const ipHash = digest("ip");
 
 async function claim() {
   const started = Date.now();
