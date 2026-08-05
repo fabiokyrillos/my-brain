@@ -115,25 +115,22 @@ export function gateDefinitions({ root = REPOSITORY_ROOT, hosted = null } = {}) 
       verdict: fileExists(root, "docs/reports/BYOK_TRACEABILITY_MATRIX.md") ? PASS : FAIL,
       reason: "BYOK closeout traceability matrix present",
     }),
-    "RG-BYOK-2": () => {
-      // The absence of the name in EXECUTABLE worker code, which is what
-      // BYOK-ADAPTER-005 promises. Comments are stripped first, and the first
-      // cut of this gate is the reason: the worker's docblock explains what used
-      // to be there by naming it, so a plain substring search failed a gate that
-      // was actually green. A guard that cannot tell code from prose reports the
-      // wrong answer in whichever direction the prose happens to run.
-      const worker = join(root, "supabase/functions/process-jobs/index.ts");
-      if (!existsSync(worker)) {
-        return { verdict: FAIL, reason: "worker entrypoint is missing" };
-      }
-      const executable = readFileSync(worker, "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/(^|\s)\/\/.*$/gm, "");
-      return {
-        verdict: executable.includes("OPENAI_API_KEY") ? FAIL : PASS,
-        reason: "no project-key read in executable worker code",
-      };
-    },
+    "RG-BYOK-2": () => ({
+      // Delegated, not re-implemented. The project-key guard
+      // (`src/lib/byok/project-key-guard.test.ts`) is the mechanism that proves
+      // no path reads a process-wide provider key, it runs every CI cycle, and
+      // ADR-072 pins the exact set of files allowed to name that key at all.
+      //
+      // The first cut of this gate grepped the worker itself, which meant this
+      // script named the key -- and CI refused it, correctly: the guard admits
+      // one verification script by ADR and says in its own comment that "a
+      // second script cannot arrive under cover of the first". Re-implementing
+      // a security check beside the one that owns it would have been the wrong
+      // fix even if the guard had allowed it, because then two things would
+      // decide the same question and only one of them would have an ADR.
+      verdict: fileExists(root, "src/lib/byok/project-key-guard.test.ts") ? PASS : FAIL,
+      reason: "the ADR-072 project-key guard is present and runs in CI",
+    }),
     "RG-DEL-1": () => ({
       verdict: fileExists(root, "docs/reports/SIGNUP_HARDENING_DEPLOYED_ACCEPTANCE.md") ? PASS : FAIL,
       reason: "deployed deletion acceptance transcript present",

@@ -55,6 +55,7 @@ function repoWith(omit: string[] = []): string {
     "src/features/auth/hosted-auth-posture.ts",
     "src/features/auth/throttle.ts",
     "src/lib/closeout/heartbeat-disposition.test.ts",
+    "src/lib/byok/project-key-guard.test.ts",
     "src/proxy.ts",
   ];
   for (const path of needed) {
@@ -223,11 +224,8 @@ describe("RG-QUO-3 distinguishes built from enforced", () => {
   });
 });
 
-describe("RG-BYOK-2 reads code, not prose", () => {
-  it("passes for the real worker, whose comments discuss the key by name", () => {
-    // The first cut of this gate failed here: the worker's docblock explains
-    // what used to be there by naming it, and a substring search cannot tell
-    // code from an explanation of removed code.
+describe("RG-BYOK-2 delegates to the guard that owns the question", () => {
+  it("passes when the ADR-072 project-key guard is present", () => {
     const root = repoWith();
     try {
       expect(verdictFor("RG-BYOK-2", root)).toBe("PASS");
@@ -236,13 +234,11 @@ describe("RG-BYOK-2 reads code, not prose", () => {
     }
   });
 
-  it("fails when the key is genuinely read", () => {
-    const root = repoWith();
+  it("fails when that guard is gone", () => {
+    // The gate's whole claim is "the mechanism that proves this exists and
+    // runs". Delete the mechanism and the claim must go with it.
+    const root = repoWith(["src/lib/byok/project-key-guard.test.ts"]);
     try {
-      writeFileSync(
-        join(root, "supabase/functions/process-jobs/index.ts"),
-        'const key = Deno.env.get("OPENAI_API_KEY");\n',
-      );
       expect(verdictFor("RG-BYOK-2", root)).toBe("FAIL");
     } finally {
       rmSync(root, { recursive: true, force: true });

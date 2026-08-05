@@ -138,6 +138,14 @@ generalise:
 8. A guard that cannot tell code from prose reports the wrong answer in whichever
    direction the prose runs (`RG-BYOK-2`'s first cut).
 9. A readback filtered on the wrong column under-reports (§4 above).
+10. **A verifier must not re-implement a check that already has an owner.**
+    `RG-BYOK-2`'s second cut grepped the worker for the project key itself,
+    which made this script name that key — and ADR-072's guard refused it,
+    saying in its own comment that "a second script cannot arrive under cover of
+    the first". Re-implementing would have been wrong even had the guard
+    allowed it: two mechanisms would then decide the same question and only one
+    of them would have an ADR. The gate now resolves the guard's presence and
+    delegates the question to it.
 
 ## 6. Status
 
