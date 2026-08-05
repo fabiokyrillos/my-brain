@@ -51,7 +51,9 @@
     "byok:rotate-master-key": "node scripts/byok-rotate-master-key.mjs",
     "test:remote": "node scripts/remote-supabase-smoke.mjs",
     "sh6:quota-concurrency": "node scripts/sh6-quota-concurrency.mjs",
-    "sh6:retention-dry-run": "node scripts/sh6-retention-dry-run.mjs"
+    "sh6:retention-dry-run": "node scripts/sh6-retention-dry-run.mjs",
+    "sh6:retention-schedule": "node scripts/sh6-retention-schedule.mjs",
+    "sh6:quota-acceptance": "node scripts/sh6-quota-acceptance.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
