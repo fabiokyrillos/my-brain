@@ -1923,3 +1923,50 @@ before this work and are green in CI. Hosted: parity `202608040074` —
 enumerated redirect URLs, `disable_signup: true`, no custom SMTP, CAPTCHA off,
 2 accounts both `active`, storage empty. Production deployment healthy, recovery
 working, signup closed on both sides.
+
+### §25 addendum — what CI found that static review did not, and where the branch actually stands
+
+The first CI run **failed the `database` job**, and the shape of the failure is
+the useful part: the new suite (`signup_hardening_auth_throttle.sql`, 46
+assertions) passed in full, and three **pre-existing** census assertions failed
+on the new migration.
+
+| Assertion | Why the migration tripped it |
+| --- | --- |
+| `BYOK-SCHEMA-013: ip_hash exists on exactly one table` | `auth_event_attempts.ip_hash` is a second one |
+| SH.0: `no public function carries an explicit grant to anon` | the two throttle RPCs are the first ever |
+| SH.0: `exactly the three RPC-only ledgers carry zero service_role grants` | the new ledger is a fourth |
+
+Each is a declared-set assertion whose own comment requires a new member to
+"join the expected list **by name in its own slice**". All three were widened by
+name with ADR-080 as the citation — **not loosened**.
+
+The `ip_hash` one had a tempting wrong fix worth naming: rename the column and
+the assertion passes untouched. That was refused, because the value *is* an IP
+hash and renaming it would slip past a guard whose entire purpose is to notice
+this. The defensible answer is on the requirement's own terms — its stated
+concern is "a second retention surface and a second thing to forget to prune",
+and `auth_event_attempts` is swept on the same 30-day window by its own
+scheduler-only function; and Decision 3's `auth:` domain tag means the two
+columns are not the same value for the same address, which is what stops the two
+ledgers being joinable on one.
+
+**ADR-080 was corrected where it was wrong about timing.** It said the *SH.6*
+grant-matrix census "must treat these two functions as a declared exception", as
+though the census were a future event. It runs every CI cycle and failed within
+minutes. A census that only ran at SH.6 would have let three declared invariants
+drift for two slices.
+
+**Second run: all five checks green** — `application`, `database and journey`,
+`edge worker`, and both Vercel checks (run `30971441702`).
+
+### Where this actually stops
+
+**PR #84 is open and green at `d9c5ff9`. It is NOT merged** — the merge was
+declined by the environment's permission classifier, and no attempt was made to
+route around it. `main` is unchanged at `8ed69ed`; the four commits live on
+`codex/sh-slice-5-throttle`.
+
+So the next context inherits a branch, not a merged slice. Merge it (or have the
+owner merge it) before treating `202608040075` as repository truth, and
+**re-check the merge-SHA CI run** as every prior slice in this loop has done.
