@@ -27,7 +27,7 @@ footnote.
 | SH-SIGNUP-012 session fixation | **done** | `captcha.test.ts` pins |
 | SH-SIGNUP-013 disposable-email posture | **done** | recorded in `throttle-policy.ts`; v1 accepts them |
 | SH-CAPTCHA-001 vendor by ADR | **done** | ADR-076 |
-| SH-CAPTCHA-002 provider enforcement | **NOT CLAIMED** | hosted CAPTCHA is off; probes have not run — §5 |
+| SH-CAPTCHA-002 provider enforcement | **SATISFIED** as specified | deployed probes 2026-08-05: missing token, invalid token and four bypass shapes all `400 captcha_failed`; refusal identical for known vs unknown — §5. Residual: the valid-token probes could not run from automation and are SKIPPED, not passed |
 | SH-CAPTCHA-003 widget + token | **done** | four forms; `captcha.test.ts` |
 | SH-CAPTCHA-004 one external origin, absent from product | **done** | repo-wide scan asserts the offender list exactly |
 | SH-CAPTCHA-005 CI never claims the hosted control | **done** | no site key in CI → no widget, no token |
@@ -88,11 +88,11 @@ trap the next slice can walk into:
 
 | Threat | Disposition |
 | --- | --- |
-| **T-14 signup flood** | App gate closed; ceiling 3/identifier/day, 10/IP/day, enforced under proven concurrency. **Residual:** a distributed botnet with solved CAPTCHAs, bounded per-IP; CAPTCHA is not yet enforced (§5). |
+| **T-14 signup flood** | App gate closed; ceiling 3/identifier/day, 10/IP/day, enforced under proven concurrency; **and CAPTCHA now enforced by the provider** (§5). **Residual:** a distributed botnet with genuinely solved CAPTCHAs, bounded per-IP and per-identifier, each account quota-boxed. |
 | **T-15 email bombing** | `resend` has its own tighter ceiling (2/identifier/hour) and is the only surface whose purpose is to send to someone else's inbox. **Residual:** up to the ceiling per day, below the provider's own budget. |
 | **T-16 recovery abuse** | Link base is the configured origin, verified at the provider; allow list verified by observation; recovery ceiling 3/day; the reset forces a sign-out. |
 | **T-17 enumeration** | Throttle consulted before the provider so the timing difference is ours, not the provider's; one shared refusal code for existing and unknown; resend copy is conditional. **Residual: timing is not measured** — see below. |
-| **T-18 CAPTCHA bypass** | **Open.** The application collects and forwards a token; nothing enforces it until the hosted setting is on. Stated as unclaimed rather than defended. |
+| **T-18 CAPTCHA bypass** | **Closed by execution.** Provider enforcement is live and every direct-API shape that skips the widget is refused `400 captcha_failed` — no token, invalid token, empty string, `null`, token at the top level, meta object absent. UI-only enforcement is structurally impossible, which is what the threat asked for. |
 | **T-19 session fixation** | `exchangeCodeForSession` issues a fresh session; `updatePassword` re-validates with `getUser()` before writing and forces `signOut()` after; no action accepts a caller-supplied session identifier (asserted). |
 | **T-20 open redirect** | `safeAuthNext` allowlist, now including traversal and backslash rejection; every permitted value is asserted same-origin in both locales. |
 | **T-21 throttle race** | Closed by §2. |
@@ -227,17 +227,96 @@ visibly completes. **Only then** enable hosted CAPTCHA.
 
 ---
 
-## 5. SH-CAPTCHA-002 is NOT claimed
+## 4d. The site key was NOT broken — §4c's conclusion is withdrawn
 
-Hosted CAPTCHA is **off** (`security_captcha_enabled = false`, provider still
-`hcaptcha`). The application carries the widget and forwards the token; the
-provider ignores it. That is the intended intermediate state.
+> **Withdrawn 2026-08-05.** §4c concluded "the configured site key does not
+> render a widget on `my-brain-dusky.vercel.app`… a genuine defect". That was
+> wrong, and the flaw was in the control, not in the observation.
 
-The requirement — *"a raw API signup/recovery call without a valid token
-fails"* — is a property of the hosted setting and is provable only by the
-deployed probes. Those probes have **not** run. Until they do, no part of this
-repository claims provider enforcement, and `captcha.ts` deliberately exposes no
-`verifyToken` so that no caller can come to believe otherwise.
+Cloudflare's `1x00000000000000000000AA` is documented to pass **regardless of
+client**. It therefore never controlled for the one variable that actually
+differed: **bot detection**. A real managed widget declining to serve a
+challenge to a browser it fingerprints as automated produces exactly the
+observed signature — no iframe, no token, no error callback — while working
+perfectly for a human.
+
+Confirmed by the owner reconfiguring nothing about the key and the widget then
+being observed to render and complete in an ordinary browser, and by the raw
+enforcement probes below, which required no token and passed immediately.
+
+**The lesson is about the control, not the widget.** A control that is exempt
+from the mechanism under test is not a control. `1x…AA` proved the *environment*
+could run Turnstile's happy path; it could not, and did not, prove anything
+about a key subject to bot detection. Two conclusions were published from it —
+§4b's "automation and DNS" and §4c's "genuine defect" — and both were wrong in
+opposite directions.
+
+---
+
+## 5. SH-CAPTCHA-002 — SATISFIED as specified, with one residual named
+
+**The requirement:** *"CAPTCHA is enforced by the provider (GoTrue
+`security.captcha`), so a raw API signup/recovery call without a valid token
+fails — UI-only enforcement is structurally impossible. Verified behaviorally
+against the deployed project with a **missing** and an **invalid** token."*
+
+Executed 2026-08-05 by `scripts/sh5-captcha-enforcement-probes.mjs` against the
+deployed project, as `anon`, with hosted `security_captcha_enabled = true` and
+`security_captcha_provider = "turnstile"` read back first.
+
+| # | Probe | Result |
+| --- | --- | --- |
+| 1 | raw `/recover`, **no** token | **`400 captcha_failed`** |
+| 2 | raw `/recover`, **invalid** token | **`400 captcha_failed`** |
+| 4 | four bypass shapes — empty string, `null`, token at the top level instead of inside `gotrue_meta_security`, meta object absent | **all four `400 captcha_failed`** |
+| 6 | the refusal for a **known** address vs an **unknown** one | **identical** — `400 captcha_failed` both |
+| — | raw `/signup`, no token | `400 captcha_failed` |
+
+**UI-only enforcement is structurally impossible**: every shape of a direct API
+call that skips the widget is refused by the provider, and the refusal does not
+vary with whether the address exists — so enforcement did not reintroduce the
+enumeration channel SH-SIGNUP-011 closes.
+
+The deployed **application** path was checked too: with no token, both
+`/pt-BR/auth/recover` and `/pt-BR/auth/login` land on `?error=captcha-failed` —
+its own declared code, not `invalid-credentials` and not `recovery-failed`.
+Requirement 11's "distinguish CAPTCHA failures from credential, throttle and
+configuration failures" is therefore verified end to end on the deployment, not
+just in unit tests.
+
+### The residual, stated rather than smoothed over
+
+**Probes 3 and 5 — the ones needing a *valid* token — could not be executed
+here, and are recorded SKIPPED rather than passed.** Turnstile declines to serve
+a challenge to an automated browser, headless or headed, which is the product
+working as designed and not a defect. A probe that cannot run has proven nothing
+in either direction.
+
+Log evidence is **ambiguous and is not being read as confirmation**: three
+`grant_type=password` sign-ins returned `200` at 15:59–16:00 UTC, but the
+earliest refusal that is provably post-enablement is 16:11, so those successes
+cannot be placed inside the enforced window. `grant_type=refresh_token` traffic
+is excluded from that count — it is not CAPTCHA-protected, and counting it would
+let a refresh storm masquerade as proof.
+
+**What settles it:** one interactive sign-in at
+`https://my-brain-dusky.vercel.app/pt-BR/auth/login`. A subsequent
+`/token?grant_type=password → 200` in the auth log, timestamped after the
+16:11 refusals, is the confirmation — and its absence would mean auth is
+currently refused for everyone, which is an outage rather than a control.
+
+---
+
+## 5b. What SH-CAPTCHA-002 does not cover
+
+It is a statement about the **provider**, not about the widget's usability. It
+says a call without a valid token fails; it says nothing about how pleasant the
+challenge is, whether a given browser can solve it, or whether the widget is
+reachable on every network. Those belong to the rollout gate.
+
+`captcha.ts` still deliberately exposes no `verifyToken`. Verification happens
+inside GoTrue against the secret, and a helper here would invite a caller to
+believe the application enforces something it does not.
 
 **The sign-in form carries the widget too**, though SH-CAPTCHA-003 names only
 register, recover and resend. Supabase's CAPTCHA protection is a per-project
