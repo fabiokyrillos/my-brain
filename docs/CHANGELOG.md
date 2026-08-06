@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — Phase 2G — Conversational Creation is authorized and planned (0 migrations)
+
+**The owner authorized Phase 2G, and the start followed the sanctioned path ADR-067 anticipated.** ADR-083 records the decision; the A13 phase-start guard retargeted from Phase 2G to Phase 2H **in the same commit**, so the invariant — the next phase must not start before it is authorized — never lapsed. The `product-ux-documentation.test.ts` prose guard moved on the same terms: the historical closeout keeps its recommendation language untouched, and `STATE.md` may now say Phase 2G started only while naming ADR-083 beside the claim.
+
+**The governing pair exists and is written against the definition study as amended.** `docs/initiatives/phase-2g/PHASE_2G_PRD.md` declares the `2G-*` requirement families — creation surfaces are **tasks** (the create verb routed to the deployed `create_task_command` family, preview-then-confirm, undo through the registered handler) plus **entries** in the separately gated capture-routing slice; reminders, projects, people, organizations, contexts, events and memories-as-commands refuse deterministically. `PHASE_2G_IMPLEMENTATION_PLAN.md` fixes four slices (2G.1 contract → 2G.2 composer routing → 2G.3 capture routing → 2G.4 closeout) and the **one-migration budget**, allocated to 2G.3's `captureSource` allowlist widening only. The threat model is `docs/reports/phase-2g/PHASE_2G_THREAT_MODEL.md` (T-2G-1…14, with the study's withdrawn spend-ceiling risks dispositioned rather than dropped).
+
+**The study's M2 maintenance item was executed first, as its §17 ordered.** `.gitattributes` pins `*.sql text eol=lf`, and `src/features/task-commands/sql-reachability.test.ts` now passes 46/46 on a Windows checkout (previously 44/46 for CRLF non-reasons). The `product-ux` closeout test that pinned M2 as *deferred* was updated to pin it as *executed* — the record and the tree agree in the new direction.
+
+**The owner's rollout tasks are re-recorded and remain open**: retention activation (enabling **is** the first-purge authorization), Resend SMTP, the backup-restore drill, the legal and monitoring signatures, then one green `rollout:verify`, the owner-only signup flip, and a second green run. The rollout gate was re-run live before this work began and reads **25 pass · 3 fail · 2 owner-signature**, refusing to open signup. No migration was created, no hosted configuration changed, no purge is authorized, and Phase 2H remains unauthorised.
+
 ## 2026-08-05 — `docs/` separates the canon from the initiative, and the pairing is guarded (0 migrations)
 
 **The reports reorganization exposed the same problem one level up.** `docs/` held 33 markdown files at one level, mixing the eleven documents that are always current — `STATE.md`, `ENGINEERING_STANDARDS.md`, `DATABASE.md` and their kin — with twenty-two PRDs, implementation plans and phase reports belonging to work that closed weeks ago. A reader could not tell, from the listing alone, which files were the contract and which were history.

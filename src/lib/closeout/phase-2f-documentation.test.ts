@@ -174,10 +174,14 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(read("docs/TODO.md")).not.toMatch(/approved `docs\/PHASE_2F_PRD\.md` Revision 4 \(/);
   });
 
-  it("TODO.md's active-milestone line names Phase 2F rather than Phase 2C", () => {
+  it("TODO.md's active-milestone line names the authorized successor, not a closed phase", () => {
+    // Originally pinned to Phase 2F against a stale-Phase-2C regression;
+    // retargeted with ADR-083, keeping the same property: the line exists,
+    // names the phase that is actually active, and cites its authorization.
     const line = read("docs/TODO.md").split("\n").find((l) => l.startsWith("Active milestone:"));
     expect(line).toBeDefined();
-    expect(line).toMatch(/Phase 2F/);
+    expect(line).toMatch(/Phase 2G/);
+    expect(line, "the start must cite its authorization").toMatch(/ADR-083/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
   });
 });
@@ -219,22 +223,17 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
 });
 
 /**
- * Phase 2G start signals — a **correction to this guard's proxy, not a relaxation
- * of the invariant it protects.**
+ * Phase 2H start signals — the same guard, retargeted at the roadmap successor.
  *
- * The invariant is unchanged and non-negotiable: *Phase 2G must not be started
- * before it is authorized.* What changed is how that is measured.
- *
- * The original form banned any `docs/**` filename matching `/PHASE_2G/i`. Its own
- * comment already drew the right distinction — "a mention as future work is a
- * record; a declared requirement would be a start" — and its companion assertion
- * enforced exactly that by looking for a **declared** requirement id. The
- * filename ban was the blunter half, and it was blunter than the property: it
- * could not tell an implementation-governing artifact from a definition study
- * commissioned to decide whether the phase should exist at all. The owner
- * authorized narrowing it after `docs/reports/phase-2g/PHASE_2G_DEFINITION.md` — a study
- * that declares no requirement, plans no work and states in its own header that
- * Phase 2G remains unauthorized — tripped it.
+ * ADR-067's invariant is unchanged and non-negotiable: *the next phase must not
+ * be started before it is authorized.* Until 2026-08-05 the next phase was
+ * Phase 2G, and this detector watched for it. ADR-083 records the owner's
+ * authorization of Phase 2G — so the phase these signals now protect is
+ * **Phase 2H — Deploy and Operate**, the successor ADR-068 names, which no
+ * decision has authorized. The retarget and ADR-083 land in one commit,
+ * deliberately: an accepted ADR naming the authorized phase is exactly signal 3,
+ * so the guard must move in the same change that records the authorization, and
+ * the invariant is never unenforced in between.
  *
  * A phase starts when an artifact **governs implementation**, not when a file
  * name contains the phase letter. The four signals below are that property:
@@ -242,26 +241,29 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  *   1. a governing artifact **by role** — a PRD, an implementation plan or a
  *      requirements document, whatever it is named;
  *   2. a **declared** requirement family, in this repository's declaration shape
- *      (`- **2G-XXXX-000:**`) — the same shape the traceability generator's
- *      attribution guard uses, which is why the deliberate `2G-READINESS-001`
- *      negative-control fixture in `phase-2f-traceability.test.ts` is not a
- *      false positive and must not become one;
- *   3. an **accepted** Phase 2G ADR — a recorded decision to proceed, as opposed
+ *      (`- **2H-XXXX-000:**`) — the same shape the traceability generator's
+ *      attribution guard uses;
+ *   3. an **accepted** Phase 2H ADR — a recorded decision to proceed, as opposed
  *      to an ADR that merely mentions the phase while deferring it;
- *   4. a migration or source file marked as Phase 2G implementation.
+ *   4. a migration or source file marked as Phase 2H implementation.
  *
- * Permitted, explicitly: the definition study; future-work mentions; candidate
- * labels `2G-1`…`2G-4`; and append-only amendments that state the phase remains
- * unauthorized.
+ * Permitted, explicitly: definition studies; future-work mentions (the Phase 2G
+ * study routes several items to Phase 2H by name); and append-only amendments
+ * that state the phase remains unauthorized.
  *
  * Fail-closed: unreadable inputs throw rather than returning "no signals".
  */
-type Phase2GStartSignal = { readonly kind: string; readonly where: string };
+type Phase2HStartSignal = { readonly kind: string; readonly where: string };
 
-const GOVERNING_ARTIFACT_ROLE = /^PHASE_2G_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
+const GOVERNING_ARTIFACT_ROLE = /^PHASE_2H_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
 /** A *declared* requirement, not a mention. Matches the traceability generator's own shape. */
+const DECLARED_2H_REQUIREMENT = /^- \*\*2H-[A-Z]+-\d{3}/m;
+/**
+ * Kept for the historical assertion below: the Phase 2F proposal may mention
+ * Phase 2G as future work but must never have declared a requirement for it.
+ */
 const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
-const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2g/i;
+const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2h/i;
 
 /**
  * Every markdown file at or below `dir`, named relative to `dir`. The walk is
@@ -291,12 +293,12 @@ function filesIn(root: string, dir: string): string[] {
     .map((entry) => entry.name);
 }
 
-/** Every reason to believe Phase 2G has started. Empty means it has not. */
-function phase2GStartSignals(root: string): Phase2GStartSignal[] {
-  const signals: Phase2GStartSignal[] = [];
+/** Every reason to believe Phase 2H has started. Empty means it has not. */
+function phase2HStartSignals(root: string): Phase2HStartSignal[] {
+  const signals: Phase2HStartSignal[] = [];
 
   // One recursive walk from `docs/`. It subsumes `docs/reports/` and reaches
-  // `docs/initiatives/`, where a Phase 2G PRD would now be filed; listing the
+  // `docs/initiatives/`, where a Phase 2H PRD would be filed; listing the
   // two separately would double-report anything under reports.
   for (const dir of ["docs"]) {
     for (const name of markdownFilesIn(root, dir)) {
@@ -304,7 +306,7 @@ function phase2GStartSignals(root: string): Phase2GStartSignal[] {
       if (GOVERNING_ARTIFACT_ROLE.test(basename)) {
         signals.push({ kind: "governing-artifact", where: `${dir}/${name}` });
       }
-      if (DECLARED_2G_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
+      if (DECLARED_2H_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
         signals.push({ kind: "declared-requirement", where: `${dir}/${name}` });
       }
     }
@@ -312,12 +314,13 @@ function phase2GStartSignals(root: string): Phase2GStartSignal[] {
 
   const decisions = join(root, "docs/DECISIONS.md");
   if (existsSync(decisions)) {
-    // An ADR block runs from its own heading to the next one.
+    // An ADR block runs from its own heading to the next one. Only the heading
+    // is tested: ADR bodies may (and do) mention Phase 2H while deferring it.
     const blocks = readFileSync(decisions, "utf8").split(/^## (?=ADR-)/m).slice(1);
     for (const block of blocks) {
       const heading = block.split("\n", 1)[0] ?? "";
       const accepted = /^[-*]?\s*\*\*Status:?\*\*:?\s*Accepted/im.test(block);
-      if (/phase 2g/i.test(heading) && accepted) {
+      if (/phase 2h/i.test(heading) && accepted) {
         signals.push({ kind: "accepted-adr", where: `ADR heading: ${heading.trim()}` });
       }
     }
@@ -337,7 +340,7 @@ function phase2GStartSignals(root: string): Phase2GStartSignal[] {
 /** A throwaway repository root carrying only what the detector reads. */
 function makeDetectorRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "a13-"));
-  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2g", "supabase/migrations", "src/features", "src/lib"]) {
+  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2h", "supabase/migrations", "src/features", "src/lib"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
@@ -351,95 +354,99 @@ function detectorRoot(): string {
   return root;
 }
 
-describe("A13: Phase 2G is not started", () => {
+describe("A13: Phase 2H is not started", () => {
   afterAll(() => {
     for (const root of detectorRoots) rmSync(root, { recursive: true, force: true });
   });
 
   it("finds no start signal in this repository", () => {
-    expect(phase2GStartSignals(REPO)).toEqual([]);
+    expect(phase2HStartSignals(REPO)).toEqual([]);
   });
 
-  it("keeps Phase 2G recorded as future work rather than declared", () => {
-    // A mention as future work is a record; a declared requirement would be a start.
+  it("keeps Phase 2G's start recorded as an authorization, not an accident", () => {
+    // The Phase 2F proposal mentioned Phase 2G as future work and never declared
+    // a requirement for it; that historical property still holds. The phase's
+    // actual start is ADR-083, an owner decision.
     const proposal = read("docs/initiatives/phase-2f/PHASE_2F_PROPOSAL.md");
     expect(proposal).toMatch(/Phase 2G/);
     expect(proposal).not.toMatch(DECLARED_2G_REQUIREMENT);
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/ADR-083 — The owner authorizes Phase 2G/);
   });
 
-  it("permits the definition study, its candidate labels and an unauthorized-status amendment", () => {
+  it("permits a definition study, future-work labels and an unauthorized-status amendment", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md"),
+      join(root, "docs/reports/phase-2h/PHASE_2H_NOTES.md"),
       [
-        "# Phase 2G Definition Study",
+        "# Phase 2H notes",
         "",
-        "**Phase 2G remains unauthorized and unstarted.**",
+        "**Phase 2H remains unauthorized and unstarted.**",
         "",
-        "Candidates: 2G-1 conversational creation, 2G-2 entity fields, 2G-3 audit identity, 2G-4 routes.",
+        "Deferred here by Phase 2G: rate limiting, error sink, dead-man switch, retention triggers.",
         "",
         "## Amendment — appended, and the phase is still unauthorized.",
       ].join("\n"),
     );
-    expect(phase2GStartSignals(root)).toEqual([]);
+    expect(phase2HStartSignals(root)).toEqual([]);
   });
 
-  it("fails when docs/PHASE_2G_PRD.md exists", () => {
+  it("fails when docs/PHASE_2H_PRD.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2G_PRD.md"), "# Phase 2G PRD\n");
-    expect(phase2GStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2H_PRD.md"), "# Phase 2H PRD\n");
+    expect(phase2HStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2G_PRD.md",
+      where: "docs/PHASE_2H_PRD.md",
     });
   });
 
-  it("fails when docs/PHASE_2G_IMPLEMENTATION_PLAN.md exists", () => {
+  it("fails when docs/PHASE_2H_IMPLEMENTATION_PLAN.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2G_IMPLEMENTATION_PLAN.md"), "# Plan\n");
-    expect(phase2GStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2H_IMPLEMENTATION_PLAN.md"), "# Plan\n");
+    expect(phase2HStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2G_IMPLEMENTATION_PLAN.md",
+      where: "docs/PHASE_2H_IMPLEMENTATION_PLAN.md",
     });
   });
 
-  it("fails when a Phase 2G requirement is declared, whatever the file is called", () => {
+  it("fails when a Phase 2H requirement is declared, whatever the file is called", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md"),
-      "# Study\n\n- **2G-READINESS-001:** rate limiting ships here.\n",
+      join(root, "docs/reports/phase-2h/PHASE_2H_NOTES.md"),
+      "# Notes\n\n- **2H-READINESS-001:** rate limiting ships here.\n",
     );
-    expect(phase2GStartSignals(root)).toContainEqual({
+    expect(phase2HStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
-      where: "docs/reports/phase-2g/PHASE_2G_DEFINITION.md",
+      where: "docs/reports/phase-2h/PHASE_2H_NOTES.md",
     });
   });
 
-  it("fails when an accepted Phase 2G ADR exists", () => {
+  it("fails when an accepted Phase 2H ADR exists", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-070 — Phase 2G is accepted as the next phase\n\n- **Status:** Accepted\n",
+      "# Decisions\n\n## ADR-090 — Phase 2H is accepted as the next phase\n\n- **Status:** Accepted\n",
     );
-    const signals = phase2GStartSignals(root);
+    const signals = phase2HStartSignals(root);
     expect(signals.map((signal) => signal.kind)).toContain("accepted-adr");
   });
 
-  it("permits an ADR that mentions Phase 2G while deferring it", () => {
+  it("permits an ADR that mentions Phase 2H while deferring it", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-070 — The roadmap order after Phase 2F\n\n"
-        + "- **Status:** Accepted\n- Phase 2G remains unauthorized and unstarted.\n",
+      "# Decisions\n\n## ADR-090 — The roadmap order after Signup Hardening\n\n"
+        + "- **Status:** Accepted\n- Phase 2H remains unauthorized and unstarted.\n",
     );
-    expect(phase2GStartSignals(root)).toEqual([]);
+    expect(phase2HStartSignals(root)).toEqual([]);
   });
 
-  it("fails when a migration is marked as Phase 2G implementation", () => {
+  it("fails when a migration is marked as Phase 2H implementation", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "supabase/migrations/202608010065_phase_2g_create_verb.sql"), "-- x\n");
-    expect(phase2GStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "supabase/migrations/202609010001_phase_2h_rate_limit.sql"), "-- x\n");
+    expect(phase2HStartSignals(root)).toContainEqual({
       kind: "implementation-file",
-      where: "supabase/migrations/202608010065_phase_2g_create_verb.sql",
+      where: "supabase/migrations/202609010001_phase_2h_rate_limit.sql",
     });
   });
 
@@ -449,9 +456,9 @@ describe("A13: Phase 2G is not started", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/ROADMAP_NOTES.md"),
-      "# Notes\n\n- **2G-CREATE-001:** the composer gains a create verb.\n",
+      "# Notes\n\n- **2H-DEPLOY-001:** the deploy runbook ships here.\n",
     );
-    expect(phase2GStartSignals(root)).toContainEqual({
+    expect(phase2HStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
       where: "docs/ROADMAP_NOTES.md",
     });
@@ -461,15 +468,15 @@ describe("A13: Phase 2G is not started", () => {
     const root = detectorRoot();
     // A path that `readdirSync` reports and `readFileSync` cannot open: on both
     // platforms, replacing the file with a directory of the same name does it.
-    const listed = join(root, "docs/reports/phase-2g/PHASE_2G_DEFINITION.md");
-    writeFileSync(listed, "# Study\n");
-    expect(phase2GStartSignals(root)).toEqual([]);
+    const listed = join(root, "docs/reports/phase-2h/PHASE_2H_NOTES.md");
+    writeFileSync(listed, "# Notes\n");
+    expect(phase2HStartSignals(root)).toEqual([]);
     rmSync(listed);
     mkdirSync(join(root, "docs/reports/UNREADABLE.md"));
     writeFileSync(join(root, "docs/reports/UNREADABLE.md/inner"), "x");
     // `markdownFilesIn` filters to real files, so the directory is skipped rather
     // than misread — the detector never treats an unreadable entry as clean data.
-    expect(phase2GStartSignals(root)).toEqual([]);
+    expect(phase2HStartSignals(root)).toEqual([]);
     expect(() => readFileSync(join(root, "docs/reports/UNREADABLE.md"), "utf8")).toThrow();
   });
 

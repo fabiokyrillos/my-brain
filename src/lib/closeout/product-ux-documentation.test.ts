@@ -188,9 +188,12 @@ describe("the permanent documents agree on the facts that outlive the slice", ()
     const todo = read(TODO);
     expect(todo).toContain(".gitattributes");
     expect(todo).toMatch(/maintenance/i);
-    // And it is not in the tree: adding it here would make the local counter
-    // green while hiding why the closeout could be trusted without it.
-    expect(() => readFileSync(path.join(ROOT, ".gitattributes"), "utf8")).toThrow();
+    // M2 was executed as its own maintenance commit at the opening of the
+    // Phase 2G planning branch (the definition study's §17 ordering: "first —
+    // before any Phase 2G branch"), never as part of this closeout. The file
+    // must now exist and carry exactly the one attribute M2 named, so the
+    // maintenance record and the tree agree in the new direction.
+    expect(readFileSync(path.join(ROOT, ".gitattributes"), "utf8")).toContain("*.sql text eol=lf");
   });
 
   /**
@@ -198,19 +201,33 @@ describe("the permanent documents agree on the facts that outlive the slice", ()
    * an append-only history tens of thousands of characters long, and a failing
    * `expect(text).toMatch(...)` prints all of it. A test whose failure output
    * has to be scrolled past is a test people stop reading.
+   *
+   * Retargeted 2026-08-05 with ADR-083: the closeout is a closed historical
+   * record and keeps describing Phase 2G as a recommendation; `STATE.md` is the
+   * living document and now records the phase's start as an owner authorization
+   * rather than being forbidden to state it.
    */
-  it.each([STATE, CLOSEOUT] as const)("%s says Phase 2G is not authorized or started", (document) => {
-    const claims = read(document).match(/[^.\n]*Phase 2G[^.\n]*/g) ?? [];
+  it("keeps the closeout's Phase 2G language a recommendation, not a start", () => {
+    const claims = read(CLOSEOUT).match(/[^.\n]*Phase 2G[^.\n]*/g) ?? [];
     const disclaims = claims.filter((claim) =>
       /not (authorized|started)|has not started|is a recommendation|remains a recommendation|not begin/i.test(claim),
     );
     expect(
       disclaims.length > 0,
-      `${document} mentions Phase 2G ${claims.length}× but never says it is unauthorized/unstarted`,
+      `${CLOSEOUT} mentions Phase 2G ${claims.length}× but never says it was a recommendation`,
     ).toBe(true);
 
     const authorized = claims.filter((claim) => /Phase 2G (is|has been) (authorized|started|begun)/i.test(claim));
-    expect(authorized, `${document} claims Phase 2G has begun`).toEqual([]);
+    expect(authorized, `${CLOSEOUT} claims Phase 2G has begun`).toEqual([]);
+  });
+
+  it("records Phase 2G's start in STATE.md as an owner authorization, never an accident", () => {
+    // The phase may only be described as started while the authorizing decision
+    // is named beside it. A `STATE.md` that says "Phase 2G" without ADR-083
+    // anywhere is either stale or claiming a start nothing authorized.
+    const state = read(STATE);
+    expect(state).toMatch(/Phase 2G/);
+    expect(state).toMatch(/ADR-083/);
   });
 
   /**

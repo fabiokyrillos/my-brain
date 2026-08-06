@@ -77,13 +77,16 @@ fails the build on an addition to it.
 | [`initiatives/entity-graph/`](./initiatives/entity-graph/) | PRD and implementation plan for Entity Graph Completion. |
 | [`initiatives/byok/`](./initiatives/byok/) | PRD and implementation plan for bring-your-own-key. |
 | [`initiatives/signup-hardening/`](./initiatives/signup-hardening/) | PRD and implementation plan for SH.0–SH.7. |
+| [`initiatives/phase-2g/`](./initiatives/phase-2g/) | `PHASE_2G_PRD.md`, `PHASE_2G_IMPLEMENTATION_PLAN.md` — Conversational Creation, authorized by ADR-083 (2026-08-05). The definition study behind them is `reports/phase-2g/PHASE_2G_DEFINITION.md`. |
 
-**Phase 2G has no governing artifact and must not acquire one without owner
-authorization.** `docs/reports/phase-2g/PHASE_2G_DEFINITION.md` is a study of
-whether the phase should exist; the A13 guard in
+**Phase 2H has no governing artifact and must not acquire one without owner
+authorization.** The A13 guard in
 `src/lib/closeout/phase-2f-documentation.test.ts` fails the build the moment a
-`PHASE_2G_PRD.md` or `PHASE_2G_IMPLEMENTATION_PLAN.md` appears anywhere under
-`docs/`, or any file declares a `2G-…` requirement.
+`PHASE_2H_PRD.md` or `PHASE_2H_IMPLEMENTATION_PLAN.md` appears anywhere under
+`docs/`, or any file declares a `2H-…` requirement, or an accepted ADR names
+Phase 2H in its heading. Phase 2G was started the sanctioned way — ADR-083 and
+the guard's retarget landed in one commit — and that is the precedent a Phase 2H
+start must follow.
 
 ---
 

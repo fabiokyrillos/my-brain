@@ -179,7 +179,6 @@ describe("docs placement", () => {
     // for a stated reason rather than by omission.
     const reportedWithoutGoverningDocs = new Set([
       "pre-2e",        // a hardening pass answering docs/reviews/, with no PRD of its own
-      "phase-2g",      // a definition study; the phase is unauthorized and has no PRD
       "shared",        // initiative-independent governance material
     ]);
     const reported = readdirSync(join(REPO, "docs/reports"), { withFileTypes: true })
