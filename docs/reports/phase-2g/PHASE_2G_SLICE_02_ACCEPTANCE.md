@@ -62,6 +62,8 @@ removed; the `no_match` offer is untouched (2G-ROUTE-003).
 | Several qualifiers keep the first in declaration order, and only it | `actions.test.ts`, `creation.test.ts` |
 | An unresolvable date is asked to be rephrased; nothing is previewed or written | `actions.test.ts` |
 | Confirm creates through the same family under the **same operation key** the preview fingerprinted; the applied event carries `applyRoute: "created"` | `actions.test.ts` |
+| **2G-ROUTE-002** — preview-then-confirm is mandatory: the preview names the object type and every field before anything exists, the server mints the single-use confirmation at render time against the shown payload, and no token is ever returned to the client as authorization | `actions.test.ts` — the offer renders with `control: "create"` and `issue_task_command_creation_confirmation` is called, while `create_task_command` is not, until the confirm |
+| **2G-ROUTE-005** — the created task is undoable through the registered `undo_create_task_command` handler, and the composer surfaces the undo affordance exactly as the no-match offer does | `actions.test.ts` (the applied state carries `undo.undoId`); the handler and its 24-hour window are the deployed ones, unchanged by this slice |
 | No `task_command_previewed` event for an explicit create | `actions.test.ts` |
 | The narrowed refusal names the supported surfaces | `actions.test.ts` |
 | `mapCreateIntentToCreationProposal` bare/qualified/blank-value behavior | `creation.test.ts` |

@@ -20,7 +20,7 @@
     "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
     "test:remote:daily-cycle": "node scripts/remote-daily-cycle-smoke.mjs",
     "test:remote:2c:confirmation": "node scripts/remote-editable-candidate-confirmation-smoke.mjs",
-  "test:remote:2d:resolution": "node scripts/remote-question-resolution-smoke.mjs",
+    "test:remote:2d:resolution": "node scripts/remote-question-resolution-smoke.mjs",
     "test:remote:2d:preview": "node scripts/remote-question-preview-smoke.mjs",
     "test:remote:2d:reinterpretation": "node scripts/remote-question-reinterpretation-smoke.mjs",
     "test:remote:2d:cleanup": "node scripts/verify-phase-2d-cleanup.mjs",
@@ -55,7 +55,8 @@
     "sh6:retention-schedule": "node scripts/sh6-retention-schedule.mjs",
     "sh6:quota-acceptance": "node scripts/sh6-quota-acceptance.mjs",
     "rollout:verify": "node scripts/verify-signup-rollout.mjs",
-    "docs:signup-hardening:traceability": "node scripts/generate-signup-hardening-traceability.mjs"
+    "docs:signup-hardening:traceability": "node scripts/generate-signup-hardening-traceability.mjs",
+    "docs:phase-2g:traceability": "node scripts/generate-phase-2g-traceability.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
