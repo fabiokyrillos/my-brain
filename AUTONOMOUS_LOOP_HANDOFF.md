@@ -336,3 +336,75 @@ not.
 Unchanged from §34. **Phase 2G is the roadmap successor and is not authorised**,
 and it still has no governing artifact — which is now a guarded property rather
 than an observation.
+
+*(§36's "Next" is answered by §37 below.)*
+
+---
+
+## §37 — Phase 2G is authorized, and the planning package exists (2026-08-05)
+
+### What changed
+
+**The owner authorized Phase 2G — Conversational Creation** (start directive,
+2026-08-05), the exact decision §34 named as the missing precondition. ADR-083
+records it. The starting state was verified first, not assumed: `main` at
+`d941359` (clean, > `a2d7102`), hosted parity `202608050077` read back from the
+linked project, the rollout gate **re-run live** — 25 pass · 3 fail ·
+2 owner-signature, refusing to open signup — merge-SHA CI green on `main`'s
+head, all Signup Hardening branches preserved, no monitors running.
+
+### The sanctioned start, in one commit
+
+An accepted ADR naming Phase 2G is itself an A13 start signal, so the ADR and
+the guard's retarget landed together:
+
+- **A13 now protects Phase 2H** with the same four signals (governing artifact
+  by role, declared `- **2H-XXXX-000:**` requirement, accepted ADR whose
+  *heading* names the phase, phase-marked implementation file). ADR-083's
+  heading deliberately avoids the successor's name for exactly that reason.
+- **`product-ux-documentation.test.ts`** now requires `STATE.md` to name
+  ADR-083 beside any claim that Phase 2G started; the closed product-ux
+  closeout keeps its recommendation language and is not edited.
+- **`docs-taxonomy-guard.test.ts`** dropped its stale `phase-2g`
+  reported-without-governing-docs exception the moment the governing pair
+  existed.
+
+### The planning package
+
+- `docs/initiatives/phase-2g/PHASE_2G_PRD.md` — governing; written against the
+  definition study **as amended by §20–§22**. Surfaces: **tasks** (create verb
+  → deployed `preview_task_command_creation` →
+  `issue_task_command_creation_confirmation` → `create_task_command`,
+  preview-then-confirm, registered undo) and **entries** (gated slice only).
+  Reminders/projects/people/organizations/contexts/events/memories-as-commands
+  refuse deterministically — reminders would reopen the Option C posture Phase
+  2F bounded.
+- `docs/initiatives/phase-2g/PHASE_2G_IMPLEMENTATION_PLAN.md` — slices 2G.1
+  (contract, 0 migrations, zero re-established by inventory gate G-2G.1) →
+  2G.2 (composer routing, 0) → 2G.3 (capture routing, **the ONE budgeted
+  migration**: `captureSource` allowlist widening) → 2G.4 (closeout, 0).
+- `docs/reports/phase-2g/PHASE_2G_THREAT_MODEL.md` — T-2G-1…14; the withdrawn
+  spend-ceiling risks (R3/R10/R11) are dispositioned: BYOK made the owner not
+  the payer, SH.6 owns quotas, `max_output_tokens` is verified shipped.
+
+### What a successor must not misread
+
+- **The migration budget is ONE and it is 2G.3's.** 2G.1/2G.2/2G.4 are zero;
+  2G.1's zero must be re-established by an executed inventory before that
+  slice is planned in detail (2G-CREATE-005). Exceeding the budget stops the
+  work and asks the owner.
+- **M2 is executed** — `.gitattributes` pins `*.sql text eol=lf`, and
+  `sql-reachability.test.ts` is now 46/46 on Windows. The old "two local
+  failures are the Windows baseline" memory is stale for this file.
+- **Nothing destructive moved.** No purge is authorized or executed; retention
+  sweeps stay unscheduled (ADR-082); SMTP unconfigured; signup closed at both
+  layers; the owner rollout tasks (retention, SMTP, backup drill, legal,
+  monitoring, two-green-runs flip) are re-recorded in `TODO.md`'s Phase 2G
+  section and remain open. **Documentation of those tasks is not their
+  completion.**
+
+### Next
+
+Implement 2G.1 per the plan: execute inventory gate G-2G.1, then the
+create-intent contract with the policy-version bump exercised. Phase 2H remains
+unauthorised.
