@@ -48,16 +48,17 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`pre-2e/`](./pre-2e/) | Pre-2E foundation hardening | historical, closed |
 | [`phase-2e/`](./phase-2e/) | Phase 2E — task commands | historical, closed |
 | [`phase-2f/`](./phase-2f/) | Phase 2F — operations and cleanup | historical, closed |
-| [`phase-2g/`](./phase-2g/) | Phase 2G — **definition study only; the phase is unauthorized and unstarted** | not started |
+| [`phase-2g/`](./phase-2g/) | Phase 2G — Conversational Creation (definition study, threat model, slice evidence) | **ACTIVE** — authorized by ADR-083, 2026-08-05 |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**No initiative is currently active.** Signup Hardening closed on 2026-08-05 and
-Phase 2G has not started. The next initiative to open creates its own directory
-here as its first act.
+**The active initiative is Phase 2G — Conversational Creation** (ADR-083,
+2026-08-05). Its governing pair lives in `docs/initiatives/phase-2g/`; its
+reports file here. Signup Hardening closed on 2026-08-05 and its directory is
+historical.
 
 ---
 
