@@ -1324,6 +1324,19 @@ one-shot authorization to buy another 15-minute timeout. This is an outage to
 wait out or to raise with GitHub support — **no code change and no rerun
 addresses it**, and `508cf6c` green ×3 cannot be reached until it clears.
 
+**The outage then escalated, and this part changes the recovery sequence.** The
+last workflow run GitHub created for this repository was `31126038710`
+(`001c2fe`, 18:32:41Z). The two pushes after it — `bdb6252` and `fc44375` —
+**produced no workflow run at all.** So the failure is no longer only runner
+allocation: GitHub has stopped *dispatching* runs for pushes here.
+
+**What that means for recovery, stated because it is easy to get wrong:** when
+runners return, PR #112 will have **no run at all** for its current head, and a
+missing run is not a failing run — nothing will retry itself. The PR's CI must
+be **explicitly re-triggered** (an empty commit, a close/reopen, or a manual
+dispatch), and *then* required green ×3. Waiting for a run that was never
+created is how this outage would quietly turn into an indefinite stall.
+
 **A reading trap worth keeping:** the run object's `run_attempt` field briefly
 reported `4` while attempt 5 was spinning up. Read
 `/actions/runs/{id}/attempts/{n}` for attempt facts; the summary field can lag.
