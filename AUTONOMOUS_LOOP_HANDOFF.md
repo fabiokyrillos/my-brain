@@ -879,3 +879,93 @@ the first-purge authorization), Resend SMTP, the backup-restore drill, the legal
 and monitoring signatures, one green `rollout:verify`, the owner-only
 `disable_signup` flip, a second green run. No purge is authorized; signup stays
 closed at both layers.
+
+## §45 — account deletion works again (standalone authentication hotfix, 2026-08-06)
+
+PR #107 merged at `231e274` with all three merge-SHA CI jobs green. This is the
+hotfix that followed it. **No phase started; Phase 2H remains unauthorised.**
+
+### The defect
+
+`requestAccountDeletion` re-authenticates before an irreversible action, which
+is a **password grant**, and hosted GoTrue enforces CAPTCHA on password grants —
+not on "the login page". It forwarded no `captchaToken`, so since SH.5 it
+answered `400 captcha_failed` for every caller and the surface reported
+**`A senha não confere.`** for the correct password. Deletion was impossible on
+the deployment and the message pointed at the wrong cause.
+
+### Why the guard did not catch it
+
+`captcha.test.ts` asserted the forward **by name, over one file**:
+`["signIn", "signUp", "recoverPassword", "resendConfirmation"]` in
+`features/auth/actions.ts`. True, and satisfied, and blind to a fifth grant
+living in `features/account/` — written in SH.2, before the control existed.
+
+**A list of known call sites is not a property of the system.** The guard now
+reads every `signInWithPassword` in `src/`, requires each to read a token,
+forward it in `options`, and use `isCaptchaError`, and asserts the found list is
+non-empty so it cannot pass vacuously.
+
+### What the fix does, and what it deliberately does not
+
+- the **same** `TurnstileWidget`, no second implementation;
+- rendered **server-side** and passed to the client surface as a node —
+  importing it into `DeletionSurface` would put `turnstileSiteKey(process.env)`
+  in the client bundle, where Next cannot inline a key read through a function
+  parameter: the widget would render nothing and every deletion would refuse for
+  a missing challenge. A guard pins page-renders / surface-does-not-import;
+- CSP permits the origin on the **exact** route `/{locale}/account/delete`. Not
+  `/account/:path*`: that also matches `/{locale}/account`, which the base
+  pattern's lookahead would not exclude, so the path would be served two
+  policies — and a browser enforces the **intersection**, which is the silent
+  no-op this repository already shipped once;
+- token forwarded as `options.captchaToken`;
+- **nothing verifies a token** — the secret stays in hosted GoTrue; a guard
+  asserts no `siteverify` anywhere in `src/`;
+- refusals split: `captcha-missing` (no token where a widget renders, decided
+  before any provider call), `captcha-failed` (the provider rejected it),
+  `password`, `throttled`, `unavailable`, `lifecycle`, `phrase`, `session`;
+- the grant is throttled against the existing `signin_failure` kind — **no
+  migration**. It was the only password grant in the product with nothing in
+  front of it;
+- **hosted CAPTCHA was not touched.** Disabling it would have "fixed" the
+  symptom by trading a provider-enforced boundary for four missing lines.
+
+Where no site key is configured — local and CI, deliberately (SH-CAPTCHA-005) —
+no token is required, or the surface would be untestable without a hosted secret
+and a green CI run would imply a control it never exercised.
+
+### Verification
+
+- `npm test` — **4107 passed** (3 file-level failures are the known Windows
+  shebang baseline, green in CI);
+- hosted journey, deployed project — **3 passed · 1 skipped · 0 failed**,
+  including the defect inverted: a correct password now yields the *challenge*
+  refusal and explicitly **not** the password one;
+- `npm run verify:online-residue` — **zero fixture residue**;
+- `npm run verify:deletion-captcha` — new, non-destructive, reads the **deployed
+  response**: one CSP header, the origin permitted in `script-src`/`frame-src`/
+  `connect-src`, the widget container and `captchaToken` field present, a site
+  key present, no second key-shaped value and no secret variable name in the
+  document. Signs in a disposable account, deletes it, submits nothing.
+
+### The one remaining owner step
+
+**The successful deletion has not run and is not claimed.** It needs a *valid*
+Turnstile token, and hosted Turnstile declines automated browsers by design —
+that refusal is SH-CAPTCHA-002 working. Solving it headlessly is what the
+control prevents; an "always passes" test key would make the assertion vacuous
+(that already produced two wrong published verdicts here); disabling CAPTCHA
+would weaken the control to prove the control. So it stays `test.fixme` and the
+owner action is one interactive pass on the deployment with a **disposable**
+account — never the owner's.
+
+### Phase 2H readiness
+
+Unchanged and **unauthorised**. The deferral list is unchanged (rate limiting,
+error sink, dead-man switch, retention triggers, deploy runbook) and this defect
+is now off it — it was fixed rather than carried in. Owner rollout tasks are
+unchanged: retention activation (enabling **is** the first-purge authorization),
+Resend SMTP, backup-restore drill, legal and monitoring signatures, one green
+`rollout:verify`, the owner-only `disable_signup` flip, a second green run. No
+purge is authorized; signup stays closed at both layers.

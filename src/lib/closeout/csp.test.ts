@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import nextConfig, {
+  ACCOUNT_DELETE_SOURCE,
   AUTH_SOURCE,
   BASE_SOURCE,
   contentSecurityPolicy,
@@ -74,11 +75,27 @@ const AUTH_PATHS = [
   "/en/auth/callback",
 ];
 
+/**
+ * The account-deletion route, which carries the widget for the same reason the
+ * auth routes do: re-authenticating before an irreversible deletion is a
+ * password grant, and hosted GoTrue enforces CAPTCHA on password grants.
+ */
+const WIDGET_PRODUCT_PATHS = ["/pt-BR/account/delete", "/en/account/delete"];
+
 const PRODUCT_PATHS = [
   "/pt-BR/app",
   "/pt-BR/app/inbox",
   "/en/app/settings",
   "/pt-BR/legal/terms",
+  // Shares a prefix with the deletion route and must NOT inherit its policy --
+  // `account-state` is a different path segment, not a child of `account/`.
+  "/pt-BR/account-state",
+  "/en/account-state",
+  // The wildcard that was deliberately not written: `/account/:path*` would
+  // have matched this too, and the base pattern's lookahead would not have
+  // excluded it, so it would have been served two policies and enforced their
+  // intersection -- the silent failure this whole file exists to prevent.
+  "/pt-BR/account",
   "/",
 ];
 
@@ -132,10 +149,30 @@ describe("SH-CAPTCHA-004: the Turnstile origin is permitted only where the widge
     expect(cspOf(base)).not.toContain(TURNSTILE_ORIGIN);
   });
 
-  it("no product route is served the Turnstile policy", async () => {
+  it("the account-deletion route is served the Turnstile policy too", async () => {
+    // Without this the script is blocked, no token is produced, and the
+    // provider refuses every deletion with `captcha_failed` -- which is the
+    // deployed defect this route's rule fixes. It is asserted here rather than
+    // trusted, because the failure is invisible until CAPTCHA is switched on.
+    const rule = (await rules()).find((r) => r.source === ACCOUNT_DELETE_SOURCE);
+    expect(rule, "no header rule exists for the account-deletion route").toBeTruthy();
+    expect(cspOf(rule!)).toContain(TURNSTILE_ORIGIN);
+
+    for (const path of WIDGET_PRODUCT_PATHS) {
+      expect(matches(ACCOUNT_DELETE_SOURCE, path), `${path} must match its own source`).toBe(true);
+      expect(matches(BASE_SOURCE, path), `${path} must NOT also match the base source`).toBe(false);
+      expect(matches(AUTH_SOURCE, path), `${path} is not an auth route`).toBe(false);
+    }
+  });
+
+  it("no other product route is served the Turnstile policy", async () => {
     for (const path of PRODUCT_PATHS) {
       expect(matches(BASE_SOURCE, path), `${path} must match the base source`).toBe(true);
       expect(matches(AUTH_SOURCE, path), `${path} must NOT match the auth source`).toBe(false);
+      expect(
+        matches(ACCOUNT_DELETE_SOURCE, path),
+        `${path} must NOT match the account-deletion source`,
+      ).toBe(false);
     }
   });
 
@@ -143,8 +180,10 @@ describe("SH-CAPTCHA-004: the Turnstile origin is permitted only where the widge
     // Two would mean the browser intersects the policies and the looser one is
     // a no-op -- the exact trap this fix exists to avoid. Zero would mean a
     // route with no CSP at all, which is worse than the bug being fixed.
-    for (const path of [...AUTH_PATHS, ...PRODUCT_PATHS]) {
-      const hits = [BASE_SOURCE, AUTH_SOURCE].filter((source) => matches(source, path));
+    for (const path of [...AUTH_PATHS, ...WIDGET_PRODUCT_PATHS, ...PRODUCT_PATHS]) {
+      const hits = [BASE_SOURCE, AUTH_SOURCE, ACCOUNT_DELETE_SOURCE].filter((source) =>
+        matches(source, path),
+      );
       expect(hits.length, `${path} matched ${hits.length} sources`).toBe(1);
     }
   });

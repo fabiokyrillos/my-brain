@@ -72,10 +72,30 @@ const sharedHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-/** Everything that is NOT an auth route. */
-export const BASE_SOURCE = "/((?!pt-BR/auth|en/auth).*)";
+/** Everything that is NOT a route carrying the widget. */
+export const BASE_SOURCE = "/((?!pt-BR/auth|en/auth|pt-BR/account/delete|en/account/delete).*)";
 /** Exactly the auth routes, both locales. */
 export const AUTH_SOURCE = "/:locale(pt-BR|en)/auth/:path*";
+/**
+ * The account-deletion route, both locales — the one product-side page that
+ * carries the widget.
+ *
+ * Named as the **exact** route rather than `/account/:path*`, for two reasons
+ * that are both about not repeating the bug this file exists to document.
+ * First, the requirement is "permitted only where the widget renders", and
+ * `/account/…` would license a prefix rather than a page. Second, a wildcard
+ * would also match `/{locale}/account` itself, which the base pattern's
+ * lookahead — anchored on `account/delete` — would not exclude; that path would
+ * then match *two* sources and be served the intersection, which is the silent
+ * failure mode all over again. `/account-state` is deliberately unaffected: it
+ * shares a prefix but not a path segment, so it keeps the base policy.
+ *
+ * Re-authenticating before an irreversible deletion is a password grant, and
+ * hosted GoTrue applies CAPTCHA enforcement to password grants. Without this
+ * origin the script is blocked, no token is produced, and the provider refuses
+ * every attempt with `captcha_failed` — which is exactly the defect this fixes.
+ */
+export const ACCOUNT_DELETE_SOURCE = "/:locale(pt-BR|en)/account/delete";
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -92,6 +112,16 @@ const nextConfig: NextConfig = {
       },
       {
         source: AUTH_SOURCE,
+        headers: [
+          ...sharedHeaders,
+          {
+            key: "Content-Security-Policy",
+            value: contentSecurityPolicy({ turnstile: true }),
+          },
+        ],
+      },
+      {
+        source: ACCOUNT_DELETE_SOURCE,
         headers: [
           ...sharedHeaders,
           {

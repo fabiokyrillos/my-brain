@@ -46,6 +46,7 @@
     "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
     "verify:storage:orphans": "node scripts/verify-storage-orphans.mjs",
     "verify:online-residue": "node scripts/verify-online-fixture-residue.mjs",
+    "verify:deletion-captcha": "node scripts/verify-deletion-captcha-surface.mjs",
     "account:lifecycle": "node scripts/account-lifecycle-admin.mjs",
     "byok:interop": "node scripts/byok-crypto-interop.mjs",
     "byok:verify-runtime": "node scripts/byok-verify-runtime-parity.mjs",

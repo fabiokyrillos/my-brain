@@ -19,13 +19,36 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import { useActionState } from "react";
 import type { Locale } from "@/lib/preferences";
 import { requestAccountDeletion } from "./actions";
 import { getDeletionCopy } from "./deletion-copy";
 import { idleDeletionRequestState } from "./deletion-request-state";
 
-export function DeletionSurface({ locale }: { locale: Locale }) {
+/** Refusals the provider actually answered, which spend the single-use token. */
+const CHALLENGE_SPENT = new Set(["password", "captcha-failed"]);
+
+export function DeletionSurface({
+  locale,
+  captcha,
+}: {
+  locale: Locale;
+  /**
+   * The Turnstile widget, rendered by the **page** and passed in.
+   *
+   * Not imported here, and that is load-bearing rather than stylistic. This is
+   * a client component; importing `TurnstileWidget` would pull it into the
+   * client bundle, where `turnstileSiteKey(process.env)` reads the key through
+   * a function parameter that Next cannot statically inline. The site key would
+   * come back `undefined`, the widget would render nothing, no token would be
+   * produced, and every deletion would be refused for a missing challenge —
+   * the same silent, configuration-shaped failure the CSP bug in
+   * `next.config.ts` describes. Rendering it on the server and handing it down
+   * as a node keeps the key where it is resolvable.
+   */
+  captcha?: ReactNode;
+}) {
   const copy = getDeletionCopy(locale);
   const [state, formAction, pending] = useActionState(
     requestAccountDeletion,
@@ -65,6 +88,7 @@ export function DeletionSurface({ locale }: { locale: Locale }) {
             type="password"
           />
         </label>
+        {captcha}
         <button disabled={pending} type="submit">
           {pending ? copy.submitting : copy.submit}
         </button>
@@ -77,6 +101,9 @@ export function DeletionSurface({ locale }: { locale: Locale }) {
         <p className="form-alert" role="alert">
           {state.message}
         </p>
+      ) : null}
+      {state.status === "error" && state.code && CHALLENGE_SPENT.has(state.code) ? (
+        <p className="form-hint">{copy.retryHint}</p>
       ) : null}
     </div>
   );
