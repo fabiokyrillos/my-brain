@@ -165,9 +165,22 @@ export function findings(root) {
   }
 
   // The migration budget, resolved rather than restated.
+  //
+  // Asserted as *presence in the chain* rather than as the chain's head. The
+  // original form pinned the head to `202608050077` and was right while
+  // Signup Hardening was the last initiative to spend a migration; Phase 2G
+  // then spent its own budgeted one (`202608060078`, ADR-083/ADR-084) and the
+  // check began reporting a successor phase's legitimate work as a defect in
+  // this initiative's evidence.
+  //
+  // The property that actually belongs to Signup Hardening is that its eight
+  // migrations are in the chain and that it spent no ninth — a later phase
+  // extending the chain says nothing about either. What is *not* weakened:
+  // the SH head must still be present, so deleting or renumbering it fails
+  // exactly as before.
   const versions = migrationVersions(root);
-  if (versions.length && versions[versions.length - 1] !== "202608050077") {
-    problems.push(`chain head is ${versions[versions.length - 1]}, not the SH close head 202608050077`);
+  if (versions.length && !versions.includes("202608050077")) {
+    problems.push("the SH close head 202608050077 is absent from the migration chain");
   }
 
   return problems;

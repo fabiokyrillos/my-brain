@@ -173,12 +173,12 @@ export type ProductEventSubject = {
 type EmptyProductEventProperties = Readonly<Record<string, never>>;
 
 export type ProductEventPropertiesByName = {
-  capture_started: { captureSource: "home" | "capture_page" | "global" };
-  capture_save_succeeded: { captureSource: "home" | "capture_page" | "global"; durationMs: number };
+  capture_started: { captureSource: "home" | "capture_page" | "global" | "composer" };
+  capture_save_succeeded: { captureSource: "home" | "capture_page" | "global" | "composer"; durationMs: number };
   capture_save_failed: {
-    captureSource: "home" | "capture_page" | "global";
+    captureSource: "home" | "capture_page" | "global" | "composer";
     durationMs: number;
-    failureKind: "validation" | "session" | "storage" | "unknown";
+    failureKind: "validation" | "session" | "storage" | "unknown" | "quota";
   };
   capture_processing_enqueued: { processingMode: "initial" | "reprocess" };
   capture_processing_completed: {
@@ -378,16 +378,16 @@ function arePropertiesValid<Name extends ProductEventName>(
   switch (name) {
     case "capture_started":
       return hasExactKeys(value, ["captureSource"])
-        && isOneOf(value.captureSource, ["home", "capture_page", "global"]);
+        && isOneOf(value.captureSource, ["home", "capture_page", "global", "composer"]);
     case "capture_save_succeeded":
       return hasExactKeys(value, ["captureSource", "durationMs"])
-        && isOneOf(value.captureSource, ["home", "capture_page", "global"])
+        && isOneOf(value.captureSource, ["home", "capture_page", "global", "composer"])
         && isBoundedDuration(value.durationMs);
     case "capture_save_failed":
       return hasExactKeys(value, ["captureSource", "durationMs", "failureKind"])
-        && isOneOf(value.captureSource, ["home", "capture_page", "global"])
+        && isOneOf(value.captureSource, ["home", "capture_page", "global", "composer"])
         && isBoundedDuration(value.durationMs)
-        && isOneOf(value.failureKind, ["validation", "session", "storage", "unknown"]);
+        && isOneOf(value.failureKind, ["validation", "session", "storage", "unknown", "quota"]);
     case "capture_processing_enqueued":
       return hasExactKeys(value, ["processingMode"])
         && isOneOf(value.processingMode, ["initial", "reprocess"]);

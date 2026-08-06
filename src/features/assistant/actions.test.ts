@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { captureEntry } from "@/features/capture/actions";
 import { sendChatMessage } from "@/features/chat/actions";
 import { runTaskCommand } from "@/features/task-commands/actions";
 import {
@@ -26,9 +27,15 @@ import { idleAssistantComposerState } from "./composer-state";
 
 vi.mock("@/features/task-commands/actions", () => ({ runTaskCommand: vi.fn() }));
 vi.mock("@/features/chat/actions", () => ({ sendChatMessage: vi.fn() }));
+// Slice 2G.3's third collaborator, mocked on the same terms as the other two:
+// `captureEntry` has its own suite, and what is untested until here is the
+// decision to reach it at all. It also carries `server-only` transitively, so
+// an unmocked import would fail this file at load rather than at an assertion.
+vi.mock("@/features/capture/actions", () => ({ captureEntry: vi.fn() }));
 
 const commandMock = vi.mocked(runTaskCommand);
 const chatMock = vi.mocked(sendChatMessage);
+const captureMock = vi.mocked(captureEntry);
 
 function ask(text: string, overrides: Record<string, string> = {}): FormData {
   const data = new FormData();
@@ -47,6 +54,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   chatMock.mockResolvedValue({ status: "error", message: "O Brain não conseguiu responder agora." });
   commandMock.mockResolvedValue(commandState());
+  captureMock.mockResolvedValue({
+    status: "success",
+    receipt: {
+      entryId: "aaaaaaaa-1111-4111-8111-111111111111",
+      persisted: true,
+      productState: "organizing",
+      messageKey: "capture_saved",
+      safeHref: "/pt-BR/app/inbox/aaaaaaaa-1111-4111-8111-111111111111",
+      replayed: false,
+    },
+  } as Awaited<ReturnType<typeof captureEntry>>);
 });
 
 describe("runAssistantTurn — the command path keeps its contracts", () => {
@@ -253,5 +271,120 @@ describe("runAssistantTurn — the bounds", () => {
   it("localizes every refusal in English too", async () => {
     const result = await runAssistantTurn(idleAssistantComposerState, ask("   ", { locale: "en" }));
     expect(result.notice?.heading).toBe("Write something first");
+  });
+});
+
+describe("capture routing (2G.3)", () => {
+  it("files an explicit capture request and links to the entry it became", async () => {
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Registre que preciso enviar o relatório para a Marina"),
+    );
+
+    expect(result.route).toBe("capture_intent");
+    expect(result.notice?.heading).toBe("Anotei isso para você");
+    expect(result.notice?.nextStep?.href).toBe("/pt-BR/app/inbox/aaaaaaaa-1111-4111-8111-111111111111");
+    // Neither the model nor the knowledge path was reached: the route is
+    // decided deterministically, before anything is billed.
+    expect(commandMock).not.toHaveBeenCalled();
+    expect(chatMock).not.toHaveBeenCalled();
+
+    const submitted = captureMock.mock.calls[0]?.[1] as FormData;
+    expect(submitted.get("captureSource")).toBe("composer");
+    // `entries.source` says where the entry came from; `captureSource` says
+    // which surface asked. They are different questions.
+    expect(submitted.get("source")).toBe("chat");
+    expect(submitted.get("content")).toContain("relatório");
+    // 2G-CAPTURE-006: a server-minted key rides every routed capture.
+    expect(String(submitted.get("idempotencyKey"))).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("asks which object was meant instead of guessing, and writes nothing", async () => {
+    // A filing imperative *and* a named task: two different objects in one
+    // sentence, and the product has no way to know which was meant. Asking
+    // costs a turn; guessing wrong costs a stored object of the wrong type
+    // that the owner has to find and delete.
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Registre que preciso de uma tarefa para revisar os números"),
+    );
+
+    expect(result.route).toBe("capture_ambiguous");
+    expect(result.notice?.heading).toBe("Uma nota ou uma tarefa?");
+    expect(captureMock).not.toHaveBeenCalled();
+    expect(commandMock).not.toHaveBeenCalled();
+    expect(chatMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves an unambiguous task request to the model, which is where creation lives", async () => {
+    // "Registre uma tarefa…" names exactly one object and matches no filing
+    // opener, so it is not this module's to route: it goes to the command
+    // path, where 2G.1's `create` classification handles it. The two routes
+    // are structurally disjoint, and this pins that rather than assuming it.
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Registre uma tarefa para revisar os números"),
+    );
+
+    expect(result.route).toBe("command");
+    expect(captureMock).not.toHaveBeenCalled();
+    expect(commandMock).toHaveBeenCalled();
+  });
+
+  it("surfaces the capture action's own honest refusal rather than a generic failure", async () => {
+    // A quota ceiling and a storage fault are different facts, and
+    // `captureEntry` already localizes both (SH.6). Flattening them here would
+    // tell someone at today's limit that something went wrong instead.
+    captureMock.mockResolvedValue({
+      status: "error",
+      code: "quota_exceeded",
+      message: "Você atingiu o limite de entradas de hoje.",
+    } as Awaited<ReturnType<typeof captureEntry>>);
+
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Anote que a reunião mudou para sexta"),
+    );
+
+    expect(result.route).toBe("capture_intent");
+    expect(result.notice?.heading).toBe("Não consegui guardar isso");
+    expect(result.notice?.detail).toBe("Você atingiu o limite de entradas de hoje.");
+    expect(result.notice?.nextStep).toBeNull();
+  });
+
+  it("leaves a question to the knowledge path, even with a filing verb in it", async () => {
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Registre que eu pedi o relatório?"),
+    );
+
+    expect(result.route).not.toBe("capture_intent");
+    expect(captureMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps memory ahead of capture, because its branch persists nothing", async () => {
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Lembre disso sempre: eu reviso faturas às sextas"),
+    );
+
+    expect(result.route).toBe("memory_intent");
+    expect(captureMock).not.toHaveBeenCalled();
+  });
+
+  it("localizes the capture acknowledgment and the ambiguity question in English", async () => {
+    const filed = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Note that the invoice arrived late", { locale: "en" }),
+    );
+    expect(filed.route).toBe("capture_intent");
+    expect(filed.notice?.heading).toBe("I noted that for you");
+
+    const asked = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Note that I need a task for the numbers", { locale: "en" }),
+    );
+    expect(asked.route).toBe("capture_ambiguous");
+    expect(asked.notice?.heading).toBe("A note or a task?");
   });
 });

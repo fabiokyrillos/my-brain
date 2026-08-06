@@ -53,7 +53,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608050077";
+const AUTHORIZED_MIGRATION_HEAD = "202608060078";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

@@ -17,7 +17,11 @@ import type { CaptureState } from "./quick-capture-form";
 
 const captureRequestSchema = z.object({
   idempotencyKey: z.string().uuid(),
-  captureSource: z.enum(["home", "capture_page"]),
+  // `composer` joins the two form surfaces with Slice 2G.3 (2G-CAPTURE-003).
+  // It is its own value rather than a reuse of `global`: the funnel's whole
+  // purpose is to say *where* a capture came from, and a composer capture and
+  // a global-shortcut capture answer that question differently.
+  captureSource: z.enum(["home", "capture_page", "composer"]),
 });
 
 const sessionExpiredMessage = { "pt-BR": "Sua sessão expirou. Entre novamente.", en: "Your session expired. Sign in again." } as const;
@@ -122,7 +126,14 @@ export async function captureEntry(
     persisted: true,
     productState: lifecycle.productState,
     messageKey: replayed ? "capture_replayed" : "capture_saved",
-    safeHref: captureSource === "capture_page" ? `/${locale}/app/inbox/${entryId}` : undefined,
+    // The composer gets the link for the same reason the capture page does:
+    // both leave the user somewhere other than the entry they just created, so
+    // without it the entry is stored and unreachable from the acknowledgment
+    // that announced it (2G-CAPTURE-001).
+    safeHref:
+      captureSource === "capture_page" || captureSource === "composer"
+        ? `/${locale}/app/inbox/${entryId}`
+        : undefined,
     replayed,
   });
   if (!receipt) return { status: "error", code: "operation_failed", message: actionFailedMessage[locale] };

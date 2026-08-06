@@ -42,6 +42,20 @@ export const ASSISTANT_ROUTES = [
   "idle",
   "command",
   "memory_intent",
+  /**
+   * `capture_intent` — recognised as a request to file the owner's own words
+   * as an entry, and **the one composer route that writes on the turn that
+   * recognises it** (2G-CAPTURE-001). It is the capture page's posture reached
+   * by sentence rather than by navigation: the text is the owner's, so there
+   * is nothing to confirm about it, and the acknowledgment names the object it
+   * became and links to it.
+   *
+   * `capture_ambiguous` — the sentence opened with a filing imperative *and*
+   * named a task, so it asks which was meant instead of guessing
+   * (2G-CAPTURE-002, study R6). Writes nothing.
+   */
+  "capture_intent",
+  "capture_ambiguous",
   "knowledge_failed",
   "invalid",
 ] as const;

@@ -38,6 +38,22 @@ type AssistantCopy = {
    */
   readonly memoryNextStep: string;
   /** The knowledge answer failed. */
+  /**
+   * The capture route's own words (2G-CAPTURE-001/002).
+   *
+   * `captureHeading`/`captureDetail` announce an entry — never a task — so the
+   * object the turn produced is legible without opening it. `captureNextStep`
+   * is the link to the entry itself. The ambiguous pair asks rather than
+   * guessing, and `captureFailedDetail` is the honest failure that keeps the
+   * user's text visible in the echo so nothing is lost.
+   */
+  readonly captureHeading: string;
+  readonly captureDetail: string;
+  readonly captureNextStep: string;
+  readonly captureAmbiguousHeading: string;
+  readonly captureAmbiguousDetail: string;
+  readonly captureFailedHeading: string;
+  readonly captureFailedDetail: string;
   readonly knowledgeFailedHeading: string;
   /** Submission-level refusals. */
   readonly emptyHeading: string;
@@ -64,6 +80,14 @@ export const assistantCopy = {
     resultRegionLabel: (agent) => `Resposta do ${agent}`,
     echoLabel: "Você escreveu",
     memoryNextStep: "Criar essa memória em Memórias",
+    captureHeading: "Anotei isso para você",
+    captureDetail: "Guardei o texto como uma entrada e comecei a interpretá-la.",
+    captureNextStep: "Ver a entrada",
+    captureAmbiguousHeading: "Uma nota ou uma tarefa?",
+    captureAmbiguousDetail:
+      "Você pediu para registrar e mencionou uma tarefa, e eu não quero escolher por você. Para uma nota, escreva sem a palavra “tarefa”; para uma tarefa, comece com “adicione uma tarefa…”.",
+    captureFailedHeading: "Não consegui guardar isso",
+    captureFailedDetail: "Nada foi salvo. Seu texto continua acima — tente enviar de novo.",
     knowledgeFailedHeading: "Não consegui responder agora",
     emptyHeading: "Escreva algo primeiro",
     emptyDetail: "O campo está vazio, então não há nada para interpretar.",
@@ -87,6 +111,14 @@ export const assistantCopy = {
     resultRegionLabel: (agent) => `${agent}’s response`,
     echoLabel: "You wrote",
     memoryNextStep: "Create this memory in Memories",
+    captureHeading: "I noted that for you",
+    captureDetail: "I kept your text as an entry and started interpreting it.",
+    captureNextStep: "Open the entry",
+    captureAmbiguousHeading: "A note or a task?",
+    captureAmbiguousDetail:
+      "You asked me to record something and mentioned a task, and I do not want to choose for you. For a note, write it without the word “task”; for a task, start with “add a task…”.",
+    captureFailedHeading: "I could not save that",
+    captureFailedDetail: "Nothing was stored. Your text is still above — try sending it again.",
     knowledgeFailedHeading: "I could not answer right now",
     emptyHeading: "Write something first",
     emptyDetail: "The field is empty, so there is nothing to interpret.",

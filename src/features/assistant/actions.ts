@@ -30,6 +30,7 @@
  *    path from this module to `memories`.
  */
 
+import { captureEntry } from "@/features/capture/actions";
 import { sendChatMessage } from "@/features/chat/actions";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { runTaskCommand } from "@/features/task-commands/actions";
@@ -171,6 +172,64 @@ export async function runAssistantTurn(
       ),
       proposal,
     };
+  }
+
+  if (decision.kind === "capture_ambiguous") {
+    // Nothing is written and no provider is called: the sentence asked for two
+    // objects and the honest answer is to ask which (2G-CAPTURE-002).
+    return noticed(
+      "capture_ambiguous",
+      {
+        heading: copy.captureAmbiguousHeading,
+        detail: copy.captureAmbiguousDetail,
+        nextStep: null,
+      },
+      text,
+    );
+  }
+
+  if (decision.kind === "capture_intent") {
+    // The one composer branch that writes. It reuses `captureEntry` whole —
+    // the same Server Action the capture page submits to — so the owner's
+    // lifecycle gate, the SH.6 quota ceilings (2G-CAPTURE-005), the
+    // idempotency key (2G-CAPTURE-006), the `awaiting_ai_configuration` path
+    // when no credential exists (2G-CAPTURE-004) and the worker nudge are all
+    // inherited rather than re-implemented beside them.
+    const request = new FormData();
+    request.set("content", text);
+    request.set("locale", locale);
+    // `entries.source` has admitted `'chat'` since `202607160003`; this is
+    // where the entry came from, and `captureSource` is which surface asked.
+    request.set("source", "chat");
+    request.set("idempotencyKey", crypto.randomUUID());
+    request.set("captureSource", "composer");
+
+    const captured = await captureEntry({ status: "idle" }, request);
+    if (captured.status !== "success") {
+      return noticed(
+        "capture_intent",
+        {
+          heading: copy.captureFailedHeading,
+          // A quota ceiling and a storage fault are different facts, and
+          // `captureEntry` already localizes both — surfacing its message
+          // keeps the honest one rather than flattening them into a generic
+          // failure.
+          detail: captured.status === "error" ? captured.message : copy.captureFailedDetail,
+          nextStep: null,
+        },
+        text,
+      );
+    }
+    const href = captured.receipt.safeHref;
+    return noticed(
+      "capture_intent",
+      {
+        heading: copy.captureHeading,
+        detail: copy.captureDetail,
+        nextStep: href ? { href, label: copy.captureNextStep } : null,
+      },
+      text,
+    );
   }
 
   if (decision.kind === "knowledge") {

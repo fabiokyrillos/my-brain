@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
+import { parseProductEventPayload } from "./contracts";
+
 type ProductAnalyticsContracts = {
   productEventContractVersion?: number;
   productEventVersionByName?: Record<string, number>;
@@ -318,6 +320,78 @@ describe("product analytics contracts", () => {
       ...confirmedValid,
       properties: { candidateCount: 2, editedCandidateCount: 3, editedFieldCount: 3 },
     })).not.toBeNull();
+  });
+
+  /**
+   * ADR-084's regression pin: the producer and the two validators must not
+   * diverge again.
+   *
+   * SH.6 shipped a producer for `failureKind: 'quota'` and no consumer of it —
+   * neither this module's `isOneOf` nor the database enum admitted the value,
+   * so every quota refusal recorded nothing while the call site read as though
+   * it recorded something. Three declarations of one vocabulary, checked here
+   * against each other rather than against a hand-written list, because that
+   * is the shape of the defect: each one was internally consistent.
+   */
+  it("agrees with the migration chain on captureSource and failureKind (ADR-084)", () => {
+    const migration = readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/202608060078_phase_2g_composer_capture_source.sql",
+      ),
+      "utf8",
+    );
+    // The database's own words, read rather than restated.
+    expect(migration).toContain(
+      "'captureSource', array['home', 'capture_page', 'global', 'composer']",
+    );
+    expect(migration).toContain(
+      "'failureKind', array['validation', 'session', 'storage', 'unknown', 'quota']",
+    );
+
+    // The application's, and they must admit exactly what the database does.
+    const contracts = readFileSync(
+      path.resolve(process.cwd(), "src/features/product-analytics/contracts.ts"),
+      "utf8",
+    );
+    expect(contracts).toContain('["home", "capture_page", "global", "composer"]');
+    expect(contracts).toContain('["validation", "session", "storage", "unknown", "quota"]');
+
+    // And the producer's, so a value nobody validates cannot ship again.
+    const producer = readFileSync(
+      path.resolve(process.cwd(), "src/features/capture/actions.ts"),
+      "utf8",
+    );
+    for (const emitted of ["quota", "storage", "composer"]) {
+      expect(producer, `${emitted} is emitted by capture/actions.ts`).toContain(`"${emitted}"`);
+    }
+
+    // The behavioural half: the validator this module exports must accept the
+    // two repaired values and still refuse an invented one.
+    // Imported statically rather than through this file's `importActual`
+    // shim. That shim exists to tolerate the module being absent — it falls
+    // back to `{}` — which is the right posture for the vocabulary-census
+    // cases above and the wrong one here: a `parse` that silently became
+    // `undefined` would make every refusal assertion below pass by not
+    // running, which is the exact failure mode this test exists to catch.
+    const failed = {
+      ...basePayload,
+      name: "capture_save_failed",
+      properties: { captureSource: "composer", durationMs: 12, failureKind: "quota" },
+    };
+    expect(parseProductEventPayload(failed)).not.toBeNull();
+    expect(
+      parseProductEventPayload({
+        ...failed,
+        properties: { ...failed.properties, failureKind: "invented" },
+      }),
+    ).toBeNull();
+    expect(
+      parseProductEventPayload({
+        ...failed,
+        properties: { ...failed.properties, captureSource: "invented" },
+      }),
+    ).toBeNull();
   });
 
   it("keeps contracts independent from React, Supabase, database types, and UI modules", () => {

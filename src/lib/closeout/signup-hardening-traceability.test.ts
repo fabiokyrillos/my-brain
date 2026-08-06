@@ -102,11 +102,34 @@ describe("the generator refuses to print past a defect", () => {
     );
   });
 
-  it("catches a chain head that is not the SH close head", () => {
+  it("permits a later phase extending the chain past the SH close head", () => {
+    // Retargeted with Phase 2G's own budgeted migration. The check used to pin
+    // the chain *head* to `202608050077`, which was correct only while Signup
+    // Hardening was the last initiative to spend one: the moment a successor
+    // phase spent its own, this initiative's evidence began reporting that
+    // phase's legitimate work as a defect of its own.
     withFixture(
       (root) => writeFileSync(join(root, "supabase/migrations/202609010078_something.sql"), "-- x\n"),
       (root) => {
-        expect(findings(root).some((f) => f.includes("chain head"))).toBe(true);
+        expect(findings(root).some((f) => f.includes("migration chain"))).toBe(false);
+      },
+    );
+  });
+
+  it("still catches an SH migration that left the chain", () => {
+    // The property that genuinely belongs to this initiative, and the half the
+    // retarget above must not have given away: its own head must be present,
+    // so a deleted or renumbered SH migration fails exactly as before.
+    withFixture(
+      (root) => {
+        // A non-empty chain that has lost the SH head, rather than an empty
+        // one: the check tolerates a repository with no migrations at all, so
+        // deleting the only file would prove nothing.
+        rmSync(join(root, "supabase/migrations/202608050077_retention_and_exposure.sql"));
+        writeFileSync(join(root, "supabase/migrations/202609010078_something.sql"), "-- x\n");
+      },
+      (root) => {
+        expect(findings(root).some((f) => f.includes("202608050077"))).toBe(true);
       },
     );
   });

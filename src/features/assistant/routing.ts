@@ -19,10 +19,13 @@ import type { TaskCommandConsoleState } from "@/features/task-commands/console-s
 // (see its header) precisely so callers outside the provider can share it.
 import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 
+import { classifyCaptureIntent } from "./capture-intent";
 import { looksLikeMemoryIntent } from "./memory-intent";
 
 export type AssistantDecision =
   | { readonly kind: "memory_intent" }
+  | { readonly kind: "capture_intent" }
+  | { readonly kind: "capture_ambiguous" }
   | { readonly kind: "knowledge"; readonly reason: "too_long_for_command" }
   | { readonly kind: "command_first" };
 
@@ -45,6 +48,21 @@ export type AssistantDecision =
  */
 export function decideAssistantRoute(text: string): AssistantDecision {
   if (looksLikeMemoryIntent(text)) return { kind: "memory_intent" };
+  // Capture is second, and its position is the decision worth defending: it is
+  // the only branch here that writes on the turn that selects it, so it must
+  // sit behind the free branch and ahead of the billed one. Ahead of the
+  // command parse, because an explicit "registre que…" is not a task command
+  // and sending it to the model would buy a refusal this rule already knows;
+  // behind memory, because "lembre disso" is the narrower instruction and its
+  // branch persists nothing.
+  //
+  // The ambiguous verdict is deliberately *not* folded into `command_first`.
+  // Falling through would let the model classify the sentence as a creation,
+  // which is precisely the silent object substitution 2G-CAPTURE-002 exists to
+  // prevent — the user asked for two things and the honest answer is to ask.
+  const capture = classifyCaptureIntent(text);
+  if (capture === "capture") return { kind: "capture_intent" };
+  if (capture === "ambiguous") return { kind: "capture_ambiguous" };
   if (text.length > MAX_COMMAND_TEXT_LENGTH) {
     return { kind: "knowledge", reason: "too_long_for_command" };
   }
