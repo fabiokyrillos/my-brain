@@ -194,7 +194,59 @@ container present, the response field named `captchaToken`, a site key present,
 both form controls intact. It then deletes the disposable account. It submits
 nothing and deletes nothing else.
 
-<!-- HOSTED-RESULT -->
+Run against `https://my-brain-dusky.vercel.app` after the hotfix merged at
+`c3afeb6` (merge-SHA CI green on all three jobs):
+
+```
+the deployed account-deletion surface
+  ok   reachable while authenticated — status 200
+  ok   carries exactly one Content-Security-Policy — 1 policy/policies
+  ok   its script-src permits the widget origin
+  ok   its frame-src permits it too
+  ok   its connect-src permits it too
+
+the widget itself
+  ok   the page renders the Turnstile container
+  ok   the response field is the one the action reads
+  ok   it loads the script from Cloudflare
+  ok   a site key is present — 0x4AAA… (24 chars)
+
+nothing secret is exposed
+  ok   no second key-shaped value in the document
+  ok   no secret variable name reaches the page
+
+the controls are still there
+  ok   the confirmation input
+  ok   the password input
+
+disposable account removed : true
+```
+
+Controls read at the same time: `/pt-BR/auth/login` still permits the origin
+(the surface that always worked), and `/pt-BR/account-state` still does **not** —
+so the widening is the deletion route and nothing else.
+
+## 7b. The deployed surface, driven in a browser
+
+`e2e/deployed-deletion-captcha.spec.ts` — opt-in through `DEPLOYED_ORIGIN`,
+because every other online spec drives a locally-built app against the hosted
+database, and the two things this checks exist only on the deployment: the site
+key that makes a widget render, and the CSP that decides whether its script may
+load at all. **5 passed · 0 failed**, and it deletes nothing.
+
+| case | result |
+| --- | --- |
+| the deployed page renders exactly one widget, **inside the form**, with a public site key and no second key-shaped value | pass |
+| a wrong phrase refuses **before the challenge is consulted** | pass |
+| a submission carrying **no token** → `A verificação de segurança não foi concluída.` and **not** the password message | pass |
+| a **forged** token → refused **by GoTrue**, reported as `A verificação de segurança não foi aceita.` and **not** the password message | pass |
+| the provisioned account is `active` and intact after all of them | pass |
+
+The last two are the pair the defect collapsed. A missing token is decided by
+the application before any provider call; a forged one is decided by the
+provider, because the application holds no secret and verifies nothing. Both are
+now distinguishable from a wrong password **on the deployment**, which is where
+the original symptom lived.
 
 ## 8. The smallest owner action
 

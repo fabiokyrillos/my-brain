@@ -969,3 +969,33 @@ unchanged: retention activation (enabling **is** the first-purge authorization),
 Resend SMTP, backup-restore drill, legal and monitoring signatures, one green
 `rollout:verify`, the owner-only `disable_signup` flip, a second green run. No
 purge is authorized; signup stays closed at both layers.
+
+## §46 — the hotfix is deployed and verified on the deployment (2026-08-06)
+
+PR #108 merged at `c3afeb6`; all three merge-SHA CI jobs green. Vercel carries
+it. Two hosted verifications ran against `https://my-brain-dusky.vercel.app`
+and both pass, neither destructive:
+
+- `npm run verify:deletion-captcha` — one CSP header, the widget origin in
+  `script-src`/`frame-src`/`connect-src`, the container and the `captchaToken`
+  field present, a real public site key (`0x4AAA…`, 24 chars — not a Cloudflare
+  test key), no second key-shaped value, no secret variable name, both form
+  controls intact. Controls read alongside it: `/auth/login` still permits the
+  origin, `/account-state` still does not.
+- `e2e/deployed-deletion-captcha.spec.ts` (opt-in via `DEPLOYED_ORIGIN`) —
+  **5 passed**, driving the deployed app in a browser: exactly one widget and
+  it is **inside the form**; a wrong phrase refuses before the challenge is
+  consulted; **no token** → the missing-challenge copy and explicitly not the
+  password copy; a **forged** token → refused *by GoTrue* with the
+  challenge-rejected copy, again not the password copy; the provisioned account
+  `active` and intact throughout.
+
+That last pair is the one the defect collapsed into "A senha não confere.", and
+both halves are now distinguishable **on the deployment** — which is where the
+symptom lived and where no unit test could have seen it.
+
+**Still not claimed, and this is the only remaining step:** the *successful*
+deletion. It needs an interactive Turnstile solve; the three ways to automate it
+(a headless solve, an always-passing test key, disabling the control) each prove
+nothing. Owner action: one manual pass at `/pt-BR/account/delete` on the
+deployment with a **disposable** account — never the owner's.
