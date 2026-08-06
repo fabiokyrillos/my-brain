@@ -566,11 +566,68 @@ Two lessons that generalise, in this repository's own idiom:
 
 ### Next
 
-Merge the 2G.3 PR when green, re-running the merge-SHA `verify` run if branch
-concurrency cancels it (§39's trap). Then **apply `202608060078` to the linked
-project** — non-destructive, a `create or replace` of an internal validator,
-inside the approved budget — and read parity back. Then 2G.4: the fail-closed
-traceability generator, the hosted verification that finally executes the two
-written-not-executed journeys, the measured funnel statement for ADR-055, and
-the phase's final report. Phase 2H remains unauthorised; no purge is
-authorized; signup stays closed.
+*(Answered by §41 below — 2G.3 merged, deployed and verified.)*
+
+---
+
+## §41 — 2G.3 is deployed, and three probes measured nothing before one worked (2026-08-06)
+
+### Where things stand
+
+- **2G.3 is CLOSED AND DEPLOYED.** PR #102 merged at `e2c3718`, merge-SHA CI
+  green on all three jobs. `npx supabase db push --linked` applied
+  `202608060078` after a `--dry-run` confirmed it was the only pending one.
+  **Hosted parity is `202608060078`**, read back row for row.
+- **Phase 2G's migration budget is fully spent and was not exceeded.** Any
+  further DDL in this phase is an owner amendment.
+- **Three of four slices are closed** (2G.1, 2G.2, 2G.3). Only 2G.4 —
+  convergence and closeout, zero migrations — remains.
+- `main` is clean and synchronized. Nothing destructive moved: signup closed,
+  retention unscheduled, no purge, SMTP untouched.
+
+### The verification, and the three that came before it
+
+Schema parity says the migration ran; it does not say the function accepts
+what it was widened for. The behavioural probe is **5/5 with both controls
+refused** (`400 / 22023`) on a disposable account — evidence at
+`docs/reports/phase-2g/PHASE_2G_MIGRATION_078_DEPLOYMENT.md`.
+
+**Three earlier probe shapes measured nothing, and their controls caught all
+three:**
+
+1. Wrong RPC parameter names → `404 PGRST202` for every case.
+2. `service_role` caller → `403 / 42501` for every case: the EXECUTE grant is
+   checked *before* the function body, so the validator never ran.
+3. Password sign-in → `400 captcha_failed`: SH.5's hosted Turnstile refuses
+   automated sign-in **by design**.
+
+Each time, **every case returned identically, controls included**. A probe
+whose controls agree with its positives has measured nothing, and publishing
+either of the first two as "the widened values are accepted" would have been
+the same class of false verdict SH.5 already paid for once
+(`control-must-not-be-exempt`).
+
+**What worked** is SH.5's own observation mechanism: `admin/generate_link`
+composes the link GoTrue would send without sending it, and its `email_otp`
+exchanges at `/auth/v1/verify` for a real session — no SMTP, no CAPTCHA, no
+interactive browser. Worth remembering: it is the general way to get an
+authenticated session against this project from a script.
+
+### The finding 2G.4 must not discover at execution time
+
+**Hosted CAPTCHA refuses automated password sign-in, and every
+`online-*.spec.ts` journey signs in through the login form.** The
+written-not-executed journeys from 2G.2 and 2G.3 may therefore not be runnable
+headlessly as written. Establish this *first* in 2G.4 rather than planning
+around journeys that cannot run; the likely fix is the `generate_link` →
+`verify` exchange above as a Playwright fixture, which is a test-harness
+change and not a product change.
+
+### Next
+
+2G.4 — convergence and closeout, **zero migrations**: the fail-closed
+traceability generator over every `2G-*` id, the hosted journey verification
+(after settling the CAPTCHA question above), the measured funnel statement for
+ADR-055's evidence gate, the phase's final report, and the documentation
+reconciliation that re-raises every Phase 2H deferral by name. Phase 2H
+remains unauthorised; no purge is authorized; signup stays closed.
