@@ -31,6 +31,13 @@ type FakeOptions = {
   /** SH-EXPOSURE-001: the narrow credential status RPC's answer. */
   credentialStatus?: string | null;
   credentialError?: boolean;
+  /**
+   * The RPC answers `{ data: null, error: null }` -- the account never
+   * configured a provider credential, so there is no row to have a status.
+   * Distinct from `credentialStatus: null`, which `??` would turn back into
+   * the default.
+   */
+  credentialAbsent?: boolean;
   objects?: Record<string, { name: string; size: number }[]>;
   objectsAfterRemoval?: Record<string, { name: string; size: number }[]>;
   listError?: boolean;
@@ -179,6 +186,7 @@ function fakeService(options: FakeOptions) {
       // ciphertext from here, this fixture will not be able to give it.
       if (name === "admin_credential_status") {
         if (options.credentialError) return { data: null, error: { message: "boom" } };
+        if (options.credentialAbsent) return { data: null, error: null };
         return { data: options.credentialStatus ?? "removed", error: null };
       }
       throw new Error(`unexpected rpc ${name}`);
@@ -209,6 +217,61 @@ Deno.test("completes: storage removed by exact prefix, account deleted, log reco
   assertEquals(recorder.recorded[0].p_outcome, "completed");
   assertEquals(recorder.recorded[0].p_storage_objects_removed, 2);
   assertEquals(recorder.recorded[0].p_storage_bytes_removed, 300);
+});
+
+/**
+ * The shape of every ordinary account, and the one the deployed executor
+ * stalled on.
+ *
+ * `admin_credential_status` answers `{ data: null, error: null }` for an
+ * account that never configured a provider credential -- there is no row, so
+ * there is no status. That is not an error and must not stop the machine:
+ * stopping there would mean **no account that never used BYOK could ever be
+ * deleted**, which is almost all of them.
+ *
+ * Measured against the deployed project on 2026-08-06, where a real account
+ * stuck in `deleting` produced exactly this answer. The stall itself was a
+ * different cause -- a deployed function older than the migration that changed
+ * its contract -- but nothing pinned this branch either way, so it is pinned
+ * now, in the direction that terminal deletion is reached.
+ */
+Deno.test("completes for an account that never configured a credential", async () => {
+  const { service, recorder } = fakeService({
+    lifecycleStatus: "deleting",
+    census: { profiles: 1, agent_preferences: 1, policy_acceptances: 2 },
+    censusAfter: {},
+    objects: {},
+    objectsAfterRemoval: {},
+    credentialAbsent: true,
+  });
+
+  const result = await executeDeletion(service, OWNER, REQUESTED_AT, null);
+
+  assertEquals(result.outcome, "completed");
+  assertEquals(recorder.deletedUsers, [OWNER]);
+  assertEquals(recorder.recorded[0].p_outcome, "completed");
+  assertEquals(recorder.recorded[0].p_stop_reason, null);
+});
+
+/**
+ * The other direction, so the case above is not passing for want of a check:
+ * when the RPC genuinely errors, the machine stops and the account survives.
+ */
+Deno.test("stops, and deletes nothing, when the credential check itself fails", async () => {
+  const { service, recorder } = fakeService({
+    lifecycleStatus: "deleting",
+    census: { profiles: 1 },
+    censusAfter: {},
+    objects: {},
+    objectsAfterRemoval: {},
+    credentialError: true,
+  });
+
+  const result = await executeDeletion(service, OWNER, REQUESTED_AT, null);
+
+  assertEquals(result.outcome, "stopped");
+  assertEquals(recorder.deletedUsers, []);
+  assertEquals(recorder.recorded[0].p_stop_reason, "credential_not_erased");
 });
 
 Deno.test("every listed prefix is exactly the owner's id -- ownership is structural", async () => {

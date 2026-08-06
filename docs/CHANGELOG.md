@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — Account deletion stalls at `deleting`, and it is a deployment defect (0 migrations, fix is one deploy)
+
+**The CAPTCHA hotfix worked and the account still was not deleted.** The first interactive proof completed the challenge, accepted `EXCLUIR` and the correct password, recorded the request — and stopped permanently at "Exclusão em andamento". Not pending: there is no job, no cron and no reaper for a deletion, so one failed invocation is forever.
+
+**`delete-account` was deployed once, on 2026-08-04, and never again.** That build reads `user_ai_credentials` directly. On 2026-08-05 the repository narrowed it to the `admin_credential_status` RPC (`357cd63`) *and* migration `202608050077` revoked `service_role`'s access to that table — but only the migration was deployed. Since then the executor's step 5 errored for **every** account, stopped with `credential_not_erased`, and left the account in `deleting` with every write refused. The migration's own prose names the executor as an affected caller: the dependency was known, the code was fixed the same day, and the deploy was a separate act nobody took.
+
+**The gap is now visible.** `npm run verify:edge-parity` compares each deployed function against the newest commit touching its deployable source — `.ts`/`.json`, never tests or markdown, because its first draft raised two false alarms from a docs move and a fixture edit, and a parity check that cries wolf gets run with eyes closed. It found this defect, found `process-jobs` also behind, and recognises `heartbeat` as deliberately undeployed. Two Deno tests now pin the branch that stalled, including the shape of every ordinary account — no credential row, `{data: null, error: null}`, which must still reach terminal deletion.
+
+**Two findings kept:** "re-runnable" was implemented as a property of the executor rather than a mechanism that re-runs it (Phase 2H); and every stop reason is written to `account_deletion_log`, which is revoked from every role — so the diagnosing operator cannot read it, and the supported path is to re-run the executor and read the `409`. Evidence: `docs/reports/signup-hardening/SIGNUP_HARDENING_DELETION_EXECUTOR_STALL.md`.
+
 ## 2026-08-06 — Account deletion works again (standalone authentication hotfix, 0 migrations)
 
 **Deleting your account was impossible on the deployment, and the product blamed your password for it.** `requestAccountDeletion` re-authenticates before an irreversible action — a **password grant** — and forwarded no `captchaToken`. Hosted GoTrue enforces CAPTCHA on password grants, so from the day SH.5 enabled Turnstile that call answered `400 captcha_failed` for every caller and the surface said `A senha não confere.` to people typing the correct password.
