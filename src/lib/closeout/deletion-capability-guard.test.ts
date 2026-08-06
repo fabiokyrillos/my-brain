@@ -46,6 +46,11 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
   "e2e/byok-settings-journey.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
   "e2e/editable-candidate-confirmation.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
   "e2e/online-auth.spec.ts": { class: "e2e-teardown", reason: "pre-SH.2: disposable-account teardown" },
+  "e2e/deployed-deletion-captcha.spec.ts": {
+    class: "e2e-teardown",
+    reason:
+      "the deletion-challenge hotfix's deployed verification: every case is a refusal, so nothing deletes the disposable account and this call is the only thing that does",
+  },
   "e2e/online-account-deletion.spec.ts": {
     class: "e2e-teardown",
     reason:
@@ -163,7 +168,19 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
       /^e2e\/online-(account-deletion|account-suspension|consent-interposition)\.spec\.ts$/.test(file),
     );
     expect(acceptanceJourneys).toHaveLength(3);
-    expect(teardown).toHaveLength(5 + acceptanceJourneys.length);
+
+    // Plus the deletion-challenge hotfix's deployed verification. Counted on
+    // its own line rather than folded into the number above, for the same
+    // reason the three are: a count that grows without saying why stops being
+    // evidence of anything. Every case in that spec is a *refusal*, so the
+    // product never deletes the disposable account and this call is the only
+    // thing that removes it.
+    const hotfixVerification = teardown.filter(
+      (file) => file === "e2e/deployed-deletion-captcha.spec.ts",
+    );
+    expect(hotfixVerification).toHaveLength(1);
+
+    expect(teardown).toHaveLength(5 + acceptanceJourneys.length + hotfixVerification.length);
     expect(byClass("operator-script")).toHaveLength(14);
   });
 
