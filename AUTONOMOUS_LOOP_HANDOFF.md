@@ -1231,17 +1231,43 @@ SH.6 parameters and shrink `2H-RATE`, not to build a second mechanism.
 Merge SHA `508cf6c`, run `31116254874`, attempt history read from
 `/actions/runs/{id}/attempts/{n}` rather than inferred:
 
-| Attempt | Started | Outcome |
-| --- | --- | --- |
-| 3 | 15:43:52Z | `failure` at 15:49:37Z |
-| 4 | 15:55:44Z | `failure` at 16:11:36Z — `application` cancelled having executed **zero steps** |
-| 5 | 17:41:06Z | **queued** |
+| Attempt | `application` queued | Cancelled | Waited | Steps |
+| --- | --- | --- | --- | --- |
+| 3 | 15:43:52Z | 15:49:37Z | — | 0 |
+| 4 | 15:55:46Z | 16:10:47Z | **15m01s** | **0** |
+| 5 | 17:50:02Z | 18:05:03Z | **15m01s** | **0** |
 
-`database and journey` ✅ and `edge worker` ✅ throughout. **Attempt 5 was
-already queued when this session resumed and was not triggered by this work**;
-per the owner's "no repeated reruns while one is queued", no further rerun was
-fired. **A job that never ran is neither a pass nor a fail**, and merge-SHA
-green ×3 is not claimed.
+`database and journey` ✅ (21 steps) and `edge worker` ✅ (9 steps) throughout —
+both obtained runners **instantly** on attempt 1 at 15:31.
+
+**This is infrastructure evidence, not a code result.** Zero steps means the job
+never reached `Set up job`, never checked out, never saw the repository. **A job
+that never ran is neither a pass nor a fail**, and merge-SHA green ×3 is not
+claimed.
+
+**What the diagnosis rules out**, read rather than assumed:
+
+- **Not billing** — the repository is **public**, so standard-runner minutes are
+  free and unmetered.
+- **Not a special runner** — all three jobs are plain `ubuntu-latest`;
+  `.github/workflows/ci.yml` declares no matrix, container or service for `app`.
+- **Not contention from other work** — at 18:05 the only non-completed run in
+  the repository was PR #112's.
+- **Not random flakiness** — **15m01s twice, to the second.** That is a timeout
+  being applied, not a queue that happened to be slow.
+
+**The open question:** why a *lone* `application` job cannot obtain a runner
+while the heavier `database` job could. Note that `gh run rerun --failed`
+re-queues only the failed job, so attempts 4 and 5 each queued `application`
+**alone**.
+
+**The decisive experiment is already in flight and cost nothing to obtain.** PR
+#112's run (`31124961457`, `pull_request`) has **all three** jobs queued from
+18:03:58Z. If its `application` job acquires a runner, runners are healthy and
+the merge-SHA rerun is worth spending an authorization on; if all three are
+cancelled at 15m01s, the problem is account-wide and reruns are futile until it
+clears. **The single authorized rerun is therefore being held** until that
+answer arrives, rather than spent on a third identical 15-minute timeout.
 
 **A reading trap worth keeping:** the run object's `run_attempt` field briefly
 reported `4` while attempt 5 was spinning up. Read
