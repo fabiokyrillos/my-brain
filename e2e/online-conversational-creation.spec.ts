@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInWithoutTheLoginForm } from "./support/online-session";
+
 /**
  * Slice 2G.2's authenticated acceptance (2G-ROUTE-008): the natural sentence
  * creates a task — preview first, confirm second, undo offered — and a refused
@@ -95,14 +97,17 @@ test.describe("conversational creation (2G.2)", () => {
   });
 
   for (const locale of ["pt-BR", "en"] as const) {
-    test(`the natural sentence previews, confirms, creates and undoes — ${locale}`, async ({ page }) => {
+    test(`the natural sentence previews, confirms, creates and undoes — ${locale}`, async ({ page, baseURL }) => {
       const text = strings[locale];
 
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(text.loginEmail).fill(email);
-      await page.getByLabel(text.loginPassword, { exact: true }).fill(password);
-      await page.getByRole("button", { name: text.loginSubmit }).click();
-      await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+      await signInWithoutTheLoginForm(page, {
+        supabaseUrl: supabaseUrl!,
+        serviceRoleKey: serviceRoleKey!,
+        publishableKey: publishableKey!,
+        email,
+        locale,
+        appOrigin: baseURL!,
+      });
 
       // The credential the turn will spend on — configured once, first locale.
       if (locale === "pt-BR") {
@@ -145,14 +150,17 @@ test.describe("conversational creation (2G.2)", () => {
     });
   }
 
-  test("a refused surface refuses by name, and writes nothing", async ({ page }) => {
+  test("a refused surface refuses by name, and writes nothing", async ({ page, baseURL }) => {
     const text = strings["pt-BR"];
 
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel(text.loginEmail).fill(email);
-    await page.getByLabel(text.loginPassword, { exact: true }).fill(password);
-    await page.getByRole("button", { name: text.loginSubmit }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+    await signInWithoutTheLoginForm(page, {
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
+      locale: "pt-BR",
+      appOrigin: baseURL!,
+    });
 
     await page.goto("/pt-BR/app/chat");
     await page.getByLabel(text.composerLabel).fill(text.refuseSentence);
