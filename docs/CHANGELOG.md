@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — The authenticated online journey suite runs again (repository maintenance, 0 migrations)
+
+**From zero to 80 passed · 7 skipped · 0 failed.** Every `e2e/online-*.spec.ts` had been unrunnable against the deployed project, and the suite now runs on a session fixture that does not touch the login form. **Nothing about hosted CAPTCHA, GoTrue or product authentication was weakened** — the form is still guarded; the fixture simply does not use it, and it needs the service-role key to work at all.
+
+**Three blockers, not one.** Hosted CAPTCHA on the login form was the known one. Underneath it: **SH.4's consent gate** had been interposing on every admin-created fixture account since it shipped, independently of Turnstile — so those journeys had been unable to pass for a second reason nobody had seen. And `/auth/v1/token?grant_type=password` answers `400 captcha_failed` for **every** client, which took five specs' access-token exchange with it.
+
+**A product defect fell out of the third one, and is recorded rather than fixed here.** `requestAccountDeletion` re-authenticates with `signInWithPassword` and forwards **no `captchaToken`**, unlike all four surfaces in `auth/actions.ts`. On the deployment that call cannot succeed, so **account deletion refuses a correct password** and the account cannot be deleted. `docs/TODO.md`; both cases in `e2e/online-account-deletion.spec.ts` are `test.fixme` naming it, on the working helper.
+
+**The cookie contract was established by execution, and the first attempt's three hypotheses were all wrong.** Name, `base64-` encoding, single-chunk handling and the proxy's non-interference were all already correct; the redirect was to `/consent`, never to `/auth/login`. A control that had stopped being falsifiable was repaired in passing: `online-account-suspension` asserted a banned account cannot sign in by checking that `signInWithPassword` errors — true for every account since SH.5. The service-role boundary is guarded at runtime and in source; the source guard caught two new shapes during this work, which is the only evidence it does anything. **`2G-ROUTE-008` and `2G-CLOSE-003` move from *not delivered* to *partially delivered*** on one named blocker each — an unprovisioned disposable BYOK credential. Evidence: `docs/reports/phase-2g/PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md`.
+
 ## 2026-08-06 — Phase 2G — Conversational Creation is COMPLETE (1 migration across the whole phase)
 
 **The composer creates.** *"Adicione uma tarefa para revisar os números"* previews, confirms and creates through the deployed `create_task_command` family; *"Registre que preciso enviar o relatório"* files an entry through `captureEntry` reused whole; and a sentence naming both a note and a task **asks** instead of choosing. The phase added **zero RPCs and zero grants**, and `direct-write-guard.test.ts` is unchanged with the `tasks` allowlist still empty — the invariant it set out to keep.

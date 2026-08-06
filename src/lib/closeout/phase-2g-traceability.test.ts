@@ -8,6 +8,7 @@ import {
   MIGRATION_BUDGET,
   PRD_PATH,
   REPORTS_DIR,
+  PARTIAL,
   REPOSITORY_ROOT,
   UNDELIVERED,
   findings,
@@ -131,6 +132,24 @@ describe("each deliberate defect is caught", () => {
     );
   });
 
+  it("catches a partial declaration that no acceptance record cites", () => {
+    // "Partially delivered" must not become a way to assert half a delivery
+    // with nothing on disk behind it. The declaration says what is missing;
+    // the citation is still what proves the rest landed.
+    const [partialId] = Object.keys(PARTIAL);
+    withFixture(
+      (root) => {
+        const path = join(root, REPORTS_DIR, "PHASE_2G_SLICE_00_ACCEPTANCE.md");
+        const text = readFileSync(path, "utf8");
+        writeFileSync(path, text.replace(partialId, "(removed)"));
+      },
+      (root) => {
+        expect(findings(root).some((f) => f.includes(partialId) && f.includes("partially")))
+          .toBe(true);
+      },
+    );
+  });
+
   it("does not accept a blocker report as delivery evidence", () => {
     // The generator's own first design counted any markdown file here, so a
     // document saying "this did not happen" satisfied the requirement it was
@@ -181,9 +200,41 @@ describe("the committed matrix", () => {
   it("gives every undelivered requirement a reason and a destination", () => {
     // A deferral without a destination is an open item wearing a different
     // word, and this is the only place the phase is allowed to say "no".
-    for (const [id, entry] of Object.entries(UNDELIVERED)) {
+    //
+    // Vacuous today — the online-harness maintenance moved both of Phase 2G's
+    // undelivered rows to `PARTIAL` — and kept anyway, because the rule has to
+    // be in force *before* the next entry is written, not after.
+    const undelivered = UNDELIVERED as Record<string, { reason?: string; destination?: string }>;
+    for (const [id, entry] of Object.entries(undelivered)) {
       expect(entry.reason, `${id} has no reason`).toBeTruthy();
       expect(entry.destination, `${id} has no destination`).toBeTruthy();
+    }
+  });
+
+  it("gives every partial requirement what landed, what is missing, and where it goes", () => {
+    // The same rule as a deferral, in three parts instead of two: a partial
+    // that cannot say what remains is a delivery claim with a hedge attached.
+    for (const [id, entry] of Object.entries(PARTIAL)) {
+      expect(entry.delivered, `${id} does not say what landed`).toBeTruthy();
+      expect(entry.remaining, `${id} does not say what is missing`).toBeTruthy();
+      expect(entry.destination, `${id} has no destination`).toBeTruthy();
+      expect(id in UNDELIVERED, `${id} is both partial and undelivered`).toBe(false);
+    }
+  });
+
+  it("records each partial as partially delivered, not as delivered", () => {
+    // The rendered row is what a reader sees, so it is what the assertion is
+    // about: a partial that renders as "delivered" would have hidden the very
+    // thing the category exists to keep visible.
+    const matrix = readFileSync(join(REPO, MATRIX_OUTPUT_PATH), "utf8");
+    for (const id of Object.keys(PARTIAL)) {
+      const row = matrix
+        .split("\n")
+        .map((line) => line.trimEnd())
+        .find((line) => line.includes(`\`${id}\``));
+      expect(row, `${id} has no row in the matrix`).toBeTruthy();
+      expect(row!, `${id} is not marked partial`).toContain("partially delivered");
+      expect(row!, `${id} does not name what remains`).toContain("remaining:");
     }
   });
 });

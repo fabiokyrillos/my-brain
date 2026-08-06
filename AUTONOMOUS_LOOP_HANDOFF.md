@@ -768,3 +768,114 @@ The owner's rollout tasks are unchanged and open: retention activation
 backup-restore drill, the legal and monitoring signatures, then one green
 `rollout:verify`, the owner-only `disable_signup` flip, and a second green run.
 No purge is authorized; signup stays closed at both layers.
+
+## §44 — the online journey suite runs again, and there were three blockers (2026-08-06)
+
+Repository maintenance between phases. No phase started; **Phase 2H remains
+unauthorised**.
+
+### The result
+
+`node scripts/online-playwright.mjs e2e/online-*.spec.ts --project=desktop`
+against hosted parity `202608060078`: **80 passed · 7 skipped · 0 failed**,
+17.1 minutes at two workers. Before this, the number that could run was zero.
+`npm run verify:online-residue` then reports **zero fixture residue** — two
+accounts on the project, both real.
+
+### The session contract, established by execution
+
+`@supabase/ssr@0.12.3` + `@supabase/auth-js@2.110.7`:
+
+- cookie **`sb-<ref>-auth-token`**, where `<ref>` is the project the *app* is
+  configured against — a wrong ref resolves nothing;
+- value **`base64-`** + base64url of `JSON.stringify(session)`, the
+  `/auth/v1/verify` body unaltered;
+- `access_token`, `refresh_token`, `expires_at` are all required
+  (`_isValidSession`); an expired one is refused even with a good name;
+- `combineChunks` tries the **bare name before `.0`**, and at ~2.8 KB the
+  session is under the 3180-byte threshold, so exactly **one** cookie;
+- `domain` = app host, `path=/`, `sameSite=Lax`, `secure` only on https,
+  `httpOnly=false`; seeded **before the first navigation**;
+- **the proxy does not rotate or clear a cookie it did not mint** — byte
+  identical after navigation. No refreshed cookie is expected.
+
+**All three of §42's "where to look next" hypotheses were wrong.** The cookie
+had been right the whole time; the redirect was to `/consent`, not to
+`/auth/login`. `e2e/online-auth.spec.ts` had been installing that same cookie
+successfully for months — the answer was already in the directory.
+
+### The two blockers that were underneath
+
+1. **SH.4's consent gate**, independent of CAPTCHA and older than it. An
+   account created through `admin/users` has no `policy_acceptances` row
+   because the *registration form* is what writes one, so `requireUser`
+   interposed on every fixture account. Cleared by **accepting through the
+   product's own consent surface**, which records a real acceptance; nothing is
+   forged, and `acceptPolicies: false` exists for the spec whose subject is the
+   gate.
+2. **The password grant is gone for everyone.**
+   `/auth/v1/token?grant_type=password` → `400 captcha_failed` for any client.
+   Five specs minted their user access token that way; they now use
+   `mintOnlineAccessToken`.
+
+### The test-harness boundary
+
+The service role may create a disposable account, mint and exchange a link, and
+delete the account. Node-side only. Guarded twice: `online-session-fixture.spec.ts`
+asserts it is absent from storage state, `document.cookie`, `localStorage` and
+`sessionStorage` and that the browser's token carries `role: "authenticated"`;
+`src/lib/closeout/online-session-boundary.test.ts` allows the identifier only in
+an enumerated set of source shapes and refuses every browser-facing API in the
+helper. It caught two new shapes during this work.
+
+### PRODUCT DEFECT, found here and not fixed here
+
+`requestAccountDeletion` (`src/features/account/actions.ts`) re-authenticates
+with `signInWithPassword` and forwards **no `captchaToken`**, unlike all four
+surfaces in `src/features/auth/actions.ts`. Since SH.5 that call cannot succeed
+on the deployment, so **account deletion refuses a correct password and the
+account cannot be deleted**. The fix is a Turnstile widget on
+`/{locale}/account/delete` plus the token forwarded the way the auth surfaces
+already forward one — a product-authentication change, deliberately outside a
+test-harness PR. `docs/TODO.md`; both cases are `test.fixme` naming it.
+
+Also repaired in passing: `online-account-suspension` asserted a banned account
+cannot sign in by checking that `signInWithPassword` errors — true for *every*
+account since SH.5, so the control had stopped being falsifiable. It now asserts
+through the link exchange, with the unban proving the positive half.
+
+### Remaining journey blockers
+
+- **BYOK credential (one owner action).** `online-conversational-creation` ×3
+  and `online-assistant-composer` ×1 need a provider call;
+  `BYOK_TEST_USER_A_OPENAI_API_KEY` is unset. **No credential was invented and
+  no BYOK provider behaviour is claimed.**
+- **The deletion defect** — 2 skips, above.
+- **Provider-routable email domain** — 1 skip, the signup journey; unchanged,
+  and public signup is disabled at both layers anyway.
+- **`--project=mobile` was not run.** Nothing is claimed for it.
+
+### Phase 2G residuals
+
+`2G-ROUTE-008` and `2G-CLOSE-003` are now **partially delivered**, not "not
+delivered". The generator grew a `PARTIAL` category that requires *both* a
+declaration of what remains *and* a citation proving the rest landed, with its
+own tests in both directions. `PHASE_2G_TRACEABILITY_MATRIX.md` regenerated:
+**29 declared · 27 delivered · 2 partial · 0 undelivered**. The prior
+"written, not executed" state is preserved verbatim in
+`PHASE_2G_ONLINE_JOURNEY_BLOCKER.md` under a resolution banner.
+
+### Phase 2H readiness
+
+Unchanged and **unauthorised**. ADR-068's successor is **Phase 2H — Deploy and
+Operate**; it needs an owner decision, and the accepted ADR naming it is itself
+an A13 start signal, so that ADR and the guard's retarget land in one commit.
+What this maintenance changes for it: a hosted verification lane now exists and
+works, so Phase 2H can plan against journeys that run. The deletion defect
+above is a natural first candidate for it, and it is already written down.
+
+Owner rollout tasks are unchanged and open: retention activation (enabling **is**
+the first-purge authorization), Resend SMTP, the backup-restore drill, the legal
+and monitoring signatures, one green `rollout:verify`, the owner-only
+`disable_signup` flip, a second green run. No purge is authorized; signup stays
+closed at both layers.
