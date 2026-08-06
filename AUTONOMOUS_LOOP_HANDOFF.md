@@ -456,3 +456,52 @@ anyone.
 2G.2 — creation from the composer: route the `create` classification to the
 deployed family, preview/confirm, refusal narrowing, undo surfacing, journeys.
 Zero migrations. Phase 2H remains unauthorised.
+
+*(§38's blocker was cleared by the owner's merge authorization; §39 below.)*
+
+---
+
+## §39 — #99 and #100 are merged, and 2G.2 is repository-complete (2026-08-05)
+
+### Where things stand
+
+- **The owner authorized proceeding, and the merges executed.** PR #99 merged
+  at `7516569`, PR #100 at `ad0b56c`; `main` carries the planning package and
+  slice 2G.1. **Both exact merge SHAs are CI-green on all three jobs — but not
+  on the first attempt:** each merge's push run was auto-cancelled by the next
+  push's branch concurrency, and a cancelled merge-SHA run is not a green one.
+  Both were re-run to completion. A successor merging stacked PRs should
+  expect this and re-run the cancelled `verify` run rather than counting the
+  PR-level green as the merge-SHA evidence.
+- **`codex/2g-slice-2`** (branched from `ad0b56c`) carries slice 2G.2
+  repository-complete: the create classification routes to the deployed
+  creation family (preview → server-minted confirmation → `create_task_command`
+  → registered undo), session envelope `2026-08-05.1` with the `create`
+  discriminator, one-validator qualifier resolution, narrowed refusals in both
+  locales, and 13 new tests. Full suite 4047/4047; lint/typecheck clean.
+  Design note and acceptance record in `docs/reports/phase-2g/`.
+
+### What a successor must not misread
+
+- **The journey is WRITTEN, NOT EXECUTED** —
+  `e2e/online-conversational-creation.spec.ts` needs the deployed app carrying
+  this slice plus `BYOK_TEST_USER_A_OPENAI_API_KEY` (every conversational turn
+  is a BYOK provider call). Destination: 2G.4's hosted verification. Its undo
+  step navigates back to a client state and is flagged in the acceptance
+  report as the first thing to fix if it proves fragile.
+- **No `task_command_previewed` event for an explicit create, deliberately.**
+  `creation_offered` is the no-match funnel the ADR-055 reader measures, and a
+  new outcome member costs the one migration budgeted to 2G.3. The vocabulary
+  question is a 2G.4 disposition, not an oversight.
+- **The clarify-smuggling finding is accepted, not fixed:** a crafted form can
+  push a create session into the matcher, yielding an ordinary mutation
+  preview of the owner's own task — the same thing typing the mutation yields.
+  Recorded in the acceptance report §3.
+
+### Next
+
+Merge the 2G.2 PR when green (re-run the cancelled merge-SHA run if
+concurrency cancels it), then 2G.3 — capture routing, the phase's ONE
+migration (`captureSource` allowlist widening) — or hold 2G.3 for a fresh
+session and go straight to 2G.4's hosted verification once deployed. Phase 2H
+remains unauthorised; nothing destructive is authorized.
