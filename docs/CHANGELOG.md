@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — Account deletion works again (standalone authentication hotfix, 0 migrations)
+
+**Deleting your account was impossible on the deployment, and the product blamed your password for it.** `requestAccountDeletion` re-authenticates before an irreversible action — a **password grant** — and forwarded no `captchaToken`. Hosted GoTrue enforces CAPTCHA on password grants, so from the day SH.5 enabled Turnstile that call answered `400 captcha_failed` for every caller and the surface said `A senha não confere.` to people typing the correct password.
+
+**Why the four auth surfaces were right and this one was not.** All four forward a token, and a guard asserted it — *by name, over one file*. It could not see a fifth password grant in `features/account/`, written in SH.2 before the control existed. A list of known call sites is not a property of the system: the guard is now stated over **every** `signInWithPassword` in `src/`, with a case that fails if the list of found call sites is ever empty.
+
+**The fix reuses what exists and weakens nothing.** The same `TurnstileWidget`, rendered on the **server** and handed to the client surface as a node — importing it into the client bundle would leave the site key unresolvable and the widget silently absent. The CSP now permits the widget origin on the **exact** deletion route: a wildcard would also have matched `/{locale}/account`, which the base pattern's lookahead would not exclude, and two `Content-Security-Policy` headers are enforced as an intersection — the no-op that looks like a fix. Refusals are now distinct (`captcha-missing`, `captcha-failed`, `password`, `throttled`, `unavailable`, `lifecycle`), nothing verifies a token (the secret stays in hosted GoTrue), and the grant is throttled against the existing `signin_failure` ceiling — it was the only password grant in the product with nothing in front of it. **Zero migrations. Disabling hosted CAPTCHA was rejected: the bug was four missing lines, not a control that was wrong.**
+
+**Proven:** 4107 unit tests, and 3 hosted journey cases against the deployed project including the defect inverted — a correct password now produces the *challenge* refusal and explicitly not the password one. **Not claimed:** the successful deletion needs an interactive Turnstile solve, so it stays `test.fixme` with one named owner step. Evidence: `docs/reports/signup-hardening/SIGNUP_HARDENING_DELETION_CAPTCHA_HOTFIX.md`.
+
 ## 2026-08-06 — The authenticated online journey suite runs again (repository maintenance, 0 migrations)
 
 **From zero to 80 passed · 7 skipped · 0 failed.** Every `e2e/online-*.spec.ts` had been unrunnable against the deployed project, and the suite now runs on a session fixture that does not touch the login form. **Nothing about hosted CAPTCHA, GoTrue or product authentication was weakened** — the form is still guarded; the fixture simply does not use it, and it needs the service-role key to work at all.

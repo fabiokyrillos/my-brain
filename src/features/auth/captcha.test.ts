@@ -74,6 +74,99 @@ describe("SH-CAPTCHA-003: the token is collected and forwarded", () => {
   });
 });
 
+/**
+ * The requirement the four-surface list above could not express, and the defect
+ * that proves why it needed to.
+ *
+ * Hosted GoTrue applies CAPTCHA enforcement to **password grants**, not to "the
+ * login page". `requestAccountDeletion` performs one — it re-authenticates
+ * before an irreversible deletion — and it forwarded no token, because it was
+ * written before the control existed and the guard above only ever looked at
+ * `features/auth/actions.ts`. From the day Turnstile was enabled that grant
+ * answered `400 captcha_failed` for every caller, and account deletion became
+ * impossible on the deployment while the surface blamed the user's password.
+ *
+ * So the property is restated as what it actually is: **every**
+ * `signInWithPassword` in the product forwards a token. Stated over the whole
+ * source tree, a sixth grant added tomorrow in a file nobody thought to list is
+ * caught the day it lands rather than the day someone tries to use it.
+ */
+describe("every password grant in the product forwards a challenge token", () => {
+  function sourceFiles(): string[] {
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(entry.name) && !/\.test\.(ts|tsx)$/.test(entry.name)) {
+          found.push(path.slice(REPO.length + 1).replace(/\\/g, "/"));
+        }
+      }
+    };
+    walk(join(REPO, "src"));
+    return found;
+  }
+
+  const callers = sourceFiles().filter((file) => read(file).includes("signInWithPassword("));
+
+  it("finds the password grants, so this guard is not vacuously satisfied", () => {
+    // Without this, a rename or a deletion would leave the cases below passing
+    // over an empty list — a guard that measures nothing while looking green.
+    expect(callers.sort()).toEqual([
+      "src/features/account/actions.ts",
+      "src/features/auth/actions.ts",
+    ]);
+  });
+
+  it.each(["src/features/account/actions.ts", "src/features/auth/actions.ts"])(
+    "%s reads a token and hands it to the grant",
+    (file) => {
+      const source = read(file);
+      expect(source, `${file} must read the token`).toContain("readCaptchaToken");
+      // The supported contract: `options.captchaToken` on the grant itself.
+      // Reading a token and then forgetting to pass it is a real failure mode,
+      // so the assertion is on the forward, not on the read.
+      expect(source, `${file} must forward it in options`).toMatch(/options:\s*\{[^}]*captchaToken/);
+    },
+  );
+
+  it("distinguishes a failed challenge from a wrong password wherever it re-authenticates", () => {
+    // Conflating them is what made the deployed defect read as a credential
+    // problem: the surface said the password was wrong to people who had typed
+    // the right one, sending them to reset something that was never broken.
+    for (const file of callers) {
+      expect(read(file), `${file} must use isCaptchaError`).toContain("isCaptchaError");
+    }
+  });
+
+  it("renders the widget on the account-deletion page, on the server", () => {
+    // The half no component test can cover: `DeletionSurface` is a client
+    // component and takes the widget as a node, so the *page* is what decides
+    // whether a challenge exists at all. Rendering it there is also what keeps
+    // the site key resolvable — inside a client bundle
+    // `turnstileSiteKey(process.env)` reads through a parameter Next cannot
+    // inline, and the widget would silently render nothing.
+    const page = read("src/app/[locale]/account/delete/page.tsx");
+    expect(page, "the deletion page must render the shared widget").toContain("TurnstileWidget");
+    expect(page, "and hand it to the surface").toMatch(/captcha=\{<TurnstileWidget/);
+    // The *import* is what would pull it into the client bundle — the prose in
+    // that file names the component deliberately, to explain why it is absent.
+    expect(
+      read("src/features/account/deletion-surface.tsx"),
+      "the client surface must not import the widget itself",
+    ).not.toMatch(/^import .*from "@\/features\/auth\/turnstile"/m);
+  });
+
+  it("verifies no token itself, anywhere in the product", () => {
+    // Verification needs the Turnstile secret, which lives only in hosted
+    // GoTrue. A product that verified a token would need one in its runtime,
+    // and a runtime that holds one can leak one.
+    for (const file of sourceFiles()) {
+      expect(read(file), `${file} must not verify a token itself`).not.toMatch(/siteverify/i);
+    }
+  });
+});
+
 describe("SH-CAPTCHA-004: the widget's origin is the only new external one, and it is not in the product", () => {
   it("appears in the widget module and nowhere else in src", () => {
     // A scan rather than a claim: the requirement is about where this origin is

@@ -161,7 +161,7 @@ parity `202608060078`. Before this work the number that could run was **zero**.
 
 | spec file | pass | skip |
 | --- | --- | --- |
-| `online-account-deletion` | 0 | **2** |
+| `online-account-deletion` | 0 → **3** | **2** → **1** |
 | `online-account-suspension` | 5 | 0 |
 | `online-assistant-composer` | 2 | **1** |
 | `online-assistant-name` | 2 | 0 |
@@ -186,7 +186,7 @@ reasons and nothing vague:
 | skipped | why | whose problem |
 | --- | --- | --- |
 | `online-conversational-creation` ×3, `online-assistant-composer` ×1 | every turn is a provider call under BYOK and `BYOK_TEST_USER_A_OPENAI_API_KEY` is unset | **one owner action** |
-| `online-account-deletion` ×2 | the product defect in §4 — deletion re-auth has no `captchaToken` | a product change, `docs/TODO.md` |
+| `online-account-deletion` ×2 → **×1** | the product defect in §4. **Fixed the same day** by the standalone hotfix in `docs/reports/signup-hardening/SIGNUP_HARDENING_DELETION_CAPTCHA_HOTFIX.md`: three of those cases now execute, and the one that remains needs an **interactive** Turnstile solve, which no automation may honestly perform | one owner step |
 | `online-auth` ×1 (signup journey) | no provider-routable test email domain, and public signup is disabled at both layers by design | unchanged, not a regression |
 
 **No journey is marked passed because authentication succeeded.** Every one of

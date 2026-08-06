@@ -18,6 +18,7 @@
  */
 
 import type { Locale } from "@/lib/preferences";
+import type { DeletionRefusalCode } from "./deletion-request-state";
 
 export type DeletionCopy = {
   readonly title: string;
@@ -31,13 +32,19 @@ export type DeletionCopy = {
   readonly passwordLabel: string;
   readonly submit: string;
   readonly submitting: string;
-  readonly errors: {
-    readonly session: string;
-    readonly password: string;
-    readonly phrase: string;
-    readonly lifecycle: string;
-    readonly failed: string;
-  };
+  readonly errors: Readonly<Record<DeletionRefusalCode, string>>;
+  /**
+   * Shown after a refusal that **spent the challenge**.
+   *
+   * A Turnstile token is single-use, and the widget does not re-issue one for a
+   * form that stays on screen. So after any refusal the provider actually
+   * answered — a wrong password, a rejected token — the next attempt needs a
+   * fresh challenge, and the only way to get one here is a reload. Saying so is
+   * better than a retry that fails for a reason the user cannot see. A wrong
+   * confirmation word does not appear here on purpose: it is compared before
+   * the provider is called, so the token is still unspent.
+   */
+  readonly retryHint: string;
   /** Counts and timestamps only -- never a path, an id or an internal message. */
   readonly receiptTitle: string;
   readonly receiptBody: string;
@@ -60,11 +67,20 @@ const ptBR: DeletionCopy = {
   submitting: "Excluindo…",
   errors: {
     session: "Sua sessão expirou. Entre novamente para continuar.",
+    // Two sentences, because they ask for two different things: one says the
+    // check did not run, the other says it ran and did not pass.
+    "captcha-missing":
+      "A verificação de segurança não foi concluída. Recarregue a página e tente de novo.",
+    "captcha-failed":
+      "A verificação de segurança não foi aceita. Recarregue a página e tente de novo.",
     password: "A senha não confere.",
     phrase: "Digite exatamente a palavra pedida para confirmar.",
     lifecycle: "Esta conta não está em um estado que permita esta ação.",
+    throttled: "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
+    unavailable: "Não foi possível verificar sua identidade agora. Tente novamente em instantes.",
     failed: "Não foi possível iniciar a exclusão agora. Tente novamente.",
   },
+  retryHint: "Recarregue a página antes de tentar novamente: a verificação de segurança só vale uma vez.",
   receiptTitle: "Conta excluída",
   receiptBody: "Removemos seus dados e seus arquivos. Este é o fim da sessão.",
 };
@@ -86,11 +102,18 @@ const en: DeletionCopy = {
   submitting: "Deleting…",
   errors: {
     session: "Your session expired. Sign in again to continue.",
+    "captcha-missing":
+      "The security check did not complete. Reload the page and try again.",
+    "captcha-failed":
+      "The security check was not accepted. Reload the page and try again.",
     password: "That password is not correct.",
     phrase: "Type the confirmation word exactly as shown.",
     lifecycle: "This account is not in a state that allows this action.",
+    throttled: "Too many attempts. Wait a few minutes and try again.",
+    unavailable: "We could not verify your identity right now. Please try again shortly.",
     failed: "We could not start the deletion right now. Please try again.",
   },
+  retryHint: "Reload the page before trying again: the security check is valid only once.",
   receiptTitle: "Account deleted",
   receiptBody: "Your data and your files are gone. This is the end of the session.",
 };

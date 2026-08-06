@@ -16,6 +16,7 @@
 
 import { notFound, redirect } from "next/navigation";
 import { DeletionSurface } from "@/features/account/deletion-surface";
+import { TurnstileWidget } from "@/features/auth/turnstile";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -34,9 +35,20 @@ export default async function DeleteAccountPage({
 
   await assertActiveAccount(supabase, user.id, locale);
 
+  /*
+   * The widget is rendered **here**, on the server, and handed to the client
+   * surface as a node.
+   *
+   * Re-authenticating before an irreversible deletion is a password grant, and
+   * hosted GoTrue applies CAPTCHA enforcement to password grants — so this page
+   * needs the same challenge the login form carries. It is the same component,
+   * deliberately: a second CAPTCHA implementation would be a second thing to
+   * keep correct, and the one that drifted would be the one nobody was looking
+   * at. `next.config.ts` carries the matching CSP source for exactly this route.
+   */
   return (
     <main className="auth-stage">
-      <DeletionSurface locale={locale} />
+      <DeletionSurface locale={locale} captcha={<TurnstileWidget />} />
     </main>
   );
 }

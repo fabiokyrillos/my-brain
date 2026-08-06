@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { signInOnline } from "./support/online-session";
+import { mintOnlineAccessToken, signInOnline } from "./support/online-session";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -49,6 +49,8 @@ type Copy = {
   readonly deletingTitle: string;
   readonly phraseError: string;
   readonly passwordError: string;
+  readonly captchaMissing: string;
+  readonly captchaFailed: string;
 };
 
 /**
@@ -72,13 +74,17 @@ const COPY: Copy = {
   deletingTitle: "Exclusão em andamento",
   phraseError: "Digite exatamente a palavra pedida para confirmar.",
   passwordError: "A senha não confere.",
+  captchaMissing:
+    "A verificação de segurança não foi concluída. Recarregue a página e tente de novo.",
+  captchaFailed:
+    "A verificação de segurança não foi aceita. Recarregue a página e tente de novo.",
 };
 
 test.describe("SH.2 — account deletion on the deployed product surface", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
-  const email = `sh2-journey-${crypto.randomUUID()}@mybrain.com`;
+  const email = `sh2-journey-${crypto.randomUUID()}@example.com`;
   const password = `Sh2!${crypto.randomUUID()}a7`;
   let userId: string | undefined;
 
@@ -108,15 +114,18 @@ test.describe("SH.2 — account deletion on the deployed product surface", () =>
     // The consent gate is SH.4's and interposes every account that has not
     // accepted. It is not what this journey is testing, so it is satisfied
     // through the same RPC the interposition surface calls.
-    const anon = createClient(supabaseUrl!, publishableKey!, {
-      auth: { autoRefreshToken: false, persistSession: false },
+    // `signInWithPassword` is refused by hosted CAPTCHA (`400 captcha_failed`)
+    // for every client, so the user token comes from the admin link exchange.
+    const { accessToken } = await mintOnlineAccessToken({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
     });
-    const session = await anon.auth.signInWithPassword({ email, password });
-    expect(session.error).toBeNull();
     const asUser = createClient(supabaseUrl!, publishableKey!, {
       auth: { autoRefreshToken: false, persistSession: false },
       global: {
-        headers: { Authorization: `Bearer ${session.data.session!.access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       },
     });
     for (const document of ["terms", "privacy"]) {
@@ -168,49 +177,82 @@ test.describe("SH.2 — account deletion on the deployed product surface", () =>
     await page.locator('form button[type="submit"]').click();
   }
 
+  test("the wrong phrase refuses before the provider is asked anything", async ({ page }) => {
+    // Executable regardless of the challenge, and that is the point: the phrase
+    // is compared in the Server Action *first*, so a mistyped word costs neither
+    // a password attempt nor the single-use CAPTCHA token.
+    await signIn(page);
+
+    await submitDeletion(page, COPY.wrongPhrase, password);
+    await expect(page.locator(".form-alert")).toHaveText(COPY.phraseError, { timeout: 15_000 });
+    expect(await lifecycleStatus()).toBe("active");
+  });
+
   /**
-   * BLOCKED ON A PRODUCT DEFECT, not on the harness — and marked rather than
-   * left red or deleted.
+   * The deployed defect, asserted from the outside.
    *
-   * `requestAccountDeletion` re-authenticates with
-   * `supabase.auth.signInWithPassword({ email, password })`
-   * (`src/features/account/actions.ts`) and passes **no `captchaToken`**, unlike
-   * the four surfaces in `src/features/auth/actions.ts`, every one of which
-   * forwards one. Since SH.5 enabled hosted CAPTCHA the password grant answers
-   * `400 captcha_failed — "captcha protection: request disallowed (no
-   * captcha_token found)"` for every caller, which was measured directly
-   * against the deployed project rather than inferred.
+   * Hosted GoTrue enforces CAPTCHA on **password grants**, and this surface
+   * performs one. Before the hotfix it forwarded no token, the provider refused
+   * with `captcha_failed`, and the surface reported **`A senha não confere.`** —
+   * a correct password blamed for a challenge that never ran, with account
+   * deletion impossible on the deployment.
    *
-   * So on the deployment the re-authentication cannot succeed, and the surface
-   * reports `A senha não confere.` to someone who typed the right password.
-   * Both cases below would then be dishonest in different directions: the
-   * "wrong password refuses" half would pass for the wrong reason — the CAPTCHA,
-   * not the password — and the "both correct" half cannot pass at all.
-   *
-   * The sign-in above is already on the working helper, so these run the moment
-   * the defect is fixed. Recorded in `docs/TODO.md`.
+   * This case reproduces exactly that provider refusal — the app under test
+   * carries no `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, so no token is produced, while
+   * the *provider* is the hosted one with CAPTCHA on — and asserts the surface
+   * now names it correctly. It is the strongest statement available without an
+   * interactive solve: the message must be the challenge one and must **not** be
+   * the password one, and the account must still be `active`.
    */
-  test.fixme("the wrong phrase and the wrong password each refuse, and the account survives both", async ({
+  test("a provider-refused challenge is reported as a challenge, not as a wrong password", async ({
     page,
   }) => {
     await signIn(page);
 
-    // 1 — wrong phrase, right password. The phrase is compared in the Server
-    // Action before the provider is asked anything, so this must not even cost
-    // a password attempt.
-    await submitDeletion(page, COPY.wrongPhrase, password);
-    await expect(page.locator(".form-alert")).toHaveText(COPY.phraseError, { timeout: 15_000 });
-    expect(await lifecycleStatus()).toBe("active");
+    await submitDeletion(page, COPY.phrase, password);
 
-    // 2 — right phrase, wrong password. Only the provider can answer this, and
-    // it is asked server-side rather than trusted from the client. The message
-    // differs from the phrase refusal, which is what proves the password was
-    // actually checked rather than the form rejected wholesale.
-    await submitDeletion(page, COPY.phrase, `${password}-wrong`);
-    await expect(page.locator(".form-alert")).toHaveText(COPY.passwordError, { timeout: 15_000 });
+    const alert = page.locator(".form-alert");
+    await expect(alert).toBeVisible({ timeout: 15_000 });
+    const message = (await alert.textContent())?.trim() ?? "";
+
+    // The two refusals the defect conflated, asserted apart.
+    expect(message).not.toBe(COPY.passwordError);
+    expect([COPY.captchaFailed, COPY.captchaMissing]).toContain(message);
+
+    // And nothing was deleted on the way to saying so.
     expect(await lifecycleStatus()).toBe("active");
   });
 
+  test("no refusal path mutates the account", async () => {
+    // Restated as its own assertion rather than trusted from the two above: the
+    // account this journey provisioned must still be exactly where it started.
+    expect(await lifecycleStatus()).toBe("active");
+    const { data } = await admin().auth.admin.getUserById(userId!);
+    expect(data.user?.id).toBe(userId);
+  });
+
+  /**
+   * STILL NOT EXECUTABLE, and for a reason that is not a defect.
+   *
+   * The destructive path needs a **valid** Turnstile token, and hosted
+   * Turnstile declines automated browsers by design — that refusal is
+   * SH-CAPTCHA-002 working. There is no honest automated route to it:
+   *
+   *   * solving the challenge headlessly is what the control exists to prevent;
+   *   * a Cloudflare "always passes" test key would make the assertion vacuous.
+   *     That is not hypothetical here — an always-passing test key already
+   *     produced two wrong published verdicts in this repository once, and the
+   *     lesson recorded from it was that a control must not be exempt from the
+   *     mechanism it is testing;
+   *   * disabling hosted CAPTCHA to let the test through would weaken the
+   *     control to prove the control.
+   *
+   * So it is marked, with the smallest owner action named: one interactive
+   * pass through `/{locale}/account/delete` on the deployment with a disposable
+   * account. Everything up to the challenge is proven above and in
+   * `src/features/account/deletion-request.test.ts`; the hosted CSP and widget
+   * are proven non-destructively by `npm run verify:deletion-captcha`.
+   */
   test.fixme("both correct: the account is destroyed and the Auth user is gone", async ({ page }) => {
     await signIn(page);
     await submitDeletion(page, COPY.phrase, password);
