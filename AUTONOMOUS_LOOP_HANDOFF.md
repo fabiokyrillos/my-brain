@@ -1146,3 +1146,92 @@ without defeating the control.
 activation (enabling **is** the first-purge authorization), Resend SMTP,
 backup-restore drill, legal and monitoring signatures, one green
 `rollout:verify`, the owner-only `disable_signup` flip, a second green run.
+
+*(Superseded on 2026-08-06 by §49: the owner authorized Phase 2H for planning.)*
+
+## §49 — Phase 2H is authorized for planning, and the guard moves with it (2026-08-06)
+
+**ADR-085 is the authorization, and it is deliberately narrow.** Planning
+artifacts, repository-safe research, tests and generators are authorized.
+Merging an implementation PR, deploying a migration, enabling retention,
+purging, opening signup and deploying `process-jobs` are **not**. ADR-086
+records the last of those as its own decision.
+
+**A13 retargeted from Phase 2H to Phase 2I in the same commit as ADR-085**, so
+ADR-067's invariant never lapsed. Two sibling guards moved on the same terms and
+for the same reason — the `Active milestone:` assertion in
+`phase-2f-documentation.test.ts` and the `STATE.md` prose gate in
+`product-ux-documentation.test.ts`. **The lesson, because it recurs every phase:
+the phase letter and the ADR number must move together.** Pinning one without
+the other is how a backlog comes to announce a milestone nothing authorized.
+
+ADR-068 names **no Phase 2I**. 2H's real successor is *opening public signup*,
+which is guarded by the fail-closed rollout checklist and
+`signup-config-guard.test.ts` — so ADR-085 records where that gate actually
+lives, and A13's silence must never be read as a gate on signup.
+
+### The planning package
+
+`docs/initiatives/phase-2h/` carries the PRD (**44 requirements, nine
+families**) and the implementation plan (slices 2H.0–2H.6, gates
+G-2H.1…G-2H.6, **migration budget FIVE**, per-slice and non-transferable, **0
+spent**). `docs/reports/phase-2h/` carries the threat model (T-2H-01…T-2H-24),
+the traceability contract, the `process-jobs` audit and the rate-limit decision
+request.
+
+**The phase's scope is its founding defect decomposed.** The 2026-08-04
+deletion stall had no retry, no error sink, no liveness check, no operator
+surface and no deployment-parity contract. So `2H-RECOVER` is a **first-class
+family**, not a residual, and `2H-RECOVER-006` requires the historical failure
+be *reproduced* before anything is called a regression test.
+
+**The traceability generator is specified and deliberately not built.** Run
+fail-closed against a phase with zero acceptance records it reports every
+requirement unresolved and turns CI red; the alternative — a planning-mode flag
+that suppresses findings — is not a fail-closed generator. Every prior phase
+built its generator in the closeout slice, so this one is `2H-CLOSE-001` in
+2H.6, and `PHASE_2H_TRACEABILITY_CONTRACT.md` §4 states the interim gap rather
+than letting it be discovered at closeout.
+
+### The `process-jobs` audit changed the recommendation's shape
+
+ADR-086 was drafted assuming a two-sided risk. **The audit does not support that
+symmetry**, and the finding is worth carrying forward:
+
+- Deployed build is the tree at **`7be25f0`**; three deployable commits have
+  landed since (`715dc15` rotation window, `7d84a2b` lifecycle gate, `8982d74`
+  request-body bound). `9d23214` is test-only and correctly not counted.
+- The deployed build has **no `lifecycle-gate.ts`, no `byok-rotation.ts`**, and
+  **parses request bodies with no byte bound before authentication**.
+- **No migration since changed a signature or grant on any RPC the deployed
+  build calls** — checked specifically, because that is exactly what stalled
+  `delete-account`. The one RPC only the *new* source calls is
+  `defer_job_for_inactive_owner`, which is the safe direction.
+- **Reachable and idle**: `jobs` holds **4 rows, all completed, newest
+  2026-08-02T13:06:59Z** — *after* the deployment, so the deployed build has
+  demonstrably worked. Zero non-terminal rows.
+- **The trap to avoid:** "no observed breakage" is **weak evidence** here, and
+  the audit says so — four jobs total means the build is *unexercised*, not
+  proven. Recommendation: deploy, as its own change, **after** baseline CI is
+  green, never bundled into a slice.
+
+### G-2H.5 is red, and the two ceilings stay blank
+
+`PHASE_2H_RATE_LIMIT_DECISION_REQUEST.md` gives the owner six decisions
+(V-1…V-6) with three options each for the two ceilings and a recommended
+conservative default — **written nowhere else**. The substantive finding:
+SH.6's deployed quotas (`entries_per_day` 300, `attachments_per_day` 50,
+`live_jobs_per_user` 50) already bound *daily volume*, so **C1's real gap is
+burst rate, not volume** — both ceilings are therefore specified per rolling
+hour. If the owner prefers daily ceilings, the right answer is to change the
+SH.6 parameters and shrink `2H-RATE`, not to build a second mechanism.
+
+### CI, stated exactly
+
+Merge SHA `508cf6c`: `database and journey` ✅, `edge worker` ✅. The
+`application` job was **cancelled on attempt 3 having executed zero steps** —
+never acquired a runner, never reached `Set up job`. **Attempt 4 was already
+queued when this session resumed and was not triggered by this work**; per the
+owner's "no repeated reruns while one is queued", no further rerun was fired.
+**A job that never ran is neither a pass nor a fail**, and merge-SHA green ×3 is
+not claimed.
