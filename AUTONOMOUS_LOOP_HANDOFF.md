@@ -999,3 +999,90 @@ deletion. It needs an interactive Turnstile solve; the three ways to automate it
 (a headless solve, an always-passing test key, disabling the control) each prove
 nothing. Owner action: one manual pass at `/pt-BR/account/delete` on the
 deployment with a **disposable** account — never the owner's.
+
+## §47 — the deletion stalls, and it is a deployment defect (2026-08-06)
+
+The first interactive account-deletion proof. **The CAPTCHA hotfix worked**:
+challenge solved, `EXCLUIR` accepted, correct password accepted, no refusal, the
+request recorded. The account then stopped permanently at "Exclusão em
+andamento".
+
+### Not pending — stalled
+
+There is no job row, no cron, and no reaper for a deletion. Read-only: the Auth
+user still exists, `account_lifecycle.status` is `deleting`, owned rows remain,
+storage is empty, the function is deployed and reachable, and re-signing in
+lands on the same interposition — so the screen is **real state**, not a stale
+session or a cache.
+
+### Root cause
+
+Re-running the executor through its supported path answers
+`409 {"outcome":"stopped","code":"credential_not_erased"}` — step 5. But against
+the *repository's* code that check passes: `admin_credential_status` answers
+`200 null` for an account that never configured a credential, which is not an
+error.
+
+`delete-account` is deployed at **v1, 2026-08-04, never redeployed** — build
+`eb92035`, the SH.2 executor, which read `user_ai_credentials` **directly**.
+On 2026-08-05 two things happened: `357cd63` narrowed the executor to the RPC
+**in the repository**, and migration `202608050077` (SH-EXPOSURE-001) revoked
+`service_role`'s access to that table **on the deployment**. Confirmed:
+`service_role` now gets `403 / 42501` on it.
+
+So since 2026-08-05, **every** account deletion has stalled. The migration's own
+prose names the executor as an affected caller — the dependency was known, the
+code was fixed the same day, and the deploy was simply a separate act that never
+happened. Nothing in the repository could see the gap.
+
+### The fix, which is an owner action
+
+```
+npx supabase functions deploy delete-account
+```
+
+No code change, no migration. Blocked here by the permission classifier, which
+is correct — deploying to production is the owner's.
+
+### What the repository gained
+
+- **`npm run verify:edge-parity`** — the check that did not exist. Compares each
+  deployed function's `updated_at` against the newest commit touching its
+  **deployable** source (`.ts`/`.json`, never tests or markdown). Its first run
+  found the defect, and its first *draft* produced two false alarms — a docs
+  reorganisation touching a `.test.ts`, and a fixture edit — which is exactly
+  why the narrowing matters: a parity check that cries wolf gets run with eyes
+  closed. It also found `process-jobs` behind (`8982d74`, no observed
+  dependency), and recognises `heartbeat` as deliberately undeployed with
+  SH-EXPOSURE-005's reasoning carried in the allowlist.
+- **Two Deno tests** pinning the branch that stalled: `completes for an account
+  that never configured a credential` (the shape of every ordinary account —
+  `{ data: null, error: null }` must not stop the machine) and `stops, and
+  deletes nothing, when the credential check itself fails` (so the first is not
+  passing for want of a check). The fixture previously defaulted the status to
+  `"removed"` and never exercised `null`.
+
+### Two findings worth keeping
+
+1. **`re-runnable` was implemented as a property, not a mechanism.** The
+   executor is idempotent and stops rather than forces — all true — but nothing
+   re-runs it, so one failed invocation strands an account in `deleting` with
+   every write refused. Destination: Phase 2H, beside the error sink and
+   dead-man switch. Needs a migration; not taken opportunistically.
+2. **The stop reason is written where nobody can read it.** Every stop records
+   into `account_deletion_log`, revoked from every role including
+   `service_role`, with an invariant test keeping it that way. Right for a table
+   holding a session hash, and it means the diagnosing operator cannot see the
+   reason. The supported path is to **re-run the executor** and read the `409`
+   body — written down in the evidence report rather than solved with a new
+   reader, which would need a migration and would widen a deliberately closed
+   table.
+
+### State
+
+The disposable account is **deliberately left in `deleting`** as the live
+reproduction; admin-deleting it would destroy the only end-to-end proof that the
+deploy fixes it. No owner account touched, no CAPTCHA setting, signup posture,
+retention schedule or Phase 2H state changed. The remaining `test.fixme` in
+`e2e/online-account-deletion.spec.ts` **stays** — terminal deletion is not
+proven and is not claimed.
