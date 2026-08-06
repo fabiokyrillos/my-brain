@@ -505,3 +505,72 @@ concurrency cancels it), then 2G.3 — capture routing, the phase's ONE
 migration (`captureSource` allowlist widening) — or hold 2G.3 for a fresh
 session and go straight to 2G.4's hosted verification once deployed. Phase 2H
 remains unauthorised; nothing destructive is authorized.
+
+*(§39's "Next" is answered by §40 below.)*
+
+---
+
+## §40 — 2G.2 closed, 2G.3 built, and the phase's migration budget is spent (2026-08-06)
+
+### Where things stand
+
+- **2G.2 is CLOSED.** PR #101 merged at `e63e103`, exact merge-SHA CI green on
+  all three jobs. `main` carries the create verb end to end: sentence →
+  preview → confirmation → `create_task_command` → registered undo.
+- **`codex/2g-slice-3`** carries capture routing complete, **including the
+  phase's one and only migration `202608060078`**. `AUTHORIZED_MIGRATION_HEAD`
+  moves with it. Full suite **4064/4064**, lint and typecheck clean.
+- **The migration is NOT applied to the hosted project.** Parity stays
+  `202608050077`. This is safe in both directions and deliberately so: the
+  widenings are additive, and the app half degrades to a dropped best-effort
+  event while the capture itself still succeeds.
+
+### The finding a successor should not lose
+
+**SH.6's quota refusals have been recording nothing.** `capture/actions.ts`
+emits `failureKind: 'quota'`; the value was in neither the database enum nor
+`contracts.ts`, so `parseProductEventPayload` rejected the payload *before the
+RPC*, at a call site that wraps its emission in `.catch(() => {})` and reads no
+result. The ceilings SH.6 proved under genuine concurrency have had invisible
+refusals since the day they deployed.
+
+Fixed in 2G.3's migration at zero additional cost, because that migration
+already replaced the same function — ADR-084 carries the analysis and the
+rejected alternatives. **The lost events do not backfill.** If a later reader
+finds the quota funnel suspiciously empty before 2026-08-06, this is why.
+
+Two lessons that generalise, in this repository's own idiom:
+
+1. **A producer with no consumer is invisible on both sides.** Each layer was
+   internally consistent; only reading them against each other found it. The
+   regression test now pins the producer, the app validator and the database
+   validator to one another rather than to a hand-written list.
+2. **A test-harness fallback can make a whole assertion vacuous.** That
+   regression test's own behavioural half was passing by not running — this
+   file's `vi.importActual(...).catch(() => ({}))` shim returned `{}`, so
+   `parse?.(…)` was `undefined` and every refusal assertion silently held. The
+   fallback is right for a census case and wrong for a behavioural one.
+
+### Two guards fired correctly and were retargeted, not weakened
+
+- **`phase-2f-documentation.test.ts`** requires `SECURITY.md` to name the chain
+  head — it caught the head moving without the documentation following.
+  `SECURITY.md` now describes `202608060078` and the ADR-084 repair.
+- **The Signup Hardening traceability generator** pinned the chain *head* to
+  `202608050077`, which was right only while SH was the last initiative to
+  spend a migration; it began reporting Phase 2G's legitimate work as a defect
+  in SH's own evidence. It now asserts the SH head is **present in the chain**.
+  Its negative control was rewritten to remove that head from a *non-empty*
+  chain, because the check tolerates a repository with no migrations at all and
+  deleting the only file proved nothing.
+
+### Next
+
+Merge the 2G.3 PR when green, re-running the merge-SHA `verify` run if branch
+concurrency cancels it (§39's trap). Then **apply `202608060078` to the linked
+project** — non-destructive, a `create or replace` of an internal validator,
+inside the approved budget — and read parity back. Then 2G.4: the fail-closed
+traceability generator, the hosted verification that finally executes the two
+written-not-executed journeys, the measured funnel statement for ADR-055, and
+the phase's final report. Phase 2H remains unauthorised; no purge is
+authorized; signup stays closed.
