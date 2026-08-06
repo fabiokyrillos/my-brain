@@ -132,7 +132,9 @@ Bound by ADR-075: an operator CLI over `service_role` SQL. **No product admin UI
 
 ## 14. Value sheet — the numbers this phase must not invent
 
-Every threshold below is **proposed and requires owner signature before the slice that consumes it is implemented**, following ADR-073's tiered-gate discipline. They are listed here so they are argued once, in the open, rather than appearing inside a function body.
+Thresholds are listed here so they are argued once, in the open, rather than appearing inside a function body. Each is **proposed** until the owner signs it, following ADR-073's tiered-gate discipline.
+
+### 14.1 Proposed, awaiting signature
 
 | Value | Proposed | Consumes |
 | --- | --- | --- |
@@ -142,10 +144,27 @@ Every threshold below is **proposed and requires owner signature before the slic
 | Error-sink retention window | 90 days | `2H-SINK-004` |
 | Scheduled-job staleness multiple | 3× the job's own interval | `2H-DEADMAN-002` |
 | Dead-man history retention | 90 days | `2H-RETENTION-001` |
-| AI operation rate ceiling | per user, per hour — **owner to set** | `2H-RATE-002` |
-| Upload rate ceiling | per user, per hour — **owner to set** | `2H-RATE-002` |
 
-The two ceilings marked *owner to set* are deliberately blank. A rate limit is a product decision about how the product feels under load, and proposing a number here would launder an invention into a signature.
+### 14.2 SIGNED — the `2H-RATE` ceilings (gate G-2H.5, owner signature 2026-08-06)
+
+**G-2H.5 is CLEARED for planning.** The signature does **not** authorize implementing, migrating, merging or deploying slice 2H.3. The decision request that produced these values, with the alternatives considered and their consequences, is `docs/reports/phase-2h/PHASE_2H_RATE_LIMIT_DECISION_REQUEST.md`.
+
+| # | Decision | **Signed value** | Consumes |
+| --- | --- | --- | --- |
+| **V-1** | AI operations ceiling | **60 operations per user per rolling hour** | `2H-RATE-001`, `2H-RATE-002` |
+| **V-2** | Upload operations ceiling | **20 accepted upload requests per user per rolling hour** | `2H-RATE-001`, `2H-RATE-002` |
+| **V-3** | Window shape | **Rolling window — not a fixed clock-hour window** | `2H-RATE-001` |
+| **V-4** | Retries | **Bounded automatic worker retries do NOT consume a new slot; user-initiated retries DO** | `2H-RATE-001` |
+| **V-5** | Background jobs | **Yes — provider-reaching background work consumes the owning user's AI slot. However, work already admitted by the drain must not be double-refused by a second admission decision.** | `2H-RATE-001` |
+| **V-6** | Exemptions | **None, including the owner** | `2H-RATE-001` |
+
+**Three consequences these values carry into 2H.3, stated here so the slice inherits them rather than rediscovering them:**
+
+- **V-3 forbids the cheap implementation.** A fixed clock-hour counter admits 2× the ceiling across a boundary — 120 AI operations in two minutes at 59 and 01 past. The rolling window is the requirement, not an optimisation.
+- **V-5 is two rules, and the second is the hard one.** A background job consumes its owner's slot, *and* the limiter must not refuse work the drain has already admitted (`drain_claims_per_owner_per_tick = 5`). So admission happens **once**, at claim time, not again at provider-call time — otherwise a claimed job dies mid-flight and burns a retry it did not earn.
+- **V-6 makes the owner's own account the control's first test subject.** No exemption path may exist to be accidentally widened later; `2H-RATE-004`'s concurrency proof runs against an ordinary account, and a control the owner is exempt from is a control nobody has exercised.
+
+`2H-RATE-004` proves V-1 and V-2 under genuine concurrency with the signed number as `M` (60 racers against 60, 20 against 20 — exactly `M` admitted). `2H-RATE-006` still forbids either ceiling becoming a spend control: under BYOK the user pays, and these bound availability and fairness, not cost.
 
 ## 15. Definition of done
 

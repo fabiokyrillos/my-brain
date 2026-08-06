@@ -1215,16 +1215,51 @@ symmetry**, and the finding is worth carrying forward:
   proven. Recommendation: deploy, as its own change, **after** baseline CI is
   green, never bundled into a slice.
 
-### G-2H.5 is red, and the two ceilings stay blank
+### Owner decisions, 2026-08-06 (appended after the incident diagnosis)
 
-`PHASE_2H_RATE_LIMIT_DECISION_REQUEST.md` gives the owner six decisions
-(V-1…V-6) with three options each for the two ceilings and a recommended
-conservative default — **written nowhere else**. The substantive finding:
-SH.6's deployed quotas (`entries_per_day` 300, `attachments_per_day` 50,
-`live_jobs_per_user` 50) already bound *daily volume*, so **C1's real gap is
-burst rate, not volume** — both ceilings are therefore specified per rolling
-hour. If the owner prefers daily ceilings, the right answer is to change the
-SH.6 parameters and shrink `2H-RATE`, not to build a second mechanism.
+**G-2H.5 is CLEARED.** The owner signed all six lines, taking the recommended
+option on each: **V-1 60 AI operations/user/rolling hour**, **V-2 20 accepted
+uploads/user/rolling hour**, **V-3 rolling window** (not fixed clock-hour),
+**V-4** bounded worker retries consume no slot / user-initiated retries do,
+**V-5** provider-reaching background work consumes the owning user's AI slot
+*but* drain-admitted work must not be double-refused, **V-6** no exemptions
+including the owner. Authoritative in `PHASE_2H_PRD.md` §14.2.
+
+**Three consequences carried into 2H.3 so the slice inherits them rather than
+rediscovering them:** V-3 rules out a fixed-window counter (it admits 2× the
+ceiling across a boundary); V-5 forces admission to happen **once, at claim
+time**, or a claimed job dies mid-flight and burns a retry it did not earn; V-6
+leaves no exemption path that could later be widened, and makes the owner's own
+account the control's first test subject.
+
+**Clearing G-2H.5 authorizes nothing beyond planning.** G-2H.1 is still red.
+
+**ADR-086 is ACCEPTED**, on four binding conditions: separate explicit
+operation; never bundled into a slice merge; only after `508cf6c` is green ×3
+with the audit's §7 verification lane and §8 rollback ready; **not during the
+current incident**. **Acceptance is not execution** — condition 3 is unmet,
+condition 4 is active, nothing was deployed, and no Phase 2H slice may depend on
+the lifecycle gate or the request-body bound being live in the deployed worker.
+
+### The argument that produced the ceilings (retained)
+
+`PHASE_2H_RATE_LIMIT_DECISION_REQUEST.md` put six decisions (V-1…V-6) to the
+owner with three options each for the two ceilings. It is retained as the
+**argument** — the alternatives and what each would have cost — now that
+§14.2 of the PRD holds the signed values.
+
+The substantive finding, and the reason the ceilings are hourly rather than
+daily: SH.6's deployed quotas (`entries_per_day` 300, `attachments_per_day` 50,
+`live_jobs_per_user` 50) **already bound daily volume**, so **C1's real gap is
+burst rate, not volume**. Nothing today stops a user spending an entire daily
+allowance in ten seconds. If a future owner wants daily ceilings instead, the
+right answer is to change the SH.6 parameters — an `UPDATE`, not a migration
+(SH-QUOTA-010) — and shrink `2H-RATE`, never to build a second mechanism
+alongside the first.
+
+Provider limits were recorded as **NOT READ / unknown** rather than estimated:
+under BYOK the binding limit is each user's own key tier and is not knowable
+from this repository.
 
 ### CI, stated exactly
 

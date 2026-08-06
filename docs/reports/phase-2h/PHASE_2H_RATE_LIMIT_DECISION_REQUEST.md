@@ -1,7 +1,8 @@
 # `2H-RATE` ceilings — owner decision request (gate G-2H.5)
 
-- **Status:** **AWAITING OWNER SIGNATURE. G-2H.5 is RED and slice 2H.3 cannot begin.**
-- **Purpose:** the PRD's §14 value sheet leaves two ceilings deliberately blank. This document gives the owner what is needed to choose them, and **nothing here is written into the PRD or into any implementation until the owner signs.**
+- **Status:** **SIGNED 2026-08-06. G-2H.5 is CLEARED for planning.** The owner chose the recommended conservative default on both ceilings (V-1 = 60/h, V-2 = 20/h) and the recommended answer on V-3…V-6. The signed values are now recorded in `PHASE_2H_PRD.md` §14.2, which is authoritative; this document is retained as the **argument** behind them — the alternatives considered and what each would have cost.
+- **What the signature does not do:** it does not authorize implementing, migrating, merging or deploying slice 2H.3. G-2H.5 was the only gate blocking that slice's *planning*; the remaining gates (G-2H.1 in particular) are unaffected and G-2H.1 is still red.
+- **Purpose (as written before signature):** the PRD's §14 value sheet left two ceilings deliberately blank. This document gave the owner what was needed to choose them, and nothing here was written into the PRD or into any implementation until the owner signed.
 - **Rule this document obeys:** no ceiling is invented. Every option below is derived from a measured figure, an existing enforced ceiling, or a provider constraint — and where a figure is unknown, it says so rather than estimating.
 
 ---
@@ -80,17 +81,19 @@ Anchor: `attachments_per_day = 50`, 25 MiB per file, 500 MiB total. Uploads are 
 
 **The BYOK consequence, stated plainly:** because the user pays, an AI rate limit is **not a spend control** — `2H-RATE-006` already forbids it becoming one. Its purpose is availability, fairness across users, and bounding this product's own reputation with providers. If the owner's goal were cost, this is the wrong mechanism and the honest answer would be that BYOK already solved it.
 
-## 6. What the owner is being asked to sign
+## 6. What the owner signed — 2026-08-06
 
-| # | Decision | Options | Recommended |
+| # | Decision | Options offered | **Signed** |
 | --- | --- | --- | --- |
-| **V-1** | AI operations ceiling | A: 60/h · B: 150/h · C: 30/h | **A (60 per rolling hour)** |
-| **V-2** | Upload operations ceiling | A: 20/h · B: 50/h · C: 10/h | **A (20 per rolling hour)** |
-| **V-3** | Window shape | rolling / fixed | **rolling** |
-| **V-4** | Retries consume a slot? | worker no / user yes — or another split | **worker no, user yes** |
-| **V-5** | Background jobs consume a slot? | yes / no | **yes, without double-refusing the drain** |
-| **V-6** | Exemptions | none / owner exempt | **none** |
+| **V-1** | AI operations ceiling | A: 60/h · B: 150/h · C: 30/h | **A — 60 operations per user per rolling hour** |
+| **V-2** | Upload operations ceiling | A: 20/h · B: 50/h · C: 10/h | **A — 20 accepted upload requests per user per rolling hour** |
+| **V-3** | Window shape | rolling / fixed | **rolling, not a fixed clock-hour window** |
+| **V-4** | Retries consume a slot? | worker no / user yes — or another split | **bounded automatic worker retries do not; user-initiated retries do** |
+| **V-5** | Background jobs consume a slot? | yes / no | **yes — provider-reaching background work consumes the owning user's AI slot; work already admitted by the drain must not be double-refused by a second admission decision** |
+| **V-6** | Exemptions | none / owner exempt | **none, including the owner** |
 
-**Nothing above is implemented, and nothing is written into `PHASE_2H_PRD.md` §14.** On signature, the chosen values enter the PRD value sheet and `private.quota_ceilings`-style runtime parameters in slice 2H.3, and `2H-RATE-004` proves them under genuine concurrency with the signed number as `M`.
+The owner took the recommended option on every line, including both conservative ceilings.
 
-**Until V-1 and V-2 are signed, G-2H.5 is red and slice 2H.3 does not begin.**
+**Where these live now.** `PHASE_2H_PRD.md` §14.2 is authoritative and carries the signed values verbatim, together with the three consequences they push into slice 2H.3 (V-3 rules out a fixed-window counter; V-5 forces admission to happen **once**, at claim time; V-6 leaves no exemption path to widen later). In implementation they become runtime parameters in the `private.quota_ceilings` shape — changeable by `UPDATE`, never by a migration, per SH-QUOTA-010 — and `2H-RATE-004` proves them under genuine concurrency with the signed number as `M`.
+
+**G-2H.5 is cleared for planning.** It does not authorize implementing, migrating, merging or deploying slice 2H.3, and the other gates are untouched — **G-2H.1 is still red**.

@@ -1,6 +1,6 @@
 # `process-jobs` deployment audit — the evidence ADR-086 asked for
 
-- **Status:** Audit complete. **Recommendation made. Nothing deployed.** ADR-086 stays `Proposed` until the owner decides.
+- **Status:** Audit complete; **the owner accepted it and its recommendation on 2026-08-06, and ADR-086 is now `Accepted`.** Nothing has been deployed. Acceptance binds four conditions: the deploy is a **separate explicit operation**, **never bundled into a Phase 2H slice merge**, **authorized only after merge SHA `508cf6c` is green on all three jobs** and §7/§8 below are ready, and **not during the current GitHub Actions incident**. As of writing, the third condition is **unmet** and the fourth is **active**.
 - **Requirement:** `2H-DEPLOY-007`. **Authorization:** the owner authorized the audit and explicitly did **not** authorize deploying `process-jobs` in this run.
 - **Date:** 2026-08-06. Every figure below was read, not recalled; the read commands are named beside each.
 
@@ -142,4 +142,6 @@ The reasoning, and where it departs from ADR-086's draft:
 - The migration audit found **no signature or grant change** affecting any RPC the deployed build calls, so the `delete-account` failure mode is specifically **not** present here. The deploy is therefore ordinary rather than a repair under pressure.
 - **Timing is the one real argument for waiting.** With the GitHub Actions incident unresolved and merge-SHA CI not yet green, a production worker deploy would land in a window where attribution is muddled. The recommendation is to deploy **after** baseline CI is green, not immediately.
 
-**This audit deploys nothing.** ADR-086 stays `Proposed`. The owner decides, and the deploy — whenever it happens — is a standalone authorized action, never bundled into a slice.
+**This audit deploys nothing.**
+
+**Owner decision, 2026-08-06:** the audit and this recommendation are **accepted in principle**, and ADR-086 moves to `Accepted` on four binding conditions — separate explicit operation; never bundled into a slice merge; only after `508cf6c` is green ×3 with §7 and §8 ready; and **not during the current GitHub Actions incident**. Acceptance is **not** authorization to execute the deployment now, and nothing here has been deployed.
