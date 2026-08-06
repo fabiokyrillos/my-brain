@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice G4's authenticated acceptance for History (UX-13, UX-21, UX-27, UX-28).
  *
@@ -78,11 +80,7 @@ test.describe("history reads as sentences, filters in the database, and links to
   });
 
   async function signIn(page: Page, locale: "pt-BR" | "en" = "pt-BR") {
-    await page.goto(`/${locale}/auth/login`);
-    await page.getByLabel("E-mail").fill(owner.email);
-    await page.getByLabel(locale === "en" ? "Password" : "Senha").fill(owner.password);
-    await page.getByRole("button", { name: locale === "en" ? "Sign in" : "Entrar" }).click();
-    await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email: owner.email, locale });
   }
 
   /**
@@ -307,14 +305,10 @@ test.describe("history reads as sentences, filters in the database, and links to
 
     const stranger = await createAccount("history-stranger");
     try {
-      await page.goto("/pt-BR/auth/login");
-      // Sign out by signing in as someone else in a fresh context.
+      // Become someone else in this same context: the previous session's
+      // cookie has to go before another one is installed over it.
       await page.context().clearCookies();
-      await page.goto("/pt-BR/auth/login");
-      await page.getByLabel("E-mail").fill(stranger.email);
-      await page.getByLabel("Senha").fill(stranger.password);
-      await page.getByRole("button", { name: "Entrar" }).click();
-      await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+      await signInOnline(page, { email: stranger.email, locale: "pt-BR" });
 
       await page.goto("/pt-BR/app/history");
       await expect(page.getByText("Nenhuma alteração")).toBeVisible({ timeout: 30_000 });

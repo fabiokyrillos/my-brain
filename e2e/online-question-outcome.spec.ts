@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice G1's authenticated acceptance for the question after-state (UX-11).
  *
@@ -150,11 +152,7 @@ test.describe("what happened after the question was answered", () => {
     test(`a resolved question is reachable and says what it changed — ${locale}`, async ({ page }, testInfo) => {
       const text = strings[locale];
 
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(text.loginEmail).fill(email);
-      await page.getByLabel(text.loginPassword).fill(password);
-      await page.getByRole("button", { name: text.loginSubmit }).click();
-      await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+      await signInOnline(page, { email, locale });
 
       await page.goto(`/${locale}/app/questions`);
 

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { mintOnlineAccessToken, signInOnline } from "./support/online-session";
+
 /**
  * Slice G5's authenticated acceptance for the reminder lifecycle
  * (UX-12, DEC-6 option A, DEC-7 option a).
@@ -110,11 +112,7 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
   });
 
   async function signIn(page: Page, locale: "pt-BR" | "en" = "pt-BR") {
-    await page.goto(`/${locale}/auth/login`);
-    await page.getByLabel("E-mail").fill(owner.email);
-    await page.getByLabel(locale === "en" ? "Password" : "Senha").fill(owner.password);
-    await page.getByRole("button", { name: locale === "en" ? "Sign in" : "Entrar" }).click();
-    await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email: owner.email, locale });
   }
 
   /**
@@ -164,15 +162,15 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
    * the library is free to change.
    */
   async function sessionToken(): Promise<string> {
-    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, "content-type": "application/json" },
-      body: JSON.stringify({ email: owner.email, password: owner.password }),
+    // Not the password grant: hosted CAPTCHA refuses it for every client
+    // (`400 captcha_failed`), so the exchange is the admin link one.
+    const { accessToken } = await mintOnlineAccessToken({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email: owner.email,
     });
-    expect(response.ok, `sign-in for the token failed: ${await response.clone().text()}`).toBe(true);
-    const { access_token: token } = (await response.json()) as { access_token?: string };
-    expect(token, "the token grant returned no access token").toBeTruthy();
-    return token as string;
+    return accessToken;
   }
 
   /**

@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+
+import { mintOnlineAccessToken, signInOnline } from "./support/online-session";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -104,11 +106,16 @@ for (const COPY of COPIES) {
       return (data ?? []) as { document: string; version: string; surface: string }[];
     }
 
+    // The interposition is this journey's subject, so the helper must not walk
+    // through it — `acceptPolicies: false` — and must not assert a destination
+    // the gate is supposed to withhold.
     async function signIn(page: Page) {
-      await page.goto(`/${COPY.locale}/auth/login`);
-      await page.getByLabel(COPY.emailLabel).fill(email);
-      await page.getByLabel(COPY.passwordLabel).fill(password);
-      await page.getByRole("button", { name: COPY.signIn }).click();
+      await signInOnline(page, {
+        email,
+        locale: COPY.locale,
+        acceptPolicies: false,
+        assertDestination: false,
+      });
     }
 
     test.beforeAll(async () => {
@@ -116,12 +123,14 @@ for (const COPY of COPIES) {
       expect(created.error).toBeNull();
       userId = created.data.user!.id;
 
-      const anon = createClient(supabaseUrl!, publishableKey!, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-      const session = await anon.auth.signInWithPassword({ email, password });
-      expect(session.error).toBeNull();
-      accessToken = session.data.session!.access_token;
+      // `signInWithPassword` is refused by hosted CAPTCHA (`400 captcha_failed`)
+      // for every client, so the user token comes from the admin link exchange.
+      accessToken = (await mintOnlineAccessToken({
+        supabaseUrl: supabaseUrl!,
+        serviceRoleKey: serviceRoleKey!,
+        publishableKey: publishableKey!,
+        email,
+      })).accessToken;
     });
 
     test.afterAll(async () => {

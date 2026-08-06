@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+
+import { attemptOnlineSession, signInOnline } from "./support/online-session";
 import { execFileSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
@@ -111,24 +113,32 @@ test.describe("SH.3 — suspension and reactivation on the deployed project", ()
     return { status: response.status, body: await response.text() };
   }
 
+  // Not the login form: hosted CAPTCHA refuses automated password sign-in, and
+  // the destination is deliberately not asserted — a suspended account belongs
+  // on `/account-state`, which is the whole point of this journey.
   async function signIn(page: Page) {
-    await page.goto(`/${LOCALE}/auth/login`);
-    await page.getByLabel(COPY.emailLabel).fill(email);
-    await page.getByLabel(COPY.passwordLabel).fill(password);
-    await page.getByRole("button", { name: COPY.signIn }).click();
+    await signInOnline(page, { email, locale: LOCALE, assertDestination: false });
   }
+
+  /** The link exchange, aimed at this account. */
+  const attempt = () =>
+    attemptOnlineSession({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
+    });
 
   test.beforeAll(async () => {
     const created = await admin().auth.admin.createUser({ email, password, email_confirm: true });
     expect(created.error).toBeNull();
     userId = created.data.user!.id;
 
-    const anon = createClient(supabaseUrl!, publishableKey!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const session = await anon.auth.signInWithPassword({ email, password });
-    expect(session.error).toBeNull();
-    accessToken = session.data.session!.access_token;
+    // `signInWithPassword` is refused by hosted CAPTCHA (`400 captcha_failed`)
+    // for every client, so the user token comes from the admin link exchange.
+    const opened = await attempt();
+    expect(opened.ok, opened.ok ? "" : `session refused at ${opened.stage}: ${opened.body}`).toBe(true);
+    accessToken = (opened as { accessToken: string }).accessToken;
 
     for (const document of ["terms", "privacy"]) {
       const { error } = await asUser().rpc("record_policy_acceptance", {
@@ -311,11 +321,15 @@ test.describe("SH.3 — suspension and reactivation on the deployed project", ()
     // A banned account cannot obtain a fresh session at all — this is the half
     // of suspension the database cannot enforce, and the reason the runbook has
     // a provider-side step.
-    const anon = createClient(supabaseUrl!, publishableKey!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const refused = await anon.auth.signInWithPassword({ email, password });
-    expect(refused.error).not.toBeNull();
+    //
+    // Asserted through the **link exchange**, not `signInWithPassword`. Since
+    // SH.5 the password grant answers `400 captcha_failed` for every account,
+    // banned or not, so an assertion on "sign-in returns an error" would have
+    // been satisfied by the CAPTCHA rather than by the ban — a control that
+    // cannot fail. The exchange below is the same path the whole online suite
+    // uses to succeed, which is exactly why its refusal here means something.
+    const refused = await attempt();
+    expect(refused.ok, "a banned account must not be able to open a session").toBe(false);
   });
 
   test("10-14 — reactivation restores the account, the job, and nothing else", async () => {
@@ -334,12 +348,11 @@ test.describe("SH.3 — suspension and reactivation on the deployed project", ()
     const unbanned = await admin().auth.admin.updateUserById(userId, { ban_duration: "none" });
     expect(unbanned.error).toBeNull();
 
-    const anon = createClient(supabaseUrl!, publishableKey!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const session = await anon.auth.signInWithPassword({ email, password });
-    expect(session.error).toBeNull();
-    accessToken = session.data.session!.access_token;
+    // The positive half of the same control: with the ban lifted, the exchange
+    // that was refused a moment ago succeeds.
+    const reopened = await attempt();
+    expect(reopened.ok, reopened.ok ? "" : `session still refused at ${reopened.stage}: ${reopened.body}`).toBe(true);
+    accessToken = (reopened as { accessToken: string }).accessToken;
 
     // 12 — the SAME job becomes claimable. No re-enqueue: the id is unchanged
     // and no second job row appeared for this owner.
