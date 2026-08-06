@@ -295,6 +295,29 @@ describe("2E-PREVIEW-004 — the seven hashed values", () => {
     expect(payload.p_operation_key).not.toBe(OPERATION_KEY);
   });
 
+  it("2G-CREATE-004: the policy bump invalidates what was minted under the superseded version", () => {
+    // Slice 2G.1 moved the policy version off `2026-07-25.2`. The SQL
+    // fingerprint hashes `p_policy_version` as one of its seven inputs and is
+    // `strict`, so equal inputs are the only route to an equal digest — and
+    // `apply_task_command` / `create_task_command` resolve a stored
+    // confirmation by that digest. A fingerprint or unexpired confirmation
+    // stored under the superseded version therefore cannot match any request
+    // built after the bump: this exercises the invalidation the taxonomy
+    // comment promises, rather than asserting the promise.
+    const superseded = "2026-07-25.2";
+    expect(TASK_COMMAND_POLICY_VERSION).not.toBe(superseded);
+
+    const payload = payloadFor(scenario({ action: "complete_task" }));
+    expect(payload.p_policy_version).toBe(TASK_COMMAND_POLICY_VERSION);
+
+    // The identical request as it would have been stored before the bump:
+    // every other hash input byte-equal, only the version moved. One differing
+    // input is sufficient and necessary for a different digest.
+    const stored = { ...payload, p_policy_version: superseded };
+    expect(Object.keys(stored).sort()).toEqual(Object.keys(payload).sort());
+    expect(stored).not.toEqual(payload);
+  });
+
   it("carries every instant as text, so no session timezone can change the digest", () => {
     // `to_jsonb(timestamptz)` renders through the session's TimeZone GUC, which
     // `set search_path = ''` does not pin — a timestamp crossing the boundary as

@@ -746,6 +746,20 @@ export async function startTaskCommand(
       retryable: true,
     });
   }
+  if (normalized.kind === "create") {
+    // Slice 2G.1 ships the contract only. Until 2G.2 routes a creation intent
+    // to the deployed creation family (2G-ROUTE-001), the composer's observable
+    // behavior stays exactly what it was before the contract could represent
+    // one: the refusal a create request has always received. Deliberate, and
+    // removed by 2G.2 — not a lost classification, a staged one.
+    return resolved({
+      heading: copy.outcomes.unsupported.title,
+      detail: copy.outcomes.unsupported.description,
+      reason: copy.unsupportedReasons.unsupported_action,
+      unsupportedReason: "unsupported_action",
+      terminal: true,
+    });
+  }
   if (normalized.kind === "unsupported") {
     return resolved({
       heading: copy.outcomes.unsupported.title,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   TASK_COMMAND_ACTIONS,
+  TASK_COMMAND_CREATION_QUALIFIERS,
   TASK_COMMAND_MODEL_UNSUPPORTED_REASONS,
   type TaskCommandModelUnsupportedReason,
 } from "@/features/task-commands/taxonomy";
@@ -27,7 +28,8 @@ import {
  */
 
 export const TASK_COMMAND_STRATEGY_VERSION = "task-command-v1";
-export const TASK_COMMAND_PROMPT_VERSION = "2026-07-25.1";
+/** `2026-08-05.1` — Slice 2G.1 added the creation classification and its rules. */
+export const TASK_COMMAND_PROMPT_VERSION = "2026-08-05.1";
 
 /**
  * The model returns a classification and a bounded set of short strings, so a
@@ -77,7 +79,16 @@ const modelPatchSchema = z.object({
 }).strict();
 
 export const taskCommandProposalSchema = z.object({
-  outcome: z.enum(["proposal", "unsupported"]),
+  /**
+   * `create` arrived with Slice 2G.1 (2G-CREATE-001): an explicit request to
+   * create a NEW task, distinct from the fifteen mutation verbs and from
+   * `unsupported`. The object shape is deliberately unchanged — a creation
+   * reuses `targetHints.titleWords` as the new task's name words (the same
+   * 1–12-word shape the deployed creation family consumes) and `patch` for at
+   * most the qualifier fields the family accepts, so the model gains no new
+   * field to misuse.
+   */
+  outcome: z.enum(["proposal", "unsupported", "create"]),
   action: z.enum(TASK_COMMAND_ACTIONS).nullable(),
   unsupportedReason: z.enum(TASK_COMMAND_MODEL_UNSUPPORTED_REASONS).nullable(),
   targetHints: modelTargetHintsSchema,
@@ -94,7 +105,8 @@ Security and truth rules:
 - Never emit an identifier of any kind: no task id, no UUID, no table name, no column name, no SQL. The schema has no field for one.
 - One command targets exactly one task. If the sentence addresses several tasks, or "all" of something, return outcome "unsupported" with unsupportedReason "multiple_targets".
 - If the sentence asks for two different changes, return outcome "unsupported" with unsupportedReason "multiple_actions".
-- The available actions are fixed by the response schema. If the requested verb is not one of them, return outcome "unsupported" with unsupportedReason "unsupported_action".
+- If the sentence explicitly asks to create, add, or register a NEW task ("adicione uma tarefa...", "add a task...", "crie uma tarefa..."), return outcome "create". A creation names no existing task: leave action null, put the new task's name words in targetHints.titleWords (lowercase, without articles, at most twelve), and fill in patch only a deadline (dueAt), a planned date (plannedAt), a priority, or one project/context/person reference the sentence itself supplies. Asking to create several tasks at once is "multiple_targets". Asking to create anything that is not a task — a reminder, a project, a person, an event, a note, a memory — is outcome "unsupported" with unsupportedReason "unsupported_action".
+- For every other sentence the available actions are fixed by the response schema. If the requested verb is not one of them, return outcome "unsupported" with unsupportedReason "unsupported_action".
 - Email, calendar, messaging and notification integrations do not exist: unsupportedReason "integration_requested".
 - Repeating or recurring schedules do not exist: unsupportedReason "recurrence_requested".
 - Rewriting history, moving a past occurrence, or invalidating a past review do not exist: unsupportedReason "retroactive_requested".
@@ -107,7 +119,7 @@ Filling a proposal:
 - status and priority carry the plain word the user used. Do not translate it into a status the action does not permit; if the user asked to cancel or to complete, use the action for that, not set_status.
 - Never invent a title, a note, a name or a date that the sentence does not contain.
 
-Return outcome "proposal" with a non-null action, or outcome "unsupported" with a non-null unsupportedReason. Never both, never neither.`;
+Return outcome "proposal" with a non-null action, outcome "create" with a null action, a null unsupportedReason and non-empty titleWords, or outcome "unsupported" with a non-null unsupportedReason. Never a mixture, never neither.`;
 
 /**
  * Strips the fence's own delimiters out of the fenced value.
@@ -206,6 +218,14 @@ export class TaskCommandProviderError extends Error {
 
 export type NormalizedTaskCommandProposal =
   | { kind: "proposal"; payload: Record<string, unknown> }
+  | {
+      kind: "create";
+      payload: {
+        readonly titleWords: readonly string[];
+        readonly patch: Record<string, unknown>;
+        readonly operationKey: string;
+      };
+    }
   | { kind: "unsupported"; reason: TaskCommandModelUnsupportedReason }
   | { kind: "invalid"; reason: "invalid_model_output" };
 
@@ -244,6 +264,34 @@ export function normalizeTaskCommandProposal(
       return { kind: "invalid", reason: "invalid_model_output" };
     }
     return { kind: "unsupported", reason: proposal.unsupportedReason };
+  }
+
+  if (proposal.outcome === "create") {
+    // A creation names no existing task and refuses nothing, so an action or a
+    // reason beside it is a contradiction — invalid, never repaired
+    // (2G-CREATE-001). A creation with no title words is the same: the model
+    // claimed a creation it could not describe.
+    if (proposal.action !== null || proposal.unsupportedReason !== null) {
+      return { kind: "invalid", reason: "invalid_model_output" };
+    }
+    const titleWords = proposal.targetHints.titleWords
+      .map((word) => word.trim())
+      .filter((word) => word !== "");
+    if (titleWords.length === 0) {
+      return { kind: "invalid", reason: "invalid_model_output" };
+    }
+    // Only the declared qualifier fields survive (2G-CREATE-002). A `status`,
+    // `note` or `title` the model put in a creation patch has no qualifier
+    // action in the deployed family; dropping it here means the preview shows
+    // exactly what will be created and nothing rides in unrendered.
+    const qualifierPatch: Record<string, unknown> = {};
+    for (const key of Object.keys(TASK_COMMAND_CREATION_QUALIFIERS)) {
+      const value = proposal.patch[key as keyof typeof proposal.patch];
+      if (value === null || value === undefined) continue;
+      if (typeof value === "string" && value.trim() === "") continue;
+      qualifierPatch[key] = value;
+    }
+    return { kind: "create", payload: { titleWords, patch: qualifierPatch, operationKey } };
   }
 
   if (proposal.action === null || proposal.unsupportedReason !== null) {
