@@ -1228,10 +1228,21 @@ SH.6 parameters and shrink `2H-RATE`, not to build a second mechanism.
 
 ### CI, stated exactly
 
-Merge SHA `508cf6c`: `database and journey` ✅, `edge worker` ✅. The
-`application` job was **cancelled on attempt 3 having executed zero steps** —
-never acquired a runner, never reached `Set up job`. **Attempt 4 was already
-queued when this session resumed and was not triggered by this work**; per the
-owner's "no repeated reruns while one is queued", no further rerun was fired.
-**A job that never ran is neither a pass nor a fail**, and merge-SHA green ×3 is
-not claimed.
+Merge SHA `508cf6c`, run `31116254874`, attempt history read from
+`/actions/runs/{id}/attempts/{n}` rather than inferred:
+
+| Attempt | Started | Outcome |
+| --- | --- | --- |
+| 3 | 15:43:52Z | `failure` at 15:49:37Z |
+| 4 | 15:55:44Z | `failure` at 16:11:36Z — `application` cancelled having executed **zero steps** |
+| 5 | 17:41:06Z | **queued** |
+
+`database and journey` ✅ and `edge worker` ✅ throughout. **Attempt 5 was
+already queued when this session resumed and was not triggered by this work**;
+per the owner's "no repeated reruns while one is queued", no further rerun was
+fired. **A job that never ran is neither a pass nor a fail**, and merge-SHA
+green ×3 is not claimed.
+
+**A reading trap worth keeping:** the run object's `run_attempt` field briefly
+reported `4` while attempt 5 was spinning up. Read
+`/actions/runs/{id}/attempts/{n}` for attempt facts; the summary field can lag.
