@@ -78,7 +78,9 @@ import {
   createTaskCommand,
   decideInitialTaskCommandNoMatch,
   issueTaskCommandCreationConfirmation,
+  mapCreateIntentToCreationProposal,
   previewTaskCommandCreation,
+  type TaskCommandCreationIntent,
 } from "./creation";
 import { buildTaskDisambiguation } from "./disambiguation";
 import type { TaskMatchEvidence } from "./match-policy";
@@ -86,7 +88,7 @@ import { TaskMatchInputError, rankTaskCandidates } from "./matching";
 import type { TaskCommandOutcome } from "./outcomes";
 import { TaskPreviewInputError, buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
 import { MAX_HINT_LENGTH, MAX_TITLE_WORDS } from "./schema";
-import { TASK_COMMAND_UNSUPPORTED_REASONS } from "./taxonomy";
+import { TASK_COMMAND_POLICY_VERSION, TASK_COMMAND_UNSUPPORTED_REASONS } from "./taxonomy";
 import {
   createTaskCommandSession,
   deriveBaseTaskCommand,
@@ -643,6 +645,163 @@ async function creationRound(
   };
 }
 
+/** The envelope shape a bare creation session carries (2G-ROUTE-001). */
+const bareCreationProposalSchema = z
+  .object({
+    titleWords: z.array(z.string().trim().min(1).max(240)).min(1).max(60),
+    operationKey: z.string().min(1).max(128),
+  })
+  .strict();
+
+type CreationIntentDerivation =
+  | {
+      readonly status: "ok";
+      readonly intent: TaskCommandCreationIntent;
+      readonly operationKey: string;
+    }
+  | {
+      /** The envelope is not a creation session any render produced. */
+      readonly status: "invalid_envelope";
+    }
+  | {
+      readonly status: "unsupported";
+      readonly reason: string;
+    }
+  | {
+      /** `invalid` or `needs_clarification` from the deterministic validator. */
+      readonly status: "not_derivable";
+      readonly derivationStatus: "invalid" | "needs_clarification";
+      readonly reason: string;
+    };
+
+/**
+ * Re-derives the creation this session is about, at the pinned instant.
+ *
+ * A qualified creation re-enters `deriveTaskCommand`, so the temporal lexicon,
+ * the vocabulary and every hint bound are re-applied by the same validator a
+ * mutation uses — one validator, not two (design note §2). A bare creation has
+ * nothing to resolve; its title words are re-bounded by
+ * `bareCreationTitleWords` inside the payload builder.
+ */
+function deriveCreationIntent(
+  context: CommandContext,
+  session: TaskCommandSession,
+): CreationIntentDerivation {
+  if (typeof session.proposal.action === "string") {
+    const derived = deriveTaskCommand(session, context.timeZone);
+    if (derived.status === "ok") {
+      return {
+        status: "ok",
+        intent: { kind: "create", command: derived.command },
+        operationKey: derived.command.operationKey,
+      };
+    }
+    if (derived.status === "unsupported") {
+      return { status: "unsupported", reason: derived.reason };
+    }
+    return { status: "not_derivable", derivationStatus: derived.status, reason: derived.reason };
+  }
+  const parsed = bareCreationProposalSchema.safeParse(session.proposal);
+  if (!parsed.success) return { status: "invalid_envelope" };
+  return {
+    status: "ok",
+    intent: {
+      kind: "create_bare",
+      title: parsed.data.titleWords.join(" "),
+      operationKey: parsed.data.operationKey,
+      // The current constant, exactly as manual creation stamps it: the
+      // fingerprint binds the confirmation to the policy in force when the
+      // preview was rendered (2G-CREATE-004's invalidation is what makes this
+      // safe across a bump).
+      policyVersion: TASK_COMMAND_POLICY_VERSION,
+    },
+    operationKey: parsed.data.operationKey,
+  };
+}
+
+/**
+ * The create-verb round (2G-ROUTE-001/002): preview, then confirmation, then
+ * the same offer state the no-match path renders — both paths converge on
+ * identical RPC calls, which is the invariant the phase exists to keep.
+ *
+ * Deliberately emits no `task_command_previewed` event: `creation_offered`
+ * there means "a mutation matched nothing and creation was offered", the
+ * funnel the ADR-055 reader measures, and an explicit create is not that.
+ * The unsupported early-return has always emitted nothing either, so this is
+ * the established posture for a turn that never enters the matcher — recorded
+ * in the slice design note §3, with the vocabulary question dispositioned at
+ * 2G.4 rather than silently decided here.
+ */
+async function createIntentRound(
+  context: CommandContext,
+  session: TaskCommandSession,
+): Promise<MatchRound> {
+  const { copy } = context;
+  const derived = deriveCreationIntent(context, session);
+  if (derived.status === "invalid_envelope") {
+    return { session, state: expiredSession(context) };
+  }
+  if (derived.status === "unsupported") {
+    const declared = TASK_COMMAND_UNSUPPORTED_REASONS.find((reason) => reason === derived.reason)
+      ?? null;
+    return {
+      session,
+      state: resolved({
+        heading: copy.outcomes.unsupported.title,
+        detail: copy.outcomes.unsupported.description,
+        reason:
+          copy.unsupportedReasons[derived.reason as keyof typeof copy.unsupportedReasons]
+          ?? copy.outcomes.unsupported.description,
+        unsupportedReason: declared,
+        terminal: true,
+      }),
+    };
+  }
+  if (derived.status === "not_derivable") {
+    // The mirror of `runCommandRound`'s handling: a temporal phrase outside
+    // the lexicon or an invalid proposal is asked to be said differently,
+    // never guessed at (2G-CAPTURE-002's rule applied to creation).
+    const reason =
+      derived.derivationStatus === "invalid"
+        ? copy.validation[derived.reason as keyof typeof copy.validation]
+        : copy.validation.unrecognized_value;
+    return {
+      session,
+      state: resolved({
+        heading: copy.outcomes.refused.title,
+        detail: copy.outcomes.refused.description,
+        reason: reason ?? copy.console.unexpected,
+        retryable: true,
+        terminal: false,
+      }),
+    };
+  }
+
+  const input = {
+    intent: derived.intent,
+    observedBefore: session.issuedAt,
+    locale: context.locale,
+  };
+  const preview = await previewTaskCommandCreation(context.supabase, input);
+  if (preview.outcome !== "creation_offered") {
+    return { session, state: presentFailure(context, session, preview) };
+  }
+  const issued = await issueTaskCommandCreationConfirmation(context.supabase, input);
+  if (issued.outcome !== "issued") {
+    return { session, state: presentFailure(context, session, issued) };
+  }
+  return {
+    session,
+    state: resolved({
+      heading: preview.copy.title,
+      detail: preview.copy.description,
+      session: serializeTaskCommandSession(session),
+      creation: preview,
+      control: "create",
+    }),
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* The seven Server Actions                                                    */
 /* -------------------------------------------------------------------------- */
@@ -747,18 +906,28 @@ export async function startTaskCommand(
     });
   }
   if (normalized.kind === "create") {
-    // Slice 2G.1 ships the contract only. Until 2G.2 routes a creation intent
-    // to the deployed creation family (2G-ROUTE-001), the composer's observable
-    // behavior stays exactly what it was before the contract could represent
-    // one: the refusal a create request has always received. Deliberate, and
-    // removed by 2G.2 — not a lost classification, a staged one.
-    return resolved({
-      heading: copy.outcomes.unsupported.title,
-      detail: copy.outcomes.unsupported.description,
-      reason: copy.unsupportedReasons.unsupported_action,
-      unsupportedReason: "unsupported_action",
-      terminal: true,
+    // 2G.2 (2G-ROUTE-001): an explicit creation routes to the deployed
+    // creation family, never the matcher. The session carries either the
+    // synthesized qualifier proposal or the bare title words, flagged
+    // `create: true`, and every later step re-derives from the pinned clock
+    // exactly as a mutation session does.
+    const mapping = mapCreateIntentToCreationProposal(normalized.payload);
+    const session = createTaskCommandSession({
+      proposal:
+        mapping.outcome === "qualified"
+          ? mapping.proposal
+          : { titleWords: [...normalized.payload.titleWords], operationKey },
+      issuedAt,
+      model: parsed.model,
+      promptVersion: parsed.promptVersion || TASK_COMMAND_PROMPT_VERSION,
+      strategyVersion: parsed.strategyVersion || TASK_COMMAND_STRATEGY_VERSION,
+      create: true,
     });
+    try {
+      return (await createIntentRound(context, session)).state;
+    } catch (error) {
+      return guard(error, copy, session);
+    }
   }
   if (normalized.kind === "unsupported") {
     return resolved({
@@ -1012,14 +1181,28 @@ export async function createTaskFromCommand(
   const session = parsedSession.session;
 
   try {
-    const derived = deriveTaskCommand(session, context.timeZone);
-    if (derived.status !== "ok") return expiredSession(context);
+    let intent: TaskCommandCreationIntent;
+    let operationKey: string;
+    if (session.create) {
+      // 2G-ROUTE-007: the confirm rebuilds the identical intent from the same
+      // envelope the preview rendered, so the fingerprint the RPC resolves is
+      // the one the confirmation row was minted against.
+      const derived = deriveCreationIntent(context, session);
+      if (derived.status !== "ok") return expiredSession(context);
+      intent = derived.intent;
+      operationKey = derived.operationKey;
+    } else {
+      const derived = deriveTaskCommand(session, context.timeZone);
+      if (derived.status !== "ok") return expiredSession(context);
+      intent = { kind: "no_match", command: derived.command };
+      operationKey = derived.command.operationKey;
+    }
 
     // No origin argument. The chat creation path keeps `'agent'`, and *omitting*
     // the parameter rather than sending it explicitly is what proves the
     // recreated function's default still resolves for every pre-existing caller.
     const created = await createTaskCommand(context.supabase, {
-      intent: { kind: "no_match", command: derived.command },
+      intent,
       observedBefore: session.issuedAt,
       locale: context.locale,
     });
@@ -1029,7 +1212,7 @@ export async function createTaskFromCommand(
     emit(
       context,
       "task_command_applied",
-      `${derived.command.operationKey}:created`,
+      `${operationKey}:created`,
       buildTaskCommandAppliedProperties({
         origin: context.origin,
         outcome: "applied",

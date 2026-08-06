@@ -11,7 +11,7 @@ import {
 } from "./apply";
 import { getTaskCommandCopy } from "./copy";
 import type { TaskCommandTargetHints, ValidatedTaskCommand } from "./schema";
-import type { TaskCommandAction } from "./taxonomy";
+import { TASK_COMMAND_CREATION_QUALIFIERS, type TaskCommandAction } from "./taxonomy";
 
 export const TASK_LIKE_CREATION_ACTIONS = [
   "reschedule_due",
@@ -197,6 +197,46 @@ export function continueTaskCommandNoMatch(
   };
 }
 
+/**
+ * Maps a normalized create-intent payload (2G.1's `kind: "create"`) onto the
+ * shape a creation session carries (2G-ROUTE-001).
+ *
+ * A **qualified** creation synthesizes a mutation-shaped proposal whose action
+ * is the mapped qualifier, so `deriveTaskCommand` re-applies every bound, the
+ * temporal lexicon and the vocabulary to it — one validator, not two. A
+ * **bare** creation carries only its title words. When more than one qualifier
+ * survives 2G.1's normalization, the first in
+ * `TASK_COMMAND_CREATION_QUALIFIERS` declaration order wins (dueAt →
+ * plannedAt → priority → projectRef → contextRef → personRef): the deployed
+ * family accepts exactly one qualifier action, and the preview then shows
+ * exactly what will be created before anything exists, which is the
+ * visibility 2G-CREATE-002 requires.
+ */
+export type TaskCommandCreateIntentMapping =
+  | { readonly outcome: "qualified"; readonly proposal: Record<string, unknown> }
+  | { readonly outcome: "bare"; readonly title: string };
+
+export function mapCreateIntentToCreationProposal(payload: {
+  readonly titleWords: readonly string[];
+  readonly patch: Record<string, unknown>;
+  readonly operationKey: string;
+}): TaskCommandCreateIntentMapping {
+  for (const [field, action] of Object.entries(TASK_COMMAND_CREATION_QUALIFIERS)) {
+    const value = payload.patch[field];
+    if (typeof value !== "string" || value.trim() === "") continue;
+    return {
+      outcome: "qualified",
+      proposal: {
+        action,
+        targetHints: { titleWords: [...payload.titleWords] },
+        patch: { [field]: value },
+        operationKey: payload.operationKey,
+      },
+    };
+  }
+  return { outcome: "bare", title: payload.titleWords.join(" ") };
+}
+
 type PreviewArgs =
   Database["public"]["Functions"]["preview_task_command_creation"]["Args"];
 
@@ -255,6 +295,26 @@ export type TaskCommandCreationIntent =
       readonly title: string;
       readonly operationKey: string;
       readonly policyVersion: string;
+    }
+  /**
+   * The Phase 2G create verb (2G-ROUTE-001) — a third thing, deliberately.
+   *
+   * Not an inference: the user explicitly asked to create, so there is no
+   * `decideInitialTaskCommandNoMatch` gate to pass and no `creation_offered`
+   * claim about a failed match to assert. Not a form either: the sentence may
+   * carry one qualifier, which a form never does. `create` carries the
+   * validated command whose action is the mapped qualifier (so every temporal,
+   * vocabulary and bound rule was re-applied by `validateTaskCommand`);
+   * `create_bare` carries only a title, exactly like `manual`, and shares its
+   * payload branch — the two differ in what the caller may honestly claim
+   * about how the request arrived, not in what is written.
+   */
+  | { readonly kind: "create"; readonly command: ValidatedTaskCommand }
+  | {
+      readonly kind: "create_bare";
+      readonly title: string;
+      readonly operationKey: string;
+      readonly policyVersion: string;
     };
 
 /**
@@ -301,7 +361,7 @@ export function buildTaskCommandCreationPayload(
   input: TaskCommandCreationInput,
 ): PreviewArgs {
   const { intent } = input;
-  if (intent.kind === "manual") {
+  if (intent.kind === "manual" || intent.kind === "create_bare") {
     const words = bareCreationTitleWords(intent.title);
     if (words === null) {
       throw new TaskCommandApplyError(
@@ -319,6 +379,29 @@ export function buildTaskCommandCreationPayload(
       p_observed_before: input.observedBefore,
       p_policy_version: intent.policyVersion,
       p_operation_key: normalizeTaskCommandOperationKey(intent.operationKey),
+    };
+  }
+
+  if (intent.kind === "create") {
+    // The same honesty condition the no-match offer enforces — a task-like
+    // qualifier action and a representable title — checked directly rather
+    // than through `decideInitialTaskCommandNoMatch`, because that function's
+    // other outcome (`clarification_requested`) belongs to the bounded
+    // no-match flow and asserting it here would spend a slot the create verb
+    // does not have.
+    if (!isTaskLikeCreationAction(intent.command.action) || titleOf(intent.command) === null) {
+      throw new TaskCommandApplyError(
+        `${intent.command.action} does not carry the bounded positive payload required for standalone creation`,
+        "creation_not_offered",
+      );
+    }
+    return {
+      p_action: intent.command.action,
+      p_title_words: [...normalizedTitleWords(intent.command)],
+      p_patch: intent.command.patch as PreviewArgs["p_patch"],
+      p_observed_before: input.observedBefore,
+      p_policy_version: intent.command.policyVersion,
+      p_operation_key: normalizeTaskCommandOperationKey(intent.command.operationKey),
     };
   }
 

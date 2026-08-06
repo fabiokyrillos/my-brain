@@ -411,7 +411,8 @@ const ptBR: TaskCommandCopy = {
     noReminder: "Esta tarefa não criará um lembrete.",
   },
   unsupportedReasons: {
-    unsupported_action: "Ainda não tenho esse verbo para tarefas.",
+    unsupported_action:
+      "Ainda não tenho esse verbo. Posso atualizar tarefas existentes, criar uma tarefa nova ou capturar uma nota — lembretes, projetos, pessoas e eventos ainda não são criados por aqui.",
     multiple_actions: "Essa frase pede duas mudanças diferentes. Peça uma de cada vez.",
     multiple_targets: "Um comando muda uma tarefa por vez. Diga qual é a tarefa.",
     integration_requested: "Não me conecto a e-mail, calendário ou aplicativos de mensagem.",
@@ -675,7 +676,8 @@ const en: TaskCommandCopy = {
     noReminder: "This task will not create a reminder.",
   },
   unsupportedReasons: {
-    unsupported_action: "I do not have that verb for tasks yet.",
+    unsupported_action:
+      "I do not have that verb yet. I can update existing tasks, create a new task, or capture a note — reminders, projects, people and events are not created here yet.",
     multiple_actions: "That sentence asks for two different changes. Ask for one at a time.",
     multiple_targets: "A command changes one task at a time. Name a single task.",
     integration_requested: "I do not connect to email, calendar or messaging apps.",

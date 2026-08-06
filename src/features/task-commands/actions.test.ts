@@ -626,6 +626,159 @@ describe("no-match", () => {
   });
 });
 
+describe("the create verb (2G.2)", () => {
+  function createProposal(patch: Record<string, string | null> = {}) {
+    return modelProposal({
+      outcome: "create",
+      action: null,
+      targetHints: {
+        titleWords: ["book", "the", "flights"],
+        project: null,
+        person: null,
+        context: null,
+        status: null,
+        temporalPhrase: null,
+      },
+      patch: {
+        title: null,
+        note: null,
+        status: null,
+        priority: null,
+        dueAt: null,
+        plannedAt: null,
+        projectRef: null,
+        contextRef: null,
+        personRef: null,
+        ...patch,
+      },
+    });
+  }
+
+  it("routes a bare creation to the family, never the matcher (2G-ROUTE-001)", async () => {
+    const bench = harness();
+    provider(createProposal());
+
+    const state = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "add a task to book the flights" }),
+    );
+    expect(state.control).toBe("create");
+    expect(state.creation?.title).toBe("book the flights");
+
+    // The matcher never ran — there is no existing task to match.
+    expect(bench.rpcCalls.some((call) => call.fn === "list_task_command_candidates")).toBe(false);
+    const preview = bench.rpcCalls.find((call) => call.fn === "preview_task_command_creation");
+    expect(preview?.args.p_action).toBe("create_title_only");
+    expect(preview?.args.p_title_words).toEqual(["book", "the", "flights"]);
+    expect(preview?.args.p_patch).toEqual({});
+    // The confirmation is minted at render time, against the shown payload.
+    expect(bench.rpcCalls.some((call) => call.fn === "issue_task_command_creation_confirmation")).toBe(true);
+    expect(bench.rpcCalls.some((call) => call.fn === "create_task_command")).toBe(false);
+
+    // The session is a creation session, and says so.
+    expect(JSON.parse(state.session as string).create).toBe(true);
+  });
+
+  it("resolves one qualifier deterministically and maps it to the family's action", async () => {
+    const bench = harness();
+    provider(createProposal({ dueAt: "tomorrow" }));
+
+    await startTaskCommand(idleTaskCommandState, form({ commandText: "add a task due tomorrow" }));
+
+    const preview = bench.rpcCalls.find((call) => call.fn === "preview_task_command_creation");
+    expect(preview?.args.p_action).toBe("reschedule_due");
+    // The lexicon resolved the phrase at the pinned instant: an ISO instant
+    // reaches the RPC, never the user's words (2E-COMMAND-014 inherited).
+    const patch = preview?.args.p_patch as Record<string, unknown>;
+    expect(String(patch.dueAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("keeps the first declared qualifier when the model returned several", async () => {
+    const bench = harness();
+    provider(createProposal({ dueAt: "tomorrow", priority: "high" }));
+
+    await startTaskCommand(idleTaskCommandState, form({ commandText: "add an urgent task for tomorrow" }));
+
+    const preview = bench.rpcCalls.find((call) => call.fn === "preview_task_command_creation");
+    // dueAt precedes priority in TASK_COMMAND_CREATION_QUALIFIERS declaration
+    // order; the preview shows exactly what will be created (2G-CREATE-002).
+    expect(preview?.args.p_action).toBe("reschedule_due");
+    expect(Object.keys(preview?.args.p_patch as Record<string, unknown>)).toEqual(["dueAt"]);
+  });
+
+  it("asks for an unresolvable date to be said differently, and writes nothing", async () => {
+    const bench = harness();
+    provider(createProposal({ dueAt: "whenever the mood strikes" }));
+
+    const state = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "add a task due whenever" }),
+    );
+    expect(state.retryable).toBe(true);
+    expect(bench.rpcCalls.some((call) => call.fn === "preview_task_command_creation")).toBe(false);
+    expect(bench.rpcCalls.some((call) => call.fn === "create_task_command")).toBe(false);
+  });
+
+  it("creates through the same family on confirm, idempotently keyed (2G-ROUTE-007)", async () => {
+    const bench = harness();
+    provider(createProposal());
+
+    const offered = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "add a task to book the flights" }),
+    );
+    const previewKey = bench.rpcCalls.find((call) => call.fn === "preview_task_command_creation")
+      ?.args.p_operation_key;
+
+    const created = await createTaskFromCommand(
+      idleTaskCommandState,
+      form({ session: offered.session as string }),
+    );
+    expect(created.heading).toBe("Done");
+    expect(created.undo?.undoId).toBe(UNDO_ID);
+
+    const create = bench.rpcCalls.find((call) => call.fn === "create_task_command");
+    expect(create?.args.p_action).toBe("create_title_only");
+    // The confirm re-derived the identical identity the preview fingerprinted.
+    expect(create?.args.p_operation_key).toBe(previewKey);
+
+    await flushAfter();
+    const applied = emittedProperties("task_command_applied");
+    expect(applied?.applyRoute).toBe("created");
+  });
+
+  it("emits no task_command_previewed event for an explicit create", async () => {
+    // `creation_offered` there means "a mutation matched nothing", the funnel
+    // the ADR-055 reader measures; an explicit create must not pollute it
+    // (design note §3).
+    harness();
+    provider(createProposal());
+
+    await startTaskCommand(idleTaskCommandState, form({ commandText: "add a task" }));
+    await flushAfter();
+    expect(emittedProperties("task_command_previewed")).toBeUndefined();
+  });
+
+  it("names the supported surfaces when refusing an out-of-scope creation (2G-ROUTE-004)", async () => {
+    harness();
+    provider(
+      modelProposal({
+        outcome: "unsupported",
+        action: null,
+        unsupportedReason: "unsupported_action",
+      }),
+    );
+
+    const state = await startTaskCommand(
+      idleTaskCommandState,
+      form({ commandText: "create a reminder for tomorrow" }),
+    );
+    expect(state.unsupportedReason).toBe("unsupported_action");
+    expect(state.reason).toMatch(/create a new task/i);
+    expect(state.reason).toMatch(/reminders, projects, people and events/i);
+  });
+});
+
 describe("undo", () => {
   it("re-reads the operation and refuses an expired one without calling the router", async () => {
     const bench = harness();
