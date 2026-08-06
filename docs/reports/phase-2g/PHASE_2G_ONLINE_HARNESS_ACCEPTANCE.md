@@ -161,7 +161,7 @@ parity `202608060078`. Before this work the number that could run was **zero**.
 
 | spec file | pass | skip |
 | --- | --- | --- |
-| `online-account-deletion` | 0 → **3** | **2** → **1** |
+| `online-account-deletion` | 0 → **4** | **2** → **0** |
 | `online-account-suspension` | 5 | 0 |
 | `online-assistant-composer` | 2 | **1** |
 | `online-assistant-name` | 2 | 0 |
@@ -186,7 +186,7 @@ reasons and nothing vague:
 | skipped | why | whose problem |
 | --- | --- | --- |
 | `online-conversational-creation` ×3, `online-assistant-composer` ×1 | every turn is a provider call under BYOK and `BYOK_TEST_USER_A_OPENAI_API_KEY` is unset | **one owner action** |
-| `online-account-deletion` ×2 → **×1** | the product defect in §4. **Fixed the same day** by the standalone hotfix in `docs/reports/signup-hardening/SIGNUP_HARDENING_DELETION_CAPTCHA_HOTFIX.md`: three of those cases now execute, and the one that remains needs an **interactive** Turnstile solve, which no automation may honestly perform | one owner step |
+| ~~`online-account-deletion` ×2~~ **→ zero** | the product defect in §4 needed **two** fixes: the CAPTCHA hotfix (`SIGNUP_HARDENING_DELETION_CAPTCHA_HOTFIX.md`) and an Edge Function **deploy** (`SIGNUP_HARDENING_DELETION_EXECUTOR_STALL.md` §8b). Both landed on 2026-08-06 and the spec now runs **4/4**. The one step that is still a person's — a form submit carrying a valid Turnstile token — was performed interactively once and is no longer a skipped test | **closed** |
 | `online-auth` ×1 (signup journey) | no provider-routable test email domain, and public signup is disabled at both layers by design | unchanged, not a regression |
 
 **No journey is marked passed because authentication succeeded.** Every one of
@@ -245,3 +245,20 @@ The blocker report's three hypotheses were aimed at a contract that was already
 demonstrated, in the same directory, in a spec that was passing. The lesson is
 not about cookies: a "how does this work" question is worth grepping the
 repository for before it is worth an afternoon of probes.
+
+## 11. Addendum — 2026-08-06, after the deletion closeout
+
+`online-account-deletion` went from **0 passed / 2 skipped** to **4 passed / 0
+skipped**, so the suite now reads **81 passed · 5 skipped · 0 failed** at two
+workers (the three intermittent failures observed at higher concurrency are the
+shared-account OTP race described in §6, and all thirteen pass serially).
+
+The remaining **5** skips are two reasons, both named and neither new:
+
+| skipped | reason |
+| --- | --- |
+| `online-conversational-creation` ×3, `online-assistant-composer` ×1 | a provider call under BYOK; `BYOK_TEST_USER_A_OPENAI_API_KEY` unset — **one owner action** |
+| `online-auth` signup journey ×1 | no provider-routable test email domain, and public signup is disabled at both layers by design |
+
+The deletion reason is gone from this table because it was fixed, not because it
+was reclassified.
