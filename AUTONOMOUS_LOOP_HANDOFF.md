@@ -1086,3 +1086,63 @@ deploy fixes it. No owner account touched, no CAPTCHA setting, signup posture,
 retention schedule or Phase 2H state changed. The remaining `test.fixme` in
 `e2e/online-account-deletion.spec.ts` **stays** — terminal deletion is not
 proven and is not claimed.
+
+## §48 — account deletion completes, and it took two fixes (2026-08-06)
+
+The owner deployed `delete-account`. Parity confirmed **first**
+(`2026-08-06T14:40` ahead of the `2026-08-05T19:27` commit), then the stuck
+disposable account was driven through the **supported** executor path — the
+product's own call shape, no admin shortcut.
+
+### Terminal deletion, proven
+
+`200 {"outcome":"completed"}`. Auth user **404**. Access token **403**, refresh
+**400**. `profiles 1→0`, `agent_preferences 1→0`, `policy_acceptances 2→0`,
+`account_lifecycle 1→0`, `audit_logs 1→0`, `heartbeat_runs 1→0`,
+`product_events` gone; the executor's own census returns `{}`. Storage zero.
+Fixture residue zero. Project accounts **3 → 2**, both survivors real. CAPTCHA
+still enabled, signup still disabled, retention still **0/5**, SMTP still null.
+
+### The lesson worth keeping
+
+**Two fixes were required and only one was code.** The CAPTCHA hotfix let the
+request through; the executor deploy let it finish. A green repository, green
+CI on three jobs, and a merged PR proved nothing about the second — the code had
+been correct since `357cd63` and simply was not running anywhere. That is what
+`npm run verify:edge-parity` now makes visible, and it is why the check compares
+deployment timestamps rather than reading the repository.
+
+The defect also stayed invisible for a day because **nothing re-runs a stalled
+executor** and the only thing that surfaced it was a person trying to delete an
+account.
+
+### The journey is executable again
+
+`e2e/online-account-deletion.spec.ts` — **4/4**, the `test.fixme` removed. It now
+automates everything the challenge stands in front of: the account is driven to
+`deleting` through `request_account_deletion` (the exact RPC the Server Action
+calls once phrase, challenge and password are accepted), the interposition is
+observed in the browser, the executor is invoked in the product's call shape,
+and terminal deletion, session invalidation and zero residue are asserted.
+Before the deploy that invocation answered `409 credential_not_erased` — so it
+is a regression test, not a description.
+
+**Not automated, and named where a reader will find it:** the form submit
+carrying a *valid* Turnstile token. Performed once, interactively, on the
+deployment, on 2026-08-06, with a disposable account. It cannot be automated
+without defeating the control.
+
+### Still open, deliberately
+
+- **`process-jobs` is undeployed** (`8982d74`). Explicitly excluded from this
+  closeout as a separate decision; nothing observed depends on it, and
+  `verify:edge-parity` reports it every run.
+- **`re-runnable` is a property, not a mechanism** — Phase 2H, needs a
+  migration, not taken opportunistically.
+- **The stop reason is written where nobody can read it** — the supported
+  diagnostic is to re-run the executor and read the `409`.
+
+**Phase 2H remains unauthorised.** Owner rollout tasks unchanged: retention
+activation (enabling **is** the first-purge authorization), Resend SMTP,
+backup-restore drill, legal and monitoring signatures, one green
+`rollout:verify`, the owner-only `disable_signup` flip, a second green run.

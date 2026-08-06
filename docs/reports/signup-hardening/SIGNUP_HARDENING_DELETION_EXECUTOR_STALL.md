@@ -171,11 +171,95 @@ reproduction, and destroying it before the fix is deployed would remove the only
 end-to-end proof that the fix works. No owner account was touched. No CAPTCHA
 setting, signup posture, retention schedule or Phase 2H state was changed.
 
-<!-- TERMINAL-RESULT -->
+## 8b. RESOLVED — terminal deletion proven end to end (2026-08-06, appended)
+
+The owner deployed the function:
+
+```
+npx supabase functions deploy delete-account
+```
+
+No config push, no migration, no Auth configuration change. Parity confirmed
+before anything else was touched:
+
+```
+delete-account    2026-08-06T14:40      2026-08-05T19:27      ok
+```
+
+The stuck disposable account was then driven through the **supported** executor
+path — the product's own call shape, no admin shortcut — and every claim was
+verified against the hosted project:
+
+| # | claim | result |
+| --- | --- | --- |
+| 1 | no longer `credential_not_erased` for an account with no credential row | **no stop code at all** |
+| 2 | terminal success outcome | `200 {"outcome":"completed","objectsRemoved":0,"bytesRemoved":0}` |
+| 3 | the Supabase Auth user no longer exists | admin lookup **404** |
+| 4 | the existing session is invalidated | access token → **403**; refresh token → **400** |
+| 5 | `account_lifecycle` and all owned rows follow the cascade | `profiles 1→0`, `agent_preferences 1→0`, `policy_acceptances 2→0`, `account_lifecycle 1→0`, `audit_logs 1→0`, `heartbeat_runs 1→0`, `product_events` gone; the executor's own census returns **`{}`** |
+| 6 | storage residue | **zero** objects under the owner prefix |
+| 7 | fixture residue | **zero** — `@example.com` accounts: none |
+| 8 | no owner account or owner-owned row touched | project accounts **3 → 2**; the two survivors are the two real ones |
+| 9 | hosted CAPTCHA still enabled | `security_captcha_enabled = true`, provider `turnstile` |
+| 10 | signup still disabled | `disable_signup = true` |
+| 11 | no purge or retention activation | SH.6 retention sweeps **0/5**; cron carries only heartbeat, entry-dispatch, job-reaper and the auth-attempt prune |
+
+SMTP remains `null`; nothing else in the hosted configuration was read as
+changed.
+
+### Both fixes were required, and only one was code
+
+A deletion could not complete until **both** landed:
+
+1. **The CAPTCHA hotfix** (PR #108) — without it the request never got past
+   re-authentication, and the surface blamed the user's password.
+2. **The executor deploy** — without it the request was accepted and then
+   stalled at `deleting` forever.
+
+The first was a code change; the second was a deploy of code that had been
+correct in the repository since `357cd63`. A green repository proved nothing
+about the second, which is the whole reason `npm run verify:edge-parity` exists.
+
+### The journey is executable again
+
+`e2e/online-account-deletion.spec.ts` — **4 passed · 0 skipped · 0 failed**. The
+`test.fixme` is gone. What it now automates is everything the challenge stands
+in front of: the account is driven to `deleting` through
+`request_account_deletion` — the exact RPC the Server Action calls once the
+phrase, challenge and password have all been accepted — the `deleting`
+interposition is observed in the browser, the executor is invoked in the
+product's call shape, and terminal deletion, session invalidation and zero
+residue are asserted. Before the deploy that invocation answered
+`409 credential_not_erased`; the test would have failed, which is what makes it
+a regression test rather than a description.
+
+**The one step still not automated** is the form submit carrying a *valid*
+Turnstile token. It was performed once, interactively, on the deployment, on
+2026-08-06, with a disposable account, and it succeeded. It is not automatable
+without defeating the control, and the spec says so where a reader will find it.
 
 ## 9. What is still not proven
 
-Terminal deletion. The remaining `test.fixme` in
-`e2e/online-account-deletion.spec.ts` **stays**, and this report does not claim
-the account was destroyed, the session invalidated, or the cascade verified —
-none of that can be true until the executor is deployed.
+**Superseded by §8b, and kept as written.** At the time this section was
+written the executor had not been deployed and none of it could be claimed.
+Terminal deletion is now proven; the `test.fixme` is gone.
+
+> Terminal deletion. The remaining `test.fixme` in
+> `e2e/online-account-deletion.spec.ts` **stays**, and this report does not claim
+> the account was destroyed, the session invalidated, or the cascade verified —
+> none of that can be true until the executor is deployed.
+
+## 10. Still open, deliberately
+
+- **`process-jobs` is undeployed** (`8982d74 feat(bounds): one home for the file
+  limits, the input bounds and the body bound`). Deliberately **not** deployed
+  as part of this task — it is a separate decision, and nothing observed depends
+  on that change. `npm run verify:edge-parity` reports it on every run, so it
+  stays visible rather than forgotten.
+- **`re-runnable` is still a property, not a mechanism.** Nothing re-runs a
+  stalled executor. This deployment failed for a whole day and the only reason
+  it surfaced is that a person tried to delete an account. Destination: Phase
+  2H, beside the error sink and dead-man switch. Needs a migration; not taken
+  opportunistically.
+- **The stop reason is still written where nobody can read it.** The supported
+  diagnostic remains §7: re-run the executor and read the `409` body.

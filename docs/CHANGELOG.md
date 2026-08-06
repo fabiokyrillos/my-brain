@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — Account deletion completes end to end (0 migrations; two fixes, only one of them code)
+
+**Proven on the deployment**: `completed`, the Auth user **404**, the access token **403** and its refresh **400**, every owned row and the `account_lifecycle` row gone with the executor's own census returning `{}`, storage zero, fixture residue zero, project accounts 3 → 2 with both survivors real. CAPTCHA still enabled, signup still disabled, retention still 0/5, SMTP still unconfigured.
+
+**It took two fixes and only one was a code change.** The CAPTCHA hotfix let the request through; deploying `delete-account` let it finish. The executor's code had been correct in the repository since `357cd63` and was simply not running anywhere — a green repository, green CI on three jobs and a merged PR proved nothing about that. `npm run verify:edge-parity` is what makes the deploy half visible, and it is why the check reads deployment timestamps rather than the repository.
+
+**The journey is executable again.** `e2e/online-account-deletion.spec.ts` runs **4/4**; the `test.fixme` is removed. It automates everything the challenge stands in front of — the account is driven to `deleting` through `request_account_deletion`, the exact RPC the Server Action calls once phrase, challenge and password are accepted; the interposition is observed in the browser; the executor is invoked in the product's own call shape; terminal deletion, session invalidation and zero residue are asserted. Before the deploy that invocation answered `409 credential_not_erased`, which is what makes it a regression test rather than a description. The one step still not automated — a form submit carrying a valid Turnstile token — was performed interactively once and cannot be automated without defeating the control. The online suite now reads **81 passed · 5 skipped**, the skips being four BYOK-credential cases and the signup journey.
+
+**Left open on purpose:** `process-jobs` is undeployed (`8982d74`) and is a separate decision, reported on every parity run; "re-runnable" is still a property of the executor rather than a mechanism that re-runs it (Phase 2H); and a stop reason is still written to a table no role can read, so the supported diagnostic is to re-run the executor and read the `409`. Evidence: `docs/reports/signup-hardening/SIGNUP_HARDENING_DELETION_EXECUTOR_STALL.md` §8b.
+
 ## 2026-08-06 — Account deletion stalls at `deleting`, and it is a deployment defect (0 migrations, fix is one deploy)
 
 **The CAPTCHA hotfix worked and the account still was not deleted.** The first interactive proof completed the challenge, accepted `EXCLUIR` and the correct password, recorded the request — and stopped permanently at "Exclusão em andamento". Not pending: there is no job, no cron and no reaper for a deletion, so one failed invocation is forever.

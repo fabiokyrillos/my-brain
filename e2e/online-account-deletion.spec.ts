@@ -232,63 +232,118 @@ test.describe("SH.2 — account deletion on the deployed product surface", () =>
   });
 
   /**
-   * STILL NOT EXECUTABLE, and for a reason that is not a defect.
+   * The destructive half, executable at last — and honest about the one step
+   * that is still a person's.
    *
-   * The destructive path needs a **valid** Turnstile token, and hosted
-   * Turnstile declines automated browsers by design — that refusal is
-   * SH-CAPTCHA-002 working. There is no honest automated route to it:
+   * ## What is automated here, and what is not
    *
-   *   * solving the challenge headlessly is what the control exists to prevent;
-   *   * a Cloudflare "always passes" test key would make the assertion vacuous.
-   *     That is not hypothetical here — an always-passing test key already
-   *     produced two wrong published verdicts in this repository once, and the
-   *     lesson recorded from it was that a control must not be exempt from the
-   *     mechanism it is testing;
-   *   * disabling hosted CAPTCHA to let the test through would weaken the
-   *     control to prove the control.
+   * **Not automated:** the form submit that carries a *valid* Turnstile token.
+   * Hosted Turnstile declines automated browsers by design — that refusal is
+   * SH-CAPTCHA-002 working — and the three ways around it are each a way of
+   * proving nothing: solving it headlessly is what the control exists to
+   * prevent; a Cloudflare "always passes" test key would make the assertion
+   * vacuous (not hypothetical here — one already produced two wrong published
+   * verdicts, and the lesson kept was that a control must not be exempt from
+   * the mechanism it is testing); and disabling the control to prove the
+   * control is not a proof. That step was performed **once, interactively, on
+   * the deployment, on 2026-08-06**, with a disposable account, and it
+   * succeeded: the challenge passed, `EXCLUIR` and the correct password were
+   * accepted, and the request was recorded.
    *
-   * So it is marked, with the smallest owner action named: one interactive
-   * pass through `/{locale}/account/delete` on the deployment with a disposable
-   * account. Everything up to the challenge is proven above and in
-   * `src/features/account/deletion-request.test.ts`; the hosted CSP and widget
-   * are proven non-destructively by `npm run verify:deletion-captcha`.
+   * **Automated, from here down:** everything the challenge stands in front of.
+   * The account is driven to `deleting` through `request_account_deletion` —
+   * the very RPC the Server Action calls once its phrase, challenge and
+   * password checks pass, and the only thing those checks guard. The refusals
+   * themselves are covered by the cases above, by
+   * `src/features/account/deletion-request.test.ts`, and on the deployed
+   * surface by `e2e/deployed-deletion-captcha.spec.ts`.
+   *
+   * ## Why this half needed covering at all
+   *
+   * Because it was broken, silently, for a day and it was this journey that
+   * found it. The interactive pass reached `deleting` and **stopped there
+   * forever**: `delete-account` had been deployed once on 2026-08-04 and never
+   * again, while migration `202608050077` revoked the grant that build depended
+   * on, so the executor answered `credential_not_erased` for every account and
+   * nothing re-runs it. Two things were required to make a deletion complete —
+   * the CAPTCHA hotfix to let the request through, and the executor deploy to
+   * let it finish — and only the first was a code change.
+   *
+   * So this test asserts the terminal state rather than the request, and
+   * `npm run verify:edge-parity` is what now makes the deploy half visible.
    */
-  test.fixme("both correct: the account is destroyed and the Auth user is gone", async ({ page }) => {
+  test("both correct: the account is destroyed and the Auth user is gone", async ({ page }) => {
     await signIn(page);
-    await submitDeletion(page, COPY.phrase, password);
+    // The surface the interactive pass used, reached the same way: an
+    // authenticated account can open it, which is the half of the journey a
+    // browser still proves.
+    await page.goto(`/${COPY.locale}/account/delete`);
+    await expect(page.getByRole("heading", { name: COPY.deleteTitle })).toBeVisible({
+      timeout: 30_000,
+    });
 
-    // What the deployed surface actually shows here is NOT the action's own
-    // receipt: the moment `request_account_deletion` lands, the account leaves
-    // `active`, the Server Action's revalidation re-runs the lifecycle gate,
-    // and SH.1's account-state surface interposes before React can paint the
-    // returned `started` state. So the receipt copy in `deletion-copy.ts` is
-    // unreachable in practice — recorded as a finding rather than papered over.
-    //
-    // The interposition is the stronger observation anyway: it is the `deleting`
-    // interlude of SH-DELETE-005 made visible in the browser, which is exactly
-    // the state the checkpoint asks to see before destruction.
+    // The request, through the product's own RPC as the account itself. This is
+    // exactly what the Server Action does after the phrase, the challenge and
+    // the password have all been accepted -- and the only thing they guard.
+    const { accessToken } = await mintOnlineAccessToken({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
+    });
+    const asUser = createClient(supabaseUrl!, publishableKey!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+    const requested = await asUser.rpc("request_account_deletion");
+    expect(requested.error).toBeNull();
+    expect(await lifecycleStatus()).toBe("deleting");
+
+    // The `deleting` interlude, in the browser: SH.1's gate refusing the
+    // product to an account on its way out. This is what the interactive pass
+    // saw, and what it never got past.
+    await page.goto(`/${COPY.locale}/app`);
     await expect(page.getByRole("heading", { name: COPY.deletingTitle })).toBeVisible({
       timeout: 30_000,
     });
 
-    // The executor runs outside the request path (`after()`), so the terminal
-    // state is polled rather than assumed to be immediate. The account must
-    // never return to `active`: `deleting` is one-way.
-    let terminal: string | null = "active";
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      terminal = await lifecycleStatus();
-      if (terminal !== "active") break;
-      await page.waitForTimeout(1_000);
-    }
-    expect(terminal === "deleting" || terminal === null).toBe(true);
+    // The executor, invoked exactly as the Server Action invokes it. Before the
+    // 2026-08-06 deploy this answered `409 credential_not_erased` here, every
+    // time, for every account.
+    const executed = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ requestedAt: new Date().toISOString() }),
+    });
+    const executedBody = await executed.text();
+    expect(executed.status, `executor refused: ${executedBody.slice(0, 200)}`).toBe(200);
+    expect(JSON.parse(executedBody).outcome).toBe("completed");
 
-    for (let attempt = 0; attempt < 90; attempt += 1) {
-      const { data } = await admin().auth.admin.getUserById(userId!);
-      if (!data?.user) break;
-      await page.waitForTimeout(1_000);
-    }
+    // The session dies with the account: a token minted while it lived must
+    // stop resolving, and its refresh token must not mint another.
+    const stillMe = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: publishableKey!, authorization: `Bearer ${accessToken}` },
+    });
+    expect(stillMe.ok, "the access token still resolves after deletion").toBe(false);
+
+    // A note kept from this journey's first writing, because it is still true
+    // and still surprising: the surface never shows the action's own receipt.
+    // The moment `request_account_deletion` lands, the account leaves `active`,
+    // the revalidation re-runs the lifecycle gate, and SH.1's account-state
+    // surface interposes before React can paint the returned `started` state.
+    // The receipt copy in `deletion-copy.ts` is unreachable in practice —
+    // recorded as a finding rather than papered over. The interposition
+    // asserted above is the stronger observation anyway.
+
+    // The account itself. Asserted directly rather than polled: the executor
+    // answered `completed` synchronously above, and polling for a state that is
+    // already decided only turns a failure into a timeout.
     const { data: finalUser } = await admin().auth.admin.getUserById(userId!);
     expect(finalUser?.user ?? null).toBeNull();
+
+    // `deleting` is one-way: the lifecycle row must be gone with the account,
+    // never back to `active`.
+    expect(await lifecycleStatus()).toBeNull();
 
     // Zero residue, asserted from the same census the executor uses.
     const { data: residue } = await admin().rpc("account_owned_row_counts", {
