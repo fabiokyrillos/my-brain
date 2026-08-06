@@ -122,7 +122,7 @@ Bound by ADR-075: an operator CLI over `service_role` SQL. **No product admin UI
 
 | Precondition | State at authorization | Who clears it |
 | --- | --- | --- |
-| All three merge-SHA CI jobs green for `508cf6c` | `database and journey` ✅, `edge worker` ✅, **`application` queued** — a GitHub Actions runner-availability delay, not a code failure | Re-checked before **any** 2H implementation merge or deployment (ADR-085) |
+| All three merge-SHA CI jobs green for `508cf6c` | **NOT met.** `database and journey` ✅, `edge worker` ✅, **`application` cancelled** at `2026-08-06T16:10:47Z` after ~15 min queued with **zero steps executed** — never acquired a runner, never reached `Set up job`, so it tested nothing. Run `31116254874` = `failure`. GitHub Actions runner availability, not a code failure. | A fresh successful run of that job. Timing is an owner decision while the incident continues; re-checked before **any** 2H implementation merge or deployment (ADR-085) |
 | Hosted migration parity `202608060078` | current | re-read at 2H.0 |
 | `process-jobs` deployed build | stale at `8982d74` | ADR-086 — owner, separately |
 | Public signup | closed at both layers | unchanged by this phase |
