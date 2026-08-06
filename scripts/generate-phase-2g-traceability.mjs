@@ -63,18 +63,46 @@ export const MIGRATION_BUDGET = 1;
  * Declared here rather than derived, because nothing on disk can evidence an
  * absence. Cross-checked in both directions by `findings`.
  */
-export const UNDELIVERED = Object.freeze({
+export const UNDELIVERED = Object.freeze({});
+
+/**
+ * Requirements this phase delivered **in part**, each with what landed, what is
+ * still missing, and where the remainder lives.
+ *
+ * This category exists because the two-way split was lying in both directions.
+ * At Phase 2G's close, `2G-ROUTE-008` and `2G-CLOSE-003` were declared *not
+ * delivered* on one blocker: hosted CAPTCHA had made every authenticated online
+ * journey unrunnable, so nothing could be executed against the deployment. The
+ * online-session harness maintenance that followed resolved that blocker — the
+ * journeys now run — and a second, unrelated one was found underneath it:
+ * SH.4's consent gate had been interposing on every admin-created fixture
+ * account since it shipped, independently of Turnstile.
+ *
+ * With both cleared, calling these two "not delivered" understates what exists,
+ * and calling them "delivered" would claim a conversational-creation journey
+ * that still cannot make a provider call. **Partial, with the single remaining
+ * blocker named**, is the only description that is true — and a partial must
+ * still be *cited* by an acceptance record, so it cannot be used to smuggle an
+ * unevidenced claim past the citation rule.
+ */
+export const PARTIAL = Object.freeze({
   "2G-ROUTE-008": {
-    reason:
-      "the authenticated journeys are written and NOT executed: hosted CAPTCHA refuses "
-      + "automated sign-in, which blocks all 28 online specs, and a disposable BYOK product "
-      + "credential is not provisioned",
-    destination: "PHASE_2G_ONLINE_JOURNEY_BLOCKER.md — blocked on the session helper and a credential",
+    delivered:
+      "the authenticated online journeys execute against the deployed project again — "
+      + "80 of 87 cases pass and none fails, on a session fixture proven in both directions",
+    remaining:
+      "the conversational-creation journey itself (sentence → preview → confirm → task → undo) "
+      + "still cannot run: every turn is a provider call under BYOK and "
+      + "BYOK_TEST_USER_A_OPENAI_API_KEY is not provisioned",
+    destination: "PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md — one owner action, a disposable provider credential",
   },
   "2G-CLOSE-003": {
-    reason:
-      "non-destructive hosted verification of the journeys could not run, for the same two reasons",
-    destination: "PHASE_2G_ONLINE_JOURNEY_BLOCKER.md — the same blocker",
+    delivered:
+      "the authenticated journey set runs against the deployed project on disposable fixtures "
+      + "that are created and deleted per spec, with the funnel statement already recorded",
+    remaining:
+      "the conversational-creation subset of that set, for the same single credential reason",
+    destination: "PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md — the same owner action",
   },
 });
 
@@ -127,6 +155,18 @@ export function classify(root, id) {
   if (undelivered) {
     return { id, status: "not delivered", evidence: cited, ...undelivered };
   }
+  const partial = PARTIAL[id];
+  if (partial) {
+    // A partial still owes evidence. Without this, "partial" would be a way to
+    // assert half a delivery with nothing on disk behind it — which is exactly
+    // the unevidenced claim the citation rule exists to refuse.
+    return {
+      id,
+      status: cited.length > 0 ? "partially delivered" : "unresolved",
+      evidence: cited,
+      ...partial,
+    };
+  }
   if (cited.length > 0) return { id, status: "delivered", evidence: cited };
   return { id, status: "unresolved", evidence: [] };
 }
@@ -146,7 +186,11 @@ export function findings(root) {
   for (const id of ids) {
     const row = classify(root, id);
     if (row.status === "unresolved") {
-      problems.push(`${id} is neither cited by an acceptance record nor declared undelivered`);
+      problems.push(
+        PARTIAL[id]
+          ? `${id} is declared partially delivered but no acceptance record cites it`
+          : `${id} is neither cited by an acceptance record nor declared undelivered`,
+      );
     }
     // Deliberately NOT a finding: an acceptance record naming a requirement in
     // order to say it was not delivered. The first cut treated any mention as
@@ -160,6 +204,12 @@ export function findings(root) {
   // and a stale exception is how an inventory quietly shrinks.
   for (const id of Object.keys(UNDELIVERED)) {
     if (!ids.includes(id)) problems.push(`${id} is declared undelivered but the PRD does not declare it`);
+    if (PARTIAL[id]) problems.push(`${id} is declared both undelivered and partially delivered`);
+  }
+  for (const id of Object.keys(PARTIAL)) {
+    if (!ids.includes(id)) {
+      problems.push(`${id} is declared partially delivered but the PRD does not declare it`);
+    }
   }
 
   const migrations = phaseMigrations(root);
@@ -180,6 +230,7 @@ export function renderMatrix(root) {
   const ids = parseRequirements(root);
   const rows = ids.map((id) => classify(root, id));
   const delivered = rows.filter((row) => row.status === "delivered");
+  const partial = rows.filter((row) => row.status === "partially delivered");
   const undelivered = rows.filter((row) => row.status === "not delivered");
   const migrations = phaseMigrations(root);
 
@@ -200,10 +251,13 @@ export function renderMatrix(root) {
     `Delivery is evidenced by **citation**: a requirement is delivered when an`,
     `acceptance record under \`${REPORTS_DIR}/\` names its id. A requirement that`,
     "is not delivered must be declared in the generator with a reason and a",
-    "destination, and the generator refuses an id that is neither.",
+    "destination, and the generator refuses an id that is neither. A requirement",
+    "that is **partially delivered** must be declared *and* cited — the",
+    "declaration says what is still missing, the citation proves the rest landed.",
     "",
     `- **${ids.length}** requirements declared`,
     `- **${delivered.length}** delivered`,
+    `- **${partial.length}** partially delivered, each with its single remaining blocker named`,
     `- **${undelivered.length}** not delivered, each named with a destination`,
     `- **${migrations.length}** of ${MIGRATION_BUDGET} budgeted migrations spent`
       + (migrations.length ? `: \`${migrations.join("`, `")}\`` : ""),
@@ -213,9 +267,15 @@ export function renderMatrix(root) {
   for (const [family, familyRows] of byFamily) {
     lines.push(`## 2G-${family}`, "", "| Requirement | Status | Evidence |", "| --- | --- | --- |");
     for (const row of familyRows) {
-      const evidence = row.status === "not delivered"
-        ? `**${row.reason}** → ${row.destination}`
-        : row.evidence.map((name) => `\`${name}\``).join(", ");
+      let evidence;
+      if (row.status === "not delivered") {
+        evidence = `**${row.reason}** → ${row.destination}`;
+      } else if (row.status === "partially delivered") {
+        evidence = `${row.evidence.map((name) => `\`${name}\``).join(", ")}`
+          + ` — delivered: ${row.delivered}; **remaining: ${row.remaining}** → ${row.destination}`;
+      } else {
+        evidence = row.evidence.map((name) => `\`${name}\``).join(", ");
+      }
       lines.push(`| \`${row.id}\` | ${row.status} | ${evidence} |`);
     }
     lines.push("");

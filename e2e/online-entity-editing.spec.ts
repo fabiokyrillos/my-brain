@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice F2's authenticated acceptance for Projects and People (UX-08, UX-09).
  *
@@ -62,11 +64,7 @@ test.describe("editing a project and a person", () => {
     const mobile = testInfo.project.name === "mobile";
     const projectName = `Atlas ${crypto.randomUUID().slice(0, 8)}`;
 
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(password);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+    await signInOnline(page, { email, locale: "pt-BR" });
 
     await page.goto("/pt-BR/app/projects");
     await page.getByRole("textbox", { name: "Nome do projeto" }).fill(projectName);
@@ -109,11 +107,7 @@ test.describe("editing a project and a person", () => {
     const first = `Alpha ${crypto.randomUUID().slice(0, 8)}`;
     const second = `Beta ${crypto.randomUUID().slice(0, 8)}`;
 
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(password);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+    await signInOnline(page, { email, locale: "pt-BR" });
 
     await page.goto("/pt-BR/app/projects");
     for (const name of [first, second]) {
@@ -142,11 +136,7 @@ test.describe("editing a project and a person", () => {
   test("a person's notes become editable, and their modelled relations are shown", async ({ page }) => {
     const personName = `Marina ${crypto.randomUUID().slice(0, 8)}`;
 
-    await page.goto("/en/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/en\/app$/, { timeout: 30_000 });
+    await signInOnline(page, { email, locale: "en" });
 
     await page.goto("/en/app/people");
     await page.getByRole("textbox", { name: "Person name" }).fill(personName);

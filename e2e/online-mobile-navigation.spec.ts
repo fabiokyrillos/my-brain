@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { mintOnlineAccessToken, signInOnline } from "./support/online-session";
+
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
@@ -31,13 +33,14 @@ test.describe("authenticated converged navigation", () => {
     expect(response.ok).toBe(true);
     userId = ((await response.json()) as { id: string }).id;
 
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    expect(authResponse.ok).toBe(true);
-    accessToken = ((await authResponse.json()) as { access_token: string }).access_token;
+    // `signInWithPassword` is refused by hosted CAPTCHA (`400 captcha_failed`)
+    // for every client, so the user token comes from the admin link exchange.
+    accessToken = (await mintOnlineAccessToken({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
+    })).accessToken;
   });
 
   test.afterAll(async () => {
@@ -52,11 +55,7 @@ test.describe("authenticated converged navigation", () => {
   });
 
   test("keeps the same hierarchy reachable in both locales and viewports", async ({ page }, testInfo) => {
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(password);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+    await signInOnline(page, { email, locale: "pt-BR" });
 
     for (const locale of ["pt-BR", "en"] as const) {
       const labels = locale === "pt-BR"

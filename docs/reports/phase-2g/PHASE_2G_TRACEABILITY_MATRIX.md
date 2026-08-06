@@ -7,11 +7,14 @@ edit here produces a status nothing checked (2G-CLOSE-001).
 Delivery is evidenced by **citation**: a requirement is delivered when an
 acceptance record under `docs/reports/phase-2g/` names its id. A requirement that
 is not delivered must be declared in the generator with a reason and a
-destination, and the generator refuses an id that is neither.
+destination, and the generator refuses an id that is neither. A requirement
+that is **partially delivered** must be declared *and* cited — the
+declaration says what is still missing, the citation proves the rest landed.
 
 - **29** requirements declared
 - **27** delivered
-- **2** not delivered, each named with a destination
+- **2** partially delivered, each with its single remaining blocker named
+- **0** not delivered, each named with a destination
 - **1** of 1 budgeted migrations spent: `202608060078_phase_2g_composer_capture_source.sql`
 
 ## 2G-CREATE
@@ -36,7 +39,7 @@ destination, and the generator refuses an id that is neither.
 | `2G-ROUTE-005` | delivered | `PHASE_2G_SLICE_02_ACCEPTANCE.md`, `PHASE_2G_SLICE_04_ACCEPTANCE.md` |
 | `2G-ROUTE-006` | delivered | `PHASE_2G_SLICE_02_ACCEPTANCE.md` |
 | `2G-ROUTE-007` | delivered | `PHASE_2G_SLICE_02_ACCEPTANCE.md` |
-| `2G-ROUTE-008` | not delivered | **the authenticated journeys are written and NOT executed: hosted CAPTCHA refuses automated sign-in, which blocks all 28 online specs, and a disposable BYOK product credential is not provisioned** → PHASE_2G_ONLINE_JOURNEY_BLOCKER.md — blocked on the session helper and a credential |
+| `2G-ROUTE-008` | partially delivered | `PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md`, `PHASE_2G_SLICE_02_ACCEPTANCE.md`, `PHASE_2G_SLICE_04_ACCEPTANCE.md` — delivered: the authenticated online journeys execute against the deployed project again — 80 of 87 cases pass and none fails, on a session fixture proven in both directions; **remaining: the conversational-creation journey itself (sentence → preview → confirm → task → undo) still cannot run: every turn is a provider call under BYOK and BYOK_TEST_USER_A_OPENAI_API_KEY is not provisioned** → PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md — one owner action, a disposable provider credential |
 
 ## 2G-CAPTURE
 
@@ -65,6 +68,6 @@ destination, and the generator refuses an id that is neither.
 | --- | --- | --- |
 | `2G-CLOSE-001` | delivered | `PHASE_2G_SLICE_04_ACCEPTANCE.md` |
 | `2G-CLOSE-002` | delivered | `PHASE_2G_SLICE_04_ACCEPTANCE.md` |
-| `2G-CLOSE-003` | not delivered | **non-destructive hosted verification of the journeys could not run, for the same two reasons** → PHASE_2G_ONLINE_JOURNEY_BLOCKER.md — the same blocker |
+| `2G-CLOSE-003` | partially delivered | `PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md`, `PHASE_2G_SLICE_04_ACCEPTANCE.md` — delivered: the authenticated journey set runs against the deployed project on disposable fixtures that are created and deleted per spec, with the funnel statement already recorded; **remaining: the conversational-creation subset of that set, for the same single credential reason** → PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md — the same owner action |
 | `2G-CLOSE-004` | delivered | `PHASE_2G_SLICE_04_ACCEPTANCE.md` |
 

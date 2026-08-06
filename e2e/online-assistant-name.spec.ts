@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice F1's authenticated acceptance for the assistant name (UX-06, DEC-2).
  *
@@ -104,11 +106,7 @@ test.describe("the assistant name", () => {
       const text = strings[locale];
       const mobile = testInfo.project.name === "mobile";
 
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(text.loginEmail).fill(email);
-      await page.getByLabel(text.loginPassword).fill(password);
-      await page.getByRole("button", { name: text.loginSubmit }).click();
-      await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+      await signInOnline(page, { email, locale });
 
       // The composer addresses the assistant by its default name before anything
       // is changed. This is also the control for the assertion after the rename.

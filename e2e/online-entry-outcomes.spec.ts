@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice H — UX-04, against the real database.
  *
@@ -197,11 +199,7 @@ test.describe("what now exists because of an entry", () => {
     const words = copy[locale];
 
     test(`the entry page answers all four families in ${locale}`, async ({ page }) => {
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(words.loginEmail).fill(email);
-      await page.getByLabel(words.loginPassword).fill(password);
-      await page.getByRole("button", { name: words.loginSubmit }).click();
-      await page.waitForURL(new RegExp(`/${locale}/app$`));
+      await signInOnline(page, { email, locale });
 
       await page.goto(`/${locale}/app/inbox/${richEntryId}`);
 
@@ -237,11 +235,7 @@ test.describe("what now exists because of an entry", () => {
     });
 
     test(`an entry that produced nothing says so in ${locale}`, async ({ page }) => {
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(words.loginEmail).fill(email);
-      await page.getByLabel(words.loginPassword).fill(password);
-      await page.getByRole("button", { name: words.loginSubmit }).click();
-      await page.waitForURL(new RegExp(`/${locale}/app$`));
+      await signInOnline(page, { email, locale });
 
       await page.goto(`/${locale}/app/inbox/${bareEntryId}`);
 
@@ -264,11 +258,7 @@ test.describe("what now exists because of an entry", () => {
     const context = await browser.newContext();
     try {
       const page = await context.newPage();
-      await page.goto("/pt-BR/auth/login");
-      await page.getByLabel("E-mail").fill(otherEmail);
-      await page.getByLabel("Senha").fill(otherPassword);
-      await page.getByRole("button", { name: "Entrar" }).click();
-      await page.waitForURL(/\/pt-BR\/app$/);
+      await signInOnline(page, { email: otherEmail, locale: "pt-BR" });
 
       const response = await page.goto(`/pt-BR/app/inbox/${richEntryId}`);
       // RLS hides the entry entirely, so the route answers 404 rather than

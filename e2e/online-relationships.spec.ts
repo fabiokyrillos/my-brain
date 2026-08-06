@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice EGC.2's authenticated acceptance — **the Camila scenario** (gate B1).
  *
@@ -65,13 +67,7 @@ test.describe("relationships and associations", () => {
   });
 
   async function signIn(page: import("@playwright/test").Page, locale: "pt-BR" | "en") {
-    await page.goto(`/${locale}/auth/login`);
-    // `E-mail` is not localized on the login form — see the note in
-    // `online-entity-graph.spec.ts`.
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel(locale === "pt-BR" ? "Senha" : "Password").fill(password);
-    await page.getByRole("button", { name: locale === "pt-BR" ? "Entrar" : "Sign in" }).click();
-    await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email, locale });
   }
 
   /** The visible half of an outcome, never the live region. */

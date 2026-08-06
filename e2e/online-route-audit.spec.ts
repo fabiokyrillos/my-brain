@@ -1,5 +1,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice H — the final authenticated route re-audit.
  *
@@ -235,13 +237,7 @@ test.describe("Slice H — authenticated route re-audit", () => {
   async function signedInPage(browser: Browser, width: number, height: number, locale: string) {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
-    await page.goto(`/${locale}/auth/login`);
-    // The login form renders the literal `E-mail` in both locales; only the
-    // password and submit labels are translated.
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel(locale === "pt-BR" ? "Senha" : "Password").fill(password);
-    await page.getByRole("button", { name: locale === "pt-BR" ? "Entrar" : "Sign in" }).click();
-    await page.waitForURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email, locale: locale === "en" ? "en" : "pt-BR" });
     return { context, page };
   }
 

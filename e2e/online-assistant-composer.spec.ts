@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice E's authenticated acceptance for the unified composer (UX-07).
  *
@@ -112,11 +114,7 @@ test.describe("the unified composer", () => {
       const text = strings[locale];
       const mobile = testInfo.project.name === "mobile";
 
-      await page.goto(`/${locale}/auth/login`);
-      await page.getByLabel(text.loginEmail).fill(email);
-      await page.getByLabel(text.loginPassword).fill(password);
-      await page.getByRole("button", { name: text.loginSubmit }).click();
-      await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+      await signInOnline(page, { email, locale });
 
       await page.goto(`/${locale}/app/chat`);
 
@@ -203,13 +201,21 @@ test.describe("the unified composer", () => {
   }
 
   test("a question still reaches its grounded answer through the fallthrough", async ({ page }) => {
+    // The one case in this file that is a **provider** call, and therefore the
+    // one gated on a credential. Under BYOK the answer is produced with the
+    // account's own key; a disposable account has none, so without
+    // `BYOK_TEST_USER_A_OPENAI_API_KEY` the product correctly refuses with
+    // `awaiting_ai_configuration` and this journey would be asserting the
+    // refusal rather than the fallthrough. Skipped honestly instead of retried.
+    test.skip(
+      !process.env.BYOK_TEST_USER_A_OPENAI_API_KEY,
+      "No disposable BYOK product credential is provisioned; the grounded answer needs a provider call.",
+    );
+    // Longer than the lane's own budget: this waits on a live model round.
+    test.setTimeout(240_000);
     const text = strings["pt-BR"];
 
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel(text.loginEmail).fill(email);
-    await page.getByLabel(text.loginPassword).fill(password);
-    await page.getByRole("button", { name: text.loginSubmit }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/, { timeout: 30_000 });
+    await signInOnline(page, { email, locale: "pt-BR" });
 
     await page.goto("/pt-BR/app/chat");
     await page.getByLabel(text.composerLabel).fill("O que eu combinei com a Marina?");

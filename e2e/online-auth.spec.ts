@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+
+import { mintOnlineAccessToken, signInOnline } from "./support/online-session";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.ONLINE_SUPABASE_URL;
@@ -65,14 +67,25 @@ test.describe("online Supabase authentication", () => {
     });
   });
 
-  test("signs in and persists only operational profile preferences", async ({ page }) => {
-    await page.goto("/pt-BR/auth/login");
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(password);
-    await page.getByRole("button", { name: "Entrar" }).click();
+  /**
+   * The login *form* is no longer part of this journey, and that is a statement
+   * about coverage worth making explicitly rather than by omission.
+   *
+   * Hosted CAPTCHA declines automated browsers by design (SH-CAPTCHA-002), so
+   * nothing automated can drive that form against the deployment. What this
+   * case is actually about — that an authenticated session sees its own
+   * preferences, that the settings surface writes them, and that the columns
+   * SH.0 removed from the form stay absent — is unaffected, so it runs on the
+   * session helper. The form's own behaviour is covered locally by
+   * `e2e/account-session.spec.ts` against a stack without CAPTCHA.
+   */
+  test("an authenticated session persists only operational profile preferences", async ({ page }) => {
+    await signInOnline(page, { email, locale: "pt-BR" });
 
-    await expect(page).toHaveURL(/\/pt-BR\/app$/);
-    await expect(page.getByRole("heading", { name: /boa tarde/i })).toBeVisible();
+    // The greeting is computed from the account's local time, so pinning one
+    // period of the day made this assertion pass only in the afternoon. What it
+    // is really asserting is that the shell greeted somebody at all.
+    await expect(page.getByRole("heading", { name: /bom dia|boa tarde|boa noite/i })).toBeVisible();
 
     await page.goto("/pt-BR/app/settings");
     await expect(page.getByLabel("Fuso horário")).toHaveValue("America/Sao_Paulo");
@@ -86,19 +99,22 @@ test.describe("online Supabase authentication", () => {
 
     await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
 
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: publishableKey!, "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
+    // Read back as the user, through PostgREST, so RLS is what allows it. The
+    // password grant is refused by hosted CAPTCHA for every client, so the
+    // token comes from the admin link exchange instead.
+    const auth = await mintOnlineAccessToken({
+      supabaseUrl: supabaseUrl!,
+      serviceRoleKey: serviceRoleKey!,
+      publishableKey: publishableKey!,
+      email,
     });
-    const auth = (await authResponse.json()) as { access_token: string };
 
     const [profileResponse, preferencesResponse] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/profiles?select=display_name,timezone&user_id=eq.${userId}`, {
-        headers: { apikey: publishableKey!, authorization: `Bearer ${auth.access_token}` },
+        headers: { apikey: publishableKey!, authorization: `Bearer ${auth.accessToken}` },
       }),
       fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=agent_name,response_detail&user_id=eq.${userId}`, {
-        headers: { apikey: publishableKey!, authorization: `Bearer ${auth.access_token}` },
+        headers: { apikey: publishableKey!, authorization: `Bearer ${auth.accessToken}` },
       }),
     ]);
 
@@ -152,7 +168,18 @@ test.describe("online Supabase authentication", () => {
     if (createdUser) await admin.auth.admin.deleteUser(createdUser.id);
   });
 
-  test("exchanges a recovery link, updates the password, and signs in again", async ({ page }, testInfo) => {
+  /**
+   * The last step — signing in with the new password — is **not** verifiable
+   * headlessly, and this says so rather than dropping it quietly.
+   *
+   * Both ways of checking a password go through a CAPTCHA-guarded surface: the
+   * login form, and `/auth/v1/token?grant_type=password`, which answers
+   * `400 captcha_failed` for every client since SH.5. There is no third way to
+   * ask "is this the password now?", so the assertion is replaced by the two
+   * facts that *are* observable — the product's own `password-updated` receipt,
+   * and the provider recording a change against the account.
+   */
+  test("exchanges a recovery link and updates the password", async ({ page }, testInfo) => {
     const admin = createClient(supabaseUrl!, serviceRoleKey!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -221,9 +248,20 @@ test.describe("online Supabase authentication", () => {
     await page.getByRole("button", { name: "Atualizar senha" }).click();
 
     await expect(page).toHaveURL(/\/pt-BR\/auth\/login\?message=password-updated/);
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Senha").fill(newPassword);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app$/);
+
+    // The provider agrees that something changed on this account. Weaker than
+    // signing in with the new password, and deliberately labelled as weaker.
+    const { data: after } = await admin.auth.admin.getUserById(userId!);
+    expect(after.user?.updated_at, "the provider recorded no change to the account").toBeTruthy();
+    expect(new Date(after.user!.updated_at!).getTime())
+      .toBeGreaterThan(new Date(after.user!.created_at).getTime());
+
+    testInfo.annotations.push({
+      type: "captcha-limitation",
+      description:
+        "Signing in with the new password is not asserted: both the login form and the password "
+        + "grant are CAPTCHA-guarded, so no automated caller can verify a password while hosted "
+        + "CAPTCHA is enabled. See docs/reports/phase-2g/PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md.",
+    });
   });
 });

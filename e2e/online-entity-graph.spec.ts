@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice EGC.1's authenticated acceptance for Companies and Contexts (gates A4, A9).
  *
@@ -73,11 +75,7 @@ test.describe("the entity graph's own surfaces", () => {
    * recorded rather than worked around silently.
    */
   async function signIn(page: import("@playwright/test").Page, locale: "pt-BR" | "en") {
-    await page.goto(`/${locale}/auth/login`);
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel(locale === "pt-BR" ? "Senha" : "Password").fill(password);
-    await page.getByRole("button", { name: locale === "pt-BR" ? "Entrar" : "Sign in" }).click();
-    await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email, locale });
   }
 
   /**

@@ -1,3 +1,12 @@
+> **RESOLVED 2026-08-06 — kept as written.** Everything below was true when it
+> was measured and is left unedited, because a record that quietly becomes
+> right is a record nobody can check. The blocker is cleared; §2's "where to
+> look next" was aimed at the wrong thing, and finding that out is the useful
+> part. The resolution, the cookie contract established by execution, the
+> *second* blocker hiding underneath this one, and what each of the 18 online
+> spec files does now are in
+> [`PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md`](PHASE_2G_ONLINE_HARNESS_ACCEPTANCE.md).
+
 # The authenticated online journey suite is blocked, and this is what was measured
 
 Slice 2G.4's first task, per the handoff: establish whether hosted CAPTCHA

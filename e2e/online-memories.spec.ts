@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInOnline } from "./support/online-session";
+
 /**
  * Slice G3's authenticated acceptance for Memories (UX-10) and DEC-5.
  *
@@ -61,13 +63,7 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
   });
 
   async function signIn(page: import("@playwright/test").Page, locale: "pt-BR" | "en" = "pt-BR") {
-    await page.goto(`/${locale}/auth/login`);
-    // The email label is "E-mail" in both locales; only the password and the
-    // submit control are translated.
-    await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel(locale === "en" ? "Password" : "Senha").fill(password);
-    await page.getByRole("button", { name: locale === "en" ? "Sign in" : "Entrar" }).click();
-    await expect(page).toHaveURL(new RegExp(`/${locale}/app$`), { timeout: 30_000 });
+    await signInOnline(page, { email, locale });
   }
 
   test("a manually created memory is inspectable, editable and archivable", async ({ page }, testInfo) => {
