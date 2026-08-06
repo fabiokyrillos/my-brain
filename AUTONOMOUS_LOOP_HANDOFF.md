@@ -1261,13 +1261,33 @@ while the heavier `database` job could. Note that `gh run rerun --failed`
 re-queues only the failed job, so attempts 4 and 5 each queued `application`
 **alone**.
 
-**The decisive experiment is already in flight and cost nothing to obtain.** PR
-#112's run (`31124961457`, `pull_request`) has **all three** jobs queued from
-18:03:58Z. If its `application` job acquires a runner, runners are healthy and
-the merge-SHA rerun is worth spending an authorization on; if all three are
-cancelled at 15m01s, the problem is account-wide and reruns are futile until it
-clears. **The single authorized rerun is therefore being held** until that
-answer arrives, rather than spent on a third identical 15-minute timeout.
+**The decisive experiment ran, and the answer is account-wide.** PR #112's run
+`31124961457` queued **all three** jobs at 18:03:59Z. All three were cancelled
+at 18:20:03Z with **zero steps** — including `database and journey` and `edge
+worker`, the two that acquired runners *instantly* at 15:31.
+
+| PR #112 run `31124961457` | Started | Cancelled | Steps |
+| --- | --- | --- | --- |
+| `application` | 18:03:59Z | 18:20:03Z | **0** |
+| `database and journey` | 18:03:59Z | 18:20:03Z | **0** |
+| `edge worker` | 18:03:59Z | 18:20:03Z | **0** |
+
+**So the earlier hypothesis was wrong and is corrected here rather than left
+standing:** nothing is specific to the `application` job. **No job in this
+repository can obtain a hosted runner.** The reason `application` looked
+singled out is only that `gh run rerun --failed` re-queues just the failed job,
+so it was the only one being asked for after attempt 3.
+
+**A second false lead, also corrected:** the pushes made during this session did
+**not** cause the cancellation via `cancel-in-progress`. Run `31124961457` died
+at 18:20:03Z; the push that created its successor landed at 18:32:41Z, twelve
+minutes later. Timestamps, not inference.
+
+**Consequence: the single authorized rerun was NOT spent.** A rerun cannot
+succeed while no job in the repository can start, so firing it would consume a
+one-shot authorization to buy another 15-minute timeout. This is an outage to
+wait out or to raise with GitHub support — **no code change and no rerun
+addresses it**, and `508cf6c` green ×3 cannot be reached until it clears.
 
 **A reading trap worth keeping:** the run object's `run_attempt` field briefly
 reported `4` while attempt 5 was spinning up. Read
