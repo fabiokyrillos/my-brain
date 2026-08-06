@@ -691,10 +691,80 @@ helper working *and* on a disposable BYOK product credential
 (`BYOK_TEST_USER_A_OPENAI_API_KEY` is unset — every conversational turn is a
 provider call).
 
+*(Answered by §43 below — the phase is complete.)*
+
+---
+
+## §43 — Phase 2G is COMPLETE (2026-08-06)
+
+### Where things stand
+
+**All four slices closed, every merge SHA CI-green on all three jobs**: 2G.1
+`ad0b56c`, 2G.2 `e63e103`, 2G.3 `e2c3718` (+ deployment `4dcced9`), 2G.4
+`3d35b84` and `a87d543`. Branches preserved, `main` clean and synchronized.
+
+- **29 requirements: 27 delivered, 2 not delivered and named with a
+  destination.** Generated and fail-closed —
+  `npm run docs:phase-2g:traceability` refuses to print an unresolved claim.
+- **1 of 1 budgeted migrations spent and deployed.** Hosted parity
+  `202608060078`, verified behaviourally 5/5 with both controls refused.
+- **Zero RPCs and zero grants added.** `direct-write-guard.test.ts` unchanged
+  with the `tasks` allowlist still empty — the invariant the phase existed to
+  keep.
+
+Final report: `docs/reports/phase-2g/PHASE_2G_REPORT.md`.
+
+### The two that were not delivered, and why that is honest
+
+`2G-ROUTE-008` and `2G-CLOSE-003` — the authenticated journeys are **written
+and not executed**. Hosted CAPTCHA blocks **all 28** online specs, and no
+disposable BYOK product credential is provisioned. Neither is a product
+defect; the product reports its own declared refusal code correctly. Do not
+read the empty journey column as untested behaviour: the same paths are
+covered by unit and component tests, and the deployed migration was verified
+behaviourally against the live project.
+
+### The funnel is empty, and a successor must not misread it
+
+**Zero qualifying commands.** ADR-055's gate expires **2026-10-27**. The
+definition study's R9 named this exact outcome — the phase produces capability
+but not evidence — and that is where it landed. **If the gate expires with the
+funnel empty, the honest reading is that nobody typed a command, not that
+semantic retrieval was measured and found wanting.** Writing that ADR is the
+next dated obligation in `TODO.md`.
+
+### Four lessons this phase paid for
+
+1. **A producer with no consumer is invisible on both sides** (ADR-084). Each
+   layer was internally consistent; only reading them against each other found
+   that SH.6's quota refusals had recorded nothing since deployment. The lost
+   events do not backfill.
+2. **A test-harness fallback can make a whole assertion vacuous.** The
+   regression test for that defect was itself passing by not running.
+3. **A probe whose controls agree with its positives has measured nothing.**
+   Three shapes returned identically for every case before one worked.
+4. **A document saying "this did not happen" must not satisfy the requirement
+   it describes** — the traceability generator's own first cut did exactly
+   that.
+
+### Repository maintenance this phase surfaced and did not own
+
+**The authenticated online journey suite cannot run** — all 28 specs, every
+initiative planning a hosted lane inherits it. **Disabling hosted CAPTCHA is
+not the fix.** `e2e/support/online-session.ts` is in the tree with three
+hypotheses eliminated and its guard's positive case honestly `test.fixme`;
+finishing it unblocks every online journey in the repository, not just Phase
+2G's.
+
 ### Next
 
-Finish 2G.4's repository half, which is not blocked: the fail-closed
-traceability generator over every `2G-*` id, the funnel measurement for
-ADR-055, the final report, and the documentation reconciliation that re-raises
-every Phase 2H deferral by name. Then the journey half when the helper works.
-Phase 2H remains unauthorised; no purge is authorized; signup stays closed.
+**No phase is authorized.** ADR-068's successor is **Phase 2H — Deploy and
+Operate**, and it needs an owner decision to begin, exactly as Phase 2G did:
+an accepted ADR naming it is itself an A13 start signal, so that ADR and the
+guard's retarget must land in one commit.
+
+The owner's rollout tasks are unchanged and open: retention activation
+(enabling **is** the first-purge authorization), Resend SMTP, the
+backup-restore drill, the legal and monitoring signatures, then one green
+`rollout:verify`, the owner-only `disable_signup` flip, and a second green run.
+No purge is authorized; signup stays closed at both layers.

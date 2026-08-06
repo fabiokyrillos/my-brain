@@ -1,6 +1,16 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — Phase 2G — Conversational Creation is COMPLETE (1 migration across the whole phase)
+
+**The composer creates.** *"Adicione uma tarefa para revisar os números"* previews, confirms and creates through the deployed `create_task_command` family; *"Registre que preciso enviar o relatório"* files an entry through `captureEntry` reused whole; and a sentence naming both a note and a task **asks** instead of choosing. The phase added **zero RPCs and zero grants**, and `direct-write-guard.test.ts` is unchanged with the `tasks` allowlist still empty — the invariant it set out to keep.
+
+**29 requirements: 27 delivered, 2 not delivered and named.** The accounting is generated and fail-closed. `2G-ROUTE-008` and `2G-CLOSE-003` are the two: the authenticated journeys are **written and not executed**, because hosted CAPTCHA blocks all 28 online specs (a control working as designed against a harness that has not caught up) and no disposable BYOK credential is provisioned. Neither is a product defect and neither is claimed as satisfied.
+
+**The funnel is empty, and that is the phase's honest result.** Zero qualifying commands: the paths reached `main` on 2026-08-05/06 and the journeys cannot run. ADR-055's gate expires **2026-10-27** and the definition study's R9 named this exact outcome — capability without evidence. If it expires empty, the honest reading is that nobody typed a command.
+
+**Four defects, each with a lesson kept because it generalises:** a producer with no consumer is invisible on both sides (ADR-084); a test-harness fallback can make a whole assertion vacuous; a probe whose controls agree with its positives has measured nothing; and a document saying "this did not happen" must not satisfy the requirement it describes. Five guards fired correctly during the phase and were **retargeted rather than weakened**. Nothing destructive moved: signup closed, retention unscheduled, no purge, SMTP unconfigured, Phase 2H unauthorised. Final report: `docs/reports/phase-2g/PHASE_2G_REPORT.md`.
+
 ## 2026-08-06 — Slice 2G.3: capture routing, and a defect its inventory found (1 migration — the phase's budget, now spent)
 
 **"Registre que preciso enviar o relatório" now files an entry from the composer**, with an acknowledgment that names the object it became and links to it. The routing decision is declared data in `capture-intent.ts` (2G-CAPTURE-001), positioned second in the router — behind memory, whose branch persists nothing, and ahead of the command parse, because an explicit filing imperative is not a task command. It is the one composer branch that writes on the turn that selects it, and the module says so. `captureEntry` is reused **whole**, so the lifecycle gate, SH.6's quota ceilings, the server-minted idempotency key, the `awaiting_ai_configuration` path and the worker nudge are inherited rather than rebuilt beside them.

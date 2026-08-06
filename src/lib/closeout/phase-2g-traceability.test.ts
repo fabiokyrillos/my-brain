@@ -154,8 +154,16 @@ describe("each deliberate defect is caught", () => {
 
 describe("the committed matrix", () => {
   it("regenerates byte-for-byte from the real repository", () => {
-    const committed = readFileSync(join(REPO, MATRIX_OUTPUT_PATH), "utf8");
-    expect(committed).toBe(`${renderMatrix(REPO)}\n`);
+    // CRLF-normalized on read, the same way `phase-2f-traceability.test.ts`
+    // does it: `.gitattributes` pins `*.sql` to LF and not `*.md`, so a
+    // Windows checkout hands back CRLF for a file the generator wrote with LF.
+    // The comparison is still byte-for-byte over content — what it deliberately
+    // does not assert is the checkout's line-ending policy.
+    const committed = readFileSync(join(REPO, MATRIX_OUTPUT_PATH), "utf8").replace(/\r\n/g, "\n");
+    expect(
+      committed,
+      `${MATRIX_OUTPUT_PATH} is stale or hand-edited — run \`npm run docs:phase-2g:traceability\``,
+    ).toBe(`${renderMatrix(REPO)}\n`);
   });
 
   it("accounts for every declared requirement exactly once", () => {
