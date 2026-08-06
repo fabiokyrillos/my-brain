@@ -119,8 +119,17 @@ export type TaskCommandUnsupportedReason = (typeof TASK_COMMAND_UNSUPPORTED_REAS
  * invalidates every stored fingerprint and every unexpired confirmation token.
  * Nothing stores one yet, which is precisely why the field had to arrive with
  * its bump now rather than later.
+ *
+ * `2026-08-05.1` — Slice 2G.1 added the creation classification: the wire
+ * contract gains the `create` outcome and this module gains
+ * `TASK_COMMAND_CREATE_ACTION` and the declared qualifier mapping. The
+ * fifteen mutation policies are untouched — the policy-lock digests prove it
+ * by not moving — but what a sentence may be classified *as* changed, so every
+ * fingerprint and unexpired confirmation minted under `.2` is invalidated by
+ * this bump, and `fingerprint.test.ts` exercises that consequence rather than
+ * assuming it (2G-CREATE-004).
  */
-export const TASK_COMMAND_POLICY_VERSION = "2026-07-25.2";
+export const TASK_COMMAND_POLICY_VERSION = "2026-08-05.1";
 
 /**
  * The window in which a Phase 2E operation stays undoable (2E-UNDO-006).
@@ -153,6 +162,45 @@ export const TASK_COMMAND_PATCH_FIELDS = [
 ] as const;
 
 export type TaskCommandPatchField = (typeof TASK_COMMAND_PATCH_FIELDS)[number];
+
+/**
+ * The Phase 2G creation intent (2G-CREATE-001).
+ *
+ * Deliberately NOT a sixteenth member of `TASK_COMMAND_ACTIONS`: every member
+ * of that list mutates an existing task and carries a PRD §11.2 policy row —
+ * eligibility over the target's current status, patch bounds, an undo strategy
+ * over recorded pre-state. A creation has no existing target, so forcing it
+ * into the row shape would give every policy column a fabricated value. It is
+ * a third classification outcome beside `proposal` and `unsupported` in the
+ * wire contract, and the database has admitted it as a *confirmation kind*
+ * since Phase 2E: `task_command_confirmations`' CHECK carries `create_task`
+ * (`202607270060:20`), and the deployed creation family consumes it.
+ */
+export const TASK_COMMAND_CREATE_ACTION = "create_task" as const;
+
+/**
+ * Which patch fields a creation intent may carry, and the qualifier action
+ * each maps to in `private.task_command_creation_payload`'s seven-member list
+ * (`202607270060:87-95`). Declared data, consumed by the routing slice: a
+ * patch field absent here is not representable as a creation qualifier — it
+ * surfaces in the preview or is dropped visibly, never written silently
+ * (2G-CREATE-002).
+ *
+ * `personRef` maps to `assign_person`, the neutral involvement role, and not
+ * to `set_waiting_on`: the no-match path knows which mutation verb the user
+ * originally used, but a bare creation does not, and "waiting on" is a claim
+ * about an existing obligation the sentence did not make.
+ */
+export const TASK_COMMAND_CREATION_QUALIFIERS = {
+  dueAt: "reschedule_due",
+  plannedAt: "set_planned",
+  priority: "set_priority",
+  projectRef: "assign_project",
+  contextRef: "assign_context",
+  personRef: "assign_person",
+} as const satisfies Partial<Record<TaskCommandPatchField, TaskCommandAction>>;
+
+export type TaskCommandCreationQualifierField = keyof typeof TASK_COMMAND_CREATION_QUALIFIERS;
 
 /**
  * The `Changes` column of PRD §11.2, as data.

@@ -1,6 +1,14 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-05 — Slice 2G.1: the create-intent contract (0 migrations, proven by executed inventory)
+
+The wire contract gains a third classification: `outcome: "create"` beside `proposal` and `unsupported` (2G-CREATE-001). The object shape is unchanged — a creation reuses `targetHints.titleWords` as the new task's 1–12 name words and `patch` for at most the six declared qualifier fields (`TASK_COMMAND_CREATION_QUALIFIERS` in the taxonomy, mapping onto `private.task_command_creation_payload`'s seven-member list; `personRef → assign_person`, because a bare creation does not make the claim "waiting on" makes). A contradictory creation is `invalid`, never repaired; non-qualifier patch fields are dropped so nothing rides in unrendered (2G-CREATE-002).
+
+**The policy bump is exercised, not asserted** (2G-CREATE-004): `TASK_COMMAND_POLICY_VERSION` moves `2026-07-25.2 → 2026-08-05.1` (prompt version with it), the four policy-lock digests **do not move** — the proof that no mutation policy changed — and `fingerprint.test.ts` proves the identical request stored under the superseded version can no longer match: the hashed version input itself moved, so every pre-bump fingerprint and unexpired confirmation is invalid by construction. The funnel is empty, so the blast radius is nil and the mechanism is now known to work.
+
+**Observable behavior is unchanged in this slice, including telemetry**: the composer maps the new classification to the exact refusal a create request has always received, removed by 2G.2 when routing lands (2G-ROUTE-001). The zero-migration claim was re-established by reading every SQL object the study cited — the confirmations CHECK already admits `create_task`, the fifteen-literal lists are mutation-path internal, and the product-event validator pins `policyVersion` by format only. Evidence: `docs/reports/phase-2g/PHASE_2G_SLICE_01_ACCEPTANCE.md`.
+
 ## 2026-08-05 — Phase 2G — Conversational Creation is authorized and planned (0 migrations)
 
 **The owner authorized Phase 2G, and the start followed the sanctioned path ADR-067 anticipated.** ADR-083 records the decision; the A13 phase-start guard retargeted from Phase 2G to Phase 2H **in the same commit**, so the invariant — the next phase must not start before it is authorized — never lapsed. The `product-ux-documentation.test.ts` prose guard moved on the same terms: the historical closeout keeps its recommendation language untouched, and `STATE.md` may now say Phase 2G started only while naming ADR-083 beside the claim.

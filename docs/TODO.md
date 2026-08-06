@@ -6,7 +6,7 @@ Active milestone: **Phase 2G — Conversational Creation** (authorized by ADR-08
 ## Phase 2G — Conversational Creation — ACTIVE (2026-08-05, ADR-083)
 
 - [ ] **Phase 2G implementation, per `docs/initiatives/phase-2g/PHASE_2G_IMPLEMENTATION_PLAN.md`.** Migration budget: **ONE**, allocated to 2G.3 only; Signup Hardening's spent budget cannot be reused and nothing is borrowed from Phase 2H.
-  - [ ] **2G.1 — the create-intent contract** (0 migrations; the zero re-established by the executed inventory gate G-2G.1 before detailed planning). Taxonomy + policy-version bump with the invalidation consequence exercised.
+  - [~] **2G.1 — the create-intent contract** — repository work complete, in PR on `codex/2g-slice-1` (stacked on the planning branch). G-2G.1 executed: zero migrations proven by reading every cited SQL object. Policy version `2026-08-05.1` with the four policy-lock digests unmoved and the fingerprint invalidation exercised. Composer behavior deliberately unchanged until 2G.2 routes the classification. Evidence: `docs/reports/phase-2g/PHASE_2G_SLICE_01_ACCEPTANCE.md`.
   - [ ] **2G.2 — creation from the composer** (0 migrations). Routing to the deployed creation family, preview/confirm, refusal narrowing, undo surfacing, journeys in both locales.
   - [ ] **2G.3 — capture routing** (the ONE migration: `captureSource` allowlist widening). Separately gated; drops cleanly if declined.
   - [ ] **2G.4 — convergence and closeout** (0 migrations). Fail-closed traceability, hosted non-destructive verification on disposable fixtures, measured funnel statement for ADR-055.

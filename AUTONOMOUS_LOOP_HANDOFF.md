@@ -408,3 +408,51 @@ the guard's retarget landed together:
 Implement 2G.1 per the plan: execute inventory gate G-2G.1, then the
 create-intent contract with the policy-version bump exercised. Phase 2H remains
 unauthorised.
+
+*(§37's "Next" is answered by §38 below.)*
+
+---
+
+## §38 — 2G.1 is repository-complete, and merging is the one blocked act (2026-08-05)
+
+### Where things stand
+
+- **PR #99** (`codex/phase-2g-planning` — ADR-083, guard retargets, the
+  governing pair, M2) is **open and green on all five checks**. It is NOT
+  merged: both `gh pr merge` and a git-native merge push to `main` were
+  **denied by the permission classifier**, the same posture an earlier session
+  recorded — green CI is not authorization for the classifier, and no
+  permission rule for merges exists in this environment.
+- **`codex/2g-slice-1`** is stacked on the planning branch, the SH.6 stacking
+  precedent. It carries slice 2G.1 complete: the `create` wire classification,
+  the declared qualifier mapping, the policy bump to `2026-08-05.1` with all
+  four policy-lock digests unmoved and the fingerprint invalidation exercised,
+  and the deliberate behavior-neutral mapping in the composer. Zero migrations,
+  proven by the executed G-2G.1 inventory.
+  Evidence: `docs/reports/phase-2g/PHASE_2G_SLICE_01_ACCEPTANCE.md`.
+- **`main` is untouched** and still at `d941359`. Hosted parity `202608050077`.
+  Nothing destructive moved; signup stays closed; no purge authorized.
+
+### What a successor must not misread
+
+- **The stack order is #99 → 2G.1.** Merge the planning PR first; the slice PR
+  then rebases onto `main` trivially (it was branched from the planning head).
+- **The composer still refuses creates, on purpose.** 2G.1 ships the contract;
+  the classification maps to the old refusal until 2G.2 routes it
+  (2G-ROUTE-001). Do not read the refusal as a defect or "finish" it inside
+  2G.1's PR.
+- **The Windows local baseline changed.** `.gitattributes` (M2) fixed the two
+  sql-reachability failures; the remaining known-local-only failures are the
+  three shebang parse-failure files, green in CI.
+
+### The smallest owner action
+
+Merge PR #99 (then the 2G.1 PR when its CI is green), or add a Bash permission
+rule allowing `gh pr merge` so the loop can do it. Nothing else is waiting on
+anyone.
+
+### Next
+
+2G.2 — creation from the composer: route the `create` classification to the
+deployed family, preview/confirm, refusal narrowing, undo surfacing, journeys.
+Zero migrations. Phase 2H remains unauthorised.

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TASK_COMMAND_ACTIONS,
+  TASK_COMMAND_CREATION_QUALIFIERS,
   TASK_COMMAND_MODEL_UNSUPPORTED_REASONS,
   TASK_COMMAND_UNSUPPORTED_REASONS,
 } from "@/features/task-commands/taxonomy";
@@ -273,6 +274,95 @@ describe("proposal normalization", () => {
   });
 });
 
+describe("creation normalization (2G-CREATE-001)", () => {
+  const creation = (overrides: Partial<TaskCommandProposal> = {}): TaskCommandProposal =>
+    proposal({
+      outcome: "create",
+      action: null,
+      unsupportedReason: null,
+      targetHints: {
+        titleWords: ["revisar", "números"],
+        project: null,
+        person: null,
+        context: null,
+        status: null,
+        temporalPhrase: null,
+      },
+      ...overrides,
+    });
+
+  it("accepts the create outcome on the wire", () => {
+    expect(taskCommandProposalSchema.safeParse(creation()).success).toBe(true);
+  });
+
+  it("normalizes a creation to its title words, its qualifiers and the server key", () => {
+    const value = creation();
+    const withDue = creation({ patch: { ...value.patch, dueAt: "amanhã" } });
+    expect(normalizeTaskCommandProposal(withDue, OPERATION_KEY)).toEqual({
+      kind: "create",
+      payload: {
+        titleWords: ["revisar", "números"],
+        patch: { dueAt: "amanhã" },
+        operationKey: OPERATION_KEY,
+      },
+    });
+  });
+
+  it("refuses a creation that also carries a mutation action", () => {
+    expect(normalizeTaskCommandProposal(creation({ action: "complete_task" }), OPERATION_KEY))
+      .toEqual({ kind: "invalid", reason: "invalid_model_output" });
+  });
+
+  it("refuses a creation that also carries a refusal reason", () => {
+    expect(
+      normalizeTaskCommandProposal(creation({ unsupportedReason: "unsupported_action" }), OPERATION_KEY),
+    ).toEqual({ kind: "invalid", reason: "invalid_model_output" });
+  });
+
+  it("refuses a creation the model could not title, instead of inventing one", () => {
+    const value = creation();
+    const untitled = creation({ targetHints: { ...value.targetHints, titleWords: ["  ", ""] } });
+    expect(normalizeTaskCommandProposal(untitled, OPERATION_KEY)).toEqual({
+      kind: "invalid",
+      reason: "invalid_model_output",
+    });
+  });
+
+  it("keeps only the declared qualifier fields, so nothing rides in unrendered", () => {
+    // `status`, `note` and `title` have no qualifier action in the deployed
+    // creation family (2G-CREATE-002): a preview could not show what they would
+    // do, so they are dropped here rather than written silently anywhere.
+    const value = creation();
+    const noisy = creation({
+      patch: {
+        ...value.patch,
+        priority: "high",
+        status: "blocked",
+        note: "smuggled",
+        title: "someone else's title",
+      },
+    });
+    const result = normalizeTaskCommandProposal(noisy, OPERATION_KEY);
+    expect(result.kind === "create" && result.payload.patch).toEqual({ priority: "high" });
+  });
+
+  it("agrees with the taxonomy on which fields qualify a creation", () => {
+    expect(Object.keys(TASK_COMMAND_CREATION_QUALIFIERS).sort()).toEqual(
+      ["contextRef", "dueAt", "personRef", "plannedAt", "priority", "projectRef"],
+    );
+  });
+
+  it("states the creation rules in the prompt it ships", () => {
+    expect(taskCommandSystemPrompt).toContain('return outcome "create"');
+    expect(taskCommandSystemPrompt).toContain("NEW task");
+    // One creation per turn (2G-CREATE-006): several creations are refused as
+    // multiple targets, in the prompt's own words.
+    expect(taskCommandSystemPrompt).toContain('Asking to create several tasks at once is "multiple_targets"');
+    // Refused surfaces stay refused at the model layer too (PRD §2).
+    expect(taskCommandSystemPrompt).toMatch(/a reminder, a project, a person, an event/);
+  });
+});
+
 describe("call bounds and failure vocabulary", () => {
   it("bounds the billed output", () => {
     expect(TASK_COMMAND_MAX_OUTPUT_TOKENS).toBeGreaterThan(0);
@@ -327,8 +417,9 @@ describe("call bounds and failure vocabulary", () => {
     // suite stayed green. Update the version, run this, paste the digest.
     const digest = createHash("sha256").update(taskCommandSystemPrompt).digest("hex").slice(0, 16);
     expect({ version: TASK_COMMAND_PROMPT_VERSION, digest }).toEqual({
-      version: "2026-07-25.1",
-      digest: "60644c2e4ea7d5aa",
+      // `2026-08-05.1` — Slice 2G.1 added the creation rules (2G-CREATE-001).
+      version: "2026-08-05.1",
+      digest: "297481e5fa4bccb3",
     });
   });
 });

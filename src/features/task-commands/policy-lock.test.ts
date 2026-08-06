@@ -55,7 +55,7 @@ describe("policy digest", () => {
   it("pins the action taxonomy to its declared version", () => {
     const canonical = TASK_COMMAND_ACTIONS.map((action) => [action, actionPolicy(action)]);
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.2",
+      version: "2026-08-05.1",
       digest: "7390ce73be772c2c",
     });
   });
@@ -116,7 +116,7 @@ describe("policy digest", () => {
       // The digest is unchanged from `2026-07-25.1`, and that is the point:
       // Slice 2E.3 added `targetStatus` to the action policies and touched no
       // status or priority literal. Only the version moved.
-      version: "2026-07-25.2",
+      version: "2026-08-05.1",
       digest: "e8c8bb1bd473e41f",
     });
   });
@@ -135,7 +135,7 @@ describe("policy digest", () => {
       version: TASK_VOCABULARY_VERSION,
       digest: digest(canonicalVocabularyEntries()),
     }).toEqual({
-      version: "2026-07-25.2",
+      version: "2026-08-05.1",
       digest: "ee9b0095c8418659",
     });
   });
@@ -146,7 +146,7 @@ describe("policy digest", () => {
     expect(TEMPORAL_LEXICON_VERSION).toBe(TASK_COMMAND_POLICY_VERSION);
     const canonical = TEMPORAL_LEXICON.map((entry) => [entry.id, entry.rule, String(entry.pattern)]);
     expect({ version: TEMPORAL_LEXICON_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-07-25.2",
+      version: "2026-08-05.1",
       digest: "a5b7f3be24a9abe1",
     });
   });
