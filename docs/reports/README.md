@@ -48,17 +48,22 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`pre-2e/`](./pre-2e/) | Pre-2E foundation hardening | historical, closed |
 | [`phase-2e/`](./phase-2e/) | Phase 2E — task commands | historical, closed |
 | [`phase-2f/`](./phase-2f/) | Phase 2F — operations and cleanup | historical, closed |
-| [`phase-2g/`](./phase-2g/) | Phase 2G — Conversational Creation (definition study, threat model, slice evidence) | **ACTIVE** — authorized by ADR-083, 2026-08-05 |
+| [`phase-2g/`](./phase-2g/) | Phase 2G — Conversational Creation (definition study, threat model, slice evidence) | closed 2026-08-06; 27 delivered, 2 partial with a named blocker |
+| [`phase-2h/`](./phase-2h/) | Phase 2H — Deploy and Operate (threat model, traceability contract, slice evidence) | **ACTIVE (PLANNING)** — authorized by ADR-085, 2026-08-06 |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**The active initiative is Phase 2G — Conversational Creation** (ADR-083,
-2026-08-05). Its governing pair lives in `docs/initiatives/phase-2g/`; its
-reports file here. Signup Hardening closed on 2026-08-05 and its directory is
-historical.
+**The active initiative is Phase 2H — Deploy and Operate** (ADR-085,
+2026-08-06), and it is **in planning**: the authorization covers planning
+artifacts, research, tests and generators, and explicitly does **not** cover
+merging an implementation PR, deploying a migration, enabling retention,
+executing a purge, opening signup, or deploying `process-jobs` (ADR-086). Its
+governing pair lives in `docs/initiatives/phase-2h/`; its reports file here.
+Phase 2G closed on 2026-08-06 and its directory is historical, with two
+requirements partial on a single named blocker.
 
 ---
 
@@ -121,10 +126,21 @@ asymmetric by history, not by rule, and the generator accepts either an
 
 ### `phase-2g/` — Phase 2G
 
-`PHASE_2G_DEFINITION.md` only — a study of whether the phase should exist. It
-declares no requirement and plans no work, and the A13 guard in
-`src/lib/closeout/phase-2f-documentation.test.ts` fails the build if that stops
-being true.
+`PHASE_2G_DEFINITION.md` — the study of whether the phase should exist, which
+declares no requirement and plans no work — then the threat model, the four
+slice acceptance records, the online-journey blocker and harness acceptances,
+`PHASE_2G_TRACEABILITY_MATRIX.md` and `PHASE_2G_REPORT.md`. Closed 2026-08-06.
+
+### `phase-2h/` — Phase 2H (active, planning)
+
+`PHASE_2H_THREAT_MODEL.md` (T-2H-01…T-2H-24, the per-slice review floor) and
+`PHASE_2H_TRACEABILITY_CONTRACT.md`, which **specifies** the fail-closed
+generator that `2H-CLOSE-001` builds in slice 2H.6 — deliberately not built
+during planning, because a fail-closed generator run against a phase with zero
+acceptance records reports every requirement unresolved. The governing pair
+(PRD, implementation plan) lives in `docs/initiatives/phase-2h/`. Slice
+acceptance records file here as they are produced; there are none yet, and
+nothing has been implemented, merged or deployed.
 
 ### `product-ux/` — Product UX/UI remediation
 

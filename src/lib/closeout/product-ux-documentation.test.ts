@@ -230,6 +230,20 @@ describe("the permanent documents agree on the facts that outlive the slice", ()
     expect(state).toMatch(/ADR-083/);
   });
 
+  it("records Phase 2H's start in STATE.md as an owner authorization, never an accident", () => {
+    // The same rule, one phase on (ADR-085). `STATE.md` may say Phase 2H has
+    // begun only while naming the decision that began it. It must also keep
+    // saying what that authorization withheld: planning is authorized, the
+    // production state changes are not, and a living document that drops the
+    // second half is the one that leads someone to deploy.
+    const state = read(STATE);
+    expect(state).toMatch(/Phase 2H/);
+    expect(state).toMatch(/ADR-085/);
+    expect(state, "STATE.md claims Phase 2H beyond the planning authorization").toMatch(
+      /planning|não autoriza|does not authorize/i,
+    );
+  });
+
   /**
    * The initiative may be declared COMPLETE in exactly one place, and only
    * after the merge SHA's CI is green. Before then §10 still carries its

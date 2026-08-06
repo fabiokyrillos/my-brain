@@ -1,9 +1,22 @@
 # Project Backlog
 
-Last updated: 2026-08-05 (Signup Hardening complete at SH.7; hosted parity `202608050077`)
-Active milestone: **Phase 2G — Conversational Creation** (authorized by ADR-083, 2026-08-05). Phase 2F — One Write Path — and every phase before it are complete; Signup Hardening is closed at SH.7 and public signup remains closed.
+Last updated: 2026-08-06 (Phase 2G complete; Phase 2H authorized for planning by ADR-085; hosted parity `202608060078`)
+Active milestone: **Phase 2H — Deploy and Operate** (authorized by ADR-085, 2026-08-06, **planning only**). Phase 2G — Conversational Creation — and every phase before it are complete; Signup Hardening is closed at SH.7 and public signup remains closed.
 
-## Phase 2G — Conversational Creation — ACTIVE (2026-08-05, ADR-083)
+## Phase 2H — Deploy and Operate — ACTIVE, PLANNING (2026-08-06, ADR-085)
+
+- [x] **Planning package written (2026-08-06).** `docs/initiatives/phase-2h/PHASE_2H_PRD.md` (44 requirements, nine families), `..._IMPLEMENTATION_PLAN.md` (slices 2H.0–2H.6, gates G-2H.1…G-2H.6, migration budget **FIVE** allocated per slice and non-transferable), `docs/reports/phase-2h/PHASE_2H_THREAT_MODEL.md` (T-2H-01…T-2H-24) and `..._TRACEABILITY_CONTRACT.md`. The A13 phase-start guard retargeted from Phase 2H to Phase 2I in the same commit as ADR-085.
+- [ ] **BLOCKING GATE G-2H.1 — merge-SHA CI for `508cf6c` green ×3.** `database and journey` ✅ and `edge worker` ✅; the **`application` job is queued** at a GitHub-hosted runner and has not reached checkout — an infrastructure delay, not a code failure. It has not been cancelled and no additional rerun has been triggered. **No Phase 2H implementation PR may merge and no Phase 2H migration may deploy until all three are green.**
+- [ ] **2H.0 — pre-code gates** (0 migrations). G-2H.1 (above), G-2H.2 deployment census, G-2H.3 scheduled-job census, G-2H.4 deletion-stall reproduction, G-2H.5 owner value signature (§14, including the two **deliberately blank** rate ceilings), G-2H.6 hosting decision recorded as an ADR. Nothing in 2H.1–2H.6 is implemented until every gate is executed and green.
+- [ ] **2H.1 — deletion recovery** (1 migration). `2H-RECOVER-001…006`. **First, because it is the only family here addressing harm that already occurred.** The bound is built before the retry loop, deliberately: a reaper written before its ceiling is an unbounded retry against the most destructive operation in the product.
+- [ ] **2H.2 — error sink and cron dead-man switch** (1 migration). `2H-SINK-001…004`, `2H-DEADMAN-001…003`. Their consumers land in 2H.4 — claiming them here would repeat ADR-084's producer-with-no-consumer.
+- [ ] **2H.3 — distributed rate limiting, C1** (1 migration). `2H-RATE-001…006`. **Blocked on G-2H.5**: this slice does not start with a placeholder ceiling.
+- [ ] **2H.4 — operator surfaces** (1 migration). `2H-OPS-001…005` plus `2H-SINK-005`/`2H-DEADMAN-004`. Bound by ADR-075 — operator CLI over `service_role` SQL, **no product admin UI, no service-role HTTP endpoint**.
+- [ ] **2H.5 — deploy, retention and backup** (1 migration, buying only the retention sweeps and twins). `2H-DEPLOY-001…007`, `2H-RETENTION-001…004`, `2H-BACKUP-001…002`. Nothing here executes: the restore drill is a procedure plus a script, retention scheduling requires `--enable`, and the runbook's destructive steps are marked owner-only.
+- [ ] **2H.6 — closeout** (0 migrations). `2H-CLOSE-001…005` — the fail-closed traceability generator, the budget reconciliation, the final report with every undelivered requirement's destination, the destructive-posture re-read, and the A13 re-verification.
+- [ ] **OWNER — `process-jobs` deployment decision (ADR-086, `Proposed`).** The deployed build is stale at `8982d74` and `verify:edge-parity` reports it every run. The proposed discharge is an **audit before a deploy** (`2H-DEPLOY-007`): read the diff against every migration applied since, and check every RPC the worker calls for a signature or grant change — the exact defect class that stalled `delete-account`. **The deploy itself remains a separate owner action and is never bundled into a slice merge.**
+
+## Phase 2G — Conversational Creation — COMPLETE (2026-08-05, ADR-083)
 
 - [x] **Phase 2G — COMPLETE (2026-08-06).** All four slices closed with merge-SHA CI green; 29 requirements, 27 delivered, 2 named as not delivered with a destination; 1 of 1 migrations spent and deployed (parity `202608060078`). `2G-ROUTE-008`/`2G-CLOSE-003` are the two, both on the CAPTCHA journey blocker. The funnel is measured and empty — ADR-055 expires 2026-10-27. Final report: `docs/reports/phase-2g/PHASE_2G_REPORT.md`.
 - [ ] **Phase 2G implementation record (retained), per `docs/initiatives/phase-2g/PHASE_2G_IMPLEMENTATION_PLAN.md`.** Migration budget: **ONE**, allocated to 2G.3 only; Signup Hardening's spent budget cannot be reused and nothing is borrowed from Phase 2H.
