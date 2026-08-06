@@ -625,9 +625,76 @@ change and not a product change.
 
 ### Next
 
-2G.4 — convergence and closeout, **zero migrations**: the fail-closed
-traceability generator over every `2G-*` id, the hosted journey verification
-(after settling the CAPTCHA question above), the measured funnel statement for
-ADR-055's evidence gate, the phase's final report, and the documentation
-reconciliation that re-raises every Phase 2H deferral by name. Phase 2H
-remains unauthorised; no purge is authorized; signup stays closed.
+*(Answered by §42 below — the CAPTCHA question is settled, with evidence.)*
+
+---
+
+## §42 — the online journey suite is blocked, measured, and three hypotheses are eliminated (2026-08-06)
+
+### The finding, which is bigger than Phase 2G
+
+**Every authenticated `e2e/online-*.spec.ts` has been unrunnable since SH.5
+enabled hosted CAPTCHA on 2026-08-05.** Twenty-eight spec files sign in through
+the login form; running one against the deployment lands on
+`?error=captcha-failed`. This is the control working as designed — SH.5's
+record already said Turnstile declines automated browsers — but the
+*consequence* had never been stated, and nothing failed loudly enough to say
+so.
+
+Full evidence, the three approaches and what each eliminated:
+`docs/reports/phase-2g/PHASE_2G_ONLINE_JOURNEY_BLOCKER.md`.
+
+### What is in the tree, and its honest state
+
+- **`e2e/support/online-session.ts`** — a helper that obtains a session
+  without the login form. The session exchange **works** (`generate_link` →
+  `/auth/v1/verify` with `email_otp`; the same path Slice 2G.3's deployment
+  probe used to run 5/5). Installing it as an `@supabase/ssr` cookie **does
+  not yet authenticate the browser**.
+- **`e2e/online-session-fixture.spec.ts`** — its guard. The **negative control
+  passes**, proving the target route is genuinely gated; the positive case is
+  **`test.fixme`** with the exact status. Marked rather than deleted or left
+  red: a red suite trains people to ignore red, and a deleted test hides the
+  work.
+
+### Eliminated, so the next attempt does not repeat them
+
+1. **Login form** → CAPTCHA refuses automated sign-in, by design.
+2. **`generate_link` → the app's `/auth/callback`** → two independent
+   blockers: GoTrue **silently rewrote** the non-allow-listed `redirect_to` to
+   `site_url`, and magiclink returns tokens in the URL **fragment** (implicit)
+   while the callback reads `?code=` (PKCE). No allow-list entry makes those
+   meet.
+3. **Cookie format** → matches `@supabase/ssr@0.12.3` (`base64-` +
+   base64url(JSON), `dist/main/cookies.js:7,23`), so that is not the fault.
+
+Look next at: the cookie name's project ref, whether `src/proxy.ts` clears a
+session it did not itself refresh, and whether 0.12.3 expects the chunked
+(`.0`) name even for a single chunk.
+
+### What must not be proposed as the fix
+
+**Disabling hosted CAPTCHA.** It is an owner action, it weakens a control SH.5
+proved is enforced at the provider rather than in the UI, and the problem is a
+harness that has not caught up. A fixture that bypasses the login form with the
+**service-role key** removes no protection — every online spec already holds
+that key to create its disposable account.
+
+### Where Phase 2G stands
+
+Three of four slices closed and deployed (2G.1 `ad0b56c`, 2G.2 `e63e103`,
+2G.3 `e2c3718` + deployment record `4dcced9`), all merge-SHAs CI-green, hosted
+parity `202608060078`, migration budget spent. **2G.4 remains**, and its
+journey half now has a named blocker instead of an open question.
+`2G-ROUTE-008` and `2G-CLOSE-003` stay **WRITTEN, NOT EXECUTED**, gated on this
+helper working *and* on a disposable BYOK product credential
+(`BYOK_TEST_USER_A_OPENAI_API_KEY` is unset — every conversational turn is a
+provider call).
+
+### Next
+
+Finish 2G.4's repository half, which is not blocked: the fail-closed
+traceability generator over every `2G-*` id, the funnel measurement for
+ADR-055, the final report, and the documentation reconciliation that re-raises
+every Phase 2H deferral by name. Then the journey half when the helper works.
+Phase 2H remains unauthorised; no purge is authorized; signup stays closed.
