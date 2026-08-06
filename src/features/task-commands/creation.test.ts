@@ -10,6 +10,7 @@ import {
   createTaskCommand,
   decideInitialTaskCommandNoMatch,
   issueTaskCommandCreationConfirmation,
+  mapCreateIntentToCreationProposal,
   previewTaskCommandCreation,
   type TaskCommandCreationClient,
   type TaskCommandCreationInput,
@@ -298,6 +299,96 @@ describe("2F-CREATE-002 — the bare manual creation intent", () => {
 
     expect((calls[0]?.args as { p_created_by?: string }).p_created_by).toBe("user");
     expect(created.outcome).toBe("applied");
+  });
+});
+
+describe("the create-verb intent (2G.2)", () => {
+  it("maps a bare create payload to a title and nothing else", () => {
+    const mapping = mapCreateIntentToCreationProposal({
+      titleWords: ["book", "the", "flights"],
+      patch: {},
+      operationKey: OPERATION_KEY,
+    });
+    expect(mapping).toEqual({ outcome: "bare", title: "book the flights" });
+  });
+
+  it("maps one qualifier to its declared action, in declaration order", () => {
+    const mapping = mapCreateIntentToCreationProposal({
+      titleWords: ["book", "flights"],
+      patch: { priority: "high", dueAt: "tomorrow" },
+      operationKey: OPERATION_KEY,
+    });
+    // dueAt precedes priority in TASK_COMMAND_CREATION_QUALIFIERS; exactly one
+    // qualifier survives, because the deployed family accepts exactly one.
+    expect(mapping).toEqual({
+      outcome: "qualified",
+      proposal: {
+        action: "reschedule_due",
+        targetHints: { titleWords: ["book", "flights"] },
+        patch: { dueAt: "tomorrow" },
+        operationKey: OPERATION_KEY,
+      },
+    });
+  });
+
+  it("ignores blank qualifier values rather than synthesizing an empty patch", () => {
+    const mapping = mapCreateIntentToCreationProposal({
+      titleWords: ["call", "maria"],
+      patch: { dueAt: "   " },
+      operationKey: OPERATION_KEY,
+    });
+    expect(mapping.outcome).toBe("bare");
+  });
+
+  it("builds the bare-action payload for a create_bare intent, like manual", () => {
+    const payload = buildTaskCommandCreationPayload({
+      intent: {
+        kind: "create_bare",
+        title: "book the flights",
+        operationKey: OPERATION_KEY,
+        policyVersion: TASK_COMMAND_POLICY_VERSION,
+      },
+      observedBefore: OBSERVED_BEFORE,
+      locale: "en",
+    });
+    expect(payload.p_action).toBe("create_title_only");
+    expect(payload.p_title_words).toEqual(["book", "the", "flights"]);
+    expect(payload.p_patch).toEqual({});
+  });
+
+  it("builds the qualifier payload for a create intent carrying a validated command", () => {
+    const payload = buildTaskCommandCreationPayload({
+      intent: { kind: "create", command: command("reschedule_due") },
+      observedBefore: OBSERVED_BEFORE,
+      locale: "en",
+    });
+    expect(payload.p_action).toBe("reschedule_due");
+    expect(payload.p_patch).toEqual(PATCHES.reschedule_due);
+  });
+
+  it("refuses a create intent whose action is not task-like, with the declared code", () => {
+    expect(() =>
+      buildTaskCommandCreationPayload({
+        intent: { kind: "create", command: command("complete_task", { patch: {} }) },
+        observedBefore: OBSERVED_BEFORE,
+        locale: "en",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "creation_not_offered" }));
+  });
+
+  it("refuses an unrepresentable bare title with the declared code", () => {
+    expect(() =>
+      buildTaskCommandCreationPayload({
+        intent: {
+          kind: "create_bare",
+          title: "x".repeat(241),
+          operationKey: OPERATION_KEY,
+          policyVersion: TASK_COMMAND_POLICY_VERSION,
+        },
+        observedBefore: OBSERVED_BEFORE,
+        locale: "en",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "creation_title_unrepresentable" }));
   });
 });
 

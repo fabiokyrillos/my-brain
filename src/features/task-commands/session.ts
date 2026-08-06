@@ -61,7 +61,7 @@ import {
  * would otherwise arrive as `undefined` and be silently defaulted, which is how
  * a missing staleness witness turns into a preview that cannot go stale.
  */
-export const TASK_COMMAND_SESSION_VERSION = "2026-07-28.1";
+export const TASK_COMMAND_SESSION_VERSION = "2026-08-05.1";
 
 /**
  * What the client believes it is looking at (2E-PREVIEW-006).
@@ -87,6 +87,22 @@ export type TaskCommandSession = {
    * the RPC reserved describe different requests.
    */
   readonly proposal: Record<string, unknown>;
+  /**
+   * True exactly when this session carries a Phase 2G creation intent
+   * (2G-ROUTE-001) rather than a mutation proposal.
+   *
+   * A discriminator, not a payload: for a *qualified* creation the proposal is
+   * the synthesized mutation-shaped payload (`action` = the mapped qualifier
+   * from `TASK_COMMAND_CREATION_QUALIFIERS`), so `deriveTaskCommand` re-applies
+   * every bound, the temporal lexicon and the vocabulary exactly as it does for
+   * a mutation; for a *bare* creation the proposal carries only `titleWords`
+   * and the operation key. What the flag decides is the route — the creation
+   * family, never the matcher — and tampering with it buys nothing: a mutation
+   * proposal flagged as a creation must still validate as a task-like
+   * creation, and a creation flagged as a mutation re-enters the matcher and
+   * simply matches or refuses on its own merits.
+   */
+  readonly create: boolean;
   /** The pinned clock. ISO-8601 with a timezone designator, always. */
   readonly issuedAt: string;
   /**
@@ -148,6 +164,7 @@ export const taskCommandSessionSchema = z
     // command inside it is not, and those are different failures with different
     // copy — `invalid_session` is a defect, `unsupported` is a product outcome.
     proposal: z.record(z.string(), z.unknown()),
+    create: z.boolean(),
     issuedAt: isoInstantSchema,
     model: z.string().min(1).max(120).nullable(),
     promptVersion: z.string().min(1).max(60).nullable(),
@@ -203,6 +220,8 @@ export type CreateTaskCommandSessionInput = {
   readonly model?: string | null;
   readonly promptVersion?: string | null;
   readonly strategyVersion?: string | null;
+  /** Omitted for mutation sessions; true marks a creation session (2G.2). */
+  readonly create?: boolean;
 };
 
 export class TaskCommandSessionError extends Error {
@@ -232,6 +251,7 @@ export function createTaskCommandSession(
   return {
     version: TASK_COMMAND_SESSION_VERSION,
     proposal: input.proposal,
+    create: input.create ?? false,
     issuedAt: input.issuedAt,
     model: input.model ?? null,
     promptVersion: input.promptVersion ?? null,
