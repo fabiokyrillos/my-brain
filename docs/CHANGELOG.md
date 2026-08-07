@@ -1,6 +1,24 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.3 deployed, and the parity gap this phase was founded on is closed
+
+**Merged at `46f7244` with exact merge-SHA CI green ×3**, read per job. `202608070081` applied; local = remote = `202608070081`, 81 migrations. **Hosted acceptance 28 of 28.**
+
+**The limiter was raced against a real database and the numbers are exact.** 80 concurrent connections against a ceiling of 60 through the worker door, 30 against 20 through real authenticated sessions: exactly 60 and exactly 20 admitted, the rest refused **by name**, and the limiter **stored** exactly 60 and exactly 20. The stored count is read from the table over a direct connection rather than counted from the replies — a reply proves what the limiter said, and the requirement is about what it wrote.
+
+**Both stale Edge Functions were deployed, separately and with their own gates.**
+
+`delete-account` v2 → **v3**. Ten pre-deploy gates; `executor.ts` byte-unchanged, which is the claim that matters — the reaper gained a door into the executor without the executor gaining a capability. **19 of 19** after. The reap door is live and **provably disabled**: an empty secret and a well-formed 64-character wrong secret **both** answer `401 reap_disabled`, because an unconfigured door has no correct secret to present.
+
+`process-jobs` v20 → **v21**, ADR-086 executed. The pre-flight read the RPC names out of the worker source rather than a hand-written list and checked all **14 against hosted parity** — every one exists with the argument list the worker sends. Deployed **after** the 2H.3 migration, so the worker and the database contract moved together. **20 of 20** after, including `SH-QUOTA-008`'s `413` byte bound proved **live** rather than in a unit test.
+
+**`verify:edge-parity` now reads "every deployed function is at or ahead of its source."** The phase's founding defect was a parity gap nobody measured. It is measured, and it is closed.
+
+**Three probe defects were found during this deployment, and all three were mine.** A `reaper` substring match that conflated the pre-existing job-lease reaper with the unarmed deletion reaper. `.startsWith` called on an epoch-millisecond number. And reap probes that sent only `apikey`, so they read the platform gateway's `UNAUTHORIZED_NO_AUTH_HEADER` as the function's answer — **a probe that would have passed against a function that was never deployed.** Suspect the probe before the product; this repository has now paid for that lesson three times.
+
+**Nothing else moved.** Cron catalog unchanged at five. No sweep scheduled, no purge, no account touched, no provider call (`ai_usage_events` 10 → 10), no attempt burned (4 → 4). Signup disabled, CAPTCHA enforced, SMTP unset.
+
 ## 2026-08-07 — Slice 2H.3: the limiter, and the two lines of the value sheet that were hard (1 migration)
 
 **`202608070081` — the slice's whole allocation. Budget: 5 allocated · 3 spent · 2 remaining.**
