@@ -1950,7 +1950,15 @@ restore drill executed · **Phase 2I not started.**
 **44 requirements declared · 44 delivered and cited · 0 partial · 0 undelivered.**
 Budget **5 allocated · 5 spent · 0 remaining**, each by its allocated slice.
 **Hosted parity `202608070083`, 83 migrations, local = remote.**
-PRs **#112–#125**, every merge SHA green ×3 per job, every branch preserved.
+PRs **#112–#125**, every merge SHA green ×3 per job **except `4a7e9bd`**, which
+was verified green **×1** on explicit owner instruction after its first run came
+back green on all three jobs. Every branch preserved.
+
+**The exception is written down rather than rounded off**, and a successor should
+read the reason as much as the fact: this phase found a test that failed roughly
+**one run in three**, and one run catches such a flake ~33% of the time against
+~70% for three. The closeout PR changes no product code, so the exposure is
+bounded — but the number in a record must be the number that happened.
 
 | Slice | Merge SHA | Migration |
 | --- | --- | --- |
