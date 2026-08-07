@@ -449,6 +449,16 @@ begin
     insert into public.account_deletion_attempts (user_id) values (p_user);
   exception when others then failures := failures || ('account_deletion_attempts: ' || sqlerrm); end;
 
+  -- 2H.2's error sink. Inserted directly rather than through
+  -- `record_error_event`, because that function attributes the row to
+  -- `auth.uid()` and this populator runs without a session -- the row would
+  -- land unowned and the drill would then report the table as empty for an
+  -- account that is supposed to be row-complete.
+  begin
+    insert into public.error_events (surface, operation, reason, correlation_id, user_id)
+    values ('server_action', 'capture_entry', 'provider_error', gen_random_uuid(), p_user);
+  exception when others then failures := failures || ('error_events: ' || sqlerrm); end;
+
   return array_to_string(failures, ' | ');
 end;
 $populate$;

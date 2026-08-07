@@ -187,6 +187,8 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
     "SH.4 consent record written only by the account itself through record_policy_acceptance; no Phase 2F proof writes it; cascades at 202608040074:74",
   account_deletion_attempts:
     "2H.1 recovery state seeded by the lifecycle trigger only while an account is deleting, and unreadable by service_role by design, so this sweep could not count it even if it wanted to; cascades at 202608070079:57",
+  error_events:
+    "2H.2 error sink. Owner-scoped only incidentally -- user_id is nullable and records who was affected, never who is at fault -- and unreadable by service_role, so this sweep cannot count it; cascades at 202608070080:59",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */

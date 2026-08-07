@@ -50,8 +50,9 @@ const REPO = resolve(__dirname, "../../..");
  * Phase 2G spent its single migration on `202608060078`. Phase 2H's budget is
  * **five**, allocated per slice and not transferable between them (ADR-085,
  * `PHASE_2H_IMPLEMENTATION_PLAN.md` §1), and it is tracked here as it is spent:
- * 2H.1 by one (`202608070079`, the stalled-deletion recovery mechanism) —
- * **one of five**.
+ * 2H.1 by one (`202608070079`, the stalled-deletion recovery mechanism) and
+ * 2H.2 by one (`202608070080`, the error sink and the cron dead-man switch) —
+ * **two of five**.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -59,7 +60,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608070079";
+const AUTHORIZED_MIGRATION_HEAD = "202608070080";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
