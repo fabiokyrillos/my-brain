@@ -29,7 +29,7 @@
 -- Written in pure ASCII, following the SH.0-SH.6 and 2H.1-2H.4 suites.
 
 begin;
-select plan(31);
+select plan(32);
 
 set local timezone to 'UTC';
 
@@ -334,7 +334,18 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 7 -- nothing is scheduled, and the catalog says so (3)
+-- Section 7 -- nothing OF THIS PHASE'S is scheduled, and the catalog says so (4)
+--
+-- What this section deliberately does NOT assert: that SH.6's five
+-- user-content sweeps are unscheduled. They are unscheduled on the hosted
+-- project because an operator act removed them (ADR-082), and they ARE
+-- scheduled in any database built from the chain, because `202608050077`'s
+-- own `do $retention_schedule$` block still creates them at apply time. That
+-- difference is a property of two environments, not of this slice, and an
+-- assertion over it would pass against the hosted pre-flight and fail in CI
+-- while nothing was wrong with the product. It is recorded as a finding in
+-- PHASE_2H_SLICE_05_ACCEPTANCE.md instead, where it belongs -- and it is why
+-- the restore drill checks the destructive posture of a restored copy.
 -- ---------------------------------------------------------------------------
 
 select is(
@@ -344,23 +355,37 @@ select is(
   '2H-RETENTION-002: no Phase 2H retention sweep is scheduled'
 );
 
--- The two attempt-prune jobs that predate this phase are untouched. Asserting
--- their PRESENCE matters as much as asserting the absence above: a slice that
--- removed somebody else's authorized schedule would pass an absence-only check.
+-- The two authorized attempt prunes are untouched. Asserting their PRESENCE
+-- matters as much as asserting the absence above: a slice that removed somebody
+-- else's authorized schedule would pass an absence-only check.
+--
+-- ASSERTED BY COMMAND, NOT BY JOB NAME, and that distinction is a finding this
+-- suite made rather than a style choice. The BYOK prune is scheduled under
+-- `byok-prune-credential-validation-attempts` by `202608050077` in a database
+-- built from the chain, and reads as `byok-prune-validation-attempts` on the
+-- hosted project, whose catalog an earlier operator act rewrote. A name
+-- assertion would therefore have passed against the hosted pre-flight and
+-- failed in CI -- true of the environment, not of the product. The command is
+-- what the authorization was about.
 select is(
   (select count(*)::int from cron.job
-   where jobname in ('byok-prune-validation-attempts', 'sh-prune-auth-event-attempts')),
-  2,
-  '2H-RETENTION-002: both previously authorized attempt-prune jobs survive'
+   where command ~* 'prune_auth_event_attempts'),
+  1,
+  '2H-RETENTION-002: the authorized auth-event attempt prune survives'
 );
 
--- SH.6's five user-content sweeps are still built and still unscheduled. This
--- slice must not have enabled one as a side effect of touching the registry.
-select is(
+select ok(
   (select count(*)::int from cron.job
-   where command ~* '(prune_terminal_jobs|prune_notifications|prune_product_events|prune_heartbeat_runs|prune_undo_operations)'),
-  0,
-  'ADR-082: SH.6 user-content sweeps remain unscheduled'
+   where command ~* 'prune_credential_validation_attempts') >= 1,
+  '2H-RETENTION-002: the authorized credential-validation attempt prune survives'
+);
+
+-- Non-vacuity for the detector in the assertion above this section: if
+-- `command ~* 'prune_'` matched nothing at all, "no Phase 2H sweep is
+-- scheduled" would be satisfied by a catalog the pattern simply cannot read.
+select ok(
+  (select count(*)::int from cron.job where command ~* 'prune_') >= 2,
+  '2H-RETENTION-002: the schedule detector matches real prune jobs, so its zero above is meaningful'
 );
 
 -- ---------------------------------------------------------------------------

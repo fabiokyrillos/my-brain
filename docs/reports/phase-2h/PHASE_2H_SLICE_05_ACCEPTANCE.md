@@ -213,6 +213,46 @@ comment-stripper that ate the whole file cannot read as "no findings".
 
 **Sixth "suspect the probe before the product" of the phase.**
 
+### F-2H.5-7 — `202608050077` still schedules five user-content sweeps at apply time
+
+**Severity: high, latent. Destination: `docs/TODO.md` + the restore drill's
+check 4. Not fixed here — migrations are append-only and the budget is spent.**
+
+Found because two of this suite's assertions were about the **environment**
+rather than the product, and would have passed the hosted pre-flight and failed
+in CI. Chasing why exposed something larger.
+
+SH.6's migration ends with a `do $retention_schedule$` block that calls
+`cron.schedule` for **seven** jobs, five of them the user-content sweeps. Those
+five were removed from the **hosted project** the same day by
+`scripts/sh6-retention-schedule.mjs` (ADR-082) — but the migration was not, and
+could not be, edited afterwards. So:
+
+- the **hosted** project has 5 cron jobs and no user-content sweep scheduled;
+- **any database built from the chain** — CI's `db reset`, a restored disposable
+  project, a future environment — schedules all five, and they begin deleting
+  user content at 04:11 UTC the next morning.
+
+**This is exactly the failure ADR-082 was written about, still live in the
+chain**, reachable by anyone who stands up a new environment. It is also why
+`phase-2h-restore-drill.mjs`'s check 4 asserts the destructive posture of the
+restored copy: a drill following the documented procedure **would fail that
+check**, correctly, and the operator would learn about the five schedules before
+they ran rather than afterwards.
+
+**Not fixable by this slice.** Migrations are append-only, so the schedule block
+cannot be removed from `202608050077`; unscheduling them would take a **sixth**
+Phase 2H migration, and the budget is five, non-transferable. Recorded with a
+destination rather than silently absorbed.
+
+**The suite's own repair:** the two environment-dependent assertions were
+replaced with environment-independent ones — the authorized attempt prunes are
+now asserted **by command rather than by job name** (the BYOK prune is
+`byok-prune-credential-validation-attempts` in a chain-built database and
+`byok-prune-validation-attempts` on hosted), and a non-vacuity control proves
+the `prune_` detector matches real jobs, so the zero in *"no Phase 2H sweep is
+scheduled"* means something.
+
 ### F-2H.5-6 — The migration managed its own transaction, and the pre-flight hid it
 
 **Severity: high (would have been silent). Fixed in this slice, before merge.**
