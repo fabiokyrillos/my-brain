@@ -65,9 +65,24 @@ create table public.error_events (
 
   -- Nullable: a failure before sign-in, in a scheduled job, or in an anonymous
   -- route handler has no owner, and inventing one would be worse than leaving
-  -- it null. Cascades, so a deleted account's failures go with it -- which is
-  -- also what keeps `account_owned_row_counts` able to certify zero residue.
-  user_id uuid references auth.users(id) on delete cascade,
+  -- it null.
+  --
+  -- `ON DELETE SET NULL`, NOT cascade, and the difference matters twice.
+  --
+  -- Correctness first: an append-only table whose rows cascade cannot coexist
+  -- with a trigger that refuses DELETE, because the cascade IS a delete. The
+  -- SH.0 drill caught exactly that -- `deleting a ROW-COMPLETE account is not
+  -- blocked by any owned row` failed, which in production would have meant no
+  -- account could be deleted at all. A sink built to record failures would have
+  -- caused the most serious one in the product.
+  --
+  -- Design second, and it is the better answer rather than a consolation: the
+  -- row carries no user content, so de-identifying it preserves the operational
+  -- record without preserving the person. `account_deletion_log` set that
+  -- precedent deliberately. `account_owned_row_counts` counts rows WHERE
+  -- user_id = the owner, so a nulled row is not residue -- zero-residue still
+  -- holds, and it now holds without discarding evidence of what failed.
+  user_id uuid references auth.users(id) on delete set null,
 
   created_at timestamptz not null default now(),
 
@@ -189,6 +204,10 @@ comment on function public.record_error_event(text, text, text, uuid) is
 -- platform default returning) would silently make the sink mutable. A trigger
 -- refuses regardless of who holds what.
 
+-- One mutation is permitted, and exactly one: the foreign key's own
+-- `ON DELETE SET NULL` de-identifying a row when its account is deleted. Every
+-- field is compared, so the exemption cannot be used to change anything else
+-- while nulling the owner -- "de-identify" is enforced rather than trusted.
 create or replace function private.refuse_error_event_mutation()
 returns trigger
 language plpgsql
@@ -196,6 +215,19 @@ security definer
 set search_path = ''
 as $$
 begin
+  if old.user_id is not null
+    and new.user_id is null
+    and new.id is not distinct from old.id
+    and new.occurred_at is not distinct from old.occurred_at
+    and new.surface is not distinct from old.surface
+    and new.operation is not distinct from old.operation
+    and new.reason is not distinct from old.reason
+    and new.correlation_id is not distinct from old.correlation_id
+    and new.created_at is not distinct from old.created_at
+  then
+    return new;
+  end if;
+
   raise exception 'error_events is append-only'
     using errcode = 'P0001', detail = 'ERROR_SINK_APPEND_ONLY';
 end;

@@ -74,13 +74,25 @@ Three chain guards were updated **before** the first push this time, having lear
 
 `error-sink.ts` does **not** carry `import "server-only"`, unlike nearly everything else in `src/lib` that touches the database. The reasoning is in the module header: it holds no credential, constructs no client and reads no environment variable — the caller passes the client in. What the guard would cost is the only assertion T-2H-07 actually asks for, because Vitest runs under `jsdom` where `server-only` throws at import, so every module carrying it is tested by *reading its source* rather than by *running it*. The claim "a provider message never leaves the process" is not provable by reading. If a reviewer disagrees, the alternative is a second Vitest project with a node environment, which is a larger change than this slice should make on its own.
 
-## 9. What this slice did NOT do
+## 9. A real defect, caught by a guard that predates this phase
+
+The first CI run failed the SH.0 cascade drill on seven assertions, and the finding was serious: **an append-only table whose rows `CASCADE` cannot coexist with a trigger that refuses `DELETE`, because the cascade IS a delete.** `error_events.user_id` was declared `ON DELETE CASCADE`, so deleting an `auth.users` row hit `error_events_refuse_delete` and the whole deletion was refused. In production that means **no account could be deleted at all** — a sink built to record failures causing the most serious failure in the product, and doing it in the exact area this phase exists to protect.
+
+Two things are worth saying about it rather than just fixing it quietly.
+
+**The drill caught it, not review.** SH.0's `deleting a ROW-COMPLETE account is not blocked by any owned row` exists because the cascade had never been executed against a fully populated account. It has now earned its cost twice.
+
+**The fix is better than the original, not a workaround.** `ON DELETE SET NULL` de-identifies the row instead of destroying it. The row carries no user content — surface, operation, reason, two timestamps and a correlation id — so keeping it preserves the operational record without preserving the person, which is the precedent `account_deletion_log` set deliberately. Zero-residue still holds, because `account_owned_row_counts` counts rows `WHERE user_id = the owner` and a nulled row is not one. The append-only trigger now permits exactly one mutation — user_id going from non-null to null with **every other field compared unchanged** — so "de-identify" is enforced rather than trusted, and pgTAP §6 proves an update that tries to null the owner *and* change the reason is still refused.
+
+Two smaller CI findings, both mine: an assertion compared `last_useful_at < last_success_at` inside a single pgTAP transaction, where `now()` is frozen and both are the same instant — replaced with a version that pins the useful timestamp to a fixed past value, so the claim is exact without depending on the clock. And the `anon`-grant census named two functions; `record_error_event` is a third, which the census correctly refused until the decision was written down beside it.
+
+## 10. What this slice did NOT do
 
 - **No consumer exists yet.** `2H-SINK-005` and `2H-DEADMAN-004` are 2H.4's, by the plan. Until then the sink is a producer with no reader, which is the ADR-084 shape — recorded here as a **known, scheduled** gap rather than left for the closeout to discover.
 - **No scheduled job reports yet.** `record_scheduled_job_run` exists and nothing calls it, so every job classifies `never_reported` until the callers land. That is the honest state and the classification says so rather than reading `current`.
 - **Nothing is scheduled.** Neither sweep is on `pg_cron`, and neither is executable by any role.
 - No hosted configuration changed, no purge ran, signup stays closed, SMTP stays unconfigured, `process-jobs` untouched, and `delete-account`'s reap door remains undeployed from 2H.1.
 
-## 10. Deployment record
+## 11. Deployment record
 
 *(Filled after exact merge-SHA CI green ×3.)*

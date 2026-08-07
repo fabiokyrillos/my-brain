@@ -124,7 +124,23 @@ select is(
 -- these two functions are its only path, and a claimed slot sends no mail,
 -- creates no account and authenticates nobody.
 --
--- A third name appearing here without an ADR is a finding.
+-- A third name appearing here without a recorded decision is a finding. One has
+-- appeared, and this is the record.
+--
+-- 2H.2 (`202608070080`) grants `record_error_event` to `anon` on ADR-080's
+-- reasoning applied to a second case: the failures most worth recording -- a
+-- route handler refusing a malformed request, a sign-in that could not reach
+-- the provider -- happen before a session exists, and the alternative is the
+-- same one ADR-080 declined, a service-role client in the Next.js runtime.
+--
+-- What keeps THIS one bounded is different from the throttle's pepper, and
+-- narrower: every argument the function accepts must already be a member of a
+-- closed CHECK vocabulary, so the only thing an anonymous caller can write is a
+-- row made entirely of values this schema already declares. It takes no owner
+-- parameter, so a caller cannot attribute a failure to another account. And the
+-- table has no free-text column at all, so there is nothing to inject into. The
+-- worst an abusive caller achieves is volume, which the unscheduled retention
+-- sweep bounds and `2H-OPS-001`'s volume-by-class read makes visible.
 select is(
   (
     select coalesce(string_agg(distinct proc.proname, ', ' order by proc.proname), '')
@@ -135,8 +151,8 @@ select is(
     where namespace.nspname = 'public'
       and acl.grantee = 'anon'::regrole::oid
   ),
-  'claim_auth_event_slot, finalize_auth_event_attempt',
-  'exactly the two pre-session throttle RPCs carry an explicit anon grant -- offenders are named'
+  'claim_auth_event_slot, finalize_auth_event_attempt, record_error_event',
+  'exactly the two pre-session throttle RPCs and the error sink''s writer carry an explicit anon grant -- offenders are named'
 );
 
 -- ---------------------------------------------------------------------------

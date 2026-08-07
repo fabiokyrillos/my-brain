@@ -14,7 +14,7 @@
 -- Written in pure ASCII, following the SH.0-SH.6 and 2H.1 suites.
 
 begin;
-select plan(48);
+select plan(52);
 
 set local timezone to 'UTC';
 
@@ -269,6 +269,33 @@ select is(
   'both refusals left the sink exactly as it was'
 );
 
+-- The one permitted mutation, and the proof it cannot be used for anything else.
+-- This exists because the SH.0 cascade drill caught the first version: an
+-- append-only table whose rows CASCADE cannot coexist with a trigger refusing
+-- DELETE, and the result was that no account could be deleted at all -- a sink
+-- built to record failures causing the most serious one in the product.
+select throws_ok(
+  $$update public.error_events set user_id = null, reason = 'timeout'
+     where user_id is not null$$,
+  'P0001',
+  'error_events is append-only',
+  'the de-identification exemption cannot be used to change anything else at the same time'
+);
+
+delete from auth.users where id = 'e2000001-0000-4000-8000-000000000001';
+
+select is(
+  (select count(*)::int from public.error_events where user_id is not null),
+  0,
+  'deleting the account de-identifies its sink rows rather than being blocked by them'
+);
+
+select is(
+  (select count(*)::int from public.error_events),
+  2,
+  'and the de-identified rows SURVIVE: the record of what failed is not user content, and zero-residue holds because account_owned_row_counts asks WHERE user_id = the owner'
+);
+
 -- ---------------------------------------------------------------------------
 -- Section 7 -- retention: built, bounded, executable by nobody, unscheduled (7)
 -- ---------------------------------------------------------------------------
@@ -367,10 +394,29 @@ select is(
   '2H-DEADMAN-001: successes and useful runs are counted SEPARATELY -- a tick that achieved nothing cannot masquerade as work'
 );
 
-select ok(
-  (select last_useful_at < last_success_at
+-- The property is "an empty run does not move `last_useful_at`", and inside one
+-- pgTAP transaction `now()` is frozen, so comparing the two timestamps proves
+-- nothing -- both are the same instant and the first version of this assertion
+-- failed for that reason rather than because the mechanism was wrong. Pinning
+-- the useful timestamp to a fixed past value first makes the claim exact
+-- without depending on the clock moving.
+update public.scheduled_job_health
+set last_useful_at = timestamptz '2026-01-01 00:00:00+00'
+where job_name = 'my-brain-job-reaper';
+
+select public.record_scheduled_job_run('my-brain-job-reaper', false);
+
+select is(
+  (select last_useful_at from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+  timestamptz '2026-01-01 00:00:00+00',
+  '2H-DEADMAN-001: an empty run leaves the last USEFUL run exactly where it was'
+);
+
+select is(
+  (select last_success_at = now() and consecutive_empty = 2
    from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
-  'the last useful run stays where it was while the last success moves forward'
+  true,
+  'while the last SUCCESS moves forward and the empty streak grows -- the two facts are independent'
 );
 
 -- ---------------------------------------------------------------------------
