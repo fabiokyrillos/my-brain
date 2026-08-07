@@ -1,6 +1,22 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.4 deployed, and the dead-man switch starts reporting
+
+**Merged at `70d26a5` with exact merge-SHA CI green ×3**, read per job. `202608070082` applied; local = remote = `202608070082`, 82 migrations. `process-jobs` **v21 → v22**. **Hosted acceptance 39 of 39.**
+
+**Forty-nine seconds after the deploy, both per-minute jobs were reporting `success_empty`** — succeeding ticks that did no useful work, which is the truth for an idle queue. Had `useful` been derived from "the call returned", both would already read `success_work`, and the 2H.0 census defect would have been rebuilt inside the mechanism built to catch it.
+
+**`my-brain-entry-dispatch` reporting at all is the end-to-end proof of the Edge Function deploy** — the drain reached PostgREST as `service_role` and the guarded RPC accepted it. Nothing in the repository could have shown that.
+
+**The ordering was merge → migrate → deploy, and it is the opposite of 2H.3's.** 2H.3 applied its migration inside the merge window because the auto-deployed application called a function only the migration created. Here no `src/` file calls the new RPCs — asserted by walking the tree — so the merge shipped a behaviourally identical application, and the only new consumer is an Edge Function that does not move with a merge. Reversed, the drain would have got `PGRST202`, logged the code and carried on: a **silently unreported run**, which is the thing this slice exists to remove.
+
+**Three jobs still read `never_reported`, correctly** — the hourly heartbeat and the two 04:xx prunes had not ticked yet. No evidence of a successful run reads as *no evidence*, never as health. `ops:health` exits **1** and names all three, which is the whole interface ADR-089 leaves for alerting, working on its first run.
+
+**A finding: `database.types.ts` had been stale for five migrations** — SH.6's two, 2H.1, 2H.2 and 2H.3. Regenerating added 343 lines, none of them 2H.4's. Nothing broke and nothing could have: not one of those objects has a TypeScript caller, so `tsc` had nothing to disagree with. **That is why nobody noticed** — the same shape as ADR-084, a contract decaying quietly because nothing reads it closely enough.
+
+**Nothing else moved.** Five cron jobs, reaper unarmed (0/2 Vault secrets), every sweep unscheduled, no purge, signup disabled, CAPTCHA enforced, SMTP unset.
+
 ## 2026-08-07 — Slice 2H.4: the operator surfaces, and the consumer 2H.2 deliberately did not build (1 migration)
 
 **`202608070082` — the slice's whole allocation. Budget: 5 allocated · 4 spent · 1 remaining**, the last one 2H.5's and 2H.6 holding none.

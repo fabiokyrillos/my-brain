@@ -39,6 +39,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_attempts: {
+        Row: {
+          attempt_count: number
+          claim_expires_at: string | null
+          claim_token: string | null
+          first_seen_at: string
+          last_attempt_at: string | null
+          last_stop_reason: string | null
+          next_attempt_at: string | null
+          recovery_state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          claim_expires_at?: string | null
+          claim_token?: string | null
+          first_seen_at?: string
+          last_attempt_at?: string | null
+          last_stop_reason?: string | null
+          next_attempt_at?: string | null
+          recovery_state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          claim_expires_at?: string | null
+          claim_token?: string | null
+          first_seen_at?: string
+          last_attempt_at?: string | null
+          last_stop_reason?: string | null
+          next_attempt_at?: string | null
+          recovery_state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       account_deletion_log: {
         Row: {
           account_deleted_at: string | null
@@ -1175,6 +1214,39 @@ export type Database = {
           },
         ]
       }
+      error_events: {
+        Row: {
+          correlation_id: string
+          created_at: string
+          id: string
+          occurred_at: string
+          operation: string
+          reason: string
+          surface: string
+          user_id: string | null
+        }
+        Insert: {
+          correlation_id: string
+          created_at?: string
+          id?: string
+          occurred_at?: string
+          operation: string
+          reason: string
+          surface: string
+          user_id?: string | null
+        }
+        Update: {
+          correlation_id?: string
+          created_at?: string
+          id?: string
+          occurred_at?: string
+          operation?: string
+          reason?: string
+          surface?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       heartbeat_runs: {
         Row: {
           analyzed_items: number
@@ -1931,6 +2003,30 @@ export type Database = {
           },
         ]
       }
+      rate_limit_events: {
+        Row: {
+          bucket: string
+          consumed_at: string
+          id: string
+          outcome: string
+          user_id: string
+        }
+        Insert: {
+          bucket: string
+          consumed_at?: string
+          id?: string
+          outcome: string
+          user_id: string
+        }
+        Update: {
+          bucket?: string
+          consumed_at?: string
+          id?: string
+          outcome?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
           created_at: string
@@ -2004,6 +2100,45 @@ export type Database = {
             referencedColumns: ["user_id", "id"]
           },
         ]
+      }
+      scheduled_job_health: {
+        Row: {
+          consecutive_empty: number
+          failure_count: number
+          job_name: string
+          last_failure_at: string | null
+          last_outcome: string | null
+          last_success_at: string | null
+          last_useful_at: string | null
+          success_count: number
+          updated_at: string
+          useful_count: number
+        }
+        Insert: {
+          consecutive_empty?: number
+          failure_count?: number
+          job_name: string
+          last_failure_at?: string | null
+          last_outcome?: string | null
+          last_success_at?: string | null
+          last_useful_at?: string | null
+          success_count?: number
+          updated_at?: string
+          useful_count?: number
+        }
+        Update: {
+          consecutive_empty?: number
+          failure_count?: number
+          job_name?: string
+          last_failure_at?: string | null
+          last_outcome?: string | null
+          last_success_at?: string | null
+          last_useful_at?: string | null
+          success_count?: number
+          updated_at?: string
+          useful_count?: number
+        }
+        Relationships: []
       }
       summaries: {
         Row: {
@@ -2592,6 +2727,27 @@ export type Database = {
         Args: { p_email: string; p_user_id: string }
         Returns: Json
       }
+      admin_credential_status: { Args: { p_user_id: string }; Returns: string }
+      admin_list_credential_envelopes: {
+        Args: { p_limit: number; p_offset: number }
+        Returns: {
+          ciphertext: string
+          iv: string
+          key_version: number
+          provider: string
+          user_id: string
+        }[]
+      }
+      admin_rewrap_credential_envelope: {
+        Args: {
+          p_ciphertext: string
+          p_expected_key_version: number
+          p_iv: string
+          p_key_version: number
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       apply_reminder_command_v1: {
         Args: {
           p_command: Json
@@ -2680,8 +2836,47 @@ export type Database = {
         Args: { p_lease_seconds: number; p_worker_id: string }
         Returns: Json
       }
+      claim_rate_limit_slot: {
+        Args: { p_bucket: string; p_ceiling: number; p_window: string }
+        Returns: {
+          admitted: boolean
+          refusal: string
+          slot_id: string
+        }[]
+      }
+      claim_rate_limit_slot_for_user: {
+        Args: {
+          p_bucket: string
+          p_ceiling: number
+          p_user_id: string
+          p_window: string
+        }
+        Returns: {
+          admitted: boolean
+          refusal: string
+          slot_id: string
+        }[]
+      }
+      claim_stalled_account_deletions: {
+        Args: {
+          p_backoff_cap: string
+          p_lease: string
+          p_limit: number
+          p_max_attempts: number
+          p_retry_interval: string
+        }
+        Returns: {
+          attempt_count: number
+          claim_token: string
+          user_id: string
+        }[]
+      }
       complete_job: {
         Args: { p_job_id: string; p_result: Json; p_worker_id: string }
+        Returns: Json
+      }
+      confirm_account_deletion_claim: {
+        Args: { p_claim_token: string; p_user_id: string }
         Returns: Json
       }
       confirm_entry_task_candidates: {
@@ -2757,6 +2952,24 @@ export type Database = {
         }
         Returns: Json
       }
+      count_prunable_auth_event_attempts: { Args: never; Returns: number }
+      count_prunable_credential_validation_attempts: {
+        Args: never
+        Returns: number
+      }
+      count_prunable_error_events: {
+        Args: { p_window: string }
+        Returns: number
+      }
+      count_prunable_heartbeat_runs: { Args: never; Returns: number }
+      count_prunable_notifications: { Args: never; Returns: number }
+      count_prunable_product_events: { Args: never; Returns: number }
+      count_prunable_scheduled_job_health: {
+        Args: { p_window: string }
+        Returns: number
+      }
+      count_prunable_terminal_jobs: { Args: never; Returns: number }
+      count_prunable_undo_operations: { Args: never; Returns: number }
       create_task_command: {
         Args: {
           p_action: string
@@ -2944,6 +3157,72 @@ export type Database = {
         Returns: Json
       }
       normalize_entity_alias: { Args: { p_value: string }; Returns: string }
+      operator_account_lifecycle_summary: {
+        Args: never
+        Returns: {
+          account_count: number
+          lifecycle_status: string
+          newest_changed_at: string
+          oldest_changed_at: string
+        }[]
+      }
+      operator_deletion_recovery_summary: {
+        Args: never
+        Returns: {
+          account_count: number
+          max_attempt_count: number
+          next_attempt_due_at: string
+          oldest_first_seen_at: string
+          recovery_state: string
+        }[]
+      }
+      operator_error_event_volume: {
+        Args: { p_window: string }
+        Returns: {
+          event_count: number
+          first_seen_at: string
+          has_owner_count: number
+          last_seen_at: string
+          operation: string
+          reason: string
+          surface: string
+        }[]
+      }
+      operator_job_queue_health: {
+        Args: never
+        Returns: {
+          due_now_count: number
+          expired_lease_count: number
+          job_count: number
+          job_type: string
+          newest_created_at: string
+          oldest_created_at: string
+          status: string
+        }[]
+      }
+      operator_scheduled_job_findings: {
+        Args: { p_window: string }
+        Returns: {
+          finding: string
+          job_name: string
+          last_seen_at: string
+          occurrence_count: number
+        }[]
+      }
+      operator_stalled_deletions: {
+        Args: { p_limit: number }
+        Returns: {
+          attempt_count: number
+          claim_active: boolean
+          first_seen_at: string
+          last_attempt_at: string
+          last_stop_reason: string
+          lifecycle_status: string
+          next_attempt_at: string
+          recovery_state: string
+          user_id: string
+        }[]
+      }
       persist_entry_interpretation: {
         Args: {
           p_entry_id: string
@@ -3004,11 +3283,34 @@ export type Database = {
       }
       prune_auth_event_attempts: { Args: never; Returns: number }
       prune_credential_validation_attempts: { Args: never; Returns: number }
+      prune_error_events: {
+        Args: { p_limit: number; p_window: string }
+        Returns: number
+      }
+      prune_heartbeat_runs: { Args: never; Returns: number }
+      prune_notifications: { Args: never; Returns: number }
+      prune_product_events: { Args: never; Returns: number }
+      prune_scheduled_job_health: {
+        Args: { p_limit: number; p_window: string }
+        Returns: number
+      }
+      prune_terminal_jobs: { Args: never; Returns: number }
+      prune_undo_operations: { Args: never; Returns: number }
       reactivate_account: {
         Args: { p_reason_code: string; p_user_id: string }
         Returns: Json
       }
       reap_expired_jobs: { Args: { p_limit: number }; Returns: Json }
+      reap_stalled_account_deletions: {
+        Args: {
+          p_backoff_cap: string
+          p_lease: string
+          p_limit: number
+          p_max_attempts: number
+          p_retry_interval: string
+        }
+        Returns: Json
+      }
       record_account_deletion: {
         Args: {
           p_account_deleted_at: string
@@ -3024,6 +3326,15 @@ export type Database = {
         }
         Returns: string
       }
+      record_account_deletion_attempt: {
+        Args: {
+          p_claim_token: string
+          p_outcome: string
+          p_stop_reason: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       record_ai_usage: {
         Args: {
           p_cached_input_tokens?: number
@@ -3036,6 +3347,15 @@ export type Database = {
           p_source_id?: string
           p_source_type?: string
           p_user_id?: string
+        }
+        Returns: string
+      }
+      record_error_event: {
+        Args: {
+          p_correlation_id: string
+          p_operation: string
+          p_reason: string
+          p_surface: string
         }
         Returns: string
       }
@@ -3081,6 +3401,14 @@ export type Database = {
           event_id: string
           recorded: boolean
         }[]
+      }
+      record_scheduled_job_failure: {
+        Args: { p_job_name: string }
+        Returns: undefined
+      }
+      record_scheduled_job_run: {
+        Args: { p_did_work: boolean; p_job_name: string }
+        Returns: undefined
       }
       request_account_deletion: { Args: never; Returns: Json }
       request_heartbeat: { Args: never; Returns: Json }
@@ -3142,6 +3470,21 @@ export type Database = {
       save_profile_settings: {
         Args: { p_preferences: Json; p_profile: Json }
         Returns: undefined
+      }
+      scheduled_job_liveness: {
+        Args: { p_staleness_multiple: number }
+        Returns: {
+          active: boolean
+          consecutive_empty: number
+          expected_interval: string
+          job_name: string
+          last_success_at: string
+          last_useful_at: string
+          liveness: string
+          schedule: string
+          seconds_since_success: number
+          staleness_threshold: string
+        }[]
       }
       suspend_account: {
         Args: { p_reason_code: string; p_user_id: string }
