@@ -1,6 +1,20 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.1 deployed: hosted parity `202608070079`, and a control that was exempt from its own mechanism
+
+**Merged at `d7d5091` with exact merge-SHA CI green ×3** (run `31148068318`, read per job rather than from the run's conclusion). `202608070079` applied; `supabase migration list --linked` reports local = remote = `202608070079`, 79 migrations.
+
+**Hosted acceptance: 29 of 30, then 7 of 7.** Everything the migration created is present and closed as designed — `service_role` can neither read nor write the recovery table, no client role can read it, forced RLS carries zero policies, and **`account_deletion_log` is still unreadable by every role**, which is the claim that made 2H-RECOVER-004 worth building the way it was. The cron catalog still holds the same five jobs, neither Vault secret is set, and the reaper reports `{"armed":false,"claimed":0,"dispatched":0}` rather than pretending.
+
+**The one failure was the probe, and it is worth reading.** A control meant to prove the closed stop-reason vocabulary offered free text against a lease token that a previous successful report had already consumed — so the function found no row, returned `attempt_row_absent`, and never reached the constraint at all. It measured a stale token while carrying the vocabulary's name: a control exempt from the mechanism it claims to exercise, which is the failure mode this repository has already paid for once. Re-run against a **live** lease it refuses with `23514` and stores nothing, and a calibration on the same lease proves a declared value is still accepted — so the refusal is the vocabulary rather than a broken function.
+
+**A third control arrived by accident and was kept.** The first probe called the reaper through the Management API, which executes as `postgres`, and got `42501 Service role required`. That is the caller check working, so it is now an assertion: the reaper's PASS cannot be read as "any caller can run it".
+
+**Three CI iterations, each catching something the local suite could not.** The first: the pgTAP file aborted with `Bad plan. You planned 52 tests but ran 0`, because the fixture UUIDs began `2h1` and `h` is not a hex digit — plus three chain guards that all live in files which fail to *load* on the Windows baseline, so CI was the first place they could speak at all. The second: 51 of 52, with a test claiming to check "a cap equal to the retry interval" while passing a 5-minute cap against a 15-minute interval — the refused case wearing the accepted case's description. The third: green.
+
+**Still not done, and named:** the deployed `delete-account` build lacks the reap door, and closing that is a separate recorded deployment operation; the reaper is unarmed; no purge, no retention schedule, signup closed, SMTP unconfigured, `process-jobs` untouched.
+
 ## 2026-08-07 — Slice 2H.1: a stalled account deletion now retries itself, and stops (1 migration)
 
 **The founding defect of this phase has a mechanism.** On 2026-08-04 a revoked grant made every deletion answer `credential_not_erased`, and nothing re-ran the executor for two days. The executor was idempotent and resumable; `re-runnable` was a property with no mechanism behind it. Migration `202608070079` is the mechanism — the slice's entire allocation, leaving the phase at **5 allocated · 1 spent**.

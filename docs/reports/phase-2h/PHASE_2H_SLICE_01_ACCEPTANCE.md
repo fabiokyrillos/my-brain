@@ -106,10 +106,52 @@ Five repository guards fired during this slice and were answered rather than sup
 - **No live stalled deletion was reaped**, because there is none: the hosted `account_lifecycle` holds two accounts, both `active`.
 - No hosted Auth configuration changed. No retention sweep was scheduled. No purge ran. `process-jobs` was not deployed. Phase 2H.2 has not started.
 
-## 11. Hosted deployment and acceptance
+## 11. Deployment record
 
-*(Completed after exact merge-SHA CI green ×3; see §11.)*
+| Step | Result |
+| --- | --- |
+| PR | **#114**, merged 2026-08-07 |
+| PR-head CI | ✅ green ×3 (`application`, `database and journey`, `edge worker`) |
+| Merge SHA | **`d7d5091e7063877b9876da4dcdaf0aa60132d365`** |
+| Merge-SHA CI | ✅ **green ×3**, run `31148068318` — read back per job, not from the run's overall conclusion |
+| Migration applied | `npx supabase db push` — `202608070079_phase_2h_deletion_recovery.sql`, 2026-08-07 |
+| Parity after | `supabase migration list --linked`: local = remote = **`202608070079`**, 79 migrations |
+| Branch | `codex/phase-2h-slice-1` preserved |
 
-## 12. Deployment record
+**Three CI iterations, and what each one caught.** Recorded because the sequence is the evidence that the gates work, and because the local suite could not have produced it. Iteration 1: the pgTAP file aborted with `Bad plan. You planned 52 tests but ran 0` — the fixture UUIDs began `2h1`, and `h` is not a hex digit; three chain guards also fired, all three living in files that fail to *load* on this Windows baseline, so CI was the first place they could speak. Iteration 2: 51 of 52 pgTAP assertions passed; test 19 claimed to check *"a cap equal to the retry interval"* while passing a 5-minute cap against a 15-minute interval — the refused case wearing the accepted case's description, which would only ever have gone green if the validation it bounded had been deleted. Iteration 3: green ×3.
 
-*(Filled by the deployment operation.)*
+## 12. Hosted acceptance — executed against the deployed schema
+
+**29 of 30 checks passed on the first run, plus 7 of 7 on a corrected control.** The failure was in the probe, not the mechanism, and §12.2 is what that cost and what it proved.
+
+### 12.1 What was verified
+
+| Group | Result |
+| --- | --- |
+| Migration parity | head `202608070079`, 79 migrations, local = remote |
+| Objects created | 8 of 8 — one table, six functions, one trigger |
+| Grant posture | `service_role` can neither read nor write the recovery table; no client role can read it; forced RLS with **zero** policies; the operator read is `service_role`-only |
+| **`account_deletion_log` not widened** | still unreadable by `service_role`, `authenticated` and `anon` — the claim that made 2H-RECOVER-004 worth doing this way, re-read against the live schema |
+| Nothing scheduled | the cron catalog still holds exactly the **same 5 jobs**; no `my-brain-deletion-reaper`; **neither Vault secret set** (0 of 2) |
+| The reaper is honest about being unarmed | `{"armed":false,"claimed":0,"dispatched":0}` |
+| Audit | `account_deletion_retry_claimed` and `account_deletion_retry_result`, both `actor=system`, one each |
+| Fixture residue | **zero** — attempts 0, lifecycle 0, auth.users 0 |
+| Destructive posture | signup **disabled**, CAPTCHA **enforced** (turnstile), SMTP **unset**, exactly the **two** pre-authorized prune jobs scheduled |
+
+### 12.2 The controls, including the one that was wrong
+
+A probe whose controls agree with its positives has measured nothing, so the run carries five that must refuse:
+
+1. **A freshly seeded account is not claimed.** 0 claimed against the signed 15-minute threshold — so the claim below is the threshold elapsing, not the predicate being vacuous.
+2. **A lease token confirms nothing for a different account.** `{"confirmed":false}`. This is 2H-RECOVER-003 against the live schema: holding a token is not holding the capability.
+3. **The non-`service_role` path is refused.** The Management API executes as `postgres`, and the reaper answered `42501 Service role required`. This began as an accident — the first probe called it that way and failed — and is kept as an assertion, so the reaper's PASS cannot be read as "any caller can run it".
+4. **An undeclared outcome is refused before any write.** `22023`.
+5. **Free text is refused by the closed stop-reason vocabulary.** `23514`, and the row still reads `last_stop_reason: null` — nothing was stored. **This control failed on the first run and the failure was mine:** it offered free text against a token the previous successful report had already consumed, so the function found no row, returned `attempt_row_absent`, and never reached the constraint. It measured a stale token while claiming to measure the vocabulary — a control exempt from the mechanism it was named after. Re-run against a **live** lease, with a calibration proving the same lease accepts a declared value, so the refusal is the vocabulary and not a broken function: **7 of 7**.
+
+### 12.3 One observation, recorded rather than filed as a defect
+
+`record_account_deletion_attempt` validates its **outcome** vocabulary in the function body (a declared `22023`) but leaves the **stop-reason** vocabulary to the table CHECK, so an undeclared reason surfaces as a raw `23514` rather than a declared error. Nothing invalid is stored either way, and this is the same shape SH.2's `record_account_deletion` already has, so it is consistent rather than novel. Named here so a future reader meeting a `23514` from this path knows it is the vocabulary working and not a schema fault.
+
+### 12.4 What was NOT done in the hosted step
+
+No Edge Function was deployed — `delete-account`'s deployed build still lacks the reap door, and closing that is a separate recorded operation. Nothing was armed: no cron job, neither Vault secret. No hosted Auth configuration was touched. No retention sweep was scheduled and no purge ran. `process-jobs` was not deployed. The two disposable accounts created by the probes were removed and their removal verified by read-back, not assumed.
