@@ -207,6 +207,20 @@ jobs:
       - name: Prove same-key standalone creation with two database sessions
         run: npm run test:local:2e:creation-race
 
+      - name: Prove the deletion reaper claims each stuck account exactly once
+        # 2H-RECOVER-001/003. The pgTAP suite cannot prove this: it runs in one
+        # session and one transaction, so two "concurrent" claims would
+        # serialise and the assertion would agree with itself. This step opens
+        # six real PostgREST connections against eight stuck accounts, each
+        # racer permitted to take all eight, and fails if any account is handed
+        # to two reapers — which would mean two executors deleting one account.
+        #
+        # It creates and removes disposable accounts, and verifies the removal
+        # rather than assuming it. Local stack only, deliberately: a hosted run
+        # would put disposable users in the production auth table to prove a
+        # property that is identical here.
+        run: npm run test:local:2h1:reaper-race
+
       - name: Build the application under test
         run: npm run build
 
