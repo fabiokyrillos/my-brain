@@ -82,17 +82,34 @@ Five repository guards fired during this slice and were answered rather than sup
 | "The migration quietly schedules a purge" | Its own postcondition fails if it did; pgTAP §9 asserts the job's absence |
 | "This claims a working reaper while nothing is deployed" | It does not, and §9 below is where that is stated rather than implied |
 
-## 9. What this slice did NOT do — stated, not implied
+## 9. Threat-model rows this slice must answer
+
+`PHASE_2H_THREAT_MODEL.md` is the per-slice review floor: no slice merges with an unanswered row that touches it. Six rows touch 2H.1.
+
+| # | Answered by | Executed evidence |
+| --- | --- | --- |
+| **T-2H-01** — the reaper becomes a second write path to deletion | The reaper contains no `DELETE`, and the recovery functions hold no table privilege on anything they could delete from | pgTAP §10 reads `prosrc` from `pg_proc` for all five functions; §1 proves `service_role` holds no DML on the recovery table itself |
+| **T-2H-02** — unbounded retry hiding a permanent failure | Ceiling as a required argument, hard-capped at 50 by CHECK; terminal `stalled` | pgTAP §7 drives past the ceiling and asserts it **stops and becomes visible** in the same section |
+| **T-2H-03** — resurrecting a cancelled deletion | The lifecycle trigger removes the recovery row on the way out of `deleting`; the executor re-checks | pgTAP §3 (reverted account loses its row); `reap.test.ts` flips the state **between claim and invoke** and asserts `lifecycle_not_deleting` with nothing deleted |
+| **T-2H-04** — two overlapping reapers invoke for one account | Lease plus `FOR UPDATE ... SKIP LOCKED` | pgTAP §6 for the single-session half; `phase-2h-deletion-reaper-race.mjs` for the real one, with a control and five rejected mutations |
+| **T-2H-11** — the projection leaks `account_deletion_log`'s session hash | An explicit column allowlist, never `select *`, and the log is not read at all | pgTAP §1 proves the base table is unreadable by every role **and** that the projection declares ten arguments none of which match a hash/session/token/credential/content pattern — the column count asserted first, so the pattern check is not satisfied by an empty set |
+| **T-2H-23** — a migration revokes a grant a deployed build depends on | This is the slice's subject. `2H-RECOVER-001` makes the resulting stall self-recovering and `2H-RECOVER-004` makes it visible | pgTAP §7 replays the exact `credential_not_erased` shape to its terminal classification; `reap.test.ts` covers the worker half |
+
+**T-2H-05** (a migration scheduling a destructive sweep) is 2H.5's row, but this slice is subject to the same rule and answers it early: the migration schedules nothing and its own postcondition fails if a future edit adds the reaper's job to it (pgTAP §9).
+
+**T-2H-25** is worth naming here rather than deferring to 2H.5, because this slice creates an instance of it: merging this PR deploys the application to Vercel Production automatically while the `delete-account` Edge Function stays behind. §10 below states that rather than letting the merge read as "shipped".
+
+## 10. What this slice did NOT do — stated, not implied
 
 - **The reap door is not live.** `delete-account`'s deployed build now differs from this repository. Closing that gap is a separate, explicitly recorded deployment operation in the shape ADR-086 established, and it has not been performed by this slice. Until it is, `verify:edge-parity` will report `delete-account` stale, and that report is correct.
 - **The reaper is not armed.** No cron job exists, and neither Vault secret is set. Nothing retries anything on the hosted project today.
 - **No live stalled deletion was reaped**, because there is none: the hosted `account_lifecycle` holds two accounts, both `active`.
 - No hosted Auth configuration changed. No retention sweep was scheduled. No purge ran. `process-jobs` was not deployed. Phase 2H.2 has not started.
 
-## 10. Hosted deployment and acceptance
+## 11. Hosted deployment and acceptance
 
 *(Completed after exact merge-SHA CI green ×3; see §11.)*
 
-## 11. Deployment record
+## 12. Deployment record
 
 *(Filled by the deployment operation.)*
