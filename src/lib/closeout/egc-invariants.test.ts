@@ -182,12 +182,35 @@ function sourceFiles(directory = join(REPO, "src")): string[] {
  * generous window over-reports nothing in practice. Over-reporting would be the
  * safe direction anyway: it fails the exact-set assertion and asks a human.
  */
+/**
+ * Every source file, read **once**.
+ *
+ * `writersOf` is called four times, and it used to redo the whole recursive
+ * `readdirSync`/`statSync` walk plus a `readFileSync` of every `.ts`/`.tsx`
+ * file on each call. On Windows under full-suite parallel load that pushed a
+ * single call past vitest's **5 s default timeout** — one call was measured at
+ * 5242 ms — so the file passed 9/9 in isolation and intermittently failed in a
+ * full run. Exactly the shape of the `project-key-guard.test.ts` flake fixed in
+ * the same session: **the time was going into I/O, not into the property under
+ * test.**
+ *
+ * Memoised lazily rather than at import, so a file that never calls it pays
+ * nothing. This changes no assertion: the same paths, the same contents, the
+ * same regex. ADR-090 makes a flake a defect with an owner, so it is fixed at
+ * its cause instead of being absorbed by a rerun.
+ */
+let sourceCache: ReadonlyArray<{ path: string; source: string }> | null = null;
+
+function sourcesOnce(): ReadonlyArray<{ path: string; source: string }> {
+  sourceCache ??= sourceFiles().map((path) => ({ path, source: readFileSync(path, "utf8") }));
+  return sourceCache;
+}
+
 function writersOf(table: string): string[] {
   const writers = new Set<string>();
   const anchor = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
 
-  for (const path of sourceFiles()) {
-    const source = readFileSync(path, "utf8");
+  for (const { path, source } of sourcesOnce()) {
     for (const match of source.matchAll(anchor)) {
       const window = source.slice(match.index ?? 0, (match.index ?? 0) + 260);
       if (/\.(insert|update|upsert|delete)\s*\(/.test(window)) {

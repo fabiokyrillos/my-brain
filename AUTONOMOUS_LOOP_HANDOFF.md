@@ -2091,3 +2091,124 @@ read after every deploy) · destructive-action authorization, ADR-082's
 fail-closed rate limiting · the fail-closed signup rollout gate. The policy
 changed how many times evidence is collected. It did not change what counts as
 evidence.
+
+## §40 — Post-2H rollout readiness: what shipped, and the three defects it found
+
+**Read §39 first** — it carries the CI policy this work ran under.
+
+**Not Phase 2I.** A bounded post-2H effort. No successor phase is authorized,
+and none was created. A13 remains green.
+
+### Shipped and deployed
+
+`202608070084` (ADR-091) — merged in **PR #127** at `a20505f`, PR-head CI green
+on `50003c2` and **exact-merge-SHA CI green on `a20505f`, attempt 1, all three
+jobs**. Under ADR-090 that is one run each, and the merge-SHA run **preceded the
+deploy** rather than following it — the ordering §39 corrected.
+
+**Hosted parity `202608070084`, local = remote.** Cron catalog byte-identical
+before and after, still exactly five jobs. Edge functions untouched and at
+parity. Rollout gate re-read **25 pass · 3 fail · 2 owner-signature**,
+unchanged.
+
+The deploy's own NOTICE is the idempotency proof, on the live project:
+
+```
+post-2H retention schedule correction: 5 cron jobs before, 5 after,
+five user-content sweeps forbidden and absent
+```
+
+Five before, five after — nothing removed, because the five were already gone
+from hosted; nothing added; **all four postconditions still executed and
+asserted.** The migration's real effect is on databases built from the chain,
+which is why CI's `db reset` is the proof and a hosted readback is not.
+
+### The three defects, and what connects them
+
+**1. The restore drill counted `public.entities`, a table that does not exist.**
+Found by the first census ever taken against the live project (`42P01`). Nothing
+had caught it because **the drill had never been run**, so nothing had ever asked
+the database whether the list was true. Had it run first, check 1 — the only
+check that measures whether the data came back — would have reported a failure
+**on a perfectly good restore**, and a reviewer who accepted one known-noisy
+failure there would have been trained to discount check 1 generally.
+
+**2. A pgTAP fixture borrowed a live catalog entry, and CI caught it.**
+`phase_2h_error_sink_and_deadman.sql` test 46 needed a never-reported job and
+used `sh-prune-notifications` — which existed **only because `202608050077`
+scheduled it.** Its own comment noted the hosted divergence and called it
+"harmless here". It was not: unscheduling the five made the subject vanish and
+the assertion read `NULL`. **The test was right to break — it was measuring the
+environment, not the product.** There was no surviving job to borrow (everything
+else reports since 2H.4, and the BYOK prune's *name* differs by environment), so
+the suite now schedules its own subject, exactly as the T-2H-14 probe fifteen
+lines below it already did.
+
+**3. The defect also made `RG-QUO-3` pass without an authorized purge — and this
+is the worst of the three.** `verify-signup-rollout.mjs` computes
+`retentionSweepsScheduled` as *"all five user-content sweeps are in
+`cron.job`"*. In any chain-built database all five **were** scheduled at apply
+time, so the gate whose entire purpose is to require an **authorized** retention
+activation would have read **PASS** — satisfied by the very defect ADR-082 was
+written about. Hosted never reached that state only because an operator removed
+the five the same day, which means **the gate has been honest by accident rather
+than by construction.** No code change was needed: the gate logic was right; the
+chain was wrong.
+
+**What connects 1 and 2:** *a fixture must not borrow a live catalog entry.*
+Both were probes depending on ambient state they did not own. That is *suspect
+the probe before the product* for the ninth and tenth time in this repository.
+**3 is the mirror image and the more dangerous shape** — there the probe was
+correct and the product was lying to it, which no amount of probe scrutiny would
+have found. It surfaced only from asking *what else references these five
+names?* after the fix.
+
+### Backup: the verdict changed
+
+**A bounded owner-run `pg_dump` satisfies the restore-readiness contract without
+a provider upgrade.** The two classes a paid plan does not cover — Storage
+objects and hosted Auth configuration — are **the same two a dump does not
+cover**, so the upgrade buys convenience, not coverage. That reverses 2H.5's
+recorded "smallest closing action".
+
+Toolchain: `backup:check|census|run|verify|restore-disposable`, 23 guard
+assertions. Encryption default-on; checksum over the **plaintext**, because a
+ciphertext checksum proves the file survived and not the content; a failed dump
+deletes its partials and writes no manifest; the connection string is env-only
+and every error is redacted — **the Supabase CLI's own `db dump --dry-run`
+prints a live `PGPASSWORD` to stdout**, which is how that hazard was found.
+
+Three restore refusals, no override, two proven by execution. The one that
+matters most is the one `--target` cannot make: a *disposable* target alongside
+a *production* connection string passes the ref check. **The writes follow the
+connection string, not the flag.**
+
+### What was deliberately not done, and a successor must not "finish"
+
+- **`SIGNUP_HARDENING_BACKUP_RESTORE.md` was not created.** `RG-DEP-3` passes on
+  that file's mere **existence**. Writing it without a restore would turn the
+  gate green on nothing. It gets written when a restore succeeds.
+- **No alerting destination was invented for `RG-DEP-4`.** ADR-089 holds: an
+  unread alert channel is an *argument* that someone is watching.
+
+Neither owner-signature gate was satisfied on the owner's behalf.
+
+### Two gaps a successor inherits
+
+1. **The rate limiter has no operator read.** 2H.3 built `rate_limit_events`;
+   none of 2H.4's five operator reads covers it. Enforcement is proven,
+   visibility is missing — the ADR-084 shape again, and **the one gap that
+   widens specifically because signup opened.** No migration needed.
+2. **The deployed application exposes no commit identifier over HTTP**
+   (F-2H.5-4, carried).
+
+### Posture, re-read live at close
+
+Hosted parity **`202608070084`**, local = remote · signup **disabled** at both
+layers · CAPTCHA **enforced** · SMTP **unconfigured** (every `smtp_*` null) ·
+exactly **five** cron jobs, none a sweep · `delete-account` v3 and `process-jobs`
+v22 at parity, `heartbeat` undeployed by design · deletion reaper **unarmed**,
+0/2 Vault secrets · **eight sweeps built, zero scheduled** · **no purge has ever
+run** · restore drill **not executed** · rollout gate **25 · 3 · 2**, refusing to
+open signup · **Phase 2I not started**, A13 green · planning-only workspace for
+the next UX initiative at `docs/initiatives/next-experience/`, with **no ADR**.
