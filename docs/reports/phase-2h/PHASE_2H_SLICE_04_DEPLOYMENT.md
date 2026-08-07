@@ -182,3 +182,53 @@ Nothing was created, deleted, scheduled, armed or purged. Every probe is a read;
 the one command that writes anything is the CLI's own `--enable` on the deletion
 reaper, which was not run. No disposable fixture was created, so there is no
 residue to clean up.
+
+---
+
+## 7. The defect the deployment record's own CI run found
+
+**Instrumenting a live scheduled function made every test that used its name
+flaky, and it took three runs to show.**
+
+`202607170019` schedules `my-brain-job-reaper` **every minute**, and that cron
+job is active inside the CI container. 2H.4 made `reap_expired_jobs` write to
+`scheduled_job_health` — so a real tick began **committing** a row under the
+exact key 2H.2's suite used as a ledger fixture. When a minute boundary lands
+inside the suite's ~5-second window, `record_scheduled_job_run` takes its
+`ON CONFLICT DO UPDATE` path against the committed row and the counts are one
+higher: `have: 3/1, want: 2/1`.
+
+**It passed on the slice PR and on the merge SHA, and failed on the docs-only
+PR that followed.** A change that touches nothing pgTAP reads is the clearest
+possible signal that a test is time-dependent rather than input-dependent, and
+that is the only reason it was caught rather than absorbed as noise.
+
+Section 9 was exposed twice over: it *backdates* the same row to prove
+`stale`, which races the same tick.
+
+### The fix, and the rule behind it
+
+**A fixture that shares a key with a live writer is a fixture that will flake.**
+
+* **Section 8** now uses `2h2-ledger-control` — synthetic, no cron entry, no
+  writer. Those assertions are about the ledger's arithmetic; the name was never
+  part of the claim.
+* **Section 9** needs a *real* cron job, because `scheduled_job_liveness` joins
+  the catalog. It uses `my-brain-entry-dispatch`, the one 1-minute job that
+  cannot self-report in CI: its statement posts over HTTP guarded by
+  `where exists (... vault.decrypted_secrets ...)`, and those secrets do not
+  exist there, so it calls no reporter. Same interval, so every 3×/30×
+  threshold is unchanged.
+* **The `never_reported` subject** moved off `my-brain-hourly-heartbeat`, which
+  now reports its own runs and would read `current` for a suite that ran at the
+  top of an hour, onto `sh-prune-notifications`, whose sweep 2H.4 did not
+  instrument — **unreportable by construction rather than unlikely to have
+  reported**.
+
+`phase_2h_operator_surfaces.sql` deliberately keeps asserting against the real
+`my-brain-job-reaper`, because *that* file's subject is the real path. Its
+assertions survive a concurrent tick for a reason now written into the file:
+only `last_outcome` is asserted absolutely, `useful_count` cannot be moved by a
+tick (reaping needs a **committed** expired lease and the fixture lives inside
+the transaction), and once the first call touches the row it holds the lock for
+the rest of the section.
