@@ -154,21 +154,84 @@ remains an owner action, and it is blocked ahead of that by the finding in §8.
 
 ---
 
-## 7. Post-deploy readings
+## 7. Deployment and post-deploy readings
 
-*(Filled after `npx supabase db push --linked`. See §9 for the ordering
-reasoning: this slice is deliberately **not** schema-coupled.)*
+**Merged at `40f2fac` (PR #124), PR-head CI green ×3 on `c77f4a0`** — all three
+jobs on each of the three attempts of run `31202220208`. Branch
+`codex/phase-2h-slice-5` preserved.
+
+**Ordering executed: merge → `npx supabase db push --linked`.** No Edge Function
+was deployed — this slice touches neither, and the runbook's own rule is not to
+redeploy to refresh a timestamp. See §9 for why the ordering was safe.
 
 | Reading | Result |
 | --- | --- |
-| Hosted parity after | `202608070083`, 83 migrations, local = remote |
-| `verify:edge-parity` after | green, unchanged (no function touched) |
-| Cron catalog after | **5 jobs**, identical to before — nothing scheduled |
-| `ops:retention-dry-run` | recorded below |
-| Deletion reaper | **not armed**, 0/2 Vault secrets, no cron job |
-| Signup | **disabled** at both layers |
-| CAPTCHA | **enforced** |
-| SMTP | **unconfigured** |
+| Hosted parity after | **`202608070083`, 83 migrations, local = remote** |
+| `verify:edge-parity` | **fully green** — `delete-account` ok (v3), `process-jobs` ok (v22), `heartbeat` `not deployed, by design` |
+| Cron catalog after | **5 jobs**, byte-identical to before. No Phase 2H sweep scheduled. |
+| Deletion reaper | **NOT armed** — `deletion_reap_url=ABSENT`, `deletion_reap_secret=ABSENT`, no cron job |
+| `disable_signup` | **`true`** |
+| `security_captcha_enabled` / provider | **`true`** / **`turnstile`** |
+| SMTP | **unconfigured** — `smtp_host = null`, `smtp_admin_email = null`, `smtp_pass = null` |
+| `mailer_autoconfirm` | `false` |
+| `rollout:verify` | **25 pass · 3 fail · 2 owner-signature — "SIGNUP MUST NOT OPEN"** |
+| `ops:health` | 5 jobs classified; the two 04:xx prunes `never_reported`, correctly; error sink 1 event, 0 with an owner |
+
+### The count-only transcript — `2H-RETENTION-003`
+
+```
+$ npm run ops:retention-dry-run
+mode    : COUNT ONLY -- every destructive half is executable by no role
+
+error_events          window 90 days (PRD sec. 14.1, signed)   prunable rows: 0
+scheduled_job_health  window 90 days (PRD sec. 14.1, signed)   prunable rows: 0
+rate_limit_events     window 90 days (PRD sec. 14.1, signed)   prunable rows: 0
+
+total prunable across Phase 2H observability classes: 0
+
+Nothing is out of window. No purge is due, and none is authorized either way.
+```
+
+All three twins are reachable by `service_role` on the deployed project, and all
+three destructive halves are reachable by nobody. **Nothing was deleted, and
+`--enable` was not run.**
+
+### One honest gap in the transcript, recorded rather than papered over
+
+The boundary evidence reads **`NOT READABLE (HTTP 403)`** for all three classes,
+and that is *correct behaviour*, not a failure: `error_events`,
+`scheduled_job_health` and `rate_limit_events` all revoke every table privilege
+from every role including `service_role`, so the row-level read the transcript
+uses for SH.6's classes cannot work here. The script reports the third outcome
+rather than collapsing it into "(none in window)", which is exactly what it was
+built to do.
+
+It does mean the transcript proves the *count* but not the *cutoff* for these
+three. With all three counts at zero that is moot today; it would not be on the
+day a count is non-zero. **The two 2H.2 classes have interval-taking twins
+(`count_prunable_error_events(interval)`) already granted to `service_role`**, so
+counting at two windows is available boundary evidence that needs no migration.
+**Destination: slice 2H.6**, which spends no migration and is the convergence
+slice.
+
+### `rollout:verify`, in full
+
+```
+25 pass, 3 fail, 2 owner-signature
+
+FAIL  RG-QUO-3   sweeps built and dry-run recorded, but NOT SCHEDULED — no window is enforced (ADR-082)
+FAIL  RG-DEP-1   production SMTP configured (readback)
+FAIL  RG-DEP-3   backup restored to a disposable project and recorded
+OWNER RG-LEG-4   professional legal review is an owner signature
+OWNER RG-DEP-4   monitoring adequacy is an owner signature
+
+SIGNUP MUST NOT OPEN.
+```
+
+Unchanged from the reading recorded at Signup Hardening's close. `RG-QUO-3`
+failing is the **correct** state: this slice built three more sweeps and
+scheduled none, so "no window is enforced" stays true and the gate stays shut.
+`RG-DEP-3` is blocked by F-2H.5-1 — a drill needs something to restore.
 
 ---
 

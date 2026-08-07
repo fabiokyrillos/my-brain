@@ -96,6 +96,53 @@ async function rpc(name) {
 }
 
 /**
+ * The interval-taking twins 2H.2 built, which `service_role` may run.
+ *
+ * These give **boundary evidence that needs no table read**, and the first live
+ * run of this script is why they are here. All three Phase 2H classes revoke
+ * every table privilege from every role including `service_role`, so the
+ * row-level read below reports `NOT READABLE (HTTP 403)` for each — correctly,
+ * and by design. That proves the count and says nothing about the cutoff.
+ *
+ * Counting at two windows fixes it without touching a row: if the wider window
+ * does not return at least as many rows as the signed one, the predicate is not
+ * time-sensitive in the direction it claims to be, and the count is not
+ * measuring what the transcript says it measures.
+ *
+ * `rate_limit_events` has no interval-taking twin — 2H.5 gave it only the
+ * zero-argument form, and adding one costs a migration the phase's budget no
+ * longer has. Reported as unavailable rather than skipped.
+ */
+const INTERVAL_TWIN = {
+  error_events: "count_prunable_error_events",
+  scheduled_job_health: "count_prunable_scheduled_job_health",
+};
+
+async function widerWindowCount(entry) {
+  const twin = INTERVAL_TWIN[entry.key];
+  if (!twin) return { available: false, reason: "no interval-taking twin exists for this class" };
+  try {
+    const response = await fetch(`${url}/rest/v1/rpc/${twin}`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      // Half the signed window: strictly wider, so it must return at least as
+      // many rows. Equal is fine; fewer is a broken predicate.
+      body: JSON.stringify({ p_window: `${Math.floor(entry.days / 2)} days` }),
+    });
+    if (!response.ok) {
+      return { available: false, reason: `HTTP ${response.status}` };
+    }
+    return { available: true, days: Math.floor(entry.days / 2), count: Number(await response.text()) };
+  } catch (failure) {
+    return { available: false, reason: failure.message };
+  }
+}
+
+/**
  * Timestamps only — no id, no owner, no content.
  *
  * Three outcomes, kept three: readable-with-a-row, readable-and-empty, and
@@ -139,11 +186,21 @@ for (const entry of CLASSES) {
       count === null
         ? { readable: false, reason: "twin unavailable", oldest: null }
         : await boundary(entry, cutoff),
+    wider: count === null ? { available: false, reason: "twin unavailable" } : await widerWindowCount(entry),
     twin: entry.twin,
     sweep: entry.sweep,
     error,
   });
 }
+
+// A wider window must not return FEWER prunable rows than a narrower one. This
+// is the one arithmetic claim the transcript can check about itself, and it is
+// the only boundary evidence available for classes whose tables no role may
+// read. A violation means the predicate is not measuring time the way the
+// window says it does.
+const monotonicity = report.filter(
+  (row) => row.wider?.available && row.prunable !== null && row.wider.count < row.prunable,
+);
 
 if (asJson) {
   console.log(
@@ -166,6 +223,13 @@ if (asJson) {
           : `NOT READABLE (${row.boundary.reason})`
       }`,
     );
+    console.log(
+      `  wider window    : ${
+        row.wider.available
+          ? `${row.wider.count} prunable at ${row.wider.days} days (must be >= ${row.prunable})`
+          : `UNAVAILABLE (${row.wider.reason})`
+      }`,
+    );
     console.log(`  twin            : ${row.twin}`);
     console.log(`  sweep (unscheduled): ${row.sweep}\n`);
   }
@@ -179,4 +243,14 @@ if (asJson) {
   );
 }
 
-process.exit(report.some((row) => row.error) ? 1 : 0);
+if (monotonicity.length > 0) {
+  console.error("\nBOUNDARY VIOLATION — a wider window returned fewer prunable rows:");
+  for (const row of monotonicity) {
+    console.error(
+      `  ${row.class}: ${row.prunable} at ${row.windowDays} days but ${row.wider.count} at ${row.wider.days}`,
+    );
+  }
+  console.error("The predicate is not measuring time the way its window claims.");
+}
+
+process.exit(report.some((row) => row.error) || monotonicity.length > 0 ? 1 : 0);
