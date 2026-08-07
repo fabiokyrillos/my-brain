@@ -1,6 +1,28 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.4: the operator surfaces, and the consumer 2H.2 deliberately did not build (1 migration)
+
+**`202608070082` — the slice's whole allocation. Budget: 5 allocated · 4 spent · 1 remaining**, the last one 2H.5's and 2H.6 holding none.
+
+**This is the half that makes the previous half true.** 2H.2 shipped `error_events` and `scheduled_job_health` with no consumer, on purpose, because claiming the consumer in the slice that built the producer is exactly ADR-084's defect — SH.6's quota refusals recorded nothing for weeks while both halves were internally consistent. Slice 2H.4 is the other half, and until it existed `record_scheduled_job_run` had no caller at all: every job in `scheduled_job_liveness` read `never_reported` forever, which was the honest answer to a question nobody was answering.
+
+**The mechanism had to move out of the guarded RPC, and the reason is worth keeping.** `pg_cron` executes as `postgres`, where `auth.role()` is **null**. The `service_role`-guarded reporter would have refused every in-database scheduled path with `42501` — the same trap the Management API's `/database/query` sets and the reason 2H.1's hosted probes had to move to PostgREST. So the upsert lives in `private.apply_scheduled_job_run`, executable by **no role**, and the public RPC is a thin guarded wrapper over it.
+
+**All five scheduled paths now report their own runs**: `run_all_heartbeats`, `reap_expired_jobs`, both pre-authorized attempt prunes, and the `mode=dispatch` drain in `process-jobs`. `useful` is derived from the path's own result — notifications created, leases recycled, rows pruned, jobs drained — and never from the call having returned. That distinction is the 2H.0 census in one sentence: 29 042 successful cron ticks against four rows of work.
+
+**The drain's failure case had to be given its own field.** A claim error and an empty queue produced the identical summary — `processed: 0` — so a broken queue would have recorded the healthiest outcome the dead-man switch has. `claimFailed` separates *found nothing* from *could not look*, and the failed branch calls `record_scheduled_job_failure`, which exists because 2H.2's CHECK permitted `'failed'` and nothing could write it. **A failure never advances `last_success_at`; the omission is the requirement.**
+
+**Five operator reads, and every one of them declares columns.** A `returns jsonb` operator read is unauditable by construction — it has no columns to census — so `2H-OPS-004` is asserted from `pg_get_function_result` in the deployed catalog rather than from reviewing the migration. None of them touches `account_deletion_log`, the one table holding a session hash, and the sink's consumer returns classification and counts: no id, no correlation id, no owner. A per-row operator read would restore the identifiability the sink's schema exists to exclude.
+
+**`2H-DEADMAN-004`: deployment parity is read beside liveness, in one command.** `npm run ops:health` prints queue depth, expired leases, scheduled-job liveness, the three findings an enumeration of `cron.job` cannot show, Edge Function parity and error-sink volume — and exits non-zero when any of them needs attention. `heartbeat`'s deliberate absence classifies `undeployed_by_design`, which is **not** folded into `ok`: a function that silently stopped being deployed must not be able to hide inside the allowlist's shape.
+
+**`2H-OPS-005`: alerting is defined and deliberately not built** — ADR-089. A destination, a threshold and a receiving owner are all owner decisions, and `RG-DEP-4` is unsigned. Building a notifier against a guessed destination produces an unread channel, which is worse than none: an unread alert channel is an *argument* that someone is watching.
+
+**A probe defect, found before it published anything.** The pgTAP pre-flight spliced the migration into the suite with `String.replace` and a replacement **string** — where `$$` is an escape for a literal `$`, which silently turned every dollar-quoted function body into a syntax error. The suite reported a parse failure rather than a wrong verdict, so this one failed loudly; the general form does not. Suspect the probe before the product, for the fourth time.
+
+**Nothing scheduled, nothing armed, nothing purged.** The migration schedules nothing and asserts that about itself; both pre-authorized prunes keep their DELETE and their predicate byte-identical, because this slice adds the report and nothing else.
+
 ## 2026-08-07 — Slice 2H.3 deployed, and the parity gap this phase was founded on is closed
 
 **Merged at `46f7244` with exact merge-SHA CI green ×3**, read per job. `202608070081` applied; local = remote = `202608070081`, 81 migrations. **Hosted acceptance 28 of 28.**

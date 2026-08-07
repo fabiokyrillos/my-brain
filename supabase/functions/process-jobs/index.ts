@@ -3,7 +3,12 @@ import {
   requireFingerprintPepper,
   requireMasterKey,
 } from "../_shared/byok-envelope.ts";
-import { isSupportedJobType, processClaimedJob, runEntryDispatchDrain } from "./dispatch.ts";
+import {
+  isSupportedJobType,
+  processClaimedJob,
+  reportDispatchRun,
+  runEntryDispatchDrain,
+} from "./dispatch.ts";
 import { readBoundedBody } from "./request-bounds.ts";
 
 const JOB_LEASE_SECONDS = 300;
@@ -74,6 +79,7 @@ Deno.serve(async (request) => {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const summary = await runEntryDispatchDrain(service);
+    await reportDispatchRun(service, summary);
     return Response.json({ ok: true, mode: "dispatch", ...summary });
   }
 
