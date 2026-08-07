@@ -1,6 +1,20 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.2 deployed: hosted parity `202608070080`, and one row that cannot be taken back
+
+**Merged at `88c9e3b` with exact merge-SHA CI green ×3** (run `31158204968`, read per job). `202608070080` applied; local = remote = `202608070080`, 80 migrations. **Hosted acceptance 33 of 33.**
+
+**The defect the SH.0 cascade drill caught is verified fixed on the deployed table.** `error_events`'s owner foreign key reads `confdeltype = 'n'` — `ON DELETE SET NULL`, not `CASCADE`. The first version cascaded, which meant the append-only trigger refused the cascade and **no account could have been deleted at all**. Review missed it; the drill did not.
+
+**Every sentinel is refused against the real schema.** A provider message quoting a user's own words, a filename, an `sk-proj-…` key, a JWT, user content smuggled through the surface column, a path smuggled through the operation column — all six `23514`, none anywhere in storage, with a calibration proving a fully declared failure still records. UPDATE is refused **even for the `postgres` owner**, and DELETE outside the sweep.
+
+**Neither sweep is executable by any role, `service_role` included, and neither is scheduled.** The five cron jobs are unchanged.
+
+**One permanent artifact, and it was a decision.** The calibration row cannot be removed: the sink is append-only and its sweep is executable by nobody, so there is no disposable-fixture story for this table by design. Skipping the calibration would have been worse — six refusals are satisfied equally by a writer that refuses everything, which is a sink that records nothing, the exact defect the slice exists to prevent. The row holds no user content and is a truthful record of an event that happened: the acceptance probe. No sweep was called, **not even through the Management API**, which runs as `postgres` and could have.
+
+**All five jobs read `never_reported`, and that is the correct answer.** Nothing calls the run reporter yet. The classification exists precisely so that "no evidence of a successful run" reads as *no evidence* rather than as health — which is the whole lesson of the 29 042 ticks.
+
 ## 2026-08-07 — Slice 2H.2: the failure that recorded nothing, and the tick that meant nothing (1 migration)
 
 **Two defects, both already paid for, both now structural.** On 2026-08-04 every account deletion failed for two days and **nothing recorded it** — there was no server-side error record at all. And the 2H.0 census read `my-brain-entry-dispatch` at **29 042 successful cron ticks against four rows of work**: `pg_cron` records that the *statement* ran, so any health claim built on tick counts was measuring silence. `202608070080` answers both.

@@ -95,4 +95,43 @@ Two smaller CI findings, both mine: an assertion compared `last_useful_at < last
 
 ## 11. Deployment record
 
-*(Filled after exact merge-SHA CI green ×3.)*
+| Step | Result |
+| --- | --- |
+| PR | **#116**, merged 2026-08-07 |
+| PR-head CI | ✅ green ×3 |
+| Merge SHA | **`88c9e3bc606d70954bf13cfb56bf297c2df64b30`** |
+| Merge-SHA CI | ✅ **green ×3**, run `31158204968` — read per job |
+| Migration applied | `202608070080_phase_2h_error_sink_and_deadman.sql`, 2026-08-07 |
+| Parity after | local = remote = **`202608070080`**, 80 migrations |
+| Branch | `codex/phase-2h-slice-2` preserved |
+
+## 12. Hosted acceptance — **33 of 33**
+
+| Group | Result |
+| --- | --- |
+| Parity | head `202608070080`, 80 migrations, local = remote |
+| Objects | 14 of 14 — two tables, ten functions, two triggers |
+| **No payload column** | 3 text columns, **0** that could hold free text, 3 closed-vocabulary CHECKs — read from the deployed catalog |
+| **The drill's finding, verified live** | the owner FK reads `confdeltype = 'n'` — `ON DELETE SET NULL`, not `CASCADE` |
+| Grants | no role reads either table; no role writes the sink directly; the writer IS reachable by `anon` and `authenticated`; **neither sweep is executable by any role including `service_role`**; liveness is `service_role`-only |
+| Sentinels | all six refused `23514` against the deployed schema, and none appears anywhere in storage |
+| Calibration | a fully declared failure IS recorded — so the six refusals are the vocabulary, not a broken writer |
+| Append-only | UPDATE refused **even for the `postgres` owner**, DELETE refused outside the sweep, and the row survived both |
+| Dead-man | all five real cron jobs enumerated from the catalog, each interval parsed from its own schedule (`1 min`, `1 min`, `1 hour`, `1 day`, `1 day`), every one `never_reported` |
+| Posture | 5 cron jobs unchanged, neither 2H.2 sweep scheduled, signup disabled, CAPTCHA enforced, SMTP unset |
+
+### 12.1 One permanent artifact, decided deliberately
+
+**This run left one row in `error_events` that cannot be removed, and that was a choice rather than an accident.** The table is append-only and its sweep is executable by no role, so — unlike 2H.1's disposable accounts — there is no fixture story here by design.
+
+The alternative was to skip the calibration. That would have been worse: six refusals are satisfied equally well by a writer that refuses *everything*, which is a sink that records nothing — the exact defect this slice exists to prevent. So the probe wrote exactly one row, `server_action` / `other` / `unclassified` with a correlation id and two timestamps. It contains no user content by construction, and it is a truthful record of an event that really happened: this acceptance probe. It will age out if and when retention is enabled by owner action.
+
+No sweep was called — **not even through the Management API**, which executes as `postgres` and therefore could have.
+
+### 12.2 `never_reported` across the board is the honest reading
+
+Every one of the five scheduled jobs classifies `never_reported`, because nothing calls `record_scheduled_job_run` yet. That is the correct answer and not a gap in the switch: the classification exists precisely so that "no evidence of a successful run" reads as *no evidence*, rather than as health. Wiring the callers is downstream work, named in §10.
+
+### 12.3 What was NOT done in the hosted step
+
+No Edge Function deployed; `delete-account`'s reap door remains undeployed from 2H.1. No cron job created. No sweep executed. No hosted Auth configuration touched. No purge. `process-jobs` untouched.
