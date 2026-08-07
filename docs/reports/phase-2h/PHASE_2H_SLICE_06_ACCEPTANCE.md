@@ -173,6 +173,29 @@ SIGNUP MUST NOT OPEN.
 
 ---
 
+## 4b. The merge gate for this slice, and the one place it was relaxed
+
+PR #125's **PR-head CI was green ×3** — three separate runs, all three jobs
+green in each.
+
+The **merge SHA `4a7e9bd` was verified green ×1, not ×3**, on explicit owner
+instruction given after its first run came back green on all three jobs
+(`application`, `database and journey`, `edge worker`).
+
+Recorded rather than rounded off. The owner set the ×3 bar in this phase's
+execution authorization and relaxed it for this single SHA, which is theirs to
+do — but a closeout record that turned one green run into three would be exactly
+the class of falsehood the preceding six slices built mechanisms against, and
+the last document of the phase is the worst possible place to start.
+
+**What the exception costs, so it is legible rather than merely disclosed.**
+This phase found a test that failed roughly **one run in three** (`PHASE_2H_REPORT.md`
+§8, defect 4), caught only because a docs-only PR failed. One run catches such a
+flake ~33% of the time; three catch it ~70%. This PR changes **no product
+code** — a generator, a guard, two operator scripts and documents — so the
+exposure is bounded to those, and the migration chain, the hosted project and
+the deployed application are untouched by it.
+
 ## 5. A13 — Phase 2I remains unstarted — `2H-CLOSE-005`
 
 Re-run at close: **green.** No Phase 2I PRD, no ADR accepting a Phase 2I

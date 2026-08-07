@@ -68,9 +68,24 @@ this is what each family bought.
 
 ## 4. Slices, PRs and merge SHAs
 
-**Every merge SHA below was verified green ×3, per job**, across the three CI
-jobs (`application`, `database and journey`, `edge worker`). Every branch is
-preserved.
+**Every merge SHA below was verified green ×3, per job** — three separate runs,
+each with all three CI jobs (`application`, `database and journey`,
+`edge worker`) green — **with one exception, recorded rather than rounded off.**
+
+**`4a7e9bd` (2H.6, the closeout) was verified green ×1, not ×3, on explicit
+owner instruction** given after its first run came back green on all three jobs.
+The owner set the ×3 bar in this phase's execution authorization and relaxed it
+for this single SHA; the deviation is written here because a record that
+rounded "one green run" up to "three" would be the exact class of falsehood
+this phase spent six slices building mechanisms against.
+
+What ×3 buys, so the cost of the exception is legible: this phase found a test
+that failed roughly **one run in three** (§8, defect 4). One run catches such a
+flake ~33% of the time; three catch it ~70%. The closeout PR changes no product
+code — a generator, a guard, two operator scripts and documents — so the
+exposure is bounded to those.
+
+Every branch is preserved.
 
 | Slice | PR | Merge SHA | Migration |
 | --- | --- | --- | --- |
@@ -87,7 +102,7 @@ preserved.
 | 2H.4 deployment record | #122 | `056e883` | — |
 | handoff §37 addendum | #123 | `285d33e` | — |
 | **2H.5** deploy / retention / backup | #124 | `40f2fac` | `202608070083` |
-| **2H.6** closeout | #125 | *this PR* | — |
+| **2H.6** closeout | #125 | **`4a7e9bd`** — green **×1**, owner-instructed exception | — |
 
 The gate that preceded all of it: `508cf6c` (PR #111), whose three-job green
 ADR-085 made a precondition for the first Phase 2H deployment.
