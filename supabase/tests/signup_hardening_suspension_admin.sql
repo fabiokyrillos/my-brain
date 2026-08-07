@@ -24,7 +24,7 @@
 -- wall-clock race, and no dependence on when CI happens to run.
 
 begin;
-select plan(42);
+select plan(43);
 
 set local timezone to 'UTC';
 
@@ -406,14 +406,22 @@ select is(
 -- SH-SUSPEND-006. `audit_logs` is excluded from the equality and asserted
 -- separately, because the audit trail SHOULD grow: a census that hid it would
 -- be hiding the very proof SH-ADMIN-004 demands.
+--
+-- `rate_limit_events` joins that exclusion in 2H.3, for the same reason and not
+-- as a convenience. It is operational state, not user data: section G's
+-- reactivation claim is a **first** claim, and PRD §14.2 V-5 says a first claim
+-- consumes the owning user's AI slot. A ledger that did not grow there would
+-- mean the drain had stopped being rate limited, so the growth is asserted
+-- below rather than hidden — the same treatment, for the same reason, as the
+-- audit trail beside it.
 
 select is(
   (
     select public.account_owned_row_counts('53000001-0000-4000-8000-000000000001')
-      - 'audit_logs'
+      - 'audit_logs' - 'rate_limit_events'
   ),
-  (select counts - 'audit_logs' from sh3_census_before),
-  'a suspend/reactivate cycle leaves every owned table with identical row counts'
+  (select counts - 'audit_logs' - 'rate_limit_events' from sh3_census_before),
+  'a suspend/reactivate cycle leaves every owned USER-DATA table with identical row counts'
 );
 
 select is(
@@ -423,6 +431,20 @@ select is(
   ),
   3,
   'exactly three audit rows were added: the suspension, the deferral, the reactivation'
+);
+
+-- 2H-RATE-001 / PRD §14.2 V-5, observed from the other side of the phase: the
+-- reactivated owner's first claim consumed exactly one AI slot. One, not two --
+-- section F's two refused claims never reached the limiter, because a job that
+-- the lifecycle predicate skips is never claimed and therefore never admitted.
+select is(
+  (
+    select count(*)::int from public.rate_limit_events
+    where user_id = '53000001-0000-4000-8000-000000000001'
+      and bucket = 'ai' and outcome = 'admitted'
+  ),
+  (select coalesce((counts ->> 'rate_limit_events')::int, 0) + 1 from sh3_census_before),
+  'the reactivated owner''s first claim consumed exactly one AI slot, and the suspended claims consumed none'
 );
 
 -- ---------------------------------------------------------------------------

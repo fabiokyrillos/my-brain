@@ -43,6 +43,7 @@ const eventNames = [
   "task_command_disambiguated",
   "task_command_applied",
   "task_command_undone",
+  "rate_limit_refused",
 ] as const;
 
 const basePayload = {
@@ -105,10 +106,11 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
     undoResult: "undone",
     policyVersion: "2026-07-25.2",
   },
+  rate_limit_refused: { operation: "ai", failureKind: "rate_limited" },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of twenty-six product events", () => {
+  it("defines the complete closed taxonomy of twenty-seven product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",

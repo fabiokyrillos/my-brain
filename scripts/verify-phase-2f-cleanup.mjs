@@ -189,6 +189,8 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
     "2H.1 recovery state seeded by the lifecycle trigger only while an account is deleting, and unreadable by service_role by design, so this sweep could not count it even if it wanted to; cascades at 202608070079:57",
   error_events:
     "2H.2 error sink. Owner-scoped only incidentally -- user_id is nullable and records who was affected, never who is at fault -- and unreadable by service_role, so this sweep cannot count it; cascades at 202608070080:59",
+  rate_limit_events:
+    "2H.3 rate limiter state. Expiring admission decisions written only by consume_rate_limit_slot, unreadable by service_role by design (a role that could read or delete it could mint slots), so this sweep cannot count it; cascades at 202608070081:186",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */

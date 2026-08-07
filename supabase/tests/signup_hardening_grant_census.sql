@@ -206,8 +206,14 @@ select is(
   -- ledger is closed for the mirror reason: it is what the dead-man switch
   -- reads, so a writable `last_success_at` would let a dead job be made to
   -- look alive.
-  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, error_events, product_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
-  'exactly the nine RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  -- `rate_limit_events` joins in 2H.3 (`202608070081`) and is closed to
+  -- `service_role` for the sharpest version of the same reason: a role that
+  -- could DELETE from the limiter state could mint itself unlimited slots, which
+  -- is not a weakened ceiling but an absent one. The worker reaches its
+  -- admission through `claim_rate_limit_slot_for_user`, which decides and
+  -- records rather than handing out table DML.
+  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
+  'exactly the ten RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -341,7 +347,7 @@ select is(
         and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
-  -- Thirty of the forty-nine public base tables deviate from the norm, and
+  -- Thirty-one of the fifty public base tables deviate from the norm, and
   -- every one of them deviates because a named migration said so. The five
   -- shapes, so a reader can check a line against an intent rather than against
   -- a memory:
@@ -349,7 +355,7 @@ select is(
   --   (none)                 RPC-only: no client touches the table at all --
   --                          account_deletion_attempts, account_deletion_log,
   --                          auth_event_attempts, error_events,
-  --                          scheduled_job_health
+  --                          rate_limit_events, scheduled_job_health
   --   SELECT                 read-only to the client: it is written by an RPC,
   --                          a trigger or the platform -- account_lifecycle,
   --                          ai_model_pricing, ai_usage_events,
@@ -397,6 +403,7 @@ select is(
   || E'pending_questions -> SELECT,UPDATE\n'
   || E'policy_acceptances -> INSERT,SELECT\n'
   || E'product_events -> SELECT\n'
+  || E'rate_limit_events -> (none)\n'
   || E'reminders -> INSERT,SELECT\n'
   || E'scheduled_job_health -> (none)\n'
   || E'summaries -> INSERT,SELECT,UPDATE\n'

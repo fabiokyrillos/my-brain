@@ -221,6 +221,21 @@ jobs:
         # property that is identical here.
         run: npm run test:local:2h1:reaper-race
 
+      - name: Prove the rate limiter admits exactly its ceiling under concurrency
+        # 2H-RATE-004. The pgTAP suite proves the ceiling, the rolling window,
+        # the recorded refusal and the fail-closed branch, but it runs in one
+        # session and one transaction — N "concurrent" claims there would
+        # serialise and agree with themselves. This step opens 80 real
+        # connections against a ceiling of 60 through the worker door, and 30
+        # against a ceiling of 20 through real authenticated sessions, and fails
+        # if either admits one more than its signed ceiling.
+        #
+        # It reads the STORED admitted-row count over LOCAL_DB_URL rather than
+        # counting successful replies: the reply proves what the limiter said,
+        # and the requirement is about what it stored. Two disposable accounts
+        # per lane, removed and verified removed.
+        run: npm run test:local:2h3:rate-race
+
       - name: Build the application under test
         run: npm run build
 

@@ -114,6 +114,13 @@ export const productEventNames = [
   "task_command_disambiguated",
   "task_command_applied",
   "task_command_undone",
+  // Phase 2H Slice 2H.3 (2H-RATE-003). Its own event rather than a `failureKind`
+  // folded onto an existing one, because no existing event covers "an operation
+  // was refused before it started" — `capture_save_failed` is about a save that
+  // was attempted, and a rate refusal means nothing was attempted at all.
+  // Migration `202608070081` carries the same literal into the table CHECK and
+  // into `validate_product_event_properties`.
+  "rate_limit_refused",
 ] as const;
 
 export type ProductEventName = (typeof productEventNames)[number];
@@ -190,6 +197,21 @@ export type ProductEventPropertiesByName = {
     processingMode: "initial" | "reprocess";
     durationMs: number;
     failureKind: "retryable" | "terminal";
+  };
+  /**
+   * 2H-RATE-003. `operation` names the bucket exactly as
+   * `rate_limit_events.bucket` names it, so the operator reading the ledger and
+   * the analyst reading the funnel are talking about the same thing.
+   *
+   * `failureKind` is a closed vocabulary of one on purpose. `rate_limited` is
+   * the name of *this* control, and it stays distinct from SH.5's auth throttle,
+   * SH.6's `quota`, the lifecycle refusals, CAPTCHA, storage and provider
+   * failures — a reader must be able to tell which control refused. Widening it
+   * later would mean this event had started reporting a different control.
+   */
+  rate_limit_refused: {
+    operation: "ai" | "upload";
+    failureKind: "rate_limited";
   };
   needs_attention_viewed: { itemCount: number };
   needs_attention_item_opened: {
@@ -401,6 +423,10 @@ function arePropertiesValid<Name extends ProductEventName>(
         && isOneOf(value.processingMode, ["initial", "reprocess"])
         && isBoundedDuration(value.durationMs)
         && isOneOf(value.failureKind, ["retryable", "terminal"]);
+    case "rate_limit_refused":
+      return hasExactKeys(value, ["operation", "failureKind"])
+        && isOneOf(value.operation, ["ai", "upload"])
+        && isOneOf(value.failureKind, ["rate_limited"]);
     case "needs_attention_viewed":
       return hasExactKeys(value, ["itemCount"]) && isBoundedInteger(value.itemCount, 0, 1_000);
     case "needs_attention_item_opened":

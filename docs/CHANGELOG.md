@@ -1,6 +1,66 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.3: the limiter, and the two lines of the value sheet that were hard (1 migration)
+
+**`202608070081` — the slice's whole allocation. Budget: 5 allocated · 3 spent · 2 remaining.**
+
+**It reuses SH.5's limiter rather than inventing a second one** (`2H-RATE-001`).
+Advisory lock keyed on `(bucket, owner)`, the count inside it, the slot reserved
+**by inserting** in the same locked transaction — so when the lock releases the
+row exists and the next caller counts it. The window is rolling
+(`consumed_at > now() - p_window`), never a clock hour: a clock-hour counter
+admits **twice** the ceiling across its boundary, which is why PRD §14.2 V-3
+forbids it.
+
+**The ceilings arrive as required arguments, or as signed rows where a signature
+cannot** (`2H-RATE-002`). The application passes 60 and 20 explicitly, with no
+`default` anywhere in any of the three signatures. The drain claim cannot —
+`claim_entry_interpretation_job`'s argument list can never grow (ADR-057) — so it
+reads `private.rate_limit_parameters`, and `rate-limits-parity.test.ts` pins PRD
+§14.2, the constants and the seed to each other in **both directions**.
+
+**A refusal returns as data, and that is correctness rather than taste**
+(`2H-RATE-003`). PostgREST runs one RPC in one transaction, so a refusal that
+raised would roll back the `refused` row that recorded it — the refusal would
+report itself by destroying its own evidence. Refused rows do not count toward
+the ceiling either, or a refusal storm would extend a lockout past the point the
+real usage expired.
+
+**V-4 and V-5 resolve to one rule: admission happens once, at the first claim.**
+`attempts = 0` is the whole test, and it implements "a user-initiated retry
+consumes, a bounded automatic one does not" without a "was this a human" flag the
+queue does not carry — a reprocess the user asked for enqueues a **new** job. A
+refused drain claim returns `null`, **burns no attempt**, and leaves a recorded
+refused row.
+
+**Two degradations that could each have been wrong.** A rate refusal on a
+best-effort embedding skips the embedding and **keeps the record** — an hourly
+pace ceiling must not stop somebody writing something down. An upload refusal
+lands after every acceptance check and **before the bytes move**, so it leaves no
+Storage object and no metadata row.
+
+**Fail-closed on both halves** (`2H-RATE-005`). The database refuses when its own
+state is unreadable — proved by renaming the column the count reads, with the
+control run *first* at the identical ceiling. The application refuses on a
+transport error, an empty row set, a non-object row, `admitted: "true"`,
+`admitted: 1`, an unknown refusal string, and a client that throws.
+
+**80 racers against 60 and 30 against 20, through both doors, with the stored
+count read from the table.** A reply proves what the limiter said; the
+requirement is what it stored, and `rate_limit_events` is readable by no API
+role. The verdict function is mutation-proved against nine mutations, including
+the one that matters most: a limiter that refuses everybody would otherwise pass
+every other assertion.
+
+**Not a spend control** (`2H-RATE-006`). Five columns, and the migration refuses
+to apply if a cost, price, spend or token column ever appears — a test can be
+deleted, a migration that already ran cannot be un-run.
+
+**The two untouched claim paths are re-declared byte-identical**, because
+SH-WORKER-003 is only checkable while the three live in one file. The guard
+caught the omission; that is the guard working.
+
 ## 2026-08-07 — Slice 2H.2 deployed: hosted parity `202608070080`, and one row that cannot be taken back
 
 **Merged at `88c9e3b` with exact merge-SHA CI green ×3** (run `31158204968`, read per job). `202608070080` applied; local = remote = `202608070080`, 80 migrations. **Hosted acceptance 33 of 33.**

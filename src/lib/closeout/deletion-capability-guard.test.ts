@@ -83,6 +83,11 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
     reason:
       "2H-RECOVER-001: teardown for the eight disposable accounts the concurrency proof creates in the LOCAL stack. It is worth noting what this entry means and what it does not: the reaper itself does not appear on this list, because reap.ts calls executeDeletion rather than deleteUser -- the capability stayed in exactly one place while gaining an automatic caller",
   },
+  "scripts/phase-2h-rate-limit-race.mjs": {
+    class: "operator-script",
+    reason:
+      "2H-RATE-004: teardown for the four disposable accounts the rate-limit concurrency proof creates in the LOCAL stack. The limiter itself holds no deletion capability at all -- rate_limit_events rows leave with the account by cascade, so nothing in 2H.3 needed one",
+  },
 };
 
 /** Scanned roots. `docs/` is excluded: prose may name what code may not do. */
@@ -198,9 +203,10 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
     // whole design claim of 2H-RECOVER-003, asserted here by absence.
     const operatorScripts = byClass("operator-script").map(([file]) => file);
     const recoveryProof = operatorScripts.filter(
-      (file) => file === "scripts/phase-2h-deletion-reaper-race.mjs",
+      (file) => file === "scripts/phase-2h-deletion-reaper-race.mjs"
+        || file === "scripts/phase-2h-rate-limit-race.mjs",
     );
-    expect(recoveryProof).toHaveLength(1);
+    expect(recoveryProof).toHaveLength(2);
     expect(operatorScripts).toHaveLength(14 + recoveryProof.length);
     expect(operatorScripts).not.toContain("supabase/functions/delete-account/reap.ts");
   });

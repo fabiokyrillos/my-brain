@@ -8,6 +8,7 @@ import { buildTaskCommandAppliedProperties } from "@/features/task-commands/anal
 import { TaskCommandApplyError } from "@/features/task-commands/apply";
 import { TaskCandidateQueryError } from "@/features/task-commands/candidates";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
+import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import {
   createTaskCommand,
   issueTaskCommandCreationConfirmation,
@@ -172,7 +173,23 @@ export async function createRecord(
     // as one. A gated user is a normal user; only a real failure reaches the
     // catch below.
     const gate = await openAiGate(supabase, user.id);
-    if (gate.ok) {
+
+    // 2H-RATE-001, and the degradation is the point. This embedding is
+    // best-effort: the memory is created either way. So a rate refusal must
+    // behave exactly like the gate above and like a provider outage — skip the
+    // provider call, keep the record — rather than destroying a non-AI operation
+    // because its optional AI half was over pace. Refusing the whole `createRecord`
+    // here would let an hourly ceiling stop someone writing anything down.
+    const embeddingAdmission = gate.ok
+      ? await admitRateLimitedOperation({
+        client: supabase,
+        bucket: "ai",
+        locale: parsed.data.locale,
+        operation: "embed_text",
+      })
+      : null;
+
+    if (gate.ok && embeddingAdmission?.ok) {
       try {
         const preferencesResult = await supabase.from("agent_preferences").select("embedding_model").eq("user_id", user.id).maybeSingle();
         const preferences = requireSupabaseData(preferencesResult, "load embedding preference");

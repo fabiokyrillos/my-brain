@@ -25,6 +25,9 @@ vi.mock("@/features/product-analytics/server", () => ({
   createProductEventIdempotencyKey: vi.fn(() => "66666666-6666-5666-8666-666666666666"),
   recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),
 }));
+vi.mock("@/features/rate-limits/server", () => ({
+  admitRateLimitedOperation: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("@/lib/jobs/entry-worker", () => ({ kickEntryInterpretationWorker: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
 vi.mock("@/lib/preferences", () => ({

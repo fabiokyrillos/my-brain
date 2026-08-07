@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
 import { getAIProvider } from "@/lib/ai";
+import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import { sendChatMessage } from "./actions";
 
 // The chat slice had no tests at all before the pre-2E hardening pass — not for
@@ -25,6 +26,11 @@ vi.mock("@/lib/byok/gate", () => ({
   gateMessageKey: (reason: string) => (reason === "credential_required" ? "credentialRequired" : "credentialUnreadable"),
 }));
 vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: vi.fn(async () => "Brain") }));
+// 2H-RATE-001. Admitted by default, so the cases below keep testing grounding
+// and localization rather than the ceiling; the refusal case flips it.
+vi.mock("@/features/rate-limits/server", () => ({
+  admitRateLimitedOperation: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
@@ -161,6 +167,30 @@ describe("sendChatMessage localized failures", () => {
       status: "error",
       message: "Sua sessão expirou.",
     });
+  });
+});
+
+describe("2H-RATE-001: the AI ceiling refuses before any provider call", () => {
+  it("reports the refusal in the caller's locale and reaches no network", async () => {
+    // The property that matters is not the sentence, it is the ordering: the
+    // admission sits after the BYOK gate and before `getAIProvider`, so a
+    // refused turn costs the user's key nothing.
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds: [] }) as unknown as Awaited<
+        ReturnType<typeof createClient>
+      >,
+    );
+    vi.mocked(admitRateLimitedOperation).mockResolvedValueOnce({
+      ok: false,
+      refusal: "RATE_LIMIT_AI",
+      message: "Ritmo de uso da IA atingido. …",
+    });
+
+    const result = await sendChatMessage(idleState, form());
+
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("Ritmo de uso da IA atingido");
+    expect(getAIProvider).not.toHaveBeenCalled();
   });
 });
 

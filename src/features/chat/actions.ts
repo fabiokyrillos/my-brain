@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getByokCopy } from "@/features/byok/copy";
+import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
@@ -143,6 +144,20 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         message: getByokCopy(formData.get("locale")).messages[gateMessageKey(gate.reason)],
       };
     }
+
+    // 2H-RATE-001. One turn is one AI operation, admitted once: the embedding
+    // and the answer below are two provider calls serving a single thing the
+    // person asked for, and charging two slots for one question would make the
+    // signed ceiling mean half of what it says. Admission sits after the BYOK
+    // gate so a user who cannot reach a provider at all never spends a slot,
+    // and before the first provider call so a refusal reaches no network.
+    const admission = await admitRateLimitedOperation({
+      client: supabase,
+      bucket: "ai",
+      locale: parsed.data.locale,
+      operation: "chat_answer",
+    });
+    if (!admission.ok) return { status: "error", message: admission.message };
 
     const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
     const preferences = requireSupabaseData(preferencesResult, "load chat preferences");
