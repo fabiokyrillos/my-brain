@@ -121,20 +121,78 @@ describe("2H-OPS-003: the operator CLI cannot mutate", () => {
     }
   });
 
+  /**
+   * The arming doors — the only operator scripts that may write.
+   *
+   * Both schedule a `cron.job`, and scheduling IS authorization (ADR-082), so
+   * each must require an explicit `--enable` and must default to a read. Named
+   * here rather than pattern-matched, because "the scripts allowed to mutate
+   * production" is a list that should have to be edited deliberately.
+   */
+  const ARMING_DOORS = [
+    "scripts/phase-2h-deletion-reaper-schedule.mjs",
+    "scripts/phase-2h-retention-schedule.mjs",
+  ];
+
   it("never issues a DDL or DML statement of its own", () => {
     for (const path of OPERATOR_SCRIPTS) {
       const source = read(path);
-      // The schedule tool is the one operator script that *may* write, and it is
-      // the arming door: it requires --enable and it is the deletion reaper's,
-      // not a health read's. Naming it here keeps the exception explicit.
-      if (path.endsWith("deletion-reaper-schedule.mjs")) {
-        expect(source, "the arming tool must still require an explicit flag").toContain("--enable");
+      if (ARMING_DOORS.includes(path)) {
+        expect(source, `${path} must require an explicit flag`).toContain("--enable");
         continue;
       }
       expect(source, `${path} contains a destructive statement`).not.toMatch(
         /\b(delete\s+from|drop\s+(table|function|schema)|truncate|cron\.schedule|cron\.unschedule)\b/i,
       );
     }
+  });
+
+  it("every arming door exists, defaults to a read, and cannot purge blind", () => {
+    // The allowlist above is an exemption, and an exemption nobody checks is a
+    // hole. Each named door must actually exist and must actually be gated --
+    // otherwise a script could be added to the list to silence the check above.
+    for (const path of ARMING_DOORS) {
+      expect(OPERATOR_SCRIPTS, `${path} is allowlisted but is not an operator script`).toContain(path);
+      const source = read(path);
+      // The default must be a read. Both scripts express it the same way --
+      // a mode derived from the flag, with a non-mutating fallback -- but they
+      // spell the fallback differently (`"read"` / `"status"`), so the check is
+      // on the shape rather than on one script's vocabulary.
+      expect(source, `${path} must derive its mode from --enable`).toMatch(
+        /const mode = process\.argv\.includes\("--enable"\)/,
+      );
+      expect(source, `${path} must have a non-mutating default mode`).toMatch(
+        /:\s*"(read|status)";?$/m,
+      );
+      expect(source, `${path} must say what enabling authorizes`).toMatch(/AUTHORIZ/i);
+      // And the mutation must be reachable only through that mode.
+      expect(source, `${path} must gate its write on the enable mode`).toMatch(
+        /if \(mode === "enable"\)/,
+      );
+    }
+    // And the exemption must stay narrow: no other operator script may write.
+    expect(ARMING_DOORS.length, "the write allowlist has grown").toBe(2);
+  });
+
+  it("the retention arming door refuses to enable without a dry run", () => {
+    // 2H-RETENTION-003. Enabling a purge whose size is unknown is precisely
+    // what the gate exists to prevent, so the dry run runs inside the act.
+    const source = read("scripts/phase-2h-retention-schedule.mjs");
+    expect(source).toContain("phase-2h-retention-dry-run.mjs");
+    expect(source).toMatch(/refusing to enable a purge whose size is unknown/);
+  });
+
+  it("the restore drill refuses production before it reads anything", () => {
+    // 2H-BACKUP-002. The happy path and the catastrophe differ by one
+    // identifier, so the refusal is unconditional and has no override flag.
+    const source = read("scripts/phase-2h-restore-drill.mjs");
+    expect(source).toMatch(/REFUSED: the target is the LINKED PRODUCTION PROJECT/);
+    expect(source).toMatch(/supabase\/\.temp\/project-ref/);
+    expect(source, "the drill must not restore, only verify").not.toMatch(
+      /\b(delete\s+from|drop\s+(table|function|schema)|truncate|cron\.schedule|cron\.unschedule|pg_restore)\b/i,
+    );
+    // No flag may override the refusal.
+    expect(source).not.toMatch(/--force|--yes|--i-know/i);
   });
 });
 

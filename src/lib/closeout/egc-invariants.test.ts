@@ -52,9 +52,11 @@ const REPO = resolve(__dirname, "../../..");
  * `PHASE_2H_IMPLEMENTATION_PLAN.md` §1), and it is tracked here as it is spent:
  * 2H.1 by one (`202608070079`, the stalled-deletion recovery mechanism),
  * 2H.2 by one (`202608070080`, the error sink and the cron dead-man switch),
- * 2H.3 by one (`202608070081`, the distributed rate limiter) and 2H.4 by one
- * (`202608070082`, the operator surfaces and the dead-man wiring) — **four of
- * five**, with 2H.5 holding the last one and 2H.6 holding none.
+ * 2H.3 by one (`202608070081`, the distributed rate limiter), 2H.4 by one
+ * (`202608070082`, the operator surfaces and the dead-man wiring) and 2H.5 by
+ * one (`202608070083`, retention for the classes this phase created) — **all
+ * five of five, and the budget is now spent.** 2H.6 holds none, and a sixth
+ * `phase_2h` migration is an owner amendment rather than a judgement call.
  *
  * The pin is not the whole guard any more, because a moving pin cannot by itself
  * prove EGC added nothing. `EGC_FINAL_HEAD` below keeps that claim mechanical:
@@ -62,7 +64,7 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608070082";
+const AUTHORIZED_MIGRATION_HEAD = "202608070083";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
