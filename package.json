@@ -65,7 +65,10 @@
     "ops:stalled-deletions": "node scripts/phase-2h-stalled-deletions.mjs",
     "ops:deletion-reaper-schedule": "node scripts/phase-2h-deletion-reaper-schedule.mjs",
     "ops:health": "node scripts/phase-2h-operator-health.mjs",
-    "ops:account-health": "node scripts/phase-2h-account-health.mjs"
+    "ops:account-health": "node scripts/phase-2h-account-health.mjs",
+    "ops:retention-dry-run": "node scripts/phase-2h-retention-dry-run.mjs",
+    "ops:retention-schedule": "node scripts/phase-2h-retention-schedule.mjs",
+    "ops:restore-drill": "node scripts/phase-2h-restore-drill.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

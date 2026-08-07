@@ -1,6 +1,34 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.5: the deployment contract, retention, and the backup that does not exist (1 migration — the phase's last)
+
+**`202608070083` is the fifth of five.** The Phase 2H migration budget is spent; 2H.6 holds none, and a sixth is an owner amendment. `AUTHORIZED_MIGRATION_HEAD` moved in the same commit, as the rule requires.
+
+**The retention windows got a home.** 2H.2 shipped sweeps and twins for `error_events` and `scheduled_job_health` with the window as a **required argument and nowhere to live** — which would have put PRD §14.1's signed number in the text of a cron statement, a third place nothing compares to the other two. Three rows now sit in SH.6's `private.retention_windows`, and the 2H.2 sweeps gain a zero-argument form that reads them. **A scheduled statement now carries no number at all.**
+
+**`rate_limit_events` had no sweep, and it is the one class that accumulates for a live user** — one row per admission decision, forever. It gets the full set: one predicate, a count-only twin that counts what the predicate returns, and a sweep that deletes what the predicate returns. There is no second copy of the rule, so the dry run and the deletion cannot disagree, and the migration proves that structural claim by comparing the two answers at apply time.
+
+**No value was minted, and that is the loud part.** §14.1 signs 90 days for the error sink and 90 for dead-man history; both used unchanged. §14.1 does **not** name `rate_limit_events`, so it reuses that signed window rather than inventing a fourth number — a genuinely new, unsigned window would be an owner stop, not a judgement call taken inside DDL. Ninety days is also safe by three orders of magnitude here: the limiter's own window is one **rolling hour**.
+
+**`account_deletion_attempts` gets nothing, and that is the decision.** It cascades from `auth.users`, so a completed deletion removes the rows — and a *stalled* row must survive as long as the account it is stuck on, because it is the only evidence the account is stuck. A window there would delete the finding.
+
+**Nothing is scheduled, and the migration asserts that about itself** against `cron.job`, inside its own transaction — so ADR-082's rule travels with the DDL rather than only with the repository that happened to contain it. Eight sweeps built, **zero scheduled**, no purge ever run.
+
+**31 boundary assertions, run against the real hosted database before the branch was pushed.** `begin; create extension pgtap; <migration>; <suite>; rollback;` — real data, a real `cron.job` catalog — `ran 31 / planned 31, failed 0`, with a readback proving nothing persisted. Every assertion is a *boundary*: two rows one second apart across the cutoff, and the answer must differ. A count alone cannot be told apart from a count produced by a predicate off by a day.
+
+**And the probe's own defect was in how its output was read.** The Management API returns only the **last** result set, so `select * from finish()` returning nothing is identical whether the run was clean or whether the middle is simply invisible. `select _get('failed'), _get('curr_test'), _get('plan')` is the answer that cannot be misread. Fifth *suspect the probe before the product* of the phase.
+
+**The environment and secret contract is now data, checked in both directions.** 27 variables across six surfaces, with `secret` classified **separately from** the surface — because `SUPABASE_URL` legitimately has `NEXT_PUBLIC_SUPABASE_URL` as a declared twin and `SUPABASE_SERVICE_ROLE_KEY` never may. The failure it guards has no error message: Next.js inlines any `NEXT_PUBLIC_*` at build time and the build stays green.
+
+**It found two things immediately.** `.env.example` was missing `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, required by the application — fixed. And the Edge scan matched a variable name inside a **comment** recording the project-wide provider key BYOK removed; the "fix" would have been to re-declare in the contract the very name `project-key-guard.test.ts` exists to forbid, putting it back somewhere findable at 3am. The scan strips comments now, and carries a non-vacuity control so a stripper that ate the whole file cannot read as "no findings".
+
+**Finding, high, owner: there is no operator-restorable backup of this project.** `pitr_enabled: false`, `backups: []`, organization plan **free**. The schema is recoverable from git; **the rows are not**, Storage is uncovered on any plan, and hosted Auth configuration is reconstructable but not restorable. A restore would also arrive without `BYOK_MASTER_KEY`, recovering every credential envelope as unreadable ciphertext — correct design, and a recovery dependency with no backup of its own. This blocks `RG-DEP-3`: a drill needs something to restore.
+
+**The restore drill exists, refuses production, and has not been run.** The production ref is read from the repository's own record and any equal target is refused before a single read, exit 3, **with no override flag** — the happy path and the catastrophe differ by one identifier. It checks four things, because a restore into an empty database satisfies "the restore completed": counts against a pre-drill census, the migration chain head, RLS/grant posture (including a policy count, since forced RLS with zero policies denies everyone and passes a naive check), and that the copy did not arrive with sweeps scheduled.
+
+**A guard fired correctly and the repair widened what it proves.** `2H-OPS-003: the operator CLI cannot mutate` failed on the new scheduling script. The write allowlist is now an explicit two-entry list of *arming doors*, each of which must exist, derive its mode from `--enable`, default to a non-mutating mode, gate its write on that mode, and say what enabling authorizes. An exemption nobody checks is a hole.
+
 ## 2026-08-07 — Slice 2H.4 deployed, and the dead-man switch starts reporting
 
 **Merged at `70d26a5` with exact merge-SHA CI green ×3**, read per job. `202608070082` applied; local = remote = `202608070082`, 82 migrations. `process-jobs` **v21 → v22**. **Hosted acceptance 39 of 39.**
