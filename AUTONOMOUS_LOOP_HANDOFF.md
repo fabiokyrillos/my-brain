@@ -2051,3 +2051,43 @@ started**, A13 green.
 **No successor phase is authorized.** The funnel is empty. ADR-055's semantic
 retrieval deferral **expires 2026-10-27** and is now the nearest dated
 commitment in the repository.
+
+## §39 — The owner retires green ×3. Read this before you reinstate it.
+
+**ADR-090, an owner decision given 2026-08-07**, at the start of the first
+post-2H session. It supersedes the ×3 convention **for all future work**.
+
+| PR kind | Gate |
+| --- | --- |
+| docs / planning only | **one** complete PR-head CI run, all required jobs green + clean full-diff review → merge. **No merge-SHA run.** |
+| code / migration / runtime / deployment-affecting | one complete PR-head run green → review the complete diff → merge → **one** exact merge-SHA run green → *then* deploy / hosted verification |
+
+**Do not re-run an already-green suite to accumulate attempts.** A failure is
+investigated and its actual cause fixed; only what is required is re-run. A
+flake is a **defect with an owner** — diagnosed, fixed or isolated, and
+recorded — never a cost absorbed by repetition. That is the whole substitution
+this policy makes: repetition out, investigation and a real diff review in.
+
+**Why a future session will be tempted to reinstate ×3, and why it must not.**
+Every Phase 2H acceptance document says "green ×3", correctly, about the past —
+`PHASE_2H_SLICE_00…06_ACCEPTANCE.md`, `PHASE_2H_REPORT.md`, the Signup Hardening
+records, `docs/CHANGELOG.md`, and §§33–38 above. **None of those is a policy
+statement.** They are records of runs that happened, and they were deliberately
+not rewritten: a record edited to match a later rule is the falsehood Phase 2H
+built six slices of mechanism against. The **only** forward-looking statements
+of the rule are ADR-090 and `PHASE_2H_DEPLOYMENT_RUNBOOK.md` §9, and §9 now
+carries the old rule struck through beside the new one for exactly this reason.
+
+**The runbook's §9 order also changed**, and the change is substantive rather
+than editorial: the merge-SHA run now precedes the migration push and the Edge
+Function deploys instead of following them. Under ×3 the old order was a
+concession to three sequential runs. With one run required, applying a migration
+to production ahead of the only CI evidence that ever sees the merged tree has
+nothing left to recommend it.
+
+**What did not move.** RLS · grant boundaries · migration parity (local = remote,
+read after every deploy) · destructive-action authorization, ADR-082's
+*scheduling IS authorization* · secret boundaries · account-deletion invariants ·
+fail-closed rate limiting · the fail-closed signup rollout gate. The policy
+changed how many times evidence is collected. It did not change what counts as
+evidence.

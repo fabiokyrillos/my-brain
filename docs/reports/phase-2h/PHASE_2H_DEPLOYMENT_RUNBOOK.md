@@ -459,14 +459,31 @@ work". **There is no name to find.**
 ## 9. The whole sequence, for a slice that touches everything
 
 1. Pre-flight §1 — six reads, all recorded.
-2. Open the PR. Require **PR-head CI green ×3 per job**.
-3. Re-read the full diff.
+2. Open the PR. Require **one complete PR-head CI run, all required jobs
+   green** (ADR-090). ~~green ×3 per job~~ — retired 2026-08-07 by owner
+   decision; struck rather than deleted, because a reader who finds only the
+   new rule cannot tell it replaced something.
+3. Re-read the **complete** diff. This is the gate the repetition used to
+   stand in for, and under ADR-090 it carries more weight, not less.
 4. Merge with explicit authorization.
-5. **Immediately** `npx supabase db push --linked` if the change is
-   schema-coupled (§3). Read parity after.
-6. Deploy each touched Edge Function **by name** (§4). Read versions back.
-7. `npm run verify:edge-parity` — a gate, not a reminder.
-8. Verify the application (§2).
-9. Require **exact merge-SHA CI green ×3 per job**.
+5. Require **one exact merge-SHA CI run green** (ADR-090). **Nothing below this
+   line runs before it.** The merge commit is a tree no CI run has yet seen.
+6. **Then** `npx supabase db push --linked` if the change is schema-coupled
+   (§3). Read parity after.
+7. Deploy each touched Edge Function **by name** (§4). Read versions back.
+8. `npm run verify:edge-parity` — a gate, not a reminder.
+9. Verify the application (§2).
 10. Re-read the cron catalog, the rollout gate, and the destructive posture.
 11. Write the acceptance record with every reading in it.
+
+**On the reordering (2026-08-07).** Steps 5–9 previously deployed first and
+required the merge-SHA run at step 9. ADR-090 fixes the order the other way:
+green merge SHA, *then* deploy. Under ×3 the old order was a pragmatic
+concession to three sequential runs; with one run required, there is no reason
+left to apply a migration to production ahead of the only CI evidence that ever
+sees the merged tree.
+
+**A failure is investigated, not re-run** (ADR-090). Fix the actual cause and
+re-run only what is required. If a test proves flaky, it is diagnosed and fixed
+or isolated and **recorded as a defect** — repeated attempts are not an
+acceptance mechanism.

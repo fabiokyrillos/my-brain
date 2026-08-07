@@ -481,26 +481,41 @@ select is(
   '2H-DEADMAN-002: the multiple is a required argument and it actually decides -- 30x covers ten minutes'
 );
 
--- The never-reported subject is a job whose sweep 2H.4 did NOT instrument, for
--- the same reason section 9's positive subject moved: the hourly heartbeat now
--- reports its own runs, so a suite that happened to run at the top of an hour
--- would find it `current` and this assertion would fail for a reason that has
--- nothing to do with the property. `sh-prune-notifications` calls
--- `prune_notifications`, which reports nothing and cannot, so the subject is
--- unreportable by construction rather than merely unlikely to have reported.
+-- The never-reported subject, and why it is now one this suite OWNS.
 --
--- It is scheduled by `202608050077` and therefore present in the CI catalog. It
--- is NOT scheduled on the hosted project, because ADR-082's cleanup removed
--- those five user-content sweeps the day they were created. That difference is
--- harmless here and worth stating: this suite is a FRESH-DATABASE artifact --
--- section 7 asserts absolute `error_events` counts too -- and pgTAP runs only
--- in CI. Do not read a hosted failure of this file as a defect.
+-- It used to be `sh-prune-notifications`, borrowed from the catalog because
+-- `202608050077` scheduled it and because `prune_notifications` reports
+-- nothing and cannot -- unreportable by construction rather than merely
+-- unlikely to have reported. The retained note said the job was absent on the
+-- hosted project and that the divergence was "harmless here".
+--
+-- IT WAS NOT HARMLESS. `202608070084` (post-2H rollout hardening, ADR-091)
+-- unschedules those five user-content sweeps in the chain itself, because a
+-- database built from the chain would otherwise begin deleting user content at
+-- 04:11 UTC. The moment it did, this assertion read NULL: the subject was gone.
+--
+-- The lesson is the one this repository keeps relearning -- **a fixture must
+-- not borrow a live catalog entry.** The suite depended on a scheduling defect
+-- being present, so fixing the defect broke the test, and the test was right to
+-- break: it was measuring the environment, not the product.
+--
+-- There is no surviving job to borrow, and that is worth stating rather than
+-- discovering later: the hourly heartbeat, the reaper, the dispatch drain and
+-- `sh-prune-auth-event-attempts` all report their own runs since 2H.4, and the
+-- BYOK prune's job NAME differs between a chain-built database and hosted. So
+-- the subject is scheduled here, inside this transaction, exactly as the
+-- T-2H-14 probe below already does -- which also removes the environment
+-- dependence the old note had to apologise for.
+select cron.schedule('my-brain-2h2-never-reported-fixture', '11 4 * * *', 'select 1');
+
 select is(
   (select liveness from public.scheduled_job_liveness(3)
-   where job_name = 'sh-prune-notifications'),
+   where job_name = 'my-brain-2h2-never-reported-fixture'),
   'never_reported',
   'a job in the catalog that has never reported is NEVER_REPORTED -- not healthy, which is the state a silently broken job is in'
 );
+
+select cron.unschedule('my-brain-2h2-never-reported-fixture');
 
 select is(
   (select expected_interval from public.scheduled_job_liveness(3)
