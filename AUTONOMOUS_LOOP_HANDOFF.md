@@ -1844,3 +1844,99 @@ Signup **disabled** at both layers · CAPTCHA **enforced** · SMTP **unconfigure
 · exactly **five** cron jobs · deletion reaper **unarmed**, 0/2 Vault secrets ·
 five user-content sweeps and both 2H.2 sweeps **unscheduled** · **no purge
 authorized or executed** · no restore drill executed · **Phase 2I not started.**
+
+## §37 — 2H.4's addendum: instrumenting a live cron job made three tests flaky
+
+**Amends §36, which was written before this was found.** Nothing about the
+phase's state changed: 2H.4 is closed and deployed, parity is `202608070082`,
+budget is **5 allocated · 4 spent · 1 remaining**.
+
+### The merge SHAs, completed
+
+`70d26a5` (2H.4) and **`056e883`** (2H.4 deployment record), both green ×3 per
+job. PRs #121 and #122. Branches `codex/phase-2h-slice-4` and
+`codex/phase-2h-slice-4-deployment` preserved.
+
+### The finding, which is the most transferable thing in this session
+
+**Migration `202607170019` schedules `my-brain-job-reaper` every minute, and
+that cron job is ACTIVE inside the CI container.** The moment 2H.4 instrumented
+`reap_expired_jobs`, a real tick began **committing** a row into
+`scheduled_job_health` under the exact key 2H.2's pgTAP suite used as a ledger
+fixture. When a minute boundary lands inside the suite's ~5-second window,
+`record_scheduled_job_run` takes its `ON CONFLICT DO UPDATE` path against the
+committed row and the counts come out one higher — `have: 3/1, want: 2/1`.
+Section 9 was exposed twice over, because it *backdates* that row to prove
+`stale` and races the same tick.
+
+**It passed on the slice PR and on the merge SHA, and failed on the docs-only
+PR that followed.** A change that touches nothing pgTAP reads is the clearest
+signal available that a test is **time-dependent rather than input-dependent**,
+and it is the only reason this was caught instead of absorbed as noise. Left
+alone it would have flaked roughly one run in three, forever.
+
+**The rule: a fixture that shares a key with a live writer will flake.**
+
+The fix removes the coupling rather than loosening the assertion:
+
+- **`phase_2h_error_sink_and_deadman.sql` section 8** → `2h2-ledger-control`,
+  synthetic, no cron entry, no writer. Those assertions are about the ledger's
+  arithmetic and the name was never part of the claim.
+- **section 9** needs a *real* cron job, because `scheduled_job_liveness` joins
+  the catalog. It uses **`my-brain-entry-dispatch`** — the one 1-minute job that
+  cannot self-report in CI, because its statement posts over HTTP guarded by
+  `where exists (... vault.decrypted_secrets ...)` and those secrets do not
+  exist there. Same interval, so every 3×/30× threshold is unchanged.
+- **the `never_reported` subject** moved off `my-brain-hourly-heartbeat`, which
+  now reports its own runs, onto **`sh-prune-notifications`**, whose sweep 2H.4
+  did not instrument — *unreportable by construction* rather than merely
+  unlikely to have reported. This was not defensive: the heartbeat reported for
+  the first time at 15:00 UTC that same day, on the deployed project.
+
+**`phase_2h_operator_surfaces.sql` deliberately still asserts against the real
+`my-brain-job-reaper`**, because that file's subject *is* the real path. Why its
+assertions survive a concurrent tick is now written into the file: only
+`last_outcome` is asserted absolutely; `useful_count` cannot be moved by a tick
+because reaping needs a **committed** expired lease and the fixture lives inside
+the transaction; and once the first call touches the row it holds the lock for
+the rest of the section.
+
+**Anyone adding a writer to a scheduled path in 2H.5 or later inherits this.**
+Before instrumenting a function, ask which cron jobs call it and which tests use
+those job names.
+
+### A second finding, smaller and already fixed
+
+**`src/lib/supabase/database.types.ts` had been stale for five migrations** —
+SH.6's two, 2H.1, 2H.2 and 2H.3. Regenerating added 343 lines, **none of them
+2H.4's**. Nothing broke and nothing could have: not one of those objects has a
+TypeScript caller, so `tsc` had nothing to disagree with. That is exactly *why*
+nobody noticed — ADR-084's shape once more. Regenerate it in the same change as
+the schema move; `supabase gen types --linked` reads the hosted schema, so it
+can only be run after the migration is applied.
+
+### Where 2H.5 starts — unchanged from §36, repeated because it is the next act
+
+`2H-DEPLOY-001…007`, `2H-RETENTION-001…004`, `2H-BACKUP-001…002`, **one
+migration**, the phase's last. The groundwork §36 recorded still holds:
+`error_events` and `scheduled_job_health` have sweeps and twins but no row in
+`private.retention_windows`; `rate_limit_events` has no sweep at all and is the
+one class that accumulates for a live user; `account_deletion_attempts` needs
+none because it cascades from `auth.users`; and a window must agree in three
+places — `private.retention_windows`, `RETENTION_DAYS`, and
+`RETENTION_SCHEDULE`, whose `sweepActive` flags stay **false** while nothing is
+scheduled.
+
+**Do not mint a new retention value.** §14.1 signs 90 days for the error sink
+and 90 days for dead-man history; reuse that signed figure for
+`rate_limit_events` and say so loudly. A genuinely new unsigned value is an
+owner stop condition.
+
+### Posture, re-read at the close of this session
+
+Signup **disabled** at both layers · CAPTCHA **enforced** · SMTP
+**unconfigured** · exactly **five** cron jobs · `delete-account` v3 and
+`process-jobs` **v22** both at parity, `heartbeat` undeployed by design ·
+deletion reaper **unarmed**, 0/2 Vault secrets · five user-content sweeps and
+both 2H.2 sweeps **unscheduled** · **no purge authorized or executed** · no
+restore drill executed · **Phase 2I not started.**
