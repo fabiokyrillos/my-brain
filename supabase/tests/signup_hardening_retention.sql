@@ -29,7 +29,7 @@
 -- Written in pure ASCII.
 
 begin;
-select plan(37);
+select plan(38);
 
 set local timezone to 'UTC';
 
@@ -45,14 +45,20 @@ insert into auth.users (
    'sh6-retention@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 -- ---------------------------------------------------------------------------
--- Section 1 -- the windows are the signed schedule (3)
+-- Section 1 -- the windows are the signed schedule (4)
 -- ---------------------------------------------------------------------------
 
 select has_table('private', 'retention_windows', 'the windows table exists');
 
+-- SH.6's own seven, by key and value. This is the claim this file owns: the
+-- signed schedule of plan sec. 7, unchanged by anything that came after it.
 select is(
   (select array_agg(windows.key || '=' || windows.days order by windows.key)
-   from private.retention_windows as windows),
+   from private.retention_windows as windows
+   where windows.key in (
+     'auth_event_attempts', 'credential_validation_attempts', 'heartbeat_runs',
+     'jobs_terminal', 'notifications', 'product_events', 'undo_operations_past_expiry'
+   )),
   array[
     'auth_event_attempts=30',
     'credential_validation_attempts=30',
@@ -63,6 +69,37 @@ select is(
     'undo_operations_past_expiry=30'
   ],
   'plan sec. 7, seeded unchanged'
+);
+
+-- And the registry holds NOTHING ELSE undeclared.
+--
+-- The assertion above used to be a whole-table equality, which meant Phase
+-- 2H.5 seeding three observability windows broke a test whose subject is SH.6.
+-- Splitting it keeps both halves of the original claim and puts each on the
+-- right subject: the seven above are SH.6's and must not move, and the total
+-- set is enumerated here so a window nobody declared still fails.
+--
+-- A future phase that retains a new class MUST edit this line. That is the
+-- point rather than the cost: adding something the database will one day delete
+-- rows for should require touching the list that enumerates what gets deleted.
+select is(
+  (select array_agg(windows.key order by windows.key)
+   from private.retention_windows as windows),
+  array[
+    -- SH.6, plan sec. 7
+    'auth_event_attempts',
+    'credential_validation_attempts',
+    -- Phase 2H.5, PRD sec. 14.1, all three at the signed 90 days
+    'error_events',
+    'heartbeat_runs',
+    'jobs_terminal',
+    'notifications',
+    'product_events',
+    'rate_limit_events',
+    'scheduled_job_health',
+    'undo_operations_past_expiry'
+  ],
+  'the registry holds exactly the declared windows and no undeclared one'
 );
 
 -- A sweep that cannot read its window must delete NOTHING. The quota ceilings

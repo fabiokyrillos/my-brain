@@ -213,6 +213,40 @@ comment-stripper that ate the whole file cannot read as "no findings".
 
 **Sixth "suspect the probe before the product" of the phase.**
 
+### F-2H.5-8 — SH.6's registry assertion was a whole-table equality
+
+**Severity: medium. Fixed in this slice. Found by CI, which is the only place it
+could speak.**
+
+`signup_hardening_retention.sql` test 2 (*"plan sec. 7, seeded unchanged"*)
+compared the **entire** `private.retention_windows` table to SH.6's seven rows.
+Seeding three observability windows broke a test whose subject is SH.6 — and it
+broke only in CI, because the hosted pre-flight had already been run against a
+database where the assertion's own baseline differs.
+
+The assertion carried two claims fused into one: *SH.6's seven have not moved*
+and *nothing undeclared exists*. Both are worth keeping, so it is now two
+assertions on the right subjects — the seven by key and value, and the full key
+set enumerated with each window attributed to the phase that declared it.
+
+A future phase retaining a new class must edit that list. **That is the point
+rather than the cost:** adding something the database will one day delete rows
+for should require touching the list that enumerates what gets deleted.
+
+**Proven in three directions on the hosted project**, because a repaired
+assertion that merely stopped failing would be indistinguishable from a
+weakened one:
+
+| Run | Result |
+| --- | --- |
+| Original suite, **no** migration (control) | 37 ran, **1 failed** — pre-existing, hosted-only |
+| Repaired suite, **no** migration | 38 ran, **2 failed** — the new assertion fails when the windows are absent |
+| Repaired suite **+** migration | 38 ran, **1 failed** — back to the control's baseline |
+
+The one residual failure is **pre-existing and hosted-only**: this suite runs
+live sweeps against real data, so it is environment-dependent in the same way
+the 2H.2 suite is. In CI's fresh database the only failure was test 2.
+
 ### F-2H.5-7 — `202608050077` still schedules five user-content sweeps at apply time
 
 **Severity: high, latent. Destination: `docs/TODO.md` + the restore drill's
