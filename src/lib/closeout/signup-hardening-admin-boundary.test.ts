@@ -70,6 +70,11 @@ const ADMIN_RPC_CALLER_ALLOWLIST: Readonly<Record<string, { class: string; reaso
     class: "generated-types",
     reason: "generated from the schema; naming an RPC is not calling one",
   },
+  "scripts/phase-2h-deletion-reaper-race.mjs": {
+    class: "local-proof",
+    reason:
+      "2H-RECOVER-001's concurrency proof drives eight disposable LOCAL accounts to `deleting` through begin_account_deletion_admin rather than by writing account_lifecycle directly. Using the sanctioned route is the point: it also proves the recovery trigger fires for the operator's path and not only the user's. It reaches no hosted project -- SUPABASE_URL is the CI stack -- so the executable operator CLI below is still exactly one.",
+  },
 };
 
 const ADMIN_RPCS = [

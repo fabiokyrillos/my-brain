@@ -16,10 +16,21 @@
  * attacker could point at somebody else's account (T-01): the over-broad
  * admin endpoint the threat model calls out cannot be built here by accident,
  * because the shape of the input does not admit it.
+ *
+ * ## The reaper's door (2H-RECOVER-001), and why it is a different door
+ *
+ * A stalled deletion has no session, so nothing can present the Bearer token
+ * the door above requires — which is why the 2026-08-04 stall sat for two days
+ * with a resumable executor and no resumer. `reap.ts` is the second door, taken
+ * only when the reap header is present, and it is guarded by a secret absent
+ * from this repository plus a single-use lease the database mints. Read its
+ * header for why a target account id is not sufficient there either. Nothing
+ * below this comment changes for a request that does not carry that header.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { executeDeletion } from "./executor.ts";
+import { handleReapRequest, REAP_SECRET_ENV, REAP_SECRET_HEADER } from "./reap.ts";
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") {
@@ -30,8 +41,24 @@ Deno.serve(async (request) => {
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const service = createClient(url, serviceRole, { auth: { persistSession: false } });
 
-  // The ONLY source of the account being deleted. No body parameter is read
-  // for identity — there is nothing to point elsewhere.
+  // The reaper's door. Branched on the PRESENCE of the header rather than on
+  // its value, so a request that carries a wrong secret is refused here instead
+  // of falling through to the user door and being refused for the wrong reason
+  // — a fallthrough would make a misconfigured reaper look like an auth bug.
+  const presentedReapSecret = request.headers.get(REAP_SECRET_HEADER);
+  if (presentedReapSecret !== null) {
+    const reaped = await handleReapRequest(
+      service,
+      await request.json().catch(() => ({})),
+      presentedReapSecret,
+      Deno.env.get(REAP_SECRET_ENV),
+    );
+    return Response.json(reaped.body, { status: reaped.status });
+  }
+
+  // The ONLY source of the account being deleted for a user-initiated request.
+  // No body parameter is read for identity — there is nothing to point
+  // elsewhere.
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) {
     return Response.json({ error: "Unauthorized", code: "missing_bearer" }, { status: 401 });

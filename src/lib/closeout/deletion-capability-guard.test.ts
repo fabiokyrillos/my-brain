@@ -78,6 +78,11 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
   "scripts/remote-question-reinterpretation-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-question-resolution-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-supabase-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
+  "scripts/phase-2h-deletion-reaper-race.mjs": {
+    class: "operator-script",
+    reason:
+      "2H-RECOVER-001: teardown for the eight disposable accounts the concurrency proof creates in the LOCAL stack. It is worth noting what this entry means and what it does not: the reaper itself does not appear on this list, because reap.ts calls executeDeletion rather than deleteUser -- the capability stayed in exactly one place while gaining an automatic caller",
+  },
 };
 
 /** Scanned roots. `docs/` is excluded: prose may name what code may not do. */
@@ -181,7 +186,23 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
     expect(hotfixVerification).toHaveLength(1);
 
     expect(teardown).toHaveLength(5 + acceptanceJourneys.length + hotfixVerification.length);
-    expect(byClass("operator-script")).toHaveLength(14);
+
+    // The operator scripts split the same way, and for the same reason. Thirteen
+    // pre-date SH.2 and clean up their own fixtures; the fourteenth is 2H.1's
+    // concurrency proof, which creates eight disposable accounts in the LOCAL
+    // stack to prove the reaper claims each exactly once, and removes them.
+    //
+    // What is NOT on this list is the reaper itself. `reap.ts` invokes
+    // `executeDeletion` rather than `deleteUser`, so the capability still has
+    // exactly one home while having gained an automatic caller — which is the
+    // whole design claim of 2H-RECOVER-003, asserted here by absence.
+    const operatorScripts = byClass("operator-script").map(([file]) => file);
+    const recoveryProof = operatorScripts.filter(
+      (file) => file === "scripts/phase-2h-deletion-reaper-race.mjs",
+    );
+    expect(recoveryProof).toHaveLength(1);
+    expect(operatorScripts).toHaveLength(14 + recoveryProof.length);
+    expect(operatorScripts).not.toContain("supabase/functions/delete-account/reap.ts");
   });
 
   it("the product entry cites the ADR that placed it there", () => {

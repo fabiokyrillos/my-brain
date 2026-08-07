@@ -134,7 +134,11 @@ Bound by ADR-075: an operator CLI over `service_role` SQL. **No product admin UI
 
 Thresholds are listed here so they are argued once, in the open, rather than appearing inside a function body. Each is **proposed** until the owner signs it, following ADR-073's tiered-gate discipline.
 
-### 14.1 Proposed, awaiting signature
+### 14.1 Governing for execution — the owner's execution authorization adopts this table as written
+
+**Status change, 2026-08-07.** These six values were proposed and unsigned while the phase was planning-only. The owner's execution authorization directs that *"other Phase 2H thresholds remain governed by the accepted PRD value sheet"* and that no value be silently changed, so the table below is what the slices implement, unchanged, and each consuming slice cites it. This is recorded here rather than assumed, because a threshold that arrives in a function body without a paper trail is exactly what §14 exists to prevent.
+
+Slice 2H.1 consumes the first three. They are passed as **required arguments** with no default anywhere in the signature, so the numbers a running system uses are readable in the operator act that armed it (`scripts/phase-2h-deletion-reaper-schedule.mjs`) rather than buried in DDL.
 
 | Value | Proposed | Consumes |
 | --- | --- | --- |
