@@ -126,6 +126,48 @@ restore script **writes**, so it needs two more:
 
 There is no `--force`, and the guard asserts the absence of one.
 
+### Proven by execution, 2026-08-07 — not by review
+
+**Refusal 1**, and note it fires with `--manifest /nonexistent`: the refusal
+happens **before** anything is read, so a wrong target cannot get as far as
+loading a file.
+
+```
+$ node scripts/restore-into-disposable.mjs --target ulvwzqlpsjyrnqzfxmck --manifest /nonexistent
+REFUSED.
+The target is the LINKED PRODUCTION PROJECT.
+  target      : ulvwzqlpsjyrnqzfxmck
+  production  : ulvwzqlpsjyrnqzfxmck
+There is no flag that overrides this refusal, by design.
+```
+
+**Refusal 2 — the one `--target` cannot make.** A *disposable* target alongside a
+*production* connection string. This is the slip that destroys the project, and
+refusal 1 passes it:
+
+```
+$ RESTORE_DB_URL="postgresql://postgres.ulvwzqlpsjyrnqzfxmck:...@...pooler.supabase.com:5432/postgres" \
+  node scripts/restore-into-disposable.mjs --target disposable123ref --manifest /nonexistent
+REFUSED.
+RESTORE_DB_URL points at the PRODUCTION project.
+The --target flag says "disposable123ref", but the connection string contains the
+production ref "ulvwzqlpsjyrnqzfxmck". The flag is not what the writes follow --
+the connection string is. This is the slip that destroys the project.
+```
+
+**The 2H.5 drill still refuses after being changed** (§5 replaced its table
+list, so its refusal path is re-proved rather than assumed):
+
+```
+$ node scripts/phase-2h-restore-drill.mjs --target ulvwzqlpsjyrnqzfxmck
+REFUSED: the target is the LINKED PRODUCTION PROJECT.
+exit 3
+```
+
+**Refusal 3** (target already populated) is not executable without a second
+project, so it is asserted statically by `backup-toolchain.test.ts` and stands
+unexecuted. Named here rather than counted as proven.
+
 **One trap the script prints rather than assumes:** applying the chain requires
 `npx supabase link --project-ref <disposable>`, which **rewrites
 `supabase/.temp/project-ref`** — the file every refusal in this toolchain reads
