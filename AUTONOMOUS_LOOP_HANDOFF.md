@@ -1409,3 +1409,135 @@ the most misleading state this platform presents.
 Signup closed, CAPTCHA enforced, retention unscheduled, **0** prunable rows, no
 purge, no SMTP, no Edge Function deployed, no hosted configuration changed.
 **Phase 2H.1 is not started and is not authorized.**
+
+---
+
+## §34 — Phase 2H under execution authorization: 2H.1 and 2H.2 closed and deployed
+
+**Authorization changed on 2026-08-07.** ADR-085 approved Phase 2H for
+*planning*. The owner then authorized **execution** of slices 2H.1 through
+2H.6, including the five allocated migrations, merging on green gates, and
+applying each migration to the hosted project after exact merge-SHA CI green ×3.
+This section records what that authorization actually produced.
+
+### Where the phase stands
+
+| Slice | State | Migration | Hosted |
+| --- | --- | --- | --- |
+| 2H.0 gates | closed | 0 | — |
+| **2H.1** deletion recovery | **closed and deployed** | `202608070079` | applied |
+| **2H.2** error sink + dead-man | **closed and deployed** | `202608070080` | applied |
+| 2H.3 rate limiting | **not started** | 1 allocated | — |
+| 2H.4 operator surfaces | **not started** | 1 allocated | — |
+| 2H.5 deploy/retention/backup | **not started** | 1 allocated | — |
+| 2H.6 closeout | **not started** | 0 | — |
+
+**Migration budget: 5 allocated · 2 spent · 3 remaining**, per-slice and
+non-transferable. **Hosted parity: `202608070080`, 80 migrations, local =
+remote.** `AUTHORIZED_MIGRATION_HEAD` in `egc-invariants.test.ts` tracks it.
+
+Merge SHAs, each verified green ×3 **per job** rather than from the run's
+overall conclusion: `d7d5091` (2H.1), `57dab71` (2H.1 record), `88c9e3b`
+(2H.2), `6d45bc7` (2H.2 record). PRs #114–#117. All four branches preserved.
+
+### Three things that are built and deliberately NOT live
+
+Anyone resuming must not assume these work in production.
+
+1. **The deletion reaper is unarmed.** No `my-brain-deletion-reaper` cron job;
+   neither Vault secret (`deletion_reap_url`, `deletion_reap_secret`) is set.
+   Arming is `npm run ops:deletion-reaper-schedule -- --enable` **plus** both
+   secrets. Unarmed, the tick still claims, bounds and classifies — so
+   `npm run ops:stalled-deletions` answers *is anything stuck?* — and invokes
+   nothing.
+2. **`delete-account`'s deployed build lacks the reap door.** `reap.ts` exists
+   in the repository only, so `npm run verify:edge-parity` reports
+   `delete-account` **stale and that report is correct**. Deploying it is a
+   separate recorded operation in ADR-086's shape. ADR-088 explains the door.
+3. **Nothing calls `record_scheduled_job_run`.** All five cron jobs therefore
+   read `never_reported` in `scheduled_job_liveness`, which is the honest answer
+   and not a gap: the classification exists precisely so that *no evidence of a
+   successful run* reads as no evidence rather than as health.
+
+Also open by design: the error sink has **no consumer** until 2H.4
+(`2H-SINK-005`, `2H-DEADMAN-004`) — recorded as a known scheduled gap rather
+than left for the closeout to discover as ADR-084's shape.
+
+### Two real defects, both caught by gates rather than by review
+
+**The cascade defect (2H.2, serious).** `error_events.user_id` was declared
+`ON DELETE CASCADE` while the table carried a trigger refusing `DELETE`. An
+append-only table whose rows cascade cannot coexist with that trigger, because
+**the cascade IS a delete** — so deleting an `auth.users` row was refused, and
+in production **no account could have been deleted at all**. A sink built to
+record failures would have caused the most serious one in the product, in the
+exact area this phase exists to protect. SH.0's cascade drill found it; review
+did not. The fix is better than the original: `ON DELETE SET NULL`
+de-identifies the row rather than destroying it, zero-residue still holds
+because `account_owned_row_counts` asks `WHERE user_id = the owner`, and the
+trigger now permits exactly one mutation — owner going non-null to null with
+**every other field compared unchanged**.
+
+**A control exempt from its own mechanism (2H.1).** The hosted probe's
+stop-reason-vocabulary control offered free text against a lease token that a
+previous successful report had already consumed. The function found no row,
+returned `attempt_row_absent`, and never reached the constraint — it measured a
+stale token under the vocabulary's name. Re-run against a **live** lease it
+refuses `23514` and stores nothing. This is `control-must-not-be-exempt`
+recurring; expect it again.
+
+### Traps that cost iterations, for whoever resumes
+
+- **The Windows baseline runs ~54 fewer tests than CI.** Three closeout guard
+  files fail to *load* locally (a vite parse error on the `#!` shebang of the
+  `.mjs` scripts they import): `hosted-auth-parity`,
+  `signup-hardening-admin-boundary`, `storage-orphan-scanner`. Local green is a
+  weak signal for chain guards. **Update them before the first push**, not
+  after: the cleanup partition (`verify-phase-2f-cleanup.mjs`), the deletion
+  capability allowlist, `signup_hardening_grant_census.sql` (RPC-only ledger
+  list, `authenticated` matrix, **and** the `anon`-grant list), the SH.0 cascade
+  drill's populator, and `src/features/history/` copy for any new
+  `audit_logs.action_type`. Doing this preemptively made 2H.2's `application`
+  job green on its first run.
+- **The Management API `/database/query` executes as `postgres`, not
+  `service_role`.** Every RPC guarded by `auth.role() = 'service_role'` refuses
+  it with `42501`. Use it for catalog reads; use PostgREST with the service key
+  to *call* guarded RPCs. Worth keeping as a **control** rather than only a
+  gotcha — asserting the management path is refused proves the caller check is
+  real.
+- **`now()` is transaction time in pgTAP.** Comparing two timestamps written in
+  the same transaction proves nothing; pin one to a fixed literal instead.
+- **Write a `plan(N)` count.** 2H.1's fixture UUIDs began `2h1`, `h` is not hex,
+  and the file aborted at its first INSERT. `Bad plan. You planned 52 tests but
+  ran 0` is what made that unmissable.
+
+### One permanent artifact, decided rather than stumbled into
+
+2H.2's hosted probe left **one row in `error_events` that cannot be removed**:
+the table is append-only and its sweep is executable by no role, so there is no
+disposable-fixture story for it by design. Skipping the calibration would have
+been worse — six sentinel refusals are satisfied equally by a writer that
+refuses *everything*, which is a sink that records nothing, the exact defect the
+slice exists to prevent. The row is `server_action`/`other`/`unclassified` with
+a correlation id and two timestamps; no user content by construction. **No sweep
+was called**, not even through the Management API, which runs as `postgres` and
+could have.
+
+### Value sheet
+
+`PHASE_2H_PRD.md` §14.1's six thresholds were marked *proposed, awaiting
+signature*. The execution authorization directed that other Phase 2H thresholds
+remain governed by the accepted PRD value sheet and that no value be silently
+changed, so §14.1 was adopted **as written** and the adoption recorded in the
+PRD. 2H.1 consumes the first three (15 minutes, ceiling 5, base-2 capped at 6
+hours), passed as required arguments with no default anywhere in the signature.
+§14.2's signed `2H-RATE` ceilings (60 AI/hour, 20 uploads/hour, rolling window,
+no exemptions) remain unconsumed until 2H.3.
+
+### Posture, re-read after each deployment
+
+Signup **disabled** at both layers · CAPTCHA **enforced** (turnstile) · SMTP
+**unconfigured** · exactly the **two** pre-authorized attempt-prune jobs
+scheduled, five user-content sweeps and both 2H.2 sweeps **unscheduled** · no
+purge authorized or executed · `process-jobs` **not deployed** (ADR-086 open) ·
+`heartbeat` undeployed by design · **Phase 2I not started.**
