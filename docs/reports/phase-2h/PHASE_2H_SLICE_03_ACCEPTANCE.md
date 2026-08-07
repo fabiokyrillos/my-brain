@@ -264,6 +264,52 @@ table is expiring state, not evidence, so the cascade is the whole cleanup story
 | race validator self-test | 9 mutations rejected |
 | pgTAP, `supabase db lint`, race against a real database | **CI only** — no local Docker |
 
-## 8. Post-merge — hosted deployment
+## 8. The deployment ordering this slice forces, and why it is not the default one
 
-*Filled in after exact merge-SHA CI green ×3 and the migration is applied.*
+**This is the first Phase 2H slice where the migration must reach the hosted
+database before the application code reaches production, and the platform makes
+that ordering awkward.**
+
+G-2H.2 established the phase's central operational fact (ADR-087, threat
+`T-2H-25`): **a merge to `main` auto-deploys the application to Vercel
+Production with no operator act.** The database does not move with it.
+
+So consider the two orderings for this slice:
+
+| Order | What the window looks like |
+| --- | --- |
+| Migration first, application second | The application does not call the limiter yet. The drain claim consumes slots against a signed ceiling of 60 for an account base of two. **Nothing degrades.** |
+| Application first, migration second | `claim_rate_limit_slot` does not exist. PostgREST answers `PGRST202`, the application's fail-closed rule turns that into a refusal, and **every AI operation, upload and best-effort embedding is refused** until the migration lands. Capture still works — it never calls the limiter. |
+
+The second is a product stop, and it is the exact hazard `2H-DEPLOY-001` names
+and SH.1 recorded: *"the migration-before-code hazard"*. SH.6 met the same shape
+and resolved it the same way — `202608050076`'s acceptance says the migration
+**must** be applied before the code that consumes its ceilings runs against it,
+"because the mechanism fails closed by design, and failing closed against a
+database that did not receive the migration is a product stop, not a
+degradation."
+
+**The decision.** The migration is applied to the hosted project **immediately
+after the merge commit exists and before Vercel's production build completes**,
+rather than after the exact merge-SHA CI run finishes. The evidence that
+justifies applying it is already in hand at that moment: the PR-head `database`
+job applies the entire chain to an empty database and runs the full pgTAP suite,
+which is precisely what proves this migration applies. Waiting for the
+merge-SHA run — ten to fifteen minutes — would hold the window open for no
+additional evidence.
+
+**Exact merge-SHA CI green ×3 is still required**, and is still verified before
+the phase moves to 2H.4. What changed is only that the migration is applied
+inside the merge window instead of after it, and the reason is written here
+rather than discovered later.
+
+The residual is stated rather than hidden: if the merge-SHA run had failed on a
+job the PR-head run passed, the migration would already be applied. It is
+additive — new table, new parameters, new functions, and three claim functions
+re-declared with identical signatures — so a hosted database carrying it is
+compatible with the application build that preceded it. That is what makes
+applying it early safe in a way that applying the *code* early is not.
+
+## 9. Post-merge — hosted deployment
+
+*Filled in after the migration is applied and exact merge-SHA CI is green ×3.*
