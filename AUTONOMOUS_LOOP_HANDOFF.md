@@ -1146,3 +1146,197 @@ without defeating the control.
 activation (enabling **is** the first-purge authorization), Resend SMTP,
 backup-restore drill, legal and monitoring signatures, one green
 `rollout:verify`, the owner-only `disable_signup` flip, a second green run.
+
+*(Superseded on 2026-08-06 by §49: the owner authorized Phase 2H for planning.)*
+
+## §49 — Phase 2H is authorized for planning, and the guard moves with it (2026-08-06)
+
+**ADR-085 is the authorization, and it is deliberately narrow.** Planning
+artifacts, repository-safe research, tests and generators are authorized.
+Merging an implementation PR, deploying a migration, enabling retention,
+purging, opening signup and deploying `process-jobs` are **not**. ADR-086
+records the last of those as its own decision.
+
+**A13 retargeted from Phase 2H to Phase 2I in the same commit as ADR-085**, so
+ADR-067's invariant never lapsed. Two sibling guards moved on the same terms and
+for the same reason — the `Active milestone:` assertion in
+`phase-2f-documentation.test.ts` and the `STATE.md` prose gate in
+`product-ux-documentation.test.ts`. **The lesson, because it recurs every phase:
+the phase letter and the ADR number must move together.** Pinning one without
+the other is how a backlog comes to announce a milestone nothing authorized.
+
+ADR-068 names **no Phase 2I**. 2H's real successor is *opening public signup*,
+which is guarded by the fail-closed rollout checklist and
+`signup-config-guard.test.ts` — so ADR-085 records where that gate actually
+lives, and A13's silence must never be read as a gate on signup.
+
+### The planning package
+
+`docs/initiatives/phase-2h/` carries the PRD (**44 requirements, nine
+families**) and the implementation plan (slices 2H.0–2H.6, gates
+G-2H.1…G-2H.6, **migration budget FIVE**, per-slice and non-transferable, **0
+spent**). `docs/reports/phase-2h/` carries the threat model (T-2H-01…T-2H-24),
+the traceability contract, the `process-jobs` audit and the rate-limit decision
+request.
+
+**The phase's scope is its founding defect decomposed.** The 2026-08-04
+deletion stall had no retry, no error sink, no liveness check, no operator
+surface and no deployment-parity contract. So `2H-RECOVER` is a **first-class
+family**, not a residual, and `2H-RECOVER-006` requires the historical failure
+be *reproduced* before anything is called a regression test.
+
+**The traceability generator is specified and deliberately not built.** Run
+fail-closed against a phase with zero acceptance records it reports every
+requirement unresolved and turns CI red; the alternative — a planning-mode flag
+that suppresses findings — is not a fail-closed generator. Every prior phase
+built its generator in the closeout slice, so this one is `2H-CLOSE-001` in
+2H.6, and `PHASE_2H_TRACEABILITY_CONTRACT.md` §4 states the interim gap rather
+than letting it be discovered at closeout.
+
+### The `process-jobs` audit changed the recommendation's shape
+
+ADR-086 was drafted assuming a two-sided risk. **The audit does not support that
+symmetry**, and the finding is worth carrying forward:
+
+- Deployed build is the tree at **`7be25f0`**; three deployable commits have
+  landed since (`715dc15` rotation window, `7d84a2b` lifecycle gate, `8982d74`
+  request-body bound). `9d23214` is test-only and correctly not counted.
+- The deployed build has **no `lifecycle-gate.ts`, no `byok-rotation.ts`**, and
+  **parses request bodies with no byte bound before authentication**.
+- **No migration since changed a signature or grant on any RPC the deployed
+  build calls** — checked specifically, because that is exactly what stalled
+  `delete-account`. The one RPC only the *new* source calls is
+  `defer_job_for_inactive_owner`, which is the safe direction.
+- **Reachable and idle**: `jobs` holds **4 rows, all completed, newest
+  2026-08-02T13:06:59Z** — *after* the deployment, so the deployed build has
+  demonstrably worked. Zero non-terminal rows.
+- **The trap to avoid:** "no observed breakage" is **weak evidence** here, and
+  the audit says so — four jobs total means the build is *unexercised*, not
+  proven. Recommendation: deploy, as its own change, **after** baseline CI is
+  green, never bundled into a slice.
+
+### Owner decisions, 2026-08-06 (appended after the incident diagnosis)
+
+**G-2H.5 is CLEARED.** The owner signed all six lines, taking the recommended
+option on each: **V-1 60 AI operations/user/rolling hour**, **V-2 20 accepted
+uploads/user/rolling hour**, **V-3 rolling window** (not fixed clock-hour),
+**V-4** bounded worker retries consume no slot / user-initiated retries do,
+**V-5** provider-reaching background work consumes the owning user's AI slot
+*but* drain-admitted work must not be double-refused, **V-6** no exemptions
+including the owner. Authoritative in `PHASE_2H_PRD.md` §14.2.
+
+**Three consequences carried into 2H.3 so the slice inherits them rather than
+rediscovering them:** V-3 rules out a fixed-window counter (it admits 2× the
+ceiling across a boundary); V-5 forces admission to happen **once, at claim
+time**, or a claimed job dies mid-flight and burns a retry it did not earn; V-6
+leaves no exemption path that could later be widened, and makes the owner's own
+account the control's first test subject.
+
+**Clearing G-2H.5 authorizes nothing beyond planning.** G-2H.1 is still red.
+
+**ADR-086 is ACCEPTED**, on four binding conditions: separate explicit
+operation; never bundled into a slice merge; only after `508cf6c` is green ×3
+with the audit's §7 verification lane and §8 rollback ready; **not during the
+current incident**. **Acceptance is not execution** — condition 3 is unmet,
+condition 4 is active, nothing was deployed, and no Phase 2H slice may depend on
+the lifecycle gate or the request-body bound being live in the deployed worker.
+
+### The argument that produced the ceilings (retained)
+
+`PHASE_2H_RATE_LIMIT_DECISION_REQUEST.md` put six decisions (V-1…V-6) to the
+owner with three options each for the two ceilings. It is retained as the
+**argument** — the alternatives and what each would have cost — now that
+§14.2 of the PRD holds the signed values.
+
+The substantive finding, and the reason the ceilings are hourly rather than
+daily: SH.6's deployed quotas (`entries_per_day` 300, `attachments_per_day` 50,
+`live_jobs_per_user` 50) **already bound daily volume**, so **C1's real gap is
+burst rate, not volume**. Nothing today stops a user spending an entire daily
+allowance in ten seconds. If a future owner wants daily ceilings instead, the
+right answer is to change the SH.6 parameters — an `UPDATE`, not a migration
+(SH-QUOTA-010) — and shrink `2H-RATE`, never to build a second mechanism
+alongside the first.
+
+Provider limits were recorded as **NOT READ / unknown** rather than estimated:
+under BYOK the binding limit is each user's own key tier and is not knowable
+from this repository.
+
+### CI, stated exactly
+
+Merge SHA `508cf6c`, run `31116254874`, attempt history read from
+`/actions/runs/{id}/attempts/{n}` rather than inferred:
+
+| Attempt | `application` queued | Cancelled | Waited | Steps |
+| --- | --- | --- | --- | --- |
+| 3 | 15:43:52Z | 15:49:37Z | — | 0 |
+| 4 | 15:55:46Z | 16:10:47Z | **15m01s** | **0** |
+| 5 | 17:50:02Z | 18:05:03Z | **15m01s** | **0** |
+
+`database and journey` ✅ (21 steps) and `edge worker` ✅ (9 steps) throughout —
+both obtained runners **instantly** on attempt 1 at 15:31.
+
+**This is infrastructure evidence, not a code result.** Zero steps means the job
+never reached `Set up job`, never checked out, never saw the repository. **A job
+that never ran is neither a pass nor a fail**, and merge-SHA green ×3 is not
+claimed.
+
+**What the diagnosis rules out**, read rather than assumed:
+
+- **Not billing** — the repository is **public**, so standard-runner minutes are
+  free and unmetered.
+- **Not a special runner** — all three jobs are plain `ubuntu-latest`;
+  `.github/workflows/ci.yml` declares no matrix, container or service for `app`.
+- **Not contention from other work** — at 18:05 the only non-completed run in
+  the repository was PR #112's.
+- **Not random flakiness** — **15m01s twice, to the second.** That is a timeout
+  being applied, not a queue that happened to be slow.
+
+**The open question:** why a *lone* `application` job cannot obtain a runner
+while the heavier `database` job could. Note that `gh run rerun --failed`
+re-queues only the failed job, so attempts 4 and 5 each queued `application`
+**alone**.
+
+**The decisive experiment ran, and the answer is account-wide.** PR #112's run
+`31124961457` queued **all three** jobs at 18:03:59Z. All three were cancelled
+at 18:20:03Z with **zero steps** — including `database and journey` and `edge
+worker`, the two that acquired runners *instantly* at 15:31.
+
+| PR #112 run `31124961457` | Started | Cancelled | Steps |
+| --- | --- | --- | --- |
+| `application` | 18:03:59Z | 18:20:03Z | **0** |
+| `database and journey` | 18:03:59Z | 18:20:03Z | **0** |
+| `edge worker` | 18:03:59Z | 18:20:03Z | **0** |
+
+**So the earlier hypothesis was wrong and is corrected here rather than left
+standing:** nothing is specific to the `application` job. **No job in this
+repository can obtain a hosted runner.** The reason `application` looked
+singled out is only that `gh run rerun --failed` re-queues just the failed job,
+so it was the only one being asked for after attempt 3.
+
+**A second false lead, also corrected:** the pushes made during this session did
+**not** cause the cancellation via `cancel-in-progress`. Run `31124961457` died
+at 18:20:03Z; the push that created its successor landed at 18:32:41Z, twelve
+minutes later. Timestamps, not inference.
+
+**Consequence: the single authorized rerun was NOT spent.** A rerun cannot
+succeed while no job in the repository can start, so firing it would consume a
+one-shot authorization to buy another 15-minute timeout. This is an outage to
+wait out or to raise with GitHub support — **no code change and no rerun
+addresses it**, and `508cf6c` green ×3 cannot be reached until it clears.
+
+**The outage then escalated, and this part changes the recovery sequence.** The
+last workflow run GitHub created for this repository was `31126038710`
+(`001c2fe`, 18:32:41Z). The two pushes after it — `bdb6252` and `fc44375` —
+**produced no workflow run at all.** So the failure is no longer only runner
+allocation: GitHub has stopped *dispatching* runs for pushes here.
+
+**What that means for recovery, stated because it is easy to get wrong:** when
+runners return, PR #112 will have **no run at all** for its current head, and a
+missing run is not a failing run — nothing will retry itself. The PR's CI must
+be **explicitly re-triggered** (an empty commit, a close/reopen, or a manual
+dispatch), and *then* required green ×3. Waiting for a run that was never
+created is how this outage would quietly turn into an indefinite stall.
+
+**A reading trap worth keeping:** the run object's `run_attempt` field briefly
+reported `4` while attempt 5 was spinning up. Read
+`/actions/runs/{id}/attempts/{n}` for attempt facts; the summary field can lag.
