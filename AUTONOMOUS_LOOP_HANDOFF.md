@@ -1340,3 +1340,72 @@ created is how this outage would quietly turn into an indefinite stall.
 **A reading trap worth keeping:** the run object's `run_attempt` field briefly
 reported `4` while attempt 5 was spinning up. Read
 `/actions/runs/{id}/attempts/{n}` for attempt facts; the summary field can lag.
+
+## §50 — the planning package lands and slice 2H.0 closes (2026-08-06)
+
+**Actions recovered; the authorized rerun was never spent.** `508cf6c` had
+already gone green on **attempt 6** during recovery — `application` succeeded
+with **11 real steps**, 20:57:51→21:01:41Z — so `gh run rerun --failed` would
+have targeted zero failed jobs. The authorization's purpose was already met.
+**When the goal is achieved, the means is not owed.**
+
+PR #112's head had no run (dispatch had stopped mid-outage), and **close/reopen
+retriggered it** — the least disruptive option worked, so no empty commit was
+made. Head green ×3, diff re-proven planning-only, merged at **`05e418d`**,
+exact merge-SHA CI **green ×3**, branch preserved, `main` clean.
+
+### Slice 2H.0 — six gates, all executed, zero migrations
+
+Phase budget unchanged: **5 allocated · 0 spent**. Evidence:
+`docs/reports/phase-2h/PHASE_2H_SLICE_00_ACCEPTANCE.md`.
+
+**G-2H.2.** Migration parity **exact** (78 files, local head = remote head =
+`202608060078`). **One** Edge Function gap: `process-jobs`, three deployable
+commits behind, governed by ADR-086, **not deployed**. New finding: **a merge to
+`main` auto-deploys the application to Vercel Production** (`05e418d` at
+`00:37:12Z`, no operator act) while database, workers and cron each require one.
+**That gap between layers is the founding defect's mechanism, generalised** —
+recorded as ADR-087, which migrates nothing.
+
+**G-2H.3.** Five active `pg_cron` jobs, **0 failures, 0 stale, 0 duplicated**,
+read from the hosted catalog at run time; nothing enabled or disabled. Five
+retention sweeps built and unscheduled (ADR-082). **The qualifier that keeps it
+honest:** two `prune_*` jobs *are* scheduled — they prune auth and
+credential-validation **attempt** records, not user content. Without that
+sentence the catalog reads as "retention is already running".
+
+**Two lessons worth carrying:**
+
+- **A succeeded tick is not work done.** `my-brain-entry-dispatch`: 29 042
+  successes, while `jobs` holds 4 rows, newest 2026-08-02. Cron records that the
+  *statement* ran. `2H-DEADMAN-001` must record last-successful-**run**, or the
+  switch will report health it never measured.
+- **A control is what makes a probe mean anything.** G-2H.4's refusal probe
+  would have looked identical under a broken service-role key.
+
+**G-2H.4.** Cause reproduced **live, read-only**: `service_role` on
+`user_ai_credentials` → **`403 / 42501 permission denied`**, the exact recorded
+error; `admin_credential_status` → `200 null`; control read → `200`. Consequence
+pinned by the existing Deno test `stops, and deletes nothing, when the
+credential check itself fails`. **Not claimed:** the end-to-end `409` was not
+re-elicited — that needs the old build deployed — and the seam is stated rather
+than papered over. Zero residue by construction; no account created, stalled or
+mutated; **the reaper was not built**.
+
+**G-2H.6.** ADR-087: platform recorded, per-layer rollback asymmetry named
+(Vercel promotes a previous build — *operator to confirm before the runbook
+claims it*; Edge Functions have **no** version-pinned rollback; migrations are
+never reverted), and the byte-for-byte BYOK secret constraint carried into
+`2H-DEPLOY-002`.
+
+**Threat model gained T-2H-25 from the census**: a merge can ship the app while
+workers, schema and cron stay behind. Its sharpest evidence is from the outage
+itself — **Vercel built Previews for `bdb6252` and `fc44375`, the two commits
+GitHub created no workflow run for at all.** A green preview beside absent CI is
+the most misleading state this platform presents.
+
+### Posture unchanged
+
+Signup closed, CAPTCHA enforced, retention unscheduled, **0** prunable rows, no
+purge, no SMTP, no Edge Function deployed, no hosted configuration changed.
+**Phase 2H.1 is not started and is not authorized.**

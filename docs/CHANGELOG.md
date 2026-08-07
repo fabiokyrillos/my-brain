@@ -1,6 +1,24 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-06 — Phase 2H planning lands, and slice 2H.0's six pre-code gates close (0 migrations)
+
+**The planning package merged at `05e418d` with exact merge-SHA CI green ×3.** The single authorized rerun was never spent: `508cf6c` had already gone green on attempt 6 during the Actions recovery, so re-running `--failed` would have targeted zero failed jobs. PR #112's head was retriggered by close/reopen rather than an empty commit — the least disruptive method that worked.
+
+**Slice 2H.0 closed with zero migrations, and every gate was executed rather than argued.** Phase budget unchanged at 5 allocated · 0 spent.
+
+**The deployment census found the asymmetry that explains the phase.** Migration parity is exact (78 local files, local head = remote head = `202608060078`) and exactly one Edge Function is out of parity (`process-jobs`, three deployable commits behind, governed by ADR-086 and **not deployed**). The new finding is about triggers rather than versions: **a merge to `main` auto-deploys the application to Vercel Production** — `05e418d` shipped at `00:37:12Z` with no operator act — while the database, the Edge Functions and the cron schedule all require one. That gap between layers is precisely what let a revoked grant and a two-day-old worker coexist unnoticed. **ADR-087** records it as the phase's central operational fact and migrates nothing.
+
+**The scheduled-job census is clean, and it needed a qualifier to stay honest.** Five active `pg_cron` jobs, **zero failures, zero stale, zero duplicated**, read from the hosted catalog at run time with nothing enabled or disabled. Five retention sweeps are built and deliberately unscheduled (ADR-082) — but **two `prune_*` jobs *are* on the schedule**, pruning authentication and credential-validation *attempt* records rather than user content. Anyone reading the catalog without that distinction would conclude retention is already running, so it is written down.
+
+**A succeeded tick is not work done.** `my-brain-entry-dispatch` shows 29 042 successes while the `jobs` table holds four rows, newest 2026-08-02. The cron status records that the statement ran, not that anything was processed — so `2H-DEADMAN-001` must record last-successful-**run**, and a health claim built on tick counts would be measuring silence.
+
+**The deletion stall was reproduced live, read-only, and with a control that makes it mean something.** `service_role` selecting `user_ai_credentials` answers **`403 / 42501 permission denied`** — the exact error the stall report recorded — while `admin_credential_status` answers `200 null` and a control read of another table succeeds. Without the control, a broken service-role key would have produced the same refusal and the probe would have agreed with itself. **What was not claimed:** the end-to-end `409 credential_not_erased` was not re-elicited, because that would require deploying the old build; the cause is proven live and the consequence is pinned by an existing Deno test, and the seam between them is stated rather than papered over. No account was created, stalled or mutated; residue is zero by construction; the reaper was not built.
+
+**The threat model gained T-2H-25 from the census rather than from argument**: a merge can ship the application while workers, schema and cron stay behind. Its sharpest evidence is from the outage — Vercel built Preview deployments for `bdb6252` and `fc44375`, **the two commits GitHub created no workflow run for at all**. A green preview beside absent CI is the most misleading state this platform can present, and the runbook must say a Preview proves the build compiled and never that anything was tested.
+
+**Nothing destructive moved:** signup closed, CAPTCHA enforced, retention unscheduled, zero prunable rows, no purge, no SMTP, no Edge Function deployed, no hosted configuration changed.
+
 ## 2026-08-06 — G-2H.5 signed, ADR-086 accepted, and the CI outage diagnosed (0 migrations)
 
 **The two rate ceilings are signed, and the owner took the conservative default on both.** V-1 **60 AI operations per user per rolling hour**; V-2 **20 accepted uploads per user per rolling hour**; V-3 rolling, not a fixed clock-hour window; V-4 bounded worker retries consume no slot while user-initiated retries do; V-5 provider-reaching background work consumes the owning user's slot, but drain-admitted work is not double-refused; V-6 no exemptions, including the owner. `PHASE_2H_PRD.md` §14.2 is authoritative; the decision request is retained as the argument behind them.
