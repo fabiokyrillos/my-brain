@@ -52,6 +52,18 @@ export type DispatchDrainSummary = {
    * queue.
    */
   deferred: number;
+  /**
+   * 2H-DEADMAN-001. The claim RPC itself errored, so the drain stopped without
+   * knowing whether the queue was empty.
+   *
+   * Its own field rather than a share of `failed`, because the two are opposite
+   * findings: `failed` means jobs were processed and did not succeed, and this
+   * means the drain could not look. Without it, a broken claim path and an
+   * empty queue produce the identical summary — `processed: 0` — and the
+   * dead-man switch would record the healthiest outcome it has for the one
+   * state it exists to catch.
+   */
+  claimFailed: boolean;
 };
 
 // Unattended scheduled drain for interpret_entry jobs only. Attachments
@@ -63,7 +75,13 @@ export async function runEntryDispatchDrain(
   service: SupabaseClient,
 ): Promise<DispatchDrainSummary> {
   const startedAt = Date.now();
-  const summary: DispatchDrainSummary = { processed: 0, succeeded: 0, failed: 0, deferred: 0 };
+  const summary: DispatchDrainSummary = {
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    deferred: 0,
+    claimFailed: false,
+  };
 
   while (summary.processed < DISPATCH_MAX_JOBS && Date.now() - startedAt < DISPATCH_BUDGET_MS) {
     const workerId = `process-jobs:dispatch:${crypto.randomUUID()}`;
@@ -73,6 +91,7 @@ export async function runEntryDispatchDrain(
     });
     if (error) {
       console.error("Entry dispatch claim failed", { code: error.code });
+      summary.claimFailed = true;
       break;
     }
     if (!job) break;
@@ -93,4 +112,53 @@ export async function runEntryDispatchDrain(
   }
 
   return summary;
+}
+
+/**
+ * 2H-DEADMAN-001. The name this drain reports under.
+ *
+ * A constant here, resolved from `cron.job` on the database side. This function
+ * has no SQL of its own, and an RPC round-trip every minute to ask its own name
+ * would be a recurring cost for a string that changes never. The mismatch a
+ * constant can cause is not silent: a health row whose name matches no
+ * scheduled job is reported by `operator_scheduled_job_findings` as
+ * `health_without_cron_job`, so renaming the schedule without renaming this
+ * surfaces as a finding rather than as a job that quietly stopped reporting.
+ */
+export const ENTRY_DISPATCH_JOB_NAME = "my-brain-entry-dispatch";
+
+/**
+ * The unattended drain reports its own run — 2H-DEADMAN-001, and the consumer
+ * wiring 2H.2 deliberately left for 2H.4.
+ *
+ * Three outcomes, and the distinction between the first two is the whole point:
+ *
+ *   * the claim RPC errored  -> a FAILED run. The drain could not look, and
+ *                               recording that as "successfully found nothing"
+ *                               is exactly how a broken queue reads healthy.
+ *   * nothing was claimable  -> a successful run that did no work: the ordinary
+ *                               steady state of an idle queue.
+ *   * jobs were processed    -> a successful run that did work.
+ *
+ * `processed` decides useful work rather than `succeeded`, because a job that
+ * was claimed and then failed is still evidence the drain is reaching the
+ * queue. Whether the work succeeded is the error sink's question, not the
+ * dead-man switch's.
+ *
+ * A failed report never fails the drain — the jobs are already processed and
+ * their outcome is durable — but it is logged with its code rather than
+ * swallowed, and its absence is visible rather than invisible: a tick that does
+ * not report leaves the job classified `stale`, which is the finding.
+ */
+export async function reportDispatchRun(
+  service: SupabaseClient,
+  summary: Pick<DispatchDrainSummary, "processed" | "claimFailed">,
+): Promise<void> {
+  const { error } = summary.claimFailed
+    ? await service.rpc("record_scheduled_job_failure", { p_job_name: ENTRY_DISPATCH_JOB_NAME })
+    : await service.rpc("record_scheduled_job_run", {
+      p_job_name: ENTRY_DISPATCH_JOB_NAME,
+      p_did_work: summary.processed > 0,
+    });
+  if (error) console.error("Scheduled-run report failed", { code: error.code });
 }

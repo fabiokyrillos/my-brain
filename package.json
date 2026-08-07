@@ -63,7 +63,9 @@
     "test:local:2h1:reaper-race": "node scripts/phase-2h-deletion-reaper-race.mjs",
     "test:local:2h3:rate-race": "node scripts/phase-2h-rate-limit-race.mjs",
     "ops:stalled-deletions": "node scripts/phase-2h-stalled-deletions.mjs",
-    "ops:deletion-reaper-schedule": "node scripts/phase-2h-deletion-reaper-schedule.mjs"
+    "ops:deletion-reaper-schedule": "node scripts/phase-2h-deletion-reaper-schedule.mjs",
+    "ops:health": "node scripts/phase-2h-operator-health.mjs",
+    "ops:account-health": "node scripts/phase-2h-account-health.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
