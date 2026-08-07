@@ -210,8 +210,13 @@ select throws_ok(
   '2H-RECOVER-002: an attempt ceiling of zero is refused rather than silently defaulted'
 );
 
+-- The boundary itself, and it must be the boundary: the cap is EQUAL to the
+-- retry interval here. The first version of this line passed a 5-minute cap
+-- against a 15-minute interval and called it "equal", which is the refused case
+-- one line below wearing the accepted case's description -- a test that would
+-- have gone green only by the validation being deleted.
 select lives_ok(
-  $$select * from public.claim_stalled_account_deletions(10, 5, interval '15 minutes', interval '5 minutes', interval '5 minutes')$$,
+  $$select * from public.claim_stalled_account_deletions(10, 5, interval '15 minutes', interval '15 minutes', interval '5 minutes')$$,
   'a backoff cap equal to the retry interval is accepted (the boundary, not an error)'
 );
 
