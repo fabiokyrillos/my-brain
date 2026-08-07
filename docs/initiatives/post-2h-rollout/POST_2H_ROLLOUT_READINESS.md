@@ -104,7 +104,26 @@ merge-SHA gate · **Phase 2I not started**, A13 green.
    back. Fixed at the source: one list, in `backup-shared.mjs`, imported by
    both, and asserted against the generated database types.
    *Suspect the probe before the product — eight times now.*
-2. **The rate limiter has no operator read.** 2H.3 built `rate_limit_events`;
+2. **A pgTAP fixture depended on the defect being present, and CI proved it.**
+   `phase_2h_error_sink_and_deadman.sql` test 46 needed a job that had never
+   reported, and **borrowed `sh-prune-notifications` from the catalog** — a job
+   that existed only because `202608050077` scheduled it. Its retained comment
+   even noted the job was absent on hosted and called the divergence "harmless
+   here". It was not: the moment `202608070084` unscheduled the five, the
+   subject vanished and the assertion read `NULL`.
+
+   **The test was right to break** — it was measuring the environment, not the
+   product. And there was **no surviving job to borrow**: the heartbeat, the
+   reaper, the dispatch drain and `sh-prune-auth-event-attempts` all report
+   their own runs since 2H.4, and the BYOK prune's job *name* differs between a
+   chain-built database and hosted. So the suite now **schedules its own
+   subject** inside its transaction, exactly as the T-2H-14 probe fifteen lines
+   below it already did — which also removes the environment dependence the old
+   comment had to apologise for.
+
+   *A fixture must not borrow a live catalog entry.* This repository has now
+   learned that twice in one day, the other being the `public.entities` phantom.
+3. **The rate limiter has no operator read.** 2H.3 built `rate_limit_events`;
    2H.4's five operator reads do not cover it. Enforcement is proven; visibility
    is missing. It is the one gap that **widens specifically because signup
    opened**, and it is the ADR-084 shape again — a producer whose refusals
