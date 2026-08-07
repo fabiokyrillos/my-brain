@@ -1,6 +1,26 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.1: a stalled account deletion now retries itself, and stops (1 migration)
+
+**The founding defect of this phase has a mechanism.** On 2026-08-04 a revoked grant made every deletion answer `credential_not_erased`, and nothing re-ran the executor for two days. The executor was idempotent and resumable; `re-runnable` was a property with no mechanism behind it. Migration `202608070079` is the mechanism — the slice's entire allocation, leaving the phase at **5 allocated · 1 spent**.
+
+**An account entering `deleting` is now enrolled in a bounded recovery state** by a trigger on the lifecycle machine, so both the user's route and the operator's are covered without either function changing. A claim function hands out an expiring lease under `FOR UPDATE ... SKIP LOCKED`, backs off exponentially (base 2, from 15 minutes, capped at 6 hours), and after a ceiling of five attempts classifies the account terminally `stalled` instead of retrying it. Leaving it stuck is still possible; leaving it stuck **and invisible** is not.
+
+**The lifecycle status deliberately does not move, and that is the safety property.** Every SH.1 predicate that blocks writes tests for `deleting`. Adding a `stalled` *status* — the obvious design — would have silently made a stuck account writable again mid-deletion. `stalled` is a recovery classification carried beside the status, in a table whose row cascades away with the account.
+
+**`account_deletion_log` was not widened to make the reason readable.** That table holds the requesting session's hash and is revoked from every role including `service_role`; a migration postcondition now asserts that it still is. The reason reaches an operator through `operator_stalled_deletions`, which reads the recovery and lifecycle tables and — asserted from `pg_proc`, not from review — never mentions the log.
+
+**The reaper cannot delete anything, and this is checked rather than claimed.** No recovery function contains a `DELETE` at all, and none mentions `auth.users` or the storage catalog; both assertions read the function bodies from the catalog, so an edit that adds one fails. It claims, applies the bound, and posts to the deployed executor with a lease the database issued. Every executor refusal is unchanged and still final.
+
+**ADR-088 records the second door on `delete-account`.** The user door derives the account from a Bearer token and takes no target parameter, which is why nothing could ever re-run it: a stranded account has nobody holding a session. The reap door takes a target, and three things make the target insufficient — a secret absent from this repository that **disables** the door when unset rather than opening it, a single-use expiring lease only the database mints, and the executor's own lifecycle gate. A caller with the secret and an arbitrary account id gets `409`, proven by an executed test.
+
+**Exactly-once claiming is proven where pgTAP structurally cannot prove it.** pgTAP runs in one transaction, so two "concurrent" claims there serialise and agree with each other. `scripts/phase-2h-deletion-reaper-race.mjs` opens six real connections against eight stuck accounts, each racer permitted to take all eight, with a control pass that must claim zero and a validator that is mutation-proven against five kinds of false green. It runs in the CI database job.
+
+**Nothing is armed and nothing is deployed.** The migration schedules no job — ADR-082, and its own postcondition fails if a future edit adds one. Arming needs an operator script plus two Vault secrets, neither set. The deployed `delete-account` build now differs from this repository, and closing that gap is a **separate recorded deployment operation** in ADR-086's shape: the phase whose founding defect was an undeployed worker does not get to create a second one silently.
+
+**Five repository guards fired and were answered rather than suppressed** — the history vocabulary wanted copy in both locales for three new audit action types; the deletion-capability guard wanted the race script allowlisted with a reason and its census line rewritten to say why the count grew; the cleanup partition wanted the new table scanned or excused; the documentation guard wanted `SECURITY.md` to name the new chain head; and the traceability guard found two now-false "not yet applied to the hosted project" claims about `202608060078` left in `STATE.md` and `TODO.md`, which are struck and corrected rather than deleted.
+
 ## 2026-08-06 — Phase 2H planning lands, and slice 2H.0's six pre-code gates close (0 migrations)
 
 **The planning package merged at `05e418d` with exact merge-SHA CI green ×3.** The single authorized rerun was never spent: `508cf6c` had already gone green on attempt 6 during the Actions recovery, so re-running `--failed` would have targeted zero failed jobs. PR #112's head was retriggered by close/reopen rather than an empty commit — the least disruptive method that worked.
