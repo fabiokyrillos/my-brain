@@ -346,12 +346,18 @@ select ok(
   'V-3: the SAME rows admit under a thirty-minute window -- a clock-hour counter could not tell the two apart'
 );
 
+-- Comments are stripped before the truncation check, and that is not a
+-- loophole: the function's own comment *names* `date_trunc` to say why it is
+-- not used, and a scan that failed on the explanation would get the comment
+-- deleted rather than the code fixed. What must be absent is a truncation in
+-- the executable text.
 select ok(
-  (select prosrc like '%pg_catalog.now() - p_window%' and prosrc not like '%date_trunc%'
+  (select prosrc like '%pg_catalog.now() - p_window%'
+      and regexp_replace(prosrc, '--[^' || chr(10) || ']*', '', 'g') not like '%date_trunc%'
    from pg_catalog.pg_proc as proc
    join pg_catalog.pg_namespace as namespace on namespace.oid = proc.pronamespace
    where namespace.nspname = 'private' and proc.proname = 'consume_rate_limit_slot'),
-  'V-3: and the predicate is relative to the argument, with no truncation anywhere in it'
+  'V-3: and the predicate is relative to the argument, with no truncation anywhere in the code'
 );
 
 -- Rolling expiry releases capacity. Move every slot outside the window and the
