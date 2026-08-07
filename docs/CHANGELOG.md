@@ -1,6 +1,22 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Phase 2H is COMPLETE (slice 2H.6, 0 migrations)
+
+**44 requirements declared, 44 delivered and cited, 0 partial, 0 undelivered.** `202608070083` applied; hosted parity exactly `202608070083`, 83 migrations, local = remote. PRs #112–#125, every merge SHA green ×3 per job, every branch preserved.
+
+**The traceability generator refused before it generated, which is the proof it works.** Its first run against the real repository named exactly the five `2H-CLOSE-*` requirements 2H.6 had not yet evidenced and wrote no matrix. A generator whose first act is to refuse to describe its own slice will refuse to describe anybody else's.
+
+**The budget is reconciled per slice, not by count.** Phase 2G had one migration, so "how many" was the whole question. Phase 2H has five, allocated per slice and non-transferable — so five migrations with two belonging to one slice and none to another spends the budget exactly and breaks the rule. Thirteen fixtures each carry exactly one deliberate defect; a fixture producing two findings would prove less, not more, because it could not say which rule fired.
+
+**Twelve defects across the phase, six of them in probes rather than in the product.** *Suspect the probe before the product*, seven times. The pre-flight harness corrupted every dollar-quoted body by using a replacement string where `$$` is an escape; its output was read from `finish()` when the Management API returns only the last result set; it was **editing the artifact it was testing**, stripping the very `begin;`/`commit;` whose presence was the defect; and the Edge environment scan matched a variable name inside a comment recording the key BYOK removed, where the "fix" would have re-declared the name the BYOK guard exists to forbid.
+
+**Two findings had no resolution inside this phase, and both are named with destinations.** There is **no operator-restorable backup** of this project — `pitr_enabled: false`, `backups: []`, plan free — so the schema is recoverable from git and the rows are not; that also blocks `RG-DEP-3`, because a drill needs something to restore. And **`202608050077` still schedules five user-content sweeps at apply time**: removed from the hosted project by operator script, but the migration was not and could not be edited afterwards, so any database built from the chain begins deleting user content at 04:11 UTC. Unscheduling them needs a sixth migration against a budget of five, non-transferable.
+
+**Nothing was opened, armed, scheduled or purged.** Five cron jobs; eight sweeps built and zero scheduled; the deletion reaper unarmed at 0/2 Vault secrets with zero stalled rows; no purge ever run; the restore drill built and not executed; SMTP unconfigured; signup disabled at both layers; CAPTCHA enforced. The rollout gate, re-read live, still reads **25 pass · 3 fail · 2 owner-signature** and refuses to open signup. **No owner-signature gate was satisfied on the owner's behalf.**
+
+**Phase 2I remains unstarted**, A13 re-verified green at close.
+
 ## 2026-08-07 — Slice 2H.5: the deployment contract, retention, and the backup that does not exist (1 migration — the phase's last)
 
 **`202608070083` is the fifth of five.** The Phase 2H migration budget is spent; 2H.6 holds none, and a sixth is an owner amendment. `AUTHORIZED_MIGRATION_HEAD` moved in the same commit, as the rule requires.
