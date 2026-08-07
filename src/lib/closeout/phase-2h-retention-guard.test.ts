@@ -83,6 +83,25 @@ describe("2H-RETENTION-002: no migration schedules a destructive sweep", () => {
     expect(offenders, `Phase 2H migrations that schedule: ${offenders.join(", ")}`).toEqual([]);
   });
 
+  it("no Phase 2H migration opens or closes a transaction of its own", () => {
+    // Found during 2H.5's own adversarial re-read, and it would have been
+    // silent. `supabase db push` already runs each migration inside a
+    // transaction, so an inner `commit;` ENDS that transaction and leaves every
+    // statement after it running in autocommit. For this slice specifically
+    // that would have meant the section 6 self-assertion raising *after* its own
+    // DDL had already been committed — the guard travelling with the DDL is
+    // worth exactly nothing if it can no longer roll the DDL back.
+    //
+    // No migration in this chain does it, so the rule is the existing
+    // convention made checkable rather than a new one.
+    const offenders = PHASE_2H_MIGRATIONS.filter((name) =>
+      /^\s*(begin|commit|rollback)\s*;/im.test(migration(name)),
+    );
+    expect(offenders, `migrations managing their own transaction: ${offenders.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
   it("the retention migration carries its own refusal, not only ours", () => {
     // A test in `src/` cannot stop a migration applied by hand from a branch.
     // The migration asserts against `cron.job` itself, so the rule travels with

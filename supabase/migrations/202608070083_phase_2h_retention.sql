@@ -60,8 +60,13 @@
 -- no role can execute and does not put any of them in `cron.job`. Section 6
 -- raises if it ever does, so the rule is enforced by the migration against
 -- itself and not only by a test that reads it.
-
-begin;
+--
+-- NO EXPLICIT `begin;`/`commit;`, matching every migration in this chain.
+-- `supabase db push` already runs each file inside a transaction, so an inner
+-- `commit;` would end THAT transaction and leave the statements after it
+-- running in autocommit — which would mean the section 6 guard raising after
+-- the DDL had already been committed. The self-assertion is only worth
+-- anything while it can still roll the DDL back.
 
 -- ---------------------------------------------------------------------------
 -- 1. The three windows get a home
@@ -365,5 +370,3 @@ begin
   end if;
 end;
 $$;
-
-commit;

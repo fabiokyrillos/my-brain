@@ -74,6 +74,16 @@ with `String.replace` and a replacement *string* turns every `$$` into a literal
 becomes a syntax error. **Use a function replacer.** *Suspect the probe before
 the product* — that is five times in this phase.
 
+**And do not let the harness edit the thing it is testing.** To splice a
+migration into one transaction the harness must strip the file's own
+`begin;`/`commit;` — and if it does that silently, it is testing a text that
+will never be applied. 2H.5's migration carried an explicit `begin;`/`commit;`
+that **no other migration in this chain has**, and the pre-flight passed 31/31
+because it had removed them. Applied for real, that `commit;` would have ended
+`db push`'s own transaction and left the migration's self-assertion raising
+after its DDL was already committed. Migrations in this chain **never manage
+their own transaction**, and `phase-2h-retention-guard.test.ts` now asserts it.
+
 **And read the result correctly.** The Management API returns only the **last**
 result set, so `select * from finish()` returning nothing looks identical
 whether the run was clean or whether you simply cannot see the middle. Ask

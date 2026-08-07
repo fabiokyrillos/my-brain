@@ -213,6 +213,31 @@ comment-stripper that ate the whole file cannot read as "no findings".
 
 **Sixth "suspect the probe before the product" of the phase.**
 
+### F-2H.5-6 — The migration managed its own transaction, and the pre-flight hid it
+
+**Severity: high (would have been silent). Fixed in this slice, before merge.**
+
+`202608070083` was written with an explicit `begin;` / `commit;`. **No other
+migration in this chain has one.** `supabase db push` already runs each file
+inside a transaction, so the inner `commit;` would have **ended that
+transaction**, leaving every statement after it in autocommit — and for this
+migration specifically, that means §6's self-assertion (*"no Phase 2H retention
+sweep is scheduled"*) would have raised **after its own DDL was already
+committed**. A guard that travels with the DDL is worth nothing once it can no
+longer roll the DDL back.
+
+**The pre-flight passed 31/31 anyway**, because to splice a migration into one
+transaction the harness must strip the file's own `begin;`/`commit;` — so it was
+testing a text that would never be applied. Found by re-reading the diff against
+its siblings, not by any check.
+
+Fixed; `phase-2h-retention-guard.test.ts` now asserts that no Phase 2H migration
+opens or closes a transaction, which makes the existing convention checkable
+rather than merely conventional. Re-pre-flighted after the fix: **31/31**.
+
+**Seventh "suspect the probe before the product" of the phase, and the first
+where the probe was editing the artifact it was testing.**
+
 ### F-2H.5-4 — The application exposes no deployed-commit identifier
 
 **Severity: low. Destination: `docs/TODO.md`, deployment observability.**
