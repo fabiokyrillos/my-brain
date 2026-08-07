@@ -346,6 +346,16 @@ select is(
 -- while nothing was wrong with the product. It is recorded as a finding in
 -- PHASE_2H_SLICE_05_ACCEPTANCE.md instead, where it belongs -- and it is why
 -- the restore drill checks the destructive posture of a restored copy.
+--
+-- SUPERSEDED, 2026-08-07, and the paragraph above is kept because it is the
+-- correct record of why this suite stayed silent. The divergence it describes
+-- is gone: `202608070084` (post-2H rollout hardening, ADR-091) unschedules
+-- those five in the chain itself, so a chain-built database and hosted now
+-- agree, and the assertion is finally a statement about the product rather
+-- than about an environment. It is made in its own file --
+-- `supabase/tests/post_2h_retention_schedule_correction.sql` -- rather than
+-- added here, because it belongs to the correction and not to Phase 2H, whose
+-- budget it is deliberately not charged against.
 -- ---------------------------------------------------------------------------
 
 select is(

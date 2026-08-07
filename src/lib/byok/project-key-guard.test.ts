@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -379,6 +379,35 @@ describe("BYOK-GUARD-006: the allowlist is closed and every entry is classified"
 });
 
 describe("BYOK-GUARD-002: the provider cannot be constructed without a credential", () => {
+  /**
+   * The provider module, imported once as *setup* rather than inside a test.
+   *
+   * ## The flake this removes, diagnosed rather than retried
+   *
+   * The runtime assertion below used to `await import(...)` in its own body.
+   * The assertion itself is instantaneous — construct with an empty key, expect
+   * a throw — but the `await` pulls in the whole OpenAI SDK module graph, and
+   * on a cold transform cache under full-suite parallel load that regularly
+   * exceeded vitest's **5 s default test timeout**. The file passes 19/19 in
+   * isolation every time and failed roughly one full-suite run in three, which
+   * is the signature: the variance is in module transformation, not in the code
+   * under test.
+   *
+   * Moving the import into `beforeAll` with its own generous budget fixes the
+   * actual cause. The test keeps the default 5 s, so it still measures only the
+   * behaviour — raising the *test's* timeout would have hidden a slow
+   * constructor behind a budget sized for a bundler.
+   *
+   * ADR-090 retired green ×3, and this is the first flake diagnosed under it:
+   * repeated CI attempts are not an acceptance mechanism, so a flake is a
+   * defect with an owner.
+   */
+  let OpenAIProvider: typeof import("@/lib/ai/openai-provider").OpenAIProvider;
+
+  beforeAll(async () => {
+    ({ OpenAIProvider } = await import("@/lib/ai/openai-provider"));
+  }, 60_000);
+
   it("getAIProvider has no environment-reading branch for a key", () => {
     const source = code(read("src/lib/ai/index.ts"));
     expect(source).not.toMatch(/OPENAI_API_KEY/);
@@ -405,8 +434,9 @@ describe("BYOK-GUARD-002: the provider cannot be constructed without a credentia
     expect(source).not.toMatch(/constructor\(options\?:/);
   });
 
-  it("fails at runtime on an empty credential, not silently", async () => {
-    const { OpenAIProvider } = await import("@/lib/ai/openai-provider");
+  it("fails at runtime on an empty credential, not silently", () => {
+    // Synchronous now. The import is setup (see `beforeAll` above), so this
+    // test's 5 s budget covers the constructor and nothing else.
     expect(() => new OpenAIProvider({ apiKey: "" })).toThrow(/credential is required/);
   });
 

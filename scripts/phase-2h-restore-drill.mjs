@@ -51,6 +51,8 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 
+import { COUNTED_TABLES as SHARED_COUNTED_TABLES } from "./backup-shared.mjs";
+
 const REPO = new URL("..", import.meta.url);
 
 function flag(name) {
@@ -140,25 +142,20 @@ const LOCAL_HEAD = (() => {
 })();
 
 /**
- * The tables whose counts are checked.
+ * The tables whose counts are checked — now imported, not re-declared.
  *
- * User-owned content first, because those are the rows a restore exists to
- * bring back. The operational tables follow, because a restore that recovered
- * every entry and no audit trail is a partial recovery that would read as a
- * complete one.
+ * It used to be a second copy of the list, and it named `public.entities`, a
+ * table that **does not exist in this schema**. The first census ever taken
+ * against the live project returned `42P01`, which is how it was found: the
+ * drill had never been run, so nothing had ever asked the database whether the
+ * list was true. Had the drill run first, check 1 would have reported a
+ * failure on a perfectly good restore.
+ *
+ * A census measured over one list and compared against another cannot fail for
+ * the reason it exists, so there is now exactly one list, in
+ * `backup-shared.mjs`, and `backup-census.mjs` reads the same one.
  */
-const COUNTED_TABLES = [
-  "entries",
-  "entry_interpretations",
-  "tasks",
-  "entities",
-  "memories",
-  "notifications",
-  "jobs",
-  "audit_logs",
-  "ai_usage_events",
-  "product_events",
-];
+const COUNTED_TABLES = SHARED_COUNTED_TABLES;
 
 /** Tables no client role may hold a direct grant on, restored or not. */
 const NO_CLIENT_GRANT = ["audit_logs", "ai_usage_events", "product_events", "scheduled_job_health"];
