@@ -76,9 +76,13 @@
 -- rather than duplicated: a second table would be a second schedule, which is
 -- the failure the first one was built to prevent.
 --
--- `on conflict do nothing` because a migration that fails on re-application in
--- a restored or drilled database is a migration that cannot be replayed, and
--- `2H-BACKUP-002`'s drill replays the whole chain.
+-- `on conflict ... do update` rather than `do nothing`, and the difference
+-- matters in exactly one direction. `do nothing` is idempotent but not
+-- AUTHORITATIVE: against a database that already held one of these keys at a
+-- different number, it would leave the wrong window in place and report
+-- success. The registry is migration-owned data, so the migration's value wins;
+-- and `2H-BACKUP-002`'s drill replays the whole chain, so replayability is a
+-- requirement rather than a nicety.
 
 insert into private.retention_windows (key, days, note) values
   ('error_events', 90,
@@ -87,7 +91,10 @@ insert into private.retention_windows (key, days, note) values
    '2H-DEADMAN-004 / 2H-RETENTION-001. PRD sec. 14.1, signed. Dead-man history. Only rows for jobs that have LEFT the cron catalog are ever prunable -- see private.prunable_scheduled_job_health.'),
   ('rate_limit_events', 90,
    '2H-RATE-001 / 2H-RETENTION-001. NOT a new value: sec. 14.1 does not name this class, so it reuses the signed 90-day Phase 2H observability window. The limiter reads a ONE HOUR rolling window, so this cannot remove a row a ceiling is counting.')
-on conflict (key) do nothing;
+on conflict (key) do update
+  set days = excluded.days,
+      note = excluded.note,
+      updated_at = pg_catalog.now();
 
 -- ---------------------------------------------------------------------------
 -- 2. `rate_limit_events` -- the one class with no sweep at all
@@ -283,8 +290,17 @@ begin
       ('rate_limit_events',   'public.prune_rate_limit_events()',   'public.count_prunable_rate_limit_events()')
     ) as pairs(k, s, t)
   loop
-    if not exists (select 1 from private.retention_windows as w where w.key = window_key) then
-      raise exception 'Phase 2H window % was not seeded', window_key;
+    -- Existence is not enough. A window that exists at the wrong number is the
+    -- failure this whole slice is about -- a policy claim and an enforced
+    -- window that silently disagree -- so the SIGNED value is asserted, not the
+    -- presence of a row. Ninety is PRD sec. 14.1, and a different number here
+    -- would mean someone changed a signed value without an amendment.
+    if not exists (
+      select 1 from private.retention_windows as w
+      where w.key = window_key and w.days = 90
+    ) then
+      raise exception
+        'Phase 2H window % is missing or is not the signed 90 days (PRD sec. 14.1)', window_key;
     end if;
 
     if pg_catalog.to_regprocedure(sweep) is null then
