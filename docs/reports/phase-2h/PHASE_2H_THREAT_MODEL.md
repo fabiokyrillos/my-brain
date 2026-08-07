@@ -1,6 +1,6 @@
 # Phase 2H — Deploy and Operate — Threat Model
 
-- **Status:** Planning artifact under ADR-085. T-2H-01…T-2H-24 are the **per-slice review floor**: no slice merges with an unanswered row that touches it.
+- **Status:** Planning artifact under ADR-085, **reviewed after slice 2H.0** (§5b). T-2H-01…**T-2H-25** are the **per-slice review floor**: no slice merges with an unanswered row that touches it. T-2H-25 was added by the 2H.0 census, not by the original model.
 - **Scope:** the mechanisms `PHASE_2H_PRD.md` declares — deletion recovery, error sink, cron dead-man switch, distributed rate limiting, deployment contract, retention mechanism, backup procedure, operator surfaces.
 - **Method:** each threat names the asset, the actor who could realise it, the mechanism that refuses it, and — where the refusal is only as good as its proof — the evidence that must be *executed*, not reviewed.
 
@@ -68,6 +68,23 @@ The third is the quietest and this repository has already paid for it twice — 
 | **T-2H-24** | `process-jobs` is deployed as a side effect of a slice merge, and an unaudited worker build breaks the live capture path. | ADR-086 and `2H-DEPLOY-007`: the slice produces a **written audit** and a recommendation; the deploy is a separately authorized owner action, never bundled. | The audit itself, citing executed reads of the diff against every migration applied since `8982d74`. |
 
 ---
+
+## 5b. Threat review after slice 2H.0 (2026-08-06)
+
+The pre-code gates were executed against the live project. Four rows are updated by measurement rather than by argument, and one threat is **added**, because the census found a failure mode the original model did not name.
+
+| # | Row | Change after 2H.0 |
+| --- | --- | --- |
+| **T-2H-13** | Dead-man switch fires on everything | **Reinforced, with a live example.** `my-brain-entry-dispatch` shows 29 042 successes while the `jobs` table holds 4 rows, newest 2026-08-02. A `succeeded` cron tick records that the *statement* ran, not that work happened. `2H-DEADMAN-001` must therefore record last-successful-**run**, and any health claim built on tick counts would be measuring silence. |
+| **T-2H-14** | Switch blind to unregistered jobs | **Baseline established.** Five active jobs enumerated from `cron.job` at run time; `job_count = distinct_names = 5`, so no duplicates and no shadowed name. The unschedule-then-schedule pattern in the migrations held. |
+| **T-2H-18** | Parity check runs but does not stop a deploy | **Sharpened.** The census confirms exactly one parity gap (`process-jobs`), and it has persisted across three closeouts. The check works; what is missing is the *stopping*, which is `2H-DEPLOY-003`'s whole content. |
+| **T-2H-23** | A migration revokes a grant a deployed function depends on | **Reproduced live, read-only.** `service_role` on `user_ai_credentials` answers `403 / 42501` — the exact recorded error — while `admin_credential_status` answers `200 null` and a control read succeeds. The cause is not historical; it is present and demonstrable. |
+
+### New threat found by the census
+
+| # | Threat | Refused by | Evidence that must be executed |
+| --- | --- | --- | --- |
+| **T-2H-25** | **A merge deploys the application while the workers, the schema and the cron schedule stay behind — and the merge reads as "shipped".** Vercel creates a Production deployment on every merge to `main` with no operator act, while Edge Functions and migrations require one. This is the founding defect's mechanism generalised, and the census proved a second face of it: during the 2026-08-06 GitHub Actions outage, Vercel created Preview deployments for `bdb6252` and `fc44375` — **the two commits for which no workflow run existed at all**. A green preview beside absent CI is the most misleading state the platform can present. | ADR-087 records the asymmetry as the phase's central operational fact; `2H-DEPLOY-001`'s runbook must carry a **per-layer** deploy/rollback section rather than one sequence; `2H-DEPLOY-003`/`004` make the lagging layers visible; and the runbook must state that a Preview proves the build compiled and **never** that anything was tested. | The runbook asserted against the census: every layer named with its trigger and its rollback, and a guard that a deployment claim cites the layer it applies to. |
 
 ## 6. Threats deliberately out of scope, and why
 
