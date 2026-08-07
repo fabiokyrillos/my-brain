@@ -414,6 +414,27 @@ select is(
 --
 -- 2H.2 shipped the ledger with no caller: every job read `never_reported`,
 -- which was the honest answer and an open gap. These are the callers.
+--
+-- WHY THESE ASSERTIONS SURVIVE A CONCURRENT REAL TICK, WHICH IS NOT OBVIOUS
+-- ---------------------------------------------------------------------------
+-- Migration `202607170019` schedules `my-brain-job-reaper` every minute, and
+-- that cron job is ACTIVE inside the CI container. Once this slice instrumented
+-- `reap_expired_jobs`, a real tick began committing a row under the very key
+-- asserted below. That made 2H.2's suite flake -- see its section 9 -- and the
+-- same hazard applies here, so it is answered rather than hoped away:
+--
+--   * `last_outcome` is asserted, never `success_count`. A concurrent tick
+--     commits `success_empty`, which is what the first assertion expects
+--     anyway, and the second assertion's own call overwrites it.
+--   * `useful_count` IS asserted absolutely, and it holds because a real tick
+--     can never do useful work here: reaping requires a COMMITTED expired
+--     lease, and the fixture below is inserted inside this transaction, so no
+--     other session can see it. The CI database has no other job rows.
+--   * once this transaction's first `reap_expired_jobs` touches the row, it
+--     holds the lock, so no tick can interleave with the rest of the section.
+--
+-- The window is therefore only *before* the first call, where a tick can add a
+-- `success_empty` with `useful_count = 0` and change nothing that is asserted.
 
 select public.reap_expired_jobs(100);
 

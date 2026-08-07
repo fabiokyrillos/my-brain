@@ -363,24 +363,24 @@ select is(
 -- ---------------------------------------------------------------------------
 
 select lives_ok(
-  $$select public.record_scheduled_job_run('my-brain-job-reaper', true)$$,
+  $$select public.record_scheduled_job_run('2h2-ledger-control', true)$$,
   'the reporter accepts a service_role caller'
 );
 
 select is(
-  (select last_outcome from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+  (select last_outcome from public.scheduled_job_health where job_name = '2h2-ledger-control'),
   'success_work',
   '2H-DEADMAN-001: a run that did work is recorded as work'
 );
 
 select lives_ok(
-  $$select public.record_scheduled_job_run('my-brain-job-reaper', false)$$,
+  $$select public.record_scheduled_job_run('2h2-ledger-control', false)$$,
   'an empty run is also a successful run'
 );
 
 select is(
   (select last_outcome || ':' || consecutive_empty::text
-   from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+   from public.scheduled_job_health where job_name = '2h2-ledger-control'),
   'success_empty:1',
   'and it is recorded as EMPTY, with the empty streak counted'
 );
@@ -389,7 +389,7 @@ select is(
 -- four rows of work. Both numbers survive here, separately.
 select is(
   (select success_count::text || '/' || useful_count::text
-   from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+   from public.scheduled_job_health where job_name = '2h2-ledger-control'),
   '2/1',
   '2H-DEADMAN-001: successes and useful runs are counted SEPARATELY -- a tick that achieved nothing cannot masquerade as work'
 );
@@ -402,19 +402,19 @@ select is(
 -- without depending on the clock moving.
 update public.scheduled_job_health
 set last_useful_at = timestamptz '2026-01-01 00:00:00+00'
-where job_name = 'my-brain-job-reaper';
+where job_name = '2h2-ledger-control';
 
-select public.record_scheduled_job_run('my-brain-job-reaper', false);
+select public.record_scheduled_job_run('2h2-ledger-control', false);
 
 select is(
-  (select last_useful_at from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+  (select last_useful_at from public.scheduled_job_health where job_name = '2h2-ledger-control'),
   timestamptz '2026-01-01 00:00:00+00',
   '2H-DEADMAN-001: an empty run leaves the last USEFUL run exactly where it was'
 );
 
 select is(
   (select last_success_at = now() and consecutive_empty = 2
-   from public.scheduled_job_health where job_name = 'my-brain-job-reaper'),
+   from public.scheduled_job_health where job_name = '2h2-ledger-control'),
   true,
   'while the last SUCCESS moves forward and the empty streak grows -- the two facts are independent'
 );
@@ -425,21 +425,49 @@ select is(
 --
 -- A control that agrees with its positive has measured nothing. The same job,
 -- the same threshold, the same function -- only the timestamp differs.
+--
+-- THE SUBJECT MOVED, AND THE REASON GENERALISES (slice 2H.4).
+-- ---------------------------------------------------------------------------
+-- These assertions used `my-brain-job-reaper`, and section 8 used it as a
+-- ledger fixture. Both were safe only while NOTHING wrote `scheduled_job_health`
+-- except this file. 2H.4 wired the real scheduled paths, and migration
+-- `202607170019` schedules `my-brain-job-reaper` **every minute** -- so inside
+-- the CI container a real tick now COMMITS a row under that exact key. When a
+-- minute boundary lands inside the suite's window, `record_scheduled_job_run`
+-- takes its `ON CONFLICT DO UPDATE` path against the committed row and the
+-- counts are one higher; backdating the row races the same tick. It failed one
+-- run in three, which is the worst kind of failure to leave standing.
+--
+-- The fix is to stop sharing a key with a live writer:
+--
+--   * section 8 uses `2h2-ledger-control`, a synthetic name with no cron entry
+--     and no writer. Those assertions are about the ledger's arithmetic and the
+--     name was never part of the claim;
+--   * section 9 needs a REAL cron job, because `scheduled_job_liveness` joins
+--     the catalog. `my-brain-entry-dispatch` is the one 1-minute job that
+--     cannot self-report here: its statement posts over HTTP and is guarded by
+--     `where exists (... vault.decrypted_secrets ...)`, and those secrets do not
+--     exist in CI, so it calls no reporter. Same interval, so every 3x/30x
+--     threshold below is unchanged.
+--
+-- A fixture that shares a key with a live writer is a fixture that will flake.
+
+select public.record_scheduled_job_run('my-brain-entry-dispatch', false);
 
 select is(
   (select liveness from public.scheduled_job_liveness(3)
-   where job_name = 'my-brain-job-reaper'),
+   where job_name = 'my-brain-entry-dispatch'),
   'current',
   '2H-DEADMAN-003 (direction 1): a job that reported a moment ago reads CURRENT'
 );
 
 update public.scheduled_job_health
 set last_success_at = now() - interval '10 minutes'
-where job_name = 'my-brain-job-reaper';
+where job_name = 'my-brain-entry-dispatch';
 
 select is(
   (select liveness from public.scheduled_job_liveness(3)
-   where job_name = 'my-brain-job-reaper'),
+   where job_name = 'my-brain-entry-dispatch'),
   'stale',
   '2H-DEADMAN-003 (direction 2): backdated past 3x its own 1-minute interval, the SAME job reads STALE'
 );
@@ -448,14 +476,28 @@ select is(
 -- backdated row is current again under a multiple that covers it.
 select is(
   (select liveness from public.scheduled_job_liveness(30)
-   where job_name = 'my-brain-job-reaper'),
+   where job_name = 'my-brain-entry-dispatch'),
   'current',
   '2H-DEADMAN-002: the multiple is a required argument and it actually decides -- 30x covers ten minutes'
 );
 
+-- The never-reported subject is a job whose sweep 2H.4 did NOT instrument, for
+-- the same reason section 9's positive subject moved: the hourly heartbeat now
+-- reports its own runs, so a suite that happened to run at the top of an hour
+-- would find it `current` and this assertion would fail for a reason that has
+-- nothing to do with the property. `sh-prune-notifications` calls
+-- `prune_notifications`, which reports nothing and cannot, so the subject is
+-- unreportable by construction rather than merely unlikely to have reported.
+--
+-- It is scheduled by `202608050077` and therefore present in the CI catalog. It
+-- is NOT scheduled on the hosted project, because ADR-082's cleanup removed
+-- those five user-content sweeps the day they were created. That difference is
+-- harmless here and worth stating: this suite is a FRESH-DATABASE artifact --
+-- section 7 asserts absolute `error_events` counts too -- and pgTAP runs only
+-- in CI. Do not read a hosted failure of this file as a defect.
 select is(
   (select liveness from public.scheduled_job_liveness(3)
-   where job_name = 'my-brain-hourly-heartbeat'),
+   where job_name = 'sh-prune-notifications'),
   'never_reported',
   'a job in the catalog that has never reported is NEVER_REPORTED -- not healthy, which is the state a silently broken job is in'
 );

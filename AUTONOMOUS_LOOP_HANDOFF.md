@@ -1714,3 +1714,133 @@ violation, not a stretch goal. It must close the producer-with-no-consumer gap
 happened" in separate columns. The error sink already has its first
 application-side producer outside its own tests: 2H.3's
 `RATE_LIMIT_STATE_UNAVAILABLE` path writes to it.
+
+## §36 — Slice 2H.4 closed and deployed: the dead-man switch has callers now
+
+**Read §34 and §35 first.** This continues them and does not repeat them.
+
+### Where the phase stands
+
+| Slice | State | Migration | Hosted |
+| --- | --- | --- | --- |
+| 2H.0 gates | closed | 0 | — |
+| **2H.1** deletion recovery | **closed and deployed** | `202608070079` | applied |
+| **2H.2** error sink + dead-man | **closed and deployed** | `202608070080` | applied |
+| **2H.3** rate limiting | **closed and deployed** | `202608070081` | applied |
+| **2H.4** operator surfaces | **closed and deployed** | `202608070082` | applied |
+| 2H.5 deploy/retention/backup | **not started** | 1 allocated | — |
+| 2H.6 closeout | **not started** | 0 | — |
+
+**Migration budget: 5 allocated · 4 spent · 1 remaining**, per-slice and
+non-transferable. **Hosted parity: `202608070082`, 82 migrations, local =
+remote.** `AUTHORIZED_MIGRATION_HEAD` in `egc-invariants.test.ts` tracks it.
+
+Merge SHAs, each verified green ×3 **per job**: `d7d5091` (2H.1), `57dab71`
+(2H.1 record), `88c9e3b` (2H.2), `6d45bc7` (2H.2 record), `46f7244` (2H.3),
+`d8aa4ed` (2H.3 record), **`70d26a5` (2H.4)**. PRs #114–#121. Every branch
+preserved.
+
+Edge Functions: `delete-account` **v3** ok · `process-jobs` **v22** ok ·
+`heartbeat` undeployed by design. `verify:edge-parity` green.
+
+### The gap 2H.2 left on purpose is closed
+
+`record_scheduled_job_run` had **no caller at all**, so every job read
+`never_reported` forever. All five scheduled paths now report: the four
+in-database ones and the `mode=dispatch` drain in `process-jobs`.
+
+**The mechanism had to move to `private`, and this is the reusable fact.**
+`pg_cron` executes as `postgres`, where **`auth.role()` is null**, so the
+`service_role`-guarded RPC refuses every in-database scheduled path with
+`42501`. This is the same trap the Management API's `/database/query` sets and
+the reason 2H.1's probes had to move to PostgREST. `private.apply_scheduled_job_run`
+and `apply_scheduled_job_failure` are executable by **no role**; the guarded RPC
+is a thin wrapper.
+
+**`useful` is derived from each path's own result** — notifications created,
+leases recycled, rows pruned, jobs drained — never from the call returning.
+Verified live: 49 seconds after the deploy both per-minute jobs read
+`success_empty`. Under the naive definition both would already have read
+`success_work`.
+
+### Three things a successor must not misread
+
+1. **Three jobs reading `never_reported` is not a gap.** The hourly heartbeat and
+   the two 04:xx prunes had not ticked since the migration. They report on their
+   next tick with no action. `ops:health` exits **1** and names them, which is
+   the exit-code contract ADR-089 leaves for alerting.
+2. **`heartbeat` is `undeployed_by_design`, which is NOT `ok`.** Flattening the
+   two would let a function that silently stopped being deployed hide inside the
+   allowlist's shape.
+3. **`operator_stalled_deletions` (2H.1) is declared VOLATILE**, unlike the five
+   reads 2H.4 adds. It writes nothing, but nothing stops it. Restoring it needs a
+   migration 2H.4 does not own, so the pgTAP suite excludes it from the
+   volatility assertion, includes it in the source census, and says so.
+
+### Two defects, and where they came from
+
+**`database.types.ts` had been stale for five migrations** — SH.6's two, 2H.1,
+2H.2, 2H.3. Regenerating added 343 lines, **none of them 2H.4's**. Nothing broke
+and nothing could have: not one of those objects has a TypeScript caller, so
+`tsc` had nothing to disagree with. That is *why* nobody noticed — ADR-084's
+shape again. Regenerate it in the same change as the schema move.
+
+**`due_now_count` inflated with age.** `next_attempt_at <= now()` counts every
+*completed* job, because a finished job keeps the attempt time it was last
+scheduled for. A queue-depth read that grows with age looks like a worsening
+problem and would have shipped as a permanent false alarm. It is now
+`status in ('pending','failed')` **and** the attempt time due.
+
+### The pre-flight that made this cheap, and the probe defect inside it
+
+`pgtap` is not installed on the hosted project, and **extension creation is
+transactional in Postgres**. So the whole suite ran as
+
+```
+begin; create extension pgtap; <migration>; <suite>; rollback;
+```
+
+against the linked project — a real database, real data, a real `cron.job`
+catalog. **47/47**, and readback proved nothing persisted (no health rows, no new
+column, no `pgtap`). It caught four defects before CI: `having count(*) = 1`
+without `GROUP BY`, a non-existent `account_lifecycle.status_changed_at`, a
+`NOT NULL` `jobs.idempotency_key` plus a trigger-validated payload, and a
+brittle assertion that assumed an empty sink.
+
+**And the pre-flight itself had a defect first.** Splicing the migration in with
+`String.replace` and a replacement *string* turned every `$$` into a literal `$`,
+because `$$` is an escape there. Every dollar-quoted function body became a
+syntax error. **Use a function replacer.** *Suspect the probe before the
+product* — that is four times in this phase.
+
+### Where 2H.5 starts
+
+`2H-DEPLOY-001…007`, `2H-RETENTION-001…004`, `2H-BACKUP-001…002`, **one
+migration**, which buys only the retention sweeps and twins for the classes this
+phase added. Groundwork already established:
+
+- **`error_events` and `scheduled_job_health` already have sweeps and twins**
+  (2H.2) but **no row in `private.retention_windows`** — the windows are passed
+  as required arguments and have no single home yet. §14.1 signs both at 90 days.
+- **`rate_limit_events` (2H.3) has no sweep at all** and is the one class that
+  genuinely accumulates for a live user. §14.1 does not name a window for it;
+  **reuse the signed 90-day Phase 2H observability window rather than minting a
+  new value**, and say so loudly — a new unsigned value is an owner stop.
+- **`account_deletion_attempts` (2H.1) needs no sweep**: it is
+  `on delete cascade` from `auth.users`, so a completed deletion removes the row,
+  and a *stalled* row must survive as long as its account does.
+- The three places a window must agree: `private.retention_windows`,
+  `RETENTION_DAYS` in `src/lib/quotas.ts`, and `RETENTION_SCHEDULE` in
+  `src/features/legal/retention.ts` (whose `sweepActive: false` flags stay false
+  while nothing is scheduled — ADR-082).
+
+**Nothing in 2H.5 executes.** The restore drill is a procedure plus a script,
+retention scheduling requires `--enable`, and the runbook's destructive steps are
+owner-only.
+
+### Posture
+
+Signup **disabled** at both layers · CAPTCHA **enforced** · SMTP **unconfigured**
+· exactly **five** cron jobs · deletion reaper **unarmed**, 0/2 Vault secrets ·
+five user-content sweeps and both 2H.2 sweeps **unscheduled** · **no purge
+authorized or executed** · no restore drill executed · **Phase 2I not started.**
