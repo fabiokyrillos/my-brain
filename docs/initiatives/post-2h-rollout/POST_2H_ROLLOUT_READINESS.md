@@ -123,7 +123,19 @@ merge-SHA gate · **Phase 2I not started**, A13 green.
 
    *A fixture must not borrow a live catalog entry.* This repository has now
    learned that twice in one day, the other being the `public.entities` phantom.
-3. **The rate limiter has no operator read.** 2H.3 built `rate_limit_events`;
+3. **The rollout gate would have passed `RG-QUO-3` in any rebuilt environment,
+   with nobody having authorized a purge.** `verify-signup-rollout.mjs`
+   computes `retentionSweepsScheduled` as *"all five user-content sweeps are in
+   `cron.job`"* — and `202608050077` scheduled all five at apply time. So the
+   gate whose entire purpose is to require an **authorized** retention
+   activation would have been satisfied **by the defect ADR-082 was written
+   about.** Hosted never reached that state only because an operator removed the
+   five the same day, which means the gate has been honest **by accident rather
+   than by construction.** After `202608070084` the only way it can pass is
+   `npm run sh6:retention-schedule -- --enable`, an operator act — which is what
+   it always meant. Hosted behaviour is unchanged; a rebuilt environment can no
+   longer read one gate greener than the truth.
+4. **The rate limiter has no operator read.** 2H.3 built `rate_limit_events`;
    2H.4's five operator reads do not cover it. Enforcement is proven; visibility
    is missing. It is the one gap that **widens specifically because signup
    opened**, and it is the ADR-084 shape again — a producer whose refusals
