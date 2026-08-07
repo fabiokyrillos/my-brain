@@ -1,6 +1,22 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Slice 2H.2: the failure that recorded nothing, and the tick that meant nothing (1 migration)
+
+**Two defects, both already paid for, both now structural.** On 2026-08-04 every account deletion failed for two days and **nothing recorded it** — there was no server-side error record at all. And the 2H.0 census read `my-brain-entry-dispatch` at **29 042 successful cron ticks against four rows of work**: `pg_cron` records that the *statement* ran, so any health claim built on tick counts was measuring silence. `202608070080` answers both.
+
+**The sink cannot record a payload because it has nowhere to put one.** `error_events` carries exactly three text columns — `surface`, `operation`, `reason` — each CHECK-bound to a closed set, and **no** json, jsonb, bytea or free-text column whatsoever. A migration postcondition reads that from `pg_catalog`, so an `ALTER TABLE` that adds one fails the apply. Six sentinels are pushed through the writer in pgTAP — a provider message quoting the user's own words, a filename, an `sk-proj-…` key, a JWT — and every one is refused `23514`, with a calibration proving a fully declared failure still records.
+
+**Append-only has two independent locks, because one of them is a grant.** The revoke is the first; a trigger refusing UPDATE and DELETE **even from the table owner** is the second, since a grant is exactly what a future migration or a returning platform default restores in silence. The retention sweep is exempted through a narrow named flag rather than by being handed a grant. This bit the test suite honestly: the retention boundary rows had to be *inserted* at their timestamps, because backdating by UPDATE is refused — and a test that needed the property weakened would have been the wrong test.
+
+**The writer is granted to `anon` deliberately**, on ADR-080's reasoning: the failures most worth recording happen before a session exists, and the alternative is a service-role client in the product runtime. What bounds it is that every field must already be a member of a closed set and **the function takes no owner parameter** — the owner is `auth.uid()` or nothing, so no caller can attribute a failure to somebody else.
+
+**"The tick fired" and "something was done" are now different columns.** `scheduled_job_health` keeps `last_success_at` and `last_useful_at` separately, and the counts diverge. `scheduled_job_liveness` enumerates from the `cron.job` catalog **at run time** — a job scheduled tomorrow appears tomorrow with no code change, proven by a test that schedules one inside itself — and classifies against a multiple of each job's own interval, taken as a required argument. A job that has never reported reads `never_reported`, **not** healthy: it is exactly the state a silently broken job is in. An unparseable schedule reads `unknown_interval` rather than passing, because a staleness check that cannot compute its threshold must not answer "fine".
+
+**Both validators are pinned in both directions, before it can cost anything.** `error-sink-parity.test.ts` reads the three CHECK lists out of the migration SQL and compares them to the TypeScript constants as sets, asserts the extracted list is non-empty first so a broken extractor cannot pass against nothing, and runs 31 real error shapes through the classifier asserting every output is a member of the database vocabulary — the direction ADR-084's defect actually travelled.
+
+**Named rather than discovered later:** the sink has no consumer until 2H.4, and nothing calls the run reporter yet, so every job classifies `never_reported`. Both sweeps are built, executable by **no role including `service_role`**, and unscheduled.
+
 ## 2026-08-07 — Slice 2H.1 deployed: hosted parity `202608070079`, and a control that was exempt from its own mechanism
 
 **Merged at `d7d5091` with exact merge-SHA CI green ×3** (run `31148068318`, read per job rather than from the run's conclusion). `202608070079` applied; `supabase migration list --linked` reports local = remote = `202608070079`, 79 migrations.
