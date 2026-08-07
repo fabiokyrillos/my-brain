@@ -438,6 +438,17 @@ begin
     );
   exception when others then failures := failures || ('task_command_confirmations: ' || sqlerrm); end;
 
+  -- 2H.1's recovery row. Inserted DIRECTLY rather than by transitioning the
+  -- account to `deleting`, because the transition would block every insert
+  -- above it through the SH.1 predicates and the drill's whole subject is a
+  -- row-complete account. The row this creates is the one an account carries
+  -- while its deletion is being retried, and what the drill proves about it is
+  -- the only thing that matters here: it cascades with `auth.users` and takes
+  -- nothing of the bystander's with it.
+  begin
+    insert into public.account_deletion_attempts (user_id) values (p_user);
+  exception when others then failures := failures || ('account_deletion_attempts: ' || sqlerrm); end;
+
   return array_to_string(failures, ' | ');
 end;
 $populate$;

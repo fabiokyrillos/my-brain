@@ -33,11 +33,11 @@ insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 ) values
-  ('2h100001-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
+  ('d7100001-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
    '2h1-stalls@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-  ('2h100002-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
+  ('d7100002-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
    '2h1-reverted@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-  ('2h100003-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+  ('d7100003-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
    '2h1-bystander@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 -- ---------------------------------------------------------------------------
@@ -152,11 +152,11 @@ select is(
 
 update public.account_lifecycle
 set status = 'deleting', reason_code = 'user_deletion_request', changed_by = 'user'
-where user_id = '2h100001-0000-4000-8000-000000000001';
+where user_id = 'd7100001-0000-4000-8000-000000000001';
 
 update public.account_lifecycle
 set status = 'deleting', reason_code = 'user_deletion_request', changed_by = 'user'
-where user_id = '2h100002-0000-4000-8000-000000000002';
+where user_id = 'd7100002-0000-4000-8000-000000000002';
 
 select is(
   (select count(*)::int from public.account_deletion_attempts),
@@ -166,7 +166,7 @@ select is(
 
 select is(
   (select recovery_state from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'pending',
   'a freshly seeded row is `pending` with no attempt spent'
 );
@@ -174,18 +174,18 @@ select is(
 -- B is reverted. SH-DELETE-014's admin return path is `deleting -> active`.
 update public.account_lifecycle
 set status = 'active', reason_code = 'deletion_reverted', changed_by = 'operator'
-where user_id = '2h100002-0000-4000-8000-000000000002';
+where user_id = 'd7100002-0000-4000-8000-000000000002';
 
 select is(
   (select count(*)::int from public.account_deletion_attempts
-   where user_id = '2h100002-0000-4000-8000-000000000002'),
+   where user_id = 'd7100002-0000-4000-8000-000000000002'),
   0,
   '2H-RECOVER-003: a reverted deletion loses its recovery row, so nothing can retry it'
 );
 
 select is(
   (select count(*)::int from public.account_deletion_attempts
-   where user_id = '2h100003-0000-4000-8000-000000000003'),
+   where user_id = 'd7100003-0000-4000-8000-000000000003'),
   0,
   'the account that never asked to be deleted was never enrolled -- the control'
 );
@@ -248,7 +248,7 @@ select is(
 
 update public.account_deletion_attempts
 set first_seen_at = now() - interval '20 minutes'
-where user_id = '2h100001-0000-4000-8000-000000000001';
+where user_id = 'd7100001-0000-4000-8000-000000000001';
 
 create temporary table claim_one on commit drop as
 select * from public.claim_stalled_account_deletions(
@@ -273,28 +273,28 @@ select ok(
 
 select is(
   (select recovery_state from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'retrying',
   'the row is now `retrying`, and the LIFECYCLE status has not moved'
 );
 
 select is(
   (select status from public.account_lifecycle
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'deleting',
   '2H-RECOVER-003: recovery never moves the lifecycle status, so the SH.1 write predicates stay in force'
 );
 
 select is(
   (select next_attempt_at - last_attempt_at from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   interval '15 minutes',
   '2H-RECOVER-002: attempt 1 backs off by exactly one retry interval (2^0)'
 );
 
 select is(
   (select count(*)::int from public.audit_logs
-   where user_id = '2h100001-0000-4000-8000-000000000001'
+   where user_id = 'd7100001-0000-4000-8000-000000000001'
      and action_type = 'account_deletion_retry_claimed'
      and actor = 'system'),
   1,
@@ -314,7 +314,7 @@ select is(
 
 select is(
   public.confirm_account_deletion_claim(
-    '2h100001-0000-4000-8000-000000000001',
+    'd7100001-0000-4000-8000-000000000001',
     (select claim_token from claim_one)
   ) ->> 'confirmed',
   'true',
@@ -323,7 +323,7 @@ select is(
 
 select is(
   public.confirm_account_deletion_claim(
-    '2h100003-0000-4000-8000-000000000003',
+    'd7100003-0000-4000-8000-000000000003',
     (select claim_token from claim_one)
   ) ->> 'confirmed',
   'false',
@@ -344,7 +344,7 @@ select is(
 
 select ok(
   (public.record_account_deletion_attempt(
-    '2h100001-0000-4000-8000-000000000001',
+    'd7100001-0000-4000-8000-000000000001',
     (select claim_token from claim_one),
     'stopped',
     'credential_not_erased'
@@ -354,7 +354,7 @@ select ok(
 
 select lives_ok(
   $$select public.record_account_deletion_attempt(
-      '2h100001-0000-4000-8000-000000000001',
+      'd7100001-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-0000000000ff'::uuid,
       'stopped', 'credential_not_erased')$$,
   'a forged token does not raise -- it records nothing, and the audit count below is what proves that'
@@ -362,7 +362,7 @@ select lives_ok(
 
 select is(
   (select count(*)::int from public.audit_logs
-   where user_id = '2h100001-0000-4000-8000-000000000001'
+   where user_id = 'd7100001-0000-4000-8000-000000000001'
      and action_type = 'account_deletion_retry_result'),
   1,
   '2H-RECOVER-005: exactly one result audit row exists -- the forged token wrote none'
@@ -370,7 +370,7 @@ select is(
 
 select is(
   (select last_stop_reason from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'credential_not_erased',
   'the stop reason is carried on the recovery row, from the closed vocabulary'
 );
@@ -386,7 +386,7 @@ begin
   for spent in 2..5 loop
     update public.account_deletion_attempts
     set next_attempt_at = now() - interval '1 second'
-    where user_id = '2h100001-0000-4000-8000-000000000001';
+    where user_id = 'd7100001-0000-4000-8000-000000000001';
 
     select claims.claim_token into token
     from public.claim_stalled_account_deletions(
@@ -398,7 +398,7 @@ begin
     end if;
 
     perform public.record_account_deletion_attempt(
-      '2h100001-0000-4000-8000-000000000001', token, 'stopped', 'credential_not_erased'
+      'd7100001-0000-4000-8000-000000000001', token, 'stopped', 'credential_not_erased'
     );
   end loop;
 end;
@@ -406,14 +406,14 @@ $$;
 
 select is(
   (select attempt_count from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   5,
   '2H-RECOVER-002: exactly the declared ceiling of attempts was spent, and not one more'
 );
 
 select is(
   (select recovery_state from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'retrying',
   'having spent five attempts, the row is not yet terminal -- it becomes terminal when it next comes due'
 );
@@ -421,7 +421,7 @@ select is(
 -- The sixth pass: due again, ceiling reached, terminal.
 update public.account_deletion_attempts
 set next_attempt_at = now() - interval '1 second'
-where user_id = '2h100001-0000-4000-8000-000000000001';
+where user_id = 'd7100001-0000-4000-8000-000000000001';
 
 select is(
   (select count(*)::int from public.claim_stalled_account_deletions(
@@ -432,14 +432,14 @@ select is(
 
 select is(
   (select recovery_state from public.account_deletion_attempts
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'stalled',
   '2H-RECOVER-002: the terminal classification is `stalled`'
 );
 
 select is(
   (select count(*)::int from public.audit_logs
-   where user_id = '2h100001-0000-4000-8000-000000000001'
+   where user_id = 'd7100001-0000-4000-8000-000000000001'
      and action_type = 'account_deletion_recovery_stalled'),
   1,
   '2H-RECOVER-005: becoming terminal is itself audited'
@@ -451,7 +451,7 @@ select is(
 
 update public.account_deletion_attempts
 set next_attempt_at = now() - interval '10 days'
-where user_id = '2h100001-0000-4000-8000-000000000001';
+where user_id = 'd7100001-0000-4000-8000-000000000001';
 
 select is(
   (select count(*)::int from public.claim_stalled_account_deletions(
@@ -462,21 +462,21 @@ select is(
 
 select is(
   (select recovery_state from public.operator_stalled_deletions(100)
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'stalled',
   '2H-RECOVER-004: the operator read shows the terminal classification'
 );
 
 select is(
   (select last_stop_reason from public.operator_stalled_deletions(100)
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   'attempt_ceiling_reached',
   '2H-RECOVER-004: and why it stopped, from the closed vocabulary'
 );
 
 select is(
   (select attempt_count from public.operator_stalled_deletions(100)
-   where user_id = '2h100001-0000-4000-8000-000000000001'),
+   where user_id = 'd7100001-0000-4000-8000-000000000001'),
   5,
   '2H-RECOVER-004: and how many times it was retried -- the read whose absence made the stall take a day to diagnose'
 );

@@ -176,8 +176,15 @@ select is(
   -- one `select *` -- T-26 exactly. The two callers that genuinely needed it are
   -- routed through `admin_credential_status` and
   -- `admin_list_credential_envelopes` instead of the closure being weakened.
-  'account_deletion_log, auth_event_attempts, credential_validation_attempts, product_events, task_command_confirmations, user_ai_credentials',
-  'exactly the six RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  -- `account_deletion_attempts` joins in 2H.1 (`202608070079`). It carries the
+  -- bounded retry state for a stalled deletion, and it is closed to
+  -- `service_role` for the reason the carve-out exists at all: the six
+  -- functions that touch it each do one thing and validate their own caller,
+  -- whereas a table grant would let any service-role holder rewrite an attempt
+  -- count or clear a terminal classification -- which is to say, silently
+  -- un-stall a deletion that a bound deliberately stopped.
+  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, product_events, task_command_confirmations, user_ai_credentials',
+  'exactly the seven RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -311,13 +318,14 @@ select is(
         and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
-  -- Twenty-seven of the forty-six public base tables deviate from the norm, and
+  -- Twenty-eight of the forty-seven public base tables deviate from the norm, and
   -- every one of them deviates because a named migration said so. The five
   -- shapes, so a reader can check a line against an intent rather than against
   -- a memory:
   --
   --   (none)                 RPC-only: no client touches the table at all --
-  --                          account_deletion_log, auth_event_attempts
+  --                          account_deletion_attempts, account_deletion_log,
+  --                          auth_event_attempts
   --   SELECT                 read-only to the client: it is written by an RPC,
   --                          a trigger or the platform -- account_lifecycle,
   --                          ai_model_pricing, ai_usage_events,
@@ -342,7 +350,8 @@ select is(
   -- `protect_entry_original` trigger rather than by a revoke, so its grant is
   -- the norm and the immutability lives one layer down. A line appearing for it
   -- would mean that trigger had been replaced by a grant change.
-  E'account_deletion_log -> (none)\n'
+  E'account_deletion_attempts -> (none)\n'
+  || E'account_deletion_log -> (none)\n'
   || E'account_lifecycle -> SELECT\n'
   || E'ai_model_pricing -> SELECT\n'
   || E'ai_usage_events -> SELECT\n'
