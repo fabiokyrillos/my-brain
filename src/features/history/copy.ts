@@ -211,6 +211,12 @@ const ptBR: HistoryCopy = {
     // reader would recognise. The sentence says what happened to the work, not
     // which internal row it was.
     job_deferred_inactive_owner: "devolveu um processamento à fila",
+    // No `{subject}` in the three below: `entity_id` is the account's own id.
+    // The sentences say what happened to the deletion, in the words a person
+    // waiting for their account to be erased would use.
+    account_deletion_retry_claimed: "tentou concluir a exclusão da conta novamente",
+    account_deletion_retry_result: "registrou o resultado da tentativa de exclusão",
+    account_deletion_recovery_stalled: "interrompeu as tentativas automáticas de exclusão",
     archive_memory: "arquivou a memória[ “{subject}”]",
     // No `{subject}` placeholder in any of the eight below: `entity_id` is the
     // junction row's own id, so there is no name to fill it with — and inventing
@@ -379,6 +385,9 @@ const en: HistoryCopy = {
     // reason column already carries the from/to states in plain words.
     account_lifecycle_transition: "changed the account status",
     job_deferred_inactive_owner: "returned a processing job to the queue",
+    account_deletion_retry_claimed: "tried to finish deleting the account again",
+    account_deletion_retry_result: "recorded the outcome of the deletion attempt",
+    account_deletion_recovery_stalled: "stopped retrying the account deletion automatically",
     archive_memory: "archived the memory[ “{subject}”]",
     associate_person_context: "linked a person to a context",
     associate_person_project: "linked a person to a project",

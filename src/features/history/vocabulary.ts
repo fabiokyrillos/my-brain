@@ -89,6 +89,16 @@ export const HISTORY_ACTION_TYPES = [
   // land between a claim and its reload — but it is an automatic action that
   // moved the user's work, so it is auditable and therefore renderable.
   "job_deferred_inactive_owner",
+  // 2H.1: the deletion-recovery reaper (202608070079). Three action types, one
+  // per thing that can happen to a stuck deletion — it was retried, the retry
+  // reported back, or it spent its ceiling and became terminal. They are in
+  // this list because the user whose deletion they concern can still read their
+  // own history right up to the moment the deletion succeeds, and an automatic
+  // action on their account that rendered as a neutral fallback would be an
+  // automatic action they could not read.
+  "account_deletion_retry_claimed",
+  "account_deletion_retry_result",
+  "account_deletion_recovery_stalled",
   "archive_memory",
   "associate_person_context",
   "associate_person_project",
@@ -170,6 +180,13 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // user scans for things that went wrong — the same reasoning
   // `entry_awaiting_ai_configuration` carries below.
   job_deferred_inactive_owner: "lifecycle",
+  // The deletion the account asked for is being carried out. Nothing was
+  // created, changed or undone, and none of the three is a `failed`: a retry
+  // that stopped is the mechanism working, and filing it under failures would
+  // put it in the list a user scans for things that went wrong.
+  account_deletion_retry_claimed: "lifecycle",
+  account_deletion_retry_result: "lifecycle",
+  account_deletion_recovery_stalled: "lifecycle",
   archive_memory: "lifecycle",
   // A link created is a creation; a link ended is a lifecycle event, not a
   // change — the same split `reminder_cancelled` versus `reminder_edited` uses.
