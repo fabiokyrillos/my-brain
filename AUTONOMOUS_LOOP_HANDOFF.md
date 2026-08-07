@@ -1541,3 +1541,176 @@ Signup **disabled** at both layers · CAPTCHA **enforced** (turnstile) · SMTP
 scheduled, five user-content sweeps and both 2H.2 sweeps **unscheduled** · no
 purge authorized or executed · `process-jobs` **not deployed** (ADR-086 open) ·
 `heartbeat` undeployed by design · **Phase 2I not started.**
+
+*(Historical as of §35: `process-jobs` and `delete-account` are both deployed
+and at parity since 2026-08-07. The rest of this posture line still holds.)*
+
+## §35 — Slice 2H.3 closed and deployed, and Edge Function parity is restored
+
+**Read §34 first.** This section continues it and does not repeat it.
+
+### Where the phase stands
+
+| Slice | State | Migration | Hosted |
+| --- | --- | --- | --- |
+| 2H.0 gates | closed | 0 | — |
+| **2H.1** deletion recovery | **closed and deployed** | `202608070079` | applied |
+| **2H.2** error sink + dead-man | **closed and deployed** | `202608070080` | applied |
+| **2H.3** rate limiting | **closed and deployed** | `202608070081` | applied |
+| 2H.4 operator surfaces | **not started** | 1 allocated | — |
+| 2H.5 deploy/retention/backup | **not started** | 1 allocated | — |
+| 2H.6 closeout | **not started** | 0 | — |
+
+**Migration budget: 5 allocated · 3 spent · 2 remaining**, per-slice and
+non-transferable. **Hosted parity: `202608070081`, 81 migrations, local =
+remote.** `AUTHORIZED_MIGRATION_HEAD` in `egc-invariants.test.ts` tracks it.
+
+Merge SHAs, each verified green ×3 **per job** rather than from the run's
+overall conclusion: `d7d5091` (2H.1), `57dab71` (2H.1 record), `88c9e3b`
+(2H.2), `6d45bc7` (2H.2 record), **`46f7244` (2H.3)**. PRs #114–#119. Every
+branch preserved.
+
+### The biggest thing that changed: parity is closed
+
+```
+delete-account    2026-08-07T13:15    ok      (v3)
+heartbeat         (never)             not deployed, by design
+process-jobs      2026-08-07T13:19    ok      (v21)
+
+every deployed function is at or ahead of its source
+```
+
+**Two of §34's three "built but deliberately not live" items are now live.**
+Only the first remains:
+
+1. **The deletion reaper is still unarmed** — no `my-brain-deletion-reaper` cron
+   job, 0/2 Vault secrets (`deletion_reap_url`, `deletion_reap_secret`). Arming
+   is an owner action and remains unauthorized. **What changed is that the door
+   is now deployed and provably closed**: an empty secret *and* a well-formed
+   64-character wrong secret both answer `401 reap_disabled`, because an
+   unconfigured door has no correct secret to present.
+2. ~~`delete-account` is behind repository source~~ — **deployed, v2 → v3.**
+   `executor.ts` is byte-unchanged: the reaper gained a door into the executor
+   without the executor gaining a capability.
+3. ~~Nothing calls `record_scheduled_job_run`~~ — **still true.** All five cron
+   jobs read `never_reported`. Wiring the callers is 2H.4's job, and it is named
+   in the authorization.
+
+`process-jobs` is deployed too (v20 → v21, ADR-086 executed), which gives
+`2H-DEPLOY-007` its execution evidence. It shipped three material changes that
+had been sitting undeployed for five days: the lifecycle gate at worker reload,
+BYOK rotation-window support, and `SH-QUOTA-008`'s request-body byte bound — the
+last of which is now proved **live** by a `413` on an oversized body.
+
+### The ordering decision 2H.3 forced, which 2H.4 and 2H.5 inherit
+
+**A merge to `main` auto-deploys the application to Vercel Production with no
+operator act** (G-2H.2's finding, threat `T-2H-25`). The database does not move
+with it. For 2H.3 that mattered for the first time, because the application
+calls a function the migration creates:
+
+* migration first, application second → nothing degrades;
+* application first, migration second → `claim_rate_limit_slot` does not exist,
+  the fail-closed rule turns `PGRST202` into a refusal, and **every AI
+  operation, upload and best-effort embedding is refused** until the migration
+  lands. Capture survives; it never calls the limiter.
+
+So `202608070081` was applied **inside the merge window**, before Vercel's
+production build completed, rather than after the merge-SHA run. Exact merge-SHA
+CI green ×3 was still required and still verified. The reasoning is written in
+full in `PHASE_2H_SLICE_03_ACCEPTANCE.md` §8. **Any later slice whose
+application code depends on a new database contract must do the same.**
+
+### What 2H.3 actually built, in one paragraph
+
+A per-owner, cross-process, rolling-window limiter that reuses SH.5's
+`claim_auth_event_slot` arrangement verbatim — advisory lock on
+`(bucket, owner)`, count inside it, slot reserved **by inserting** in the same
+locked transaction. Three doors: `claim_rate_limit_slot` (`authenticated`,
+identity from `auth.uid()`), `claim_rate_limit_slot_for_user` (`service_role`),
+and `private.consume_rate_limit_slot`, which **no role** may execute. The signed
+§14.2 values live in the PRD, in `src/lib/rate-limits.ts` (passed as required
+arguments, no default in any of the three signatures) and in
+`private.rate_limit_parameters` — pinned in both directions by
+`rate-limits-parity.test.ts`, three places holding one value.
+
+### Four things the next session should not have to rediscover
+
+**A refusal returns as data, not as an exception, and that is correctness.**
+PostgREST runs one RPC in one transaction, so a refusal that raised would roll
+back the `refused` row that recorded it — the refusal would report itself by
+destroying its own evidence. Refused rows also do not count toward the ceiling,
+or a refusal storm would extend a lockout past the point the real usage expired.
+
+**`attempts = 0` is how V-4 and V-5 are implemented.** A first claim consumes the
+owner's AI slot; an automatic retry does not; a reprocess the user asked for
+enqueues a *new* job whose first claim has `attempts = 0`. No "was this a human"
+flag was needed, because the queue does not carry one. A rate-refused claim
+returns `null` — the shape the deployed worker already treats as an empty drain
+— and **burns no attempt**.
+
+**A new table has five chain guards to join, and CI is where they speak.**
+`rate_limit_events` had to join `signup_hardening_cascade_drill.sql`,
+`signup_hardening_grant_census.sql` (the RPC-only list, now ten, *and* the
+`authenticated` matrix, now thirty-one of fifty), `verify-phase-2f-cleanup.mjs`,
+and `deletion-capability-guard.test.ts`. `account_owned_row_counts` picked it up
+**unasked**, because it enumerates the catalog at run time. The Windows baseline
+cannot see three of these files at all — budget an iteration.
+
+**SH-WORKER-003 forced re-declaring two functions that did not need to change.**
+The rule is that the lifecycle and fairness predicates are identical on every
+claim path, and the mechanism that makes it *checkable* is that all three live in
+one file. Replacing only `claim_entry_interpretation_job` would have left the
+invariant true today and unenforceable tomorrow. The guard caught it.
+
+### Two defects the gates caught, and three probes that were wrong
+
+**The pgTAP gate caught a check that failed on its own explanation.** `prosrc`
+includes comments, and the limiter's comment *names* `date_trunc` to say why it
+is not used — so "no truncation anywhere in it" failed on the sentence
+explaining that there is no truncation. Comments are stripped before the check
+now. A gate that fails on the explanation gets the comment deleted rather than
+the code fixed.
+
+**The pgTAP gate also caught SH-SUSPEND-006's census seeing the limiter work.**
+Section G's reactivation claim is a *first* claim, so it consumes a slot, so
+`rate_limit_events` grew across a cycle asserted to change nothing. It now joins
+`audit_logs` in that exclusion — operational state that *should* grow — and the
+growth is asserted separately, which is stronger evidence than the equality it
+left.
+
+**Three probe defects, all mine, all during hosted verification.** A `reaper`
+substring match that conflated `my-brain-job-reaper` (pre-existing, job leases)
+with `my-brain-deletion-reaper` (2H.1, unarmed). `.startsWith` called on an
+epoch-millisecond number. And reap probes that sent only `apikey`, so they read
+the platform gateway's `UNAUTHORIZED_NO_AUTH_HEADER` as the function's answer —
+**a probe that would have "passed" against a function that was never deployed.**
+`delete-account` has no `[functions.delete-account]` block in `config.toml`, so
+`verify_jwt` defaults to **true**; every probe of it must carry a transport
+credential, and a control must prove the probe reached the function.
+`process-jobs` sets `verify_jwt = false`, so its probes do not.
+
+**Suspect the probe before the product.** That is now three times.
+
+### Posture, re-read after every deployment in this session
+
+Signup **disabled** at both layers · CAPTCHA **enforced** (turnstile) · SMTP
+**unconfigured** · exactly **five** cron jobs, unchanged, of which the only two
+pre-authorized destructive ones prune auth/credential *attempts* and not user
+content · five user-content sweeps and both 2H.2 sweeps **unscheduled** · no
+purge authorized or executed · **`delete-account` and `process-jobs` both
+deployed and at parity** · `heartbeat` undeployed by design · deletion reaper
+**unarmed**, 0/2 Vault secrets · no restore drill executed · **Phase 2I not
+started.**
+
+### Where 2H.4 starts
+
+`2H-OPS-001…005`, `2H-SINK-005`, `2H-DEADMAN-004`, **one migration**, bound by
+ADR-075: operator CLI over narrow `service_role` SQL, **no product admin UI and
+no generic service-role HTTP endpoint** — a dashboard route is a scope
+violation, not a stretch goal. It must close the producer-with-no-consumer gap
+2H.2 left on purpose, and wire the accepted job paths to call
+`record_scheduled_job_run` while keeping "the tick fired" and "something useful
+happened" in separate columns. The error sink already has its first
+application-side producer outside its own tests: 2H.3's
+`RATE_LIMIT_STATE_UNAVAILABLE` path writes to it.

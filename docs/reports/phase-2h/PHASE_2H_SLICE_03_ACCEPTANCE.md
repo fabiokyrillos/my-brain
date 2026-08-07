@@ -312,4 +312,151 @@ applying it early safe in a way that applying the *code* early is not.
 
 ## 9. Post-merge — hosted deployment
 
-*Filled in after the migration is applied and exact merge-SHA CI is green ×3.*
+**Merged at `46f7244`** (PR #119). **Exact merge-SHA CI green ×3**, read per job
+rather than from the run's overall conclusion:
+
+| Job | Result |
+| --- | --- |
+| `application (lint, types, unit, build)` | success |
+| `database and journey (migrations, pgTAP, db lint, foundation e2e)` | success |
+| `edge worker (deno types, deno tests)` | success |
+
+**`202608070081` applied. Hosted parity is exactly `202608070081`, 81
+migrations, local = remote.**
+
+### 9.1 `2H-RATE-004`, executed against a real database
+
+The CI `database` job ran the race, and the numbers are exact:
+
+```
+rate-limit race validator self-test passed (9 mutations rejected)
+ai:     80 concurrent racers through the worker door  against a ceiling of 60
+        — exactly 60 admitted, 20 refused by name, and the limiter stored exactly 60 admitted rows.
+upload: 30 concurrent racers through the session door against a ceiling of 20
+        — exactly 20 admitted, 10 refused by name, and the limiter stored exactly 20 admitted rows.
+cleanup verified: 0 limiter rows remain for 4 disposable accounts
+```
+
+The full pgTAP suite passed: **63 of 63**.
+
+### 9.2 Hosted acceptance — 28 of 28
+
+Parity and count; forced RLS with exactly one deny-all policy; five columns and
+none of them spend; **no API role holds any grant** on the limiter state; the
+three signed values exactly as signed; the session door `authenticated`-only,
+the worker door `service_role`-only, and the core decision reachable by **no
+role**; every new or replaced claim function `SECURITY DEFINER` with an empty
+`search_path`; `rate_limit_refused` admitted and `capture_save_failed` retained;
+the declared payload validating on the **deployed** validator while SH.6's
+`quota` literal, an unsigned bucket and a free-text rider are each refused by it;
+no account identifier and no truncation in the deployed function body; the cron
+catalog unchanged at five; the reaper still unarmed at 0/2; no purge; and the
+limiter ledger starting empty.
+
+**One probe defect, found and fixed rather than reported as a posture failure.**
+The first run failed `cron catalog still holds exactly the five known jobs`
+because the check matched any job name containing `reaper` — and
+`my-brain-job-reaper` is the pre-existing **job-lease** reaper, not 2H.1's
+deletion reaper. The probe was conflating two different things with the same
+word. It now names `my-brain-deletion-reaper` exactly, and separately asserts
+that no retention sweep is scheduled. This is `control-must-not-be-exempt`
+recurring in its other form: **suspect the probe before the product.**
+
+### 9.3 The two Edge Function deployments — separate, gated, and recorded
+
+Both were executed as **standalone operations from synchronized `main`**, never
+bundled into the slice merge, and each verified after the fact rather than
+assumed.
+
+#### `delete-account` — closing 2H.1's parity gap (ADR-088's reap door)
+
+Ten pre-deploy gates, all satisfied. `verify:edge-parity` read **STALE** with
+exactly one undeployed commit, `104d848`. The deployable diff is `index.ts`
+(+19 lines: a comment, one import, one branch), `reap.ts` and `reap.test.ts` —
+and `executor.ts` is **byte-unchanged**, which is the claim that matters: the
+reaper gained a door into the executor without the executor gaining a
+capability. The user-triggered route is unchanged below the branch. The full
+Deno suite passed **28/28** and `deno check` was clean.
+
+Deployed: **version 2 → version 3**, `2026-08-07T13:15:22Z`.
+
+**19 of 19 post-deployment checks.** The reap door was probed live and refused
+three ways, with a control proving the probes reached the function at all:
+
+* a **control** first — an unauthenticated request is refused by the platform
+  gateway (`verify_jwt` defaults to true for this function), which is why every
+  probe below carries a transport credential;
+* an empty reap secret → `401 reap_disabled`;
+* a well-formed 64-character wrong secret → **also** `401 reap_disabled`, not a
+  mismatch, because an unconfigured door has no correct secret to present;
+* a valid JWT that is not a user session → `401 invalid_access_token`;
+* `GET` → `405`.
+
+**It remains unarmed and provably so:** 0/2 Vault secrets, no
+`my-brain-deletion-reaper` cron job, no account in `deleting`, and
+`account_deletion_log`, `account_deletion_attempts` and `auth.users` all
+unchanged across the probes — measured as a **delta** against a before-snapshot,
+because the log is append-only and already held ten rows from SH.2's own
+acceptance. Asserting it was empty would have been asserting something that
+stopped being true weeks ago.
+
+Two probe defects were found and fixed during this verification, both mine:
+`updated_at` arrives as epoch milliseconds and the first draft called
+`.startsWith` on a number; and the first draft's reap probes sent only `apikey`,
+so they read the gateway's `UNAUTHORIZED_NO_AUTH_HEADER` as the function's
+answer — **a probe that would have "passed" against a function that was never
+deployed.**
+
+#### `process-jobs` — ADR-086 executed
+
+The audit was re-run against live state. A fresh pre-flight read the RPC names
+**out of the worker source** rather than from a hand-written list, and checked
+each against hosted parity: **14 of 14 exist with the argument list the worker
+sends, and `service_role` holds EXECUTE on every one.**
+`claim_next_entry_interpretation_job(p_worker_id text, p_lease_seconds integer)`
+is unchanged by `202608070081` — this slice re-declared it byte-identically, so
+the worker's call still resolves. `npm run byok:verify-runtime` read **5 pass, 0
+fail**.
+
+**Ordering:** deployed **after** the 2H.3 migration and application wiring
+landed, so the deployed worker and the database contract moved coherently. 2H.3
+does change what the drain can answer — a claim may now return `null` because
+the owner is at their AI ceiling — and the deployed worker already handles
+`null` as an empty drain, which is exactly why that refusal shape was chosen.
+
+Deployed: **version 20 → version 21**, `2026-08-07T13:19:36Z`.
+
+**20 of 20 post-deployment checks**, on a lane designed so that every probe is
+refused or is a no-op:
+
+* **`SH-QUOTA-008` — an oversized request body is refused `413` before it is
+  parsed.** This is the change the deploy exists to ship, and it is now proved
+  live rather than in a unit test.
+* a malformed body is refused, not parsed;
+* a job id belonging to nobody is refused, never executed.
+
+And nothing moved: jobs `4 → 4`, running `0 → 0`, failed `0 → 0`, **total
+attempts `4 → 4`**, entries `4 → 4`, `ai_usage_events` `10 → 10` — no provider
+call was made — and `rate_limit_events` `0 → 0`, so the probes consumed no slot.
+
+#### Parity, for the first time in this phase
+
+```
+delete-account    2026-08-07T13:15    ok
+heartbeat         (never)             not deployed, by design
+process-jobs      2026-08-07T13:19    ok
+
+every deployed function is at or ahead of its source
+```
+
+**The phase's founding defect was a parity gap nobody measured. It is now
+measured, and it is closed.**
+
+### 9.4 What was NOT done
+
+No cron job created or changed — the catalog is still exactly five. No Vault
+secret configured. No retention sweep scheduled or executed. No purge. No
+account deleted, suspended or driven to `deleting`. No hosted Auth setting
+touched — signup **disabled**, CAPTCHA **enforced** (turnstile), SMTP **unset**.
+`heartbeat` remains undeployed by design. No product admin UI and no generic
+privileged endpoint was introduced.
