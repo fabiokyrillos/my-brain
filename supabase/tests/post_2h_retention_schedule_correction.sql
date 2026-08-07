@@ -187,8 +187,13 @@ select ok(
 -- count-only twin reading zero against an empty database.
 -- ---------------------------------------------------------------------------
 
+-- Cast to int deliberately: the twin returns `bigint`, and pgTAP's `is()` is
+-- `is(anyelement, anyelement)`, so `is(bigint, 0)` cannot resolve its
+-- polymorphic signature against an integer literal and fails as
+-- "function is(bigint, integer) does not exist" -- a suite error rather than a
+-- test failure, which is the harder kind to read.
 select is(
-  public.count_prunable_error_events(),
+  public.count_prunable_error_events()::int,
   0,
   'POST-2H-RETENTION-005: nothing is prunable in a freshly built database, so no purge is pending or implied'
 );
