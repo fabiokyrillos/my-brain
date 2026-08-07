@@ -28,6 +28,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
+vi.mock("@/features/rate-limits/server", () => ({
+  admitRateLimitedOperation: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("@/features/product-analytics/server", () => ({
   createProductEventIdempotencyKey: vi.fn(() => "55555555-5555-5555-8555-555555555555"),
   recordProductEvent: vi.fn(async () => ({ accepted: true, recorded: true, eventId: "evt-1", code: "recorded" })),

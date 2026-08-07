@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import * as agentActions from "./actions";
 import type { AgentFormState } from "./forms";
 
@@ -16,6 +17,11 @@ vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn() }));
 vi.mock("@/features/product-analytics/server", () => ({
   createProductEventIdempotencyKey: vi.fn(() => "44444444-4444-5444-8444-444444444444"),
   recordProductEvent: vi.fn(),
+}));
+// 2H-RATE-001. Admitted by default so the pre-existing cases keep testing what
+// they were written to test; the refusal case below flips it deliberately.
+vi.mock("@/features/rate-limits/server", () => ({
+  admitRateLimitedOperation: vi.fn(async () => ({ ok: true })),
 }));
 
 type RetryAction = (
@@ -130,6 +136,36 @@ describe("retryAttachmentJob", () => {
 
     expect(invoke).not.toHaveBeenCalled();
     expect(result).toEqual({ status: "error", message: "Job is not available." });
+  });
+
+  it("2H-RATE-001: a rate refusal stops the retry before the worker is invoked", async () => {
+    // PRD §14.2 V-4: a user-initiated retry consumes a slot, so it can be
+    // refused. What matters is where the refusal lands — before the invoke, so
+    // no provider work is started and no attempt is spent on a request the
+    // ceiling had already declined.
+    expect(retryAttachmentJob).toBeTypeOf("function");
+    if (!retryAttachmentJob) return;
+
+    vi.mocked(admitRateLimitedOperation).mockResolvedValueOnce({
+      ok: false,
+      refusal: "RATE_LIMIT_AI",
+      message: "Hourly AI pace reached. …",
+    });
+
+    const { client, invoke } = createSupabaseMock({
+      id: jobId,
+      status: "failed",
+      attempts: 1,
+      max_attempts: 5,
+      next_attempt_at: "2020-01-01T00:00:00.000Z",
+    });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await retryAttachmentJob(idleState, retryForm("en"));
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("Hourly AI pace reached");
   });
 
   it("honors the persisted backoff before invoking the worker", async () => {

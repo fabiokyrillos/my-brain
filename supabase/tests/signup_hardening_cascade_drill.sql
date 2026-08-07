@@ -459,6 +459,16 @@ begin
     values ('server_action', 'capture_entry', 'provider_error', gen_random_uuid(), p_user);
   exception when others then failures := failures || ('error_events: ' || sqlerrm); end;
 
+  -- 2H.3's limiter state. Inserted directly rather than through
+  -- `consume_rate_limit_slot`, because that function is the admission decision
+  -- and calling it here would make the fixture depend on the ceiling rather
+  -- than on the row existing. What the drill needs is one owned row, so the
+  -- cascade has something to take.
+  begin
+    insert into public.rate_limit_events (user_id, bucket, outcome)
+    values (p_user, 'ai', 'admitted');
+  exception when others then failures := failures || ('rate_limit_events: ' || sqlerrm); end;
+
   return array_to_string(failures, ' | ');
 end;
 $populate$;

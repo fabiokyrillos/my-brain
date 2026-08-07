@@ -9,6 +9,7 @@ import { taskCommandUndoErrorDetailFor } from "@/features/task-commands/errors";
 import { getByokCopy } from "@/features/byok/copy";
 import { quotaRefusalMessage } from "@/features/quotas/copy";
 import { quotaRefusal, type QuotaDetail } from "@/features/quotas/refusal";
+import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { ATTACHMENT_LIMITS, QUOTAS } from "@/lib/quotas";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
@@ -626,6 +627,23 @@ export async function uploadAttachment(
   if (refusedBy)
     return { status: "error", message: quotaRefusalMessage(locale.data, refusedBy) };
 
+  // 2H-RATE-001, PRD §14.2 V-2. "Accepted upload request" is what the signed
+  // ceiling counts, so admission sits **here**: after everything that decides
+  // whether this request is acceptable at all (size, type, session, lifecycle
+  // and SH.6's storage ceilings) and before the bytes move. A request refused
+  // above never reaches the limiter and spends nothing; a request refused here
+  // leaves no Storage object and no `attachments` row, because neither has been
+  // written yet — which is the same property SH-QUOTA-004 wanted from refusing
+  // before the write, obtained for the same reason.
+  const uploadAdmission = await admitRateLimitedOperation({
+    client: supabase,
+    bucket: "upload",
+    locale: locale.data,
+    operation: "file_upload",
+  });
+  if (!uploadAdmission.ok)
+    return { status: "error", message: uploadAdmission.message };
+
   const safeName = file.name
     .normalize("NFKD")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
@@ -797,6 +815,22 @@ export async function retryAttachmentJob(
   if (sessionError || !session)
     return { status: "error", message: messages.session };
 
+  // 2H-RATE-001, PRD §14.2 V-4. This is a **user-initiated** retry, and V-4 is
+  // explicit that those consume a new slot while bounded automatic worker
+  // retries do not. The distinction is not "was it a retry" but "did a person
+  // ask for it": an automatic attempt is the queue finishing work it was already
+  // admitted for, and a person pressing the button is a new request for provider
+  // time. Attachment claims deliberately carry no admission of their own, so
+  // this is the only place the file-analysis path can be bounded.
+  const retryAdmission = await admitRateLimitedOperation({
+    client: supabase,
+    bucket: "ai",
+    locale: parsed.data.locale,
+    operation: "process_attachment",
+  });
+  if (!retryAdmission.ok)
+    return { status: "error", message: retryAdmission.message };
+
   const { error: invokeError } = await supabase.functions.invoke(
     "process-jobs",
     {
@@ -952,6 +986,19 @@ export async function generateReview(
         message: getByokCopy(parsed.data.locale).messages[gateMessageKey(gate.reason)],
       };
     }
+
+    // 2H-RATE-001. Immediately after the gate and before the prompt is
+    // assembled, for the reason stated above it: a refusal must reach no
+    // network, and the most expensive operation in the product is the one whose
+    // ceiling matters most.
+    const reviewAdmission = await admitRateLimitedOperation({
+      client: supabase,
+      bucket: "ai",
+      locale: parsed.data.locale,
+      operation: "chat_answer",
+    });
+    if (!reviewAdmission.ok)
+      return { status: "error", message: reviewAdmission.message };
 
     const answer = await getAIProvider({
       credential: gate.credential.secret,

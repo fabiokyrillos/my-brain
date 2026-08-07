@@ -105,11 +105,13 @@ async function embedMemory(
   supabase: Client,
   userId: string,
   content: string,
+  locale: Locale,
 ): Promise<{ embedding: number[]; embedding_model: string } | undefined> {
   try {
     const { getAIProvider } = await import("@/lib/ai");
     const { recordAIUsage } = await import("@/lib/ai/usage");
     const { openAiGate } = await import("@/lib/byok/gate");
+    const { admitRateLimitedOperation } = await import("@/features/rate-limits/server");
 
     // BYOK gate. Embedding is already best-effort here — the memory is saved
     // either way and an embedding failure must never destroy it — so a missing
@@ -118,6 +120,18 @@ async function embedMemory(
     // contract, and **no project key is consulted**, because none exists.
     const gate = await openAiGate(supabase, userId);
     if (!gate.ok) return undefined;
+
+    // 2H-RATE-001, degrading exactly like the gate above. The memory is saved
+    // either way, so a rate refusal returns `undefined` — "do not touch the
+    // stored vector" — rather than failing the edit. An hourly pace ceiling must
+    // never be able to stop somebody saving what they wrote.
+    const admission = await admitRateLimitedOperation({
+      client: supabase,
+      bucket: "ai",
+      locale,
+      operation: "embed_text",
+    });
+    if (!admission.ok) return undefined;
 
     const preferencesResult = await supabase
       .from("agent_preferences")
@@ -211,7 +225,7 @@ export async function updateMemory(
   // provider call — or risk replacing a good vector on a flaky one.
   const reEmbedded = before.data.content === content
     ? undefined
-    : await embedMemory(supabase, user.id, content);
+    : await embedMemory(supabase, user.id, content, parsed.data.locale);
 
   const { data: after, error } = await supabase
     .from("memories")
@@ -354,7 +368,7 @@ export async function createProposedMemory(
     return { status: "duplicate", message: copy.proposalDuplicate, memoryId: existing.data.id };
   }
 
-  const embedded = await embedMemory(supabase, user.id, content);
+  const embedded = await embedMemory(supabase, user.id, content, parsed.data.locale);
 
   const { data: created, error } = await supabase
     .from("memories")
