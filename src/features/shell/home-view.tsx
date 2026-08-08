@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { NeedsAttentionItemRow } from "@/features/daily-cycle/needs-attention-item";
+import type { PriorityReason } from "@/features/daily-cycle/today-priorities";
+import { presentationFor } from "@/features/sensitivity/contracts";
 import type { Locale } from "@/lib/preferences";
 import { getHomeCopy, withCount } from "./home-copy";
 
@@ -21,6 +23,13 @@ export type HomeTaskView = {
   readonly stateLabel: string;
 };
 
+export type HomePriorityView = {
+  readonly taskId: string;
+  readonly title: string;
+  readonly reason: PriorityReason;
+  readonly dueLabel: string | null;
+};
+
 export type HomeViewModel = {
   readonly todayLabel: string;
   readonly status:
@@ -29,6 +38,8 @@ export type HomeViewModel = {
     | { readonly kind: "saved" };
   readonly attention: readonly NeedsAttentionItemView[];
   readonly attentionHasMore: boolean;
+  /** `2J-HOJE-004`. Already capped and ordered by `selectTodayPriorities`. */
+  readonly priorities: readonly HomePriorityView[];
   readonly today: readonly HomeTaskView[];
   readonly todayHasMore: boolean;
   readonly waitingCount: number;
@@ -133,12 +144,60 @@ export function HomeView({
         >
           {view.attention.length ? (
             <div className="home-list">
-              {view.attention.map((item) => (
-                <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" />
-              ))}
+              {view.attention.map((item) =>
+                /*
+                  `2J-PRIVACY-001`/`004`/`005`. The row is rendered either way --
+                  masking in place rather than dropping the item is what keeps
+                  the count above honest. The mask withholds the entry preview,
+                  which is raw user text, and nothing else.
+                */
+                presentationFor("hoje", item.sensitivity).outcome === "mask" ? (
+                  <p className="home-masked" key={item.key} data-masked="true">
+                    {copy.maskedLabel}
+                  </p>
+                ) : (
+                  <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" />
+                ),
+              )}
             </div>
           ) : (
             <p className="quiet-state">{sections.attention.empty}</p>
+          )}
+        </Section>
+
+        {/*
+          `2J-HOJE-004`/`005`/`006`. Rendered before the day's full list because
+          it is the answer to "what do I do first"; the list below is the answer
+          to "what else is there". The heading says "at most three" and the rule
+          is printed, so the ordering is explainable without opening the code --
+          and when nothing qualifies the section says so rather than padding
+          itself from the list below it.
+        */}
+        <Section
+          title={sections.priorities.title}
+          hint={sections.priorities.hint}
+        >
+          {view.priorities.length ? (
+            <>
+              <ol className="home-priorities">
+                {view.priorities.map((priority) => (
+                  <li key={priority.taskId}>
+                    <Link href={`/${locale}/app/work?view=today`} className="home-task">
+                      <strong>{priority.title}</strong>
+                      <span className="home-task-meta">
+                        <span className="priority-reason" data-reason={priority.reason}>
+                          {sections.priorities.reasons[priority.reason]}
+                        </span>
+                        {priority.dueLabel ? <span>{priority.dueLabel}</span> : null}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+              <p className="home-priority-rule">{sections.priorities.rule}</p>
+            </>
+          ) : (
+            <p className="quiet-state">{sections.priorities.empty}</p>
           )}
         </Section>
 

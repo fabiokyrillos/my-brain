@@ -113,7 +113,20 @@
 .library-head { display: grid; gap: 8px; }
 .library-head h1 { margin: 0; font: 500 38px/1 var(--font-newsreader); letter-spacing: -.04em; }
 .library-head p { margin: 0; color: var(--ink-soft); line-height: 1.6; }
-.library-search-link { justify-self: start; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--blue); }
+/* `2J-ACCESS-006`. This link rendered 16px tall on a Pixel 7 -- below WCAG 2.2
+   AA 2.5.8's 24px minimum -- and shipped in Phase 2I because a jsdom test
+   cannot measure a painted box. `min-height` plus centring is the smallest fix
+   that does not move the link or change its type scale. */
+.library-search-link {
+  justify-self: start;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
 
 .library-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .library-card {

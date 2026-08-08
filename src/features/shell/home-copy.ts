@@ -27,12 +27,29 @@ export type HomeCopy = {
   readonly sections: {
     readonly attention: { readonly title: string; readonly hint: string; readonly empty: string };
     readonly today: { readonly title: string; readonly hint: string; readonly empty: string };
+    /** `2J-HOJE-004`. Up to three, and the heading never promises three. */
+    readonly priorities: {
+      readonly title: string;
+      readonly hint: string;
+      readonly empty: string;
+      /** `2J-HOJE-005`. The rule, in one plain sentence, shown to the user. */
+      readonly rule: string;
+      readonly reasons: {
+        readonly overdue: string;
+        readonly due_today: string;
+        readonly marked_urgent: string;
+      };
+    };
     readonly waiting: { readonly title: string; readonly one: string; readonly many: string };
     readonly question: { readonly title: string; readonly empty: string };
     readonly recent: { readonly title: string; readonly empty: string };
   };
   readonly viewAll: string;
   readonly viewAllWork: string;
+  /** `2J-PRIVACY-001`. What a masked row says instead of the content. */
+  readonly maskedLabel: string;
+  readonly revealLabel: string;
+  readonly hideLabel: string;
   readonly viewAllRecords: string;
   readonly answerQuestion: string;
 };
@@ -51,6 +68,17 @@ export const homeCopy = {
         title: "Precisa de você",
         hint: "Decisões que o {agent} não toma sozinho.",
         empty: "Nada precisa de você agora.",
+      },
+      priorities: {
+        title: "Prioridades de hoje",
+        hint: "No máximo três. Se menos coisas merecem hoje, menos aparecem.",
+        empty: "Nada exige prioridade hoje.",
+        rule: "Atrasadas primeiro, depois as de hoje, depois as marcadas como urgentes ou altas.",
+        reasons: {
+          overdue: "Atrasada",
+          due_today: "Vence hoje",
+          marked_urgent: "Marcada como urgente",
+        },
       },
       today: {
         title: "Para hoje",
@@ -73,6 +101,9 @@ export const homeCopy = {
     },
     viewAll: "Ver tudo",
     viewAllWork: "Ver todo o trabalho",
+    maskedLabel: "Conteúdo muito sensível, oculto",
+    revealLabel: "Mostrar",
+    hideLabel: "Ocultar",
     viewAllRecords: "Ver todos os registros",
     answerQuestion: "Responder",
   },
@@ -89,6 +120,17 @@ export const homeCopy = {
         title: "Needs you",
         hint: "Decisions {agent} will not make on its own.",
         empty: "Nothing needs you right now.",
+      },
+      priorities: {
+        title: "Today's priorities",
+        hint: "At most three. If fewer things deserve today, fewer appear.",
+        empty: "Nothing needs priority today.",
+        rule: "Overdue first, then due today, then anything marked urgent or high.",
+        reasons: {
+          overdue: "Overdue",
+          due_today: "Due today",
+          marked_urgent: "Marked urgent",
+        },
       },
       today: {
         title: "For today",
@@ -111,6 +153,9 @@ export const homeCopy = {
     },
     viewAll: "View all",
     viewAllWork: "View all work",
+    maskedLabel: "Highly sensitive content, hidden",
+    revealLabel: "Show",
+    hideLabel: "Hide",
     viewAllRecords: "View all records",
     answerQuestion: "Answer",
   },

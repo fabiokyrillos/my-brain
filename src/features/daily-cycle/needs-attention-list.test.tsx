@@ -25,6 +25,7 @@ function item(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAttentionIt
     primaryAction: { id: "confirm_existing_candidates", href: "/pt-BR/app/inbox/entry-1" },
     occurredAt: "2026-07-18T12:00:00.000Z",
     groupKey: "entry-1",
+    sensitivity: "normal" as const,
     ...overrides,
   };
 }

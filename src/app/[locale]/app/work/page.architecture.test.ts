@@ -36,8 +36,23 @@ describe("canonical Work page architecture", () => {
 describe("legacy Work route aliases", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  /**
+   * `2J-HOJE-001`/`002`. `/app/today` is no longer a Work alias -- it resolves
+   * to Hoje, the surface the word actually names. The URL still works, which is
+   * what `2J-HOJE-002` requires; what changed is where it lands.
+   *
+   * Asserted here rather than deleted, because "the alias was removed" and "the
+   * alias silently stopped redirecting anywhere" are the same green test
+   * otherwise.
+   */
+  it("sends /app/today to Hoje, not to a filtered task list", async () => {
+    await expect(TodayAlias({
+      params: Promise.resolve({ locale: "pt-BR" }),
+    })).rejects.toThrow("NEXT_REDIRECT:/pt-BR/app");
+    expect(navigation.redirect).toHaveBeenCalledWith("/pt-BR/app");
+  });
+
   it.each([
-    [TodayAlias, "pt-BR", "today"],
     [TasksAlias, "en", "all"],
     [WaitingAlias, "pt-BR", "waiting"],
   ] as const)("preserves locale, equivalent view, and page", async (Page, locale, view) => {

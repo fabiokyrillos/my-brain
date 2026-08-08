@@ -184,6 +184,11 @@ describe("daily cycle product projection mappers", () => {
       explanation: "Confira a compreensão antes de seguir.",
       primaryAction: { id: "review_interpretation", href: "/pt-BR/app/inbox/entry-1" },
       secondaryAction: { id: "open_entry", href: "/pt-BR/app/inbox/entry-1" },
+      // `2J-PRIVACY-003`/`005`. The source declares no sensitivity, and
+      // `toSensitivityLevel` fails CLOSED -- an unclassified preview is treated
+      // as the most protective level, never the least. Asserted here because
+      // this is where a future mapper change could quietly default to "normal".
+      sensitivity: "highly_sensitive",
       occurredAt,
       groupKey: "entry-1",
     });

@@ -17,6 +17,7 @@ function item(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAttentionIt
     title: "Ligar para a Marina",
     explanation: "Há tarefas sugeridas prontas para sua confirmação.",
     primaryAction: { id: "confirm_existing_candidates", href: "/pt-BR/app/inbox/72f1f8af-8b90-4f1d-9916-ec6d983fd4c6" },
+    sensitivity: "normal" as const,
     occurredAt: "2026-07-18T12:00:00.000Z",
     groupKey: "72f1f8af-8b90-4f1d-9916-ec6d983fd4c6",
     ...overrides,

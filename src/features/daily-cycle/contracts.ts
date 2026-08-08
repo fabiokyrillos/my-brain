@@ -1,3 +1,5 @@
+import type { SensitivityLevel } from "@/features/sensitivity/contracts";
+
 export const productStates = [
   "saved",
   "organizing",
@@ -154,6 +156,14 @@ export type NeedsAttentionItemView = {
   readonly kind: TrackedAttentionReason;
   readonly entryId: string;
   readonly title: string;
+  /**
+   * `2J-PRIVACY-005`. The queue renders a 240-character preview of the entry's
+   * own text, so the row carries content and must carry its classification with
+   * it. Threaded through the projection rather than fetched at render time:
+   * a surface that has to ask a second question to know whether it may print
+   * something will eventually forget to ask.
+   */
+  readonly sensitivity: SensitivityLevel;
   readonly explanation: string;
   readonly primaryAction: AvailableAction;
   readonly secondaryAction?: AvailableAction;
