@@ -250,3 +250,60 @@
   font-size: 13px;
   color: var(--muted);
 }
+
+/* `2J-ATTN-005`. Filter chips. A fieldset/legend rather than a div/span so the
+   group announces itself; the legend is visible because a filter you cannot see
+   the purpose of is a row of unexplained buttons. */
+.attention-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.attention-filters legend {
+  padding: 0;
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.attention-filter {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #d6dbe3);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+.attention-filter[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* `2J-ATTN-007`/`010`. The inline and bulk retries. Both are ordinary buttons
+   with visible labels -- no icon-only affordance and no gesture, because
+   2J-ATTN-011 requires the mobile interaction to have a visible equivalent. */
+.attention-entry { display: grid; gap: 6px; }
+.attention-inline-retry { justify-self: start; min-height: 32px; }
+.attention-bulk-retry { margin-bottom: 12px; min-height: 36px; }
+
+/* `2J-CAPTURE-001`. The modality tabs. Sized for a thumb (2J-ACCESS-006's 24px
+   floor is a minimum, not a target) and labelled with words as well as icons --
+   an icon-only tab row is a guessing game on first use. */
+.unified-capture { display: grid; gap: 12px; }
+.capture-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.capture-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border, #d6dbe3);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+.capture-mode[aria-selected="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.capture-no-classification { margin: 0; font-size: 12px; color: var(--muted); }
