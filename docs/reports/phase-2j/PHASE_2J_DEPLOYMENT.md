@@ -89,6 +89,14 @@ Read from hosted state, not from a local filename:
 
 ## 5. FINDING — the three Phase 2J events still cannot be recorded
 
+> **RESOLVED 2026-08-08 by `202608080087`.** The owner authorized Option B below; the
+> redundant gate was removed rather than synchronized, the missing regression test now
+> writes every CHECK-declared name through the real writer, and hosted acceptance proves
+> all four events accepted with the negatives still fail-closed. See
+> `POST_2J_PRODUCT_EVENT_WRITER_CORRECTION.md`. **This section is left as written** — it is
+> what the first deployment actually found, and the record of that deployment is not
+> retouched to look clean in hindsight.
+
 **Severity: the phase's telemetry deliverable is inert on the live project. Nothing is
 broken *by* the deployment; the deployment simply does not reach far enough.**
 

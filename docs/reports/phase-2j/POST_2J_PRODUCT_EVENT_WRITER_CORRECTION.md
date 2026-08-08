@@ -164,11 +164,105 @@ is precisely why Option B was the right instruction.
 This is a **pre-existing Phase 2H defect surfaced by Phase 2J deployment verification**, not
 a Phase 2J regression, and Phase 2H's own records are not rewritten to hide it.
 
-## 8. Live state after the repair
+## 8. CI and deployment
 
-Recorded in **§9** below once the corrective migration is deployed and proved on hosted.
+| Step (ADR-090) | Result |
+| --- | --- |
+| PR-head run | PR **#143**, SHA `e9d6916` — **green, attempt 1**, all three jobs with real step counts |
+| Full-diff review | 6 files, 853 insertions; `202608080085`/`202608080086` untouched (verified by path diff) |
+| Merge | `db5ee41` |
+| Exact merge-SHA run | `db5ee41` — **green, attempt 1**, all three jobs |
+| Deploy | `202608080087` applied; both in-transaction verification blocks passed |
+
+The `database` job log confirms the migration applied against the chain **rebuilt from an
+empty database**, and that `supabase/tests/post_2j_product_event_write_path.sql` ran and
+reported `ok` — checked rather than assumed, because a test file that is never picked up
+passes the suite vacuously.
+
+No green run was re-run, and no run was used as acceptance twice.
 
 ## 9. Hosted acceptance
 
-*Pending deployment. This section is written from a hosted readback, never from a local
-filename, and this file is not to be read as complete until it is filled in.*
+Pre-deploy hosted head `202608080086`, exactly one pending migration, dry run confirming
+only `202608080087`, working tree clean at `db5ee41` and the migration file byte-identical
+to merged `main`.
+
+**Parity after: local = remote = `202608080087`, 87 migrations**, present in all three
+columns of `supabase migration list --linked`. Read from hosted state.
+
+### A + B. The four events that were refused
+
+Through the **real writer** on the deployed project, in a transaction whose only exit is a
+`raise`:
+
+```
+[CONTROL] work_view_viewed                 ACCEPTED recorded=true
+[2J-1]    capture_mode_selected            ACCEPTED recorded=true
+[2J-2]    voice_transcription_finished     ACCEPTED recorded=true
+[2J-3]    attention_item_resolved          ACCEPTED recorded=true
+[2H]      rate_limit_refused               ACCEPTED recorded=true
+```
+
+Every line that read `REFUSED 22023 Unsupported product event` before the repair now reads
+`ACCEPTED`. The control is unchanged, which is what makes the four meaningful.
+
+### C. Negative controls — still fail-closed
+
+```
+undeclared event name          refused 22023
+free-text `transcript`         refused 22023
+authenticated → service writer refused 42501
+unclaimed caller → usage       refused 42501
+unclaimed caller → events      refused 42501
+```
+
+### D. Producer → writer → `product_events` → consumer
+
+Proved end to end on a **disposable account**, with no personal content — every payload is
+a closed enum value:
+
+1. **Producer → writer**: all four events written through
+   `record_product_event_for_user` over PostgREST, the same RPC the server producers call.
+2. **Writer → table**: four rows.
+3. **Table → consumer under RLS**: the fixture owner's own session (obtained via
+   `admin/generate_link`'s one-time code exchanged at `/auth/v1/verify`, because hosted
+   CAPTCHA refuses password sign-in) reads exactly its **four** rows through PostgREST.
+4. **Consumer**: `aggregateExperienceFunnel` — the real function
+   `scripts/phase-2j-experience-funnel.mjs` exports and the reader runs — reports
+   `considered: 3 (ignored: 1)`, voice `1`, transcription succeeded `1`, draft edited
+   `1 / 0`, attention retry `1`, `under_5s` `1`. Exactly the fixtures. The one **ignored**
+   row is `rate_limit_refused`, which is correctly outside this reader's three names.
+
+**`2J-METRICS-007` now has a live path.** Before the repair the consumer could only ever
+read zero, and it would have been indistinguishable from a quiet week.
+
+### E. Residue
+
+**Zero.** `product_events` was 68 before and 68 after; the disposable owner was deleted and
+the `on delete cascade` on `product_events.user_id` took its four rows with it, leaving no
+row bearing the fixture's `app_version`. The rollback-only probes committed nothing. No
+append-only evidence needed deleting, and none was deleted.
+
+Independently confirmed on the same read: **no probe from the original deployment survived
+either** — zero rows carry `0.0.0-probe` or `0.0.0-pgtap`, and zero `ai_usage_events` rows
+carry `transcription`. The one row by which `product_events` grew during this work
+(67 → 68) is genuine application traffic — `needs_attention_viewed`, `app_version=client`,
+`is_synthetic=false` — not a fixture.
+
+### Posture, re-read against the pre-deploy snapshot
+
+| Posture | State | Changed by the repair? |
+| --- | --- | --- |
+| Forced RLS (`ai_usage_events`, `product_events`, `ai_model_pricing`) | `enabled=true forced=true` | **No** |
+| Policies | `ai_usage_events` 1, `product_events` 1 | **No** |
+| Grants — `record_ai_usage` | `authenticated`, `postgres`, `service_role` EXECUTE | **No** |
+| Grants — `product_events` | `authenticated` **SELECT only** | **No** |
+| `cron.job` | 5 jobs, identical names and schedules | **No** |
+| Retention | unchanged; no sweep scheduled, no purge executed | **No** |
+| Durable audio | 0 audio tables; one private bucket | **No** |
+| Signup | **closed** | **No** |
+| CAPTCHA | **enforced** | **No** |
+| Rollout gate | **25 pass · 3 fail · 2 owner-signature — SIGNUP MUST NOT OPEN** | **No** |
+
+`ADR-055` remains open and unchanged, expiring **2026-10-27**: this repair adds no semantic
+retrieval. **Phase 2K remains unstarted**; A13 green.
