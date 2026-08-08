@@ -1,6 +1,23 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+
+## 2026-08-08 — Phase 2J migrations DEPLOYED; the telemetry they widen is still refused
+
+**`202608080085` and `202608080086` are applied to the hosted project in chain order. Hosted parity is now exactly `202608080086`, 86 migrations, local = remote** — read from hosted state, not from a local filename. All four embedded verification blocks passed; they abort the migration otherwise, so their silence is the proof that each constraint swap matched its intended name and that each writer agrees with its table.
+
+**No posture moved.** Forced RLS, policy counts, function grants, table grants, the five-job cron catalog, the retention schedule, storage and the absence of any audio structure are all byte-identical to the pre-deploy snapshot. Signup stays closed, CAPTCHA stays enforced, and the rollout gate re-reads **25 pass · 3 fail · 2 owner-signature — SIGNUP MUST NOT OPEN.**
+
+**`record_ai_usage` accepts `transcription` end to end** — through its own guard, through the table CHECK, to a returned row id — at `cost_status='unpriced'` with a null `pricing_id`, the first-class state ADR-096 already modelled. Unknown operations still refuse `22023`; a caller with no `service_role` claim still refuses `42501`. No privilege was broadened.
+
+**Then the deployment's own acceptance probe found the phase's telemetry deliverable inert.** `product_events` writes pass through **three** independent copies of the event vocabulary — the table CHECK, `private.validate_product_event_properties`, and a hardcoded 26-name gate inside `private.record_product_event`. `202608080086` widened the first two. Both `record_product_event` and `record_product_event_for_user` delegate to the third, so on the live project `capture_mode_selected`, `voice_transcription_finished` and `attention_item_resolved` are each refused `22023 Unsupported product event`, while a control travelling the identical function, arguments and rollback is accepted. `2J-METRICS-007` therefore reads zero, and the producers emit into a `.catch(() => {})` — the exact SH.6 shape (ADR-084) the three-event design was chosen to avoid.
+
+**The same gate has silently refused `rate_limit_refused` since `202608070081`.** The list froze at `202607280061`, so this is a pre-existing Phase 2H defect that Phase 2J's probe surfaced, not a regression introduced here. CI never saw it because `202608080086`'s verification asserts the *text* of the validator, and no test writes a CHECK-declared name through the real writer.
+
+**Nothing was fixed.** Repairing it needs a **third migration**, which is a stop condition: no merged migration was edited, no migration was written, no history was rewritten. The correction path — Option B recommended, *delete* the redundant gate rather than sync a third copy, plus the missing pgTAP guard — is at `docs/reports/phase-2j/PHASE_2J_DEPLOYMENT.md` §5 and is an owner decision.
+
+**Every probe ran inside a transaction whose only exit is a `raise`**, so the append-only ledgers carry no probe residue: `ai_usage_events` 11 → 11, `product_events` 67 → 67. No append-only evidence had to be deleted, and none was.
+
 ## 2026-08-08 — Phase 2J — Today, Capture and Attention is COMPLETE (2 migrations, not deployed)
 
 **74 requirements declared, 74 classified, 0 unclassified** — 59 built, 6 baseline, 5 evidenced negatives, 2 partial, 2 undelivered, every partial and every undelivered naming its destination. Five PRs, **one green PR-head run and one green merge-SHA run each** under ADR-090.

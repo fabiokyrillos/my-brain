@@ -2714,7 +2714,7 @@ the matrix cannot now drift from the PRD without a refusal.
 
 ### Posture at close
 
-Hosted parity **`202608070084`** · chain head **`202608080086`**, **not deployed** ·
+Hosted parity **`202608080086`** · chain head **`202608080086`**, **DEPLOYED 2026-08-08, local = remote** (superseding "`202608070084`, not deployed") ·
 signup **disabled** · CAPTCHA **enforced** · SMTP **unconfigured** · rollout gate
 **25 · 3 · 2**, re-read and untouched · **ADR-055 open and unchanged, expiring
 2026-10-27** · **Phase 2K unstarted, A13 green, zero 2K artifacts.**
@@ -2723,3 +2723,67 @@ signup **disabled** · CAPTCHA **enforced** · SMTP **unconfigured** · rollout 
 deploying the two migrations (both merge-SHA gates already green), and measuring
 voice on real hardware for G-2J.4b. A manual screen-reader session is a third,
 and it is the one this repository has never been able to automate.
+
+## §45 — The migrations deployed cleanly, and the deployment found a third copy of the vocabulary (2026-08-08)
+
+**Both Phase 2J migrations are applied. Hosted parity is exactly `202608080086`, 86
+migrations, local = remote**, read from hosted state rather than from a filename. The
+deployment itself was uneventful in the way a good deployment is: pre-deploy readback
+matched every stated precondition, `migration list` showed exactly the two pending in
+chain order, a dry run confirmed it, and all four embedded verification blocks passed.
+Posture is byte-identical before and after — forced RLS, policy counts, function grants,
+table grants, five cron jobs, retention, storage, no audio structure. Signup closed,
+CAPTCHA enforced, rollout gate **25 · 3 · 2**.
+
+**The interesting part is what the acceptance probe found afterwards, and it is a lesson
+this repository has now learned three times in three phases.**
+
+`202608080085` exists because ADR-095's premise was wrong about which table owned a
+vocabulary. Writing it uncovered that `record_ai_usage` **enumerates the vocabulary in its
+own body**, so widening the table alone would have deployed clean and failed at runtime.
+That discovery was written into both migrations' comments, and `202608080086` was built
+in the same shape: widen the CHECK, widen the validator, verify both.
+
+**It was still one copy short.** `product_events` has *three* gates, not two. The third is
+a hardcoded 26-name `not in (...)` list inside `private.record_product_event`, which both
+public writers delegate to, and which no migration since `202607280061` has re-declared.
+So on the live project all three Phase 2J events are refused `22023 Unsupported product
+event` — while a control travelling the identical function, argument list and rollback is
+accepted. The producers exist and emit into a `.catch(() => {})`. `2J-METRICS-007` reads
+zero, which is the precise SH.6 outcome (ADR-084) the three-event design was chosen to
+prevent.
+
+**And it is older than Phase 2J: `rate_limit_refused` has been unrecordable since
+`202608070081`.** Phase 2H added that name to the CHECK and the validator, not to the
+gate. So a Phase 2H requirement has been quietly inert for a day, and Phase 2J's probe is
+what surfaced it.
+
+**Three lessons, in descending order of how much they cost:**
+
+1. **"Widen the constraint and the validator" was never the whole contract.** The right
+   question is not *"did I update the validator?"* but *"how many places enumerate this
+   vocabulary, and did I enumerate them by searching rather than by memory?"* One
+   `grep` for the refusal message would have answered it — and that grep is exactly what
+   found it, run after the deploy instead of before.
+2. **A verification block that asserts text is weaker than one that exercises the path.**
+   Both migrations verified their own artifacts by `position(... in pg_get_functiondef())`.
+   Both passed. Neither could see a gate in a *different* function. The missing guard is a
+   pgTAP test that writes **every** name in the CHECK through the real writer.
+3. **The probe's first run was wrong, and the control is what proved it.** The first pass
+   refused all three events *and* the pre-existing control, because `p_idempotency_key`
+   and `p_is_synthetic` are non-nullable and refuse at `22004` before the vocabulary is
+   consulted. That refusal was mine. Only when the control passed through the identical
+   corrected call did the three refusals mean anything. **Suspect the probe — now eight
+   times.**
+
+**Nothing was fixed.** Repair needs a third migration, which is a stop condition. No
+merged migration was edited, none was written, no history was rewritten. **Option B is
+recommended: delete the redundant gate rather than sync a third copy** — the table CHECK
+and the validator's `else` arm already refuse an unnamed event, and the gate's only
+demonstrated effect has been to silently drop two phases' worth of events. Either option
+ships with the pgTAP guard from lesson 2. Full write-up: `docs/reports/phase-2j/PHASE_2J_DEPLOYMENT.md` §5.
+
+Every probe ran inside a transaction whose only exit is a `raise`, so both append-only
+ledgers carry **zero** residue: `ai_usage_events` 11 → 11, `product_events` 67 → 67.
+
+**Phase 2K remains unstarted. A13 green. ADR-055 open, expiring 2026-10-27.**
