@@ -71,3 +71,38 @@
   .palette-close { min-width: 44px; min-height: 44px; }
   .palette-option { min-height: 46px; }
 }
+
+/* ---- global search — `2I-SEARCH-002` … `2I-SEARCH-009` ------------------- */
+
+.search-surface { max-width: 860px; margin: auto; padding: 48px var(--gutter) 120px; display: grid; gap: 18px; }
+.search-title { margin: 0; font: 500 38px/1 var(--font-newsreader); letter-spacing: -.04em; }
+.search-form { display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: center; }
+.search-input {
+  min-height: 48px; padding: 12px 14px;
+  border: 1px solid #bcc7d6; border-radius: 12px; background: var(--white);
+  color: var(--ink); font-size: 16px;
+}
+.search-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
+.search-filters label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
+.search-filters select { min-height: 40px; border: 1px solid #bcc7d6; border-radius: 10px; padding: 8px 10px; background: var(--white); color: var(--ink); }
+.search-sensitive { flex-direction: row !important; align-items: center; gap: 8px !important; font-weight: 650 !important; }
+.search-sensitive input { width: 18px; height: 18px; }
+.search-hint { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+
+/* Visibly active while results are shown -- OD-1. */
+.search-scope-banner, .search-partial {
+  margin: 0; padding: 10px 14px; border-radius: 11px;
+  border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone-fg);
+  font-size: 13px; font-weight: 700;
+}
+
+.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.search-bounded { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
+
+@media (max-width: 760px) {
+  .search-surface { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
+  .search-form { grid-template-columns: 1fr; }
+  .search-input { min-height: 50px; }
+  .search-filters { flex-direction: column; align-items: stretch; }
+  .search-filters select { min-height: 44px; }
+}

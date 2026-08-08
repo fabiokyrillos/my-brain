@@ -262,6 +262,14 @@ const INVENTORY: readonly RouteEntry[] = [
   { route: "questions", sections: [] },
   { route: "reminders", sections: [] },
   { route: "reviews", sections: [] },
+  /*
+   * Phase 2I's global search. `sections: []` because it renders **no
+   * collection of its own** — every result is a link into the surface that
+   * owns that record, and search writes nothing. Enumerated here because
+   * EGC-INVARIANT-004 is assertable only over a complete set, and this guard
+   * caught the route the moment it appeared, which is what it is for.
+   */
+  { route: "search", sections: [] },
   { route: "settings", sections: [] },
   { route: "tasks", sections: [] },
   { route: "today", sections: [] },
