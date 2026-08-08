@@ -1,6 +1,66 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-08 — Phase 2J — Today, Capture and Attention is AUTHORIZED FOR PLANNING ONLY (ADR-094, 0 migrations)
+
+**Planning only. No product code, no migration, no deployment.** Scope is the owner's
+mobile-first PRD's **Etapa 2**; Etapa 3+ stays out. **74 requirements across nine families,
+eight slices.** Governing pair under `docs/initiatives/phase-2j/`; audit, threat model,
+traceability contract and gaps under `docs/reports/phase-2j/`.
+
+**A13 retargeted from Phase 2J to the roadmap successor in the same commit as ADR-094** —
+the fifth application of the ADR-083/085/092 precedent. The retarget is mandatory rather
+than tidy: the PRD and the implementation plan are start signals 1 and 2, and the accepted
+ADR is signal 3, so the guard must move in the change that records the authorization or the
+invariant is unenforced in between. ADR-094's heading says *"retargets to the roadmap
+successor"* rather than naming it, and **a test now asserts that property** instead of
+leaving it to a session's memory — ADR-092's first draft hit exactly that trap.
+
+**The audit corrected the parent PRD in five load-bearing places, and every correction
+shrinks the phase except voice.** `/app/today` is a **redirect** to `/app/work?view=today`,
+while the cockpit the PRD asks to build already exists at `/app` as `HomeDashboard`,
+composing four projections with capture at the top — so Hoje must be made *reachable under
+its own name*, not built. The attention queue **already exists** as `list_needs_attention`,
+`security definer`, `auth.uid()`-scoped and keyset-paginated, covering five of the six
+states the PRD lists; the gap is a surface and in-place actions, because every item's
+primary action is today a **link**. **Memory conflicts do not exist in this schema.** The
+review domain already ships with four periods. And `configure_ai_credential` sits
+deliberately outside the queue because the analytics enum validating attention reasons is
+enforced *in the database*.
+
+**Voice is the only genuinely greenfield item, and its cost question resolved technically.**
+A repository-wide search for transcription, `MediaRecorder` or audio returns **zero hits in
+code** — the sole mention is the parent PRD. `user_ai_credentials.provider` is
+`check (provider in ('openai'))`, one provider whose API transcribes, so the user's existing
+BYOK credential already authorizes it: **no project-paid AI, no project key, no new secret,
+no new vendor.** Because the owner's signed flow discards the original audio, voice needs no
+bucket, no table, no retention class, no sweep and no deletion-cascade entry.
+
+**Migration budget: MAXIMUM TWO, allocated per slice.** M1 to 2J.7, because
+`product_events.event_name` is a **database check constraint** and no application path can
+record an unnamed event — this is the phase's principal schema cost and it comes from
+telemetry, not from features. M2 to 2J.4 for a transcription value on
+`ai_usage_events.operation`, and **M2 is explicitly avoidable** (`'other'` is allowed), so
+`2 allocated · 1 spent` is a legitimate close.
+
+**Phase 2I's accessibility residual becomes slice 2J.0, a pre-code gate** rather than a
+closeout item — deferring it to the end is precisely what left `2I-CLOSE-002` partial. The
+repository has **no axe dependency today**. The screen-reader session is recorded as manual
+or closes as an evidenced negative; it is never reported as automated.
+
+**Three exclusions, each recorded with its destination:** *O Brain percebeu* (no
+deterministic source; the alternative is unbounded proactive AI on the user's own
+credential), attention snooze/defer (the only attention action needing new state), and
+weekly/monthly review (Etapa 4).
+
+**Three owner decisions remain open** — `highly_sensitive` behaviour on the attention
+surfaces (OD-2J-1; Home, attention and Work apply no sensitivity predicate today while
+search excludes it by default, so two surfaces of one product currently disagree), voice
+with no valid AI credential (OD-2J-2), and user-selected priorities (OD-2J-3).
+
+ADR-055 remains open and unchanged, expiring 2026-10-27. The rollout gate is untouched at
+25 pass · 3 fail · 2 owner-signature. Hosted parity unchanged at `202608070084`.
+
 ## 2026-08-07 — Phase 2I — Foundation and Findability is COMPLETE (0 migrations)
 
 **61 requirements declared, 61 classified, 0 undelivered** — 53 built, 4 baseline, 1 rename, 2 evidenced negatives, 1 partial with its destination named. **Budget 1 allocated · 0 spent**, and hosted parity is unchanged at `202608070084` because the phase added no migration. Four PRs, each with one green PR-head run and one green merge-SHA run under ADR-090 — no green ×3, and no rerun used as an acceptance mechanism.

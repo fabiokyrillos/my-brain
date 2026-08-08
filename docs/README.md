@@ -81,22 +81,25 @@ fails the build on an addition to it.
 | [`initiatives/phase-2h/`](./initiatives/phase-2h/) | `PHASE_2H_PRD.md`, `PHASE_2H_IMPLEMENTATION_PLAN.md` — Deploy and Operate, authorized by ADR-085. **Complete 2026-08-07.** |
 | [`initiatives/post-2h-rollout/`](./initiatives/post-2h-rollout/) | `POST_2H_ROLLOUT_READINESS.md` — the governing artifact for the bounded post-2H rollout track. **Not a phase.** |
 | [`initiatives/next-experience/`](./initiatives/next-experience/) | The neutral-named planning study that reviewed the owner's mobile-first PRD and proposed Phase 2I. **Superseded by `initiatives/phase-2i/`; retained as the study that produced it.** |
-| [`initiatives/phase-2i/`](./initiatives/phase-2i/) | `PHASE_2I_PRD.md`, `PHASE_2I_IMPLEMENTATION_PLAN.md` — Foundation and Findability, **planning only**, authorized by ADR-092 (2026-08-07). Scope is the parent mobile-first PRD's Etapa 0 + Etapa 1. **Implementation is not authorized.** |
+| [`initiatives/phase-2i/`](./initiatives/phase-2i/) | `PHASE_2I_PRD.md`, `PHASE_2I_IMPLEMENTATION_PLAN.md` — Foundation and Findability, authorized by ADR-092 (2026-08-07). Scope was the parent mobile-first PRD's Etapa 0 + Etapa 1. **Complete 2026-08-07.** |
+| [`initiatives/phase-2j/`](./initiatives/phase-2j/) | `PHASE_2J_PRD.md`, `PHASE_2J_IMPLEMENTATION_PLAN.md` — Today, Capture and Attention, **planning only**, authorized by ADR-094 (2026-08-08). Scope is the parent mobile-first PRD's Etapa 2. **Implementation is not authorized.** |
 
-**Phase 2J has no governing artifact and must not acquire one without owner
+**Phase 2K has no governing artifact and must not acquire one without owner
 authorization.** The A13 guard in
 `src/lib/closeout/phase-2f-documentation.test.ts` fails the build the moment a
-`PHASE_2J_PRD.md` or `PHASE_2J_IMPLEMENTATION_PLAN.md` appears anywhere under
-`docs/`, or any file declares a `2J-…` requirement, or an accepted ADR names
-Phase 2J in its heading.
+`PHASE_2K_PRD.md` or `PHASE_2K_IMPLEMENTATION_PLAN.md` appears anywhere under
+`docs/`, or any file declares a `2K-…` requirement, or an accepted ADR names
+Phase 2K in its heading.
 
-**The retarget precedent, now applied four times.** Phase 2G was started the
+**The retarget precedent, now applied five times.** Phase 2G was started the
 sanctioned way — ADR-083 and the guard's retarget in one commit — then Phase 2H
-by ADR-085, and Phase 2I by **ADR-092** (2026-08-07), each moving the guard to
-the next unauthorized lettered phase in the same change that recorded the
-authorization. The invariant is never unenforced in between, and **no ADR names
-the successor's scope**: inventing one would be the error the guard exists to
-prevent.
+by ADR-085, Phase 2I by ADR-092, and Phase 2J by **ADR-094** (2026-08-08), each
+moving the guard to the next unauthorized lettered phase in the same change that
+recorded the authorization. The invariant is never unenforced in between, and
+**no ADR names the successor's scope**: inventing one would be the error the
+guard exists to prevent — which is why ADR-094's heading says *"retargets to the
+roadmap successor"* rather than naming it, and why a test now asserts that
+property instead of leaving it to memory.
 
 Note the shape of those ADR headings — *"retargets to the roadmap successor"*,
 never *"retargets to Phase 2X"*. That is deliberate and it is enforced: the

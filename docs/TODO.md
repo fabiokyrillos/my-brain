@@ -1,7 +1,24 @@
 # Project Backlog
 
-Last updated: 2026-08-07 (Phase 2H authorized for **execution** of slices 2H.1–2H.6 by the owner, 2026-08-07; **slices 2H.1 and 2H.2 closed and deployed**; migration budget 5 allocated · 2 spent; hosted parity `202608070080`)
-Active milestone: **Phase 2H — Deploy and Operate** (authorized by ADR-085, 2026-08-06 for planning; **execution of slices 2H.1–2H.6 authorized by the owner on 2026-08-07**). Phase 2G — Conversational Creation — and every phase before it are complete; Signup Hardening is closed at SH.7 and public signup remains closed.
+Last updated: 2026-08-08 (**Phase 2J — Today, Capture and Attention authorized for PLANNING ONLY by ADR-094**; 74 requirements, eight slices, migration budget **2 allocated · 0 spent**; hosted parity `202608070084`)
+Active milestone: **Phase 2J — Today, Capture and Attention** (authorized by ADR-094, 2026-08-08, for **planning only**; **implementation is NOT authorized**). Phase 2I — Foundation and Findability — is complete (61 declared · 61 classified · 0 undelivered · `1 allocated · 0 spent`), as is every phase before it; Signup Hardening is closed at SH.7 and public signup remains closed.
+
+## Phase 2J — awaiting implementation authorization (2026-08-08)
+
+Governing pair: `docs/initiatives/phase-2j/PHASE_2J_PRD.md` and `..._IMPLEMENTATION_PLAN.md`.
+Record: `docs/reports/phase-2j/` (audit, threat model, traceability contract, gaps).
+
+- [x] **Planning package written and merged.** PRD (nine requirement families, per-slice UX contracts, content-free metrics), implementation plan (slices 2J.0–2J.7, nine gates, budget rules), current-experience audit, threat model (T-2J-01…16), traceability contract, gaps and opportunities.
+- [x] **A13 retargeted from Phase 2J to the roadmap successor** in the same commit as ADR-094 — the fifth application. A new test asserts ADR-094's heading does **not** name the successor, because ADR-092's first draft hit that trap and the property should not depend on a session remembering it.
+- [x] **The audit was written to be falsifiable.** Every "must be built" claim cites a file, route, action, RPC or constraint. Five parent-PRD corrections came out of it, four of which **shrink** the phase.
+- [ ] **OWNER — implementation authorization for Phase 2J.** The package is complete; nothing further can be planned without it. Includes accepting or amending the **2-migration** budget.
+- [ ] **OWNER OD-2J-1 — how does `highly_sensitive` behave on Hoje, `Precisa de você`, capture receipts, notifications and review summaries?** Search excludes it by default (ADR-093); Home, attention and Work apply **no** sensitivity predicate at all, and the attention projection renders a 240-character preview of `entries.original_content`. Two surfaces of one product currently disagree. Pre-existing, not a 2J regression — but concentrating attention on one mobile surface is what makes deciding unavoidable. Blocks 2J.6; gates 2J.1/2J.2 acceptance.
+- [ ] **OWNER OD-2J-2 — what does voice do when the account has no valid AI credential?** Disabled, degraded, or offered under another explicit cost model. Blocks 2J.4 at gate G-2J.4a. Note the technical part is already settled: transcription rides the user's own BYOK key, so this is about the empty-credential state, not about who pays.
+- [ ] **OWNER OD-2J-3 — may daily priorities be explicitly user-selected?** Deterministic derivation costs nothing and ships by default; explicit selection needs storage and is therefore a budget amendment. Shapes `2J-HOJE-004` only.
+- [ ] **Gate G-2J.4b is a measurement, not a reading.** Recording must be measured on a real iOS Safari and a real Android Chrome — container, ceiling and permission flow. Safari emits `audio/mp4`, Chromium `audio/webm`; a pipeline assuming one fails half the target devices. The plan's statement of this does **not** discharge the gate.
+- [ ] **Gate G-2J.3 requires a guard that fails first.** The no-second-write-path guard must be proved red against a planted second path *before* the unified capture surface exists. A guard written afterwards is a guard shaped to pass.
+- [ ] **`2J-METRICS-007` — every declared event needs a consumer before close.** SH.6's quota refusals recorded nothing for weeks; a producer with no consumer is invisible.
+- [ ] **ADR-055 expires 2026-10-27** — still the nearest dated commitment, and Phase 2J adds no semantic retrieval. `2J-CLOSE-003` requires it restated at close as neither satisfied nor superseded.
 
 ## Post-2H rollout readiness — IN EXECUTION (2026-08-07, owner instruction). **NOT Phase 2I.**
 
