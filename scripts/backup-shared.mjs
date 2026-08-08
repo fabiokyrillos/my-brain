@@ -103,15 +103,24 @@ export function resolveAccessToken(repoUrl) {
   }
 }
 
-/** One statement through the Management API. Throws with a bounded message. */
-export async function managementQuery(token, projectRef, sql) {
+/**
+ * One statement through the Management API. Throws with a bounded message.
+ *
+ * `errorLimit` exists because the 300-character default **ate a result**: the
+ * Phase 2I search benchmark carries its measurements out in a deliberate
+ * `raise exception`, and this helper truncated the payload mid-JSON, so a run
+ * that had completed perfectly reported "failed before it could report". The
+ * bound stays by default — a runaway provider error should not flood a log —
+ * but a caller that knows the message *is* the answer can raise it.
+ */
+export async function managementQuery(token, projectRef, sql, { errorLimit = 300 } = {}) {
   const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query: sql }),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(`${response.status} ${body.slice(0, 300)}`);
+  if (!response.ok) throw new Error(`${response.status} ${body.slice(0, errorLimit)}`);
   try {
     return JSON.parse(body);
   } catch {

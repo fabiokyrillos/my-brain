@@ -37,7 +37,7 @@ describe("AppShell", () => {
     const primary = within(desktopNavigation).getByRole("group", { name: "Principal" });
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Início",
+      "Hoje",
       "Registros",
       "Trabalho",
       "Conversar",
@@ -64,7 +64,7 @@ describe("AppShell", () => {
       desktopNavigation.querySelectorAll(":scope > .nav-group-primary a, :scope > .capture-fab"),
     ).map((link) => link.textContent);
 
-    expect(alwaysVisible).toEqual(["Início", "Registros", "Trabalho", "Conversar", "Captura rápida"]);
+    expect(alwaysVisible).toEqual(["Hoje", "Registros", "Trabalho", "Conversar", "Captura rápida"]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
         (summary) => summary.textContent,
@@ -194,7 +194,7 @@ describe("AppShell", () => {
      * assigns columns in source order and nothing sets `order`.
      */
     expect(topLevelControls).toEqual([
-      "Início",
+      "Hoje",
       "Trabalho",
       "Captura rápida",
       "Conversar",
@@ -385,7 +385,7 @@ describe("AppShell", () => {
     const primary = within(desktopNavigation).getByRole("group", { name: "Primary" });
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Home",
+      "Today",
       "Records",
       "Work",
       "Talk",

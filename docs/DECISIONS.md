@@ -1116,3 +1116,41 @@ Fifteen slices reviewed this product at four viewports in two locales. Slice H's
 - **The audit corrected the parent PRD in three places, and the corrections are load-bearing.** `capabilities.ts` already exposes `home`, `inbox`, `work` (absorbing `today`/`tasks`/`waiting`) and `chat` as primary destinations with capture as the global centre action and a five-slot mobile bar; the `chat: "Conversar"` rename is **already shipped**; and Library's six members **already share `group: "context"`** — the grouping exists as data and is simply not rendered. So Phase 2I's navigation slice is **one label (`home` → Hoje) plus one grouping**, not a redesign. A phase that rebuilt delivered work would spend its budget proving nothing.
 - **A13 retargets from Phase 2I to Phase 2J in this same commit**, by the rule ADR-083 and ADR-085 established: an accepted ADR naming the authorized phase is itself a start signal, so the guard must move in the change that records the authorization and the invariant is never unenforced in between. ADR-067's invariant is unchanged — *the next phase must not be started before it is authorized.* **This ADR names no Phase 2J scope**, and inventing one would be the error the guard exists to prevent.
 - **Consequences.** The `2I-*` requirement namespace becomes declarable, which is why the retarget is mandatory rather than tidy. Phase 2I adds **no write path, no model call, no RLS policy, no grant, no secret and no external service**, so its threat surface is concentrated in two places: search as an enumeration oracle (T-2I-01) and the palette as a second write path (T-2I-02). **Two owner decisions remain open and block slice 2I.5** at gate G-2I.5 — whether `private`/`highly_sensitive` records appear in global search results, and whether `attachments.extracted_text` is searchable. **ADR-055 expires 2026-10-27 and is neither satisfied nor superseded by lexical search**; `2I-SEARCH-010` forbids embeddings, vector retrieval and generated answers, and the slice must state that at close. **The signup rollout gate is untouched** by this authorization and is re-read at the phase's close.
+
+## ADR-093 — Phase 2I's search decisions: sensitivity, extracted text, and a measured refusal to spend the migration
+
+- **Date:** 2026-08-07
+- **Status:** Accepted — **owner decisions OD-1 and OD-2**, plus the outcome of gate **G-2I.2**, which is an engineering measurement the owner's budget rules bound. Phase 2I implementation is authorized; this ADR records the three decisions that shape slice 2I.5.
+- **Context.** `PHASE_2I_PRD.md` §8.2 raised two product decisions it deliberately refused to default, and the implementation plan's G-2I.2 required the migration question to be settled **by measurement before any search code**. All three are settled here.
+
+### OD-1 — sensitivity in global search
+
+`entries`, `memories` and `attachments` carry `sensitivity in ('normal','private','highly_sensitive')`. The owner decides:
+
+- **`normal` — searchable by default. `private` — searchable by default.**
+- **`highly_sensitive` — EXCLUDED from default global-search results**, and searchable only after an **explicit user action** enabling a sensitive scope. That scope must be **visibly active** while results are shown, and must **not** silently persist across sessions unless an existing product preference contract supports it — none does today, so it does not persist.
+- **The default state must not leak the existence or the count of excluded matches.** No "3 hidden results" affordance, no different empty state when sensitive matches exist. A count is an existence oracle wearing a helpful hat.
+
+**This is a UX and expectation decision, not an authorization boundary.** The user owns every one of those rows. Ownership continues to come **exclusively** from the authenticated query plus forced RLS, and **no service-role search path may exist** — the sensitivity filter is a predicate on top of a boundary, never a substitute for one.
+
+### OD-2 — `attachments.extracted_text` is searchable
+
+Search may match inside extracted document text. Consequences, all binding: results render **bounded plain-text snippets only**; extracted text is **always data, never markup**; **no model call consumes it in Phase 2I**; OD-1's sensitivity handling applies to attachments too; **no query text, filename, extracted text or snippet enters telemetry**; a file result identifies itself as a **File** result and opens the existing file surface; and **no durable duplicate of `extracted_text` is created for UI convenience**. This does not authorize semantic search.
+
+### G-2I.2 — the migration is NOT spent, and the measurement says so
+
+`scripts/phase-2i-search-benchmark.mjs`, executed against the live database with **RLS active** and **realistic per-owner volumes** (5 000 entries, 2 000 tasks, 1 000 memories, 300 people, 100 projects, 50 companies, 500 attachments carrying ~20 KB of extracted text each), inside a **single `DO` block that ends by raising** so every fixture is rolled back by Postgres itself:
+
+| Shape | scale 1 | scale 2 | Budget 300 ms |
+| --- | --- | --- | --- |
+| Sequential — seven domains in one `UNION` round trip | 338–354 ms | 669 ms | **FAIL** |
+| **Parallel — slowest single domain** | **121–191 ms** | **244 ms** | **PASS** |
+
+**Decision: zero migrations. `1 allocated · 0 spent`.**
+
+The parallel shape is not a convenient reading — **it is the shape the requirements already mandate.** `2I-SEARCH-006` (per-domain result bounds) and `2I-SEARCH-007` (a named per-domain partial failure) are both meaningless unless each domain is queried independently. Having required independent per-domain queries, the wall clock is the slowest domain, not the sum.
+
+**The recorded revisit threshold**, so this is re-measurable rather than re-arguable: re-run the benchmark when any single owner passes **~10 000 entries** or **~1 000 attachments carrying `extracted_text`**. Growth is linear (338 → 669 ms across a doubling), which is a sequential scan behaving exactly as expected; the two dominant columns are `entries.original_content` and `attachments.extracted_text`.
+
+- **Alternatives considered.** *Spend the migration on `tsvector` + GIN across seven tables* (rejected: the accepted requirement is met without it, the owner's stated preference is `0 spent`, and seven tables of permanent index surface is a real maintenance cost incurred to answer a question the measurement already answered). *Query the seven domains in one `UNION` to save round trips* (rejected: it fails the budget **and** it destroys per-domain partial-failure reporting, so it is worse on both axes). *Drop `extracted_text` from search to make the sequential shape fit* (rejected: it is OD-2, and it is what makes file search worth having). *Use `pg_trgm`* (rejected: an extension this database does not have — reaching for it is already option B).
+- **Consequences.** Slice 2I.5 implements **one query per domain, issued concurrently**, each owner-scoped in the query under the authenticated client, each bounded, each independently failable. The benchmark script is committed so the threshold is measured rather than debated, and it is safe to re-run against production because its only exit is a raise. **ADR-055 is untouched:** no embeddings, no vector retrieval, no similarity, no generated answers — it remains open and expires 2026-10-27.
