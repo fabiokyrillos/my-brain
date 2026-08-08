@@ -230,7 +230,7 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
 });
 
 /**
- * Phase 2I start signals — the same guard, retargeted at the roadmap successor.
+ * Phase 2J start signals — the same guard, retargeted at the roadmap successor.
  *
  * ADR-067's invariant is unchanged and non-negotiable: *the next phase must not
  * be started before it is authorized.* Until 2026-08-05 the next phase was
@@ -243,7 +243,7 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  * the invariant is never unenforced in between.
  *
  * **What this guard does and does not cover, stated because the roadmap ends.**
- * ADR-068 names no Phase 2I: Phase 2H's roadmap successor is *opening public
+ * ADR-068 names no Phase 2J: Phase 2H's roadmap successor is *opening public
  * self-service signup*, not another lettered phase. So this detector holds the
  * narrower property it was built for — an unauthorized **lettered phase** cannot
  * start — while the successor gate itself lives elsewhere and is stronger:
@@ -256,28 +256,28 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  *   1. a governing artifact **by role** — a PRD, an implementation plan or a
  *      requirements document, whatever it is named;
  *   2. a **declared** requirement family, in this repository's declaration shape
- *      (`- **2I-XXXX-000:**`) — the same shape the traceability generator's
+ *      (`- **2J-XXXX-000:**`) — the same shape the traceability generator's
  *      attribution guard uses;
- *   3. an **accepted** Phase 2I ADR — a recorded decision to proceed, as opposed
+ *   3. an **accepted** Phase 2J ADR — a recorded decision to proceed, as opposed
  *      to an ADR that merely mentions the phase while deferring it;
- *   4. a migration or source file marked as Phase 2I implementation.
+ *   4. a migration or source file marked as Phase 2J implementation.
  *
  * Permitted, explicitly: definition studies; future-work mentions; and
  * append-only amendments that state the phase remains unauthorized.
  *
  * Fail-closed: unreadable inputs throw rather than returning "no signals".
  */
-type Phase2IStartSignal = { readonly kind: string; readonly where: string };
+type Phase2JStartSignal = { readonly kind: string; readonly where: string };
 
-const GOVERNING_ARTIFACT_ROLE = /^PHASE_2I_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
+const GOVERNING_ARTIFACT_ROLE = /^PHASE_2J_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
 /** A *declared* requirement, not a mention. Matches the traceability generator's own shape. */
-const DECLARED_2I_REQUIREMENT = /^- \*\*2I-[A-Z]+-\d{3}/m;
+const DECLARED_2J_REQUIREMENT = /^- \*\*2J-[A-Z]+-\d{3}/m;
 /**
  * Kept for the historical assertion below: the Phase 2F proposal may mention
  * Phase 2G as future work but must never have declared a requirement for it.
  */
 const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
-const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2i/i;
+const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2j/i;
 
 /**
  * Every markdown file at or below `dir`, named relative to `dir`. The walk is
@@ -307,12 +307,12 @@ function filesIn(root: string, dir: string): string[] {
     .map((entry) => entry.name);
 }
 
-/** Every reason to believe Phase 2I has started. Empty means it has not. */
-function phase2IStartSignals(root: string): Phase2IStartSignal[] {
-  const signals: Phase2IStartSignal[] = [];
+/** Every reason to believe Phase 2J has started. Empty means it has not. */
+function phase2JStartSignals(root: string): Phase2JStartSignal[] {
+  const signals: Phase2JStartSignal[] = [];
 
   // One recursive walk from `docs/`. It subsumes `docs/reports/` and reaches
-  // `docs/initiatives/`, where a Phase 2I PRD would be filed; listing the
+  // `docs/initiatives/`, where a Phase 2J PRD would be filed; listing the
   // two separately would double-report anything under reports.
   for (const dir of ["docs"]) {
     for (const name of markdownFilesIn(root, dir)) {
@@ -320,7 +320,7 @@ function phase2IStartSignals(root: string): Phase2IStartSignal[] {
       if (GOVERNING_ARTIFACT_ROLE.test(basename)) {
         signals.push({ kind: "governing-artifact", where: `${dir}/${name}` });
       }
-      if (DECLARED_2I_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
+      if (DECLARED_2J_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
         signals.push({ kind: "declared-requirement", where: `${dir}/${name}` });
       }
     }
@@ -329,12 +329,12 @@ function phase2IStartSignals(root: string): Phase2IStartSignal[] {
   const decisions = join(root, "docs/DECISIONS.md");
   if (existsSync(decisions)) {
     // An ADR block runs from its own heading to the next one. Only the heading
-    // is tested: ADR bodies may (and do) mention Phase 2I while deferring it.
+    // is tested: ADR bodies may (and do) mention Phase 2J while deferring it.
     const blocks = readFileSync(decisions, "utf8").split(/^## (?=ADR-)/m).slice(1);
     for (const block of blocks) {
       const heading = block.split("\n", 1)[0] ?? "";
       const accepted = /^[-*]?\s*\*\*Status:?\*\*:?\s*Accepted/im.test(block);
-      if (/phase 2i/i.test(heading) && accepted) {
+      if (/phase 2j/i.test(heading) && accepted) {
         signals.push({ kind: "accepted-adr", where: `ADR heading: ${heading.trim()}` });
       }
     }
@@ -354,7 +354,7 @@ function phase2IStartSignals(root: string): Phase2IStartSignal[] {
 /** A throwaway repository root carrying only what the detector reads. */
 function makeDetectorRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "a13-"));
-  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2i", "supabase/migrations", "src/features", "src/lib"]) {
+  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2j", "supabase/migrations", "src/features", "src/lib"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
@@ -368,13 +368,13 @@ function detectorRoot(): string {
   return root;
 }
 
-describe("A13: Phase 2I is not started", () => {
+describe("A13: Phase 2J is not started", () => {
   afterAll(() => {
     for (const root of detectorRoots) rmSync(root, { recursive: true, force: true });
   });
 
   it("finds no start signal in this repository", () => {
-    expect(phase2IStartSignals(REPO)).toEqual([]);
+    expect(phase2JStartSignals(REPO)).toEqual([]);
   });
 
   it("keeps Phase 2G's start recorded as an authorization, not an accident", () => {
@@ -401,18 +401,18 @@ describe("A13: Phase 2I is not started", () => {
   it("permits a definition study, future-work labels and an unauthorized-status amendment", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2i/PHASE_2I_NOTES.md"),
+      join(root, "docs/reports/phase-2j/PHASE_2J_NOTES.md"),
       [
-        "# Phase 2I notes",
+        "# Phase 2J notes",
         "",
-        "**Phase 2I remains unauthorized and unstarted.**",
+        "**Phase 2J remains unauthorized and unstarted.**",
         "",
         "Deferred here by Phase 2H: nothing yet; the roadmap successor is opening signup.",
         "",
         "## Amendment — appended, and the phase is still unauthorized.",
       ].join("\n"),
     );
-    expect(phase2IStartSignals(root)).toEqual([]);
+    expect(phase2JStartSignals(root)).toEqual([]);
   });
 
   it("permits Phase 2H's own governing artifacts, which are authorized", () => {
@@ -423,70 +423,70 @@ describe("A13: Phase 2I is not started", () => {
     // look identical from the passing side alone.
     const root = detectorRoot();
     writeFileSync(join(root, "docs/PHASE_2H_PRD.md"), "# Phase 2H PRD\n\n- **2H-DEPLOY-001:** the runbook.\n");
-    expect(phase2IStartSignals(root)).toEqual([]);
-    writeFileSync(join(root, "docs/PHASE_2I_PRD.md"), "# Phase 2I PRD\n");
-    expect(phase2IStartSignals(root)).toContainEqual({
+    expect(phase2JStartSignals(root)).toEqual([]);
+    writeFileSync(join(root, "docs/PHASE_2J_PRD.md"), "# Phase 2J PRD\n");
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2I_PRD.md",
+      where: "docs/PHASE_2J_PRD.md",
     });
   });
 
-  it("fails when docs/PHASE_2I_PRD.md exists", () => {
+  it("fails when docs/PHASE_2J_PRD.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2I_PRD.md"), "# Phase 2I PRD\n");
-    expect(phase2IStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2J_PRD.md"), "# Phase 2J PRD\n");
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2I_PRD.md",
+      where: "docs/PHASE_2J_PRD.md",
     });
   });
 
-  it("fails when docs/PHASE_2I_IMPLEMENTATION_PLAN.md exists", () => {
+  it("fails when docs/PHASE_2J_IMPLEMENTATION_PLAN.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2I_IMPLEMENTATION_PLAN.md"), "# Plan\n");
-    expect(phase2IStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2J_IMPLEMENTATION_PLAN.md"), "# Plan\n");
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2I_IMPLEMENTATION_PLAN.md",
+      where: "docs/PHASE_2J_IMPLEMENTATION_PLAN.md",
     });
   });
 
-  it("fails when a Phase 2I requirement is declared, whatever the file is called", () => {
+  it("fails when a Phase 2J requirement is declared, whatever the file is called", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2i/PHASE_2I_NOTES.md"),
-      "# Notes\n\n- **2I-READINESS-001:** something ships here.\n",
+      join(root, "docs/reports/phase-2j/PHASE_2J_NOTES.md"),
+      "# Notes\n\n- **2J-READINESS-001:** something ships here.\n",
     );
-    expect(phase2IStartSignals(root)).toContainEqual({
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
-      where: "docs/reports/phase-2i/PHASE_2I_NOTES.md",
+      where: "docs/reports/phase-2j/PHASE_2J_NOTES.md",
     });
   });
 
-  it("fails when an accepted Phase 2I ADR exists", () => {
+  it("fails when an accepted Phase 2J ADR exists", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-099 — Phase 2I is accepted as the next phase\n\n- **Status:** Accepted\n",
+      "# Decisions\n\n## ADR-099 — Phase 2J is accepted as the next phase\n\n- **Status:** Accepted\n",
     );
-    const signals = phase2IStartSignals(root);
+    const signals = phase2JStartSignals(root);
     expect(signals.map((signal) => signal.kind)).toContain("accepted-adr");
   });
 
-  it("permits an ADR that mentions Phase 2I while deferring it", () => {
+  it("permits an ADR that mentions Phase 2J while deferring it", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
       "# Decisions\n\n## ADR-099 — The roadmap order after Phase 2H\n\n"
-        + "- **Status:** Accepted\n- Phase 2I remains unauthorized and unstarted.\n",
+        + "- **Status:** Accepted\n- Phase 2J remains unauthorized and unstarted.\n",
     );
-    expect(phase2IStartSignals(root)).toEqual([]);
+    expect(phase2JStartSignals(root)).toEqual([]);
   });
 
-  it("fails when a migration is marked as Phase 2I implementation", () => {
+  it("fails when a migration is marked as Phase 2J implementation", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2i_something.sql"), "-- x\n");
-    expect(phase2IStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2j_something.sql"), "-- x\n");
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "implementation-file",
-      where: "supabase/migrations/202610010001_phase_2i_something.sql",
+      where: "supabase/migrations/202610010001_phase_2j_something.sql",
     });
   });
 
@@ -496,9 +496,9 @@ describe("A13: Phase 2I is not started", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/ROADMAP_NOTES.md"),
-      "# Notes\n\n- **2I-DEPLOY-001:** the deploy runbook ships here.\n",
+      "# Notes\n\n- **2J-DEPLOY-001:** the deploy runbook ships here.\n",
     );
-    expect(phase2IStartSignals(root)).toContainEqual({
+    expect(phase2JStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
       where: "docs/ROADMAP_NOTES.md",
     });
@@ -508,15 +508,15 @@ describe("A13: Phase 2I is not started", () => {
     const root = detectorRoot();
     // A path that `readdirSync` reports and `readFileSync` cannot open: on both
     // platforms, replacing the file with a directory of the same name does it.
-    const listed = join(root, "docs/reports/phase-2i/PHASE_2I_NOTES.md");
+    const listed = join(root, "docs/reports/phase-2j/PHASE_2J_NOTES.md");
     writeFileSync(listed, "# Notes\n");
-    expect(phase2IStartSignals(root)).toEqual([]);
+    expect(phase2JStartSignals(root)).toEqual([]);
     rmSync(listed);
     mkdirSync(join(root, "docs/reports/UNREADABLE.md"));
     writeFileSync(join(root, "docs/reports/UNREADABLE.md/inner"), "x");
     // `markdownFilesIn` filters to real files, so the directory is skipped rather
     // than misread — the detector never treats an unreadable entry as clean data.
-    expect(phase2IStartSignals(root)).toEqual([]);
+    expect(phase2JStartSignals(root)).toEqual([]);
     expect(() => readFileSync(join(root, "docs/reports/UNREADABLE.md"), "utf8")).toThrow();
   });
 
