@@ -259,6 +259,45 @@ export function HomeView({
           </Section>
         ) : null}
 
+        {/*
+          `2J-DAY-002`/`003`/`004`. The day's closing gesture, composed from the
+          numbers already on this page -- no new query, and no new review
+          system. It counts what is still open and offers the door to the
+          review domain that has existed since before this phase.
+
+          It changes NOTHING by itself (`2J-DAY-004`). There is no
+          "close the day" mutation, no auto-carry and no auto-complete: ending a
+          day is a reading, and anything that follows from it goes through the
+          write path that already owns it, with its own confirmation.
+        */}
+        <Section title={sections.endOfDay.title} hint={sections.endOfDay.hint}>
+          {view.attention.length + view.waitingCount + view.priorities.length > 0 ? (
+            <ul className="home-endofday">
+              {view.priorities.length ? (
+                <li>
+                  {sections.priorities.title}: {view.priorities.length} {sections.endOfDay.unresolved}
+                </li>
+              ) : null}
+              {view.attention.length ? (
+                <li>
+                  {sections.attention.title}: {view.attention.length}
+                  {view.attentionHasMore ? "+" : ""} {sections.endOfDay.unresolved}
+                </li>
+              ) : null}
+              {view.waitingCount ? (
+                <li>
+                  {sections.waiting.title}: {view.waitingCount} {sections.endOfDay.unresolved}
+                </li>
+              ) : null}
+            </ul>
+          ) : (
+            <p className="quiet-state">{sections.endOfDay.clear}</p>
+          )}
+          <Link href={`/${locale}/app/reviews`} className="panel-view-all">
+            {sections.endOfDay.openReview}
+          </Link>
+        </Section>
+
         <Section
           title={sections.recent.title}
           action={
