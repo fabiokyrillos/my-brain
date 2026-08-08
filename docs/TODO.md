@@ -1,9 +1,18 @@
 # Project Backlog
 
-Last updated: 2026-08-08 (**Phase 2J — Today, Capture and Attention authorized for PLANNING ONLY by ADR-094**; 74 requirements, eight slices, migration budget **2 allocated · 0 spent**; hosted parity `202608070084`)
-Active milestone: **Phase 2J — Today, Capture and Attention** (authorized by ADR-094, 2026-08-08, for **planning only**; **implementation is NOT authorized**). Phase 2I — Foundation and Findability — is complete (61 declared · 61 classified · 0 undelivered · `1 allocated · 0 spent`), as is every phase before it; Signup Hardening is closed at SH.7 and public signup remains closed.
+Last updated: 2026-08-08 (**Phase 2J — Today, Capture and Attention is COMPLETE**; 74 declared · 74 classified · 0 unclassified; migration budget **2 allocated · 2 spent**; chain head `202608080086`, **hosted parity still `202608070084` — nothing deployed**)
+Active milestone: **Phase 2J — Today, Capture and Attention** (authorized for **planning** by ADR-094 and for implementation by ADR-095, 2026-08-08; **COMPLETE**). No successor phase is authorized. Phase 2I — Foundation and Findability — is complete (61 declared · 61 classified · 0 undelivered · `1 allocated · 0 spent`), as is every phase before it; Signup Hardening is closed at SH.7 and public signup remains closed.
 
-## Phase 2J — awaiting implementation authorization (2026-08-08)
+## Phase 2J — COMPLETE (2026-08-08). Owner actions below.
+
+- [ ] **OWNER — deploy `202608080085` and `202608080086`.** Both passed CI's `database` job against the full chain from an empty database and both merge-SHA runs are green, which is the ADR-090 pre-deploy gate. **Hosted parity is still `202608070084`.** Neither creates a table, grants a privilege or schedules anything; both are additive vocabulary widenings carrying their own in-transaction verification blocks.
+- [ ] **OWNER — gate G-2J.4b: measure voice on real iOS Safari and Android Chrome.** Emitted container, size/duration ceiling, permission flow, interruption, revocation. `2J-VOICE-014` is **partial** until this happens: MediaRecorder is faked in tests, and the implementation plan states explicitly that describing the contract does not discharge the gate.
+- [ ] **OWNER (optional) — a manual screen-reader session.** `2J-ACCESS-008` closed as an evidenced negative. The lane proves axe, structure, focus, rendered touch targets and reduced motion in a real browser; it does not simulate a screen reader, and the file says so.
+- [ ] **Transcription is recorded but not priced.** No audio-model pricing row exists and `ai_model_pricing` is per-token while transcription bills per minute, so events land `cost_status = 'unpriced'` — a state `record_ai_usage` already modelled. **Destination:** a future phase decides whether per-minute pricing belongs in that table or a sibling.
+- [ ] **`2J-METRICS-001` and `2J-METRICS-005` are undelivered**, both because declaring another product event needs a **third migration**, which ADR-095 names as a stop condition. **Destination:** a future phase with budget.
+- [x] **Snooze, dismissal and *O Brain percebeu* are deliberate exclusions**, each recorded with its destination in `PHASE_2J_REPORT.md` and in the slice acceptances.
+
+## Phase 2J — planning record (2026-08-08)
 
 Governing pair: `docs/initiatives/phase-2j/PHASE_2J_PRD.md` and `..._IMPLEMENTATION_PLAN.md`.
 Record: `docs/reports/phase-2j/` (audit, threat model, traceability contract, gaps).
