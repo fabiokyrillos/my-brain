@@ -64,11 +64,15 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-// Moved by Phase 2J slice 2J.4, which spends that slice's allocated migration
-// (ADR-095's budget, ADR-096's corrected premise). Moved deliberately and
-// visibly in the same commit that adds `202608080085`, which is the only way
-// this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608080086";
+// Moved by the POST-2J CORRECTION, which adds `202608080087` to repair the
+// product-event writer defect that hosted deployment verification exposed. It is
+// an owner-authorized amendment charged to NO phase budget — Phase 2J remains
+// `2 allocated · 2 spent`, and the file is named `post_2j_*` so the phase's
+// traceability generator (which selects by `/phase_2j/i`) cannot absorb it, the
+// same mechanism `202608070084` used for the post-2H correction. Moved
+// deliberately and visibly in the same commit that adds the migration, which is
+// the only way this pin is allowed to change.
+const AUTHORIZED_MIGRATION_HEAD = "202608080087";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

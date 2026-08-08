@@ -91,6 +91,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
     expect(ALL_MIGRATIONS.slice(index + 1)).toEqual([
       "202608080085_phase_2j_transcription_usage.sql",
       "202608080086_phase_2j_experience_telemetry.sql",
+      // The post-2J correction: `202608080086` widened the event-name CHECK and
+      // the property validator, but `private.record_product_event` kept a third
+      // copy of the vocabulary that nothing had re-declared since
+      // `202607280061`, so the real write path refused the three Phase 2J events
+      // and `rate_limit_refused`. Named here rather than tolerated, because the
+      // property this assertion protects is "nothing follows that somebody did
+      // not deliberately account for".
+      "202608080087_post_2j_product_event_writer_deduplication.sql",
     ]);
   });
 });
