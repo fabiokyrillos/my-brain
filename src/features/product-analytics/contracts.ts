@@ -81,6 +81,36 @@ export const taskCommandAnalyticsVocabularies = {
   evidence: taskMatchEvidenceLabels,
 } as const;
 
+/** `2J-METRICS-003`. Mirrors `CAPTURE_MODES`. */
+export const captureModeAnalytics = ["text", "attachment", "voice"] as const;
+export type CaptureModeAnalytics = (typeof captureModeAnalytics)[number];
+
+export const voiceTranscriptionOutcomes = ["succeeded", "failed"] as const;
+export type VoiceTranscriptionOutcome = (typeof voiceTranscriptionOutcomes)[number];
+
+/** The subset of attention reasons that can be resolved in place (2J-ATTN-007). */
+export const trackedAttentionReasonAnalytics = ["retry_processing"] as const;
+export type TrackedAttentionReasonAnalytics = (typeof trackedAttentionReasonAnalytics)[number];
+
+export const attentionResolutionActions = ["retry", "bulk_retry"] as const;
+export type AttentionResolutionAction = (typeof attentionResolutionActions)[number];
+
+/**
+ * `2J-METRICS-002`/`004`. Buckets, never durations.
+ *
+ * A millisecond count is a behavioural fingerprint: it says when somebody was
+ * at their desk and how fast they read. Three coarse buckets answer "was this
+ * quick?" and answer nothing else.
+ */
+export const resolutionBuckets = ["under_5s", "under_60s", "over_60s"] as const;
+export type ResolutionBucket = (typeof resolutionBuckets)[number];
+
+export function toResolutionBucket(elapsedMs: number): ResolutionBucket {
+  if (elapsedMs < 5_000) return "under_5s";
+  if (elapsedMs < 60_000) return "under_60s";
+  return "over_60s";
+}
+
 export const productEventNames = [
   "capture_started",
   "capture_save_succeeded",
@@ -121,6 +151,25 @@ export const productEventNames = [
   // Migration `202608070081` carries the same literal into the table CHECK and
   // into `validate_product_event_properties`.
   "rate_limit_refused",
+  /*
+   * Phase 2J slice 2J.7. Three events, and the count is the point.
+   *
+   * `2J-METRICS-007` requires a **consumer** before close, because SH.6 shipped
+   * a producer with none and its quota refusals recorded nothing for weeks
+   * while the code read as though they did. So this vocabulary is exactly what
+   * `scripts/phase-2j-experience-funnel-reader.mjs` reads -- not the larger set
+   * the PRD sketched, which would have declared names nothing would ever ask a
+   * question of.
+   *
+   * Every property below is a closed enum or a boolean. There is no key that
+   * can hold a transcript, a filename, a task title or an entry -- which is the
+   * mechanism `2J-METRICS-006` asks for, rather than a promise that writers
+   * behave. Migration `202608080086` carries the same three literals into the
+   * table CHECK and into `validate_product_event_properties`.
+   */
+  "capture_mode_selected",
+  "voice_transcription_finished",
+  "attention_item_resolved",
 ] as const;
 
 export type ProductEventName = (typeof productEventNames)[number];
@@ -273,6 +322,28 @@ export type ProductEventPropertiesByName = {
     commandOrigin: TaskCommandOrigin;
     undoResult: TaskCommandUndoResult;
     policyVersion: string;
+  };
+  /** `2J-METRICS-003`. Which modality, and nothing about what was captured. */
+  capture_mode_selected: {
+    captureMode: CaptureModeAnalytics;
+  };
+  /**
+   * `2J-METRICS-004`. Outcome and two booleans.
+   *
+   * `draftEdited` answers whether the transcript was good enough to use as-is;
+   * `additionalSegment` answers whether one recording was enough. Neither
+   * carries a character of what was said.
+   */
+  voice_transcription_finished: {
+    outcome: VoiceTranscriptionOutcome;
+    draftEdited: boolean;
+    additionalSegment: boolean;
+  };
+  /** `2J-METRICS-002`. Reason class, action taken, and a BUCKET -- never a duration. */
+  attention_item_resolved: {
+    attentionReason: TrackedAttentionReasonAnalytics;
+    resolutionAction: AttentionResolutionAction;
+    resolutionBucket: ResolutionBucket;
   };
 };
 
@@ -505,6 +576,23 @@ function arePropertiesValid<Name extends ProductEventName>(
         && isOneOf(value.commandOrigin, taskCommandOrigins)
         && isOneOf(value.undoResult, taskCommandUndoResults)
         && isPolicyVersion(value.policyVersion);
+    // Phase 2J slice 2J.7. `hasExactKeys` is what makes `2J-METRICS-006`
+    // mechanical rather than aspirational: an extra key -- a transcript, a
+    // filename, a title -- fails here before the payload ever reaches the RPC,
+    // and fails again in the database if it somehow did.
+    case "capture_mode_selected":
+      return hasExactKeys(value, ["captureMode"])
+        && isOneOf(value.captureMode, captureModeAnalytics);
+    case "voice_transcription_finished":
+      return hasExactKeys(value, ["outcome", "draftEdited", "additionalSegment"])
+        && isOneOf(value.outcome, voiceTranscriptionOutcomes)
+        && typeof value.draftEdited === "boolean"
+        && typeof value.additionalSegment === "boolean";
+    case "attention_item_resolved":
+      return hasExactKeys(value, ["attentionReason", "resolutionAction", "resolutionBucket"])
+        && isOneOf(value.attentionReason, trackedAttentionReasonAnalytics)
+        && isOneOf(value.resolutionAction, attentionResolutionActions)
+        && isOneOf(value.resolutionBucket, resolutionBuckets);
   }
 }
 

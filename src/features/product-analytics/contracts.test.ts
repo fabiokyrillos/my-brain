@@ -44,6 +44,10 @@ const eventNames = [
   "task_command_applied",
   "task_command_undone",
   "rate_limit_refused",
+  // Phase 2J slice 2J.7.
+  "capture_mode_selected",
+  "voice_transcription_finished",
+  "attention_item_resolved",
 ] as const;
 
 const basePayload = {
@@ -107,10 +111,17 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
     policyVersion: "2026-07-25.2",
   },
   rate_limit_refused: { operation: "ai", failureKind: "rate_limited" },
+  capture_mode_selected: { captureMode: "voice" },
+  voice_transcription_finished: { outcome: "succeeded", draftEdited: false, additionalSegment: false },
+  attention_item_resolved: {
+    attentionReason: "retry_processing",
+    resolutionAction: "retry",
+    resolutionBucket: "under_5s",
+  },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of twenty-seven product events", () => {
+  it("defines the complete closed taxonomy of thirty product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",

@@ -35,6 +35,7 @@ const failingRetryMock = () =>
 
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   recordNeedsAttentionItemOpened: vi.fn(),
+  recordAttentionItemResolved: vi.fn(),
   NeedsAttentionViewed: () => null,
 }));
 

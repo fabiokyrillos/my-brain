@@ -2,7 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { LoaderCircle } from "lucide-react";
-import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
+import {
+  NeedsAttentionViewed,
+  recordAttentionItemResolved,
+} from "@/features/product-analytics/interaction-events";
 import { presentationFor } from "@/features/sensitivity/contracts";
 import { NeedsAttentionItemRow } from "./needs-attention-item";
 import { trackedAttentionReasons, type NeedsAttentionItemView, type TrackedAttentionReason } from "./contracts";
@@ -173,6 +176,10 @@ export function NeedsAttentionList({
   function retry(targets: readonly NeedsAttentionItemView[]) {
     if (!retryAction || isRetrying || targets.length === 0) return;
     setRetryError(null);
+    // `2J-METRICS-002`. Measured from the click, bucketed at the emitter -- the
+    // raw elapsed value never leaves this function.
+    const startedAt = Date.now();
+    const resolutionAction = targets.length > 1 ? ("bulk_retry" as const) : ("retry" as const);
     startRetry(async () => {
       const succeeded: string[] = [];
       for (const item of targets) {
@@ -193,6 +200,18 @@ export function NeedsAttentionList({
       }
       if (succeeded.length > 0) {
         setRetried((previous) => new Set([...previous, ...succeeded]));
+        const elapsedMs = Date.now() - startedAt;
+        for (const item of targets.filter((candidate) => succeeded.includes(candidate.key))) {
+          recordAttentionItemResolved({
+            entryId: item.entryId,
+            // The only reason resolvable in place, and the only one this event
+            // can carry -- the enum has exactly one member.
+            attentionReason: "retry_processing",
+            resolutionAction,
+            elapsedMs,
+            locale,
+          });
+        }
       }
     });
   }
