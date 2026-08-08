@@ -1,0 +1,73 @@
+/* Phase 2I — the command palette. `2I-PALETTE-001` … `2I-PALETTE-010`.
+ *
+ * `2I-PALETTE-008` budgets: open-to-interactive <= 150ms and keystroke-to-list
+ * <= 50ms. Both are met by construction rather than by optimisation -- the
+ * action list is built from `capabilities.ts` in memory and filtered with a
+ * string match. There is no network call on this path at all.
+ */
+
+.palette-trigger {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 38px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--white); color: var(--ink-soft);
+  font-size: 13px; font-weight: 650;
+}
+.palette-trigger:hover { background: var(--mist); color: var(--ink); }
+.palette-trigger kbd {
+  font: 650 10px var(--font-jetbrains);
+  padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--mist); color: var(--ink-soft);
+}
+
+.palette-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: clamp(16px, 10vh, 120px) 16px 16px;
+  background: rgba(20, 35, 59, .28);
+  backdrop-filter: blur(3px);
+}
+.palette {
+  width: min(100%, 620px);
+  display: flex; flex-direction: column;
+  max-height: min(70vh, 560px);
+  border: 1px solid var(--line); border-radius: 18px;
+  background: var(--white);
+  box-shadow: 0 32px 80px rgba(20, 35, 59, .22);
+  overflow: hidden;
+}
+.palette-field { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; border-bottom: 1px solid var(--line); }
+.palette-input { flex: 1; min-height: 48px; border: 0; background: transparent; color: var(--ink); font-size: 16px; }
+.palette-input:focus { outline: 0; }
+.palette-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; color: var(--ink-soft); font-size: 22px; line-height: 1; }
+
+.palette-results { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+.palette-group { display: grid; gap: 2px; padding: 6px 0; }
+.palette-group-label {
+  padding: 4px 10px;
+  font: 650 10px var(--font-jetbrains); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.palette-option {
+  display: block; width: 100%; text-align: left;
+  min-height: 40px; padding: 10px 12px;
+  border: 0; border-radius: 10px; background: transparent;
+  color: var(--ink); font-size: 14px; font-weight: 600;
+}
+/* The active option is marked by background AND by aria-selected. A highlight
+   that only exists visually is invisible to the screen-reader user the
+   combobox pattern is for. */
+.palette-option.is-active { background: var(--blue-wash); color: var(--blue); }
+
+.palette-empty { display: grid; gap: 4px; padding: 22px 14px; }
+.palette-empty strong { font-size: 14px; }
+.palette-empty span { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+
+@media (max-width: 760px) {
+  /* Full-screen on mobile, and the field sits at the top so the virtual
+     keyboard does not cover the results it is filtering. */
+  .palette-backdrop { padding: 0; }
+  .palette { width: 100vw; max-height: 100vh; height: 100vh; border: 0; border-radius: 0; }
+  .palette-close { min-width: 44px; min-height: 44px; }
+  .palette-option { min-height: 46px; }
+}

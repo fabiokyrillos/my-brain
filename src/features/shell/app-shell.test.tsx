@@ -22,6 +22,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/pt-BR/app"),
   useSearchParams: () => new URLSearchParams(),
+  // Added when the shell began rendering the command palette (2I.4). The
+  // palette's only effect is `router.push`, so a shell test that could not
+  // construct it would be unable to assert the top bar at all.
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 afterEach(() => {
