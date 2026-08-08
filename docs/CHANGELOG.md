@@ -21,9 +21,11 @@ shrinks the phase except voice.** `/app/today` is a **redirect** to `/app/work?v
 while the cockpit the PRD asks to build already exists at `/app` as `HomeDashboard`,
 composing four projections with capture at the top — so Hoje must be made *reachable under
 its own name*, not built. The attention queue **already exists** as `list_needs_attention`,
-`security definer`, `auth.uid()`-scoped and keyset-paginated, covering five of the six
-states the PRD lists; the gap is a surface and in-place actions, because every item's
-primary action is today a **link**. **Memory conflicts do not exist in this schema.** The
+`security definer`, `auth.uid()`-scoped and keyset-paginated. Its **five reasons cover four
+of the six** sources the PRD lists — task suggestions, ambiguities, questions and
+recoverable failures — and the gap is a surface and in-place actions, because every item's
+primary action is today a **link**. The two absent sources are absent for different reasons.
+**Memory conflicts do not exist in this schema.** The
 review domain already ships with four periods. And `configure_ai_credential` sits
 deliberately outside the queue because the analytics enum validating attention reasons is
 enforced *in the database*.

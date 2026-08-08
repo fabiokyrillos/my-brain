@@ -119,8 +119,9 @@ and a migration. Pin the model.
 - **Hoje does not need to be built.** It needs to be *reachable under its own name*, and to
   distinguish overdue from due.
 - **The attention queue exists**, is `security definer`, `auth.uid()`-scoped and
-  keyset-paginated, and covers five of the six states the PRD lists. It is narrower than the
-  PRD assumes and should stay that way.
+  keyset-paginated. Its **five reasons cover four of the six** sources the PRD lists — task
+  suggestions, ambiguities, questions and recoverable failures. It is narrower than the PRD
+  assumes and should stay that way.
 - **Memory conflicts do not exist** in this schema. The PRD lists them; there is nothing to
   compose.
 - **Configuration blockers are deliberately outside the queue.** `configure_ai_credential`

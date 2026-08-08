@@ -2574,6 +2574,25 @@ was reworded from memory; it is now a property the suite holds.
 
 `phase-2f-documentation.test.ts` + both taxonomy guards: **60 tests green** locally.
 
+### A local-only transient, named so nobody debugs it as a product defect
+
+Twice during this session a full local run reported a failure — once in A13's *"finds no
+start signal"*, once as three unnamed failures in `src/lib/closeout/` — and **neither
+reproduced**: the same suites then passed in isolation, in three consecutive directory
+runs, in two full runs, and in CI.
+
+Both occurrences share one signature: **the run was launched immediately after an `Edit`
+wrote to a file the guard reads.** The closeout guards read live `docs/*.md` and
+`src/lib/**` from disk on every run, so a parallel vitest worker on Windows can observe a
+write that has not finished landing. CI checks the tree out once and never mutates it, so
+the race cannot occur there — which is exactly what the results show.
+
+**This is not the ADR-090 flake class.** ADR-090's rule — a flake is a defect with an owner
+— is about CI. This is a local harness artifact of editing the corpus a guard reads while
+the guard runs. If you see it: re-run the suite *without* touching files in between before
+investigating anything. If it reproduces on an untouched tree, then it is real and it is
+yours.
+
 ### Posture at close
 
 Hosted parity **`202608070084`** · signup **disabled** · CAPTCHA **enforced** ·
