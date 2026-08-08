@@ -323,3 +323,15 @@ Classification vocabulary per `PHASE_2K_2O_MASTER_IMPLEMENTATION_PLAN.md` §"Req
 ---
 
 **Audit status.** Complete for the purpose of scoping Phase 2K. Every "already exists" and "does not exist" above is pinned to a file, a line, a migration or an executed command. Items 8.1–8.3 are named as unmeasured rather than guessed.
+
+---
+
+## Addendum — 2026-08-08, appended rather than merged into the text above
+
+Three of the six decisions this audit surfaced were signed after it was written (**ADR-098**). The body above is **not rewritten**: it is a record of what was known when the scope was decided, and editing it to look prescient is the drift this repository documents against. What changed:
+
+- **§4.1 / §6 — the persisted excerpt.** The audit found that `sendChatMessage` writes a 220-character excerpt into `conversation_messages.citations` whose classification does not travel with it. **OD-2K-2** resolves it by removing the copy: new messages persist a structured reference only and the source is re-read at render time against its current classification. The audit's framing — that the stored duplicate, not the render, is the asset — is what made that the chosen option rather than carrying a classification alongside the excerpt. The rows already written stay put and become a **named residual**; no backfill belongs to this phase.
+- **§2.2 / §6 — memory undo.** The audit recorded that a confirmed memory has no undo, and that a truthful one is reachable without a migration through the existing audited archive transition. **OD-2K-3** signs exactly that: the undo **archives**, preserves provenance, withdraws the memory from active use, and must say so in words that never claim deletion. The audit's note that `authenticated` *does* hold `delete` on `memories`, so the absence of a delete path is a product decision rather than a limit, is what makes this consistent rather than a workaround.
+- **§7 / §6 — ADR-055.** The audit recorded the expiry as the phase's binding constraint and its resolution as newly-required work. **OD-2K-6** signs the outcome: the *widening* retires at the expiry; the retrieval that exists today over entries and memories is untouched; and the ADR is not renewed artificially to keep a possibility on the roadmap. Slice 2K.0 therefore **records** a retirement rather than deciding one.
+
+**Unchanged by this addendum:** every classification in §6, the constraint table in §7, and the three unmeasured items in §8 — which slice 2K.0 still measures rather than assumes. `OD-2K-5`, one of those measurements, remains open.

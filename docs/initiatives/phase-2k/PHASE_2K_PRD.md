@@ -39,6 +39,14 @@ Signed 2026-08-08, recorded in ADR-097. These are inputs to this PRD, not propos
 | **OD-2K-C** *(3a)* | **Migration budget: maximum 1.** Initially destined for the content-free telemetry vocabulary of the Conversar surface. Budgeted only during planning; creation and application need later implementation authorization. **The ceiling is not an obligation** — if telemetry can be delivered honestly without one, close `1 allocated · 0 spent`. | `2K-METRICS-*` |
 | **OD-2K-D** *(4a)* | **Continuity by reopening and server re-derivation.** Restore conversation position and the card's visual reference; request a **new** server derivation; re-check authority, fingerprint and current state; never treat client state as source of truth; mark a prior confirmation **expired** when the object changed; show the relevant difference where that can be done without exposing content improperly; require a fresh confirmation; **never** auto-reapply. **No pending confirmation is persisted in the database this phase.** Permitted persistence is limited to identity and navigation context needed to request a safe re-derivation — never authorization, a reusable confirmation, or a mutation payload. | `2K-CONT-*` |
 
+Three further decisions were signed on 2026-08-08 and recorded in **ADR-098**. They were the three that **blocked** requirements; all three are now specified.
+
+| Id | Decision | Effect |
+|---|---|---|
+| **OD-2K-2** | **For new messages the excerpt is not persisted at all.** Store only the **structured reference** and **re-read the source at render time**. The current classification is consulted again on every render; `highly_sensitive` follows the central contract and appears **masked**; a removed, inaccessible or out-of-validity source appears **unavailable**; a historical excerpt is **never** reproduced in the clear; **no new copy of content is persisted**; existing excerpts remain a **named residual**; **no backfill belongs to 2K**; **no additional migration is authorized**. | `2K-PRIVACY-003/004`, `2K-SRC-*` |
+| **OD-2K-3** | **Memory undo archives; it does not physically remove.** Provenance preserved; the memory leaves the active context; authorization and owner scope unchanged; the **true** result recorded; the UI says **explicitly** that the memory was archived or withdrawn from use and **never** that it was deleted. Undo-of-the-undo exists only if the current domain can prove it safely. | `2K-ACT-008/009`, `2K-CARD-009` |
+| **OD-2K-6** | **At the ADR-055 expiry the semantic-retrieval *widening* retires from the active roadmap.** The retrieval that exists today over entries and memories is **not** removed, disabled or degraded. Retirement covers only what would need `source_type` widening, backfill, a pipeline, a job type, a new index, or new semantic infrastructure. Resumption requires a new measurable demand signal, a new audit, a new ADR, its own budget and explicit authorization. **ADR-055 is not to be renewed artificially to keep a possibility on the roadmap.** | `2K-AUDIT-004/005` |
+
 ---
 
 ## 3. Scope
@@ -91,8 +99,8 @@ Eleven closed families. Every requirement carries a stable id and ends the phase
 - **2K-AUDIT-001:** The current-experience audit is committed, and every "exists"/"does not exist" claim cites a file, line, migration, constraint, guard or executed command.
 - **2K-AUDIT-002:** The three unmeasured items named in audit §8 are **measured** before the slices that depend on them: task-command confirmation expiry semantics (read `202607260059` in full), the copy a zero-source answer currently produces, and whether any surface already renders `occurredAt`.
 - **2K-AUDIT-003:** Hosted parity is re-proved at the start of implementation, not assumed from this document.
-- **2K-AUDIT-004:** A permanent decision resolving **ADR-055's 2026-10-27 expiry** is recorded as an accepted ADR, within OD-2K-A's boundary: it authorizes no `source_type` widening, backfill, pipeline, job type, index or semantic infrastructure.
-- **2K-AUDIT-005:** That decision states explicitly whether semantic retrieval leaves the active roadmap, and if it does not, what new demand signal would reopen it and by when.
+- **2K-AUDIT-004:** The **retirement** signed by OD-2K-6 is executed and recorded: at the ADR-055 expiry the semantic-retrieval *widening* leaves the active roadmap, while the retrieval that exists today over entries and memories continues **unchanged, not removed, disabled or degraded**. The record authorizes no `source_type` widening, backfill, pipeline, job type, index or semantic infrastructure.
+- **2K-AUDIT-005:** The record states the resumption conditions as a closed list — a new measurable demand signal, a new audit, a new ADR, its own budget, explicit authorization — and states that ADR-055 is **not** renewed artificially to keep a possibility on the roadmap. A renewal date is deliberately **not** written, because a permanently pending gate blocks nothing and decides nothing.
 - **2K-AUDIT-006:** The ADR-055 offline spike is recorded as **permitted but not required**, not an implementation of 2K.7, authorizing no infrastructure, and executable only under a later or specific authorization.
 
 ### 4.2 `2K-CARD` — the action-card contract and read-only previews (slice 2K.1)
@@ -116,8 +124,8 @@ Eleven closed families. Every requirement carries a stable id and ends the phase
 - **2K-ACT-005:** A confirmation that no longer matches current state resolves to `expired` and requires a fresh confirmation. It is never silently recomputed and applied.
 - **2K-ACT-006:** Results are truthful and distinguish at minimum: applied, no change, refused with reason, failed and retryable, failed and terminal.
 - **2K-ACT-007:** Task undo keeps its existing 24-hour window and restore-afterwards disclosure.
-- **2K-ACT-008:** A confirmed memory has a **real, tested undo** appropriate to its domain, reachable from the conversation that created it, reusing the existing audited lifecycle transition — no new column, no new RPC, no migration.
-- **2K-ACT-009:** Memory undo is disclosed accurately: what it does, what it preserves, and that it is not a deletion.
+- **2K-ACT-008:** A confirmed memory has a **real, tested undo** that **archives** it (OD-2K-3), reachable from the conversation that created it, reusing the existing audited lifecycle transition — no new column, no new RPC, no migration. Provenance is preserved, the memory leaves the active context, authorization and owner scope are unchanged, and the recorded result is the true one.
+- **2K-ACT-009:** Memory undo is disclosed accurately: the UI states **explicitly** that the memory was archived or withdrawn from use, and **never** states or implies that it was deleted. An undo-of-the-undo is offered **only** if the current domain can prove it safely; where it cannot, its absence is declared rather than left ambiguous.
 
 ### 4.4 `2K-CONT` — continuity between conversation and product (slice 2K.3)
 
@@ -163,8 +171,8 @@ Eleven closed families. Every requirement carries a stable id and ends the phase
 
 - **2K-PRIVACY-001:** `chat` becomes a governed surface in the central sensitivity contract. No new code tests a literal sensitivity level; `sensitivity-boundary.test.ts` stays green.
 - **2K-PRIVACY-002:** Presentation follows the contract's doctrine — **masked in place, not excluded** — so a visible count is never a lie and no "n hidden" affordance exists.
-- **2K-PRIVACY-003:** **OD-2K-2** is resolved and recorded before implementation: what happens to the **persisted 220-character citation excerpt**, whose stored copy today outlives reclassification of its source. Options: store no excerpt and re-read at render; carry the classification with the excerpt and mask on render; or refuse `highly_sensitive` sources into the answer.
-- **2K-PRIVACY-004:** A source reclassified `highly_sensitive` **after** an answer was stored is not rendered in the clear afterwards.
+- **2K-PRIVACY-003:** Per **OD-2K-2**, a new assistant message persists **no excerpt**. It stores only the structured reference needed to locate the source, and the source is **re-read at render time**. A guard asserts no content-bearing field is written into the citation payload; the property is enforced by the payload's **shape**, not by a caller's promise.
+- **2K-PRIVACY-004:** Rendering consults the **current** classification every time. `highly_sensitive` appears **masked** per the central contract; a source that was removed, is inaccessible, or falls outside its validity window appears **unavailable**; a historical excerpt is **never** reproduced in the clear. A source reclassified `highly_sensitive` **after** an answer was stored is therefore not rendered in the clear afterwards — by construction, because there is no stored copy to render.
 - **2K-PRIVACY-005:** An unreadable classification continues to fail **closed** to `highly_sensitive`.
 - **2K-PRIVACY-006:** ADR-093 / OD-1 (search sensitivity) is not amended, re-opened or contradicted.
 
@@ -214,7 +222,7 @@ Every Phase 2K surface declares all applicable states. A state that cannot occur
 | **partial** | Names what succeeded and what did not; never renders partial as complete |
 | **stale** | The object moved; carries no content from the pre-state it knows is wrong |
 | **expired** | A prior confirmation no longer applies; shows the relevant difference where safe; requires fresh confirmation |
-| **masked** | Existence shown, content withheld, local and transient reveal offered |
+| **masked** | Existence shown, content withheld, local and transient reveal offered. Decided from the **current** classification at render time, never from a stored copy (OD-2K-2) |
 | **insufficient** | No qualifying personal evidence; visually distinct from an evidenced answer |
 | **unavailable** | Object unreadable; byte-identical across deleted, foreign and suspended causes |
 
@@ -224,7 +232,7 @@ Every Phase 2K surface declares all applicable states. A state that cannot occur
 |---|---|---|---|
 | Task mutation, non-destructive | Full deltas + linked effects | One-step Apply where the match permits | 24h, then restore |
 | Task mutation, destructive | Full deltas + gravity + effects | Server-issued single-use, fingerprint-bound | 24h, then restore |
-| Memory create from proposal | Honest asymmetric preview, no fake deltas | Explicit confirm control | Domain-appropriate reversal via the audited lifecycle transition, disclosed as not a deletion |
+| Memory create from proposal | Honest asymmetric preview, no fake deltas | Explicit confirm control | **Archives** via the audited lifecycle transition (OD-2K-3). Provenance preserved, the memory leaves the active context, and the UI says explicitly that it was archived or withdrawn from use — **never** that it was deleted. No 24-hour window is claimed, because none exists |
 | Capture from own words | Not applicable — the text is the owner's | Not applicable, and documented as such | Existing entry lifecycle |
 | Read-only card | Content preview only | **No mutating control exists** | Not applicable |
 
@@ -254,6 +262,8 @@ All new copy goes through a typed feature `copy.ts` (ADR-036), both locales, no 
 - Reconciliation is **per slice, not by count**.
 - A second migration is an owner amendment, not a planning decision.
 - Three known pressures are pre-excluded: memory-undo handler registration, teaching `match_internal_knowledge` the lifecycle window, and persisting continuity state.
+- **A fourth is pre-excluded by OD-2K-2:** backfilling or rewriting the citation excerpts already stored in `conversation_messages.citations`. That is a `jsonb` migration, it is explicitly not authorized by OD-2K-2, and no backfill belongs to Phase 2K. The existing excerpts are a named residual (§11).
+- All three decisions signed in ADR-098 were chosen partly because **none of them spends the ceiling**.
 
 ---
 
@@ -269,16 +279,15 @@ A slice is done only when: tests were written first; `npm run lint` and `npm run
 
 ## 10. Open decisions
 
-Signed decisions are §2. These remain open and **block or gate** the slices named.
+Signed decisions are §2 — the four in ADR-097 and the three in ADR-098. **No Phase 2K requirement is blocked on an unsigned decision.** The three below remain open and **gate** rather than block: each shapes how a requirement closes, none prevents its slice from starting.
 
-| Id | Question | Blocks |
+| Id | Question | Gates |
 |---|---|---|
 | **OD-2K-1** | Which parameters are editable before confirmation, per action? A closed per-action set is required; the alternative is free-text patch editing, which is refused. | Gates `2K-ACT-003/004` |
-| **OD-2K-2** | What happens to the **persisted citation excerpt** for `highly_sensitive` sources — no excerpt and re-read at render, excerpt plus travelling classification, or refuse such sources into the answer? | **Blocks** `2K-PRIVACY-003/004` |
-| **OD-2K-3** | Memory undo semantics: does the conversational undo of a confirmed memory **archive** it (preserving provenance, consistent with the product's signed refusal to delete memories) or **remove** it (matching the user's likely mental model of "undo")? | **Blocks** `2K-ACT-008/009` |
 | **OD-2K-4** | Suggestion sources: which state may produce a suggestion, and may a suggestion name a person or project on screen? *(Telemetry stays bounded either way.)* | Gates `2K-SUGG-001` |
 | **OD-2K-5** | Do task-command confirmations expire independently of object change? Audit §8.1 found no TTL; `2K-AUDIT-002` measures it in 2K.0. | Gates `2K-ACT-005`, `2K-CONT-006` |
-| **OD-2K-6** | Does the ADR-055 decision **retire** semantic retrieval from the active roadmap at expiry, or renew it with a named new demand signal and a new date? | **Blocks** `2K-AUDIT-004/005` |
+
+**OD-2K-2, OD-2K-3 and OD-2K-6 are signed** (ADR-098, 2026-08-08) and moved to §2. They were the three that blocked; their requirements are now specified rather than pending.
 
 ---
 
@@ -286,8 +295,8 @@ Signed decisions are §2. These remain open and **block or gate** the slices nam
 
 | Residual | Destination |
 |---|---|
-| Retrieval limited to entries and memories | ADR-055 decision (`2K-AUDIT-004`); any widening is a future phase with its own authorization |
-| Citation excerpts stored **before** `OD-2K-2` is applied | Named at close; backfill is a migration and the budget is one, destined elsewhere. Carried to the roadmap successor |
+| Retrieval limited to entries and memories | **Settled, not open** (OD-2K-6 / ADR-098): the widening retires at the ADR-055 expiry; today's retrieval continues unchanged. Resumption needs a new demand signal, audit, ADR, budget and authorization |
+| **Citation excerpts already stored** in `conversation_messages.citations` before OD-2K-2 takes effect | **A named residual, by decision.** New messages persist no excerpt; the historical rows are not rewritten. Backfill is a `jsonb` migration, is explicitly not authorized by OD-2K-2, and no backfill belongs to 2K. Named at close and carried to the roadmap successor |
 | No screen-reader session on Conversar | Reported manual or as an evidenced negative (`2K-CLOSE-005`) |
 | No pgTAP owner-scoping test for `match_internal_knowledge` | May be added in 2K.0 — it is a test, not a migration |
 | Mutating cards for people/projects | Out by OD-2K-B; destination is the roadmap successor's own audit |

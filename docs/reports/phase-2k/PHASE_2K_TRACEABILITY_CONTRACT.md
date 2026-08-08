@@ -54,6 +54,8 @@ A generator run **must fail** — non-zero exit, no matrix emitted — on any of
 | R12 | **Acceptance record created before execution** | A slice acceptance record whose commit predates the evidence it cites, or which exists for a slice with no merged implementation commit |
 | R13 | **Budget inconsistency** | Migrations counted in the matrix exceeding the allocation, or per-slice reconciliation disagreeing with the total |
 | R14 | **Successor scope present** | A declared requirement in a successor-phase namespace, or a governing artifact for a phase this package does not authorize |
+| R15 | **Signed decision contradicted** | A row whose classification or evidence contradicts a signed decision: a `2K-ACT-008/009` row describing deletion rather than archival (OD-2K-3); a `2K-PRIVACY-003/004` row citing a persisted excerpt or a stored classification (OD-2K-2); a `2K-AUDIT-004/005` row describing an ADR-055 renewal, a renewal date, or any claim that current retrieval was removed, disabled or degraded (OD-2K-6). A signed decision is an input the matrix may not quietly relitigate |
+| R16 | **A slice claimed as executed that was not** | Any language asserting execution — "executed slices", a slice marked delivered — without a merged implementation commit and an acceptance record postdating it. Related to R12, and separated from it because R12 checks the record's timestamp while this checks the *claim* |
 
 ---
 
@@ -82,12 +84,12 @@ Stated so the matrix can be **checked** rather than merely filled. These are exp
 |---|---|
 | `2K-AUDIT` | Mostly `built`. `2K-AUDIT-004..006` must cite an accepted ADR by id |
 | `2K-CARD` | Mixed. Task preview immutability expected `baseline` citing pre-phase code; the shared vocabulary `built` |
-| `2K-ACT` | Mixed. Task undo `baseline`; memory undo `built`; editable parameters `built` |
+| `2K-ACT` | Mixed. Task undo `baseline`; memory undo `built` **and archival, never deletion** (OD-2K-3) — a matrix row claiming a memory was removed is a refusal, not a classification; editable parameters `built` |
 | `2K-CONT` | Expected `built` throughout — the audit found no continuity capability |
 | `2K-SRC` | `2K-SRC-001/002` expected `baseline` **with proof**; the rest `built` |
 | `2K-EXPL` | Expected `built`; `2K-EXPL-006` may close `baseline` (nothing exposes reasoning today) |
 | `2K-SUGG` | Expected `built` |
-| `2K-PRIVACY` | `2K-PRIVACY-005/006` expected `baseline`; the rest `built` |
+| `2K-PRIVACY` | `2K-PRIVACY-005/006` expected `baseline`; the rest `built`. `2K-PRIVACY-003/004` must cite the **absence** of a persisted excerpt and the render-time re-read (OD-2K-2), never a stored classification travelling with a copy |
 | `2K-A11Y` | Mixed `built`/`partial`. Any AT claim must be labelled manual or an evidenced negative |
 | `2K-METRICS` | `built`, or `undelivered` with a destination if the migration is not authorized |
 | `2K-CLOSE` | `built` |

@@ -61,10 +61,12 @@
 **Browser/Playwright.** One authenticated hosted turn for measurement 2, executed manually against the linked project, with fixture deletion asserted.
 **Real device / AT.** Not applicable; declared.
 
-**Acceptance criteria.** Three measurements recorded with method and result. An accepted ADR resolves ADR-055's expiry within OD-2K-A's boundary and authorizes no infrastructure. `OD-2K-5` and `OD-2K-6` are closed. Zero fixture residue proved.
+**The ADR-055 record is now determined, not open.** OD-2K-6 (ADR-098) signed the outcome: at the expiry the semantic-retrieval **widening** retires from the active roadmap, while the retrieval that exists today over entries and memories continues **unchanged — not removed, disabled or degraded**. The slice records that retirement and the closed list of resumption conditions (new measurable demand signal, new audit, new ADR, own budget, explicit authorization). It writes **no renewal date**: ADR-055 is not to be renewed artificially to keep a possibility on the roadmap, and a permanently pending gate blocks nothing.
+
+**Acceptance criteria.** Three measurements recorded with method and result. The ADR-055 retirement recorded within OD-2K-A's boundary, authorizing no infrastructure and asserting explicitly that current retrieval is untouched. `OD-2K-5` closed by measurement. Zero fixture residue proved.
 
 **Acceptance record.** `PHASE_2K_SLICE_00_ACCEPTANCE.md`, after execution.
-**Stopping condition.** Stop if the ADR-055 decision requires scope OD-2K-A forbids — that is an owner amendment, not a slice decision.
+**Stopping condition.** Stop if the ADR-055 record would require scope OD-2K-A forbids, or if it would read as a renewal rather than a retirement — either is an owner amendment, not a slice decision.
 **Rollback.** Documentation and one optional test; revert by reverting the commit. No product behaviour changes.
 **Order.** Branch `codex/phase-2k-slice-0` → commits → push → PR → CI green → merge review → merge. **No deploy** (no migration).
 
@@ -105,9 +107,9 @@
 **Browser/Playwright.** `e2e/accessibility.spec.ts` extended with the new card states — runs in CI's `database` job on desktop and Pixel 7.
 **Real device / AT.** **Optional**, not required for this slice; if not run, recorded as not proved.
 
-**Acceptance criteria.** The vocabulary is closed and server-decided. No read-only card can mutate, proved by a guard that fails against a planted violation. `chat` is governed and masks in place. `OD-2K-2` is signed and its choice is implemented. `sensitivity-boundary.test.ts` and `locale-ternary-guard.test.ts` green.
+**Acceptance criteria.** The vocabulary is closed and server-decided. No read-only card can mutate, proved by a guard that fails against a planted violation. `chat` is governed and masks in place, decided from the **current** classification rather than a stored copy. `sensitivity-boundary.test.ts` and `locale-ternary-guard.test.ts` green.
 
-**Stopping condition.** Stop before writing the excerpt handling if `OD-2K-2` is unsigned — `2K-PRIVACY-003/004` are **blocked**, not gated.
+**Stopping condition.** Stop if masking cannot be driven from a render-time classification read — OD-2K-2 forbids the stored-copy alternative, and a mask computed from stale data is the defect the decision exists to remove.
 **Rollback.** Additive feature plus one additive vocabulary row; revert the commit. No data migration, nothing to undo in the database.
 **Order.** Branch → tests first → implementation → focused → full → diff review → commit → push → PR → CI → merge. No deploy.
 
@@ -121,7 +123,7 @@
 
 **Expected files**
 - Create: `src/features/conversation-cards/editable-parameters.ts` + test — the closed per-action editable set; free-text patch editing refused.
-- Create: `src/features/memories/undo.ts` + `undo.test.ts` — domain-appropriate reversal via the existing audited lifecycle transition.
+- Create: `src/features/memories/undo.ts` + `undo.test.ts` — **archival** reversal (OD-2K-3) via the existing audited lifecycle transition. There is deliberately no delete path, matching the module's own standing product decision.
 - Modify: `src/features/memories/actions.ts` — the conversational undo action; **no new column, no new RPC, no migration**.
 - Modify: `src/features/memories/memory-proposal-card.tsx` — honest asymmetric preview, staleness witness, accurate reversibility disclosure.
 - Modify: `src/features/assistant/actions.ts` — route the edit/discard/undo intents; the intent list stays a closed, validated vocabulary.
@@ -136,9 +138,12 @@
 1. Editing a parameter **re-derives and re-fingerprints**; applying under the pre-edit fingerprint is refused.
 2. A confirmation that no longer matches current state resolves `expired` and **no write occurs**.
 3. Discard writes nothing and leaves no intent record.
-4. Memory undo reverses the confirmed create, is audited, and is refused for a foreign row (pgTAP, with a positive control on an owned row).
-5. A memory card does **not** display a 24-hour undo affordance, because it does not have one.
-6. Results distinguish applied / no-change / refused / retryable-failure / terminal-failure, exhaustively.
+4. Memory undo **archives**: the row survives, `valid_until` is stamped, provenance is intact, the change is audited, and it is refused for a foreign row (pgTAP, with a positive control on an owned row so the denial is not vacuous).
+5. The archived memory **leaves the active context** — it is no longer retrievable as an in-force source, sharing `isMemoryInForce` with the badge the owner reads so the two cannot disagree.
+6. The copy **says archived or withdrawn from use** and, asserted negatively, contains no delete/erase/remove wording in either locale.
+7. A memory card does **not** display a 24-hour undo affordance, because it does not have one.
+8. Undo-of-the-undo is offered **only** if reactivation can be proved safe on the current domain; if it cannot, the surface declares its absence rather than leaving it ambiguous.
+9. Results distinguish applied / no-change / refused / retryable-failure / terminal-failure, exhaustively.
 
 **Focused gate.** `npx vitest run src/features/conversation-cards src/features/memories src/features/assistant` and `npx supabase test db` for the new pgTAP file.
 **Full relevant gate.** `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; plus `src/features/task-commands` in full, to prove the mature pipeline is untouched.
@@ -148,9 +153,9 @@
 **Browser/Playwright.** Accessibility lane extended. An authenticated journey confirming a memory and undoing it from the conversation is written here and **executed in 2K.8**, where the online lane runs.
 **Real device / AT.** **Not proved** in this slice; declared.
 
-**Acceptance criteria.** Edit re-fingerprints. Expired never writes. Memory undo works, is audited, is owner-scoped, and is disclosed accurately as not a deletion. Task pipeline behaviour is unchanged, proved by its own suite. `OD-2K-1` and `OD-2K-3` are signed.
+**Acceptance criteria.** Edit re-fingerprints. Expired never writes. Memory undo archives, is audited, is owner-scoped, removes the memory from the active context, and is disclosed as archival rather than deletion — asserted positively and negatively. Task pipeline behaviour is unchanged, proved by its own suite. `OD-2K-1` is signed.
 
-**Stopping condition.** Stop if `OD-2K-3` is unsigned — archive-versus-remove changes what the undo *means*, and shipping either silently would be the product deciding a semantic the owner reserved.
+**Stopping condition.** Stop if archival cannot be made to remove the memory from retrieval as well as from the list — an "undo" that leaves the memory answering questions is the comfortable lie OD-2K-3 exists to forbid.
 **Rollback.** Behavioural but reversible by revert; no schema change, so no data to migrate back.
 **Order.** As 2K.1. No deploy.
 
@@ -208,7 +213,8 @@
 - Create: `src/features/conversation-sources/copy.ts` + test — both locales.
 - Create: `src/features/conversation-sources/source-list.tsx` + test.
 - Create: `src/lib/closeout/phase-2k-answer-contract-guard.test.ts` — structural: the answer schema carries **no** action, command, patch or mutation field; no card is producible from retrieved content.
-- Modify: `src/features/chat/actions.ts` — carry `occurredAt` and the support kind into the persisted citation; apply the `OD-2K-2` excerpt choice; emit the insufficiency signal.
+- Modify: `src/features/chat/actions.ts` — persist a **structured reference only** (OD-2K-2): source type, source id, support kind. **No excerpt, no content-bearing field.** Emit the insufficiency signal.
+- Create: `src/features/conversation-sources/resolve-sources.ts` + test — the render-time re-read: fetch each cited source under RLS, consult its **current** classification, and return `show` / `masked` / `unavailable`.
 - Modify: `src/app/[locale]/app/chat/[conversationId]/page.tsx` — render sources, freshness, support kind, insufficiency and reach.
 - Modify: `src/lib/ai/chat-schema.ts` — **only** if the support kind must be provider-declared; the default is to derive it server-side, which needs no schema change and keeps the model unable to widen its own authority.
 - Modify: `e2e/accessibility.spec.ts` — the source block and the insufficiency state.
@@ -221,7 +227,11 @@
 3. Freshness renders from `occurred_at` and is absent — not fabricated — when the value is missing.
 4. Fabricated ids are still stripped, degrading to a missing citation rather than an error (regression over existing behaviour).
 5. The answer contract carries no action field; an injection-shaped source produces **no** card.
-6. A source reclassified `highly_sensitive` after the answer was stored is not rendered in the clear.
+6. **The persisted citation payload carries no content**, proved by a schema guard with a planted `excerpt` field that must fail it.
+7. A source reclassified `highly_sensitive` after the answer was stored renders **masked** on the next view — by construction, since there is no stored copy to render.
+8. A source deleted after the answer was stored renders **unavailable**, byte-identical to a source the current user cannot read.
+9. A memory archived after the answer was stored renders **unavailable** rather than in the clear.
+10. Historical rows that still carry an excerpt are **not** reproduced in the clear: the renderer reads the reference, never the legacy field.
 
 **Focused gate.** `npx vitest run src/features/conversation-sources src/features/chat src/lib/closeout/phase-2k-answer-contract-guard.test.ts`
 **Full relevant gate.** `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; plus `src/lib/ai` in full if `chat-schema.ts` is touched.
@@ -231,10 +241,10 @@
 **Browser/Playwright.** Accessibility lane extended; an authenticated sources journey written here, **executed in 2K.8**.
 **Real device / AT.** **Not proved**; declared.
 
-**Acceptance criteria.** Every answer states what it used or that it had nothing. Freshness and support kind render. Reach is disclosed. The answer path provably cannot emit an action. The post-hoc reclassification test passes.
+**Acceptance criteria.** Every answer states what it used or that it had nothing. Freshness and support kind render. Reach is disclosed. The answer path provably cannot emit an action. No content is persisted into the citation payload. Reclassified, deleted and archived sources all render correctly on re-read, and legacy excerpts are never reproduced in the clear.
 
-**Stopping condition.** Stop the excerpt work if `OD-2K-2` is unsigned; the rest of the slice may proceed.
-**Rollback.** Revert. If the `OD-2K-2` choice was "store no excerpt", already-stored excerpts are untouched by the revert and remain a named residual.
+**Stopping condition.** Stop if the render-time re-read cannot be bounded — a per-source read on every thread render is acceptable at the current 200-message ceiling, but an unbounded fan-out is not, and the fix is batching, never falling back to the stored copy.
+**Rollback.** Revert. Already-stored excerpts are untouched by the revert either way and remain a named residual; no backfill is authorized, so there is no data migration to reverse.
 **Order.** As 2K.1. No deploy.
 
 ---
@@ -321,11 +331,13 @@
 
 **Why.** ADR-055 forbids `source_type` widening, backfill, pipelines, job types and indexes until an evidence threshold is met; the funnel is empty; and `phase-2i-search-guard.test.ts` fails the build if the search feature gains embeddings, vector operators, similarity or generated answers. Semantic retrieval over entries and memories already ships and is the phase's baseline.
 
-**What survives, and where.** The ADR-055 expiry decision is `2K-AUDIT-004..006` in slice 2K.0. Claim-binding to sources is already `baseline` and is re-proved by `2K-SRC-002`. Reach disclosure — telling the user the retrieval actually covers records and memories — is `2K-SRC-006`.
+**What survives, and where.** The ADR-055 expiry **record** is `2K-AUDIT-004..006` in slice 2K.0. Claim-binding to sources is already `baseline` and is re-proved by `2K-SRC-002`. Reach disclosure — telling the user the retrieval actually covers records and memories — is `2K-SRC-006`.
 
-**The spike.** ADR-055's own offline replay spike remains permitted by ADR-055. It is **not** a closing requirement of Phase 2K, **not** an implementation of 2K.7, authorizes no infrastructure, and may run only under a later or specific authorization.
+**And the removal is now permanent by decision, not merely deferred.** OD-2K-6 (ADR-098) signed that the *widening* **retires from the active roadmap** at the ADR-055 expiry. Today's retrieval over entries and memories is untouched. Resumption is not a matter of a later phase picking this slice back up: it requires a new measurable demand signal, a new audit, a new ADR, its own budget and explicit authorization. **No renewal date is written**, deliberately.
 
-**Classification at close.** Every 2K.7 candidate requirement closes `not-built-by-rule`, naming ADR-055 and OD-2K-A.
+**The spike.** ADR-055's own offline replay spike remains permitted by ADR-055 for as long as ADR-055 stands. It is **not** a closing requirement of Phase 2K, **not** an implementation of 2K.7, authorizes no infrastructure, and may run only under a later or specific authorization. It is not a route back into this slice.
+
+**Classification at close.** Every 2K.7 candidate requirement closes `not-built-by-rule`, naming ADR-055, OD-2K-A and OD-2K-6.
 
 ---
 
@@ -392,8 +404,9 @@
 
 | Risk | Mitigation |
 |---|---|
-| ADR-055 expires mid-phase unresolved | 2K.0 is first and its ADR is a closing requirement of that slice, not of the phase |
-| `OD-2K-2` unsigned blocks two slices partially | 2K.1 and 2K.4 both proceed on their non-excerpt requirements; only `2K-PRIVACY-003/004` block |
+| ADR-055 expires mid-phase unresolved | 2K.0 is first, and OD-2K-6 already signed the outcome — the slice records a retirement it does not have to decide |
+| Render-time source re-reads add latency to every thread view | Bounded by the existing 200-message ceiling and batched into one query per source table; the stored-copy fallback is forbidden by OD-2K-2, so the fix is always batching |
+| Archival undo reads as deletion to a user | `2K-ACT-009` asserts the copy positively *and* negatively in both locales; the word "deleted" cannot appear |
 | Sharing a grammar flattens distinct outcomes | `2K-CARD-002` keeps state server-decided; exhaustive rendering tests |
 | Continuity handle drifts toward a bearer token | `2K-CONT-003` structural guard with a planted violation |
 | Telemetry lands with a producer and no consumer | `2K-METRICS-007`; SH.6 shipped exactly that failure |

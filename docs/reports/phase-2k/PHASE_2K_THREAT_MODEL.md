@@ -46,11 +46,15 @@
 
 **Why the obvious mitigation is not the real one.** Adding `chat` to `GOVERNED_SURFACES` fixes *rendering* of newly-written rows. It does nothing about the copies already stored, and nothing about divergence after the fact. The asset is the stored duplicate, not the render.
 
-**Mitigation.** Two parts, and the second is the decision:
+**Mitigation — and `OD-2K-2` is now signed (ADR-098), so this is a specification rather than an option set.**
 1. Add `chat` as a governed surface and read `presentationFor`; `sensitivity-boundary.test.ts` then fails the build if any new code tests a literal level directly. Masking, never exclusion — the contract's own doctrine is that a dropped row makes the count a lie and any "n hidden" affordance is an existence oracle.
-2. Resolve **`OD-2K-2`**: store no excerpt and re-read at render; or carry the classification with the excerpt and mask on render; or refuse `highly_sensitive` sources into the answer. Each has a different cost and a different failure mode. The phase must not pick silently.
+2. **For new messages the excerpt is not persisted at all.** Only a structured reference is stored, and the source is **re-read at render time** against its **current** classification. `highly_sensitive` renders masked; a removed, inaccessible or out-of-validity source renders unavailable; a historical excerpt is never reproduced in the clear.
 
-**Falsifying evidence.** A test that classifies a source `highly_sensitive` *after* the answer is stored and asserts the thread does not render its excerpt in the clear. `toSensitivityLevel` still failing closed to `highly_sensitive` on an unreadable value. A guard proving chat's presentation reads the shared contract.
+**Why this eliminates the threat rather than mitigating it.** The asset was a *stored duplicate that could diverge from its classification*. Carrying the classification alongside the excerpt would have kept two copies of one fact in sync by convention — the same shape of defect as the three product-event vocabulary copies `202608080087` had to delete, and the reason that one survived two phases. Removing the copy removes the thing that can diverge. There is nothing left to keep in sync.
+
+**What survives as residual, stated rather than closed.** Excerpts already stored are **not** rewritten: a `jsonb` backfill is a migration, OD-2K-2 explicitly authorizes none, and no backfill belongs to Phase 2K. The renderer must therefore read the reference and **never** fall back to a legacy excerpt field — which is a testable property, and the one that stops the residual becoming a live exposure again.
+
+**Falsifying evidence.** A schema guard with a planted `excerpt` field that must fail it. A test classifying a source `highly_sensitive` *after* the answer is stored, asserting the next render is masked. A test deleting a source afterwards, asserting `unavailable` byte-identical to an unreadable one. A test on a legacy row that still carries an excerpt, asserting it is not rendered in the clear. `toSensitivityLevel` still failing closed on an unreadable value.
 
 ---
 
@@ -172,8 +176,9 @@
 
 | Risk | Why accepted | Destination |
 |---|---|---|
-| Retrieval reaches only entries and memories | ADR-055; decision 1a | 2K.0's permanent ADR-055 decision |
-| Existing stored citation excerpts predating `OD-2K-2` | Backfilling a jsonb column is a migration; budget is one and destined for telemetry | Named in closeout; carried to the roadmap successor |
+| Retrieval reaches only entries and memories | ADR-055; decision 1a. **Settled by OD-2K-6**: the widening retires at expiry; today's retrieval is untouched | Recorded in 2K.0; resumption needs a new demand signal, audit, ADR, budget and authorization |
+| Existing stored citation excerpts predating `OD-2K-2` | Backfilling a jsonb column is a migration; the budget is one and destined for telemetry, and OD-2K-2 authorizes no backfill | Named in closeout; carried to the roadmap successor. Contained meanwhile by the renderer never reading a legacy excerpt field |
+| A memory "undone" from the conversation remains queryable in the database | **By decision** (OD-2K-3): archival preserves provenance, which is why the product has never had a memory delete path | Disclosed in copy — archived or withdrawn from use, never deleted — and enforced by `2K-ACT-009`'s negative assertion |
 | No screen-reader session on Conversar | Never executed; will not be inferred from an axe pass | Reported manual or as an evidenced negative |
 | `match_internal_knowledge` has no pgTAP owner-scoping test | RLS + `security invoker` hold, but no database test asserts it | 2K.0 may add one; it is a test, not a migration |
 
@@ -183,6 +188,6 @@
 
 Recorded so a later phase inherits the analysis rather than rediscovering it.
 
-- **Semantic widening** (`source_type` beyond entry/memory) would introduce: embedding backfill over tables with different sensitivity postures; a new job type and its failure modes; retention questions for vectors derived from deleted rows; and cost per indexed row. Blocked by ADR-055 and decision 1a.
+- **Semantic widening** (`source_type` beyond entry/memory) would introduce: embedding backfill over tables with different sensitivity postures; a new job type and its failure modes; retention questions for vectors derived from deleted rows; and cost per indexed row. Blocked by ADR-055 and decision 1a, and **retired from the active roadmap at the ADR-055 expiry by OD-2K-6** — so this analysis is inherited by whichever future phase produces a new demand signal, not by an assumed successor.
 - **Mutating cards for people and projects** would each need their own preview, fingerprint, confirmation, undo semantics and cross-owner analysis, and `people`/`projects` carry no `sensitivity` column — so the masking analysis above would not transfer. Blocked by decision 2a.
 - **Persisted pending confirmations** would create a durable authorization-adjacent artifact requiring its own RLS policy, expiry policy, retention class and deletion-cascade entry. Blocked by decision 4a.

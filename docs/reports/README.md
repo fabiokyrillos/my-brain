@@ -53,7 +53,7 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`post-2h-rollout/`](./post-2h-rollout/) | Post-2H rollout readiness — backup, SMTP, monitoring adequacy and legal packets | **NOT a phase.** Bounded owner-authorized effort, 2026-08-07; migration `202608070084` deployed |
 | [`phase-2i/`](./phase-2i/) | Phase 2I — Foundation and Findability (current-experience audit, threat model, traceability contract, gaps, eight slice acceptances, closing report) | **COMPLETE** 2026-08-07 — 61 declared · 61 classified · 0 undelivered; `1 allocated · 0 spent`; hosted parity unchanged at `202608070084` |
 | [`phase-2j/`](./phase-2j/) | Phase 2J — Today, Capture and Attention (audit, threat model, traceability contract, gaps, eight slice acceptances, matrix, closing report, deployment record) | **COMPLETE** 2026-08-08 — 74 declared · 74 classified · 0 unclassified; `2 allocated · 2 spent` (unchanged); **DEPLOYED, hosted parity `202608080087`**. The deployment probe found the declared telemetry events refused by an un-widened third vocabulary copy; the post-2J correction `202608080087` removed that duplication the same day and telemetry is proved live producer → consumer |
-| [`phase-2k/`](./phase-2k/) | Phase 2K — Conversar as the primary interface (current-experience audit, gaps, threat model, traceability contract) | **PLANNING ONLY** (ADR-097, 2026-08-08). 68 requirements, eight executed slices, `1 allocated · 0 spent`. Implementation is **not** authorized; no slice acceptance record, matrix or closing report exists yet, and none may be written before execution |
+| [`phase-2k/`](./phase-2k/) | Phase 2K — Conversar as the primary interface (current-experience audit, gaps, threat model, traceability contract) | **PLANNING ONLY** (ADR-097, 2026-08-08). 68 requirements across eleven families and **eight slices planned for execution — none executed**, `1 allocated · 0 spent`. Implementation is **not** authorized; no slice acceptance record, matrix or closing report exists yet, and none may be written before execution |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
@@ -149,7 +149,7 @@ Conversar surface from source, whose five findings reshaped the phase),
 recorded as *not* a gap because the roadmap would otherwise have rebuilt it),
 `PHASE_2K_THREAT_MODEL.md` (T-2K-01…T-2K-10, each with the falsifying evidence
 that would disprove its mitigation) and `PHASE_2K_TRACEABILITY_CONTRACT.md`,
-which **specifies** the fail-closed generator and its fourteen refusals —
+which **specifies** the fail-closed generator and its sixteen refusals —
 deliberately not built during planning, for the reason Phase 2H recorded: a
 fail-closed generator run against a phase with zero acceptance records reports
 every requirement unresolved. The governing pair (PRD, implementation plan)

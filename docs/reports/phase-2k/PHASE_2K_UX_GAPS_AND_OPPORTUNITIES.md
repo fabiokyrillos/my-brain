@@ -44,7 +44,11 @@ So today: `match_internal_knowledge` retrieves entries and memories **regardless
 
 **Recoverable.** Yes — inside boundary and without schema. The contract is designed for exactly this: add a governed surface, read `presentationFor`, and `sensitivity-boundary.test.ts` will fail the build if any new code tests a literal level instead.
 
-**The hard sub-question, which is a decision and not a design.** Masking a *rendered* row is well-defined. What to do about the *persisted* excerpt is not, and it has three honest answers with different costs: store no excerpt and re-read the source at render time; store the excerpt but carry the classification with it and mask on render; or refuse `highly_sensitive` sources into the answer entirely (which the contract's own doctrine argues against, because exclusion makes counts lie). → `OD-2K-2`
+**The hard sub-question — signed on 2026-08-08 (OD-2K-2, ADR-098).** Masking a *rendered* row was always well-defined; what to do about the *persisted* excerpt was not. The answer is the strongest of the three candidates: **store no excerpt at all for new messages**, keep only a structured reference, and **re-read the source at render time** against its current classification. Masked when `highly_sensitive`, unavailable when removed / inaccessible / out of validity, and a historical excerpt never reproduced in the clear.
+
+It is the strongest because it does not *manage* the divergence, it removes the thing that can diverge. Carrying the classification beside the excerpt would have kept two copies of one fact in sync by convention — the same shape as the three product-event vocabulary copies `202608080087` had to delete.
+
+**What it does not fix, and that is deliberate.** Excerpts already stored stay put; a `jsonb` backfill is a migration and none is authorized. They remain a **named residual**, contained by the renderer never reading a legacy excerpt field.
 
 **Cost.** Medium. → `2K-PRIVACY-*`
 
@@ -92,7 +96,11 @@ Beside it, a proposed memory gets: a card, a confirm button, content-match idemp
 
 **Recoverable.** Yes, inside decision 2a. Notably, a truthful memory undo needs **no migration**: the archive transition already exists (`setMemoryLifecycle`, `:265`), is audited, preserves provenance, and is the product's own signed answer to "this stopped being true". Registering a handler in `undo_operation` *would* cost a migration and is therefore out under 3a.
 
-**The trap to avoid.** Do not give memory a *fake* symmetry. A memory create has no pre-state, so it has no deltas; rendering an empty before/after table to look like the task card would be decoration claiming to be disclosure. The grammar must be shared where the semantics are shared and honestly different where they are not. → `OD-2K-3`
+**The trap to avoid.** Do not give memory a *fake* symmetry. A memory create has no pre-state, so it has no deltas; rendering an empty before/after table to look like the task card would be decoration claiming to be disclosure. The grammar must be shared where the semantics are shared and honestly different where they are not.
+
+**Signed on 2026-08-08 (OD-2K-3, ADR-098): the undo ARCHIVES.** It does not physically remove. Provenance is preserved, the memory leaves the active context, authorization and owner scope are unchanged, and the UI says **explicitly** that the memory was archived or withdrawn from use — and **never** that it was deleted.
+
+This resolves the asymmetry honestly rather than hiding it. The task card keeps its 24-hour window and its restore-afterwards disclosure; the memory card claims **no** window, because it has none. The one outcome the decision forbids is the comfortable lie: a control labelled "undo" that leaves the row in place while letting the user believe it is gone. Two consequences follow that are easy to miss: the archived memory must also stop being **retrievable** as a source — otherwise it keeps answering questions after the user thinks they undid it — and the copy must be asserted **negatively** in both locales, because "deleted" is the word a well-meaning contributor reaches for.
 
 **Cost.** Medium. → `2K-CARD-*`, `2K-ACT-*`
 
@@ -140,7 +148,11 @@ For G-1's fix this matters mechanically: "restore the conversation position" nee
 
 **Not recoverable in Phase 2K, by signed decision.** ADR-055 names `source_type` widening, backfill, pipelines, job types and indexes as forbidden until an evidence threshold is met. The funnel is empty. Decision 1a removes 2K.7 from implementation scope.
 
-**Destination.** Slice 2K.0 must produce the permanent decision that resolves ADR-055's **2026-10-27** expiry — which falls *inside* the phase's own 9–13 week estimate. Letting the date pass silently is the one unacceptable outcome, and `TODO.md:104` already says so.
+**And now not recoverable later by default either — signed on 2026-08-08 (OD-2K-6, ADR-098).** At the ADR-055 expiry the *widening* **retires from the active roadmap**. The retrieval that exists today over entries and memories is **not** removed, disabled or degraded; only the expansion retires. Resumption requires a new measurable demand signal, a new audit, a new ADR, its own budget and explicit authorization — and ADR-055 is explicitly **not** to be renewed artificially to keep a possibility alive on the roadmap.
+
+That is the correct reading of ADR-055's own logic rather than a new refusal: it gave itself an expiry precisely because a permanently pending gate blocks nothing and decides nothing. The funnel is empty, the spike tier was never executed, and the planning tier's statistics were never available at one user. Retirement is the outcome the ADR already committed to when its thresholds went unmet.
+
+**Destination.** Slice 2K.0 records the retirement and the closed list of resumption conditions. It writes **no** renewal date.
 
 **The opportunity this creates.** Phase 2K can make the *limit* legible instead of hiding it. An answer that says "I looked at your records and memories" is honest and teaches the user the shape of the system; today the product implies it looked everywhere. That costs nothing and is inside boundary. → `2K-SRC-*`
 
