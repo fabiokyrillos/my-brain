@@ -1,6 +1,28 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-07 — Phase 2I — Foundation and Findability is COMPLETE (0 migrations)
+
+**61 requirements declared, 61 classified, 0 undelivered** — 53 built, 4 baseline, 1 rename, 2 evidenced negatives, 1 partial with its destination named. **Budget 1 allocated · 0 spent**, and hosted parity is unchanged at `202608070084` because the phase added no migration. Four PRs, each with one green PR-head run and one green merge-SHA run under ADR-090 — no green ×3, and no rerun used as an acceptance mechanism.
+
+**The measurement refused the migration.** Gate G-2I.2 ran *before* any search code existed, at realistic per-owner volumes: the sequential `UNION` shape took 338–669 ms and failed the 300 ms budget; the parallel slowest-domain shape took 121–244 ms and passed. The parallel shape was not chosen to fit the budget — `2I-SEARCH-006` (per-domain bounds) and `2I-SEARCH-007` (a *named* per-domain failure) are meaningless unless each domain is queried independently, so having required them, the wall clock is the slowest domain. The revisit threshold is recorded so it is re-measurable rather than re-arguable.
+
+**The benchmark's first design could have committed to production.** It seeded thousands of fixture rows inside `begin;` and relied on the Management API not committing — a guess about someone else's transaction handling. It became a single `DO` block whose only exit is a `raise`, which Postgres rolls back regardless of the caller, with the measurements carried out in the exception message and the rollback verified by reading the table back on every run.
+
+**The phase's own audit was wrong three times about what was already shipped**, each caught by reading the source rather than the plan: `chat: "Conversar"` had already shipped, `Mais` already rendered grouped destinations with visible labels and `role="group"` on both breakpoints, and Library's membership already existed as `group: "context"` data. `2I-SHELL-003` was reclassified **built → baseline**. This is precisely why the matrix carries `baseline` as a distinct class: a phase reporting an assertion of existing behaviour identically to something it built would have overstated itself three times over.
+
+**Two requirements are delivered by not being built.** `2I-LIB-004` — zero pin/favourite columns exist anywhere in the schema, and adding one would be the data model `2I-LIB-002` forbids one line above; the guard re-derives the absence from `database.types.ts` every run, so a future migration breaks it rather than silently invalidating the claim. `2I-PALETTE-009` — recents would need state that outlives the palette, which `2I-PALETTE-010` forbids.
+
+**The phase added no write path, no model call, no RLS policy, no grant, no secret and no external service.** T-2I-01 is proved in pgTAP with **two accounts in both directions**, because a policy written `user_id = auth.uid()` and one written `user_id = '<A>'` are indistinguishable from one side. T-2I-02 is closed three ways, the strongest being that **an action has no invocable field at all** and that a hostile query cannot invent one — user text selects, it never constructs.
+
+**`2I-CLOSE-002` is partial and says so.** Component accessibility is asserted by executed test; no axe pass, screen-reader session or Playwright journey was run over the new surfaces. Classifying it built on component tests alone would be the over-claim the `baseline` class exists to prevent.
+
+**Fifteen defects, thirteen of them in probes, fixtures, guards or tooling.** Three guards failed on correct product code for one root cause — scanning raw text including comments, so a header saying *"no `pt ?` ternary is added"* was read as the violation. Two were in the generator itself and both surfaced as refusals: it rejected `partial` as an unknown class when the contract permits it, and it could not be imported by its own test until the repo-root computation matched Phase 2H's pattern. **A generator no test can import is a generator nothing proves.**
+
+**The generator refused on its first real run**, naming nineteen unevidenced requirements individually and writing nothing. Mutation-proved by eleven fixtures, one deliberate defect each, plus a clean baseline fixture so every negative differs by exactly one thing.
+
+**ADR-055 remains open and unchanged**, expiring 2026-10-27. Rollout gate untouched at 25 pass · 3 fail · 2 owner-signature. **Phase 2J is unstarted**, A13 green.
+
 ## 2026-08-07 — Phase 2I — Foundation and Findability is AUTHORIZED FOR PLANNING (ADR-092, 0 migrations)
 
 **Planning only. Implementation is not authorized, and this package does not start it.** Scope is the owner's mobile-first PRD's **Etapa 0 + Etapa 1**. The parent PRD stays the roadmap and is decomposed one phase per etapa, because a seven-etapa phase cannot close — and a phase that cannot close cannot be traced, budgeted or gated, which would break the one mechanism that has made every phase since 2C verifiable.
