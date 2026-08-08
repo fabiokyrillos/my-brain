@@ -3,7 +3,18 @@ import type { Locale } from "@/lib/preferences";
 const messages = {
   "pt-BR": {
     nav: {
-      home: "Início",
+      /*
+       * `Hoje`, not `Início` (2I-SHELL-002).
+       *
+       * The route key stays `home` and the URL is unchanged. What changes is
+       * that the destination stops being named after its position in the app
+       * and starts being named after what it answers: the day. `Início` says
+       * "this is where you arrive"; `Hoje` says "this is what is happening",
+       * which is the only reason to open it. Same move the `chat` label made
+       * when it became `Conversar` -- a destination is a place, so it gets the
+       * thing it is about.
+       */
+      home: "Hoje",
       today: "Hoje",
       /*
        * `Registros`, not `Caixa` (UX-03, DEC-1).
@@ -72,7 +83,7 @@ const messages = {
   },
   en: {
     nav: {
-      home: "Home",
+      home: "Today",
       today: "Today",
       inbox: "Records",
       work: "Work",

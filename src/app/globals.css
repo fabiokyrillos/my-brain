@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Phase 2I's state language. First, deliberately: it declares the tone tokens
+   every later stylesheet may consume, and a token used before it is declared
+   resolves to nothing. */
+@import "./experience.css";
 @import "./operations.css";
 @import "./chat.css";
 @import "./agent.css";

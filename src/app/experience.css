@@ -1,0 +1,217 @@
+/* Phase 2I — the semantic state language. `2I-LANG-001` … `2I-LANG-007`.
+ *
+ * The single source of state colour in the product. Before this file each
+ * surface picked its own, which is why "needs attention" did not look the same
+ * in Registros as in Trabalho. `phase-2i-experience-guard.test.ts` fails when a
+ * stylesheet declares a state colour outside this block.
+ *
+ * NO DARK MODE. Owner decision D5, `2I-LANG-007`: out of scope and not
+ * partially implemented, so there is no `prefers-color-scheme` block here and
+ * no half-set of dark tokens to mislead a later reader.
+ */
+
+:root {
+  /* Six tones. Each has a foreground, a wash and a border, so a tone can be
+     applied to text, to a surface and to an outline without a surface picking
+     its own tint. */
+  --tone-information-fg: #315cff;
+  --tone-information-bg: #eef2ff;
+  --tone-information-line: #c3d0ff;
+
+  --tone-success-fg: #226a46;
+  --tone-success-bg: #eaf8f0;
+  --tone-success-line: #b6e0c8;
+
+  --tone-attention-fg: #8a5a10;
+  --tone-attention-bg: #fdf3e2;
+  --tone-attention-line: #f0d3a1;
+
+  --tone-risk-fg: #9b2d24;
+  --tone-risk-bg: #fff0ee;
+  --tone-risk-line: #f3c4bd;
+
+  /* The Brain proposing something. Deliberately distinct from `information`:
+     `2I-LANG-002` requires user text, interpretation, suggestion and confirmed
+     action to be visually distinguishable, and two of those would otherwise
+     share a colour. */
+  --tone-suggestion-fg: #5b3fbf;
+  --tone-suggestion-bg: #f1ecff;
+  --tone-suggestion-line: #d6c9f5;
+
+  --tone-archived-fg: #5c6879;
+  --tone-archived-bg: #f1f4f8;
+  --tone-archived-line: #d8dfe9;
+}
+
+/* ---- tones ------------------------------------------------------------- */
+
+.tone-information { --tone-fg: var(--tone-information-fg); --tone-bg: var(--tone-information-bg); --tone-line: var(--tone-information-line); }
+.tone-success     { --tone-fg: var(--tone-success-fg);     --tone-bg: var(--tone-success-bg);     --tone-line: var(--tone-success-line); }
+.tone-attention   { --tone-fg: var(--tone-attention-fg);   --tone-bg: var(--tone-attention-bg);   --tone-line: var(--tone-attention-line); }
+.tone-risk        { --tone-fg: var(--tone-risk-fg);        --tone-bg: var(--tone-risk-bg);        --tone-line: var(--tone-risk-line); }
+.tone-suggestion  { --tone-fg: var(--tone-suggestion-fg);  --tone-bg: var(--tone-suggestion-bg);  --tone-line: var(--tone-suggestion-line); }
+.tone-archived    { --tone-fg: var(--tone-archived-fg);    --tone-bg: var(--tone-archived-bg);    --tone-line: var(--tone-archived-line); }
+
+/* ---- authorship: the four kinds of text, distinguishable without colour --- */
+
+/* `2I-LANG-002`. The border and the label carry the distinction; the tint is
+   reinforcement, never the signal. */
+.ux-authored { border-left: 3px solid var(--line); padding-left: 14px; }
+.ux-authored-user { border-left-color: var(--ink); }
+.ux-authored-interpretation { border-left-color: var(--tone-information-fg); border-left-style: dashed; }
+.ux-authored-suggestion { border-left-color: var(--tone-suggestion-fg); border-left-style: dotted; }
+.ux-authored-confirmed { border-left-color: var(--tone-success-fg); }
+.ux-authored-label {
+  display: block;
+  font: 650 10px var(--font-jetbrains);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+/* ---- universal states --------------------------------------------------- */
+
+.ux-state {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: 1px solid var(--tone-line, var(--line));
+  border-radius: 14px;
+  background: var(--tone-bg, var(--mist));
+  color: var(--ink);
+}
+.ux-state-icon { flex: 0 0 auto; color: var(--tone-fg, var(--ink-soft)); margin-top: 1px; }
+.ux-state-body { min-width: 0; display: grid; gap: 4px; }
+.ux-state-title { margin: 0; font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
+.ux-state-description { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+/* The reassurance that the user's content is durable. Given its own weight
+   because on `interpreting` it is the most important sentence on the screen. */
+.ux-state-safety { margin: 0; font-size: 12px; font-weight: 650; color: var(--tone-fg, var(--ink)); }
+.ux-state-action {
+  justify-self: start;
+  margin-top: 6px;
+  border: 1px solid var(--tone-line, var(--line));
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  /* 44px touch target on mobile — `2I-LANG-006`. */
+  min-height: 40px;
+}
+@media (max-width: 760px) { .ux-state-action { min-height: 44px; width: 100%; text-align: center; } }
+
+/* A skeleton that matches the final layout, so nothing reflows on arrival. */
+.ux-skeleton { display: grid; gap: 10px; }
+.ux-skeleton-row { height: 14px; border-radius: 7px; background: linear-gradient(90deg, #eef1f6, #e3e8f0, #eef1f6); background-size: 200% 100%; }
+.ux-skeleton-row:nth-child(2) { width: 82%; }
+.ux-skeleton-row:nth-child(3) { width: 64%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ux-skeleton-row { animation: ux-shimmer 1.3s linear infinite; }
+  @keyframes ux-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+}
+/* Reduced motion is honoured by the absence of the animation above, not by a
+   second rule that re-states it — `2I-LANG-006`. */
+
+/* ---- trust components — `2I-TRUST-001` … `2I-TRUST-007` ------------------ */
+
+.ux-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--tone-line, var(--line));
+  border-radius: 16px;
+  background: var(--white);
+}
+/* The suggestion card is tinted; the confirmation card is not, because a
+   confirmation must not look like a proposal. */
+.ux-card-suggestion { background: var(--tone-bg); }
+.ux-card-head { display: flex; align-items: center; gap: 9px; }
+.ux-card-icon { color: var(--tone-fg); flex: 0 0 auto; }
+.ux-card-title { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
+.ux-card-detail { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-soft); }
+/* The consequence of a destructive action. Never quiet. */
+.ux-card-consequence {
+  margin: 0; padding: 10px 12px; border-radius: 10px;
+  background: var(--tone-bg); color: var(--tone-fg);
+  font-size: 13px; font-weight: 700; line-height: 1.5;
+}
+.ux-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+
+.ux-action {
+  min-height: 40px; padding: 9px 15px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--white); color: var(--ink);
+  font-weight: 700; font-size: 13px;
+}
+.ux-action-primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.ux-action-destructive { background: var(--tone-risk-fg); color: var(--white); border-color: var(--tone-risk-fg); }
+.ux-action-quiet { background: transparent; border-color: transparent; color: var(--ink-soft); }
+@media (max-width: 760px) {
+  /* 44px targets, and actions stack rather than wrapping into slivers. */
+  .ux-action { min-height: 44px; flex: 1 1 100%; }
+}
+
+.ux-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--mist); font-size: 12px; font-weight: 650;
+}
+.ux-chip-kind { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); }
+.ux-chip-kind[data-kind="person"] { background: var(--tone-information-fg); }
+.ux-chip-kind[data-kind="project"] { background: var(--tone-success-fg); }
+.ux-chip-kind[data-kind="organization"] { background: var(--tone-suggestion-fg); }
+.ux-chip-kind[data-kind="context"] { background: var(--tone-attention-fg); }
+.ux-chip-remove { border: 0; background: transparent; color: var(--ink-soft); font-size: 15px; line-height: 1; padding: 2px 4px; }
+
+.ux-source {
+  display: grid; gap: 3px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--white);
+}
+.ux-source:hover { background: var(--mist); }
+/* Type as text. A result list that encoded type by tint alone would be
+   unreadable to a screen reader and to anyone with a colour-vision difference. */
+.ux-source-type { font: 650 10px var(--font-jetbrains); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.ux-source-title { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.ux-source-snippet { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+.ux-source-meta { font-size: 11px; color: var(--ink-soft); }
+
+.ux-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: 12px;
+  border: 1px solid var(--tone-line); background: var(--tone-bg);
+  color: var(--ink); font-size: 13px; line-height: 1.5;
+}
+.ux-banner em { font-style: normal; font-weight: 700; color: var(--tone-fg); }
+
+.ux-undo {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-radius: 12px;
+  border: 1px solid var(--tone-line); background: var(--tone-bg);
+  font-size: 13px;
+}
+.ux-undo-none { color: var(--ink-soft); font-size: 12px; }
+
+/* Desktop: a side panel. Mobile: the full-screen equivalent. One contract. */
+.ux-detail {
+  position: fixed; z-index: 40; top: 0; right: 0; bottom: 0;
+  width: min(460px, 100vw);
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--line); background: var(--white);
+  box-shadow: -18px 0 50px rgba(20, 35, 59, .12);
+}
+.ux-detail-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 20px; border-bottom: 1px solid var(--line);
+}
+.ux-detail-title { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+.ux-detail-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-soft); }
+.ux-detail-body { flex: 1; min-height: 0; overflow: auto; padding: 20px; }
+@media (max-width: 760px) {
+  .ux-detail { left: 0; width: 100vw; border-left: 0; }
+  .ux-detail-close { min-width: 44px; min-height: 44px; }
+}
