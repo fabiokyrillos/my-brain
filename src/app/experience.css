@@ -307,3 +307,25 @@
 }
 .capture-mode[aria-selected="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
 .capture-no-classification { margin: 0; font-size: 12px; color: var(--muted); }
+
+/* `2J-VOICE-006`. The recording state, visible and unmistakable. The dot
+   animates only where motion is allowed -- reduced-motion users get a solid
+   marker, which still says "live" without the pulse. */
+.voice-composer { display: grid; gap: 12px; }
+.voice-controls { display: grid; gap: 8px; }
+.voice-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.voice-live button, .voice-record, .voice-denied button { min-height: 36px; padding: 0 12px; border-radius: 8px; cursor: pointer; }
+.voice-record { display: inline-flex; align-items: center; gap: 6px; justify-self: start; border: 1px solid var(--border, #d6dbe3); background: transparent; }
+.voice-indicator { width: 10px; height: 10px; border-radius: 50%; background: #c0392b; }
+.voice-indicator[data-recording="true"] { animation: voice-pulse 1.2s ease-in-out infinite; }
+@keyframes voice-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .voice-indicator[data-recording="true"] { animation: none; }
+}
+.voice-duration { font-variant-numeric: tabular-nums; font-weight: 700; }
+.voice-transcribing { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); }
+.voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid #f0c9c9; border-radius: 10px; background: #fdecec; }
+.voice-denied p { margin: 0; font-size: 13px; }
+.voice-draft-form { display: grid; gap: 8px; }
+.voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border, #d6dbe3); border-radius: 10px; font: inherit; }
+.voice-notice { margin: 0; font-size: 12px; color: var(--muted); }

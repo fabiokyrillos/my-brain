@@ -12,7 +12,17 @@ export type AIOperation =
   // Phase 2E command parsing. Added to the table CHECK and to the
   // `record_ai_usage` guard by migration 202607250055 — recording it as `chat`
   // would have made the phase's spend unattributable.
-  | "task_command";
+  | "task_command"
+  /**
+   * Phase 2J slice 2J.4. Added to the table CHECK **and** to `record_ai_usage`'s
+   * own guard by migration `202608080085` -- the constraint alone is not the
+   * enforcement, and widening only one of them rejects every call at runtime.
+   *
+   * There is no audio-model pricing row and transcription is billed per audio
+   * minute rather than per token, so these events land with `cost_status =
+   * 'unpriced'` -- a state the function already models (ADR-096).
+   */
+  | "transcription";
 
 export type AIUsageEvent = {
   operation: AIOperation;
