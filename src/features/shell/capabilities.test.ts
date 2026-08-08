@@ -36,7 +36,7 @@ describe("navigation capabilities", () => {
       ["/pt-BR/app/reviews", "reviews", "reflection"],
       ["/pt-BR/app/settings", "settings", "preferences"],
       ["/pt-BR/app/tasks", "work", "primary"],
-      ["/pt-BR/app/today", "work", "primary"],
+      ["/pt-BR/app/today", "home", "primary"],
       ["/pt-BR/app/waiting", "work", "primary"],
       ["/pt-BR/app/work", "work", "primary"],
     ] as const;
@@ -82,7 +82,7 @@ describe("navigation capabilities", () => {
       ["/pt-BR/app/inbox?view=needs-you", "inbox"],
       ["/pt-BR/app/inbox/entry-1", "inbox"],
       ["/pt-BR/app/work?view=waiting&page=2", "work"],
-      ["/pt-BR/app/today?page=3", "work"],
+      ["/pt-BR/app/today?page=3", "home"],
       ["/pt-BR/app/tasks?page=2", "work"],
       ["/pt-BR/app/waiting?page=4", "work"],
       ["/pt-BR/app/chat/conversation-1", "chat"],

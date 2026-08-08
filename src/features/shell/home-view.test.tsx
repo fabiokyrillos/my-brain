@@ -19,6 +19,7 @@ function attentionItem(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAt
   return {
     key: "attention-1",
     kind: "review_interpretation",
+  sensitivity: "normal",
     entryId: "11111111-1111-4111-8111-111111111111",
     title: LONG_TITLE,
     explanation: "O Brain não teve confiança suficiente para criar as tarefas sozinho.",
@@ -46,6 +47,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
     todayLabel: "QUINTA-FEIRA, 30 DE JULHO",
     status: { kind: "attention", count: 2, hasMore: false },
+    priorities: [],
     attention: [attentionItem()],
     attentionHasMore: false,
     today: [{ taskId: "t1", title: LONG_TITLE, dueLabel: "31 jul.", stateLabel: "Não iniciada" }],
@@ -75,6 +77,7 @@ describe("HomeView", () => {
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Precisa de você",
+      "Prioridades de hoje",
       "Para hoje",
       "Aguardando outras pessoas",
       "Pergunta em aberto",
@@ -89,6 +92,7 @@ describe("HomeView", () => {
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Precisa de você",
+      "Prioridades de hoje",
       "Para hoje",
       "Registrado recentemente",
     ]);
@@ -98,6 +102,7 @@ describe("HomeView", () => {
     renderHome(
       viewModel({
         status: { kind: "saved" },
+        priorities: [],
         attention: [],
         today: [],
         waitingCount: 0,
@@ -141,6 +146,7 @@ describe("HomeView", () => {
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Needs you",
+      "Today's priorities",
       "For today",
       "Waiting on other people",
       "Open question",

@@ -1,3 +1,4 @@
+import { toSensitivityLevel } from "@/features/sensitivity/contracts";
 import {
   trackedAttentionReasons,
   dailyCycleActions,
@@ -48,6 +49,8 @@ export type NeedsAttentionItemSource = {
   readonly kind: string;
   readonly entryId: string;
   readonly title: string;
+  /** Raw `entries.sensitivity`. Narrowed by the mapper, which fails closed. */
+  readonly sensitivity?: string | null;
   readonly explanation: string;
   readonly primaryAction: ProjectionActionSource;
   readonly secondaryAction?: ProjectionActionSource | null;
@@ -335,6 +338,11 @@ export function toNeedsAttentionItemView(source: NeedsAttentionItemSource): Need
   return Object.freeze({
     key: source.key,
     kind: source.kind,
+    // `2J-PRIVACY-003`. `toSensitivityLevel` fails closed: a row whose
+    // classification is missing or unrecognised is treated as the most
+    // protective level, not the least. A preview we cannot classify is exactly
+    // the preview that should not appear on a phone.
+    sensitivity: toSensitivityLevel(source.sensitivity),
     entryId: source.entryId,
     title: source.title,
     explanation: source.explanation,

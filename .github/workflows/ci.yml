@@ -248,9 +248,14 @@ jobs:
         # the proxy's auth boundary, the locale redirects and the accessible
         # auth forms. task-command.spec.ts is credential-free for the same
         # reason and proves Slice 2E.7's new nested route joins both contracts.
+        # accessibility.spec.ts (Slice 2J.0) is credential-free by construction:
+        # it composes the surfaces from the real stylesheets and the DOM the
+        # components emit, because the routes themselves need a session this job
+        # does not have. It runs at BOTH viewports deliberately -- the rendered
+        # touch-target contract (2J-ACCESS-006) only executes on mobile.
         # The remaining specs are credential-gated against the linked project
         # and skip themselves; remote smokes stay manual.
-        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts --project=desktop --project=mobile
+        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts --project=desktop --project=mobile
 
       # 2F-REVOKE-003 — the re-grant rollback rehearsal.
       #

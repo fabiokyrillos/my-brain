@@ -73,9 +73,19 @@ export type NavigationGroupKey =
 export type NavigationVisibility = "primary" | "more" | "global" | "context-only";
 
 export const navigationCapabilities = [
-  { key: "home", route: "", group: "primary", visibility: "primary", nested: false, aliases: [] },
+  // `2J-HOJE-001`. `today` is an alias of **home**, not of Work. The word
+  // labels this destination (`messages.nav.home` is "Hoje"/"Today"), so the URL
+  // that spells it must highlight it -- and `/app/today` redirects here. The
+  // alias moved rather than disappearing so the nav still resolves during the
+  // redirect and any deep link keeps a truthful active state (`2J-HOJE-002`).
+  { key: "home", route: "", group: "primary", visibility: "primary", nested: false, aliases: ["today"] },
   { key: "inbox", route: "inbox", group: "primary", visibility: "primary", nested: true, aliases: [] },
-  { key: "work", route: "work", group: "primary", visibility: "primary", nested: true, aliases: ["today", "tasks", "waiting"] },
+  // `2J-HOJE-001`. `today` left this alias list when `/app/today` stopped
+  // resolving to Work: the word "Hoje" labels the `home` destination, so a URL
+  // saying `today` that landed on a filtered task list was the collision the
+  // slice exists to remove. `tasks` and `waiting` are unaffected -- both are
+  // genuinely Work views and neither is the name of another destination.
+  { key: "work", route: "work", group: "primary", visibility: "primary", nested: true, aliases: ["tasks", "waiting"] },
   { key: "chat", route: "chat", group: "primary", visibility: "primary", nested: true, aliases: [] },
   { key: "projects", route: "projects", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "people", route: "people", group: "context", visibility: "more", nested: true, aliases: [] },

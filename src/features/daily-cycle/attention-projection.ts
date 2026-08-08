@@ -62,7 +62,7 @@ export async function loadAttentionProjection(
   const interpretationIds = page.flatMap((row) => (row.current_interpretation_id ? [row.current_interpretation_id] : []));
 
   const [entriesResult, interpretationsResult] = await Promise.all([
-    supabase.from("entries").select("id,original_content").in("id", entryIds),
+    supabase.from("entries").select("id,original_content,sensitivity").in("id", entryIds),
     interpretationIds.length
       ? supabase.from("entry_interpretations").select("id,summary").in("id", interpretationIds)
       : Promise.resolve({ data: [], error: null }),
@@ -70,6 +70,9 @@ export async function loadAttentionProjection(
   const entries = requireSupabaseData(entriesResult, "load needs-attention entry originals") ?? [];
   const interpretations = requireSupabaseData(interpretationsResult, "load needs-attention interpretation summaries") ?? [];
   const originalByEntryId = new Map(entries.map((entry) => [entry.id, entry.original_content]));
+  // `2J-PRIVACY-005`. Carried next to the preview it classifies, so the two
+  // can never be assembled from different rows.
+  const sensitivityByEntryId = new Map(entries.map((entry) => [entry.id, entry.sensitivity]));
   const summaryByInterpretationId = new Map(interpretations.map((interpretation) => [interpretation.id, interpretation.summary]));
 
   const copy = getDailyCycleCopy(locale, await getAgentName());
@@ -101,6 +104,7 @@ export async function loadAttentionProjection(
       },
       occurredAt: row.occurred_at,
       groupKey: row.entry_id,
+      sensitivity: sensitivityByEntryId.get(row.entry_id),
     };
 
     const view = toNeedsAttentionItemView(source);

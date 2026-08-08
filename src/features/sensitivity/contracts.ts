@@ -1,0 +1,182 @@
+/**
+ * `2J-PRIVACY-001` … `2J-PRIVACY-005` — the central sensitivity-presentation
+ * contract (ADR-095, OD-2J-1).
+ *
+ * ## What this is, and what it is emphatically not
+ *
+ * This is a **presentation** contract. It decides whether a surface *renders*
+ * content the user already owns. It is **never** an authorization boundary:
+ * ownership comes exclusively from the authenticated query plus forced RLS, and
+ * nothing here may be relied on to keep one account's rows away from another's.
+ * A reviewer who finds this module load-bearing for isolation has found a bug.
+ *
+ * ## Why it is one module rather than a rule per surface
+ *
+ * Before Phase 2J the product already disagreed with itself: global search
+ * excludes `highly_sensitive` by default (ADR-093), while Hoje, the attention
+ * queue and the Work views applied **no** sensitivity predicate at all — and
+ * the attention projection renders a 240-character preview of raw entry text.
+ * Two surfaces of one product meant two answers to "what does this
+ * classification promise?".
+ *
+ * `2J-PRIVACY-001` fixes that by construction: the rules live here as **data**,
+ * every touched surface reads them, and `sensitivity-boundary.test.ts` fails
+ * the build if a surface starts testing a literal level on its own.
+ *
+ * ## Masking, not exclusion — and why that is the safer reading
+ *
+ * OD-2J-1 says `highly_sensitive` is "excluded/masked" by default. This module
+ * chooses **masked in place** everywhere content is listed, because exclusion
+ * creates the exact leak the same decision forbids: if a sensitive row is
+ * dropped, the visible count is a lie, and any "3 hidden" affordance is an
+ * existence oracle wearing a helpful hat. A masked row is honest about *that
+ * something is there* while saying nothing about *what* — and the user who
+ * wants it can reveal it deliberately.
+ *
+ * Notifications are the one surface where the content genuinely must not exist
+ * in the payload at all, so they get their own outcome (`omit`) rather than a
+ * mask the OS could render.
+ */
+
+/** Mirrors the CHECK constraint carried by every classified table. */
+export const SENSITIVITY_LEVELS = ["normal", "private", "highly_sensitive"] as const;
+export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
+
+/**
+ * The surfaces this contract governs.
+ *
+ * `search` is deliberately absent: ADR-093 signed its behaviour in Phase 2I and
+ * OD-2J-1 explicitly does not redefine it. Adding it here would silently
+ * re-open a closed decision.
+ */
+export const GOVERNED_SURFACES = [
+  "hoje",
+  "attention",
+  "capture_receipt",
+  "review_summary",
+  "notification",
+] as const;
+export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
+
+/**
+ * What a surface may do with a piece of content.
+ *
+ * - `show`   — render it normally.
+ * - `mask`   — render the row/acknowledgement, withhold the text, offer a
+ *              local reveal. The item's *existence* is not hidden.
+ * - `omit`   — the content must not reach this surface at all, in any form.
+ *              Only notifications use this, and only because their payload
+ *              leaves the application's control.
+ */
+export type PresentationOutcome = "show" | "mask" | "omit";
+
+export type Presentation = {
+  readonly outcome: PresentationOutcome;
+  /** Whether an explicit, local user action may reveal the content in place. */
+  readonly revealable: boolean;
+};
+
+const SHOW: Presentation = { outcome: "show", revealable: false };
+const MASK: Presentation = { outcome: "mask", revealable: true };
+const OMIT: Presentation = { outcome: "omit", revealable: false };
+
+/**
+ * The rules, as data.
+ *
+ * `normal` and `private` are unchanged by OD-2J-1 and are shown everywhere the
+ * user can already see them — with one exception that is not a change in
+ * policy but a change in *medium*: a notification payload leaves the app, so it
+ * carries no user content at any level. That is why the notification column is
+ * `omit` for all three, and why `notificationCopy()` below exists instead.
+ */
+const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
+  hoje: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  attention: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  capture_receipt: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  review_summary: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  notification: { normal: OMIT, private: OMIT, highly_sensitive: OMIT },
+};
+
+/** The single entry point. Every governed surface asks this and obeys it. */
+export function presentationFor(
+  surface: GovernedSurface,
+  level: SensitivityLevel,
+): Presentation {
+  return RULES[surface][level];
+}
+
+/**
+ * `2J-PRIVACY-004` — the count is computed over everything, masked or not.
+ *
+ * Exists as a named function rather than as a comment because "don't leak the
+ * count" is the rule most easily broken by a well-meaning `.filter()` three
+ * refactors from now. A surface that calls this cannot accidentally count only
+ * what it rendered in the clear.
+ */
+export function visibleCount<T>(items: readonly T[]): number {
+  return items.length;
+}
+
+/**
+ * `2J-PRIVACY-001`, notification half — the payload has nowhere to put content.
+ *
+ * This returns generic copy and takes **no content parameter at all**. That is
+ * the point: a privacy property enforced by "callers promise not to pass text"
+ * is weaker than a signature that cannot accept it. There is deliberately no
+ * overload that takes a title, an excerpt or an entity name.
+ */
+export function notificationCopy(locale: "pt-BR" | "en"): { title: string; body: string } {
+  return locale === "pt-BR"
+    ? { title: "My Brain", body: "Você tem algo que precisa da sua atenção." }
+    : { title: "My Brain", body: "My Brain has something that needs your attention." };
+}
+
+/**
+ * The reveal is **local and transient** (OD-2J-1).
+ *
+ * No accepted preference contract supports a durable "show sensitive content"
+ * mode, so this type has no persisted form and no serializer. A future phase
+ * that wants one must add a preference contract and amend OD-2J-1 — it cannot
+ * arrive by someone storing this in `localStorage`.
+ */
+export type RevealState = {
+  /** Keys currently revealed, for this render only. */
+  readonly revealed: ReadonlySet<string>;
+};
+
+export const NO_REVEALS: RevealState = { revealed: new Set<string>() };
+
+export function isRevealed(state: RevealState, key: string): boolean {
+  return state.revealed.has(key);
+}
+
+/**
+ * Resolves what a surface should actually render for one item, folding in any
+ * active local reveal.
+ *
+ * Note that `omit` ignores the reveal entirely: a notification payload cannot
+ * be "revealed", because by the time the user could act the content has already
+ * left the application.
+ */
+export function resolveContent(
+  surface: GovernedSurface,
+  level: SensitivityLevel,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  const presentation = presentationFor(surface, level);
+  if (presentation.outcome === "omit") return { show: false, masked: false, revealable: false };
+  if (presentation.outcome === "show") return { show: true, masked: false, revealable: false };
+  const revealed = isRevealed(state, key);
+  return { show: revealed, masked: !revealed, revealable: true };
+}
+
+/** Narrows an unvalidated string from the database to the closed vocabulary. */
+export function toSensitivityLevel(value: string | null | undefined): SensitivityLevel {
+  // Fails **closed**: an unrecognised value is treated as the most protective
+  // level, not the least. A row whose classification we cannot read is exactly
+  // the row we should not be printing on a phone.
+  return (SENSITIVITY_LEVELS as readonly string[]).includes(value ?? "")
+    ? (value as SensitivityLevel)
+    : "highly_sensitive";
+}

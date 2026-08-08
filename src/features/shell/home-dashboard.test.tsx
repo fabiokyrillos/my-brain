@@ -73,6 +73,7 @@ function attentionItem(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAt
     title: "Confirmar proposta do Atlas",
     explanation: "Há tarefas sugeridas prontas para sua confirmação.",
     primaryAction: { id: "confirm_existing_candidates", href: "/pt-BR/app/inbox/entry-9" },
+    sensitivity: "normal" as const,
     occurredAt: "2026-07-17T12:00:00.000Z",
     groupKey: "entry-9",
     ...overrides,
@@ -169,21 +170,43 @@ describe("HomeDashboard", () => {
     );
   });
 
-  it("bounds the priority panel to the first five today/overdue tasks", async () => {
+  it("bounds Hoje to three priorities plus five more, and repeats nothing", async () => {
+    // `2J-HOJE-004`. The composition changed in Phase 2J: the day now opens with
+    // up to three priorities, and the list underneath carries what is left. The
+    // assertion that matters is the LAST one -- before the promoted tasks were
+    // filtered out of the list, every priority rendered twice on one screen.
     const items = Array.from({ length: 8 }, (_, index) => workItem({ taskId: `task-${index}`, title: `Tarefa ${index}` }));
     setup({ workItems: items });
 
-    render(await HomeDashboard({ locale: "pt-BR" }));
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getAllByText(/^Tarefa \d$/)).toHaveLength(5);
+    expect(container.querySelectorAll(".home-priorities li")).toHaveLength(3);
+    const rendered = screen.getAllByText(/^Tarefa \d$/).map((node) => node.textContent);
+    expect(rendered).toHaveLength(8);
+    expect(new Set(rendered).size).toBe(rendered.length);
   });
 
-  it("links the priority panel to the canonical Work today view", async () => {
+  it("leaves the list underneath bounded at five when more than eight qualify", async () => {
+    const items = Array.from({ length: 20 }, (_, index) => workItem({ taskId: `task-${index}`, title: `Tarefa ${index}` }));
+    setup({ workItems: items });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(container.querySelectorAll(".home-priorities li")).toHaveLength(3);
+    expect(container.querySelectorAll(".home-list .home-task")).toHaveLength(5);
+  });
+
+  it("links Hoje's task rows to the canonical Work today view", async () => {
     setup({ workItems: [workItem()] });
 
-    render(await HomeDashboard({ locale: "en" }));
+    const { container } = render(await HomeDashboard({ locale: "en" }));
 
-    expect(screen.getByText("Preparar reunião").closest("a")).toHaveAttribute("href", "/en/app/work?view=today");
+    // One task, and it now qualifies as a priority -- so it renders once, in the
+    // priorities list. `getByText` would be ambiguous if it ever rendered twice,
+    // which is itself the regression this scoping protects.
+    const rows = container.querySelectorAll(".home-priorities a.home-task");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute("href", "/en/app/work?view=today");
   });
 
   it("shows the empty state when the Work today projection has no due/overdue tasks", async () => {

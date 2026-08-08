@@ -215,3 +215,38 @@
   .ux-detail { left: 0; width: 100vw; border-left: 0; }
   .ux-detail-close { min-width: 44px; min-height: 44px; }
 }
+
+/* `2J-HOJE-004`/`005` — today's priorities. A list, not a dashboard tile:
+   there is no chart, no score and no count, because the section's job is to be
+   acted on rather than read. */
+.home-priorities { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.home-priorities li { margin: 0; }
+.home-priority-rule { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.priority-reason {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--surface-2, #eef1f5);
+  color: var(--muted);
+}
+/* `2J-HOJE-003`. Overdue and due-today must not read the same. The distinction
+   is a tone, not only a word, because the word is the first thing a glance
+   skips. */
+.priority-reason[data-reason="overdue"] { background: #fdecec; color: #a11b1b; }
+.priority-reason[data-reason="due_today"] { background: #eaf2fd; color: #12508f; }
+
+/* `2J-PRIVACY-001`. A masked row occupies the same slot as the content it
+   withholds, so the surrounding count stays truthful (`2J-PRIVACY-004`). */
+.home-masked {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--border, #d6dbe3);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}

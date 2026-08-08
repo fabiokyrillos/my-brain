@@ -49,9 +49,24 @@ describe("2I-SHELL-001: the primary destinations are the delivered baseline", ()
     expect(capture?.group).toBe("global");
   });
 
-  it("keeps work absorbing today, tasks and waiting", () => {
+  /**
+   * Amended by Phase 2J (`2J-HOJE-001`), and amended rather than deleted.
+   *
+   * Phase 2I's contract was that Work absorbs `today`, `tasks` and `waiting`.
+   * Phase 2J found the cost of that: `messages.nav.home` is "Hoje"/"Today", so
+   * the URL spelling the word landed on a filtered task list while the surface
+   * bearing the name lived at `/app`. `today` therefore moved to `home`.
+   *
+   * Both halves are asserted together. A test that only checked Work's list had
+   * shrunk would also pass if the alias had been dropped entirely -- which
+   * would 404 a real bookmark and silently break `2J-HOJE-002`.
+   */
+  it("keeps work absorbing tasks and waiting, with today reassigned to home", () => {
     const work = navigationCapabilities.find((item) => item.key === "work");
-    expect([...(work?.aliases ?? [])].sort()).toEqual(["tasks", "today", "waiting"]);
+    expect([...(work?.aliases ?? [])].sort()).toEqual(["tasks", "waiting"]);
+
+    const home = navigationCapabilities.find((item) => item.key === "home");
+    expect(home?.aliases).toContain("today");
   });
 });
 
