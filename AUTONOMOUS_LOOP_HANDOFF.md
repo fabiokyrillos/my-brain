@@ -2212,3 +2212,130 @@ v22 at parity, `heartbeat` undeployed by design · deletion reaper **unarmed**,
 run** · restore drill **not executed** · rollout gate **25 · 3 · 2**, refusing to
 open signup · **Phase 2I not started**, A13 green · planning-only workspace for
 the next UX initiative at `docs/initiatives/next-experience/`, with **no ADR**.
+
+## §41 — Phase 2I is authorized for PLANNING ONLY, and the audit shrank it
+
+**Read §39 (CI policy) and §40 (post-2H rollout) first.**
+
+**ADR-092, an owner decision, 2026-08-07.** Phase 2I — Foundation and
+Findability. **Planning only; implementation is NOT authorized**, and the
+planning package does not start it. Scope is the owner's mobile-first PRD's
+**Etapa 0 + Etapa 1 only.**
+
+### Why the label covers two etapas and not seven
+
+**A seven-etapa phase cannot close, and a phase that cannot close cannot be
+traced, budgeted or gated.** That would break the one mechanism that has made
+every phase since 2C verifiable. The parent PRD stays the roadmap and is
+decomposed one phase per etapa, in the shape 2C→2H already used: one governing
+pair, one migration budget, one closing report, then the next authorization.
+
+### The A13 retarget, and the trap inside it
+
+A13 moved **2I → 2J in the same commit as ADR-092** — fourth application of the
+ADR-083/ADR-085 precedent. **ADR-092's heading says *"retargets to the roadmap
+successor"* and never names 2J.** That is enforced, not stylistic: the detector
+treats an accepted ADR **naming the next phase in its heading** as a start
+signal, so an authorizing ADR that named its successor **fails the guard it is
+moving.** The first draft did exactly that. If you write the next one, copy the
+wording.
+
+`docs/README.md` now records this pattern beside the guard description.
+
+### What the audit found, and why it matters more than the plan
+
+**Read `capabilities.ts` before pricing any navigation work.** The parent PRD
+describes a navigation redesign; the code is further along than it feels:
+
+- `home`, `inbox`, `work` (absorbing `today`/`tasks`/`waiting` as aliases) and
+  `chat` are **already primary**, with capture as the global centre action in a
+  **five-slot mobile bar** — all delivered by product-UX slice H.
+- **`chat: "Conversar"` is already shipped.** The earlier neutral-named study
+  listed it as pending. It was wrong.
+- Library's six members **already share `group: "context"`** — the grouping
+  exists as data and is simply not rendered.
+
+**So the navigation slice is one label (`home` → "Início" → Hoje) plus one
+grouping.** Twice now a planning pass has over-stated remaining navigation work
+by reading the product's *feel* rather than its *source*. The PRD therefore
+requires that any rename requirement **cite the exact constant it changes**.
+
+The audit classifies everything **DELIVERED / RENAME / MISSING**, and the
+traceability contract carries a matching **`baseline` / `built` / `rename`**
+marker — so a requirement that merely asserts an existing property cannot be
+reported as though it built something.
+
+### The order, inverted by the owner, and why
+
+**Palette → search → Library.** Twelve destinations sit flat inside `Mais`;
+nothing competes for attention because nothing is visible. That is a
+**retrieval** problem. Building Library first would group twelve into five and
+then build the two tools that make grouping largely unnecessary.
+
+Slices: 2I.0 pre-code · 2I.1 visual language + universal states · 2I.2 trust
+components · 2I.3 shell + navigation · 2I.4 palette · 2I.5 search · 2I.6 Library
+· 2I.7 closeout.
+
+### Migration budget: MAXIMUM ONE, and zero is the preferred close
+
+Allocated to **2I.5 only**. The input was established rather than assumed:
+**no `tsvector`, no `to_tsquery`, no GIN index, no `pg_trgm` anywhere in the
+84-migration chain.** Gate **G-2I.2 decides by measurement, before any search
+code**, and records the numbers. `1 allocated · 0 spent` is a success. Not
+created during planning; must not be created to justify the budget.
+
+### The search surface, read from the schema
+
+Seven existing tables, **no new data model**: `tasks`(title, description) ·
+`entries`(original_content) · `memories`(content) · `people`(name, notes) ·
+`projects`(name, description) · **`organizations`**(name, description) ·
+**`attachments`**(original_name, description, `extracted_text`).
+
+**Two vocabulary facts to reuse rather than re-derive:** "Companies" is
+`organizations`, displayed **Empresas/Companies** (the label already exists and
+carries its EGC.1 reasoning); "Files" is `attachments`, reached at the `files`
+route.
+
+### Two owner decisions block slice 2I.5 (gate G-2I.5)
+
+- **OD-1 — do `private`/`highly_sensitive` records appear in search results?**
+  Three domains carry `sensitivity in ('normal','private','highly_sensitive')`
+  and nothing declares search behaviour for them, because there has never been a
+  global result list. Not confidentiality — the user owns all of it — but
+  **expectation**. *A search feature that silently surfaces every class has
+  taken this decision by omission.*
+- **OD-2 — is `attachments.extracted_text` searchable?** Document content, not
+  text the user typed.
+
+Both cheap now, expensive after users form expectations.
+
+### Signed owner decisions, recorded so they are not re-taken
+
+Signup is **not** a prerequisite; instrumentation separates the internal cohort
+from a future public one and **current-population figures are never public
+activation evidence**. **Dark mode is out**, not partially implemented.
+**Original audio is discarded** after confirmed transcription — recorded now as
+an input to the future Etapa 2 phase; **voice is not in 2I**, and if a provider
+requires temporary retention, *document the exact provider behaviour before
+implementation*.
+
+### Threat surface, and the one most likely to be built by accident
+
+Phase 2I adds **no write path, no model call, no RLS policy, no grant, no secret
+and no external service.** Two real threats: **T-2I-01** search as an
+enumeration oracle (mitigated in the query, proved in pgTAP **with a second
+account**), and **T-2I-02** the palette as a second write path — **the likelier
+one, because the generic-command-executor version is better engineering by every
+local measure, which is exactly why it gets built.**
+
+**ADR-055 expires 2026-10-27** and `2I-SEARCH-010` forbids embeddings, vector
+retrieval and generated answers. Lexical search is what would *generate* the
+evidence ADR-055 wanted; it must not quietly resolve it.
+
+### Posture at close of planning
+
+Hosted parity **`202608070084`**, local = remote · signup **disabled** ·
+CAPTCHA **enforced** · SMTP **unconfigured** · five cron jobs, none a sweep ·
+reaper **unarmed** · **eight sweeps built, zero scheduled** · **no purge has
+ever run** · rollout gate **25 · 3 · 2**, untouched by this authorization ·
+**Phase 2I planned and unstarted; Phase 2J not started, A13 green.**

@@ -49,7 +49,9 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`phase-2e/`](./phase-2e/) | Phase 2E — task commands | historical, closed |
 | [`phase-2f/`](./phase-2f/) | Phase 2F — operations and cleanup | historical, closed |
 | [`phase-2g/`](./phase-2g/) | Phase 2G — Conversational Creation (definition study, threat model, slice evidence) | closed 2026-08-06; 27 delivered, 2 partial with a named blocker |
-| [`phase-2h/`](./phase-2h/) | Phase 2H — Deploy and Operate (threat model, traceability contract, slice evidence) | **ACTIVE (PLANNING)** — authorized by ADR-085, 2026-08-06 |
+| [`phase-2h/`](./phase-2h/) | Phase 2H — Deploy and Operate (threat model, traceability contract, slice evidence) | **COMPLETE** 2026-08-07 — 44 declared · 44 delivered; hosted parity `202608070083` |
+| [`post-2h-rollout/`](./post-2h-rollout/) | Post-2H rollout readiness — backup, SMTP, monitoring adequacy and legal packets | **NOT a phase.** Bounded owner-authorized effort, 2026-08-07; migration `202608070084` deployed |
+| [`phase-2i/`](./phase-2i/) | Phase 2I — Foundation and Findability (current-experience audit, threat model, traceability contract, gaps) | **PLANNING ONLY** — authorized by ADR-092, 2026-08-07. **Implementation not authorized.** |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
