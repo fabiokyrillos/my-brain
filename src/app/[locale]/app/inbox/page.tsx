@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+// `2J-ATTN-007`. The EXISTING reinterpretation action, passed down. The list
+// never imports it, and there is no generic attention-mutation executor: the
+// only write reachable from this surface is the one that already owned it.
+import { reprocessEntry } from "@/features/interpretations/actions";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import { NeedsAttentionList } from "@/features/daily-cycle/needs-attention-list";
@@ -62,6 +66,7 @@ export default async function InboxPage({
             initialHasNext={projection.hasNext}
             locale={locale}
             loadMore={loadMoreNeedsAttention}
+            retryAction={reprocessEntry}
           />
         ) : (
           <>
