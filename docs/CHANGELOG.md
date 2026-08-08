@@ -2,6 +2,20 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-08 — POST-2J CORRECTION: the product-event writer stops keeping its own vocabulary
+
+**`202608080087` is deployed. Hosted parity is exactly `202608080087`, 87 migrations, local = remote.** Charged to **no phase budget** — Phase 2J remains `2 allocated · 2 spent`, and the file is named `post_2j_*` so the phase's traceability generator (which selects by `/phase_2j/i`) cannot absorb it, the same mechanism `202608070084` used.
+
+**The fix is deletion, not synchronization.** `private.record_product_event`'s hardcoded 26-name allowlist is removed rather than extended by four, so `product_events` now has exactly **two** enforcement points instead of three. Appending the missing names would have restored the behaviour and left the defect in place for the next widening to hit — which is how it survived two phases.
+
+**Fail-closed is preserved, and that was the load-bearing question.** The table CHECK still refuses (`23514`) and is untouched, so `event_name` does not become open-ended. The validator's `else` arm raises `'Unsupported product event'` with errcode `22023` — the same message and errcode the deleted list raised — so no caller can distinguish. The migration proves the CHECK and the validator are one vocabulary **name-by-name rather than by count**, because a count matches while two lists disagree by one name in each direction, and it refuses to run against a truncated extraction.
+
+**The missing test now exists.** `supabase/tests/post_2j_product_event_write_path.sql` derives the vocabulary from the CHECK constraint and writes **every declared name through the writer production calls** — the question no previous test asked, since every one of them inspected artifacts in isolation and passed while four legal events were being refused. Two set-difference assertions make a future CHECK widening that forgets the writer or the validator fail automatically. Non-vacuity is proved by planting `202607280061`'s gate and requiring **exactly four** refusals, then restoring the captured definition and re-running.
+
+**Hosted acceptance.** All four previously-refused events — `capture_mode_selected`, `voice_transcription_finished`, `attention_item_resolved` and `rate_limit_refused` — are **accepted** through the real writer, with the control unchanged. Negatives still refuse: undeclared event and free-text `transcript` at `22023`, authenticated-to-service-role and unclaimed callers at `42501`. **Producer → writer → `product_events` → consumer is proved end to end** on a disposable account: four rows written, read back under the owner's own RLS session, and aggregated by the real `aggregateExperienceFunnel`, which reported exactly the fixtures and correctly ignored the one event outside its three names. `2J-METRICS-007` has a live path for the first time.
+
+**Zero residue.** `product_events` 68 before and 68 after — the disposable owner was deleted and the `on delete cascade` took its rows. No append-only evidence was deleted. Posture byte-identical: forced RLS, policy counts, grants, five cron jobs, retention, no durable audio, signup closed, CAPTCHA enforced, rollout gate **25 pass · 3 fail · 2 owner-signature**. ADR-055 open, expiring 2026-10-27. Phase 2K unstarted.
+
 ## 2026-08-08 — Phase 2J migrations DEPLOYED; the telemetry they widen is still refused
 
 **`202608080085` and `202608080086` are applied to the hosted project in chain order. Hosted parity is now exactly `202608080086`, 86 migrations, local = remote** — read from hosted state, not from a local filename. All four embedded verification blocks passed; they abort the migration otherwise, so their silence is the proof that each constraint swap matched its intended name and that each writer agrees with its table.

@@ -2787,3 +2787,57 @@ Every probe ran inside a transaction whose only exit is a `raise`, so both appen
 ledgers carry **zero** residue: `ai_usage_events` 11 → 11, `product_events` 67 → 67.
 
 **Phase 2K remains unstarted. A13 green. ADR-055 open, expiring 2026-10-27.**
+
+## §46 — The repair, and the shape of the test that was missing (2026-08-08)
+
+**`202608080087` is deployed. Hosted parity `202608080087`, 87 migrations, local = remote.**
+All four events the stale gate refused — the three Phase 2J ones and `rate_limit_refused` —
+are accepted through the real writer on the live project, negatives still fail closed, and
+producer → writer → `product_events` → consumer is proved end to end with **zero residue**.
+Charged to no phase budget; Phase 2J stays `2 allocated · 2 spent`.
+
+**The fix was deletion.** Appending four names to `private.record_product_event`'s list
+would have restored the behaviour and left the defect: a third copy for the next widening
+to forget, which is precisely how it survived two phases. Removing it leaves exactly two
+enforcement points, and the migration proves they agree **name-by-name** — not by count,
+because a count matches while two lists disagree by one name in each direction.
+
+**The load-bearing question was not "does this work" but "is it still fail-closed".**
+Deleting a guard is only safe when the survivors are complete. Here they were, and
+verifiably: the CHECK is untouched and still refuses `23514`, and the validator's `else`
+arm raises the *same message and the same errcode* the deleted list raised, so no caller
+can tell the difference. Had the validator's coverage been a subset of the CHECK, Option B
+would have been a widening in disguise — so that equality was checked before the migration
+was written, not after.
+
+**The missing test had a shape, and it is worth naming.** Every existing product-event
+test inspected artifacts **in isolation** — the CHECK contains a name, the function body
+contains a name, the writer is `security definer` — and every one of them passed while
+four legal events were refused. `202608080086`'s own verification block is of that kind;
+it asserts the validator's *text*, which cannot see a gate in a different function. The
+question none of them asked was **"can the writer production calls actually accept this
+event?"** That is now asked for every name the database declares, with the vocabulary
+**derived from the CHECK** so a future widening that forgets the writer fails
+automatically rather than shipping silent.
+
+**Three process notes, cheaper to read than to rediscover:**
+
+1. **Non-vacuity has to be demonstrated, not asserted.** The new assertions would all pass
+   against a writer that never had the defect, which says nothing about whether they can
+   *see* it. So the historical gate is planted and the harness re-run, requiring exactly
+   four refusals, then the captured definition is restored and re-run a third time.
+2. **Static scrutiny paid again, with no local Docker to run pgTAP.** Two defects were
+   caught by reading: an OUT column named `event_name` would have been ambiguous against
+   both joined tables, and the planted function returning `null::uuid` would have scored
+   all thirty events unwritten — making the non-vacuity count read 30 instead of 4 and
+   measuring the fixture rather than the gate.
+3. **A guard failing right after you edit its corpus is a mid-write read.** The suite
+   reported two failures immediately after `SECURITY.md` was edited and **4616 passed, 0
+   failed** on an untouched re-run. Re-run before debugging.
+
+**Residue discipline held throughout.** Rollback-only probes for everything provable that
+way, a disposable account for the one thing that needed committed rows, and the
+`on delete cascade` on `product_events.user_id` to take them away: 68 before, 68 after. The
+single row by which the table grew during this work is genuine application traffic.
+
+**Phase 2K remains unstarted. A13 green. Rollout gate 25 · 3 · 2, signup closed.**
