@@ -2455,3 +2455,153 @@ SMTP **unconfigured** · five cron jobs, none a sweep · reaper **unarmed** ·
 **No successor phase is authorized.** The parent PRD's Etapa 2 is the natural
 next one, and its voice audio-discard contract is already signed and recorded in
 `PHASE_2I_PRD.md` §13 — but naming it is not authorizing it.
+
+## §43 — Phase 2J is authorized for PLANNING ONLY, and the audit shrank it again (2026-08-08)
+
+**Baseline:** `main` at `a02c74e`, clean, synced. Hosted parity `202608070084`, 84
+migrations, local = remote. Phase 2I complete. Nothing running: no monitor, no background
+task.
+
+### What happened
+
+Phase 2I's roadmap successor is the parent mobile-first PRD's **Etapa 2 — Hoje, captura e
+atenção**. Before naming anything missing, the whole etapa was re-derived from source.
+**ADR-094 authorizes Phase 2J — Today, Capture and Attention, planning only.** 74
+requirements, nine families, eight slices, migration budget **2 allocated · 0 spent**.
+
+### Read this before you plan anything on Hoje
+
+**`/app/today` is a redirect.** Nine lines, and its body is
+`redirect('/${locale}/app/work?view=today')`. The cockpit the parent PRD describes —
+capture at the top, attention, today, waiting, pending question, recent activity — **already
+exists at `/app`** as `HomeDashboard` + `home-view.tsx`, composing four projections in
+parallel with `NEEDS_ATTENTION_HOME_LIMIT = 3` and `TODAY_HOME_LIMIT = 5`.
+
+The product has **two things called "today"**, and the one the user navigates to is the
+weaker one. That is the highest-value item in the phase and it costs no schema. A session
+that reads the parent PRD and starts building a cockpit will rebuild delivered work — the
+Phase 2I failure mode, repeating.
+
+### Four more corrections, all shrinking the phase
+
+1. **The attention queue already exists.** `list_needs_attention`
+   (`202607180030`, fixed by `202607180031`) — `security definer`, `set search_path = ''`,
+   `auth.uid()`-scoped, keyset-paginated, bounded 1–200, granted to `authenticated` and
+   revoked from `public, anon`. Five reasons. What is missing is a **surface and in-place
+   actions**: `attention-actions.ts` exports exactly one function and it only pages, and
+   every item's `primaryAction` is a **link** to `/app/inbox/[entryId]`.
+2. **`configure_ai_credential` is deliberately outside the queue.** `contracts.ts:36-50`
+   explains it: `needs_attention_item_opened` validates `attentionReason` against a
+   **five-member enum inside the database** (`202607170024:205`). Admitting it to the
+   queue is a **migration**, not a mapper change. Do not "fix" this.
+3. **Memory conflicts do not exist in this schema.** The parent PRD lists them as an
+   attention source. There is nothing to compose, and inventing a table for them would be
+   the duplication the PRD itself warns against.
+4. **The review domain already ships** — `/app/reviews`, `generateReview` with
+   `daily · weekly_review · weekly_plan · monthly`. The gap is continuity from Hoje, not
+   the domain. Do not rebuild review.
+
+### Voice: greenfield, and cheaper than it looks
+
+`grep -rni 'transcri|mediarecorder|audio/webm|whisper' src/ supabase/` returns **zero hits
+in code**. The only mention in the repository is the parent PRD.
+
+**The cost question resolves technically, not by owner decision.**
+`user_ai_credentials.provider` is `check (provider in ('openai'))` — one provider, whose API
+transcribes. So the user's existing BYOK credential already authorizes transcription: **no
+project-paid AI, no project key, no new secret, no new environment variable, no new
+vendor.** Reuse `resolveOwnCredential` in `src/lib/byok/adapter.ts`.
+
+**The signed audio-discard decision is what makes it cheap.** No durable audio means **no
+bucket, no table, no retention class, no sweep, no deletion-cascade entry**. The draft lives
+client-side and confirmation goes through `captureEntry`. If a future session finds itself
+designing audio storage, the retention decision has been lost — go back and re-read it.
+
+**What is NOT settled and must be measured (G-2J.4b):** Safari — including every browser on
+iOS — emits `audio/mp4`; Chromium emits `audio/webm`. A pipeline that assumes one container
+fails on half the target devices. The size ceiling is a duration ceiling in practice and
+must be enforced client-side. The plan *stating* this does not discharge the gate.
+
+### The migration budget comes from telemetry, not from features
+
+`product_events.event_name` is a **database check constraint** (27 names, last re-declared
+`202608070081:783`), paired with `private.validate_product_event_properties`, which
+allow-lists **properties per event**. **Any new product event costs a migration.** That is
+why Phase 2I spent zero and Phase 2J cannot: 2I added no events.
+
+M1 → 2J.7 (telemetry). M2 → 2J.4 (`ai_usage_events.operation` += a transcription value) and
+**M2 is avoidable**, because `'other'` is an allowed operation. It is recommended anyway:
+logging an entire new AI capability as `'other'` destroys per-operation cost attribution and
+makes transcription invisible in `/app/costs`. **`2 allocated · 1 spent` is a legitimate
+close.** Reconcile **per slice**, not by count.
+
+### The sensitivity gap you will find, and must not fix quietly
+
+`grep sensitivity src/features/daily-cycle/ src/features/shell/ src/features/tasks/` returns
+**nothing**. Home, the attention queue and the Work views apply **no** sensitivity predicate,
+and `attention-projection.ts` renders a 240-character `originalPreview` of
+`entries.original_content`. Search, meanwhile, excludes `highly_sensitive` by default
+(ADR-093, `DEFAULT_SENSITIVITY`).
+
+Two surfaces of one product disagree. This is **pre-existing**, not a Phase 2J regression —
+and it is **OD-2J-1**, an owner expectation decision. Do not let each component choose, and
+do not close it by picking the reasonable-looking option.
+
+### The accessibility residual is slice zero, deliberately
+
+`2I-CLOSE-002` closed **partial**: component behaviour asserted by test, no axe pass, no
+screen-reader session, no Playwright journey. It becomes **2J.0, a pre-code gate** — because
+Phase 2I put it last and then did not reach it, and the same ordering would produce the same
+result.
+
+Two facts for whoever builds it: **there is no axe dependency in `package.json` today**, and
+CI's `database` job already runs `e2e/foundation.spec.ts` against a production build on
+desktop and Pixel 7 — so a **local** (non-`online-*`) spec runs on every PR. The
+screen-reader session is recorded **as manual** or closes as an evidenced negative. Naming a
+manual check automated is the over-claim the `baseline` class exists to prevent.
+
+### A13 moved, and now asserts one more thing
+
+Retargeted **2J → the roadmap successor** in the same commit as ADR-094 — the fifth
+application. This was mandatory, not tidy: `PHASE_2J_PRD.md` and
+`PHASE_2J_IMPLEMENTATION_PLAN.md` are signals 1 and 2, the accepted ADR is signal 3, and
+the `2J-…` declarations are signal 2's content. Without the retarget in the same commit the
+planning package fails its own guard.
+
+**New assertion:** a test now checks ADR-094's heading contains *"roadmap successor"* and
+does **not** contain the successor's letter. ADR-092's first draft hit exactly that trap and
+was reworded from memory; it is now a property the suite holds.
+
+`phase-2f-documentation.test.ts` + both taxonomy guards: **60 tests green** locally.
+
+### A local-only transient, named so nobody debugs it as a product defect
+
+Twice during this session a full local run reported a failure — once in A13's *"finds no
+start signal"*, once as three unnamed failures in `src/lib/closeout/` — and **neither
+reproduced**: the same suites then passed in isolation, in three consecutive directory
+runs, in two full runs, and in CI.
+
+Both occurrences share one signature: **the run was launched immediately after an `Edit`
+wrote to a file the guard reads.** The closeout guards read live `docs/*.md` and
+`src/lib/**` from disk on every run, so a parallel vitest worker on Windows can observe a
+write that has not finished landing. CI checks the tree out once and never mutates it, so
+the race cannot occur there — which is exactly what the results show.
+
+**This is not the ADR-090 flake class.** ADR-090's rule — a flake is a defect with an owner
+— is about CI. This is a local harness artifact of editing the corpus a guard reads while
+the guard runs. If you see it: re-run the suite *without* touching files in between before
+investigating anything. If it reproduces on an untouched tree, then it is real and it is
+yours.
+
+### Posture at close
+
+Hosted parity **`202608070084`** · signup **disabled** · CAPTCHA **enforced** ·
+SMTP **unconfigured** · five cron jobs, none a sweep · reaper **unarmed** ·
+**eight sweeps built, zero scheduled** · **no purge has ever run** · rollout gate
+**25 · 3 · 2**, untouched · **ADR-055 open and unchanged, expiring 2026-10-27** ·
+**Phase 2K unstarted, A13 green.**
+
+**Phase 2J implementation is NOT authorized.** The planning package is complete and merged;
+three owner decisions (OD-2J-1, OD-2J-2, OD-2J-3) and the implementation authorization
+itself are the next steps. **Naming the successor is not authorizing it** — and ADR-094
+deliberately names no scope for whatever follows Phase 2J.
