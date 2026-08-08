@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { signOut } from "@/features/auth/actions";
+import { CommandPalette } from "@/features/palette/command-palette";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
 import { AccountMenu } from "./account-menu";
@@ -51,6 +52,13 @@ export function AppShell({
       <div className="main-stage">
         <header className="top-bar">
           <div className="top-actions">
+            {/*
+              `2I-PALETTE-001`: an explicit control, not a keyboard secret.
+              Ctrl/Cmd+K works from anywhere, but a palette reachable only by a
+              shortcut is a desktop power-user toy — and on mobile there is no
+              shortcut at all, so the button IS the entry point.
+            */}
+            <CommandPalette locale={locale} />
             <Suspense fallback={<span aria-hidden="true">{locale === "pt-BR" ? "EN" : "PT"}</span>}>
               <LocaleSwitchLink locale={locale} />
             </Suspense>
