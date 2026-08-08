@@ -74,7 +74,8 @@
     "ops:retention-dry-run": "node scripts/phase-2h-retention-dry-run.mjs",
     "ops:retention-schedule": "node scripts/phase-2h-retention-schedule.mjs",
     "ops:restore-drill": "node scripts/phase-2h-restore-drill.mjs",
-    "docs:phase-2h:traceability": "node scripts/generate-phase-2h-traceability.mjs"
+    "docs:phase-2h:traceability": "node scripts/generate-phase-2h-traceability.mjs",
+    "docs:phase-2i:traceability": "node scripts/generate-phase-2i-traceability.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

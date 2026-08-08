@@ -21,6 +21,22 @@
 | `2I-SEARCH-010` | **built** | Guard forbids `embedding`, `entry_embeddings`, `<=>`, `cosine`, `pgvector`, `similarity(` and any provider call. **ADR-055 remains open and unchanged** |
 | `2I-SEARCH-011` | **built** | Telemetry carries a result **bucket**, filter booleans and `partial` — never the query. Payload asserted structurally |
 
+## Telemetry — `2I-METRIC`, owned by this slice
+
+| Id | Class | Evidence |
+| --- | --- | --- |
+| `2I-METRIC-001` | **built** | Cohort labelling is carried by the existing `record_product_event` path; search events are emitted through it and never through a second channel |
+| `2I-METRIC-002` | **built** | The internal-cohort caveat is recorded in the PRD §10 and in this phase's closing report; no surface presents current-population figures as public activation |
+| `2I-METRIC-003` | **built** | Measured: search run, result-count **bucket**, type filter used, period filter used, sensitive scope on/off, partial failure — the payload in `search-surface.tsx` |
+| `2I-METRIC-004` | **built** | **Structural, not procedural.** The payload is a closed set of booleans and a bucket string; the guard parses the literal `onSearched({…})` object and fails if it carries `query`, `title`, `snippet`, `name` or `content` |
+| `2I-METRIC-005` | **built** | Activation and retention measures are labelled *instrument now, evaluate after public cohort exists* in the PRD §10; none is interpreted in this phase |
+| `2I-METRIC-006` | **built** | One telemetry path — the existing product-event RPC and its validator. No new free-text field, so a badly-shaped event fails loudly rather than recording nothing (ADR-084's lesson) |
+
+**Buckets, never counts.** `bucket()` maps a result count to `0` / `1-3` /
+`4-10` / `11-25` / `26+`. A raw count for a rare term is close to identifying on
+its own — "the search that returned exactly 1 result" is a much narrower fact
+than "a search returned something".
+
 ## OD-1 — the exclusion is a predicate, and the silence is the point
 
 `highly_sensitive` is excluded via `.in("sensitivity", levels)` **inside each

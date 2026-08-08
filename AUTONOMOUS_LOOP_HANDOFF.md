@@ -2339,3 +2339,119 @@ CAPTCHA **enforced** · SMTP **unconfigured** · five cron jobs, none a sweep ·
 reaper **unarmed** · **eight sweeps built, zero scheduled** · **no purge has
 ever run** · rollout gate **25 · 3 · 2**, untouched by this authorization ·
 **Phase 2I planned and unstarted; Phase 2J not started, A13 green.**
+
+## §42 — Phase 2I is COMPLETE, and the audit it was built on was wrong three times
+
+**Read §39 (CI policy), §40 (post-2H) and §41 (2I planning) first.**
+
+**61 declared · 61 classified · 0 undelivered.** 53 built, 4 baseline, 1 rename,
+2 evidenced negatives, 1 partial. **Budget 1 allocated · 0 SPENT.** Hosted parity
+**unchanged at `202608070084`** — the phase added no migration, so there was
+nothing to deploy.
+
+| Slice | PR | Merge SHA |
+| --- | --- | --- |
+| 2I.0–2I.3 | #131 | `e2779a5` |
+| 2I.4 | #132 | `1660bad` |
+| 2I.5 | #133 | `4295200` |
+| 2I.6–2I.7 | #134 | closeout |
+
+One green PR-head run and one green merge-SHA run each. ADR-090 held all the way
+through; no rerun was used as an acceptance mechanism.
+
+### The thing a successor should actually take from this phase
+
+**Read the source before pricing UX work.** The Phase 2I audit — which I wrote,
+after explicitly warning that the previous pass had over-stated navigation work
+— **over-stated it again, three times**:
+
+1. `chat: "Conversar"` had already shipped;
+2. `Mais` already rendered grouped destinations with visible labels and
+   `role="group"` on both breakpoints;
+3. Library's membership already existed as `group: "context"` data.
+
+Each was found by reading `capabilities.ts`, `messages.ts` or
+`navigation-links.tsx` rather than the plan. `2I-SHELL-003` was reclassified
+**built → baseline** mid-phase.
+
+**This is why the matrix carries `baseline` as a class distinct from `built`.**
+A phase that reported an assertion of existing behaviour identically to
+something it constructed would, in this case, have overstated itself three times
+over. If you inherit a UX plan, assume it over-states, and make every rename or
+rebuild requirement **cite the exact constant it changes**.
+
+### The migration that was not spent
+
+G-2I.2 measured **before** any search code existed. Sequential `UNION`
+338–669 ms (fail); parallel slowest-domain 121–244 ms (pass).
+
+**The parallel shape was not chosen to fit the budget** — `2I-SEARCH-006` and
+`2I-SEARCH-007` already required per-domain queries, so the wall clock was
+always going to be the slowest domain. The measurement confirmed a shape the
+requirements had already fixed.
+
+Revisit threshold: **~10 000 entries or ~1 000 attachments with
+`extracted_text`** per owner. `scripts/phase-2i-search-benchmark.mjs` is
+committed and safe to re-run against production.
+
+### The benchmark's safety design, which is the most transferable thing here
+
+It seeds **thousands of rows into production tables**. The first draft wrapped
+them in `begin;` and relied on the Management API not committing — **a guess
+about someone else's transaction handling**, and being wrong leaves the fixtures
+behind.
+
+It became **a single `DO` block whose only exit is a `raise`**. A `DO` block is
+one statement and is atomic, so the raise rolls back every insert, every trigger
+disable and every `set_config` regardless of what the caller does with
+transactions. Measurements ride out in the exception message, and every run
+reads the table back and prints `rollback verified: 0 benchmark rows persisted`.
+
+**If you ever need to measure against production, copy this shape.**
+
+### Two requirements delivered by NOT being built
+
+`2I-LIB-004` — **zero** pin/favourite columns exist anywhere in the schema, and
+adding one would be the data model `2I-LIB-002` forbids one line above.
+`2I-PALETTE-009` — recents need state that outlives the palette, which
+`2I-PALETTE-010` forbids.
+
+Both are **re-derived, not asserted**: the Library guard re-reads
+`database.types.ts` every run, so a future migration adding a `pinned` column
+breaks the test rather than silently invalidating the claim.
+
+### What is still owed
+
+- **`2I-CLOSE-002` is PARTIAL.** Component accessibility is asserted by test;
+  **no axe pass, no screen-reader session, no Playwright journey** over palette,
+  search and Library. Destination: a Playwright accessibility lane. Do not let a
+  successor read the matrix and conclude accessibility is done.
+- **Locale debt: 263 → 263.** The ratchet held but did not fall, because this
+  phase created surfaces rather than rewriting them.
+- **The rate limiter still has no operator read** (carried from post-2H).
+
+### Defect tally
+
+**Fifteen, thirteen of them in probes, fixtures, guards or tooling.** Three
+guards failed on *correct product code* for one root cause — scanning raw text
+including comments, so a header saying *"no `pt ?` ternary is added"* was read
+as the violation. Two were in the generator and both surfaced as refusals: it
+rejected `partial` as an unknown class when the contract permits it, and it
+could not be imported by its own test until the repo-root computation matched
+Phase 2H's. **A generator no test can import is a generator nothing proves.**
+
+The generator **refused on its first real run**, naming nineteen unevidenced
+requirements individually. Eleven mutation fixtures, one defect each, plus a
+**clean baseline fixture** so every negative differs by exactly one thing.
+
+### Posture at close
+
+Hosted parity **`202608070084`** · signup **disabled** · CAPTCHA **enforced** ·
+SMTP **unconfigured** · five cron jobs, none a sweep · reaper **unarmed** ·
+**eight sweeps built, zero scheduled** · **no purge has ever run** · rollout gate
+**25 · 3 · 2**, untouched · **ADR-055 open and unchanged, expiring 2026-10-27** ·
+**Phase 2J unstarted, A13 green.**
+
+**No successor phase is authorized.** The parent PRD's Etapa 2 is the natural
+next one, and its voice audio-discard contract is already signed and recorded in
+`PHASE_2I_PRD.md` §13 — but naming it is not authorizing it.

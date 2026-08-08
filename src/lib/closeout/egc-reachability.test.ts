@@ -259,6 +259,12 @@ const INVENTORY: readonly RouteEntry[] = [
       },
     ],
   },
+  /*
+   * Phase 2I's Library. `sections: []` because it renders no collection of its
+   * own: each card is a link into the domain route that owns those records, and
+   * Library writes nothing.
+   */
+  { route: "library", sections: [] },
   { route: "questions", sections: [] },
   { route: "reminders", sections: [] },
   { route: "reviews", sections: [] },
