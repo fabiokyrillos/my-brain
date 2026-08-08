@@ -102,6 +102,50 @@ event carries both this and whatever the review produces, rather than two.
 | 9 | Data export | `src/features/account/` — the PRD's §6.3 "exportação de dados" is **planned, not shipped**; a reviewer asking about portability must be told that |
 | 10 | Backup posture (a retention claim depends on it) | `docs/reports/post-2h-rollout/POST_2H_BACKUP_READINESS.md` |
 | 11 | Current rollout posture | signup **closed**; 3 accounts; **no public users have ever existed** |
+| 12 | **Operational data classes Phase 2H introduced** | **§4.1 below** — new to this product, and a reviewer will not find them in an older data map |
+| 13 | **BYOK — how AI credentials work** | **§4.2 below** — unusual enough that it changes the controller/processor analysis |
+
+---
+
+## 4.1 Operational data classes introduced by Phase 2H
+
+New since any previous review. All four are **operational**, none holds user
+content, and each is disclosed with its deletion behaviour because that is the
+question a reviewer will ask.
+
+| Class | What it holds | Contains user content? | On account deletion | Retention |
+| --- | --- | --- | --- | --- |
+| `error_events` | `surface`, `operation`, `reason` — **each bound to a closed vocabulary by CHECK** — plus a minted `correlation_id` | **No, and it has nowhere to put any.** No `json`, `jsonb`, `bytea` or free-text column exists; a postcondition in the migration asserts that against the catalog | **De-identified**, not deleted — the table is append-only by revoke *and* by a trigger that refuses even the table owner, so a row cannot cascade | 90 days declared · **sweep built, NOT scheduled** |
+| `scheduled_job_health` | Job names, timestamps, counters | No. No person appears in it | n/a — not user-owned | 90 days declared · **built, NOT scheduled** |
+| `rate_limit_events` | Owner, bucket, outcome, time. **No cost, price or token column** — asserted by a postcondition | No | **Cascades** from `auth.users` | 90 days declared · **built, NOT scheduled** |
+| `account_deletion_attempts` | Attempt count, backoff, terminal `stalled` classification | No | Cascades when deletion completes | **No sweep, deliberately** — a *stalled* row must survive while the account does, because it is the only evidence the deletion stalled |
+
+**The `correlation_id` is minted for the sink and does not derive from a session,
+cookie or token** — so it cannot be joined back to a login.
+
+**Open question already routed** (§3): whether the Privacy Policy's retention
+table should enumerate `error_events` and `rate_limit_events`. The Policy makes
+no false claim today; adding a class forces re-acceptance by every user.
+
+## 4.2 BYOK — the reviewer needs this, because it changes the analysis
+
+**The user supplies their own OpenAI API key. The user is the payer. This
+product never holds a shared provider key for user work.**
+
+| Property | Detail |
+| --- | --- |
+| Storage | The key is stored **encrypted at rest** as a credential envelope, wrapped under `BYOK_MASTER_KEY`, which lives in the runtime environment and **never in the database or this repository** |
+| Reachability | `service_role` holds **no table DML** on `user_ai_credentials`; three narrow named functions are the only access, and `RG-EXP-3` verifies the closure by readback |
+| Project key | **None exists on any deployed path.** ADR-072 removed it and `project-key-guard.test.ts` asserts no Node or Deno path can reach one |
+| Who the provider sees | The **user's own account** with the provider. Billing, quota and the provider's own retention are between the user and the provider |
+| Consequence for restore | A restored backup **without the original `BYOK_MASTER_KEY` recovers every envelope as unreadable ciphertext** — correct design, and a recovery dependency worth disclosing |
+| Consequence for deletion | Deleting the account destroys the envelope. **It does not delete anything held by the provider**, which is outside this product's control and should be said plainly in the Policy |
+
+**Why a reviewer must be told:** under BYOK the product is not the party
+purchasing model inference on the user's behalf, and the provider relationship
+is the user's own. That is a different controller/processor story from the usual
+"we call OpenAI for you", and a Policy written for the usual story would
+misdescribe it.
 
 ---
 

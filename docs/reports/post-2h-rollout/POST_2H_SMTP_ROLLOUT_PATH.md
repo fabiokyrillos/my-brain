@@ -99,11 +99,12 @@ default, clamped by `private.auth_event_ceiling_cap()`, exactly so that this
 provider number could change without a migration. `src/lib/…` holds the
 application values; nothing in DDL freezes 2.
 
-**Owner decision required with the cutover:** the new value. Resend's free tier
-is 100 emails/day and 3 000/month. A `rate_limit_email_sent` of **30/hour** sits
-under the daily allowance even in a bad hour while removing the current
-blockage. **It is not signed here** — it is a ceiling, and ceilings in this
-project are signed by the owner (the PRD §14.2 pattern), not minted by a report.
+**Owner decision required with the cutover: the new value.** It is **not
+recommended-and-adopted here.** Ceilings in this project are signed by the owner
+(the PRD §14.2 pattern), never minted by a report — and an earlier draft of this
+document offered a single number, which is exactly how a report's suggestion
+becomes a product value nobody decided. The consolidated decision, with its
+options and their consequences, is **§9**.
 
 ---
 
@@ -141,7 +142,7 @@ No credential appears in this repository, in this document, or in chat.
 | Sender name | `My Brain` |
 
 Then **Authentication → Rate Limits → Emails sent per hour**: raise from `2` to
-the value the owner signs (§4).
+the value the owner signs (**§9**).
 
 ### 5.3 The trap that must not be sprung
 
@@ -222,3 +223,69 @@ step of configuring a mail provider.**
 
 **Everything not dependent on the domain is finished.** The subtask stops
 exactly at the DNS/credential boundary, and no other work was held behind it.
+
+---
+
+## 9. The one compact owner decision, surfaced after all independent work
+
+Every part of the SMTP path that does not need a secret, a domain or a DNS
+record is **finished**: the hosted state is inventoried, the provider decision
+is repository truth and unchanged, the affected flows are enumerated, the
+redirect allow list is verified correct, the dashboard settings are exact, the
+`config push` hazard is recorded, and seven verification steps are written and
+runnable.
+
+**One product/security value remains, and it is a single decision.**
+
+### The question
+
+> **What should `rate_limit_email_sent` be after custom SMTP lands?**
+
+It is **per hour, project-wide**. Today it is **2**, which is an artefact of
+Supabase's shared default SMTP and not a chosen policy — recorded during SH.5
+precisely so it would not be mistaken for one. **At 2/hour, public signup is
+non-functional**, so this value must move with the cutover.
+
+### Why it is a *signed* value rather than a configuration detail
+
+It is the ceiling that bounds **email-based abuse of a public signup funnel** —
+confirmation-mail flooding at a third party's address, and password-reset
+harassment. Set too high it is not a control; set too low the product looks
+broken to legitimate users, and the two failure modes are indistinguishable from
+inside the product.
+
+The application-side ceilings are **already independent of it by design**
+(ADR-079: required parameters, no defaults, clamped by
+`private.auth_event_ceiling_cap()`), so this number can change without a
+migration. That is what makes it a decision rather than a schema change.
+
+### The options, with the consequence of each
+
+Resend's free tier is **100 emails/day** and **3 000/month**, which is the outer
+bound on any value here.
+
+| Value | Real signups/hour it supports | Consequence |
+| --- | --- | --- |
+| **2/h** (today) | ~2 | Status quo. Public signup **does not work**. Only viable while signup stays closed. |
+| **10/h** | ~10 | Comfortable for invitation-scale rollout. A burst of invitees hits the ceiling and waits. Tightest control. |
+| **30/h** | ~30 | Removes the blockage with headroom; still under the 100/day free tier even after a bad hour. **This was the earlier draft's suggestion and it is NOT adopted** — it is one option among these. |
+| **100/h** | ~100 | Exhausts the daily free-tier allowance in one hour. Not recommended: a single abusive burst silences the product's email for the rest of the day. |
+
+Each figure is *emails*, and one signup can cost more than one email
+(confirmation, then a resend, then a password reset).
+
+### What is needed to close it
+
+One value, recorded. Then the cutover applies it in
+**Authentication → Rate Limits → Emails sent per hour**, and §6 step 1's readback
+confirms it.
+
+**Until it is signed, nothing else in this document is blocked** — every other
+step waits on the sending domain, its DNS records and the Resend credential
+(§5.1), which are separate owner actions.
+
+### `RG-DEP-1` is not complete
+
+It is a readback gate on `smtp_host` and the related fields, all of which are
+`null`. **No part of this document makes it pass**, and none should be read as
+claiming otherwise.
