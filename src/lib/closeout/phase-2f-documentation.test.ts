@@ -176,11 +176,11 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
 
   it("TODO.md's active-milestone line names the authorized successor, not a closed phase", () => {
     // Originally pinned to Phase 2F against a stale-Phase-2C regression;
-    // retargeted with ADR-083, then ADR-085, and now ADR-094, keeping the same
-    // property each time: the line exists, names the phase that is actually
-    // active, and cites its authorization. The phase letter and the ADR move
-    // together — pinning one without the other is how a backlog comes to
-    // announce a milestone nothing authorized.
+    // retargeted with ADR-083, then ADR-085, then ADR-094, and now ADR-097,
+    // keeping the same property each time: the line exists, names the phase
+    // that is actually active, and cites its authorization. The phase letter
+    // and the ADR move together — pinning one without the other is how a
+    // backlog comes to announce a milestone nothing authorized.
     //
     // Phase 2I is why this assertion is worth keeping and worth watching. The
     // backlog line still said "Phase 2H" through the whole of Phase 2I, and
@@ -188,15 +188,21 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     // stale value the backlog carried. A guard that agrees with a stale
     // document is indistinguishable from a guard that is correct, right up
     // until the document is fixed. Move it with the ADR, every time.
+    //
+    // The same drift was found again during the Phase 2K retarget, in a
+    // different file this guard does not read: `docs/reports/README.md` still
+    // named Phase 2H as the active initiative after 2I and 2J had both closed.
+    // Corrected there; noted here because it is the identical failure mode one
+    // index over, and because this guard's scope is deliberately one line.
     const line = read("docs/TODO.md").split("\n").find((l) => l.startsWith("Active milestone:"));
     expect(line).toBeDefined();
-    expect(line).toMatch(/Phase 2J/);
-    expect(line, "the start must cite its authorization").toMatch(/ADR-094/);
+    expect(line).toMatch(/Phase 2K/);
+    expect(line, "the start must cite its authorization").toMatch(/ADR-097/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
-    // ADR-094 authorizes planning only. A backlog line that says Phase 2J is
+    // ADR-097 authorizes planning only. A backlog line that says Phase 2K is
     // active without saying what that authorization withheld is the line a
     // reader acts on before checking the ADR.
-    expect(line, "the active-milestone line overstates ADR-094's authorization").toMatch(/planning/i);
+    expect(line, "the active-milestone line overstates ADR-097's authorization").toMatch(/planning/i);
   });
 });
 
@@ -237,22 +243,33 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
 });
 
 /**
- * Phase 2K start signals — the same guard, retargeted at the roadmap successor.
+ * Phase 2L start signals — the same guard, retargeted at the roadmap successor.
  *
  * ADR-067's invariant is unchanged and non-negotiable: *the next phase must not
  * be started before it is authorized.* Until 2026-08-05 the next phase was
  * Phase 2G; ADR-083 recorded the owner's authorization of it and moved these
- * signals to Phase 2H. ADR-085 moved them to Phase 2I, ADR-092 to Phase 2J, and
- * **ADR-094 now records the owner's authorization of Phase 2J — Today, Capture
- * and Attention**, so the signals move again, by the same rule and in the same
- * shape. This is the fifth application. The retarget and ADR-094 land in one
- * commit, deliberately: an accepted ADR naming the authorized phase is exactly
- * signal 3, and its governing PRD and implementation plan are signals 1 and 2,
- * so the guard must move in the same change that records the authorization, and
- * the invariant is never unenforced in between.
+ * signals to Phase 2H. ADR-085 moved them to Phase 2I, ADR-092 to Phase 2J,
+ * ADR-094 to Phase 2K, and **ADR-097 now records the owner's authorization of
+ * Phase 2K — Conversar as the primary interface**, so the signals move again, by
+ * the same rule and in the same shape. This is the sixth application. The
+ * retarget and ADR-097 land in one commit, deliberately: an accepted ADR naming
+ * the authorized phase is exactly signal 3, and its governing PRD and
+ * implementation plan are signals 1 and 2, so the guard must move in the same
+ * change that records the authorization, and the invariant is never unenforced
+ * in between.
+ *
+ * **A note the Phase 2K retarget earned.** The roadmap design document pair the
+ * owner wrote before authorization — `PHASE_2K_2O_ROADMAP_DESIGN.md` and
+ * `PHASE_2K_2O_MASTER_IMPLEMENTATION_PLAN.md` — made the second of those match
+ * `GOVERNING_ARTIFACT_ROLE` while Phase 2K was still the target, because
+ * `^PHASE_2K_` followed by `2O_MASTER_` followed by `IMPLEMENTATION_PLAN`
+ * satisfies the pattern. The guard was right to fire: a file named as a Phase 2K
+ * implementation plan is signal 1 whatever it contains, and the alternative —
+ * matching on content — is exactly the too-weak half ADR-067 removed. The
+ * resolution is authorization, not a looser regex.
  *
  * **What this guard does and does not cover, stated because the roadmap ends.**
- * No accepted ADR names a Phase 2K, and ADR-094 deliberately names no scope for
+ * No accepted ADR names a Phase 2L, and ADR-097 deliberately names no scope for
  * the successor — inventing one would be the error this guard exists to prevent.
  * The independent fail-closed track (opening public self-service signup) is not
  * a lettered phase. So this detector holds the narrower property it was built
@@ -267,28 +284,28 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  *   1. a governing artifact **by role** — a PRD, an implementation plan or a
  *      requirements document, whatever it is named;
  *   2. a **declared** requirement family, in this repository's declaration shape
- *      (`- **2K-XXXX-000:**`) — the same shape the traceability generator's
+ *      (`- **2L-XXXX-000:**`) — the same shape the traceability generator's
  *      attribution guard uses;
- *   3. an **accepted** Phase 2K ADR — a recorded decision to proceed, as opposed
+ *   3. an **accepted** Phase 2L ADR — a recorded decision to proceed, as opposed
  *      to an ADR that merely mentions the phase while deferring it;
- *   4. a migration or source file marked as Phase 2K implementation.
+ *   4. a migration or source file marked as Phase 2L implementation.
  *
  * Permitted, explicitly: definition studies; future-work mentions; and
  * append-only amendments that state the phase remains unauthorized.
  *
  * Fail-closed: unreadable inputs throw rather than returning "no signals".
  */
-type Phase2KStartSignal = { readonly kind: string; readonly where: string };
+type Phase2LStartSignal = { readonly kind: string; readonly where: string };
 
-const GOVERNING_ARTIFACT_ROLE = /^PHASE_2K_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
+const GOVERNING_ARTIFACT_ROLE = /^PHASE_2L_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
 /** A *declared* requirement, not a mention. Matches the traceability generator's own shape. */
-const DECLARED_2K_REQUIREMENT = /^- \*\*2K-[A-Z]+-\d{3}/m;
+const DECLARED_2L_REQUIREMENT = /^- \*\*2L-[A-Z]+-\d{3}/m;
 /**
  * Kept for the historical assertion below: the Phase 2F proposal may mention
  * Phase 2G as future work but must never have declared a requirement for it.
  */
 const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
-const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2k/i;
+const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2l/i;
 
 /**
  * Every markdown file at or below `dir`, named relative to `dir`. The walk is
@@ -318,12 +335,12 @@ function filesIn(root: string, dir: string): string[] {
     .map((entry) => entry.name);
 }
 
-/** Every reason to believe Phase 2K has started. Empty means it has not. */
-function phase2KStartSignals(root: string): Phase2KStartSignal[] {
-  const signals: Phase2KStartSignal[] = [];
+/** Every reason to believe Phase 2L has started. Empty means it has not. */
+function phase2LStartSignals(root: string): Phase2LStartSignal[] {
+  const signals: Phase2LStartSignal[] = [];
 
   // One recursive walk from `docs/`. It subsumes `docs/reports/` and reaches
-  // `docs/initiatives/`, where a Phase 2K PRD would be filed; listing the
+  // `docs/initiatives/`, where a Phase 2L PRD would be filed; listing the
   // two separately would double-report anything under reports.
   for (const dir of ["docs"]) {
     for (const name of markdownFilesIn(root, dir)) {
@@ -331,7 +348,7 @@ function phase2KStartSignals(root: string): Phase2KStartSignal[] {
       if (GOVERNING_ARTIFACT_ROLE.test(basename)) {
         signals.push({ kind: "governing-artifact", where: `${dir}/${name}` });
       }
-      if (DECLARED_2K_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
+      if (DECLARED_2L_REQUIREMENT.test(readFileSync(join(root, dir, name), "utf8"))) {
         signals.push({ kind: "declared-requirement", where: `${dir}/${name}` });
       }
     }
@@ -340,12 +357,12 @@ function phase2KStartSignals(root: string): Phase2KStartSignal[] {
   const decisions = join(root, "docs/DECISIONS.md");
   if (existsSync(decisions)) {
     // An ADR block runs from its own heading to the next one. Only the heading
-    // is tested: ADR bodies may (and do) mention Phase 2K while deferring it.
+    // is tested: ADR bodies may (and do) mention Phase 2L while deferring it.
     const blocks = readFileSync(decisions, "utf8").split(/^## (?=ADR-)/m).slice(1);
     for (const block of blocks) {
       const heading = block.split("\n", 1)[0] ?? "";
       const accepted = /^[-*]?\s*\*\*Status:?\*\*:?\s*Accepted/im.test(block);
-      if (/phase 2k/i.test(heading) && accepted) {
+      if (/phase 2l/i.test(heading) && accepted) {
         signals.push({ kind: "accepted-adr", where: `ADR heading: ${heading.trim()}` });
       }
     }
@@ -365,7 +382,7 @@ function phase2KStartSignals(root: string): Phase2KStartSignal[] {
 /** A throwaway repository root carrying only what the detector reads. */
 function makeDetectorRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "a13-"));
-  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2k", "supabase/migrations", "src/features", "src/lib"]) {
+  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2l", "supabase/migrations", "src/features", "src/lib"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
@@ -379,13 +396,13 @@ function detectorRoot(): string {
   return root;
 }
 
-describe("A13: Phase 2K is not started", () => {
+describe("A13: Phase 2L is not started", () => {
   afterAll(() => {
     for (const root of detectorRoots) rmSync(root, { recursive: true, force: true });
   });
 
   it("finds no start signal in this repository", () => {
-    expect(phase2KStartSignals(REPO)).toEqual([]);
+    expect(phase2LStartSignals(REPO)).toEqual([]);
   });
 
   it("keeps Phase 2G's start recorded as an authorization, not an accident", () => {
@@ -421,109 +438,158 @@ describe("A13: Phase 2K is not started", () => {
     expect(existsSync(join(REPO, "docs/initiatives/phase-2j/PHASE_2J_IMPLEMENTATION_PLAN.md"))).toBe(true);
   });
 
-  it("keeps ADR-094's heading free of the successor's name, which would itself be a start signal", () => {
+  it("keeps Phase 2K's start recorded as an authorization, not an accident", () => {
+    // The same property, one phase on. Phase 2K's governing artifacts exist and
+    // its requirement namespace is declarable; what makes that legitimate is
+    // ADR-097, an owner decision. If ADR-097 were ever removed while the PRD and
+    // the plan remained, the repository would be carrying an unexplained phase
+    // start — which is exactly the condition this guard was built to refuse.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/ADR-097 — The owner authorizes Phase 2K/);
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2k/PHASE_2K_PRD.md"))).toBe(true);
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2k/PHASE_2K_IMPLEMENTATION_PLAN.md"))).toBe(true);
+  });
+
+  it("keeps ADR-097's heading free of the successor's name, which would itself be a start signal", () => {
     // Signal 3 is an *accepted ADR whose heading names the phase*. An
     // authorizing ADR that named its successor in the heading would start the
     // next phase in the act of authorizing this one. ADR-092's first draft hit
     // exactly that and was reworded; the property is asserted rather than
-    // remembered.
+    // remembered, and it is asserted for the *current* authorizing ADR so the
+    // check moves with the retarget instead of ossifying on ADR-094.
     const decisions = read("docs/DECISIONS.md");
     const heading = decisions
       .split("\n")
-      .find((line) => line.startsWith("## ADR-094")) ?? "";
+      .find((line) => line.startsWith("## ADR-097")) ?? "";
     expect(heading).toMatch(/roadmap successor/);
-    expect(heading).not.toMatch(/2K/i);
+    expect(heading).not.toMatch(/2L/i);
+  });
+
+  it("keeps every previous authorizing heading free of its own successor too", () => {
+    // The property is not "the newest ADR is clean" — it is that no authorizing
+    // ADR has ever named the phase it was handing the guard to. Asserted over
+    // the whole series, so a future retarget cannot quietly drop an earlier
+    // check by replacing it.
+    const decisions = read("docs/DECISIONS.md");
+    const headingFor = (adr: string): string =>
+      decisions.split("\n").find((line) => line.startsWith(`## ${adr}`)) ?? "";
+    for (const [adr, successor] of [
+      ["ADR-092", /2J/i],
+      ["ADR-094", /2K/i],
+      ["ADR-097", /2L/i],
+    ] as const) {
+      const heading = headingFor(adr);
+      expect(heading, `${adr} heading not found`).not.toBe("");
+      expect(heading, `${adr} names its successor in the heading`).not.toMatch(successor);
+    }
   });
 
   it("permits a definition study, future-work labels and an unauthorized-status amendment", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2k/PHASE_2K_NOTES.md"),
+      join(root, "docs/reports/phase-2l/PHASE_2L_NOTES.md"),
       [
-        "# Phase 2K notes",
+        "# Phase 2L notes",
         "",
-        "**Phase 2K remains unauthorized and unstarted.**",
+        "**Phase 2L remains unauthorized and unstarted.**",
         "",
-        "Deferred here by Phase 2J: nothing yet; no successor scope is named.",
+        "Deferred here by Phase 2K: nothing yet; no successor scope is named.",
         "",
         "## Amendment — appended, and the phase is still unauthorized.",
       ].join("\n"),
     );
-    expect(phase2KStartSignals(root)).toEqual([]);
+    expect(phase2LStartSignals(root)).toEqual([]);
   });
 
-  it("permits Phase 2J's own governing artifacts, which are authorized", () => {
+  it("permits Phase 2K's own governing artifacts, which are authorized", () => {
     // The retarget must not be a blanket relaxation: an *authorized* phase's
     // PRD is permitted, and the signals that would catch the *next* one still
     // fire in the same fixture. Both halves are asserted together, because a
     // guard that permits everything and a guard that permits the right thing
     // look identical from the passing side alone.
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2J_PRD.md"), "# Phase 2J PRD\n\n- **2J-HOJE-001:** one Hoje.\n");
-    expect(phase2KStartSignals(root)).toEqual([]);
-    writeFileSync(join(root, "docs/PHASE_2K_PRD.md"), "# Phase 2K PRD\n");
-    expect(phase2KStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2K_PRD.md"), "# Phase 2K PRD\n\n- **2K-CARD-001:** one grammar.\n");
+    expect(phase2LStartSignals(root)).toEqual([]);
+    writeFileSync(join(root, "docs/PHASE_2L_PRD.md"), "# Phase 2L PRD\n");
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2K_PRD.md",
+      where: "docs/PHASE_2L_PRD.md",
     });
   });
 
-  it("fails when docs/PHASE_2K_PRD.md exists", () => {
+  it("fails when docs/PHASE_2L_PRD.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2K_PRD.md"), "# Phase 2K PRD\n");
-    expect(phase2KStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2L_PRD.md"), "# Phase 2L PRD\n");
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2K_PRD.md",
+      where: "docs/PHASE_2L_PRD.md",
     });
   });
 
-  it("fails when docs/PHASE_2K_IMPLEMENTATION_PLAN.md exists", () => {
+  it("fails when docs/PHASE_2L_IMPLEMENTATION_PLAN.md exists", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2K_IMPLEMENTATION_PLAN.md"), "# Plan\n");
-    expect(phase2KStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "docs/PHASE_2L_IMPLEMENTATION_PLAN.md"), "# Plan\n");
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2K_IMPLEMENTATION_PLAN.md",
+      where: "docs/PHASE_2L_IMPLEMENTATION_PLAN.md",
     });
   });
 
-  it("fails when a Phase 2K requirement is declared, whatever the file is called", () => {
+  it("fails on a multi-phase roadmap document named as the successor's implementation plan", () => {
+    // The case the Phase 2K retarget actually met. `PHASE_2K_2O_MASTER_
+    // IMPLEMENTATION_PLAN.md` matched the *then-current* target because
+    // `^PHASE_2K_` + `2O_MASTER_` + `IMPLEMENTATION_PLAN` satisfies the role
+    // pattern — and the guard was right to fire. A document named as a phase's
+    // implementation plan is signal 1 whatever its contents, because the
+    // alternative is matching on content, which is the too-weak half ADR-067
+    // deliberately removed. Asserted here so a future retarget cannot "fix" the
+    // regex by loosening it.
+    const root = detectorRoot();
+    writeFileSync(join(root, "docs/PHASE_2L_2P_MASTER_IMPLEMENTATION_PLAN.md"), "# Roadmap only\n");
+    expect(phase2LStartSignals(root)).toContainEqual({
+      kind: "governing-artifact",
+      where: "docs/PHASE_2L_2P_MASTER_IMPLEMENTATION_PLAN.md",
+    });
+  });
+
+  it("fails when a Phase 2L requirement is declared, whatever the file is called", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2k/PHASE_2K_NOTES.md"),
-      "# Notes\n\n- **2K-READINESS-001:** something ships here.\n",
+      join(root, "docs/reports/phase-2l/PHASE_2L_NOTES.md"),
+      "# Notes\n\n- **2L-READINESS-001:** something ships here.\n",
     );
-    expect(phase2KStartSignals(root)).toContainEqual({
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
-      where: "docs/reports/phase-2k/PHASE_2K_NOTES.md",
+      where: "docs/reports/phase-2l/PHASE_2L_NOTES.md",
     });
   });
 
-  it("fails when an accepted Phase 2K ADR exists", () => {
+  it("fails when an accepted Phase 2L ADR exists", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-099 — Phase 2K is accepted as the next phase\n\n- **Status:** Accepted\n",
+      "# Decisions\n\n## ADR-099 — Phase 2L is accepted as the next phase\n\n- **Status:** Accepted\n",
     );
-    const signals = phase2KStartSignals(root);
+    const signals = phase2LStartSignals(root);
     expect(signals.map((signal) => signal.kind)).toContain("accepted-adr");
   });
 
-  it("permits an ADR that mentions Phase 2K while deferring it", () => {
+  it("permits an ADR that mentions Phase 2L while deferring it", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-099 — The roadmap order after Phase 2J\n\n"
-        + "- **Status:** Accepted\n- Phase 2K remains unauthorized and unstarted.\n",
+      "# Decisions\n\n## ADR-099 — The roadmap order after Phase 2K\n\n"
+        + "- **Status:** Accepted\n- Phase 2L remains unauthorized and unstarted.\n",
     );
-    expect(phase2KStartSignals(root)).toEqual([]);
+    expect(phase2LStartSignals(root)).toEqual([]);
   });
 
-  it("fails when a migration is marked as Phase 2K implementation", () => {
+  it("fails when a migration is marked as Phase 2L implementation", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2k_something.sql"), "-- x\n");
-    expect(phase2KStartSignals(root)).toContainEqual({
+    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2l_something.sql"), "-- x\n");
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "implementation-file",
-      where: "supabase/migrations/202610010001_phase_2k_something.sql",
+      where: "supabase/migrations/202610010001_phase_2l_something.sql",
     });
   });
 
@@ -533,9 +599,9 @@ describe("A13: Phase 2K is not started", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/ROADMAP_NOTES.md"),
-      "# Notes\n\n- **2K-DEPLOY-001:** the deploy runbook ships here.\n",
+      "# Notes\n\n- **2L-DEPLOY-001:** the deploy runbook ships here.\n",
     );
-    expect(phase2KStartSignals(root)).toContainEqual({
+    expect(phase2LStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
       where: "docs/ROADMAP_NOTES.md",
     });
@@ -545,15 +611,15 @@ describe("A13: Phase 2K is not started", () => {
     const root = detectorRoot();
     // A path that `readdirSync` reports and `readFileSync` cannot open: on both
     // platforms, replacing the file with a directory of the same name does it.
-    const listed = join(root, "docs/reports/phase-2k/PHASE_2K_NOTES.md");
+    const listed = join(root, "docs/reports/phase-2l/PHASE_2L_NOTES.md");
     writeFileSync(listed, "# Notes\n");
-    expect(phase2KStartSignals(root)).toEqual([]);
+    expect(phase2LStartSignals(root)).toEqual([]);
     rmSync(listed);
     mkdirSync(join(root, "docs/reports/UNREADABLE.md"));
     writeFileSync(join(root, "docs/reports/UNREADABLE.md/inner"), "x");
     // `markdownFilesIn` filters to real files, so the directory is skipped rather
     // than misread — the detector never treats an unreadable entry as clean data.
-    expect(phase2KStartSignals(root)).toEqual([]);
+    expect(phase2LStartSignals(root)).toEqual([]);
     expect(() => readFileSync(join(root, "docs/reports/UNREADABLE.md"), "utf8")).toThrow();
   });
 

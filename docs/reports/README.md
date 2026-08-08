@@ -53,20 +53,27 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`post-2h-rollout/`](./post-2h-rollout/) | Post-2H rollout readiness — backup, SMTP, monitoring adequacy and legal packets | **NOT a phase.** Bounded owner-authorized effort, 2026-08-07; migration `202608070084` deployed |
 | [`phase-2i/`](./phase-2i/) | Phase 2I — Foundation and Findability (current-experience audit, threat model, traceability contract, gaps, eight slice acceptances, closing report) | **COMPLETE** 2026-08-07 — 61 declared · 61 classified · 0 undelivered; `1 allocated · 0 spent`; hosted parity unchanged at `202608070084` |
 | [`phase-2j/`](./phase-2j/) | Phase 2J — Today, Capture and Attention (audit, threat model, traceability contract, gaps, eight slice acceptances, matrix, closing report, deployment record) | **COMPLETE** 2026-08-08 — 74 declared · 74 classified · 0 unclassified; `2 allocated · 2 spent` (unchanged); **DEPLOYED, hosted parity `202608080087`**. The deployment probe found the declared telemetry events refused by an un-widened third vocabulary copy; the post-2J correction `202608080087` removed that duplication the same day and telemetry is proved live producer → consumer |
+| [`phase-2k/`](./phase-2k/) | Phase 2K — Conversar as the primary interface (current-experience audit, gaps, threat model, traceability contract) | **PLANNING ONLY** (ADR-097, 2026-08-08). 68 requirements across eleven families and **eight slices planned for execution — none executed**, `1 allocated · 0 spent`. Implementation is **not** authorized; no slice acceptance record, matrix or closing report exists yet, and none may be written before execution |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**The active initiative is Phase 2H — Deploy and Operate** (ADR-085,
-2026-08-06), and it is **in planning**: the authorization covers planning
-artifacts, research, tests and generators, and explicitly does **not** cover
-merging an implementation PR, deploying a migration, enabling retention,
-executing a purge, opening signup, or deploying `process-jobs` (ADR-086). Its
-governing pair lives in `docs/initiatives/phase-2h/`; its reports file here.
-Phase 2G closed on 2026-08-06 and its directory is historical, with two
-requirements partial on a single named blocker.
+**The active initiative is Phase 2K — Conversar as the primary interface**
+(ADR-097, 2026-08-08), and it is **in planning only**: the authorization covers
+the audit, the governing pair, the threat model and the traceability contract,
+and explicitly does **not** cover implementation, product code, creating or
+applying a migration, deployment, opening signup, executing rollout residuals,
+running ADR-055's offline spike, or starting any successor phase. Its governing
+pair lives in `docs/initiatives/phase-2k/`; its reports file here. Phases 2H,
+2I and 2J are closed, and Phase 2J is **deployed** at hosted parity
+`202608080087`.
+
+This line was stale until 2026-08-08: it still named Phase 2H as active after
+2I and 2J had both closed. It is corrected here rather than left, because an
+index that names the wrong active initiative is the one document a new reader
+trusts first.
 
 ---
 
@@ -134,7 +141,23 @@ declares no requirement and plans no work — then the threat model, the four
 slice acceptance records, the online-journey blocker and harness acceptances,
 `PHASE_2G_TRACEABILITY_MATRIX.md` and `PHASE_2G_REPORT.md`. Closed 2026-08-06.
 
-### `phase-2h/` — Phase 2H (active, planning)
+### `phase-2k/` — Phase 2K (active, planning only)
+
+`PHASE_2K_CURRENT_EXPERIENCE_AUDIT.md` (the falsifiable re-derivation of the
+Conversar surface from source, whose five findings reshaped the phase),
+`PHASE_2K_UX_GAPS_AND_OPPORTUNITIES.md` (eleven ranked gaps, one of which is
+recorded as *not* a gap because the roadmap would otherwise have rebuilt it),
+`PHASE_2K_THREAT_MODEL.md` (T-2K-01…T-2K-10, each with the falsifying evidence
+that would disprove its mitigation) and `PHASE_2K_TRACEABILITY_CONTRACT.md`,
+which **specifies** the fail-closed generator and its sixteen refusals —
+deliberately not built during planning, for the reason Phase 2H recorded: a
+fail-closed generator run against a phase with zero acceptance records reports
+every requirement unresolved. The governing pair (PRD, implementation plan)
+lives in `docs/initiatives/phase-2k/`. Slice acceptance records file here as
+they are produced; **there are none, and nothing has been implemented, merged
+or deployed.**
+
+### `phase-2h/` — Phase 2H (closed)
 
 `PHASE_2H_THREAT_MODEL.md` (T-2H-01…T-2H-24, the per-slice review floor) and
 `PHASE_2H_TRACEABILITY_CONTRACT.md`, which **specifies** the fail-closed
@@ -142,8 +165,10 @@ generator that `2H-CLOSE-001` builds in slice 2H.6 — deliberately not built
 during planning, because a fail-closed generator run against a phase with zero
 acceptance records reports every requirement unresolved. The governing pair
 (PRD, implementation plan) lives in `docs/initiatives/phase-2h/`. Slice
-acceptance records file here as they are produced; there are none yet, and
-nothing has been implemented, merged or deployed.
+acceptance records file here as they are produced. The phase **closed
+2026-08-07** — 44 declared · 44 delivered, hosted parity `202608070083` — so
+this section's former "nothing has been implemented, merged or deployed" is
+corrected here rather than left standing.
 
 ### `product-ux/` — Product UX/UI remediation
 
