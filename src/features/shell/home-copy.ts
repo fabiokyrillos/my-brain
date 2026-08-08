@@ -28,6 +28,14 @@ export type HomeCopy = {
     readonly attention: { readonly title: string; readonly hint: string; readonly empty: string };
     readonly today: { readonly title: string; readonly hint: string; readonly empty: string };
     /** `2J-HOJE-004`. Up to three, and the heading never promises three. */
+    /** `2J-DAY-002`/`003`. Closing the day, from Hoje. */
+    readonly endOfDay: {
+      readonly title: string;
+      readonly hint: string;
+      readonly clear: string;
+      readonly openReview: string;
+      readonly unresolved: string;
+    };
     readonly priorities: {
       readonly title: string;
       readonly hint: string;
@@ -68,6 +76,13 @@ export const homeCopy = {
         title: "Precisa de você",
         hint: "Decisões que o {agent} não toma sozinho.",
         empty: "Nada precisa de você agora.",
+      },
+      endOfDay: {
+        title: "Encerrar o dia",
+        hint: "Veja o que ficou em aberto e gere a revisão do dia quando quiser.",
+        clear: "Nada ficou em aberto hoje.",
+        openReview: "Abrir revisões",
+        unresolved: "aberto",
       },
       priorities: {
         title: "Prioridades de hoje",
@@ -120,6 +135,13 @@ export const homeCopy = {
         title: "Needs you",
         hint: "Decisions {agent} will not make on its own.",
         empty: "Nothing needs you right now.",
+      },
+      endOfDay: {
+        title: "Close the day",
+        hint: "See what is still open and generate the daily review whenever you want.",
+        clear: "Nothing was left open today.",
+        openReview: "Open reviews",
+        unresolved: "open",
       },
       priorities: {
         title: "Today's priorities",

@@ -81,6 +81,7 @@ describe("HomeView", () => {
       "Para hoje",
       "Aguardando outras pessoas",
       "Pergunta em aberto",
+      "Encerrar o dia",
       "Registrado recentemente",
     ]);
   });
@@ -94,6 +95,7 @@ describe("HomeView", () => {
       "Precisa de você",
       "Prioridades de hoje",
       "Para hoje",
+      "Encerrar o dia",
       "Registrado recentemente",
     ]);
   });
@@ -150,6 +152,7 @@ describe("HomeView", () => {
       "For today",
       "Waiting on other people",
       "Open question",
+      "Close the day",
       "Recently captured",
     ]);
     // The ordinal kickers were hardcoded Portuguese literals, so an English user
