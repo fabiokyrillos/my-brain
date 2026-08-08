@@ -1,6 +1,28 @@
 # Technical Changelog
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
+## 2026-08-08 — Phase 2J — Today, Capture and Attention is COMPLETE (2 migrations, not deployed)
+
+**74 requirements declared, 74 classified, 0 unclassified** — 59 built, 6 baseline, 5 evidenced negatives, 2 partial, 2 undelivered, every partial and every undelivered naming its destination. Five PRs, **one green PR-head run and one green merge-SHA run each** under ADR-090.
+
+**Migration budget: 2 allocated · 2 SPENT**, reconciled per slice. ADR-095's preferred `2 · 1` close was not reachable, **and the premise that promised it was ours.** It said 2J.4's migration could stay unspent because `ai_usage_events.operation` allows `other`. It does not: that value belongs to **`error_events.operation`**, a different table created by the Phase 2H error sink. The conflation travelled from the current-experience audit into the PRD into ADR-095 without ever being re-derived against the constraint on the table it described. ADR-096 records the correction — and the phase's own rule turned on itself, because the audit's standard was that every claim cite the file it came from.
+
+**That migration's own verification block then found a second gap before it shipped.** `record_ai_usage` **enumerates the operation vocabulary in its body**, so a migration widening only the table CHECK would have deployed clean and then rejected every transcription at runtime — inside the code path `src/lib/ai/usage.ts` swallows into a `console` line. Both halves shipped, and the ordering matters: a first draft placed the function check *before* the re-declaration, where on a fresh chain it would have aborted the migration it existed to protect.
+
+**The accessibility lane found a real Phase 2I defect on its first execution.** `.library-search-link` rendered 16px tall on a Pixel 7, under WCAG 2.2 AA 2.5.8's 24px minimum. jsdom has no layout engine and could never have seen it. That is the whole argument for running the lane as slice **zero** rather than at closeout, which is where Phase 2I put it and why `2I-CLOSE-002` closed partial.
+
+**"Precisa de você" already existed** at `/app/inbox?view=needs-you`, with tabs, the list and keyset pagination, reachable from Hoje — so `2J-ATTN-001` is **baseline**. The phase's own audit predicted this class of error and it happened anyway, which is why `baseline` is a distinct class rather than a footnote. The slice's real content turned out to be the audit of what "in place" can honestly mean: of five attention reasons, **only `retry_processing`** is a single bounded action; the other four are decisions, not clicks.
+
+**Two of the five sensitivity surfaces had nothing to converge.** The capture receipt renders a message key and a link and has no content field at all; there is **no push, service-worker or lock-screen payload anywhere in the repository**. Both are recorded as evidenced negatives rather than given a mask for content that does not exist — which turns the notification rule into something a future push surface must satisfy instead of something a closing report could claim was enforced. Review summaries mask **unconditionally**, because `summaries` carries no classification and a period summary can contain anything the period contained.
+
+**Phase 2I's accessibility residual is PARTIALLY REDUCED, not resolved.** Now proved in a real browser at two viewports: axe violations, structure, accessible names, visible focus, focus order, **rendered** touch targets, reduced motion, dialog semantics. Still not proved: hydrated interactivity — Ctrl+K, arrows, Escape, focus **restoration**. Still not proved anywhere: a real screen-reader session. **Gate G-2J.4b is NOT discharged**: voice was never measured on real iOS Safari or Android Chrome, and MediaRecorder is faked in tests.
+
+**Thirteen defects, ten of them in probes, guards, pins or tooling.** The most interesting was a guard pinned to a **superseded** migration: every phase that widens `product_events` re-declares the whole list, so `telemetry-parity.test.ts` was asserting what Phase 2H's file said while a later migration held the constraint actually in force — and it passed because the name it looked for was still there.
+
+**Telemetry is three events, not the PRD's larger set**, because `2J-METRICS-007` requires a **consumer** and SH.6 shipped a producer with none. Privacy is the payload shape: each event's property **keys** are a closed whitelist in the database, so there is nowhere to put a transcript, a filename or a title, and `resolutionBucket` is a bucket rather than a duration.
+
+**Phase 2J added no RLS policy, no grant, no secret, no external service, no new provider and no second write path.** `T-2I-02`'s guard was proved red against a planted second caller *before* the unified capture surface was written. ADR-055 remains open and unchanged, expiring 2026-10-27. The rollout gate was re-read at close and is untouched at 25 pass · 3 fail · 2 owner-signature. **Nothing is deployed**: hosted parity remains `202608070084` while the chain head is `202608080086`.
+
 ## 2026-08-08 — Phase 2J — Today, Capture and Attention is AUTHORIZED FOR PLANNING ONLY (ADR-094, 0 migrations)
 
 **Planning only. No product code, no migration, no deployment.** Scope is the owner's

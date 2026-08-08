@@ -2605,3 +2605,121 @@ SMTP **unconfigured** · five cron jobs, none a sweep · reaper **unarmed** ·
 three owner decisions (OD-2J-1, OD-2J-2, OD-2J-3) and the implementation authorization
 itself are the next steps. **Naming the successor is not authorizing it** — and ADR-094
 deliberately names no scope for whatever follows Phase 2J.
+
+## §44 — Phase 2J is COMPLETE, and the premise it corrected was our own (2026-08-08)
+
+**74 declared · 74 classified · 0 unclassified** — 59 built, 6 baseline, 5 evidenced
+negatives, 2 partial, 2 undelivered. **Budget 2 allocated · 2 spent**, per slice.
+Chain head `202608080086`. **Hosted parity still `202608070084` — nothing deployed.**
+PRs #136 `283380d`, #137 `e2a9fc0`, #138 `b91172a`, #139 `88ddb9d`, #140 `fa791f0`,
+one green PR-head and one green merge-SHA run each.
+
+### Read this before you touch `ai_usage_events` or `error_events`
+
+**There are two `operation` columns with different closed vocabularies, and
+confusing them cost this phase its preferred close.**
+
+- `ai_usage_events.operation` — eight values before this phase, nine now. **No
+  `other`.** Widening it is a migration, and `record_ai_usage` **enumerates the
+  same list in its body**, so widening only the table CHECK deploys clean and
+  then raises `22023` at runtime inside a call site that swallows the error.
+- `error_events.operation` — sixteen values, **including `other`**, from
+  `202608070080`.
+
+ADR-095 said 2J.4's migration could stay unspent because `other` was available.
+It is not. The claim travelled audit → PRD → ADR without being re-derived against
+the constraint on the table it described. ADR-096 records it. The phase's own
+rule — *every claim cites the file it came from* — is what should have caught it.
+
+### The accessibility lane earns its place, and it is slice zero for a reason
+
+It found a **real Phase 2I defect on its first run**: `.library-search-link` at
+16px on a Pixel 7, under WCAG 2.2 AA 2.5.8. jsdom has no layout engine.
+
+**What it proves and what it does not is asserted, not merely written.**
+`accessibility-mirror-guard.test.ts` checks that the three limit sentences are
+still in `accessibility.spec.ts`, so nobody can quietly upgrade the claim:
+
+- PROVEN: axe, structure, accessible names, visible focus, focus order, rendered
+  touch targets, reduced motion, dialog semantics — real browser, two viewports.
+- NOT PROVEN: hydrated interactivity (Ctrl+K, arrows, Escape, focus
+  **restoration**) — needs a session CI does not have.
+- NOT PROVEN ANYWHERE: a real screen-reader session.
+
+The surfaces are **mirrored** (`layout-contracts.spec.ts`'s precedent) because the
+routes are behind `src/proxy.ts`. The guard bounds the drift.
+
+### Things that already existed, again
+
+`Precisa de você` **already shipped** at `/app/inbox?view=needs-you` — tabs, list,
+keyset pagination, reachable from Hoje. `2J-ATTN-001` is **baseline**. The audit
+for this phase predicted exactly this class of error and it still happened.
+
+The capture receipt has **no content field at all**, and there is **no push,
+service-worker or lock-screen payload anywhere in the repository**. Two of five
+sensitivity surfaces therefore had nothing to converge, and both are recorded as
+evidenced negatives instead of getting a mask for content that does not exist.
+
+### Voice: what is real and what is not
+
+Real: the provider capability on the interface, a pinned model checked against the
+SDK's own union, BYOK-only through `openAiGate`, rate-limited on the `ai` bucket,
+the ledger row, and **no durable audio** — proved by a guard that re-derives the
+absence from `database.types.ts` and the storage config every run.
+
+**Not real: G-2J.4b.** MediaRecorder is faked in tests. Nothing here proves how
+iOS Safari or Android Chrome behave. The accepted-container list is what the
+repository *accepts*, derived from the SDK's documented inputs — **not a
+measurement**. `2J-VOICE-014` is `partial` and says so.
+
+Also true and worth knowing: transcription events land **`cost_status =
+'unpriced'`**. No audio pricing row exists and `ai_model_pricing` is per-token
+while transcription bills per minute. That is a state `record_ai_usage` already
+modelled — an earlier ADR-096 draft wrongly called it a hole.
+
+### Telemetry is three events because each had to have a reader
+
+`2J-METRICS-007` exists because SH.6 shipped a producer with no consumer and its
+quota refusals recorded nothing for weeks. So the vocabulary is exactly what
+`npm run measure:2j:funnel` asks questions of, and the guard asserts **both**
+directions. Two metrics requirements are **undelivered** as a result: declaring
+more events needs a third migration, which ADR-095 names a stop condition.
+
+Privacy is the payload shape — per-event **key** whitelists in
+`validate_product_event_properties`. `resolutionBucket` is a bucket, never a
+duration: a millisecond count says when somebody was at their desk.
+
+### Thirteen defects, ten in the machinery
+
+The one to remember: **`telemetry-parity.test.ts` was pinned to a superseded
+migration.** Every phase that widens `product_events` re-declares the whole list,
+so the newest such migration holds the constraint in force — the test asserted
+what Phase 2H's file said and passed because the name it looked for was still
+there. If you pin a migration by filename, pin the one currently in force.
+
+Two more worth carrying: a `"use server"` module **may only export async
+functions** (constants moved to `voice-contracts.ts`), and editing files with a
+Python script that reads universal-newlines and writes `newline=''` **converts
+CRLF to LF**, which silently broke Node/Deno extraction-prompt parity locally.
+
+### The generator's honest limitation
+
+It refuses on ten fixture defects and the repository is its positive control. But
+**it did not refuse on its first real run**, unlike Phase 2I's, which named
+nineteen. The acceptance rows were generated from one classification table, so
+the two sides did not converge independently. The PRD ↔ evidence cross-check is
+still meaningful — the PRD's 74 declarations were authored in a separate, earlier
+pass and reconciled exactly — but the generator's real value here is **forward**:
+the matrix cannot now drift from the PRD without a refusal.
+
+### Posture at close
+
+Hosted parity **`202608070084`** · chain head **`202608080086`**, **not deployed** ·
+signup **disabled** · CAPTCHA **enforced** · SMTP **unconfigured** · rollout gate
+**25 · 3 · 2**, re-read and untouched · **ADR-055 open and unchanged, expiring
+2026-10-27** · **Phase 2K unstarted, A13 green, zero 2K artifacts.**
+
+**Two owner acts are outstanding and neither is optional for a complete close:**
+deploying the two migrations (both merge-SHA gates already green), and measuring
+voice on real hardware for G-2J.4b. A manual screen-reader session is a third,
+and it is the one this repository has never been able to automate.

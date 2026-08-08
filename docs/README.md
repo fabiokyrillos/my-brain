@@ -82,7 +82,7 @@ fails the build on an addition to it.
 | [`initiatives/post-2h-rollout/`](./initiatives/post-2h-rollout/) | `POST_2H_ROLLOUT_READINESS.md` — the governing artifact for the bounded post-2H rollout track. **Not a phase.** |
 | [`initiatives/next-experience/`](./initiatives/next-experience/) | The neutral-named planning study that reviewed the owner's mobile-first PRD and proposed Phase 2I. **Superseded by `initiatives/phase-2i/`; retained as the study that produced it.** |
 | [`initiatives/phase-2i/`](./initiatives/phase-2i/) | `PHASE_2I_PRD.md`, `PHASE_2I_IMPLEMENTATION_PLAN.md` — Foundation and Findability, authorized by ADR-092 (2026-08-07). Scope was the parent mobile-first PRD's Etapa 0 + Etapa 1. **Complete 2026-08-07.** |
-| [`initiatives/phase-2j/`](./initiatives/phase-2j/) | `PHASE_2J_PRD.md`, `PHASE_2J_IMPLEMENTATION_PLAN.md` — Today, Capture and Attention, **planning only**, authorized by ADR-094 (2026-08-08). Scope is the parent mobile-first PRD's Etapa 2. **Implementation is not authorized.** |
+| [`initiatives/phase-2j/`](./initiatives/phase-2j/) | `PHASE_2J_PRD.md`, `PHASE_2J_IMPLEMENTATION_PLAN.md` — Today, Capture and Attention, authorized for planning by ADR-094 and for implementation by ADR-095 (2026-08-08). Scope was the parent mobile-first PRD's Etapa 2. **Complete 2026-08-08.** |
 
 **Phase 2K has no governing artifact and must not acquire one without owner
 authorization.** The A13 guard in
