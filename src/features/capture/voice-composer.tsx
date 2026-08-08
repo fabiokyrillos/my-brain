@@ -37,6 +37,8 @@ import type { Locale } from "@/lib/preferences";
 
 import { transcriptionCopy } from "./voice-copy";
 import type { CaptureAction, CaptureState } from "./quick-capture-form";
+import { recordVoiceTranscriptionFinished } from "@/features/product-analytics/interaction-events";
+
 import { MAX_RECORDING_BYTES, type TranscribeState } from "./voice-contracts";
 
 export type TranscribeAction = (
@@ -94,6 +96,16 @@ export function VoiceComposer({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   if (idempotencyKeyRef.current === null) idempotencyKeyRef.current = crypto.randomUUID();
+  /*
+    `2J-METRICS-004`. Two facts worth knowing and neither of them is content:
+    whether the transcript was good enough to use unedited, and whether one
+    recording was enough. Tracked as refs rather than state because they must
+    not trigger a render -- they are reported, not displayed.
+  */
+  const attemptIdRef = useRef<string | null>(null);
+  if (attemptIdRef.current === null) attemptIdRef.current = crypto.randomUUID();
+  const segmentCountRef = useRef(0);
+  const lastTranscriptRef = useRef<string>("");
 
   /** Stops everything and releases the microphone. Safe to call twice. */
   const teardown = useCallback(() => {
@@ -214,14 +226,30 @@ export function VoiceComposer({
     const result = await transcribeAction({ status: "idle" }, form);
     // Whatever happened, the audio is gone by now. There is nothing to retry
     // against, which is exactly why a failure must not clear the draft.
+    const additionalSegment = segmentCountRef.current > 0;
     if (result.status === "success") {
+      segmentCountRef.current += 1;
       // `2J-VOICE-012`. Appended, never replaced: a second segment adds to what
       // the user already has, including anything they typed themselves.
-      setDraft((previous) => (previous ? `${previous.trimEnd()} ${result.text}` : result.text));
+      setDraft((previous) => {
+        const next = previous ? `${previous.trimEnd()} ${result.text}` : result.text;
+        lastTranscriptRef.current = next;
+        return next;
+      });
       setError(null);
     } else if (result.status === "error") {
       setError(result.message);
     }
+    recordVoiceTranscriptionFinished({
+      attemptId: `${attemptIdRef.current}:${segmentCountRef.current}`,
+      outcome: result.status === "success" ? "succeeded" : "failed",
+      // Compared at confirmation time, not here -- at this instant the user has
+      // not had a chance to edit yet. `false` is the truthful answer now, and
+      // the confirm path reports the edited case.
+      draftEdited: false,
+      additionalSegment,
+      locale,
+    });
     setElapsed(0);
     setPhase("idle");
   }
@@ -229,6 +257,19 @@ export function VoiceComposer({
   async function submitCapture(state: CaptureState, formData: FormData): Promise<CaptureState> {
     formData.set("idempotencyKey", idempotencyKeyRef.current!);
     formData.set("captureSource", "capture_page");
+    const submitted = String(formData.get("content") ?? "");
+    if (lastTranscriptRef.current && submitted.trim() !== lastTranscriptRef.current.trim()) {
+      // `2J-METRICS-004`. The transcript was edited before capture. Reported as
+      // a boolean by comparing lengths of intent, never by recording either
+      // version of the text.
+      recordVoiceTranscriptionFinished({
+        attemptId: `${attemptIdRef.current}:edited`,
+        outcome: "succeeded",
+        draftEdited: true,
+        additionalSegment: segmentCountRef.current > 1,
+        locale,
+      });
+    }
     const result = await captureAction(state, formData);
     if (result.status === "success") {
       idempotencyKeyRef.current = crypto.randomUUID();

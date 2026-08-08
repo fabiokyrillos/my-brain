@@ -12,6 +12,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VoiceComposer } from "./voice-composer";
+
+// The emitter reaches a Server Action, which trips the `server-only` guard the
+// moment jsdom imports it. Same reason every other component test here mocks it.
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  recordVoiceTranscriptionFinished: vi.fn(),
+}));
 import type { TranscribeState } from "./voice-contracts";
 import type { CaptureState } from "./quick-capture-form";
 

@@ -90,6 +90,7 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
     expect(index, "the correction migration left the chain").toBeGreaterThanOrEqual(0);
     expect(ALL_MIGRATIONS.slice(index + 1)).toEqual([
       "202608080085_phase_2j_transcription_usage.sql",
+      "202608080086_phase_2j_experience_telemetry.sql",
     ]);
   });
 });

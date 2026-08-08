@@ -26,7 +26,17 @@ import { parseProductEventPayload, productEventNames } from "@/features/product-
  * and a shared word would make it unanswerable.
  */
 
-const MIGRATION = "supabase/migrations/202608070081_phase_2h_rate_limiting.sql";
+/**
+ * The migration that CURRENTLY declares the vocabulary, not the one that first
+ * added `rate_limit_refused`.
+ *
+ * Each phase that widens `product_events` re-declares the whole list, so the
+ * newest such migration is the one whose CHECK is in force. Pinning the Phase 2H
+ * file made this test assert what a superseded migration said -- it passed
+ * because 2H's list still contained the name, while the list actually enforced
+ * lived two migrations later.
+ */
+const MIGRATION = "supabase/migrations/202608080086_phase_2j_experience_telemetry.sql";
 
 function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");

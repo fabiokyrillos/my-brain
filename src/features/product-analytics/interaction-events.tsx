@@ -2,12 +2,17 @@
 
 import { startTransition, useEffect, useRef, type ReactNode } from "react";
 import type {
+  AttentionResolutionAction,
+  CaptureModeAnalytics,
   ProductEventLocale,
   ProductEventName,
   ProductEventPropertiesByName,
   ProductEventSubject,
   ProductSurface,
+  TrackedAttentionReasonAnalytics,
+  VoiceTranscriptionOutcome,
 } from "./contracts";
+import { toResolutionBucket } from "./contracts";
 import { recordProductInteraction } from "./actions";
 
 type AttentionReason = ProductEventPropertiesByName["needs_attention_item_opened"]["attentionReason"];
@@ -303,3 +308,72 @@ export function recordCandidateEditReset(input: {
     properties: { editedFieldCount: input.editedFieldCount },
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * Phase 2J slice 2J.7. Three emitters, one per declared event.
+ *
+ * Each takes only bounded values -- there is no parameter that could carry a
+ * transcript, a filename or a title, which is the same property the database's
+ * key whitelist enforces one layer down (`2J-METRICS-006`).
+ * ------------------------------------------------------------------ */
+
+/** `2J-METRICS-003`. Which modality the user chose, and nothing about what. */
+export function recordCaptureModeSelected(input: {
+  attemptId: string;
+  captureMode: CaptureModeAnalytics;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    // Keyed by attempt AND mode, so switching back and forth records each
+    // choice once rather than collapsing into a single event per visit.
+    logicalKey: `capture-mode:${input.attemptId}:${input.captureMode}`,
+    name: "capture_mode_selected",
+    surface: "capture",
+    locale: input.locale,
+    properties: { captureMode: input.captureMode },
+  });
+}
+
+/** `2J-METRICS-004`. Outcome plus two booleans about the draft. */
+export function recordVoiceTranscriptionFinished(input: {
+  attemptId: string;
+  outcome: VoiceTranscriptionOutcome;
+  draftEdited: boolean;
+  additionalSegment: boolean;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    logicalKey: `voice-transcription:${input.attemptId}`,
+    name: "voice_transcription_finished",
+    surface: "capture",
+    locale: input.locale,
+    properties: {
+      outcome: input.outcome,
+      draftEdited: input.draftEdited,
+      additionalSegment: input.additionalSegment,
+    },
+  });
+}
+
+/** `2J-METRICS-002`. Reason class, action taken, and a bucket -- never a duration. */
+export function recordAttentionItemResolved(input: {
+  entryId: string;
+  attentionReason: TrackedAttentionReasonAnalytics;
+  resolutionAction: AttentionResolutionAction;
+  elapsedMs: number;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    logicalKey: `attention-resolved:${input.entryId}:${input.resolutionAction}`,
+    name: "attention_item_resolved",
+    surface: "needs_attention",
+    locale: input.locale,
+    properties: {
+      attentionReason: input.attentionReason,
+      resolutionAction: input.resolutionAction,
+      // Bucketed at the boundary, so no caller can pass a raw duration through.
+      resolutionBucket: toResolutionBucket(input.elapsedMs),
+    },
+  });
+}
+

@@ -68,7 +68,7 @@ const REPO = resolve(__dirname, "../../..");
 // (ADR-095's budget, ADR-096's corrected premise). Moved deliberately and
 // visibly in the same commit that adds `202608080085`, which is the only way
 // this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608080085";
+const AUTHORIZED_MIGRATION_HEAD = "202608080086";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
