@@ -64,7 +64,11 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-const AUTHORIZED_MIGRATION_HEAD = "202608070084";
+// Moved by Phase 2J slice 2J.4, which spends that slice's allocated migration
+// (ADR-095's budget, ADR-096's corrected premise). Moved deliberately and
+// visibly in the same commit that adds `202608080085`, which is the only way
+// this pin is allowed to change.
+const AUTHORIZED_MIGRATION_HEAD = "202608080085";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

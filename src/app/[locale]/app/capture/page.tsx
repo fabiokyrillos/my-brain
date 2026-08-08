@@ -3,7 +3,9 @@ import { uploadAttachment } from "@/features/agent/actions";
 import { UploadForm } from "@/features/agent/forms";
 import { captureEntry } from "@/features/capture/actions";
 import { QuickCaptureForm } from "@/features/capture/quick-capture-form";
+import { transcribeRecording } from "@/features/capture/transcribe-action";
 import { UnifiedCapture } from "@/features/capture/unified-capture";
+import { VoiceComposer } from "@/features/capture/voice-composer";
 import { isLocale } from "@/lib/preferences";
 import { getAgentName } from "@/features/profile/agent-identity";
 
@@ -45,6 +47,14 @@ export default async function CapturePage({ params }: { params: Promise<{ locale
           />
         }
         attachmentAction={<UploadForm action={uploadAttachment} locale={locale} />}
+        voice={
+          <VoiceComposer
+            locale={locale}
+            transcribeAction={transcribeRecording}
+            captureAction={captureEntry}
+            agentName={agentName}
+          />
+        }
       />
     </div>
   );

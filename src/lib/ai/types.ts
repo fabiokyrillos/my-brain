@@ -65,3 +65,29 @@ export type TaskCommandParseResult = AIUsageDetails & {
   promptVersion: string;
   strategyVersion: string;
 };
+
+/**
+ * `2J-VOICE-003`. What the provider is given to transcribe.
+ *
+ * Deliberately minimal. No entry id, no task, no user content beyond the audio
+ * itself, and no prompt: the provider receives a recording and returns text.
+ * Authorization, confirmation and the write all live outside it, exactly as
+ * they do for every other method on this interface.
+ */
+export type TranscriptionInput = {
+  /** The recording. Never persisted anywhere by this repository. */
+  audio: Blob;
+  /**
+   * The container the browser produced -- `audio/webm` on Chromium,
+   * `audio/mp4` on Safari. Carried explicitly rather than inferred, because a
+   * pipeline that assumes one container fails on half the target devices.
+   */
+  mimeType: string;
+  locale: "pt-BR" | "en";
+};
+
+export type TranscriptionResult = AIUsageDetails & {
+  /** The transcript. A draft for the user to edit -- never an entry. */
+  text: string;
+  model: string;
+};

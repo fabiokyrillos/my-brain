@@ -23,8 +23,54 @@ import type {
   ExtractionResult,
   TaskCommandParseInput,
   TaskCommandParseResult,
+  TranscriptionInput,
+  TranscriptionResult,
 } from "./types";
-import { normalizeEmbeddingUsage, normalizeResponseUsage } from "./usage-details";
+import { normalizeEmbeddingUsage, normalizeResponseUsage, type AIUsageDetails } from "./usage-details";
+import { TRANSCRIPTION_MODEL_ID } from "./model-routing";
+
+/**
+ * The file extension the provider needs for a given container.
+ *
+ * The endpoint accepts several containers but infers format partly from the
+ * filename, so a Safari `audio/mp4` blob named `.webm` is a support ticket. The
+ * map is small and closed on purpose: an unknown container falls back to the
+ * one the endpoint is most permissive about rather than guessing a codec.
+ */
+function extensionFor(mimeType: string): string {
+  const base = mimeType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (base === "audio/mp4" || base === "audio/x-m4a") return ".m4a";
+  if (base === "audio/mpeg") return ".mp3";
+  if (base === "audio/wav" || base === "audio/x-wav") return ".wav";
+  if (base === "audio/ogg") return ".ogg";
+  return ".webm";
+}
+
+/**
+ * Transcription usage, normalized into the shape the ledger already speaks.
+ *
+ * The endpoint may return token counts, a duration, or nothing at all
+ * depending on model and response format. None of those is guaranteed, so this
+ * reports zeros rather than inventing numbers -- and `record_ai_usage` marks
+ * the event `unpriced` anyway, because no audio pricing row exists (ADR-096).
+ * A fabricated token count would be worse than an honest zero: it would look
+ * priced.
+ */
+function normalizeTranscriptionUsage(response: unknown): AIUsageDetails {
+  const shaped = response as {
+    _request_id?: string | null;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
+  const usage = shaped?.usage;
+  return {
+    providerRequestId: shaped?._request_id ?? null,
+    transportRequestId: shaped?._request_id ?? null,
+    inputTokens: Math.max(0, Math.trunc(usage?.input_tokens ?? 0)),
+    cachedInputTokens: 0,
+    outputTokens: Math.max(0, Math.trunc(usage?.output_tokens ?? 0)),
+    reasoningTokens: 0,
+  };
+}
 
 export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
 export const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
@@ -227,6 +273,37 @@ export class OpenAIProvider implements AIProvider {
     const embedding = response.data[0]?.embedding;
     if (!embedding) throw new Error("OpenAI returned no embedding");
     return { embedding, model, ...normalizeEmbeddingUsage(response) };
+  }
+
+  /**
+   * `2J-VOICE-003`/`004`/`013`. Recording in, text out, nothing kept.
+   *
+   * The audio never touches disk here and is never handed to anything but the
+   * provider call: no temporary file, no bucket, no cache. `File` is
+   * constructed in memory from the blob the browser produced, and the container
+   * is carried from the caller rather than guessed -- Safari emits `audio/mp4`
+   * and Chromium `audio/webm`, and naming the file with the wrong extension is
+   * how a working pipeline fails on half its devices.
+   *
+   * `no-durable-audio-guard.test.ts` asserts the absence this comment claims.
+   */
+  async transcribeAudio(input: TranscriptionInput): Promise<TranscriptionResult> {
+    const model = TRANSCRIPTION_MODEL_ID;
+    const file = new File([input.audio], `recording${extensionFor(input.mimeType)}`, {
+      type: input.mimeType,
+    });
+    const response = await this.client.audio.transcriptions.create({
+      file,
+      model,
+      // `json` returns `{ text }` and nothing else. `verbose_json` would add
+      // segments and timings -- more of the user's speech, structured, for no
+      // product purpose. The smallest response that answers the question.
+      response_format: "json",
+      language: input.locale === "pt-BR" ? "pt" : "en",
+    });
+    const text = typeof response.text === "string" ? response.text.trim() : "";
+    if (!text) throw new Error("OpenAI returned no transcript");
+    return { text, model, ...normalizeTranscriptionUsage(response) };
   }
 
   async answerFromKnowledge(input: ChatInput): Promise<ChatResult> {

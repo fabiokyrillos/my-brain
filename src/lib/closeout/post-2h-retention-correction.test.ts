@@ -75,8 +75,22 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
     expect(EXECUTABLE).toContain("cron.unschedule");
   });
 
-  it("is the chain head, so nothing was appended after it without moving the pin", () => {
-    expect(ALL_MIGRATIONS[ALL_MIGRATIONS.length - 1]).toBe(CORRECTION_NAME);
+  it("has exactly one authorized successor, so nothing arrived unnoticed", () => {
+    /*
+     * This asserted "is the chain head" until Phase 2J slice 2J.4 appended
+     * `202608080085`. The property it was protecting is not "nothing may ever
+     * follow" -- the chain has to be able to grow -- but "nothing follows that
+     * somebody did not deliberately account for". So the successor is NAMED.
+     *
+     * Weakening this to "the correction is still present" would have been the
+     * easy edit and the wrong one: it would pass for any number of unreviewed
+     * migrations appended after it.
+     */
+    const index = CORRECTION_NAME ? ALL_MIGRATIONS.indexOf(CORRECTION_NAME) : -1;
+    expect(index, "the correction migration left the chain").toBeGreaterThanOrEqual(0);
+    expect(ALL_MIGRATIONS.slice(index + 1)).toEqual([
+      "202608080085_phase_2j_transcription_usage.sql",
+    ]);
   });
 });
 
