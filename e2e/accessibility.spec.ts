@@ -247,12 +247,46 @@ function conversationCards() {
     + `<ul class="assistant-composer-cards">${cards}${masked}</ul></section>`;
 }
 
+/**
+ * Mirrors the controls slice 2K.2 added: `command-console.tsx`'s edit and
+ * discard forms, and `memory-proposal-card.tsx`'s archival undo.
+ *
+ * `2K-A11Y-001/003/004`. Every control here is measured for rendered target
+ * size and focus paint at both viewports, which is the check that caught a real
+ * 16px defect the first time this lane ran.
+ */
+function conversationControls() {
+  return `<section aria-label="Controles da conversa">`
+    // The edit form: one labelled control for the one editable parameter.
+    + `<form class="task-command-edit">`
+    + `<label for="task-command-edit-value">Corrigir antes de confirmar</label>`
+    + `<input id="task-command-edit-value" type="text" name="value" autocomplete="off">`
+    + `<button class="task-command-secondary" type="submit" name="intent" value="edit">`
+    + `Rever com essa correção</button>`
+    + `</form>`
+    // The discard: writes nothing, and says so by being a plain submit.
+    + `<form class="task-command-discard">`
+    + `<button class="task-command-secondary" type="submit" name="intent" value="discard">`
+    + `Descartar</button>`
+    + `</form>`
+    // The memory undo, which archives. The note is part of the control's
+    // meaning, not decoration: it is what stops "undo" reading as deletion.
+    + `<div class="memory-proposal memory-proposal-closed">`
+    + `<form class="memory-proposal-undo">`
+    + `<p class="memory-proposal-undo-note">Arquivar tira a memória de uso: o Brain deixa de usá-la`
+    + ` nas respostas, e o registro continua lá.</p>`
+    + `<button type="submit">Arquivar essa memória</button>`
+    + `</form></div>`
+    + `</section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
   { name: "global search", body: () => searchSurface() },
   { name: "Library", body: () => librarySurface() },
   { name: "Conversar cards", body: () => conversationCards() },
+  { name: "Conversar controls", body: () => conversationControls() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -271,7 +305,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
@@ -339,7 +373,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}`);
 
   const targets = page.locator("button, a[href]");
   const total = await targets.count();

@@ -5,7 +5,7 @@ import { ConversationalQuestions } from "@/features/agent/conversational-questio
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
-import { createProposedMemory } from "@/features/memories/actions";
+import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
@@ -46,6 +46,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         agentName={agentName}
         locale={locale}
         memoryAction={createProposedMemory}
+        memoryUndoAction={undoProposedMemory}
       />
 
       {/*

@@ -40,8 +40,14 @@ import type { Database } from "@/lib/supabase/database.types";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
 import { getMemoryCopy } from "./copy";
-import type { MemoryEditState, MemoryEditSubmission, MemoryProposalState } from "./edit-state";
+import {
+  idleMemoryEditState,
+  type MemoryEditState,
+  type MemoryEditSubmission,
+  type MemoryProposalState,
+} from "./edit-state";
 import { memoryLifecycleSchema, memoryProposalSchema, memoryUpdateSchema } from "./schema";
+import { MEMORY_UNDO_TRANSITION } from "./undo";
 
 type Client = SupabaseClient<Database>;
 
@@ -400,4 +406,67 @@ export async function createProposedMemory(
 
   revalidateMemory(parsed.data.locale, created.id);
   return { status: "success", message: copy.proposalCreated, memoryId: created.id };
+}
+
+/**
+ * `2K-ACT-008` / `2K-ACT-009` — undo a memory from the conversation that
+ * created it, by **archiving** it (OD-2K-3).
+ *
+ * ## This delegates; it does not implement
+ *
+ * The whole body below is a translation between two state shapes. The write,
+ * the ownership predicate, the audit row with its before and after states and
+ * the revalidation all belong to `setMemoryLifecycle`, which already exists and
+ * is already the product's answer to "this stopped being true". A second write
+ * path here would be a second place the transition is decided, and it would
+ * need its own ownership proof — which is exactly the shape of defect this
+ * repository has paid for before.
+ *
+ * ## Why no migration
+ *
+ * OD-2K-C's ceiling is one migration, destined for telemetry. Registering a
+ * handler in `undo_operation` would spend it, and the archive transition
+ * already gives a truthful undo without one. So this reuses it and the budget
+ * stays where it was.
+ *
+ * ## What it does not do
+ *
+ * It does not delete, and there is no branch here that could: the transition is
+ * `MEMORY_UNDO_TRANSITION`, a constant, and `memoryLifecycleSchema` admits only
+ * `archive` and `restore`. The disclosure is `copy.conversationalUndone`, which
+ * is asserted in both locales to contain no deletion wording.
+ */
+export async function undoProposedMemory(
+  _previous: MemoryProposalState,
+  formData: FormData,
+): Promise<MemoryProposalState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getMemoryCopy(locale);
+  const memoryId = formData.get("memoryId");
+  if (typeof memoryId !== "string" || memoryId === "") {
+    return { status: "error", message: copy.saveFailed, memoryId: null };
+  }
+
+  // `restore` is reachable only as the undo of the undo, and only because
+  // `setMemoryLifecycle` implements it as the audited, owner-scoped inverse
+  // (`memoryUndoIsReversible`). Anything else falls back to the archive, so a
+  // tampered value cannot become a third transition.
+  const requested = formData.get("transition") === "restore"
+    ? "restore"
+    : MEMORY_UNDO_TRANSITION;
+
+  const request = new FormData();
+  request.set("memoryId", memoryId);
+  request.set("transition", requested);
+  request.set("locale", locale);
+
+  const result = await setMemoryLifecycle(idleMemoryEditState, request);
+  if (result.status !== "success") {
+    return { status: "error", message: result.message, memoryId };
+  }
+  return {
+    status: "success",
+    message: requested === "restore" ? copy.conversationalRestored : copy.conversationalUndone,
+    memoryId,
+  };
 }

@@ -137,6 +137,25 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(read("src/app/globals.css")).toContain('@import "./conversation-cards.css";');
   });
 
+  it("pins the 2K.2 controls to the components that emit them", () => {
+    const consoleSource = read("src/features/task-commands/command-console.tsx");
+    const proposal = read("src/features/memories/memory-proposal-card.tsx");
+    for (const token of ["task-command-edit", "task-command-discard", "task-command-edit-value"]) {
+      expect(consoleSource, `command-console.tsx no longer emits .${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors .${token}`).toContain(token);
+    }
+    for (const token of ["memory-proposal-undo", "memory-proposal-undo-note"]) {
+      expect(proposal, `memory-proposal-card.tsx no longer emits .${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors .${token}`).toContain(token);
+    }
+    // The two intents the controls submit. A control that stopped naming its
+    // intent would post `ask` and be silently misrouted.
+    for (const intent of ['value="edit"', 'value="discard"']) {
+      expect(consoleSource, `command-console.tsx no longer submits ${intent}`).toContain(intent);
+      expect(mirror, `${MIRROR} no longer mirrors ${intent}`).toContain(intent);
+    }
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted

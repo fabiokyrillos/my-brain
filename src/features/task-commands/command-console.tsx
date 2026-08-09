@@ -24,6 +24,10 @@ import { LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useActionState } from "react";
 
+import {
+  editableParameterSpec,
+  editableParametersFor,
+} from "@/features/conversation-cards/editable-parameters";
 import type { Locale } from "@/lib/preferences";
 
 import { ConfirmDialog } from "./confirm-dialog";
@@ -218,6 +222,19 @@ export function TaskCommandResult({
     </>
   );
 
+  /**
+   * `2K-ACT-003` — the one parameter this preview's action admits, or null.
+   *
+   * Read from the preview's own action rather than from anything the component
+   * decides, and resolved through `editableParameterSpec`, so the control and
+   * the server's refusal are answering the same question from the same source.
+   */
+  const editableParameter = state.preview === null
+    ? null
+    : editableParametersFor(state.preview.action)
+      .map((field) => editableParameterSpec(state.preview!.action, field))
+      .find((spec) => spec !== null) ?? null;
+
   return (
     <>
       {/*
@@ -354,6 +371,64 @@ export function TaskCommandResult({
               </button>
             </form>
           ) : null}
+
+          {/*
+            `2K-ACT-003` — correct one parameter before confirming.
+
+            Rendered only while a preview is on screen and only for the field
+            `editableParametersFor` allows, which is the taxonomy's own
+            `allowedPatchFields` minus OD-2K-1's exclusions. The server asks the
+            same question again in `editTaskCommand`: this decides what to
+            *draw*, never what is permitted.
+
+            Exactly one parameter per action, which is a property of the
+            taxonomy today and is asserted by `edit-controls.test.ts`. If an
+            action ever admits two, that test fails rather than this component
+            silently editing the first.
+          */}
+          {editableParameter === null ? null : (
+            <form action={formAction} className="task-command-edit">
+              {hidden}
+              <input name="field" type="hidden" value={editableParameter.field} />
+              <label htmlFor="task-command-edit-value">{copy.console.editLabel}</label>
+              {editableParameter.kind === "choice" ? (
+                <select id="task-command-edit-value" name="value" required>
+                  {editableParameter.choices.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {copy.console.editChoices[choice] ?? choice}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  autoComplete="off"
+                  id="task-command-edit-value"
+                  maxLength={1000}
+                  name="value"
+                  required
+                  type="text"
+                />
+              )}
+              <button className="task-command-secondary" name="intent" type="submit" value="edit">
+                {copy.console.editSubmit}
+              </button>
+            </form>
+          )}
+
+          {/*
+            `2K-ACT-002` — walking away, which writes nothing. Offered wherever
+            the command is still waiting on the user; once it has resolved there
+            is nothing left to discard.
+          */}
+          {state.session === null ? null : (
+            <form action={formAction} className="task-command-discard">
+              <input name="locale" type="hidden" value={locale} />
+              <input name="origin" type="hidden" value={origin} />
+              <button className="task-command-secondary" name="intent" type="submit" value="discard">
+                {copy.console.dismiss}
+              </button>
+            </form>
+          )}
 
           {state.undo === null ? null : (
             <form action={formAction}>

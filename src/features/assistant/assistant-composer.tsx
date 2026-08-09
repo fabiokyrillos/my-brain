@@ -43,6 +43,7 @@ export type AssistantComposerAction = (
 export function AssistantComposer({
   action,
   memoryAction,
+  memoryUndoAction,
   locale,
   agentName,
   conversationId,
@@ -54,6 +55,12 @@ export function AssistantComposer({
    * for a value. It is reachable only from the proposal card's confirm control.
    */
   memoryAction: MemoryProposalAction;
+  /**
+   * `2K-ACT-008`. The conversational undo, which **archives** (OD-2K-3). Passed
+   * in for the same reason the other two actions are, and kept separate from
+   * `memoryAction` so the write and its reversal never share a control.
+   */
+  memoryUndoAction: MemoryProposalAction;
   locale: Locale;
   /** The assistant’s configured name (UX-06). Passed in, never read here: this is a client component. */
   agentName: string;
@@ -162,6 +169,7 @@ export function AssistantComposer({
               content={state.proposal.content}
               kind={state.proposal.kind}
               locale={locale}
+              undoAction={memoryUndoAction}
             />
           )}
           {/*

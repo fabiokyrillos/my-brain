@@ -52,6 +52,7 @@ import {
   type TaskCommandTargetHints,
   type ValidatedTaskCommand,
 } from "./schema";
+import type { TaskCommandPatchField } from "./taxonomy";
 
 /**
  * Bumped when the envelope's shape changes.
@@ -284,6 +285,63 @@ export function withStalenessWitness(
   witness: TaskCommandStalenessWitness,
 ): TaskCommandSession {
   return { ...session, selectedTaskId: witness.taskId, expected: witness };
+}
+
+/**
+ * `2K-ACT-003` / `2K-ACT-004` — writes one edited parameter into the proposal.
+ *
+ * ## What this is, and what it deliberately is not
+ *
+ * It is the same move `withClarification` makes: put one validated value into
+ * the envelope and hand the envelope back to `deriveTaskCommand`, which
+ * re-runs `validateTaskCommand` over the whole proposal. So an edit adds **no
+ * authority** — every bound, the temporal lexicon, the per-action patch
+ * vocabulary and the closed target values all apply to an edited value exactly
+ * as they apply to a value the model proposed.
+ *
+ * It is **not** a patch merge. The caller supplies one field and one string;
+ * there is no shape here that could accept an object, a nested path or a set of
+ * fields, which is OD-2K-1's "never an arbitrary patch, never free-form JSON"
+ * expressed as a signature rather than as a rule someone enforces.
+ *
+ * ## Why the field is typed and the caller still has to ask first
+ *
+ * The parameter is `TaskCommandPatchField`, so a name outside the vocabulary
+ * cannot be passed. That is necessary and not sufficient: whether *this action*
+ * admits *this field* is a policy question, and `isEditableParameter` in
+ * `conversation-cards/editable-parameters.ts` is where it is asked. This
+ * function is the mechanism; that one is the rule.
+ *
+ * ## What does not change
+ *
+ * The pinned clock, the staleness witness, the selection, the clarification
+ * slot and the operation key. The clock stays pinned because an edit is a step
+ * *within* one command, which is exactly the case `issuedAt` exists for — and
+ * the opposite of the navigation boundary ADR-100 governs. The operation key
+ * stays because an edit re-proposes the same request rather than starting a
+ * new one; what changes is the canonical patch, which is a fingerprint input,
+ * so an earlier confirmation bound to the pre-edit digest can no longer be
+ * consumed. That is `2K-ACT-004`, and it is mechanical rather than remembered.
+ */
+export function withEditedParameter(
+  session: TaskCommandSession,
+  field: TaskCommandPatchField,
+  value: string,
+): TaskCommandSession {
+  const proposal = session.proposal;
+  const patch = proposal.patch;
+  const currentPatch = typeof patch === "object" && patch !== null && !Array.isArray(patch)
+    ? (patch as Record<string, unknown>)
+    : {};
+  // An empty edit clears the field rather than storing `""`. The normalized
+  // proposal uses `null` for "not supplied", and a blank string would be a
+  // third value for the same absence — which the validator would then have to
+  // learn about.
+  const next = value.trim() === "" ? null : value;
+  return {
+    ...session,
+    proposal: { ...proposal, patch: { ...currentPatch, [field]: next } },
+  };
 }
 
 /** Spends the one bounded clarification slot (2E-NOMATCH-008). */

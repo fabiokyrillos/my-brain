@@ -58,12 +58,12 @@ function noopMemoryAction() {
 
 describe("AssistantComposer", () => {
   it("presents exactly one text field, which is the whole point of UX-07", () => {
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });
 
   it("does not ask the user to pick a mode before typing", () => {
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     // No radio, no select, no toggle: the composer classifies, the user writes.
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
@@ -71,7 +71,7 @@ describe("AssistantComposer", () => {
   });
 
   it("labels the field and links the keyboard hint to it", () => {
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />);
     const field = screen.getByLabelText("O que você quer dizer ao Brain?");
     expect(field).toBeTruthy();
     const describedBy = field.getAttribute("aria-describedby");
@@ -81,7 +81,7 @@ describe("AssistantComposer", () => {
 
   it("submits the declared ask intent with the composed text", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "O que combinei com Marina?");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -94,7 +94,7 @@ describe("AssistantComposer", () => {
 
   it("carries the conversation id inside a thread so the answer joins it", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} conversationId="c-1" locale="en" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} conversationId="c-1" locale="en" />);
     await userEvent.type(screen.getByRole("textbox"), "and then?");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -104,7 +104,7 @@ describe("AssistantComposer", () => {
 
   it("sends on Enter and breaks the line on Shift+Enter", async () => {
     const action = resolvesTo(idleAssistantComposerState);
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     const field = screen.getByRole("textbox");
 
     await userEvent.type(field, "primeira linha{Shift>}{Enter}{/Shift}segunda linha");
@@ -119,7 +119,7 @@ describe("AssistantComposer", () => {
 
   it("mounts a single form, so nothing on the surface is a rival submission", () => {
     const { container } = render(
-      <AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />,
+      <AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="pt-BR" />,
     );
     // Command controls add their own forms once a preview exists — Apply,
     // Confirm, Choose — but at rest there is exactly one, and it is the
@@ -129,7 +129,7 @@ describe("AssistantComposer", () => {
 
   it("distinguishes what the user wrote from what the system understood", async () => {
     const action = resolvesTo(memoryProposal);
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -144,7 +144,7 @@ describe("AssistantComposer", () => {
 
   it("announces the outcome once, not twice", async () => {
     const action = resolvesTo(memoryProposal);
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -162,7 +162,7 @@ describe("AssistantComposer", () => {
     const action = vi.fn(
       () => new Promise<AssistantComposerState>((resolve) => { release = resolve; }),
     );
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={action} locale="pt-BR" />);
     await userEvent.type(screen.getByRole("textbox"), "Marque a tarefa como feita");
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -178,7 +178,7 @@ describe("AssistantComposer", () => {
   });
 
   it("localizes every visible string in English", () => {
-    render(<AssistantComposer memoryAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="en" />);
+    render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(idleAssistantComposerState)} locale="en" />);
     expect(screen.getByLabelText("What do you want to tell Brain?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     expect(screen.getByText("Enter sends · Shift+Enter adds a line")).toBeTruthy();
@@ -198,6 +198,7 @@ describe("AssistantComposer memory proposal (DEC-5)", () => {
         agentName="Brain"
         locale={locale}
         memoryAction={memoryAction}
+        memoryUndoAction={noopMemoryAction()}
       />,
     );
     await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre: prefiro reuniões pela manhã");

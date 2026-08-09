@@ -52,6 +52,26 @@ export const TASK_COMMAND_INTENTS = [
   "create",
   "undo",
   "restore",
+  /**
+   * `2K-ACT-003/004` — correct one parameter and see the command again.
+   *
+   * It lives here rather than in a new module because `2K-CARD-005` forbids a
+   * second implementation of the preview pipeline: an edit is one validated
+   * value written into the envelope and handed back to `deriveTaskCommand`,
+   * which is exactly the shape `clarify` already has. Which parameters an
+   * action admits is **not** decided here — `conversation-cards/
+   * editable-parameters.ts` narrows the taxonomy's own `allowedPatchFields`,
+   * and this intent asks it.
+   */
+  "edit",
+  /**
+   * `2K-ACT-002` — walk away, leaving nothing behind.
+   *
+   * Distinct from an expired session, which is a fact the server reports. This
+   * is the user's own decision, and it must write nothing and record no
+   * intent — which is why its handler takes no Supabase client at all.
+   */
+  "discard",
 ] as const;
 
 export type TaskCommandIntent = (typeof TASK_COMMAND_INTENTS)[number];

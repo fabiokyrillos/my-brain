@@ -179,3 +179,92 @@
     justify-content: center;
   }
 }
+
+/*
+ * `2K-ACT-002/003/008` — the controls slice 2K.2 added.
+ *
+ * The edit form, the discard and the memory undo all carry the same 44px
+ * rendered minimum as the card's own controls, and for the same reason: the
+ * lane measures from paint, and the first execution of that check found a real
+ * 16px target on a Pixel 7.
+ */
+
+.task-command-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.task-command-edit > label {
+  flex-basis: 100%;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tone-archived-fg);
+}
+
+.task-command-edit input,
+.task-command-edit select {
+  flex: 1 1 220px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--tone-archived-line);
+  border-radius: 10px;
+  background: white;
+}
+
+.task-command-edit button,
+.task-command-discard button,
+.memory-proposal-undo button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--tone-archived-line);
+  border-radius: 10px;
+  background: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-command-edit input:focus-visible,
+.task-command-edit select:focus-visible,
+.task-command-edit button:focus-visible,
+.task-command-discard button:focus-visible,
+.memory-proposal-undo button:focus-visible {
+  outline: 2px solid var(--tone-information-fg);
+  outline-offset: 2px;
+}
+
+.task-command-discard {
+  margin-top: 8px;
+}
+
+.memory-proposal-undo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* The note is what stops "undo" reading as deletion, so it is part of the
+   control rather than a caption below it. */
+.memory-proposal-undo-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--tone-archived-fg);
+}
+
+@media (max-width: 600px) {
+  .task-command-edit button,
+  .task-command-discard button,
+  .memory-proposal-undo button {
+    width: 100%;
+  }
+}
