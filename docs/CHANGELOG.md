@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L IS COMPLETE: accessibility closure, telemetry, traceability and the closing report
+
+**82 requirements declared, 82 classified: 71 built, 5 baseline, 5 partial, 1 not-built-by-rule, 0 undelivered.** **Migration budget `1 allocated - 0 spent`.** Hosted parity unmoved at `202608090089`, 89 migrations. Public signup closed; the rollout gate reads 25 pass - 3 fail - 2 owner-signature, untouched.
+
+**The phase declared NO new telemetry event, and that is the finding.** `product_events.event_name` and every property enum are database constraints, so a new name costs a migration - and OD-2L-2 option A signed the allocation away. Phase 2L therefore reports through the deployed vocabulary: `task_command_applied` for quick edit and each applied bulk item, and `task_command_undone` for undo from a Work surface, which `undoWorkOperation` gained in this slice. `failed` has no member of its own in the deployed enum and maps to `refused`, which is what the router's own refusals report.
+
+**Selection and bulk preview are not-built-by-rule.** Neither has an admitting name, and declaring one would produce a producer the deployed CHECK rejects - a vocabulary that is declared and unwritable, which is exactly what cost `202608080087` and `202608090089`. Inventing it to satisfy `2L-METRICS-005` would have traded that requirement against `2L-METRICS-003` and bought a third correction. The refusal is mechanical: the telemetry guard asserts no such name is declared and no Phase 2L migration exists to make room for one.
+
+**Added.** `phase-2l-telemetry-guard.test.ts`, `phase-2l-traceability.test.ts`, `scripts/generate-phase-2l-traceability.mjs`, `PHASE_2L_SLICE_05_ACCEPTANCE.md`, `PHASE_2L_TRACEABILITY_MATRIX.md`, `PHASE_2L_REPORT.md`, `PHASE_2L_SUCCESSOR_REAUDIT.md`, and a claims table on each of the five earlier slice records.
+
+**The generator refuses, and every refusal is executed against a mutated copy of the repository:** an unclassified requirement, a duplicate id, a classification the PRD does not declare, a citation too short to resolve, a partial with no destination, a not-built-by-rule with no rule, a claimed migration spend, a missing slice record, and - the one that matters most - a row that contradicts a signed decision. The control test proves it does NOT fire on a record that *upholds* a decision, because a guard that fires on the decision being kept teaches the next author to soften the record until it goes quiet.
+
+**A harness defect was found and fixed while writing it.** The first mutation helper replaced the first occurrence of an id in a record - which is a heading or a paragraph, not a claims row - and produced three tests that mutated prose and then asserted the generator was fine with it. It is now anchored on the row's own shape.
+
+**Five partials, each with a remainder and a destination:** `2L-BULK-011` (no behaviour outstanding; a recorded phrasing divergence), `2L-MOBILE-008` and `2L-ACCESS-008` (owner-run hardware), `2L-METRICS-005` (the successor's migration), `2L-CLOSE-004` (a live parity reading this phase never needed).
+
+**NOT executed, stated once and plainly:** no hosted probe of any kind, because no schema changed and therefore no deployment record was created; no real device, screen reader or IME; no authenticated online journey and no hydrated interactivity; no bulk run and no filter against a real database.
+
+**The successor is re-audited and stopped.** No successor artifact, no successor requirement, and A13 is not retargeted here - that belongs to the authorizing decision's commit. ADR-055's 2026-10-27 expiry is restated as neither satisfied nor superseded.
+
 ## 2026-08-09 - PHASE 2L SLICE 2L.4: mobile Work interaction, the no-gesture guard, reflow and IME
 
 **Zero gestures. Zero migrations.**

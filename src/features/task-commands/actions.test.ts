@@ -919,6 +919,48 @@ describe("undo, from a Work surface (2L-EDIT-008)", () => {
     expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(false);
   });
 
+  it("reports the outcome through the existing event, with no new name or property", async () => {
+    /*
+     * `2L-METRICS-002`/`-003`/`-005`. `task_command_undone` already admits
+     * `commandOrigin: 'work'` and a closed `undoResult`, both as deployed
+     * database constraints — so the Work affordance reports through the
+     * vocabulary the console already reports through. A name the deployed CHECK
+     * rejects would be a producer that cannot write, which is the defect
+     * `2L-METRICS-003` exists to catch.
+     */
+    const bench = harness();
+    await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+    await Promise.all(
+      vi.mocked(after).mock.calls.map(([task]) => (typeof task === "function" ? task() : task)),
+    );
+
+    const undone = vi.mocked(recordProductEvent).mock.calls
+      .map(([payload]) => payload as unknown as { name: string; properties?: Record<string, unknown> })
+      .filter((payload) => payload.name === "task_command_undone");
+    expect(undone).toHaveLength(1);
+    expect(undone[0].properties?.commandOrigin).toBe("work");
+    expect(undone[0].properties?.undoResult).toBe("undone");
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(true);
+  });
+
+  it("maps its one state with no vocabulary member onto the truthful neighbour", async () => {
+    // `failed` has no member of its own in the deployed enum. Inventing one
+    // would cost a migration; reporting it as `refused` is what the router's
+    // own refusals report and is true of what happened.
+    const bench = harness();
+    bench.undoRow = null;
+    await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+    await Promise.all(
+      vi.mocked(after).mock.calls.map(([task]) => (typeof task === "function" ? task() : task)),
+    );
+
+    const results = vi.mocked(recordProductEvent).mock.calls
+      .map(([payload]) => payload as unknown as { name: string; properties?: Record<string, unknown> })
+      .filter((payload) => payload.name === "task_command_undone")
+      .map((payload) => payload.properties?.undoResult);
+    expect(results).toEqual(["unavailable"]);
+  });
+
   it("refuses a malformed id before it reaches anything", async () => {
     const bench = harness();
     const state = await undoWorkOperation(idleTaskUndoState, undoForm("not-a-uuid"));

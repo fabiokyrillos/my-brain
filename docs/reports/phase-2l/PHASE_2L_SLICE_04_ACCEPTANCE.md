@@ -143,3 +143,20 @@ lane green at **both** viewports, 26 tests on mobile.
 
 Both are reported as **not executed** rather than rounded up, and they stay open
 exactly as `G-2J.4b` did.
+
+---
+
+## 7. Claims
+
+| id | classification | evidence |
+|---|---|---|
+| `2L-MOBILE-001` | **built** | Section 1 - every control measured from paint at the mobile viewport over all four Work fixtures; the widened locator found three real defects, all now at the WCAG 2.5.8 minimum |
+| `2L-MOBILE-002` | **built** | Section 4 - the bulk bar's box is proved not to intersect any row's box, geometrically rather than by asserting it is not fixed-position |
+| `2L-MOBILE-003` | **built** | Section 4 - every control measured without hovering: it has a box, is visible and has non-zero opacity |
+| `2L-MOBILE-004` | **built** | Section 2 - a permanent guard over thirteen named surfaces that fires on a handler added in preparation, does not fire on a comment, and asserts its own completeness against the components on disk |
+| `2L-MOBILE-005` | **built** | Section 5 - a control mid-flight is disabled rather than re-triggerable, and the one destructive verb stays behind its server-issued confirmation |
+| `2L-MOBILE-006` | **built** | Section 5 - the selection survives a re-render, and the count is announced in its own polite region apart from the outcome's |
+| `2L-MOBILE-007` | **built** | Section 4 - scroll width never exceeds client width, and every row action's box lies inside the viewport; the filter controls remain rendered at the mobile viewport |
+| `2L-MOBILE-008` | **partial** | Section 6 - every mobile behaviour is proved at an emulated viewport and the record says so. Remainder: a real-device session, which needs owner-run hardware. Destination: the same standing as G-2J.4b, carried past close |
+| `2L-MOBILE-009` | **built** | Section 4 - reflow proved at 320 CSS pixels and at an emulated 200 percent zoom, with no control losing its box; the emulation method is stated rather than implied |
+| `2L-MOBILE-010` | **built** | Section 3 - guarded on the keydown and again inside the submit handler; never discarded by a re-render because the inputs are uncontrolled and the flag is a ref |

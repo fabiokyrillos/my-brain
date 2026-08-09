@@ -240,3 +240,28 @@ open exactly as it was.
 | Product events declared | — | none |
 | RLS policies, grants, roles, secrets | — | none touched |
 | Signup / rollout state | — | untouched |
+
+---
+
+## 8. Claims
+
+| id | classification | evidence |
+|---|---|---|
+| `2L-EDIT-001` | **built** | Section 3 - the list mounts `TaskDetailControls`; controls derived in `work-projection.ts` from `detailControlsFor(row.status)`, asserted against the derivation rather than a literal in `work-projection.test.ts` |
+| `2L-EDIT-002` | **built** | Section 3 - no Server Action, RPC, table or column added; `phase-2l-work-authority-guard.test.ts` still pins `apply_task_command` at exactly one call site |
+| `2L-EDIT-003` | **baseline** | Section 3 - the four declared outcomes with localized copy are `applyTaskDetailCommand`'s, unchanged and tested in `detail-actions.test.ts`; quick edit inherits them by mounting the same component |
+| `2L-EDIT-004` | **baseline** | Section 3 - the four value refusals and their sentences are `buildDetailPatch`'s and `detail-controls-copy.ts`'s, proved in `detail-controls.test.ts`; inherited verbatim rather than reimplemented |
+| `2L-EDIT-005` | **baseline** | Section 3 - the staleness refusal and its refresh affordance are `applyTaskDetailCommand`'s `stale_pre_state` branch, tested where it lives; inherited verbatim |
+| `2L-EDIT-006` | **baseline** | Section 3 - replay under one operation key is `apply_task_command`'s idempotency, surfaced as `replayed`; inherited verbatim rather than reimplemented |
+| `2L-EDIT-007` | **built** | Section 3 - `TaskDetailSurface` is the whole surface and both routes are a locale check and a call; `panel` selects a frame and a back affordance only, asserted in `page.architecture.test.ts` |
+| `2L-EDIT-008` | **built** | Section 3 - `UndoAffordance` on the Work list's outcome region and on the detail's; `undoWorkOperation` reuses the existing undo-router call site, so the census stays at four modules |
+| `2L-EDIT-009` | **built** | Section 3 - structural: `apply_task_command` returns `undoId: null` for a no-change, so an irreversible operation has nothing to offer and the component takes no decision |
+| `2L-EDIT-010` | **baseline** | Section 3 - `cancel_task` submits `request_cancel` and the server issues the confirmation against its own resolution; inherited from the detail controls and re-asserted in `quick-edit.test.tsx` |
+| `2L-PRIVACY-001` | **built** | Section 2 - `work` joins `GOVERNED_SURFACES` with its consumers; both surfaces resolve through `ProtectedContent`, and the convergence census proves the surface key appears in exactly one module |
+| `2L-PRIVACY-002` | **built** | Sections 2.1 and 2.3 - re-read per page, never stored; no sensitivity column, no backfill, no migration, and `toTaskSensitivity` fails closed to the most protective level rather than to `undetermined` |
+| `2L-PRIVACY-003` | **built** | Section 2.5 - masked in place with a local reveal; the row, its state, its dates, its relations and its four actions survive, and the masked row stays openable through a stub that carries the link without the title |
+| `2L-PRIVACY-004` | **built** | Sections 2.2 and 2.7 - a manual task resolves to `undetermined`, the arm never asks for a level, and the partial coverage is stated on the list when something is masked and on the detail for a manual task |
+| `2L-PRIVACY-005` | **built** | Section 2.2 - removed, foreign and unreadable are one branch, proved byte-identical at the derivation and again at the projection |
+| `2L-PRIVACY-006` | **built** | Section 2.1 - owner scope stated in the query as well as under RLS, bounded to the page's own ids; no grant, no security-definer helper, no service-role client |
+| `2L-PRIVACY-007` | **built** | Sections 2.4 and 2.6 - one component, mounted by the list, the detail and Hoje; the convergence guard asserts each surface and the one-module census |
+| `2L-PRIVACY-008` | **built** | Section 2.5 - no event gained a property and no classification is emitted; the telemetry guard asserts no emitter imports the derivation at all |
