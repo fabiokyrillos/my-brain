@@ -2,6 +2,36 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — ADR-101 authorizes Phase 2K implementation; slice 2K.1 ships the card grammar and gives Conversar a sensitivity policy
+
+**Zero migrations. Zero deployment. Budget stays `1 allocated · 0 spent`.**
+
+**The authorization.** ADR-097 authorized planning only and required a separate accepted ADR before implementation — gate **G5**. **ADR-101** is that decision. It authorizes slices 2K.1–2K.8, the traceability matrix, the closing report, and deploying the **single** telemetry migration if one is created. It authorizes nothing else, and it carries its stop conditions as part of the authorization rather than as advice.
+
+**The two remaining decisions are signed, so nothing is left with two readings.** **OD-2K-1**: editable parameters are a closed **per-action** set drawn from the command schema that already exists — never an arbitrary patch, never a caller-supplied field name, never free-form JSON — and an edit **re-derives and re-fingerprints**, which is what makes an edited preview unusable under the fingerprint the user actually read. A memory create may edit **only its content**. Where a parameter is arguable it is omitted rather than widened. **OD-2K-4**: suggestions are deterministic, capped at three, zero when none is honest, cost no extra model call, and carry no mutation payload; they may name a person or project the user can currently read, and their **text and names never enter telemetry**, which carries a closed category only. The naming rule is deliberately the permissive part — a suggestion that cannot say a name is not contextual — and the boundary it does not cross is the event payload.
+
+**One closed card grammar (`2K-CARD-001/002`).** Ten states, decided on the server and rendered as themselves. `expired` is a **card** state that maps onto `rejected_stale`; the contract says so in its own comment, because slice 2K.0 measured that `TASK_COMMAND_OUTCOMES` has no `expired` member and ADR-047 refuses to add one.
+
+**The read-only rule has one decision site (`2K-CARD-008`).** `mayRenderMutatingControl` answers from the type, and `ConversationCardView` **drops** any control it was handed for a read-only type. A rule enforced at the call site holds until the next call site; this one cannot be got around by a caller's mistake. The refusal is proved against its own positive control — the identical control **is** rendered for a mutable type — so it is not a component that renders nothing.
+
+**Reversibility is a value, resolved exhaustively (`2K-CARD-009`).** `none | undo_window | archival`, matched by `switch` rather than by a ternary, so a fourth kind fails the build instead of silently rendering a sibling's sentence. That is OD-2K-3's "the memory card claims no window it does not have" made mechanical rather than remembered.
+
+**`unavailable` cannot express a cause.** `unavailableCard(cardType)` takes exactly one argument — asserted — and carries no id, no snippet and no href. Deleted, foreign and suspended produce byte-identical output. Built now, in the builder, because that is where a cause parameter would otherwise be added later.
+
+**Conversar is governed for sensitivity for the first time (`2K-PRIVACY-001/002`).** `chat` joins `GOVERNED_SURFACES` with the standard in-app posture — masked in place, revealed locally and transiently — and `search` stays out, so ADR-093 is not re-opened. An **unclassified** snippet resolves to the most protective level rather than to `normal`: failing open here would print something nobody classified. The copy is asserted to contain no count-shaped sentence in either locale, because "n hidden" is the existence oracle the central contract forbids by name.
+
+**A real consumer, not a contract with nobody using it.** The `capture_intent` route's bare "open the entry" link is now a read-only preview card for the entry it created. Same destination; what changed is that it arrives inside the one grammar and provably cannot grow a mutating control. The now-dead `captureNextStep` copy was deleted rather than left declared — the defect `assistant/copy.ts` already records having made once, with three slices of unused strings.
+
+**Accessibility was extended inside the slice, which is the whole point.** Phase 2I deferred it to closeout and did not reach it. The Conversar card states pass axe at desktop and Pixel 7; the reveal and open controls measure **44px** from paint, above WCAG 2.2 AA 2.5.8's 24px; focus indicators are measured, not asserted from CSS. The mirror guard now re-derives the card's class names, `data-state`, `aria-expanded`, its pt-BR copy **and every declared state** from the sources — so a state added to the vocabulary without a fixture breaks the guard rather than leaving the lane quietly under-scanning.
+
+**Every detector was executed against a planted violation.** The mutating-control detector fires on a form, a `formAction` submit and a `useActionState`, and does not fire on a `<Link>`. The re-derived-state detector fires on `preview.disposition` and `preview.willMutate`, and does not fire on `switch (card.state)`. The guard also asserts the feature it polices **exists** and holds its four named modules, without which every absence assertion would pass over an empty directory.
+
+**Reported NOT PROVED rather than as a pass:** a real screen-reader session, and hydrated interactivity in a browser. The reveal toggle is proved in jsdom and its markup is proved in a browser; the two together are not the third thing and are not reported as one.
+
+**Not claimed here:** `2K-PRIVACY-003/004`. Removing the persisted excerpt and re-reading the source at render belong to 2K.4, which is also why the thread's citation block is not yet a card producer — rendering the legacy stored excerpt through the mask would have reproduced a historical excerpt from a copy, which OD-2K-2 forbids.
+
+**Unchanged:** no RLS policy, grant, secret, external service or second write path; `match_internal_knowledge`, retrieval and the task-command pipeline untouched; hosted parity re-proved live at `202608080087` across 87 migrations; signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature, and Phase 2K is not progress toward it.
+
 ## 2026-08-08 — ADR-100: the continuity contract had a contradiction, caught on owner review before merge
 
 **Documentation only. No product code, no migration, no deployment, no merge.** The owner reviewed the slice 2K.0 branch directly and found a contradiction in the continuity contract. It was mine, and it was the kind that reads as a nuance and behaves as a hole.
