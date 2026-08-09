@@ -17,6 +17,9 @@
    by order — but a later import keeps the composer's own box winning if that
    ever changes. */
 @import "./assistant.css";
+/* After assistant.css: the composer hosts the card list, so a card's own box
+   wins over the composer's layout rules rather than depending on specificity. */
+@import "./conversation-cards.css";
 @import "./entities.css";
 @import "./memories.css";
 @import "./history.css";

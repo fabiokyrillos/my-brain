@@ -66,6 +66,9 @@ const STYLESHEETS = [
   "operations.css",
   "mobile-navigation.css",
   "pagination.css",
+  // Phase 2K's card grammar. Without it the target-size and focus assertions
+  // below would measure an unstyled button and pass for the wrong reason.
+  "conversation-cards.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -189,11 +192,67 @@ function librarySurface() {
     + `</ul></div>`;
 }
 
+/**
+ * Mirrors `src/features/conversation-cards/card.tsx` and `read-only-preview.tsx`.
+ *
+ * `2K-A11Y-001`. Extended **as the slice lands** rather than at closeout,
+ * which is Phase 2J's lesson about Phase 2I: accessibility deferred to the end
+ * was accessibility not reached.
+ *
+ * One card per state, so the axe scan covers every tone the grammar can paint
+ * and the target-size assertion measures the reveal and the link at both
+ * viewports. The masked card carries the reveal control; the `previewed` card
+ * carries the link.
+ */
+function conversationCards() {
+  const states = [
+    ["previewed", "Encontrei isto"],
+    ["requires_confirmation", "Preciso da sua confirmação"],
+    ["accepted", "Feito"],
+    ["expired", "Isto mudou desde que mostrei"],
+    ["refused", "Não fiz isso"],
+    ["failed", "Não consegui concluir"],
+    ["undone", "Desfeito"],
+    ["no_change", "Nada mudou"],
+    ["pending", "Trabalhando nisso"],
+    ["unavailable", "Isto não está mais disponível para você"],
+  ] as const;
+
+  const cards = states
+    .map(
+      ([state, label]) =>
+        `<li><div class="conversation-card-readonly">`
+        + `<article class="conversation-card" data-card-type="entry" data-state="${state}">`
+        + `<header class="conversation-card-head">`
+        + `<span class="conversation-card-type">Registro</span>`
+        + `<span class="conversation-card-state">${label}</span></header>`
+        + `</article></div></li>`,
+    )
+    .join("");
+
+  // The masked card: existence shown, content withheld, reveal offered.
+  const masked = `<li><div class="conversation-card-readonly">`
+    + `<article class="conversation-card" data-card-type="entry" data-state="previewed">`
+    + `<header class="conversation-card-head">`
+    + `<span class="conversation-card-type">Registro</span>`
+    + `<span class="conversation-card-state">Encontrei isto</span></header>`
+    + `<p class="conversation-card-snippet conversation-card-masked" data-masked="true">`
+    + `Conteúdo sensível, guardado.</p>`
+    + `<button class="conversation-card-reveal" type="button" aria-expanded="false">Mostrar mesmo assim</button>`
+    + `</article>`
+    + `<a class="conversation-card-open" href="#">Abrir</a>`
+    + `</div></li>`;
+
+  return `<section aria-label="Cartões da conversa">`
+    + `<ul class="assistant-composer-cards">${cards}${masked}</ul></section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
   { name: "global search", body: () => searchSurface() },
   { name: "Library", body: () => librarySurface() },
+  { name: "Conversar cards", body: () => conversationCards() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -212,7 +271,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
@@ -280,7 +339,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}`);
 
   const targets = page.locator("button, a[href]");
   const total = await targets.count();

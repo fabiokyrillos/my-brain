@@ -283,7 +283,27 @@ describe("capture routing (2G.3)", () => {
 
     expect(result.route).toBe("capture_intent");
     expect(result.notice?.heading).toBe("Anotei isso para você");
-    expect(result.notice?.nextStep?.href).toBe("/pt-BR/app/inbox/aaaaaaaa-1111-4111-8111-111111111111");
+    /*
+     * `2K-CARD-007`. The link the route used to render as a bare `nextStep` is
+     * now a read-only preview card for the entry that was created. Same
+     * destination; what changed is that it arrives inside the one card grammar,
+     * declared `read_only` by OD-2K-B, so this acknowledgment cannot grow a
+     * mutating control later without failing `phase-2k-card-guard.test.ts`.
+     */
+    expect(result.notice?.nextStep).toBeNull();
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0]).toEqual({
+      cardType: "entry",
+      state: "previewed",
+      mutability: "read_only",
+      reversal: { kind: "none" },
+      objectId: "aaaaaaaa-1111-4111-8111-111111111111",
+      snippet: null,
+      // The receipt carries no text, so nothing here was classified and the
+      // default is the protective one rather than an invented `normal`.
+      sensitivity: "highly_sensitive",
+      href: "/pt-BR/app/inbox/aaaaaaaa-1111-4111-8111-111111111111",
+    });
     // Neither the model nor the knowledge path was reached: the route is
     // decided deterministically, before anything is billed.
     expect(commandMock).not.toHaveBeenCalled();

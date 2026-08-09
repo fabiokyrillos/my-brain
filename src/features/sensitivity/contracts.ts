@@ -48,6 +48,19 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
  * `search` is deliberately absent: ADR-093 signed its behaviour in Phase 2I and
  * OD-2J-1 explicitly does not redefine it. Adding it here would silently
  * re-open a closed decision.
+ *
+ * `chat` arrives in Phase 2K (`2K-PRIVACY-001`). It is a **new** decision
+ * rather than an amendment to ADR-093, and it is the surface this contract was
+ * always going to have to reach: Conversar retrieves entries and memories
+ * regardless of classification, and before 2K it applied no predicate and no
+ * mask at any level. It takes the same posture as every other content surface
+ * — masked in place, revealable locally — because exclusion would make a
+ * visible count a lie.
+ *
+ * One property is specific to `chat` and worth stating where the rule lives:
+ * the classification consulted is the **current** one, read at render time.
+ * OD-2K-2 removed the stored excerpt precisely so there is no second copy that
+ * could carry a stale level alongside it.
  */
 export const GOVERNED_SURFACES = [
   "hoje",
@@ -55,6 +68,7 @@ export const GOVERNED_SURFACES = [
   "capture_receipt",
   "review_summary",
   "notification",
+  "chat",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -95,6 +109,7 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   capture_receipt: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
   review_summary: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
   notification: { normal: OMIT, private: OMIT, highly_sensitive: OMIT },
+  chat: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

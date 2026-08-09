@@ -14,6 +14,7 @@
  * `command-console.tsx:3-21` warns against.
  */
 
+import type { ConversationCard } from "@/features/conversation-cards/contracts";
 import { idleTaskCommandState, type TaskCommandConsoleState } from "@/features/task-commands/console-state";
 import type { MemoryProposal } from "./memory-proposal";
 
@@ -115,6 +116,18 @@ export type AssistantComposerState = {
    * utterance — there is nothing to propose, and the notice says so.
    */
   readonly proposal: MemoryProposal | null;
+  /**
+   * `2K-CARD-007` — read-only previews of the objects this turn referred to.
+   *
+   * Server-decided, exactly like `command`: the state on each card arrives
+   * settled and the composer renders it. Kept apart from `notice` for the same
+   * reason `proposal` is — a notice is prose, and these are values a component
+   * draws by contract.
+   *
+   * OD-2K-B keeps every type here read-only, and `mayRenderMutatingControl`
+   * enforces it in the renderer rather than at this call site.
+   */
+  readonly cards: readonly ConversationCard[];
   /** What a polite live region announces once the turn resolves. */
   readonly announcement: string;
 };
@@ -125,5 +138,6 @@ export const idleAssistantComposerState: AssistantComposerState = {
   notice: null,
   echo: null,
   proposal: null,
+  cards: [],
   announcement: "",
 };
