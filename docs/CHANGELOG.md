@@ -2,6 +2,42 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — Phase 2K slice 2K.4: the persisted excerpt is gone, and an answer can finally say it found nothing
+
+**Zero migrations. Zero backfill. Budget stays `1 allocated · 0 spent`.** Baseline `a3a5837` (slice 2K.3), CI green on that exact merge SHA across all three jobs.
+
+**What was removed.** `sendChatMessage` used to write `excerpt: source.content.slice(0, 220)` into `conversation_messages.citations`. That excerpt was a **copy of the user's content in a second table**, and the source row's `sensitivity` did not travel with it — reclassify an entry, archive a memory, edit its text, and the quote in the thread was unchanged and still in the clear. The audit called it the sharpest finding in the phase, and it was live. It is gone.
+
+**Carrying the classification beside the excerpt was rejected, not overlooked.** It keeps two copies of one fact in sync by convention, which is the shape of defect `202608080087` had to delete and the reason that one survived two phases. Removing the copy removes the thing that can diverge; there is now nothing to keep in sync.
+
+**The column holds two shapes, and needed no migration.** Current: `{v, evidence, reach, sources[]}`, where a source is `{id, type, sourceId, support}` and there is **nowhere to put content**. Legacy: the arrays already written. `parseCitations` normalizes both, and the legacy branch **drops the excerpt on the floor** — it is not read into anything, which is the property that stops the named residual becoming a live exposure again.
+
+**A planted content field refuses the whole envelope, not just the field.** A payload carrying content was written by something this contract does not recognise, and salvaging the rest would be trusting a writer that has already broken the shape. Proved against six field names, not only `excerpt`.
+
+**A legacy row is `unknown`, never `no_qualifying_evidence`.** Nobody recorded what retrieval found for those rows, and claiming "I had nothing" about a row that may have had plenty would be an invention. The surface says **less** for them: no reach, no insufficiency, just an honest note that the answer predates the record.
+
+**Insufficiency comes from retrieval, and the test proves the distinction.** Slice 2K.0 measured that `citations.length === 0` is ambiguous — produced both by "nothing was retrieved" and by "sources were retrieved and the model cited none". So the envelope records `retrievedAnyQualifyingSource: sources.length > 0`, where `sources` is the retrieval result after the similarity floor and the lifecycle filter. The sharpest test in the slice: every cited id fabricated → **zero** references persisted → and the evidence state is still `evidenced`, because retrieval *did* find something. Deriving it from the count would have reported the exact opposite of what happened.
+
+**An answer with no evidence is now visually distinct from one with plenty.** The block used to be drawn only when `citations.length > 0`, which is precisely why the honest case rendered **nothing at all** and looked like a short answer whose sources happened not to appear. The parent PRD's own principle is that *silence is also a result*; the product now has a way to say it.
+
+**The reach is stated on both branches.** Retrieval covers entries and memories; the product used to imply it looked everywhere. Saying so costs nothing, teaches the shape of the system, and matters most beside an answer that found nothing — it is what turns "I found nothing" from a shrug into information.
+
+**Support kind is decided server-side.** Entry → `direct_record`, memory → `product_state`. `chat-schema.ts` is **untouched**, so the model still declares exactly `answer` and `citedSourceIds` and cannot widen its own authority. The third kind, `inference`, belongs to the **answer** rather than to any source — which is what stops it being a vocabulary member nothing produces.
+
+**Freshness reaches the user for the first time.** `occurred_at` for an entry, `valid_from ?? created_at` for a memory — exactly what the RPC ranks on, so the freshness the user reads is the freshness retrieval used. Rendered as `<time datetime>`, and **absent rather than fabricated** when the row has none.
+
+**The re-read is bounded and measured.** Two queries per message, one per table — asserted by counting `from` calls, not by describing the intent. A message citing nothing issues **zero**. The stopping condition was an unbounded per-source fan-out; it does not occur, and the fix if it ever did is more batching, never the stored copy.
+
+**Positive controls throughout.** The archived-memory refusal is followed by an in-force memory rendering in the clear, so it is not a resolver that returns nothing for any input. Deleted and unreadable are compared as serialized cards, so "byte-identical" is measured. Order is asserted, because re-sorting by whatever the database returned would quietly change what the user reads.
+
+**Executed:** tests first and red for the right reason; lint and typecheck zero-error; `npm test` **4809 passed / 0 failing tests** (3 files fail to load on Windows — the known local baseline, green in CI); build green; Playwright 27 passed / 1 skipped, with the new surface rendering **both** evidence branches at both viewports; `git diff --check` clean.
+
+**One NOT PROVED changed status rather than being discharged.** The prose a zero-source answer produces is still unproved — it needs a real OpenAI call, and using the owner's credential would spend their money and write into their real account, which ADR-101 does not authorize and this slice will not do silently. What changed is that it no longer gates the requirement: the structural half is now built, so insufficiency is a persisted fact rendered as its own state, and the model's prose sits **above** a disclosure rather than being one. The residual narrowed to what the provider *says*, not to whether the product *tells the user*.
+
+**Also NOT PROVED:** a real screen-reader session; hydrated interactivity in a browser.
+
+**Unchanged:** `match_internal_knowledge`, the similarity floor, the lifecycle filter, `chat-schema.ts`, RLS, grants, secrets and write paths. Existing stored excerpts are untouched and remain the named residual — contained by a renderer that never reads one. Signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature.
+
 ## 2026-08-09 — Phase 2K slice 2K.3: a pending action survives looking at its own evidence
 
 **Zero migrations. Zero persistence. Budget stays `1 allocated · 0 spent`.** Baseline `799191c` (slice 2K.2), CI green on that exact merge SHA across all three jobs.
