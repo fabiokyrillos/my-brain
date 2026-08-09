@@ -29,6 +29,7 @@ const memoryProposal: AssistantComposerState = {
   },
   echo: "Lembre disso sempre",
   proposal: null,
+  cards: [],
   announcement: "Isso parece algo para guardar como memória. Ainda não salvei nada.",
 };
 

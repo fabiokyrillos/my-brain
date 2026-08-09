@@ -1,0 +1,181 @@
+/*
+ * `2K-CARD-001` … `2K-CARD-009`, `2K-A11Y-003/004` — the conversation card.
+ *
+ * One grammar, rendered from `data-state`. The states are deliberately given
+ * distinct tones rather than one neutral surface: T-2K-07's failure is an
+ * `expired` that looks like a `done`, and consistent styling is what creates
+ * that risk. Every tone below comes from `experience.css`'s six, so a card
+ * cannot invent a colour of its own.
+ *
+ * Both interactive controls — the mask's reveal and the object link — carry a
+ * 44px rendered minimum. The lane's first execution found a real 16px target
+ * on a Pixel 7 (WCAG 2.2 AA 2.5.8), which is why this is set here rather than
+ * left to inherit.
+ */
+
+.conversation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--tone-archived-line);
+  border-radius: 12px;
+  background: white;
+}
+
+.conversation-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.conversation-card-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-card-state {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* A state that reads as "nothing is wrong". */
+.conversation-card[data-state="previewed"],
+.conversation-card[data-state="pending"],
+.conversation-card[data-state="no_change"] {
+  border-color: var(--tone-information-line);
+}
+
+.conversation-card[data-state="previewed"] .conversation-card-state,
+.conversation-card[data-state="pending"] .conversation-card-state,
+.conversation-card[data-state="no_change"] .conversation-card-state {
+  color: var(--tone-information-fg);
+}
+
+.conversation-card[data-state="accepted"] {
+  border-color: var(--tone-success-line);
+  background: var(--tone-success-bg);
+}
+
+.conversation-card[data-state="accepted"] .conversation-card-state {
+  color: var(--tone-success-fg);
+}
+
+/* Asking is not the same as failing, and neither looks like success. */
+.conversation-card[data-state="requires_confirmation"] {
+  border-color: var(--tone-suggestion-line);
+  background: var(--tone-suggestion-bg);
+}
+
+.conversation-card[data-state="requires_confirmation"] .conversation-card-state {
+  color: var(--tone-suggestion-fg);
+}
+
+.conversation-card[data-state="expired"] {
+  border-color: var(--tone-attention-line);
+  background: var(--tone-attention-bg);
+}
+
+.conversation-card[data-state="expired"] .conversation-card-state {
+  color: var(--tone-attention-fg);
+}
+
+.conversation-card[data-state="refused"],
+.conversation-card[data-state="failed"] {
+  border-color: var(--tone-risk-line);
+  background: var(--tone-risk-bg);
+}
+
+.conversation-card[data-state="refused"] .conversation-card-state,
+.conversation-card[data-state="failed"] .conversation-card-state {
+  color: var(--tone-risk-fg);
+}
+
+.conversation-card[data-state="undone"],
+.conversation-card[data-state="unavailable"] {
+  border-color: var(--tone-archived-line);
+  background: var(--tone-archived-bg);
+}
+
+.conversation-card[data-state="undone"] .conversation-card-state,
+.conversation-card[data-state="unavailable"] .conversation-card-state {
+  color: var(--tone-archived-fg);
+}
+
+.conversation-card-snippet {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  /* Owner content. Long unbroken strings must not push the card off-screen on
+     a narrow viewport. */
+  overflow-wrap: anywhere;
+}
+
+.conversation-card-masked {
+  color: var(--tone-archived-fg);
+  font-style: italic;
+}
+
+.conversation-card-reversal {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-card-reveal,
+.conversation-card-open {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--tone-information-line);
+  border-radius: 10px;
+  background: white;
+  color: var(--tone-information-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.conversation-card-reveal:focus-visible,
+.conversation-card-open:focus-visible {
+  outline: 2px solid var(--tone-information-fg);
+  outline-offset: 2px;
+}
+
+.conversation-card-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversation-card-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assistant-composer-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 600px) {
+  /* Thumb reach: on a narrow viewport both controls span the card rather than
+     sitting as a small target at its edge. */
+  .conversation-card-reveal,
+  .conversation-card-open {
+    align-self: stretch;
+    justify-content: center;
+  }
+}

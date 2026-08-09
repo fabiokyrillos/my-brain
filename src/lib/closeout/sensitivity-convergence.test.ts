@@ -35,6 +35,13 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
       .toMatch(/resolveContent\(\s*\n?\s*"review_summary"/);
   });
 
+  it("the conversation card reads the contract (2K-PRIVACY-001)", () => {
+    // `chat` joined `GOVERNED_SURFACES` in Phase 2K. The negative guard would
+    // pass if the card simply never asked; this is the positive half.
+    expect(code("src/features/conversation-cards/card.tsx"))
+      .toMatch(/resolveContent\(\s*\n?\s*"chat"/);
+  });
+
   it("carries the classification all the way to the row that renders content", () => {
     // `2J-PRIVACY-005`. The attention row renders a 240-character preview of
     // `entries.original_content`, so the projection must carry the entry's
@@ -137,6 +144,7 @@ describe("2J-PRIVACY-002: the reveal is local everywhere it exists", () => {
       "src/features/reviews/review-body.tsx",
       "src/features/shell/home-view.tsx",
       "src/features/daily-cycle/needs-attention-list.tsx",
+      "src/features/conversation-cards/card.tsx",
     ]) {
       expect(code(file), file).not.toMatch(/localStorage|sessionStorage|document\.cookie|agent_preferences/);
     }

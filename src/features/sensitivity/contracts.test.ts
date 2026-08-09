@@ -54,6 +54,16 @@ describe("2J-PRIVACY-001: one contract governs every surface it names", () => {
   it("does not govern search, because ADR-093 already signed it", () => {
     expect(GOVERNED_SURFACES).not.toContain("search");
   });
+
+  it("governs chat, which Phase 2K added and Phase 2J did not reach (2K-PRIVACY-001)", () => {
+    // Named rather than left to the loops above: `chat` was the one content
+    // surface with no policy at all, and a list that silently lost it would
+    // still satisfy every generic assertion in this describe block.
+    expect(GOVERNED_SURFACES).toContain("chat");
+    expect(presentationFor("chat", "normal").outcome).toBe("show");
+    expect(presentationFor("chat", "private").outcome).toBe("show");
+    expect(presentationFor("chat", "highly_sensitive")).toEqual({ outcome: "mask", revealable: true });
+  });
 });
 
 describe("2J-PRIVACY-001: notifications carry no user content at any level", () => {

@@ -32,6 +32,7 @@
 
 import { captureEntry } from "@/features/capture/actions";
 import { sendChatMessage } from "@/features/chat/actions";
+import { readOnlyPreviewCard } from "@/features/conversation-cards/contracts";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { runTaskCommand } from "@/features/task-commands/actions";
 import {
@@ -116,7 +117,15 @@ export async function runAssistantTurn(
   // the confirmation requirement is decided.
   if (isTaskCommandIntent(intent)) {
     const command = await runTaskCommand(previous.command, formData);
-    return { route: "command", command, notice: null, echo: null, proposal: null, announcement: command.announcement };
+    return {
+      route: "command",
+      command,
+      notice: null,
+      echo: null,
+      proposal: null,
+      cards: [],
+      announcement: command.announcement,
+    };
   }
 
   if (intent !== "ask") {
@@ -220,16 +229,36 @@ export async function runAssistantTurn(
         text,
       );
     }
+    /**
+     * `2K-CARD-007` — the entry the turn produced, as a read-only preview.
+     *
+     * It replaces the bare "open the entry" link the route used to render.
+     * Same destination, but now inside the one card grammar, which is what
+     * makes the acknowledgment say *what kind of thing* was created and makes
+     * it impossible for this route to grow a mutating control later:
+     * `entry` is read-only by OD-2K-B and `mayRenderMutatingControl` enforces
+     * it in the renderer.
+     *
+     * The receipt deliberately carries **no content** — `CaptureReceipt` has
+     * no text field, which `sensitivity-convergence.test.ts` asserts — so the
+     * card has no snippet, and its classification defaults closed rather than
+     * being invented here.
+     */
     const href = captured.receipt.safeHref;
-    return noticed(
-      "capture_intent",
-      {
-        heading: copy.captureHeading,
-        detail: copy.captureDetail,
-        nextStep: href ? { href, label: copy.captureNextStep } : null,
-      },
-      text,
-    );
+    return {
+      ...noticed(
+        "capture_intent",
+        { heading: copy.captureHeading, detail: copy.captureDetail, nextStep: null },
+        text,
+      ),
+      cards: [
+        readOnlyPreviewCard({
+          cardType: "entry",
+          objectId: captured.receipt.entryId,
+          href: href ?? null,
+        }),
+      ],
+    };
   }
 
   if (decision.kind === "knowledge") {
@@ -248,5 +277,13 @@ export async function runAssistantTurn(
   if (commandTurnFallsThrough(command)) {
     return answerFromKnowledge(text, locale, conversationId);
   }
-  return { route: "command", command, notice: null, echo: null, proposal: null, announcement: command.announcement };
+  return {
+    route: "command",
+    command,
+    notice: null,
+    echo: null,
+    proposal: null,
+    cards: [],
+    announcement: command.announcement,
+  };
 }

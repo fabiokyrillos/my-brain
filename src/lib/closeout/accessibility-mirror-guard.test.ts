@@ -28,6 +28,10 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 const PALETTE = "src/features/palette/command-palette.tsx";
 const SEARCH = "src/features/search/search-surface.tsx";
 const LIBRARY = "src/app/[locale]/app/library/page.tsx";
+const CARD = "src/features/conversation-cards/card.tsx";
+const READ_ONLY = "src/features/conversation-cards/read-only-preview.tsx";
+const CARD_CONTRACT = "src/features/conversation-cards/contracts.ts";
+const CARD_COPY = "src/features/conversation-cards/copy.ts";
 const MIRROR = "e2e/accessibility.spec.ts";
 
 describe("2J-ACCESS-001: the accessibility mirror tracks the components it claims to represent", () => {
@@ -78,6 +82,59 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
       expect(library, `${LIBRARY} no longer uses .${className}`).toContain(className);
       expect(mirror, `${MIRROR} no longer mirrors .${className}`).toContain(className);
     }
+  });
+
+  it("pins the Conversar card's class names and state attribute (2K-A11Y-001)", () => {
+    const card = read(CARD);
+    const readOnly = read(READ_ONLY);
+    for (const token of [
+      "conversation-card",
+      "conversation-card-head",
+      "conversation-card-type",
+      "conversation-card-state",
+      "conversation-card-masked",
+      "conversation-card-reveal",
+      "data-state",
+    ]) {
+      expect(card, `${CARD} no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    for (const token of ["conversation-card-readonly", "conversation-card-open"]) {
+      expect(readOnly, `${READ_ONLY} no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    // The mask carries `aria-expanded`, which is what makes the reveal a
+    // disclosure rather than an unlabelled toggle.
+    expect(card).toContain("aria-expanded");
+    expect(mirror).toContain("aria-expanded");
+  });
+
+  it("mirrors every card state, so a new one cannot arrive unscanned", () => {
+    // The fixture enumerates states by hand. If the vocabulary grows and the
+    // fixture does not, the lane would report green over a state it never
+    // rendered — the drift this guard exists to catch.
+    const contract = read(CARD_CONTRACT);
+    const declared = contract
+      .slice(contract.indexOf("export const CONVERSATION_CARD_STATES = ["))
+      .slice(0, contract.slice(contract.indexOf("export const CONVERSATION_CARD_STATES = [")).indexOf("] as const;"));
+    const states = [...declared.matchAll(/^\s*"([a-z_]+)",/gm)].map((match) => match[1]);
+    expect(states.length).toBeGreaterThanOrEqual(10);
+    for (const state of states) {
+      expect(mirror, `${MIRROR} does not render the ${state} card`).toContain(`"${state}", "`);
+    }
+  });
+
+  it("mirrors the card's real pt-BR copy rather than invented labels", () => {
+    const copy = read(CARD_COPY);
+    for (const sentence of ["Encontrei isto", "Conteúdo sensível, guardado.", "Mostrar mesmo assim", "Abrir"]) {
+      expect(copy, `${CARD_COPY} no longer contains "${sentence}"`).toContain(sentence);
+      expect(mirror, `${MIRROR} no longer mirrors "${sentence}"`).toContain(sentence);
+    }
+  });
+
+  it("loads the card stylesheet, without which the target-size assertion is meaningless", () => {
+    expect(mirror).toContain('"conversation-cards.css"');
+    expect(read("src/app/globals.css")).toContain('@import "./conversation-cards.css";');
   });
 
   it("states its own limits, so a green lane is never read as more than it is", () => {

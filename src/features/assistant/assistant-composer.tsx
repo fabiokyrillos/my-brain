@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { useActionState } from "react";
 
+import { ReadOnlyPreview } from "@/features/conversation-cards/read-only-preview";
 import { TaskCommandResult } from "@/features/task-commands/command-console";
 import type { Locale } from "@/lib/preferences";
 
@@ -162,6 +163,22 @@ export function AssistantComposer({
               kind={state.proposal.kind}
               locale={locale}
             />
+          )}
+          {/*
+            `2K-CARD-007`. Read-only previews of what the turn referred to,
+            rendered through the one card grammar. The state on each card was
+            decided on the server; this component draws it and can add no
+            control to it — `ConversationCardView` drops any control passed for
+            a read-only type, and none is passed here.
+          */}
+          {state.cards.length === 0 ? null : (
+            <ul className="assistant-composer-cards">
+              {state.cards.map((card) => (
+                <li key={`${card.cardType}:${card.objectId ?? "unavailable"}`}>
+                  <ReadOnlyPreview card={card} locale={locale} />
+                </li>
+              ))}
+            </ul>
           )}
           {state.notice.nextStep === null ? null : (
             <Link className="assistant-composer-next" href={state.notice.nextStep.href}>
