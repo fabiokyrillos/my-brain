@@ -49,6 +49,18 @@ export type ConversationCardsCopy = {
   };
   /** The link back, rendered on the object the user went to look at. */
   readonly returnToConversation: string;
+  /**
+   * `2K-SUGG-003/004` — the suggestions that replaced one hard-coded example.
+   *
+   * The sentence is built **here**, from a category and a name the derivation
+   * kept apart. The module never produces a string, so there is no rendered
+   * sentence anywhere that a telemetry event could log whole.
+   */
+  readonly suggestions: {
+    readonly label: string;
+    readonly person: (name: string) => string;
+    readonly project: (name: string) => string;
+  };
 };
 
 const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
@@ -90,6 +102,11 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
       backToMessage: "Voltar para onde você estava",
     },
     returnToConversation: "Voltar para a conversa",
+    suggestions: {
+      label: "Você pode me perguntar",
+      person: (name) => `O que ficou pendente com ${name}?`,
+      project: (name) => `Como está ${name}?`,
+    },
   },
   en: {
     states: {
@@ -129,6 +146,11 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
       backToMessage: "Back to where you were",
     },
     returnToConversation: "Back to the conversation",
+    suggestions: {
+      label: "You can ask me",
+      person: (name) => `What is still open with ${name}?`,
+      project: (name) => `How is ${name} going?`,
+    },
   },
 };
 

@@ -233,6 +233,30 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(panel, "the product must still ship it closed").not.toMatch(/<details[^>]*\sopen/);
   });
 
+  it("pins the 2K.6 suggestion row, including the control it does not have", () => {
+    const row = read("src/features/conversation-cards/suggestion-row.tsx");
+    for (const token of [
+      "conversation-suggestions",
+      "conversation-suggestions-label",
+      "conversation-suggestions-list",
+      "data-category",
+    ]) {
+      expect(row, `suggestion-row.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    /*
+     * The absence is part of the mirror. A suggestion says what the user could
+     * type; a button would ask on their behalf. If the component ever grew one,
+     * the fixture would silently stop representing it — so both are asserted.
+     */
+    expect(row).not.toMatch(/<button\b|<form\b|onClick/);
+    const fixture = mirror.slice(
+      mirror.indexOf("function conversationSuggestions()"),
+      mirror.indexOf("const SURFACES = ["),
+    );
+    expect(fixture).not.toMatch(/<button|<a /);
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted

@@ -476,3 +476,49 @@
 .conversation-explanation-no-effect {
   font-style: italic;
 }
+
+/*
+ * `2K-SUGG-001/003` — the suggestion row.
+ *
+ * Text, not controls. A suggestion tells the user what they could type; making
+ * it a button would put words in their mouth, and the composer is one field
+ * away. So there is nothing here to size for a thumb — only to read.
+ */
+
+.conversation-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  text-align: left;
+}
+
+.conversation-suggestions-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-suggestions-list > li {
+  padding: 9px 12px;
+  border: 1px solid var(--tone-suggestion-line);
+  border-radius: 10px;
+  background: var(--tone-suggestion-bg);
+  color: var(--tone-suggestion-fg);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  /* Owner content. A long name must not push the row off a narrow viewport. */
+  overflow-wrap: anywhere;
+}

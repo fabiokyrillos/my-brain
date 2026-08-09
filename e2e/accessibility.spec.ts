@@ -360,6 +360,27 @@ function conversationExplanation() {
     + `</div></details></section>`;
 }
 
+/**
+ * Mirrors `src/features/conversation-cards/suggestion-row.tsx` — slice 2K.6.
+ *
+ * Deliberately a list of **text**, with no control in it: a suggestion says
+ * what the user could type, and a button would ask on their behalf. So what
+ * this scans is contrast and structure, not target size — and the absence of a
+ * control is itself part of what the mirror guard pins.
+ */
+function conversationSuggestions() {
+  const items = [
+    ["person", "O que ficou pendente com Marina?"],
+    ["project", "Como está Aurora?"],
+    ["person", "O que ficou pendente com Ana?"],
+  ];
+  return `<section aria-label="Sugestões"><div class="conversation-suggestions">`
+    + `<p class="conversation-suggestions-label">Você pode me perguntar</p>`
+    + `<ul class="conversation-suggestions-list">`
+    + items.map(([category, text]) => `<li data-category="${category}">${text}</li>`).join("")
+    + `</ul></div></section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -370,6 +391,7 @@ const SURFACES = [
   { name: "Conversar resumed", body: () => conversationResumed() },
   { name: "Conversar sources", body: () => conversationSources() },
   { name: "Conversar explanation", body: () => conversationExplanation() },
+  { name: "Conversar suggestions", body: () => conversationSuggestions() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -388,7 +410,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
