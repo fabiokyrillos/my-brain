@@ -40,7 +40,7 @@ function client(results: Record<string, Result>) {
 }
 
 function citations(...sources: ParsedCitations["sources"]): ParsedCitations {
-  return { evidence: "evidenced", reach: ["entry", "memory"], sources, legacy: false };
+  return { evidence: "evidenced", reach: ["entry", "memory"], sources, explanation: null, legacy: false };
 }
 
 const entryRef = { id: `entry:${ENTRY}`, type: "entry" as const, sourceId: ENTRY, support: "direct_record" as const };

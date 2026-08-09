@@ -252,12 +252,32 @@ describe("sendChatMessage memory lifecycle filtering", () => {
   // This is the assertion that makes "Archive" mean something. Without the
   // filter the RPC returns the row on `embedding is not null` alone, and the
   // assistant would keep quoting a fact the owner explicitly retired.
-  it("excludes a memory the owner archived", async () => {
+  it("excludes a memory the owner archived, and says so without a count", async () => {
     const message = await run({
       memoryRows: [{ id: memoryId, valid_from: null, valid_until: "2026-01-01T00:00:00Z" }],
     });
 
     expect(citedTypes(message)).toEqual(["entry"]);
+    /*
+     * `2K-EXPL-004`. The exclusion used to be computed and thrown away, so
+     * the user could not tell "found nothing" from "found something and
+     * rejected it". It is now disclosed — as a boolean, never as a number,
+     * because a rate is a count over repeated queries (T-2K-04).
+     */
+    const envelope = message?.citations as { explanation: Record<string, boolean> };
+    expect(envelope.explanation.archivedMemoriesExcluded).toBe(true);
+    expect(Object.values(envelope.explanation).every((v) => typeof v === "boolean")).toBe(true);
+  });
+
+  it("discloses nothing archived when every retrieved memory was in force", async () => {
+    // The positive control for the assertion above: without it, "discloses
+    // an exclusion" is satisfied by a flag that is always true.
+    const message = await run({
+      memoryRows: [{ id: memoryId, valid_from: null, valid_until: null }],
+    });
+
+    const envelope = message?.citations as { explanation: Record<string, boolean> };
+    expect(envelope.explanation.archivedMemoriesExcluded).toBe(false);
   });
 
   it("excludes a memory whose validity has not started yet", async () => {
@@ -318,6 +338,9 @@ describe("sendChatMessage citation hydration", () => {
           support: "direct_record",
         },
       ],
+      // `2K-EXPL-003/004`: two booleans, never a count. This turn had one
+      // match, it cleared the floor, and no memory was archived.
+      explanation: { weakMatchesExcluded: false, archivedMemoriesExcluded: false },
     });
     // `2K-PRIVACY-003`: no copy of the content is persisted any more.
     expect(JSON.stringify(message?.citations)).not.toContain("Conteúdo da entrada");
@@ -344,6 +367,9 @@ describe("sendChatMessage citation hydration", () => {
           support: "direct_record",
         },
       ],
+      // `2K-EXPL-003/004`: two booleans, never a count. This turn had one
+      // match, it cleared the floor, and no memory was archived.
+      explanation: { weakMatchesExcluded: false, archivedMemoriesExcluded: false },
     });
     // `2K-PRIVACY-003`: no copy of the content is persisted any more.
     expect(JSON.stringify(message?.citations)).not.toContain("Conteúdo da entrada");

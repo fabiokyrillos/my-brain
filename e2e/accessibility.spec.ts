@@ -338,6 +338,28 @@ function conversationSources() {
     + `</section>`;
 }
 
+/**
+ * Mirrors `src/features/conversation-sources/explanation-panel.tsx` — slice 2K.5.
+ *
+ * Rendered **open** here, deliberately. The product ships it closed, but axe
+ * cannot scan what is not in the accessibility tree, and a lane that only ever
+ * saw the summary would report green over a body it never looked at.
+ */
+function conversationExplanation() {
+  return `<section aria-label="Como cheguei aqui">`
+    + `<details class="conversation-explanation" open>`
+    + `<summary>Como cheguei aqui</summary>`
+    + `<div class="conversation-explanation-body">`
+    + `<ul><li>Encontrei outras coisas suas, mas nenhuma perto o bastante do que você`
+    + ` perguntou — deixei todas de fora.</li>`
+    + `<li>Algumas memórias suas combinavam, mas você as arquivou, então não usei nenhuma delas.</li></ul>`
+    + `<p class="conversation-explanation-correct-title">Se algo aqui está errado</p>`
+    + `<p>Abra a fonte acima e corrija ou arquive lá. É isso que muda as próximas respostas.</p>`
+    + `<p class="conversation-explanation-no-effect">Ainda não dá para me dizer que eu entendi errado:`
+    + ` eu não teria onde guardar isso, e um botão que não faz nada seria pior do que dizer isso claramente.</p>`
+    + `</div></details></section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -347,6 +369,7 @@ const SURFACES = [
   { name: "Conversar controls", body: () => conversationControls() },
   { name: "Conversar resumed", body: () => conversationResumed() },
   { name: "Conversar sources", body: () => conversationSources() },
+  { name: "Conversar explanation", body: () => conversationExplanation() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -365,7 +388,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
@@ -433,7 +456,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}`);
 
   const targets = page.locator("button, a[href]");
   const total = await targets.count();

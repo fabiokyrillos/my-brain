@@ -37,6 +37,7 @@ import type { Locale } from "@/lib/preferences";
 
 import type { ParsedCitations } from "./contracts";
 import { getConversationSourcesCopy } from "./copy";
+import { ExplanationPanel } from "./explanation-panel";
 import type { ResolvedSource } from "./resolve-sources";
 
 function Freshness({ locale, occurredAt }: { locale: Locale; occurredAt: string | null }) {
@@ -151,6 +152,13 @@ export function SourceList({
         Withheld only for a legacy row, which never recorded a reach.
       */}
       {citations.legacy ? null : <p className="conversation-sources-reach">{copy.reach}</p>}
+
+      {/*
+        `2K-EXPL-001`. Last, closed, and drawn only when there is something to
+        say — the answer is above it and stays readable whether or not this is
+        ever opened.
+      */}
+      <ExplanationPanel explanation={citations.explanation} locale={locale} />
     </div>
   );
 }

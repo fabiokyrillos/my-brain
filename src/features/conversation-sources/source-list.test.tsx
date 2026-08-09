@@ -42,6 +42,7 @@ const evidenced: ParsedCitations = {
   evidence: "evidenced",
   reach: ["entry", "memory"],
   sources: [{ id: entrySource.key, type: "entry", sourceId: ENTRY, support: "direct_record" }],
+  explanation: null,
   legacy: false,
 };
 
@@ -93,7 +94,8 @@ describe("2K-SRC-005: an answer with no evidence says so, and looks different", 
     evidence: "no_qualifying_evidence",
     reach: ["entry", "memory"],
     sources: [],
-    legacy: false,
+    explanation: null,
+  legacy: false,
   };
 
   it("says it found nothing", () => {
@@ -135,7 +137,7 @@ describe("2K-SRC-006: the reach is disclosed on both branches", () => {
   it("states it beside an answer that found nothing, which is when it matters most", () => {
     render(
       <SourceList
-        citations={{ evidence: "no_qualifying_evidence", reach: ["entry", "memory"], sources: [], legacy: false }}
+        citations={{ evidence: "no_qualifying_evidence", reach: ["entry", "memory"], sources: [], explanation: null, legacy: false }}
         locale="pt-BR"
         sources={[]}
       />,
@@ -145,7 +147,7 @@ describe("2K-SRC-006: the reach is disclosed on both branches", () => {
 });
 
 describe("2K-PRIVACY-004: a legacy row says less rather than guessing", () => {
-  const legacy: ParsedCitations = { evidence: "unknown", reach: [], sources: [], legacy: true };
+  const legacy: ParsedCitations = { evidence: "unknown", reach: [], sources: [], explanation: null, legacy: true };
 
   it("claims neither evidence nor insufficiency nor reach", () => {
     render(<SourceList citations={legacy} locale="pt-BR" sources={[]} />);
