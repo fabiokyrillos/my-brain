@@ -202,6 +202,27 @@ export type TaskCommandCopy = {
     dialogCancel: string;
     resultRegionLabel: string;
     previewedState: string;
+    /**
+     * `2K-ACT-002/003` — editing a parameter before confirming, and
+     * discarding. The refusal sentence is deliberately about *this field on
+     * this action* rather than about editing in general: OD-2K-1 excludes
+     * relation references by decision, and a user told only "not editable"
+     * learns nothing about which part of the card to use instead.
+     */
+    editLabel: string;
+    editSubmit: string;
+    editRefused: string;
+    /**
+     * Labels for the closed-choice parameters, keyed by the raw value.
+     *
+     * Every value any `choice` parameter can offer must have one, which
+     * `edit-controls.test.ts` asserts by walking the taxonomy rather than by
+     * listing them again here — a second list would be the drift this
+     * repository keeps paying for.
+     */
+    editChoices: Record<string, string>;
+    discardedTitle: string;
+    discardedDetail: string;
     sessionExpired: string;
     unauthenticated: string;
     unexpected: string;
@@ -481,6 +502,16 @@ const ptBR: TaskCommandCopy = {
     dialogCancel: "Manter a tarefa",
     resultRegionLabel: "Resultado do comando",
     previewedState: "Previsão pronta.",
+    editLabel: "Corrigir antes de confirmar",
+    editSubmit: "Rever com essa correção",
+    editRefused: "Esse campo não é editável por aqui. Reescreva o comando com o valor certo.",
+    editChoices: {
+      low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente",
+      inbox: "Entrada", todo: "A fazer", in_progress: "Em andamento",
+      waiting: "Aguardando", blocked: "Bloqueada", deferred: "Adiada",
+    },
+    discardedTitle: "Descartado",
+    discardedDetail: "Nada foi alterado e nada ficou guardado.",
     sessionExpired: "Sua sessão expirou. Entre de novo e tente outra vez.",
     unauthenticated: "Sua sessão expirou. Entre de novo e tente outra vez.",
     unexpected: "Algo deu errado e nada foi alterado. Tente de novo.",
@@ -746,6 +777,16 @@ const en: TaskCommandCopy = {
     dialogCancel: "Keep the task",
     resultRegionLabel: "Command result",
     previewedState: "Preview ready.",
+    editLabel: "Correct it before confirming",
+    editSubmit: "Review with that correction",
+    editRefused: "That field cannot be edited here. Rewrite the command with the value you want.",
+    editChoices: {
+      low: "Low", medium: "Medium", high: "High", urgent: "Urgent",
+      inbox: "Inbox", todo: "To do", in_progress: "In progress",
+      waiting: "Waiting", blocked: "Blocked", deferred: "Deferred",
+    },
+    discardedTitle: "Discarded",
+    discardedDetail: "Nothing changed and nothing was kept.",
     sessionExpired: "Your session expired. Sign in and try again.",
     unauthenticated: "Your session expired. Sign in and try again.",
     unexpected: "Something went wrong and nothing was changed. Try again.",

@@ -57,7 +57,9 @@ import {
   createProductEventIdempotencyKey,
   recordProductEvent,
 } from "@/features/product-analytics/server";
+import { isEditableParameter } from "@/features/conversation-cards/editable-parameters";
 import type { ProductEventName } from "@/features/product-analytics/contracts";
+import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 
 import {
   TASK_COMMAND_ORIGINS,
@@ -88,7 +90,11 @@ import { TaskMatchInputError, rankTaskCandidates } from "./matching";
 import type { TaskCommandOutcome } from "./outcomes";
 import { TaskPreviewInputError, buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
 import { MAX_HINT_LENGTH, MAX_TITLE_WORDS } from "./schema";
-import { TASK_COMMAND_POLICY_VERSION, TASK_COMMAND_UNSUPPORTED_REASONS } from "./taxonomy";
+import {
+  TASK_COMMAND_POLICY_VERSION,
+  TASK_COMMAND_UNSUPPORTED_REASONS,
+  type TaskCommandPatchField,
+} from "./taxonomy";
 import {
   createTaskCommandSession,
   deriveBaseTaskCommand,
@@ -97,6 +103,7 @@ import {
   requireApplicableSession,
   serializeTaskCommandSession,
   withClarification,
+  withEditedParameter,
   withSelectedTask,
   withStalenessWitness,
   type TaskCommandSession,
@@ -1170,6 +1177,106 @@ export async function clarifyTaskCommand(
   }
 }
 
+/**
+ * `2K-ACT-003` / `2K-ACT-004` — corrects one parameter and re-derives.
+ *
+ * ## Why this is nine lines of routing and no pipeline
+ *
+ * `2K-CARD-005` forbids a second implementation of the preview machinery, and
+ * there is none here. The edit writes one validated value into the envelope
+ * with `withEditedParameter` and hands it to `runCommandRound`, which re-runs
+ * `deriveTaskCommand`, `loadTaskCandidates`, `rankTaskCandidates` and
+ * `buildTaskCommandPreview` exactly as every other step does. So the edited
+ * command is re-validated rather than trusted, and the user sees the whole
+ * preview again before anything can be applied.
+ *
+ * ## Where the authority question is answered
+ *
+ * `isEditableParameter` — in `conversation-cards/editable-parameters.ts`, which
+ * narrows the taxonomy's own `allowedPatchFields` and never widens them. It is
+ * asked **here**, on the server, and not at the control that rendered the
+ * field: a rule enforced where the form is drawn is a rule that holds until
+ * somebody posts a different form.
+ *
+ * ## What an edit does to an earlier confirmation
+ *
+ * It makes it unusable, mechanically. The canonical patch is a fingerprint
+ * input, so a changed value yields a different digest, and a confirmation row
+ * minted against the pre-edit digest no longer matches — the consumption
+ * `UPDATE` finds no row and raises `2E_CONFIRMATION_REQUIRED`. Nothing here has
+ * to remember that; it follows from re-deriving.
+ */
+export async function editTaskCommand(
+  _previous: TaskCommandConsoleState,
+  formData: FormData,
+): Promise<TaskCommandConsoleState> {
+  const context = await loadCommandContext(formData);
+  const parsedSession = parseTaskCommandSession(formData.get("session"));
+  if (parsedSession.status !== "ok") return expiredSession(context);
+  const session = parsedSession.session;
+
+  // The action comes from re-deriving the envelope, never from the form. A
+  // caller that could name the action could pair a permissive action with a
+  // field the real one refuses.
+  const derived = deriveTaskCommand(session, context.timeZone);
+  if (derived.status !== "ok") return expiredSession(context);
+
+  const field = formData.get("field");
+  const value = formData.get("value");
+  if (typeof field !== "string" || typeof value !== "string") return expiredSession(context);
+
+  if (!isEditableParameter(derived.command.action, field)) {
+    // A refusal, not a failure: nothing was attempted, the session survives so
+    // the user can still confirm what they were shown, and the reason names the
+    // field rather than editing in general.
+    return resolved({
+      heading: context.copy.outcomes.refused.title,
+      detail: context.copy.outcomes.refused.description,
+      reason: context.copy.console.editRefused,
+      session: serializeTaskCommandSession(session),
+      retryable: false,
+    });
+  }
+
+  const edited = withEditedParameter(
+    session,
+    field as TaskCommandPatchField,
+    // Bounded here as well as in the validator, for the reason
+    // `commandTextSchema` is: this stops a multi-megabyte form field being read
+    // into memory before anything else looks at it.
+    value.slice(0, MAX_COMMAND_TEXT_LENGTH),
+  );
+  try {
+    return (await runCommandRound(context, edited)).state;
+  } catch (error) {
+    return guard(error, context.copy, edited);
+  }
+}
+
+/**
+ * `2K-ACT-002` — the user walks away, and nothing is left behind.
+ *
+ * **It takes no Supabase client, reads nothing and writes nothing**, and that
+ * is the whole design. "A discard leaves no trace of intent to act" is a
+ * property a reviewer can check by reading the signature rather than by
+ * auditing what the body happened not to call — the same argument
+ * `notificationCopy(locale)` makes by refusing to accept content.
+ *
+ * The returned state carries **no session**, so the envelope does not survive
+ * the round either. The command is simply over.
+ */
+export async function discardTaskCommand(
+  _previous: TaskCommandConsoleState,
+  formData: FormData,
+): Promise<TaskCommandConsoleState> {
+  const copy = copyFor(parseLocale(formData));
+  return resolved({
+    heading: copy.console.discardedTitle,
+    detail: copy.console.discardedDetail,
+    terminal: true,
+  });
+}
+
 /** Creates the standalone task the no-match branch offered (2E-NOMATCH-004/005). */
 export async function createTaskFromCommand(
   _previous: TaskCommandConsoleState,
@@ -1440,5 +1547,9 @@ export async function runTaskCommand(
       return undoTaskCommand(previous, formData);
     case "restore":
       return restoreCancelledTask(previous, formData);
+    case "edit":
+      return editTaskCommand(previous, formData);
+    case "discard":
+      return discardTaskCommand(previous, formData);
   }
 }

@@ -96,6 +96,21 @@ type MemoryCopy = {
   readonly proposalDuplicate: string;
   readonly proposalEmpty: string;
   readonly proposalView: string;
+  /**
+   * `2K-ACT-009` — the conversational undo, which archives (OD-2K-3).
+   *
+   * Every sentence here is asserted **negatively** in `undo.test.ts`, in both
+   * locales: none of them may contain deletion wording. That is not stylistic.
+   * The row survives, so a control that implied removal would be the one
+   * outcome OD-2K-3 forbids by name, and "deleted" is the word a well-meaning
+   * contributor reaches for when writing an undo.
+   */
+  readonly conversationalUndo: string;
+  readonly conversationalUndoing: string;
+  readonly conversationalUndone: string;
+  readonly conversationalUndoNote: string;
+  readonly conversationalRestore: string;
+  readonly conversationalRestored: string;
 };
 
 const copy = {
@@ -183,6 +198,12 @@ const copy = {
     proposalDuplicate: "Você já tem essa memória.",
     proposalEmpty: "Diga o que eu devo lembrar.",
     proposalView: "Ver memória",
+    conversationalUndo: "Arquivar essa memória",
+    conversationalUndoing: "Arquivando…",
+    conversationalUndone: "Memória arquivada. Ela saiu de uso e continua guardada no seu histórico.",
+    conversationalUndoNote: "Arquivar tira a memória de uso: o Brain deixa de usá-la nas respostas, e o registro continua lá.",
+    conversationalRestore: "Voltar a usar essa memória",
+    conversationalRestored: "Memória de volta em uso.",
   },
   en: {
     eyebrow: "LASTING KNOWLEDGE",
@@ -267,6 +288,12 @@ const copy = {
     proposalDuplicate: "You already have that memory.",
     proposalEmpty: "Tell me what to remember.",
     proposalView: "View memory",
+    conversationalUndo: "Archive that memory",
+    conversationalUndoing: "Archiving…",
+    conversationalUndone: "Memory archived. It is out of use and still on file in your history.",
+    conversationalUndoNote: "Archiving withdraws the memory from use: the Brain stops drawing on it in answers, and the record stays.",
+    conversationalRestore: "Put that memory back in use",
+    conversationalRestored: "Memory back in use.",
   },
 } satisfies Record<Locale, MemoryCopy>;
 

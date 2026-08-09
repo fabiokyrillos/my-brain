@@ -2,6 +2,42 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — Phase 2K slice 2K.2: edit before confirming, discard that writes nothing, and a memory undo that archives
+
+**Zero migrations. Zero deployment. Budget stays `1 allocated · 0 spent`.** Baseline `0865a9a` (slice 2K.1), CI green on that exact merge SHA across all three jobs.
+
+**The editable set is a narrowing of the taxonomy, never a second list (`2K-ACT-003`, OD-2K-1).** `editableParametersFor(action)` filters the action's own `allowedPatchFields` — the closed set PRD §11.2 already gave each row, enforced by the validator and pinned by `policy-lock.test.ts`. Declaring a separate list would be a second declaration of one fact, and the drift would surface as a card offering a field the validator refuses. The subset relation is asserted for every action.
+
+**Relation references are excluded, and that is a decision rather than an omission.** `projectRef`, `contextRef` and `personRef` would need a name-to-entity resolution whose ambiguous, foreign and non-existent outcomes this phase does not model as card states. OD-2K-1's instruction for that case is to exclude by default and omit rather than widen. The consequence is stated: `assign_project`, `assign_context`, `assign_person` and `set_waiting_on` expose **no** editable parameter.
+
+**An edit re-derives; it does not patch (`2K-ACT-004`).** `withEditedParameter` writes one validated value into the envelope and `runCommandRound` re-runs `deriveTaskCommand`, `loadTaskCandidates`, `rankTaskCandidates` and the preview — the shape `withClarification` already established, which is why this cost no second pipeline. The canonical patch changes, and the canonical patch is a fingerprint input, so a confirmation minted against the pre-edit digest can no longer be consumed. Nothing has to remember that; it follows from re-deriving.
+
+**The rule is asked on the server, from the re-derived action.** Not from the form: a caller who could name the action could pair a permissive one with a field the real action refuses. And not only at the control that drew the field — a rule enforced where a form is rendered holds until somebody posts a different form.
+
+**`set_status` still cannot become a route to `cancel`.** The choices a card offers come from the policy's own `allowedTargetValues`, which excludes `cancelled`, and the validator refuses it independently. The taxonomy already recorded why that list is load-bearing.
+
+**The discard writes nothing, by shape (`2K-ACT-002`).** `discardTaskCommand` **takes no Supabase client**, loads no context and carries no session forward. "Leaves no trace of intent to act" is therefore checkable by reading a signature rather than by auditing what a body happened not to call — the same argument `notificationCopy(locale)` makes by refusing to accept content.
+
+**The memory undo archives, and delegates (`2K-ACT-008`, OD-2K-3).** `undoProposedMemory` builds a lifecycle request and calls `setMemoryLifecycle`. The write, the ownership predicate, the audit row with before and after states and the revalidation all stay where they already were; a second write path here would be a second place the transition is decided and would need its own ownership proof. **No new column, no new RPC, no migration** — registering a handler in `undo_operation` would have spent the ceiling and is refused.
+
+**It is a true undo, not a decorative one.** The archived memory leaves the active window, and `chat/actions.ts` filters retrieved memories through the same `isMemoryInForce` window — so it stops being retrievable as a source rather than merely leaving a list. That is the property OD-2K-3's stopping condition names, and it is asserted in pgTAP against the window itself.
+
+**The words are asserted negatively, in both locales.** None of `conversationalUndo`, `conversationalUndone`, `conversationalUndoNote` or `conversationalRestore` may match deletion wording. That is not stylistic: the row survives, so a control implying removal would be the one outcome OD-2K-3 forbids by name, and "deleted" is the word a well-meaning contributor reaches for when writing an undo.
+
+**The undo of the undo is offered rather than declared absent.** `2K-ACT-009` permits it only if the domain can prove it safe. `restore` clears `valid_until`, writes its own audit row and is owner-scoped over forced RLS — the condition is met, so declaring absence would have been the inaccuracy. The pgTAP suite performs the round trip and asserts the memory is unchanged by it.
+
+**A duplicate is `no_change`, not `accepted` (`2K-ACT-006`).** The sentence is kept, but **this turn created nothing**. Reporting it as accepted would claim a write that did not happen — and it is why the undo is withheld for a duplicate: archiving a memory this turn did not create would act on something the owner never asked about.
+
+**The memory card is honestly asymmetric (`2K-CARD-006`).** A create has no pre-state, so there is no before/after table; inventing an empty one to match the task card would be decoration claiming to be disclosure. What it shares is the state vocabulary, mapped exhaustively from the proposal's four statuses onto four **distinct** card states.
+
+**Positive controls throughout.** The edit's re-validation refuses `priority: "catastrophic"` **and** accepts `priority: "urgent"`, so the refusal is not a derivation that fails for any input. The pgTAP denial is preceded by owner A archiving its **own** memory in the same transaction, and by a non-vacuity section proving both memories start **in force**.
+
+**Executed:** tests first and red for the right reason; focused green (2173 tests); lint and typecheck zero-error; `npm test` **4724 passed / 0 failing tests** (3 files fail to load on Windows — the known local baseline, green in CI); the whole `task-commands` suite green with the two new intents present; build green; Playwright 23 passed / 1 skipped at both viewports; `git diff --check` clean.
+
+**Reported NOT PROVED:** a real screen-reader session; hydrated interactivity in a browser. **Executed only in CI:** the new pgTAP suite, because there is no local Docker. **Deferred to 2K.8 by the plan:** the authenticated journey that confirms a memory and undoes it.
+
+**Unchanged:** `match_internal_knowledge`, retrieval, the task-command outcome vocabulary, the confirmation contract, RLS, grants, secrets and write paths. Signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature.
+
 ## 2026-08-09 — ADR-101 authorizes Phase 2K implementation; slice 2K.1 ships the card grammar and gives Conversar a sensitivity policy
 
 **Zero migrations. Zero deployment. Budget stays `1 allocated · 0 spent`.**
