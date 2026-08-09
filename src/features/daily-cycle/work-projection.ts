@@ -1,5 +1,6 @@
 import "server-only";
 import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
+import { WORK_PAGE_SIZE } from "./work-page-size";
 import { detailControlsFor, type DetailControl } from "@/features/task-commands/detail-controls";
 import { pageRange, paginateRows } from "@/lib/pagination";
 import { defaultAgentPreferences, type Locale } from "@/lib/preferences";
@@ -17,7 +18,9 @@ type TaskRow = Pick<
   | "source_entry_id"
 >;
 
-export const WORK_PAGE_SIZE = 50;
+// Re-exported so existing importers are unchanged; the declaration itself
+// lives in a client-safe module, because the selection ceiling derives from it.
+export { WORK_PAGE_SIZE };
 export const workViews = ["today", "all", "waiting"] as const;
 export type WorkViewId = (typeof workViews)[number];
 
@@ -38,6 +41,15 @@ export type WorkProjectionPage = {
    * and a plain object is the shape that has always crossed it here.
    */
   readonly editControlsByTaskId: Readonly<Record<string, readonly DetailControl[]>>;
+  /**
+   * `2L-BULK-005` — each row's **real** status.
+   *
+   * The bulk preview partitions by eligibility, which is a question about the
+   * status literal the taxonomy's tables are written in. `WorkItemView` carries
+   * `humanState`, which is lossy on purpose, so the answer has to travel from
+   * here — the same reason `editControlsByTaskId` does.
+   */
+  readonly statusByTaskId: Readonly<Record<string, string>>;
 };
 
 export function parseWorkView(value: string | string[] | undefined): WorkViewId {
@@ -208,9 +220,13 @@ export async function loadWorkProjection(
   });
 
   const editControlsByTaskId: Record<string, readonly DetailControl[]> = {};
-  for (const row of pageRows) editControlsByTaskId[row.id] = detailControlsFor(row.status);
+  const statusByTaskId: Record<string, string> = {};
+  for (const row of pageRows) {
+    editControlsByTaskId[row.id] = detailControlsFor(row.status);
+    statusByTaskId[row.id] = row.status;
+  }
 
-  return { items, hasNext, timezone, editControlsByTaskId };
+  return { items, hasNext, timezone, editControlsByTaskId, statusByTaskId };
 }
 
 /**

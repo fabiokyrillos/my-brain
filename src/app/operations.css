@@ -264,3 +264,27 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 }
 .task-panel-close{min-height:44px;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;color:var(--blue);font:600 12px var(--font-sans);cursor:pointer}
 .task-panel-close:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+
+/* Phase 2L slice 2L.2: selection, preview and bulk result.
+
+   The bar is part of the page rather than a floating overlay: `2L-MOBILE-002`
+   forbids selection controls permanently covering a list row, and an element
+   that scrolls with the list cannot. */
+.work-row-select{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;cursor:pointer}
+.work-row-select input{width:20px;height:20px}
+.work-row-select input:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-bulk-select-all{margin-bottom:8px}
+.work-bulk-bar{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fbfcfe}
+.work-bulk-selection{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.work-bulk-hint{color:var(--ink-soft);font-size:11px}
+.work-bulk-form{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.work-bulk-form label{font:600 11px var(--font-sans);color:var(--ink-soft)}
+.work-bulk-form select,.work-bulk-form input{min-height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:white}
+.work-bulk-form select:focus-visible,.work-bulk-form input:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-bulk-preview{padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:12px}
+.work-bulk-preview p{margin:4px 0 0}
+.work-bulk-refusal{margin:8px 0 0}
+.work-bulk-result{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:white}
+.work-bulk-result:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-bulk-result-list{margin:8px 0 0;padding-left:18px;color:var(--ink-soft);font-size:12px}
+@media(max-width:600px){.work-bulk-selection{align-items:flex-start}.work-bulk-form select,.work-bulk-form input{width:100%}}

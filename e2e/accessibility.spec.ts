@@ -399,6 +399,8 @@ function conversationSuggestions() {
 function workList() {
   const row = (id: string, main: string) =>
     `<article class="list-row">`
+    + `<label class="work-row-select"><input type="checkbox">`
+    + `<span class="sr-only">Select task ${id}</span></label>`
     + `<div class="list-row-main">${main}`
     + `<small class="work-origin">Criada por você</small></div>`
     + `<div class="list-meta">`
@@ -487,6 +489,49 @@ function workTaskPanel() {
     + `</section></div>`;
 }
 
+/**
+ * Mirrors `src/features/operations/bulk-bar.tsx` and the row checkbox in
+ * `task-list.tsx` — slice 2L.2.
+ *
+ * `2L-ACCESS-001`/`-005`/`-006`. Three things this scans that jsdom cannot:
+ * the checkbox's rendered target at a mobile viewport, the focus ring on the
+ * operation and value pickers, and the result region's structure once the
+ * stylesheet has laid it out.
+ *
+ * The bar is rendered in its **result** state, because that is the state with
+ * the most to get wrong: a live region, a focusable landmark, a list of
+ * per-item reasons and one undo control per applied item.
+ */
+function workBulkBar() {
+  return `<section aria-label="Bulk actions" class="work-bulk-bar">`
+    + `<div role="status" aria-live="polite" aria-atomic="true" class="sr-only">2 updated; 1 did not change.</div>`
+    + `<div class="work-bulk-selection">`
+    + `<strong>3 selected</strong>`
+    + `<span class="work-bulk-hint">You can select up to 50 tasks at a time.</span>`
+    + `<button class="row-action" type="button">Clear selection</button>`
+    + `</div>`
+    + `<form class="work-bulk-form">`
+    + `<label for="work-bulk-action">What to do with the selected tasks</label>`
+    + `<select id="work-bulk-action"><option value="set_priority">Set priority</option></select>`
+    + `<label for="work-bulk-value">New value</label>`
+    + `<select id="work-bulk-value" name="value"><option value="high">High</option></select>`
+    + `<div class="work-bulk-preview"><strong>Before applying</strong>`
+    + `<p>2 will change; 1 cannot take this change right now.</p>`
+    + `<p class="quiet-state">The task&#39;s current state does not allow this change.</p></div>`
+    + `<button class="row-action" type="submit">Apply to selected</button>`
+    + `</form>`
+    + `<div class="work-bulk-result" role="region" aria-label="Bulk action result" tabindex="-1">`
+    + `<strong>2 updated; 1 did not change.</strong>`
+    + `<ul class="work-bulk-result-list">`
+    + `<li class="work-bulk-result-refused">This task&#39;s state changed since you selected it.</li>`
+    + `</ul>`
+    + `<div class="work-undo">`
+    + `<div role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>`
+    + `<form><button class="row-action work-undo-button" type="submit">Undo</button>`
+    + `<p class="work-undo-window">You can undo this for 24 hours.</p></form>`
+    + `</div></div></section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -500,6 +545,7 @@ const SURFACES = [
   { name: "Conversar suggestions", body: () => conversationSuggestions() },
   { name: "Work list", body: () => workList() },
   { name: "Work task panel", body: () => workTaskPanel() },
+  { name: "Work bulk bar", body: () => workBulkBar() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -518,7 +564,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}${workList()}${workTaskPanel()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}${workList()}${workTaskPanel()}${workBulkBar()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);

@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L SLICE 2L.2: selection, bulk actions, and a partial result that tells the truth
+
+**Zero migrations. No new RPC, no new write path, no new grant, policy or telemetry event.**
+
+**Added.** `bulk-eligibility.ts` (the derived operation set), `selection.ts` (the bounded model), `bulk-preview.ts` (the partition), `bulk-result.ts` (the summary), `bulk-command-state.ts`, `bulk-bar.tsx`, and `applyBulkWorkCommand` in `operations/actions.ts` - one Server Action that iterates the existing `applyDetailCommand` path. `apply_task_command` still has exactly ONE call site.
+
+**The eligible set is derived from two predicates, not one.** `actionPolicy` alone cannot express "bounded value" - that is the control's shape, which `detailControlFor` derives from the same policy. Non-destructive AND control kind in {choice, date, relation} yields exactly OD-2L-3 A's eight verbs, asserted both by re-derivation and by name. `cancel_task` is excluded because it is destructive, so `2L-BULK-006`'s confirmation arm is **unreachable** rather than merely unused - the Server Action refuses a destructive verb before reading anything.
+
+**The ceiling is derived from the page size, and refuses rather than truncates.** `WORK_PAGE_SIZE` moved to a client-safe module because the selection model runs in the browser and the projection is `server-only`; the projection re-exports it, so there is still one declaration. A page of sixty rows under a ceiling of fifty would refuse a "select all shown" the user had just performed. Every refusal returns the selection **unchanged**, and `selectAllShown` refuses whole - taking the first n of a page the user asked for in one gesture is a silent truncation wearing a different hat.
+
+**The middle item fails and the rest still apply.** The canonical test drives three items with the middle one absent from the resolution result and asserts the RPC calls that actually happened, not a stubbed summary. `summariseBulk` has four kinds, and `no_change` is counted apart from both applied and refused: three different facts, and folding any two would be a lie in one direction or the other.
+
+**Undo is derived from the offer, not from the label.** `apply_task_command` returns an `undoId` exactly when it wrote an undo row, so an item with no offer cannot appear in the undoable subset even if its outcome were mislabelled.
+
+**A masked task is selectable without being revealed** (`2L-PRIVACY-008`): the checkbox's accessible name is the protected stub, and the result names reasons rather than tasks.
+
+**No event was declared.** A bulk apply reports through the existing `task_command_applied`, once per applied item - emitting nothing would make the funnel wrong rather than quiet, and emitting something new would be a vocabulary change this slice has no mandate for.
+
+**Recorded rather than absorbed:** the plan's test line asks for foreign, deleted AND ineligible to be byte-identical. Foreign and deleted are, and it is asserted. `ineligible` is kept distinct because it is reachable only for a row that came back from the caller's own resolution - it reveals a fact the caller already has, and collapsing it would make `2L-BULK-005`'s required reason class meaningless.
+
+**Executed:** lint and typecheck zero-error; `npm test` **5119 passed / 0 failing tests**; build green; accessibility lane green at both viewports including the new bulk fixture. **NOT executed:** any hosted probe - no bulk run has touched a real database, and the partial-result behaviour is proved against an injected client that answers per task id.
+
 ## 2026-08-09 - PHASE 2L SLICE 2L.1: quick edit, the derived sensitivity posture, undo where it belongs, and one responsive task detail
 
 **Zero migrations. Zero new write paths, RPCs, grants, policies or telemetry events.** Hosted parity stays `202608090089`.

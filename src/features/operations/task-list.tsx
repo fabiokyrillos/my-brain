@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
 import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
@@ -24,8 +25,18 @@ import type {
 } from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
 import { getWorkCopy } from "./copy";
+import { BulkBar, type BulkCommandHandler } from "./bulk-bar";
 import { ProtectedContent } from "./protected-content";
 import { QuickEdit } from "./quick-edit";
+import {
+  EMPTY_SELECTION,
+  SELECTION_CEILING,
+  clearSelection,
+  isSelected,
+  selectAllShown,
+  toggleSelected,
+  type Selection,
+} from "./selection";
 import type { TaskUndoHandler } from "./undo-affordance";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
@@ -60,6 +71,25 @@ export type { WorkItemActionHandler };
  * absent — a control with no options to point at is a control the user can only
  * fail to use.
  */
+/**
+ * Everything selection and bulk need, injected as one object (`2L-BULK-001`).
+ *
+ * Optional and all-or-nothing, for the reason `QuickEditSupport` is: a list
+ * rendered without it is the list exactly as it was, which is what lets the
+ * Hoje panel and the jsdom gate mount `TaskList` without a relation query.
+ *
+ * `statusByTaskId` is the row's **real** status, which the rendered
+ * `WorkItemView` deliberately cannot supply — `humanState` is lossy, and the
+ * preview partition is an eligibility question.
+ */
+export type BulkSupport = {
+  readonly action: BulkCommandHandler;
+  readonly undoAction?: TaskUndoHandler;
+  readonly statusByTaskId: Readonly<Record<string, string>>;
+  readonly relationOptions: TaskDetailRelationOptions;
+  readonly dateBounds: TaskDetailDateBounds;
+};
+
 export type QuickEditSupport = {
   readonly action: TaskDetailCommandHandler;
   /** `2L-EDIT-008`. A quick edit is an operation too, and reversible the same way. */
@@ -73,6 +103,7 @@ export type QuickEditSupport = {
 export function TaskList({
   action,
   agentName,
+  bulk,
   emptyHint,
   locale,
   quickEdit,
@@ -93,6 +124,7 @@ export function TaskList({
    * without a database.
    */
   action: WorkItemActionHandler;
+  bulk?: BulkSupport;
   emptyHint: string;
   locale: Locale;
   quickEdit?: QuickEditSupport;
@@ -102,6 +134,27 @@ export function TaskList({
   undoAction?: TaskUndoHandler;
 }) {
   const pt = locale === "pt-BR";
+  /*
+   * The selection lives here rather than above, because it is scoped to what
+   * this list is currently showing: a page change re-mounts the rows, and a
+   * selection that outlived the set it describes would let a bulk operation
+   * name items the user can no longer see (`2L-BULK-002`).
+   */
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
+  const [selectionRefusal, setSelectionRefusal] = useState<string | null>(null);
+  const bulkCopy = getWorkCopy(locale).bulk;
+
+  function change(next: ReturnType<typeof toggleSelected>) {
+    if (next.status === "refused") {
+      // Refused, never truncated: the selection is unchanged and the reason is
+      // rendered where the user acted.
+      setSelectionRefusal(bulkCopy.ceilingReached(SELECTION_CEILING));
+      return;
+    }
+    setSelectionRefusal(null);
+    setSelection(next.selection);
+  }
+
   if (tasks.length === 0) {
     return <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Tudo em ordem" : "All clear"}</strong><p>{emptyHint}</p></div>;
   }
@@ -121,8 +174,29 @@ export function TaskList({
   // fails the build if it does.
   const anyWithheld = tasks.some((task) => resolveTaskContent(task.sensitivity, task.taskId).masked);
 
+  const selected = bulk
+    ? tasks
+      .filter((task) => isSelected(selection, task.taskId))
+      .map((task) => ({
+        taskId: task.taskId,
+        title: task.title,
+        status: bulk.statusByTaskId[task.taskId] ?? "",
+      }))
+    : [];
+
   return (
     <div className="list-stack">
+      {bulk ? (
+        <div className="work-bulk-select-all">
+          <button
+            className="row-action"
+            onClick={() => change(selectAllShown(selection, tasks.map((task) => task.taskId)))}
+            type="button"
+          >
+            {bulkCopy.selectAllShown}
+          </button>
+        </div>
+      ) : null}
       {tasks.map((task) => (
         <TaskRow
           action={action}
@@ -130,11 +204,27 @@ export function TaskList({
           key={task.taskId}
           locale={locale}
           quickEdit={quickEdit}
+          selectable={bulk ? {
+            selected: isSelected(selection, task.taskId),
+            onToggle: () => change(toggleSelected(selection, task.taskId)),
+          } : undefined}
           task={task}
           timezone={timezone}
           undoAction={undoAction}
         />
       ))}
+      {bulk ? (
+        <BulkBar
+          action={bulk.action}
+          dateBounds={bulk.dateBounds}
+          locale={locale}
+          onClear={() => { setSelection(clearSelection()); setSelectionRefusal(null); }}
+          refusal={selectionRefusal}
+          relationOptions={bulk.relationOptions}
+          selected={selected}
+          undoAction={bulk.undoAction}
+        />
+      ) : null}
       {anyWithheld ? (
         <p className="quiet-state work-protected-note">{getWorkCopy(locale).protected.partialCoverage}</p>
       ) : null}
@@ -147,6 +237,7 @@ function TaskRow({
   agentName,
   locale,
   quickEdit,
+  selectable,
   task,
   timezone,
   undoAction,
@@ -155,6 +246,7 @@ function TaskRow({
   agentName: string;
   locale: Locale;
   quickEdit?: QuickEditSupport;
+  selectable?: { readonly selected: boolean; readonly onToggle: () => void };
   task: WorkItemView;
   timezone: string;
   undoAction?: TaskUndoHandler;
@@ -169,6 +261,29 @@ function TaskRow({
 
   return (
     <article className="list-row">
+      {selectable ? (
+        <label className="work-row-select">
+          {/*
+            `2L-BULK-002`. An explicit act on this item, with an accessible name
+            that says which item — a checkbox labelled only "Select" repeated
+            fifty times names nothing (`2L-ACCESS-003`). A masked row's label is
+            the protected stub, which is the honest thing to call it: the user
+            can select it without being told what it says (`2L-PRIVACY-008`).
+          */}
+          <input
+            checked={selectable.selected}
+            onChange={selectable.onToggle}
+            type="checkbox"
+          />
+          <span className="sr-only">
+            {getWorkCopy(locale).bulk.selectRow(
+              resolveTaskContent(task.sensitivity, task.taskId).masked
+                ? getWorkCopy(locale).protected.label
+                : task.title,
+            )}
+          </span>
+        </label>
+      ) : null}
       <div className="list-row-main">
         {/*
           `2L-PRIVACY-001`/`-003`. The title and the description are the only
