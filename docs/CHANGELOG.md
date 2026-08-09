@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L CLOSEOUT CORRECTED: three documentary inconsistencies, fixed from evidence
+
+**82 declared, 82 classified: 73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered.** The count was **regenerated from the slice records, never typed**. No functional code, no UX change, no migration, no deploy, no database/RLS/grant/policy/Auth change, no `2M-*` artifact, and **A13 is not retargeted**.
+
+**An independent review found three inconsistencies in the close.** All three are corrected from evidence rather than by adjusting a number.
+
+**(1) The active-milestone line contradicted the close.** `docs/TODO.md` still declared `Active milestone: Phase 2L` several lines above its own record that the phase had closed. It now declares **no active milestone**, Phase 2L complete, **no successor authorized**, **A13 still guarding** the roadmap successor, and **Phase 2M not started** - with the superseded line retained rather than deleted, per this repository's append-only convention.
+
+**(2) `2L-BULK-011` was a `partial` that owed nothing.** Its remainder read "none in behaviour", which is not a remainder; a `partial` with nothing outstanding is a classification kept for a count. Re-assessed against the requirement's own text, one claim turned out to be ARGUED RATHER THAN PROVED: that `ineligible` is unreachable for an id the caller does not own - the only place a differentiable existence signal could have hidden. That proof is now **executed**, as two runs over the same id (present in the owner-scoped resolution it yields `ineligible`; absent from it the same id yields `unresolvable`), plus a test proving no refusal carries task content whatever its cause. Nothing in behaviour, proof or decision is outstanding, so the row is **built**. **No remainder was invented to preserve the previous count.**
+
+**(3) `2L-CLOSE-004` was a `partial` waiting on a reading nobody had taken.** The requirement asks for parity from a live reading rather than from a filename; "we did not look" is not a remainder the successor inherits. `supabase migration list --linked` was executed **read-only**: 89 rows, local equal to remote on every one, **zero local-only, zero remote-only**, head `202608090089`. Nothing was applied, deployed or written. The row is **built**.
+
+**The generator now refuses a vacuous partial.** `partial` and `undelivered` already had to name a remainder and a destination; they now also have to name a **real** one. A row whose remainder is "none", or that says nothing is pending, or that points only at an already-complete record, is refused - and **the refusal quotes the words that made it vacuous**, so it cannot be edited away without noticing what is being edited. Proved by a fixture that plants exactly that row, executes the generator, asserts it fails, restores a valid classification and asserts it passes - **with the pre-existing refusals re-executed in the same run**, so the new rule cannot have been bought by weakening an old one. Five phrasings of "nothing is owed" are planted and executed, because a guard that matched one sentence is a guard the next author writes around by rephrasing.
+
+**The three remaining partials** are `2L-MOBILE-008` and `2L-ACCESS-008` (owner-run hardware) and `2L-METRICS-005` (a migration the successor must spend before its producers exist).
+
+**Phase 2M remains not started, not scoped and not authorized.**
+
 ## 2026-08-09 - PHASE 2L IS COMPLETE: accessibility closure, telemetry, traceability and the closing report
 
 **82 requirements declared, 82 classified: 71 built, 5 baseline, 5 partial, 1 not-built-by-rule, 0 undelivered.** **Migration budget `1 allocated - 0 spent`.** Hosted parity unmoved at `202608090089`, 89 migrations. Public signup closed; the rollout gate reads 25 pass - 3 fail - 2 owner-signature, untouched.

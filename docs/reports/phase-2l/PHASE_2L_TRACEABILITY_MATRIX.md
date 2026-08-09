@@ -8,7 +8,7 @@ decision — and which reconciles the migration budget by looking at the directo
 
 **82 requirements declared · 82 classified · 0 unclassified.**
 
-71 built · 5 baseline · 5 partial · 1 not-built-by-rule · 0 undelivered
+73 built · 5 baseline · 3 partial · 1 not-built-by-rule · 0 undelivered
 
 **Migration budget: 1 allocated · 0 spent.**
 
@@ -40,7 +40,7 @@ decision — and which reconciles the migration budget by looking at the directo
 | `2L-BULK-008` | 2L.2 | built | Section 2 - the loop catches per item; the canonical test drives three items with the middle one absent and asserts the RPC calls that actually happened |
 | `2L-BULK-009` | 2L.2 | built | Section 2 - four kinds with no-change counted apart from both applied and refused; a partial is reachable from exactly one condition |
 | `2L-BULK-010` | 2L.2 | built | Section 2 - one key per task and verb, asserted distinct at the RPC in `bulk-actions.test.ts` |
-| `2L-BULK-011` | 2L.2 | partial | Section 1 - foreign and deleted are byte-identical and asserted; ineligible stays distinct and reveals nothing, being reachable only for a row that came back from the caller's own resolution. Remainder: none in behaviour; the divergence from the plan's phrasing is the destination, recorded in this record's section 1 |
+| `2L-BULK-011` | 2L.2 | built | Section 1 - foreign and deleted are byte-identical, asserted end to end; and `ineligible` is now PROVED unreachable for an id the caller does not own, by driving the same id twice - present in the owner-scoped resolution it yields ineligible, absent from it the same id yields unresolvable - plus a proof that no refusal carries task content. Nothing in behaviour, proof or decision is outstanding |
 | `2L-BULK-012` | 2L.2 | built | Section 2 - the undoable subset is derived from the presence of an undo id, never from the outcome label, so an item the domain wrote no reversal for cannot appear |
 | `2L-VIEW-001` | 2L.3 | built | Section 3 - `work-views.ts` declares the three ids and each view's default ordering; names and descriptions stay in copy because they are translated, and the predicates stay in SQL where they are builder clauses |
 | `2L-VIEW-002` | 2L.3 | built | Section 3 - no fourth reported view; `workViews` unchanged and the vocabulary guard now reads the new declaration site and asserts the old one only re-exports |
@@ -92,7 +92,7 @@ decision — and which reconciles the migration budget by looking at the directo
 | `2L-CLOSE-001` | 2L.5 | built | Section 3 - all 82 requirements classified exactly once by a generator that refuses rather than prints an unresolved claim |
 | `2L-CLOSE-002` | 2L.5 | built | Section 3 - every partial and undelivered row names its remainder and its destination, and the generator refuses a row that does not |
 | `2L-CLOSE-003` | 2L.5 | built | Section 3 - the budget is reconciled by looking at the migration directory rather than by restating a number; 1 allocated and 0 spent, which is a legitimate close |
-| `2L-CLOSE-004` | 2L.5 | partial | Section 4 - hosted parity is reported as unmoved at 202608090089 from the migration chain and the recorded deployment state. Remainder: a live migration-list reading, which this phase never needed because it changed no schema. Destination: recorded as a limitation rather than claimed as executed |
+| `2L-CLOSE-004` | 2L.5 | built | Section 6 - `supabase migration list --linked` EXECUTED read-only on 2026-08-09: 89 rows, every one with local equal to remote, zero local-only, zero remote-only, head 202608090089. Parity is now stated from a live reading rather than from a filename, and the signup rollout gate is reported unchanged |
 | `2L-CLOSE-005` | 2L.5 | built | Section 4 - every unexecuted check is named as unexecuted: hosted probes, real device, screen reader, authenticated online journeys, hydrated interactivity, and any run against a real database |
 | `2L-CLOSE-006` | 2L.5 | built | The closing report restates ADR-055's 2026-10-27 expiry as neither satisfied nor superseded; this phase adds no semantic retrieval of any kind |
 | `2L-CLOSE-007` | 2L.5 | built | The closing report's successor section re-audits the roadmap successor against the closed product and stops for owner authorization, creating no successor artifact and declaring no successor requirement |

@@ -180,6 +180,82 @@ describe("2L-CLOSE-001: the generator refuses, and each refusal is executed", ()
     expect(findings(root).join(" ")).toContain("describes a sensitivity column or a backfill");
   });
 
+  it("refuses a partial whose remainder is not a remainder", () => {
+    /*
+     * R18, and the reason it exists: the close of Phase 2L shipped two rows
+     * classified `partial` with nothing outstanding — one saying "Remainder:
+     * none in behaviour" and one waiting on a reading that was simply never
+     * taken. An independent review caught both.
+     *
+     * A `partial` that owes nothing is a classification kept for a count, which
+     * is the one thing it must never be for. Naming a destination is not enough
+     * to save it: the row below names one and is still refused.
+     */
+    const root = fixture();
+    mutateRow(
+      root,
+      "2",
+      "2L-BULK-011",
+      "| `2L-BULK-011` | **partial** | Section 1 - foreign and deleted are byte-identical. Remainder: none in behaviour; the destination is this record's section 1 |",
+    );
+    const found = findings(root).join(" ");
+    expect(found).toContain('2L-BULK-011 is "partial" but its remainder is vacuous');
+    // The refusal quotes the words that made it vacuous, so it cannot be edited
+    // away without noticing what is being edited. "Remainder: none" is what the
+    // detector matched first, and it is exactly the phrase that shipped.
+    expect(found).toContain('"Remainder: none"');
+  });
+
+  it("refuses every phrasing of 'nothing is owed', not only the one that shipped", () => {
+    // A guard that matched one sentence would be a guard the next author writes
+    // around by rephrasing. Each of these is a different way to say the same
+    // thing, and each is planted and executed.
+    for (const vacuous of [
+      "Remainder: none. Destination: this record",
+      "Remainder: nothing. Destination: the successor",
+      "nothing is outstanding here; destination: the successor phase",
+      "no proof remains pending; the destination is this record's section 1",
+      "no work outstanding, and the destination is the successor",
+    ]) {
+      const root = fixture();
+      mutateRow(root, "2", "2L-BULK-011", `| \`2L-BULK-011\` | **partial** | ${vacuous} |`);
+      expect(findings(root).join(" "), vacuous).toContain("its remainder is vacuous");
+    }
+  });
+
+  it("passes once a real remainder is restored, and the other refusals still fire", () => {
+    /*
+     * The non-vacuity control, in both directions.
+     *
+     * First: a row that owes something real is accepted, so R18 is not simply
+     * refusing every `partial`. Second: the *existing* refusals are re-executed
+     * in the same run, so the new rule cannot have been bought by weakening an
+     * old one — which is how a guard suite quietly loses a check.
+     */
+    const root = fixture();
+    mutateRow(
+      root,
+      "2",
+      "2L-BULK-011",
+      "| `2L-BULK-011` | **partial** | Remainder: a hosted probe proving the refusal on a real database. Destination: the successor phase, carried past close |",
+    );
+    expect(findings(root)).toEqual([]);
+
+    // …and the older refusals have not gone quiet.
+    const stillRefuses = fixture();
+    mutateRow(stillRefuses, "4", "2L-MOBILE-005", "| `2L-MOBILE-005` | **built** | done |");
+    expect(findings(stillRefuses).join(" ")).toContain("citation is too short to resolve");
+
+    const stillRefusesRule = fixture();
+    mutateRow(
+      stillRefusesRule,
+      "2",
+      "2L-BULK-007",
+      "| `2L-BULK-007` | **not-built-by-rule** | nothing bulk-eligible requires a confirmation, so this has no subject at all |",
+    );
+    expect(findings(stillRefusesRule).join(" ")).toContain("names no ADR or signed decision");
+  });
+
   it("refuses a claimed migration spend", () => {
     const root = fixture();
     writeFileSync(

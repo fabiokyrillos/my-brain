@@ -122,10 +122,9 @@ generator, which emitted only after refusing on real mutations.
 
 **NOT executed, and not inferred:**
 
-- **any hosted probe.** Nothing in this phase changed the schema, so there is
-  nothing to verify hosted — and `2L-CLOSE-004`'s parity statement comes from the
-  migration chain and the recorded deployment state rather than from a live
-  `migration list`, which is recorded here as the limitation it is.
+- **any hosted probe that writes, deploys or leaves a fixture.** One
+  **read-only** reading was executed post-closeout and is recorded in §6; it
+  applied no migration, deployed nothing and wrote nothing.
 - **any real-device or screen-reader session** (`2L-ACCESS-008`,
   `2L-MOBILE-008`).
 - **any authenticated online journey**, and **no hydrated interactivity** in a
@@ -157,7 +156,79 @@ generator, which emitted only after refusing on real mutations.
 | `2L-CLOSE-001` | **built** | Section 3 - all 82 requirements classified exactly once by a generator that refuses rather than prints an unresolved claim |
 | `2L-CLOSE-002` | **built** | Section 3 - every partial and undelivered row names its remainder and its destination, and the generator refuses a row that does not |
 | `2L-CLOSE-003` | **built** | Section 3 - the budget is reconciled by looking at the migration directory rather than by restating a number; 1 allocated and 0 spent, which is a legitimate close |
-| `2L-CLOSE-004` | **partial** | Section 4 - hosted parity is reported as unmoved at 202608090089 from the migration chain and the recorded deployment state. Remainder: a live migration-list reading, which this phase never needed because it changed no schema. Destination: recorded as a limitation rather than claimed as executed |
+| `2L-CLOSE-004` | **built** | Section 6 - `supabase migration list --linked` EXECUTED read-only on 2026-08-09: 89 rows, every one with local equal to remote, zero local-only, zero remote-only, head 202608090089. Parity is now stated from a live reading rather than from a filename, and the signup rollout gate is reported unchanged |
 | `2L-CLOSE-005` | **built** | Section 4 - every unexecuted check is named as unexecuted: hosted probes, real device, screen reader, authenticated online journeys, hydrated interactivity, and any run against a real database |
 | `2L-CLOSE-006` | **built** | The closing report restates ADR-055's 2026-10-27 expiry as neither satisfied nor superseded; this phase adds no semantic retrieval of any kind |
 | `2L-CLOSE-007` | **built** | The closing report's successor section re-audits the roadmap successor against the closed product and stops for owner authorization, creating no successor artifact and declaring no successor requirement |
+
+---
+
+## 6. Post-closeout correction (2026-08-09) — the live parity reading
+
+Added after an independent review found that two rows were classified `partial`
+without anything outstanding. Both are corrected **from evidence**, not by
+adjusting a count.
+
+### 6.1 `2L-CLOSE-004` — executed, read-only
+
+`2L-CLOSE-004` requires the phase to state, **from a live reading rather than
+from a filename**, whether hosted parity moved. The original close reported it
+from the migration chain and called itself `partial` for exactly that reason.
+
+The reading was executed:
+
+```
+npx supabase migration list --linked
+```
+
+| Check | Result |
+|---|---|
+| Rows returned | **89** |
+| Rows where `Local` ≠ `Remote` | **0** |
+| Local-only (a migration not applied remotely) | **0** |
+| Remote-only (a migration not in the repository) | **0** |
+| Head | **`202608090089`** |
+
+**Nothing was written.** No migration was applied, nothing was deployed, no
+fixture was created, and the command is read-only by construction. The signup
+rollout gate is unchanged and was not touched.
+
+Parity is therefore stated from a live reading, and `2L-CLOSE-004` is **built**.
+
+### 6.2 `2L-BULK-011` — the missing proof was executed, so the row is `built`
+
+The original row read `partial` with the remainder *"none in behaviour"*, which
+is not a remainder. A `partial` that has nothing outstanding is a classification
+being used to preserve a count, and the traceability vocabulary has no room for
+one — so the generator now **refuses** it (§6.3).
+
+Re-assessed against the requirement's own text, one claim turned out to be
+argued rather than proved: that `ineligible` is **unreachable** for an id the
+caller does not own. That is the only place a differentiable existence signal
+could have hidden. It is now driven as two runs over the same id — present in
+the owner-scoped resolution it yields `ineligible`, absent from it the same id
+yields `unresolvable` — with a third test proving no refusal carries task
+content whatever its cause.
+
+With that executed, nothing in behaviour, proof or decision is outstanding, and
+the row is **built**. **No remainder was invented to preserve the previous
+count.**
+
+### 6.3 The generator now refuses a vacuous partial
+
+`partial` and `undelivered` already had to name a remainder. They now also have
+to name a **real** one: the generator refuses a row whose remainder is "none",
+says no behaviour or proof is pending, or points only at a record that is
+already complete.
+
+The refusal is proved by a fixture that plants exactly that row, executes the
+generator, asserts it fails, restores a valid classification and asserts it
+passes — and the existing refusals are re-asserted in the same run, so the new
+rule cannot have been bought by weakening an old one.
+
+### 6.4 What this correction did not do
+
+No functional code, no UX change, no migration, no deployment, no database, RLS,
+grant, policy or Auth change, no signup or rollout change, no `2M-*` requirement
+or artifact, and **no A13 retarget**. One test file gained three cases; every
+other change is a document, the generator, or the guard.

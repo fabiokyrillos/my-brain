@@ -42,6 +42,23 @@ would make `2L-BULK-005`'s required *reason class* meaningless.
 
 Recorded here rather than absorbed. No signed decision is touched.
 
+**Post-closeout correction (2026-08-09).** This slice originally classified
+`2L-BULK-011` as **partial** with the remainder "none in behaviour" — which is
+not a remainder at all, and the traceability vocabulary has no room for a
+`partial` that has nothing outstanding. The re-assessment found one thing that
+was genuinely argued rather than proved: that `ineligible` is **unreachable** for
+an id the caller does not own. That is the only place a differentiable existence
+signal could have hidden, and it is now driven as two runs over the same id —
+present in the owner-scoped resolution it yields `ineligible`, absent from it the
+same id yields `unresolvable` — alongside a proof that no refusal carries task
+content whatever its cause.
+
+With that proof executed, the requirement's own text is satisfied with **no
+behaviour, no proof and no decision pending**, and the classification is
+**built**. The divergence from the plan's stronger *phrasing* stays recorded
+above, because it is a fact about the plan rather than a debt against the
+product.
+
 ---
 
 ## 2. `2L-BULK-001…012`
@@ -152,5 +169,5 @@ probe, and this record does not round it up.
 | `2L-BULK-008` | **built** | Section 2 - the loop catches per item; the canonical test drives three items with the middle one absent and asserts the RPC calls that actually happened |
 | `2L-BULK-009` | **built** | Section 2 - four kinds with no-change counted apart from both applied and refused; a partial is reachable from exactly one condition |
 | `2L-BULK-010` | **built** | Section 2 - one key per task and verb, asserted distinct at the RPC in `bulk-actions.test.ts` |
-| `2L-BULK-011` | **partial** | Section 1 - foreign and deleted are byte-identical and asserted; ineligible stays distinct and reveals nothing, being reachable only for a row that came back from the caller's own resolution. Remainder: none in behaviour; the divergence from the plan's phrasing is the destination, recorded in this record's section 1 |
+| `2L-BULK-011` | **built** | Section 1 - foreign and deleted are byte-identical, asserted end to end; and `ineligible` is now PROVED unreachable for an id the caller does not own, by driving the same id twice - present in the owner-scoped resolution it yields ineligible, absent from it the same id yields unresolvable - plus a proof that no refusal carries task content. Nothing in behaviour, proof or decision is outstanding |
 | `2L-BULK-012` | **built** | Section 2 - the undoable subset is derived from the presence of an undo id, never from the outcome label, so an item the domain wrote no reversal for cannot appear |
