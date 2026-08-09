@@ -57,7 +57,9 @@ import {
   createProductEventIdempotencyKey,
   recordProductEvent,
 } from "@/features/product-analytics/server";
+import { isEditableParameter } from "@/features/conversation-cards/editable-parameters";
 import type { ProductEventName } from "@/features/product-analytics/contracts";
+import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 
 import {
   TASK_COMMAND_ORIGINS,
@@ -88,8 +90,6 @@ import { TaskMatchInputError, rankTaskCandidates } from "./matching";
 import type { TaskCommandOutcome } from "./outcomes";
 import { TaskPreviewInputError, buildTaskCommandPreview, type TaskCommandPreview } from "./preview";
 import { MAX_HINT_LENGTH, MAX_TITLE_WORDS } from "./schema";
-import { isEditableParameter } from "@/features/conversation-cards/editable-parameters";
-import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 import {
   TASK_COMMAND_POLICY_VERSION,
   TASK_COMMAND_UNSUPPORTED_REASONS,
