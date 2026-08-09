@@ -375,6 +375,13 @@ export async function applyWorkItemAction(
       title,
       heading: outcomeCopy.title,
       detail: outcomeCopy.description,
+      // `2L-EDIT-008`/`-009`. Straight from the RPC's answer: an `undoId` on
+      // `applied`, `null` on `no_change` — which 2E-UPDATE-009 requires to
+      // write no undo row at all. The surface offers exactly what the database
+      // wrote, and never infers a reversal.
+      undo: result.outcome === "applied"
+        ? { undoId: result.undoId, expiresAt: result.undoExpiresAt }
+        : null,
     });
   }
 

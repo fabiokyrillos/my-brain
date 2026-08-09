@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L SLICE 2L.1: quick edit, the derived sensitivity posture, undo where it belongs, and one responsive task detail
+
+**Zero migrations. Zero new write paths, RPCs, grants, policies or telemetry events.** Hosted parity stays `202608090089`.
+
+**`work` joins `GOVERNED_SURFACES` - together with its consumers**, which is the condition slice 2L.0 recorded for letting it in at all: a governed surface with no consumer is a producer nobody reads, and this repository has paid for that twice.
+
+**Added.** `src/features/operations/protected-content.tsx` (the single place Work withholds content), `copy.ts`, `quick-edit.tsx`, `undo-affordance.tsx`; `src/features/task-commands/task-undo-state.ts`; `src/features/daily-cycle/task-detail-surface.tsx` and `task-panel-close.tsx`; the `@panel` parallel route under `/app/work` with its intercepting `(.)[taskId]`; `undoWorkOperation` in `task-commands/actions.ts`.
+
+**The two reads, and their bounds.** The list resolves the page's source classifications in ONE owner-scoped read bounded to the page's own ids - never one per task, never a per-user scan, and a page with no task from an entry reads nothing. The detail reads the classification inside the query it was already making for the provenance excerpt, and derives through a one-entry map, so list and detail differ in how many rows they read and in nothing else.
+
+**Fail-closed in the direction that matters.** `toTaskSensitivity` narrows the value crossing the projection boundary to the most protective level and NEVER to `undetermined`: "nobody derived one" is a fact about the code, and letting it decay into "this task has no source" would render content in the clear. The existing mapper fixture, which declares no classification, now asserts `highly_sensitive` - the mechanism proving itself.
+
+**`undetermined` never asks for a level.** `resolveTaskContent`'s manual-task arm returns the shown answer directly rather than looking `normal` up. The rendered result matches `normal`'s; the reasoning must not, and that is what OD-2L-1 B says.
+
+**Removed, foreign and unreadable stay one branch**, proved byte-identical at the derivation and again at the projection. The masked row survives with its state, dates, relations and four actions, and stays openable through a stub that carries the link without the withheld title.
+
+**Quick edit adds nothing.** The list mounts `TaskDetailControls` - same derived control set, same Server Action, same operation-key discipline, same server-issued confirmation for the one destructive verb. Controls are derived in the projection because `humanState` is lossy by design and could not answer an eligibility question.
+
+**Undo was a mechanism with one surface.** `undo_operations`, the router, the owner-scoped re-read and a tested action have existed since Phase 2E and only the natural-language console offered them. `2L-EDIT-009` turns out to be structural: `apply_task_command` returns `undoId: null` for a no-change, so an irreversible operation has nothing to offer and no surface decides that.
+
+**One task detail, two frames.** `TaskDetailSurface` is the whole surface; both routes are a locale check and a call. On a narrow viewport the list is `display:none` rather than covered - the difference between a surface and an untrapped modal.
+
+**Changed.** `egc-reachability.test.ts` now judges a route on its page plus the first-party feature modules that page imports, one level and no further: the invariant always meant "reachable from this route", and the approximation that the page file is where the control is *named* stopped holding when a route legitimately delegated. `accessibility-mirror-guard.test.ts` fixed a latent defect in itself - its suggestions fixture check sliced to `const SURFACES = [` and passed only because that builder happened to be last.
+
+**Executed:** lint and typecheck zero-error; `npm test` **5046 passed / 0 failing tests**; build green; `git diff --check` clean; the accessibility lane green at BOTH viewports including the two new Work fixtures. **NOT executed:** any hosted probe, real-device session, screen-reader session, authenticated online journey, or hydrated interactivity - so the panel's interception behaviour is proved structurally and not by a browser.
+
 ## 2026-08-09 - PHASE 2L SLICE 2L.0: measurement, guards and one executable contract
 
 **Zero migrations, zero product surfaces.** One module ships - the derived-sensitivity contract M4 names - because a contract nobody can run is a paragraph.

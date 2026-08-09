@@ -48,7 +48,7 @@ vi.mock("@/features/daily-cycle/attention-projection", () => ({
 import { HomeDashboard } from "./home-dashboard";
 
 function healthy() {
-  loadWorkProjection.mockResolvedValue({ items: [], hasNext: false, timezone: "America/Sao_Paulo" });
+  loadWorkProjection.mockResolvedValue({ items: [], hasNext: false, timezone: "America/Sao_Paulo", editControlsByTaskId: {} });
   loadHomeSupplementalProjection.mockResolvedValue({ waitingCount: 0, openQuestionPreview: null });
   loadInboxProjection.mockResolvedValue({ items: [], hasNext: false });
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });
@@ -100,6 +100,7 @@ describe("2J-HOJE-010: a failing section degrades that section only", () => {
           contexts: [],
           people: [],
           waitingOnPeople: [],
+          sensitivity: { kind: "undetermined" },
         },
       ],
       hasNext: false,

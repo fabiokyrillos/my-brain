@@ -42,6 +42,71 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
       .toMatch(/resolveContent\(\s*\n?\s*"chat"/);
   });
 
+  it("the Work surfaces read the contract, through one component (2L-PRIVACY-007)", () => {
+    /*
+     * `work` joined `GOVERNED_SURFACES` in Phase 2L, and it is the surface this
+     * positive half matters most for: OD-2L-1 option B names *two* consumers —
+     * the list and the task detail — and requires them to converge. Two
+     * surfaces each remembering to ask is a convergence one refactor away from
+     * ending, silently, in the permissive direction.
+     *
+     * So the convergence is a component. `protected-content.tsx` is the only
+     * thing that asks `resolveTaskContent` what to render, and both surfaces
+     * mount it. Asserted in three parts, because any one alone would pass for
+     * the wrong reason: the component consumes the contract, and each surface
+     * mounts the component.
+     */
+    expect(code("src/features/operations/protected-content.tsx"))
+      .toMatch(/resolveTaskContent\(/);
+    expect(code("src/features/operations/task-list.tsx")).toMatch(/<ProtectedContent/);
+    expect(code("src/features/daily-cycle/task-detail-view.tsx")).toMatch(/<ProtectedContent/);
+  });
+
+  it("Hoje withholds a protected task too, because Hoje renders task titles", () => {
+    /*
+     * Not in `2L-PRIVACY-007`'s enumeration, and it belongs there anyway.
+     *
+     * `tasks` carried no classification at all before Phase 2L, so Hoje
+     * printing a task title was not a divergence — there was nothing to
+     * diverge from. The moment the Work list began withholding one, a user
+     * could see the same task masked on `/app/work` and printed in full on
+     * `/app`, which is precisely the "two surfaces of one product meant two
+     * answers" this contract module's own header says it exists to prevent.
+     *
+     * Note that `home-view.tsx` now consumes the contract twice, for two
+     * different subjects: `presentationFor("hoje", …)` for the attention
+     * entries Phase 2J governed, and `ProtectedContent` for the task rows this
+     * phase classified. Both are the contract; neither is a second rule.
+     */
+    const home = code("src/features/shell/home-view.tsx");
+    expect(home).toMatch(/<ProtectedContent/);
+    expect(home).toMatch(/presentationFor\(\s*"hoje"/);
+    // And the classification has to reach the row that renders content, rather
+    // than the surface being left to fetch it at render time.
+    expect(read("src/features/shell/home-view.tsx")).toMatch(/sensitivity: TaskSensitivity/);
+    expect(code("src/features/shell/home-dashboard.tsx")).toMatch(/sensitivity: (priority\.item|task)\.sensitivity/);
+  });
+
+  it("keeps the Work rule in one place, so a surface cannot answer for itself", () => {
+    // The negative half, scoped to `work`: `resolveContent("work", …)` may
+    // appear in the contract module and nowhere else. `sensitivity-boundary`
+    // proves no surface names a *level*; this proves none of them names the
+    // *surface* either, which is the other way a second rule could appear.
+    const walk = (dir: string, found: string[] = []): string[] => {
+      const absolute = join(REPO, dir);
+      for (const entry of readdirSync(absolute)) {
+        const full = join(absolute, entry);
+        if (statSync(full).isDirectory()) walk(join(dir, entry), found);
+        else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(join(dir, entry));
+      }
+      return found;
+    };
+    const callers = walk("src")
+      .filter((file) => /resolveContent\(\s*\n?\s*["']work["']/.test(code(file)))
+      .map((file) => file.replace(/\\/g, "/"));
+    expect(callers).toEqual(["src/features/sensitivity/task-derivation.ts"]);
+  });
+
   it("carries the classification all the way to the row that renders content", () => {
     // `2J-PRIVACY-005`. The attention row renders a 240-character preview of
     // `entries.original_content`, so the projection must carry the entry's
@@ -145,6 +210,7 @@ describe("2J-PRIVACY-002: the reveal is local everywhere it exists", () => {
       "src/features/shell/home-view.tsx",
       "src/features/daily-cycle/needs-attention-list.tsx",
       "src/features/conversation-cards/card.tsx",
+      "src/features/operations/protected-content.tsx",
     ]) {
       expect(code(file), file).not.toMatch(/localStorage|sessionStorage|document\.cookie|agent_preferences/);
     }

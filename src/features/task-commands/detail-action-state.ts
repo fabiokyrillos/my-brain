@@ -10,6 +10,7 @@
  */
 
 import type { TaskCommandAction } from "./taxonomy";
+import type { TaskUndoOffer } from "./task-undo-state";
 
 export type TaskDetailCommandStatus =
   | "idle"
@@ -64,6 +65,14 @@ export type TaskDetailCommandState = {
   /** A refusal the user acts on by reloading the page. */
   readonly refreshable: boolean;
   readonly retryable: boolean;
+  /**
+   * `2L-EDIT-008`/`-009` — the reversal the database wrote, or null.
+   *
+   * The same field the Work list's state carries, declared from the same shared
+   * type: the affordance is one thing, and two copies of its shape would be two
+   * chances for one surface to keep offering undo after the other stopped.
+   */
+  readonly undo: TaskUndoOffer | null;
 };
 
 export const idleTaskDetailCommandState: TaskDetailCommandState = {
@@ -76,4 +85,5 @@ export const idleTaskDetailCommandState: TaskDetailCommandState = {
   pending: null,
   refreshable: false,
   retryable: false,
+  undo: null,
 };

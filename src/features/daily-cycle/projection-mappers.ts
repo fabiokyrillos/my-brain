@@ -1,4 +1,5 @@
 import { toSensitivityLevel } from "@/features/sensitivity/contracts";
+import { toTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import {
   trackedAttentionReasons,
   dailyCycleActions,
@@ -81,6 +82,15 @@ export type WorkItemSource = {
   readonly waitingOnPeople?: readonly RelationSummarySource[] | null;
   readonly parent?: RelationSummarySource | null;
   readonly dependsOn?: readonly RelationSummarySource[] | null;
+  /**
+   * The derived classification, as the projection computed it.
+   *
+   * `unknown` rather than `TaskSensitivity`, because this is the untrusted side
+   * of the boundary and `toTaskSensitivity` is the gate. Typing it as the
+   * contract here would make the narrowing look redundant and invite someone to
+   * delete it.
+   */
+  readonly sensitivity?: unknown;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -410,5 +420,10 @@ export function toWorkItemView(source: WorkItemSource): WorkItemView | null {
     waitingOnPeople,
     ...(parent ? { parent } : {}),
     ...(dependsOn.length > 0 ? { dependsOn } : {}),
+    // `2L-PRIVACY-002`. Narrowed rather than trusted, and fail-closed: a
+    // projection that forgot to derive one produces a masked row, not a row in
+    // the clear. Unconditional — there is no `...(x ? {x} : {})` here, because
+    // an absent field is exactly the case this must not let through.
+    sensitivity: toTaskSensitivity(source.sensitivity),
   });
 }

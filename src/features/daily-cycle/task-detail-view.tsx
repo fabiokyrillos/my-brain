@@ -1,9 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getWorkCopy } from "@/features/operations/copy";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import { isDerivedLevel } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import type { RelationSummary, WorkItemHumanState, WorkItemPriority } from "./contracts";
 import { describeHistoryEntry, getTaskDetailCopy } from "./task-detail-copy";
+import { TaskPanelClose } from "./task-panel-close";
 import type { TaskDetailProjection } from "./task-detail-projection";
 
 /**
@@ -79,9 +83,24 @@ export function TaskDetailView({
   detail,
   actions,
   controls,
+  panel = false,
 }: {
   locale: Locale;
   detail: TaskDetailProjection;
+  /**
+   * `2L-EDIT-007` — which frame this mount is in, and nothing else.
+   *
+   * The same component, the same fields, the same injected actions and the same
+   * control set render in both. What the flag selects is the outer class the
+   * layout keys its two shapes off — a docked panel beside the list on a wide
+   * viewport, a full surface on a narrow one — and, on the panel, a back
+   * affordance that returns to where the user was instead of to the list's
+   * default view.
+   *
+   * It must never select a control. A viewport that changed what a user can do
+   * is the failure this requirement is written against.
+   */
+  panel?: boolean;
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
   /**
@@ -109,16 +128,32 @@ export function TaskDetailView({
     || (task.dependsOn?.length ?? 0) > 0;
 
   return (
-    <div className="content-page task-detail-page">
-      <Link className="back-link" href={`/${locale}/app/work`}>
-        <ArrowLeft size={16} aria-hidden="true" />{copy.back}
-      </Link>
+    <div className={panel ? "content-page task-detail-page task-detail-panel" : "content-page task-detail-page"}>
+      {panel ? (
+        // `router.back()` rather than a link to the list: the panel was opened
+        // from a position — a view, a page, a filter — and a link would send the
+        // user to the list's default instead of to where they actually were.
+        // The URL-carried return position itself is slice 2L.3's subject.
+        <TaskPanelClose label={copy.back} />
+      ) : (
+        <Link className="back-link" href={`/${locale}/app/work`}>
+          <ArrowLeft size={16} aria-hidden="true" />{copy.back}
+        </Link>
+      )}
 
       <header className="task-detail-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{task.title}</h1>
-          <p className="task-description">{task.description ?? copy.noDescription}</p>
+          {/*
+            `2L-PRIVACY-001`/`-007`. The detail withholds through the **same**
+            component the list does, so the two cannot drift: neither surface
+            owns a rule, and a surface that stopped asking would fail
+            `sensitivity-convergence.test.ts` rather than silently print.
+          */}
+          <ProtectedContent locale={locale} revealKey={task.taskId} sensitivity={task.sensitivity}>
+            <h1>{task.title}</h1>
+            <p className="task-description">{task.description ?? copy.noDescription}</p>
+          </ProtectedContent>
         </div>
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
       </header>
@@ -170,13 +205,39 @@ export function TaskDetailView({
         {detail.provenance ? (
           <>
             <p className="quiet-state">{copy.provenance.fromEntry}</p>
-            <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
+            {/*
+              The excerpt is the *entry itself*, which is the record whose
+              classification produced the mask above. Printing it while the
+              title is withheld would make the mask theatre, so it goes through
+              the same contract with its own reveal key — revealing the title
+              does not reveal the note, and vice versa.
+            */}
+            <ProtectedContent
+              locale={locale}
+              revealKey={`${task.taskId}:provenance`}
+              sensitivity={task.sensitivity}
+            >
+              <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
+            </ProtectedContent>
             <Link className="panel-view-all" href={`/${locale}/app/inbox/${detail.provenance.entryId}`}>
               {copy.provenance.openEntry}
             </Link>
           </>
         ) : (
-          <p className="quiet-state">{copy.provenance.manual}</p>
+          <>
+            <p className="quiet-state">{copy.provenance.manual}</p>
+            {/*
+              `2L-PRIVACY-004`, stated exactly where a user could otherwise be
+              misled: this is the one screen that tells them the task came from
+              nothing, and therefore the one screen where "so nothing protects
+              it" belongs.
+            */}
+            {isDerivedLevel(task.sensitivity) ? null : (
+              <p className="quiet-state work-protected-note">
+                {getWorkCopy(locale).protected.partialCoverage}
+              </p>
+            )}
+          </>
         )}
       </section>
 

@@ -28,6 +28,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/preferences";
 
+import { UndoAffordance, type TaskUndoHandler } from "@/features/operations/undo-affordance";
+
 import { ConfirmDialog } from "./confirm-dialog";
 import {
   idleTaskDetailCommandState,
@@ -61,6 +63,20 @@ const MAX_LENGTH_BY_FIELD: Partial<Record<TaskCommandPatchField, number>> = {
   note: MAX_NOTE_LENGTH,
 };
 
+/**
+ * How the controls are framed, and nothing else.
+ *
+ * Added in Phase 2L so the Work list can mount these without a second copy
+ * (`2L-EDIT-001`). `section` is the task detail's own frame — a landmark with
+ * its own heading. `inline` is a row's, where the heading would put one `<h2>`
+ * per task into the document outline and the hint would repeat fifty times.
+ *
+ * **It changes no control, no eligibility and no intent.** A variant that could
+ * add or remove a verb would be the second copy this prop exists to avoid, so
+ * everything below the frame is shared verbatim.
+ */
+export type TaskDetailControlsVariant = "section" | "inline";
+
 export function TaskDetailControls({
   action,
   locale,
@@ -69,6 +85,8 @@ export function TaskDetailControls({
   controls,
   relationOptions,
   dateBounds,
+  variant = "section",
+  undoAction,
 }: {
   action: TaskDetailCommandHandler;
   locale: Locale;
@@ -78,6 +96,9 @@ export function TaskDetailControls({
   controls: readonly DetailControl[];
   relationOptions: TaskDetailRelationOptions;
   dateBounds: TaskDetailDateBounds;
+  variant?: TaskDetailControlsVariant;
+  /** `2L-EDIT-008`. Injected like every other action this component calls. */
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getTaskDetailControlsCopy(locale);
   const router = useRouter();
@@ -189,10 +210,16 @@ export function TaskDetailControls({
     );
   }
 
+  const framed = variant === "section";
+  const Frame = framed ? "section" : "div";
+
   return (
-    <section aria-label={copy.sectionTitle} className="task-detail-section task-detail-controls">
-      <h2>{copy.sectionTitle}</h2>
-      <p className="quiet-state">{copy.sectionHint}</p>
+    <Frame
+      aria-label={copy.sectionTitle}
+      className={framed ? "task-detail-section task-detail-controls" : "task-detail-controls task-detail-controls-inline"}
+    >
+      {framed ? <h2>{copy.sectionTitle}</h2> : null}
+      {framed ? <p className="quiet-state">{copy.sectionHint}</p> : null}
 
       {/*
         One polite live region, announcing the pending phrase while a round is in
@@ -344,8 +371,10 @@ export function TaskDetailControls({
               {copy.refresh}
             </button>
           )}
+          {/* `2L-EDIT-008`, the same affordance the Work list mounts. */}
+          {undoAction ? <UndoAffordance action={undoAction} locale={locale} undo={state.undo} /> : null}
         </div>
       )}
-    </section>
+    </Frame>
   );
 }

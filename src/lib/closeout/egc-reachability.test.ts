@@ -283,6 +283,17 @@ const INVENTORY: readonly RouteEntry[] = [
   { route: "work", sections: [] },
   { route: "work/[taskId]", sections: [] },
   { route: "work/cancelled", sections: [] },
+  /*
+   * Phase 2L's parallel-route slot (`2L-EDIT-007`). These are not URLs — a slot
+   * does not appear in the address bar — but they are `page.tsx` files under the
+   * authenticated tree, and the inventory's whole point is that nothing there
+   * goes unenumerated. Two of them render `null`; the third mounts the *same*
+   * `TaskDetailSurface` as `work/[taskId]`, so it renders no collection that
+   * route does not already account for.
+   */
+  { route: "work/@panel", sections: [] },
+  { route: "work/@panel/(.)[taskId]", sections: [] },
+  { route: "work/@panel/[...catchAll]", sections: [] },
 ];
 
 /** Every `page.tsx` under the authenticated tree, as a route key. */
@@ -299,8 +310,41 @@ function routeInventory(directory = APP_ROOT, prefix = ""): string[] {
   return routes.sort();
 }
 
+/**
+ * What a route's page can reach, one level deep.
+ *
+ * ## Why this is not just the page file any more
+ *
+ * The check has always meant "the control is reachable from this route", and it
+ * approximated that by reading the page's own imports — which was exact while
+ * every page mounted its controls itself.
+ *
+ * Phase 2L broke the approximation without breaking the property.
+ * `2L-EDIT-007` requires the task detail to exist **once**, mounted by two
+ * routes (its own, and the intercepting one that renders it beside the list), so
+ * the body moved into `TaskDetailSurface` and the page became four lines. The
+ * control is exactly as reachable as it was; the page file simply stopped being
+ * where it is named.
+ *
+ * So the source a route is judged on is the page **plus the first-party feature
+ * modules it imports**. One level, and no further: two levels would drift back
+ * toward "somewhere in the repository imports this", which is the module-level
+ * check this file already rejected as far too weak. A page that delegates twice
+ * has to be enumerated honestly rather than chased.
+ */
 function pageSource(route: string): string {
-  return readFileSync(join(APP_ROOT, route, "page.tsx"), "utf8");
+  const page = readFileSync(join(APP_ROOT, route, "page.tsx"), "utf8");
+  const composed = [...page.matchAll(/from\s+["']@\/(features\/[^"']+)["']/g)]
+    .map((match) => join(REPO, "src", `${match[1]}.tsx`))
+    .filter((path) => {
+      try {
+        return statSync(path).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .map((path) => readFileSync(path, "utf8"));
+  return [page, ...composed].join("\n");
 }
 
 describe("EGC-INVARIANT-004: every rendered collection has a reachable writer", () => {

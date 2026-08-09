@@ -19,6 +19,7 @@ import { Check, Clock3, RotateCcw } from "lucide-react";
 import type { WorkItemView } from "@/features/daily-cycle/contracts";
 import { isWorkSurfaceAction, type WorkSurfaceAction } from "@/features/task-commands/taxonomy";
 import type { Locale } from "@/lib/preferences";
+import { UndoAffordance, type TaskUndoHandler } from "./undo-affordance";
 import { idleWorkItemActionState, type WorkItemActionState } from "./work-action-state";
 import { getWorkActionsCopy } from "./work-actions-copy";
 
@@ -38,10 +39,19 @@ export function WorkItemActions({
   action,
   locale,
   task,
+  undoAction,
 }: {
   action: WorkItemActionHandler;
   locale: Locale;
   task: WorkItemView;
+  /**
+   * `2L-EDIT-008`. Injected, for the same reason `action` is: this is a Client
+   * Component and the Server Action module carries the `server-only` guard.
+   *
+   * Optional, so the mounts that predate the affordance keep working unchanged
+   * — an absent handler means no control, never a control that fails.
+   */
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getWorkActionsCopy(locale);
   const router = useRouter();
@@ -144,6 +154,13 @@ export function WorkItemActions({
               {copy.refresh}
             </button>
           )}
+          {/*
+            `2L-EDIT-008`. Offered inside the outcome region, because "this
+            happened" and "you can take it back" are one thought — and because
+            an undo control floating outside the result would have no announced
+            relationship to the operation it reverses.
+          */}
+          {undoAction ? <UndoAffordance action={undoAction} locale={locale} undo={state.undo} /> : null}
         </div>
       )}
     </>

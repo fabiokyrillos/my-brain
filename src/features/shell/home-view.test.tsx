@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
 import type { Locale } from "@/lib/preferences";
+import { getWorkCopy } from "@/features/operations/copy";
 import { HomeView, type HomeViewModel } from "./home-view";
 
 // The row components report interactions through a Server Action, which reaches
@@ -50,7 +51,13 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     priorities: [],
     attention: [attentionItem()],
     attentionHasMore: false,
-    today: [{ taskId: "t1", title: LONG_TITLE, dueLabel: "31 jul.", stateLabel: "Não iniciada" }],
+    today: [{
+      taskId: "t1",
+      title: LONG_TITLE,
+      dueLabel: "31 jul.",
+      stateLabel: "Não iniciada",
+      sensitivity: { kind: "undetermined" as const },
+    }],
     todayHasMore: false,
     waitingCount: 2,
     openQuestion: "O retorno da Marina é para esta semana ou para a próxima?",
@@ -185,5 +192,79 @@ describe("HomeView", () => {
   it("renders the injected capture form", () => {
     renderHome(viewModel());
     expect(screen.getByText("captura")).toBeInTheDocument();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-PRIVACY-001`/`-007` — Hoje renders task titles, so Hoje asks the same
+ * contract Work asks.
+ * -------------------------------------------------------------------------- */
+
+describe("HomeView: withheld task content (OD-2L-1 option B)", () => {
+  const secret = { kind: "derived", level: "highly_sensitive" } as const;
+
+  it("withholds a protected task's title in the priority section", () => {
+    // Before this slice there was nothing to diverge from: `tasks` carried no
+    // classification at all. The moment Work began withholding one, a task
+    // masked on /app/work and printed in full on /app would be the exact defect
+    // the central contract was written to prevent.
+    renderHome(viewModel({
+      priorities: [
+        { taskId: "a", title: "Contrato Aurora", reason: "overdue", dueLabel: "01 ago.", sensitivity: secret },
+      ],
+    }));
+
+    expect(screen.queryByText("Contrato Aurora")).toBeNull();
+    expect(screen.getByText(getWorkCopy("pt-BR").protected.label)).toBeVisible();
+  });
+
+  it("withholds the reason and the due label with it", () => {
+    // A masked title beside "Atrasada" is a mask that leaks the interesting
+    // half: both are facts about a task the owner asked to be protected.
+    renderHome(viewModel({
+      priorities: [
+        { taskId: "a", title: "Contrato Aurora", reason: "overdue", dueLabel: "01 ago.", sensitivity: secret },
+      ],
+    }));
+
+    expect(screen.queryByText("Atrasada")).toBeNull();
+    expect(screen.queryByText("01 ago.")).toBeNull();
+  });
+
+  it("keeps the masked row, so the count and the ordering stay truthful", () => {
+    renderHome(viewModel({
+      priorities: [
+        { taskId: "a", title: "Contrato Aurora", reason: "overdue", dueLabel: null, sensitivity: secret },
+        { taskId: "b", title: "Ligar para a Marina", reason: "due_today", dueLabel: null, sensitivity: { kind: "undetermined" as const } },
+      ],
+    }));
+
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Ligar para a Marina")).toBeVisible();
+  });
+
+  it("withholds a protected task in the today list too", () => {
+    renderHome(viewModel({
+      priorities: [],
+      today: [{ taskId: "t9", title: "Segredo", dueLabel: null, stateLabel: "Não iniciada", sensitivity: secret }],
+    }));
+
+    expect(screen.queryByText("Segredo")).toBeNull();
+    expect(screen.getByText(getWorkCopy("pt-BR").protected.label)).toBeVisible();
+  });
+
+  it("leaves a manual task untouched", () => {
+    renderHome(viewModel({
+      priorities: [],
+      today: [{
+        taskId: "t9",
+        title: "Uma tarefa qualquer",
+        dueLabel: null,
+        stateLabel: "Não iniciada",
+        sensitivity: { kind: "undetermined" as const },
+      }],
+    }));
+
+    expect(screen.getByText("Uma tarefa qualquer")).toBeVisible();
   });
 });

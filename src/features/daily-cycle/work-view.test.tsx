@@ -89,6 +89,7 @@ describe("WorkView", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" } as const,
       }],
     });
 
@@ -129,6 +130,7 @@ describe("WorkView", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" } as const,
       }],
     });
 
@@ -153,6 +155,7 @@ describe("WorkView", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" } as const,
       }],
     });
 
@@ -175,6 +178,7 @@ describe("WorkView", () => {
         contexts: [{ id: "context-1", label: "Deep Work" }],
         people: [{ id: "person-1", label: "Alice" }],
         waitingOnPeople: [{ id: "person-2", label: "Bob" }],
+        sensitivity: { kind: "undetermined" } as const,
       }],
     });
 
@@ -198,6 +202,7 @@ describe("WorkView", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" } as const,
       }],
     });
 

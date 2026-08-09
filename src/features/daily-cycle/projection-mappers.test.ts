@@ -205,6 +205,13 @@ describe("daily cycle product projection mappers", () => {
       contexts: [],
       people: [],
       waitingOnPeople: [],
+      // `2L-PRIVACY-002`, and the same fail-closed reasoning as the line above.
+      // This source declares no classification at all, and the mapper resolves
+      // that to the **most protective** level rather than to `undetermined`:
+      // "nobody derived one" is a fact about the code, and letting it become
+      // "this task has no source" — which renders in the clear — is exactly the
+      // accident the three-arm type exists to prevent.
+      sensitivity: { kind: "derived", level: "highly_sensitive" },
     });
     expect(JSON.parse(JSON.stringify(attention))).toEqual(attention);
     expect(JSON.parse(JSON.stringify(work))).toEqual(work);

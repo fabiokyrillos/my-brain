@@ -387,6 +387,14 @@ export async function applyTaskDetailCommand(
         action,
         heading: outcomeCopy.title,
         detail: outcomeCopy.description,
+        // `2L-EDIT-008`/`-009`. The RPC's own answer, unmodified: an `undoId`
+        // on `applied` and `null` on `no_change`. Note that a cancellation
+        // reaches this branch too -- it is reversible inside the window, and
+        // the recovery route exists for afterwards. The two are different
+        // promises and the copy keeps them apart.
+        undo: result.outcome === "applied"
+          ? { undoId: result.undoId, expiresAt: result.undoExpiresAt }
+          : null,
       });
     }
 

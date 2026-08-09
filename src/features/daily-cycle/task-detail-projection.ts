@@ -1,4 +1,5 @@
 import "server-only";
+import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import { defaultAgentPreferences } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -110,10 +111,15 @@ export async function loadTaskDetailProjection(
 
   const [relationsByTaskId, entryResult, historyResult] = await Promise.all([
     loadTaskRelations(supabase, options.userId, [{ id: row.id, parent_task_id: row.parent_task_id }]),
+    // `2L-PRIVACY-001`/`-006`. The classification is read **here**, in the
+    // query that was already fetching this entry, rather than in a second one:
+    // one row, owner-scoped, bounded to the id the task itself names. A task
+    // with no source performs no read at all, which is what makes
+    // `undetermined` a fact about the task rather than a failed lookup.
     row.source_entry_id
       ? supabase
           .from("entries")
-          .select("id,original_content,occurred_at")
+          .select("id,original_content,occurred_at,sensitivity")
           .eq("user_id", options.userId)
           .eq("id", row.source_entry_id)
           .maybeSingle()
@@ -127,6 +133,24 @@ export async function loadTaskDetailProjection(
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT),
   ]);
+
+  const entry = requireSupabaseData(entryResult, "load task provenance") as
+    | { id: string; original_content: string; occurred_at: string; sensitivity: string | null }
+    | null;
+
+  /*
+   * The **same** derivation the Work list runs, over a map of the one entry
+   * this task names (`2L-PRIVACY-007`).
+   *
+   * Building a one-entry map rather than special-casing the single row is the
+   * point: the detail and the list then differ only in how many rows they read,
+   * never in what the answer means. An entry the query could not return is
+   * absent from the map for exactly the same reason it would be absent on the
+   * list, and resolves through the same branch to the most protective level.
+   */
+  const sourceLevels = new Map<string, string | null>(
+    entry ? [[entry.id, entry.sensitivity]] : [],
+  );
 
   const relations = relationsByTaskId.get(row.id);
   const task = toWorkItemView({
@@ -148,12 +172,10 @@ export async function loadTaskDetailProjection(
     waitingOnPeople: relations?.waitingOnPeople,
     parent: relations?.parent,
     dependsOn: relations?.dependsOn,
+    sensitivity: deriveTaskSensitivity(row.source_entry_id, sourceLevels),
   });
   if (!task) return null;
 
-  const entry = requireSupabaseData(entryResult, "load task provenance") as
-    | { id: string; original_content: string; occurred_at: string }
-    | null;
   const history = (requireSupabaseData(historyResult, "load task history") ?? []) as {
     id: string;
     action_type: string;

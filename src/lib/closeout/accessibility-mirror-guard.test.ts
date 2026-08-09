@@ -250,11 +250,66 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
      * the fixture would silently stop representing it — so both are asserted.
      */
     expect(row).not.toMatch(/<button\b|<form\b|onClick/);
-    const fixture = mirror.slice(
-      mirror.indexOf("function conversationSuggestions()"),
-      mirror.indexOf("const SURFACES = ["),
-    );
-    expect(fixture).not.toMatch(/<button|<a /);
+    /*
+     * Bounded to *this* builder rather than to everything before `SURFACES`.
+     * The first draft sliced to the declaration and passed only because
+     * `conversationSuggestions` happened to be last; slice 2L.1 added two
+     * builders after it and the assertion started reading their markup. A
+     * fixture check that widens whenever a fixture is appended is a check that
+     * fails for a reason unrelated to what it is about.
+     */
+    const start = mirror.indexOf("function conversationSuggestions()");
+    const end = mirror.indexOf("\n}", start) + 2;
+    expect(end, "the suggestions builder could not be delimited").toBeGreaterThan(start);
+    expect(mirror.slice(start, end)).not.toMatch(/<button|<a /);
+  });
+
+  it("pins the Work list's own structure, which slice 2L.1 added to the lane", () => {
+    /*
+     * `2L-ACCESS-001`. Every class below is load-bearing for an assertion the
+     * lane makes: the row actions and the quick-edit summary are measured by
+     * the touch-target check, the protected stub and its toggle are what the
+     * masked row *is*, and the undo button is the control `2L-EDIT-008` added.
+     * A component that renamed one would leave the lane scanning markup the
+     * product no longer emits — green, and about nothing.
+     */
+    const list = read("src/features/operations/task-list.tsx");
+    const protectedContent = read("src/features/operations/protected-content.tsx");
+    const quickEdit = read("src/features/operations/quick-edit.tsx");
+    const undo = read("src/features/operations/undo-affordance.tsx");
+
+    for (const [source, name, tokens] of [
+      [list, "task-list.tsx", ["list-row", "list-row-main", "list-meta", "work-origin"]],
+      [protectedContent, "protected-content.tsx", ["work-protected", "work-protected-label", "work-protected-toggle", 'data-masked="true"']],
+      [quickEdit, "quick-edit.tsx", ["work-quick-edit", "work-quick-edit-summary"]],
+      [undo, "undo-affordance.tsx", ["work-undo", "work-undo-button", "work-undo-window"]],
+    ] as const) {
+      for (const token of tokens) {
+        expect(source, `${name} no longer emits ${token}`).toContain(token);
+        expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+      }
+    }
+  });
+
+  it("pins the task panel's frame and its close control", () => {
+    // `2L-EDIT-007`. The panel's frame is the only thing that differs between
+    // the two mounts, so it is the only thing the mirror can get wrong about a
+    // surface whose controls are shared by construction.
+    const view = read("src/features/daily-cycle/task-detail-view.tsx");
+    const close = read("src/features/daily-cycle/task-panel-close.tsx");
+    for (const token of ["task-detail-panel", "task-detail-header", "task-detail-section"]) {
+      expect(view, `task-detail-view.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    for (const token of ["back-link", "task-panel-close"]) {
+      expect(close, `task-panel-close.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    // A button, not an anchor: it performs a history operation rather than
+    // naming a destination, and the mirror has to represent that or the lane
+    // would scan a link the product does not render.
+    expect(close).toMatch(/<button/);
+    expect(mirror).toMatch(/<button class="back-link task-panel-close"/);
   });
 
   it("states its own limits, so a green lane is never read as more than it is", () => {

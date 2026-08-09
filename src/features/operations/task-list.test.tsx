@@ -13,12 +13,15 @@
  * rotated after every terminal outcome.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkItemView } from "@/features/daily-cycle/contracts";
 import { TaskList, type WorkItemActionHandler } from "./task-list";
+import { getWorkCopy } from "./copy";
 import { idleWorkItemActionState, type WorkItemActionState } from "./work-action-state";
 
 const refresh = vi.fn();
@@ -46,6 +49,9 @@ function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
     waitingOnPeople: [],
     parent: null,
     dependsOn: [],
+    // A manual task by default: no source entry, so no derivable classification
+    // and nothing withheld. Rows that are meant to be masked say so explicitly.
+    sensitivity: { kind: "undetermined" },
     ...overrides,
   } as WorkItemView;
 }
@@ -423,5 +429,93 @@ describe("2F-SURFACE-010 — keyboard, focus and announcements", () => {
     await waitFor(() =>
       expect(screen.getAllByRole("region", { name: "Resultado da ação" })).toHaveLength(1),
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-PRIVACY-001`, `-003`, `-004`, `-008` — the derived classification, on the
+ * list.
+ * -------------------------------------------------------------------------- */
+
+describe("TaskList: withheld content (OD-2L-1 option B)", () => {
+  const secret = { kind: "derived", level: "highly_sensitive" } as const;
+
+  function renderTasks(tasks: WorkItemView[], locale: "pt-BR" | "en" = "en") {
+    const { action } = handler();
+    return render(
+      <TaskList action={action} agentName="Brain" emptyHint="x" locale={locale} tasks={tasks} timezone="UTC" />,
+    );
+  }
+
+  it("withholds the title and the description of a task whose source is protected", () => {
+    renderTasks([workItem({ title: "Contrato Aurora", description: "Cláusula 7", sensitivity: secret })]);
+
+    expect(screen.queryByText("Contrato Aurora")).toBeNull();
+    expect(screen.queryByText("Cláusula 7")).toBeNull();
+    expect(screen.getByText(getWorkCopy("en").protected.label)).toBeVisible();
+  });
+
+  it("shows an ordinary and a manual task in the clear", () => {
+    renderTasks([
+      workItem({ title: "Ordinary", sensitivity: { kind: "derived", level: "normal" } }),
+      workItem({ taskId: OTHER_TASK_ID, title: "Manual", sensitivity: { kind: "undetermined" } }),
+    ]);
+
+    expect(screen.getByText("Ordinary")).toBeVisible();
+    expect(screen.getByText("Manual")).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("en").protected.label)).toBeNull();
+  });
+
+  it("keeps the masked row in the list, with its state, its dates and its actions", () => {
+    // `2L-PRIVACY-003`/`-008`. The row survives so the count stays truthful, and
+    // the task stays operable without revealing what it says.
+    renderTasks([workItem({ title: "Contrato Aurora", sensitivity: secret })]);
+
+    expect(screen.getByRole("button", { name: /Complete/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Wait/ })).toBeVisible();
+    expect(screen.getByText("Not started")).toBeVisible();
+  });
+
+  it("reveals one masked row without revealing another", async () => {
+    const user = userEvent.setup();
+    renderTasks([
+      workItem({ title: "First secret", sensitivity: secret }),
+      workItem({ taskId: OTHER_TASK_ID, title: "Second secret", sensitivity: secret }),
+    ]);
+
+    await user.click(screen.getAllByRole("button", { name: getWorkCopy("en").protected.reveal })[0]);
+
+    expect(screen.getByText("First secret")).toBeVisible();
+    expect(screen.queryByText("Second secret")).toBeNull();
+  });
+
+  it("keeps a masked row openable", () => {
+    renderTasks([
+      workItem({
+        title: "Contrato Aurora",
+        sensitivity: secret,
+        availableActions: [{ id: "open_task", href: "/en/app/work/task-1" }],
+      }),
+    ]);
+
+    expect(screen.getByRole("link", { name: getWorkCopy("en").protected.label }))
+      .toHaveAttribute("href", "/en/app/work/task-1");
+  });
+
+  it("states the partial coverage rather than implying every task is protected", () => {
+    // `2L-PRIVACY-004`. Option B covers tasks that came from a note and nothing
+    // else, and a surface that said nothing would let a user assume otherwise.
+    renderTasks([workItem({ title: "Contrato Aurora", sensitivity: secret })]);
+
+    expect(screen.getByText(getWorkCopy("en").protected.partialCoverage)).toBeInTheDocument();
+  });
+
+  it("does not decide anything itself: the rule comes from the shared component", () => {
+    // `2L-PRIVACY-007`, structurally. The list may not test a level of its own;
+    // `sensitivity-boundary.test.ts` proves the negative repository-wide and
+    // this pins the positive for this file.
+    const source = readFileSync(join(__dirname, "task-list.tsx"), "utf8");
+    expect(source).toMatch(/ProtectedContent/);
+    expect(source).not.toMatch(/highly_sensitive|presentationFor|resolveContent/);
   });
 });

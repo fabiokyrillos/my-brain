@@ -18,6 +18,7 @@ type WorkProjectionModule = {
     items: readonly unknown[];
     hasNext: boolean;
     timezone: string;
+    editControlsByTaskId: Record<string, unknown>;
   }>;
 };
 
@@ -51,6 +52,7 @@ type TaskRow = {
   intentional_no_due: boolean;
   no_due_reason: string | null;
   parent_task_id: string | null;
+  source_entry_id: string | null;
 };
 
 function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
@@ -68,23 +70,32 @@ function task(index: number, overrides: Partial<TaskRow> = {}): TaskRow {
     intentional_no_due: false,
     no_due_reason: null,
     parent_task_id: null,
+    source_entry_id: null,
     ...overrides,
   };
 }
 
-function clientMock(options: { tasks?: TaskRow[]; timezone?: string | null } = {}) {
+function clientMock(
+  options: {
+    tasks?: TaskRow[];
+    timezone?: string | null;
+    entries?: { id: string; sensitivity: string | null }[];
+  } = {},
+) {
   const profileQuery = queryStub({
     data: options.timezone === null ? null : { timezone: options.timezone ?? "America/Sao_Paulo" },
     error: null,
   });
   const tasksQuery = queryStub({ data: options.tasks ?? [task(1)], error: null });
+  const entriesQuery = queryStub({ data: options.entries ?? [], error: null });
   const emptyRelationQuery = queryStub({ data: [], error: null });
   const from = vi.fn((table: string) => {
     if (table === "profiles") return profileQuery;
     if (table === "tasks") return tasksQuery;
+    if (table === "entries") return entriesQuery;
     return emptyRelationQuery;
   });
-  return { client: { from }, from, profileQuery, tasksQuery };
+  return { client: { from }, from, profileQuery, tasksQuery, entriesQuery };
 }
 
 function loadWorkProjection() {
@@ -208,6 +219,7 @@ describe("loadWorkProjection", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" },
       },
       {
         taskId: "task-002",
@@ -224,6 +236,7 @@ describe("loadWorkProjection", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" },
       },
     ]);
   });
@@ -267,6 +280,7 @@ describe("loadWorkProjection", () => {
         contexts: [],
         people: [],
         waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" },
       },
     ]);
   });
@@ -380,5 +394,177 @@ describe("loadWorkProjection", () => {
     expect(from).not.toHaveBeenCalledWith("task_projects");
     expect(from).not.toHaveBeenCalledWith("task_contexts");
     expect(from).not.toHaveBeenCalledWith("task_people");
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-EDIT-001` — the editable field set, derived rather than listed.
+ * -------------------------------------------------------------------------- */
+
+describe("loadWorkProjection: the quick-edit control set", () => {
+  it("derives each row's controls from the taxonomy against its real status", async () => {
+    const { detailControlsFor } = await import("@/features/task-commands/detail-controls");
+    const { client } = clientMock({
+      tasks: [task(1, { status: "todo" }), task(2, { status: "completed" })],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    // Compared against the derivation rather than against a literal set: a
+    // taxonomy change moves both together, and a hand-written list here would
+    // be the second copy `2L-EDIT-001` forbids.
+    const controls = page.editControlsByTaskId;
+    expect(controls["task-001"]).toEqual(detailControlsFor("todo"));
+    expect(controls["task-002"]).toEqual(detailControlsFor("completed"));
+    // Non-vacuous: the two statuses genuinely admit different verbs, so a
+    // projection that returned one set for everything would fail.
+    expect(controls["task-001"]).not.toEqual(controls["task-002"]);
+  });
+
+  it("uses the row's real status, which the rendered view deliberately cannot supply", async () => {
+    // `inbox` and `todo` both project to `not_started`; the taxonomy does not
+    // treat them identically. Deriving from `humanState` would guess exactly
+    // here, so the projection is the only place this can be answered.
+    const { detailControlsFor } = await import("@/features/task-commands/detail-controls");
+    const { client } = clientMock({ tasks: [task(1, { status: "inbox" })] });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    const controls = page.editControlsByTaskId;
+    expect(controls["task-001"]).toEqual(detailControlsFor("inbox"));
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-PRIVACY-001`, `-002`, `-004`, `-005`, `-006` — OD-2L-1 option B on the
+ * Work list.
+ * -------------------------------------------------------------------------- */
+
+describe("loadWorkProjection: the derived classification (OD-2L-1 option B)", () => {
+  it("reads the source classifications once per page, owner-scoped and bounded to the page's ids", async () => {
+    const { client, from, entriesQuery } = clientMock({
+      tasks: [
+        task(1, { source_entry_id: "entry-a" }),
+        task(2, { source_entry_id: "entry-b" }),
+        // The same source twice: the read must not grow with the number of rows.
+        task(3, { source_entry_id: "entry-a" }),
+        task(4, { source_entry_id: null }),
+      ],
+      entries: [
+        { id: "entry-a", sensitivity: "normal" },
+        { id: "entry-b", sensitivity: "highly_sensitive" },
+      ],
+    });
+
+    await loadWorkProjection()(client, { userId: "user-1", locale: "en", view: "all", page: 1 });
+
+    // `2L-PRIVACY-006`: owner scope is stated in the query, not left to RLS
+    // alone, and the `in` list is the page's own ids — never a per-user scan
+    // and never one query per task.
+    expect(entriesQuery.select).toHaveBeenCalledWith("id,sensitivity");
+    expect(entriesQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(entriesQuery.in).toHaveBeenCalledWith("id", ["entry-a", "entry-b"]);
+    expect(from.mock.calls.filter(([table]) => table === "entries")).toHaveLength(1);
+  });
+
+  it("does not read entries at all when no task on the page came from one", async () => {
+    const { client, from } = clientMock({ tasks: [task(1), task(2)] });
+
+    await loadWorkProjection()(client, { userId: "user-1", locale: "en", view: "all", page: 1 });
+
+    expect(from).not.toHaveBeenCalledWith("entries");
+  });
+
+  it("derives each row's level from its own source", async () => {
+    const { client } = clientMock({
+      tasks: [
+        task(1, { source_entry_id: "entry-normal" }),
+        task(2, { source_entry_id: "entry-private" }),
+        task(3, { source_entry_id: "entry-secret" }),
+      ],
+      entries: [
+        { id: "entry-normal", sensitivity: "normal" },
+        { id: "entry-private", sensitivity: "private" },
+        { id: "entry-secret", sensitivity: "highly_sensitive" },
+      ],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    expect(page.items.map((item) => (item as { sensitivity: unknown }).sensitivity)).toEqual([
+      { kind: "derived", level: "normal" },
+      { kind: "derived", level: "private" },
+      { kind: "derived", level: "highly_sensitive" },
+    ]);
+  });
+
+  it("resolves a manual task to `undetermined`, never to `normal`", async () => {
+    const { client } = clientMock({ tasks: [task(1, { source_entry_id: null })] });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    expect((page.items[0] as { sensitivity: unknown }).sensitivity).toEqual({ kind: "undetermined" });
+  });
+
+  it("resolves a source absent from the owner-scoped read to the most protective level", async () => {
+    // Removed, foreign and simply unreadable are the same fact here: the id is
+    // not in the map. `2L-PRIVACY-005` requires all three to be indistinguishable.
+    const { client } = clientMock({
+      tasks: [
+        task(1, { source_entry_id: "entry-removed" }),
+        task(2, { source_entry_id: "entry-foreign" }),
+      ],
+      entries: [],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    const [first, second] = page.items.map((item) => (item as { sensitivity: unknown }).sensitivity);
+    expect(first).toEqual({ kind: "derived", level: "highly_sensitive" });
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
+
+  it("keeps the masked row in the page, so the count and the pagination stay truthful", async () => {
+    // `2L-PRIVACY-003`. Excluding the row would make `hasNext`, the rendered
+    // count and any future selection describe a set the user does not own.
+    const { client } = clientMock({
+      tasks: [task(1, { source_entry_id: "entry-secret" }), task(2)],
+      entries: [{ id: "entry-secret", sensitivity: "highly_sensitive" }],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    expect(page.items).toHaveLength(2);
+  });
+
+  it("persists nothing: the classification is read and never written back", async () => {
+    // `2L-PRIVACY-002`. The projection is a read; the assertion is that the
+    // only table it touches beyond its existing reads is `entries`, and that no
+    // write verb is reachable from the stubs it was given.
+    const { client, from, tasksQuery, entriesQuery } = clientMock({
+      tasks: [task(1, { source_entry_id: "entry-a" })],
+      entries: [{ id: "entry-a", sensitivity: "private" }],
+    });
+
+    await loadWorkProjection()(client, { userId: "user-1", locale: "en", view: "all", page: 1 });
+
+    for (const stub of [tasksQuery, entriesQuery]) {
+      expect(stub.update).toBeUndefined();
+      expect(stub.insert).toBeUndefined();
+      expect(stub.upsert).toBeUndefined();
+    }
+    expect(from).not.toHaveBeenCalledWith("undo_operations");
   });
 });

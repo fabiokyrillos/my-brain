@@ -15,7 +15,18 @@
 import Link from "next/link";
 import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
+import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
+import type { DetailControl } from "@/features/task-commands/detail-controls";
+import type {
+  TaskDetailCommandHandler,
+  TaskDetailDateBounds,
+  TaskDetailRelationOptions,
+} from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
+import { getWorkCopy } from "./copy";
+import { ProtectedContent } from "./protected-content";
+import { QuickEdit } from "./quick-edit";
+import type { TaskUndoHandler } from "./undo-affordance";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
@@ -40,13 +51,34 @@ const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
 
 export type { WorkItemActionHandler };
 
+/**
+ * Everything quick edit needs, injected as one object (`2L-EDIT-001`).
+ *
+ * Optional, and deliberately all-or-nothing: a list rendered without it is the
+ * list exactly as it was, which is what lets the jsdom gate and the Hoje panel
+ * mount `TaskList` without a relation query. Half-supplied would be worse than
+ * absent — a control with no options to point at is a control the user can only
+ * fail to use.
+ */
+export type QuickEditSupport = {
+  readonly action: TaskDetailCommandHandler;
+  /** `2L-EDIT-008`. A quick edit is an operation too, and reversible the same way. */
+  readonly undoAction?: TaskUndoHandler;
+  /** Derived from the taxonomy per row, server-side. Never computed here. */
+  readonly controlsByTaskId: Readonly<Record<string, readonly DetailControl[]>>;
+  readonly relationOptions: TaskDetailRelationOptions;
+  readonly dateBounds: TaskDetailDateBounds;
+};
+
 export function TaskList({
   action,
   agentName,
   emptyHint,
   locale,
+  quickEdit,
   tasks,
   timezone,
+  undoAction,
 }: {
   /** The assistant’s configured name (UX-06), injected for the same reason the action is. */
   agentName: string;
@@ -63,19 +95,49 @@ export function TaskList({
   action: WorkItemActionHandler;
   emptyHint: string;
   locale: Locale;
+  quickEdit?: QuickEditSupport;
   tasks: readonly WorkItemView[];
   timezone: string;
+  /** `2L-EDIT-008`. Injected, like every other action this surface calls. */
+  undoAction?: TaskUndoHandler;
 }) {
   const pt = locale === "pt-BR";
   if (tasks.length === 0) {
     return <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Tudo em ordem" : "All clear"}</strong><p>{emptyHint}</p></div>;
   }
 
+  /*
+   * `2L-PRIVACY-004` — the partial coverage, stated where it could mislead.
+   *
+   * OD-2L-1 option B protects a task through the note it came from, and a task
+   * typed straight into this list has no note. A user looking at a page where
+   * *something* is withheld would otherwise reasonably conclude that everything
+   * sensitive is, so the sentence appears exactly when at least one row is
+   * masked — and never on a page where nothing is, where it would be noise
+   * about a mechanism the user has not met.
+   */
+  // "Is anything withheld" is asked of the **contract**, never of a level: this
+  // file may not name a classification, and `sensitivity-boundary.test.ts`
+  // fails the build if it does.
+  const anyWithheld = tasks.some((task) => resolveTaskContent(task.sensitivity, task.taskId).masked);
+
   return (
     <div className="list-stack">
       {tasks.map((task) => (
-        <TaskRow action={action} agentName={agentName} key={task.taskId} locale={locale} task={task} timezone={timezone} />
+        <TaskRow
+          action={action}
+          agentName={agentName}
+          key={task.taskId}
+          locale={locale}
+          quickEdit={quickEdit}
+          task={task}
+          timezone={timezone}
+          undoAction={undoAction}
+        />
       ))}
+      {anyWithheld ? (
+        <p className="quiet-state work-protected-note">{getWorkCopy(locale).protected.partialCoverage}</p>
+      ) : null}
     </div>
   );
 }
@@ -84,14 +146,18 @@ function TaskRow({
   action,
   agentName,
   locale,
+  quickEdit,
   task,
   timezone,
+  undoAction,
 }: {
   action: WorkItemActionHandler;
   agentName: string;
   locale: Locale;
+  quickEdit?: QuickEditSupport;
   task: WorkItemView;
   timezone: string;
+  undoAction?: TaskUndoHandler;
 }) {
   const pt = locale === "pt-BR";
   // The producer of `open_task` is `work-projection.ts`; this is its consumer.
@@ -104,8 +170,26 @@ function TaskRow({
   return (
     <article className="list-row">
       <div className="list-row-main">
-        {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
-        {task.description && <p>{task.description}</p>}
+        {/*
+          `2L-PRIVACY-001`/`-003`. The title and the description are the only
+          user content this row renders, and they are withheld together: masking
+          one and printing the other would protect nothing.
+
+          The row itself survives — its state, its dates, its relations and its
+          four actions all stay — because the count, the pagination and any
+          later selection have to keep describing the set the user actually
+          owns. `href` keeps the masked row openable without putting the
+          withheld title into the link.
+        */}
+        <ProtectedContent
+          href={openHref}
+          locale={locale}
+          revealKey={task.taskId}
+          sensitivity={task.sensitivity}
+        >
+          {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
+          {task.description && <p>{task.description}</p>}
+        </ProtectedContent>
         <small className="work-origin">{task.origin === "brain" ? (pt ? `Sugerida pelo ${agentName}` : `Suggested by ${agentName}`) : (pt ? "Criada por você" : "Created by you")}</small>
         {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
           || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (
@@ -150,7 +234,24 @@ function TaskRow({
         )}
         {task.noDueReason && <small>{task.noDueReason}</small>}
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
-        <WorkItemActions action={action} locale={locale} task={task} />
+        <WorkItemActions action={action} locale={locale} task={task} undoAction={undoAction} />
+        {/*
+          `2L-EDIT-001`. The controls arrive already derived from the taxonomy
+          against this row's real status — this row does not compute them, and
+          could not: `humanState` is lossy on purpose.
+        */}
+        {quickEdit ? (
+          <QuickEdit
+            action={quickEdit.action}
+            controls={quickEdit.controlsByTaskId[task.taskId] ?? []}
+            dateBounds={quickEdit.dateBounds}
+            locale={locale}
+            relationOptions={quickEdit.relationOptions}
+            taskId={task.taskId}
+            title={task.title}
+            undoAction={quickEdit.undoAction}
+          />
+        ) : null}
       </div>
     </article>
   );

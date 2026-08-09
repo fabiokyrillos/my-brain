@@ -62,8 +62,8 @@ describe("2J-HOJE-004/006: the priorities section shows what qualifies, and no m
   it("renders each priority with its reason", () => {
     renderHome({
       priorities: [
-        { taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: "01 ago." },
-        { taskId: "b", title: "Ligar para a Marina", reason: "due_today", dueLabel: "08 ago." },
+        { taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: "01 ago." , sensitivity: { kind: "undetermined" as const }},
+        { taskId: "b", title: "Ligar para a Marina", reason: "due_today", dueLabel: "08 ago." , sensitivity: { kind: "undetermined" as const }},
       ],
     });
     expect(screen.getByText("Enviar o contrato")).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("2J-HOJE-004/006: the priorities section shows what qualifies, and no m
   it("says so when nothing qualifies, instead of borrowing from the list below", () => {
     renderHome({
       priorities: [],
-      today: [{ taskId: "t1", title: "Uma tarefa qualquer", dueLabel: null, stateLabel: "Não iniciada" }],
+      today: [{ taskId: "t1", title: "Uma tarefa qualquer", dueLabel: null, stateLabel: "Não iniciada", sensitivity: { kind: "undetermined" as const } }],
     });
     expect(screen.getByText("Nada exige prioridade hoje.")).toBeInTheDocument();
     // The task below is still rendered -- the point is that it did NOT get
@@ -84,7 +84,7 @@ describe("2J-HOJE-004/006: the priorities section shows what qualifies, and no m
 
   it("prints the ordering rule, so the order is explainable without the code", () => {
     renderHome({
-      priorities: [{ taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: null }],
+      priorities: [{ taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: null , sensitivity: { kind: "undetermined" as const }}],
     });
     expect(
       screen.getByText(/Atrasadas primeiro, depois as de hoje/),
@@ -102,8 +102,8 @@ describe("2J-HOJE-003: overdue and due today are told apart in the markup", () =
   it("carries a distinct reason marker for each", () => {
     const { container } = renderHome({
       priorities: [
-        { taskId: "a", title: "Atrasada", reason: "overdue", dueLabel: null },
-        { taskId: "b", title: "Hoje", reason: "due_today", dueLabel: null },
+        { taskId: "a", title: "Atrasada", reason: "overdue", dueLabel: null , sensitivity: { kind: "undetermined" as const }},
+        { taskId: "b", title: "Hoje", reason: "due_today", dueLabel: null , sensitivity: { kind: "undetermined" as const }},
       ],
     });
     expect(container.querySelector('[data-reason="overdue"]')).not.toBeNull();

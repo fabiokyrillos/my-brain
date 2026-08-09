@@ -4,9 +4,15 @@ import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
 import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
 import { PaginationLinks } from "@/features/shell/pagination-links";
-import { runTaskCommand } from "@/features/task-commands/actions";
+import { runTaskCommand, undoWorkOperation } from "@/features/task-commands/actions";
 import { CommandConsole } from "@/features/task-commands/command-console";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
+import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
+import type { DetailControl } from "@/features/task-commands/detail-controls";
+import type {
+  TaskDetailDateBounds,
+  TaskDetailRelationOptions,
+} from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
 import { workViews, type WorkViewId } from "./work-projection";
@@ -45,6 +51,9 @@ export function WorkView({
   items,
   hasNext,
   agentName,
+  editControlsByTaskId,
+  relationOptions,
+  dateBounds,
 }: {
   locale: Locale;
   timezone: string;
@@ -53,6 +62,10 @@ export function WorkView({
   items: readonly WorkItemView[];
   hasNext: boolean;
   agentName: string;
+  /** Derived from the taxonomy per row, in the projection (`2L-EDIT-001`). */
+  editControlsByTaskId?: Readonly<Record<string, readonly DetailControl[]>>;
+  relationOptions?: TaskDetailRelationOptions;
+  dateBounds?: TaskDetailDateBounds;
 }) {
   const text = withAgentName(copy[locale], agentName);
   const active = text.views[view];
@@ -78,7 +91,22 @@ export function WorkView({
       </Link>)}
     </nav>
     <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
-    <TaskList agentName={agentName} action={applyWorkItemAction} emptyHint={active.empty} locale={locale} tasks={items} timezone={timezone} />
+    <TaskList
+      agentName={agentName}
+      action={applyWorkItemAction}
+      emptyHint={active.empty}
+      locale={locale}
+      tasks={items}
+      timezone={timezone}
+      undoAction={undoWorkOperation}
+      quickEdit={editControlsByTaskId && relationOptions && dateBounds ? {
+        action: applyTaskDetailCommand,
+        undoAction: undoWorkOperation,
+        controlsByTaskId: editControlsByTaskId,
+        relationOptions,
+        dateBounds,
+      } : undefined}
+    />
     {/*
       2E-DESTRUCTIVE-006's explicit affordance. It lives here rather than in the
       navigation because `capabilities.ts`'s `nested: true` drives active-state

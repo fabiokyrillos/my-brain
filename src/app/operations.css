@@ -201,3 +201,66 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-origin{display:block;color:var(--ink-soft);font-size:10px;margin-top:5px}
 .work-page .row-action{min-height:44px;display:inline-flex;align-items:center;gap:5px}
 @media(max-width:600px){.work-page .list-meta{align-items:flex-start;flex-wrap:wrap}.work-page .row-actions{width:100%}.work-page .row-actions form{flex:1}.work-page .row-action{justify-content:center;width:100%}}
+
+/* Phase 2L slice 2L.1: withheld task content (OD-2L-1 option B).
+
+   A masked item occupies the same slot as the content it withholds, so the
+   count, the pagination and the row's own actions stay truthful
+   (`2L-PRIVACY-003`). The dashed border is the same grammar `.home-masked`
+   established in Phase 2J, so "something is here and it is not being shown"
+   looks the same wherever the product does it. */
+.work-protected{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.work-protected[data-masked="true"]{padding:6px 10px;border:1px dashed var(--line);border-radius:10px;color:var(--ink-soft);font-size:13px}
+.work-protected-label{font:600 13px var(--font-sans)}
+/* 44px, from paint: the reveal is a real control on a phone, not a text link
+   that happens to be clickable (`2L-MOBILE-001` measures this in the browser). */
+.work-protected-toggle{min-height:44px;display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:white;padding:0 14px;color:var(--blue);font:600 12px var(--font-sans);cursor:pointer}
+.work-protected-toggle:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-protected-revealed{display:block}
+.work-protected-note{margin-top:10px;font-size:11px}
+
+/* Phase 2L slice 2L.1: quick edit on a Work row (`2L-EDIT-001`).
+
+   A disclosure rather than twelve controls at rest: a row that showed every
+   verb the taxonomy admits would bury the task under the ways to change it,
+   and on a phone it would be unreachable. `<details>` carries the keyboard
+   operation and the expanded/collapsed announcement without a line of JS. */
+.work-quick-edit{width:100%;margin-top:8px}
+.work-quick-edit-summary{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:white;color:var(--ink-soft);font:600 12px var(--font-sans);cursor:pointer;list-style:none}
+.work-quick-edit-summary::-webkit-details-marker{display:none}
+.work-quick-edit-summary:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-quick-edit[open] .work-quick-edit-summary{background:var(--ink);color:white;border-color:var(--ink)}
+.task-detail-controls-inline{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}
+.task-detail-controls-inline .task-control-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+@media(max-width:600px){.work-quick-edit-summary{width:100%;justify-content:center}}
+
+/* Phase 2L slice 2L.1: the undo affordance (`2L-EDIT-008`).
+
+   Inside the outcome region rather than beside it: "this happened" and "you can
+   take it back" are one thought, and a control floating outside the result
+   would have no announced relationship to the operation it reverses. */
+.work-undo{margin-top:10px}
+.work-undo-button{min-height:44px}
+.work-undo-window{margin:6px 0 0;color:var(--ink-soft);font-size:11px}
+.work-undo-result{margin-top:8px;color:var(--ink-soft);font-size:12px}
+.work-undo-result:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+
+/* Phase 2L slice 2L.1: the responsive task detail (`2L-EDIT-007`).
+
+   One implementation, two frames. Wide: the list keeps its place and the task
+   docks beside it. Narrow: the task IS the surface, and the list is
+   `display:none` rather than covered - which is the difference between a
+   surface and an untrapped modal. A covered list stays in the accessibility
+   tree and stays reachable by a screen reader while the user believes they are
+   on the task; a removed one leaves nothing behind to escape from. */
+.work-shell{display:block}
+.work-shell-main{min-width:0}
+@media(min-width:1024px){
+  .work-shell:has(.task-detail-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,440px);gap:24px;align-items:start}
+  .task-detail-panel{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow-y:auto;border:1px solid var(--line);border-radius:16px;padding:20px;background:white}
+}
+@media(max-width:1023px){
+  .work-shell:has(.task-detail-panel) .work-shell-main{display:none}
+}
+.task-panel-close{min-height:44px;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;color:var(--blue);font:600 12px var(--font-sans);cursor:pointer}
+.task-panel-close:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
