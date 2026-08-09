@@ -23,6 +23,8 @@ type WorkViewModule = {
     page: number;
     items: readonly WorkItemView[];
     hasNext: boolean;
+    query?: Record<string, unknown>;
+    positionAdjusted?: boolean;
   }) => React.ReactNode;
 };
 
@@ -227,5 +229,124 @@ describe("WorkView", () => {
       "href",
       "/en/app/work?view=waiting&page=3",
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-VIEW-004`/`-005`/`-006`/`-007`/`-009` and `2L-RETURN-005` — the URL is
+ * the state, on screen.
+ * -------------------------------------------------------------------------- */
+
+describe("WorkView: narrowing, grouping and the position", () => {
+  const query = {
+    view: "all" as const,
+    state: "open" as const,
+    due: "any" as const,
+    priority: "any" as const,
+    origin: "any" as const,
+    projectId: null,
+    contextId: null,
+    order: "default" as const,
+    group: "none" as const,
+    page: 1,
+  };
+
+  function item(id: string, overrides: Record<string, unknown> = {}) {
+    return {
+      taskId: id,
+      title: `Task ${id}`,
+      intentionalNoDue: false,
+      humanState: "not_started",
+      origin: "you",
+      availableActions: [],
+      projects: [],
+      contexts: [],
+      people: [],
+      waitingOnPeople: [],
+      sensitivity: { kind: "undetermined" } as const,
+      ...overrides,
+    } as unknown as WorkItemView;
+  }
+
+  it("renders a control per declared value of every filter, and marks the active one", () => {
+    renderWork({ locale: "en", view: "all", query: { ...query, priority: "high" } });
+
+    const group = screen.getByRole("group", { name: "Priority" });
+    expect(within(group).getByRole("link", { name: "High" })).toHaveAttribute("aria-current", "page");
+    expect(within(group).getByRole("link", { name: "Any" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("carries the whole query on every control, so the parts compose", () => {
+    renderWork({ locale: "en", view: "all", query: { ...query, priority: "high", order: "due_asc" } });
+
+    // Changing the ordering must not drop the filter.
+    const order = screen.getByRole("group", { name: "Order" });
+    const link = within(order).getByRole("link", { name: "Latest due first" });
+    expect(link.getAttribute("href")).toContain("priority=high");
+    expect(link.getAttribute("href")).toContain("order=due_desc");
+  });
+
+  it("resets the page when a filter changes, and keeps it when the ordering does", () => {
+    renderWork({ locale: "en", view: "all", page: 3, query: { ...query, page: 3 } });
+
+    const priority = within(screen.getByRole("group", { name: "Priority" }))
+      .getByRole("link", { name: "High" });
+    expect(priority.getAttribute("href")).not.toContain("page=");
+
+    const order = within(screen.getByRole("group", { name: "Order" }))
+      .getByRole("link", { name: "Soonest due first" });
+    expect(order.getAttribute("href")).toContain("page=3");
+  });
+
+  it("keeps the narrowing when the view changes, but returns to the first page", () => {
+    renderWork({ locale: "en", view: "all", page: 4, query: { ...query, priority: "high", page: 4 } });
+
+    const tab = within(screen.getByRole("navigation", { name: "Work views" }))
+      .getByRole("link", { name: "Waiting" });
+    expect(tab.getAttribute("href")).toContain("priority=high");
+    expect(tab.getAttribute("href")).not.toContain("page=");
+  });
+
+  it("groups by the chosen attribute and states each group's count", () => {
+    renderWork({
+      locale: "en",
+      view: "all",
+      query: { ...query, group: "priority" },
+      items: [item("a", { priority: "high" }), item("b", { priority: "high" }), item("c")],
+    });
+
+    const high = screen.getByRole("region", { name: "High" });
+    expect(within(high).getByText("2 tasks")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Without that relationship" })).toBeVisible();
+  });
+
+  it("distinguishes a filtered-empty result from a genuinely empty view", () => {
+    renderWork({ locale: "en", view: "all", items: [], query: { ...query, priority: "urgent" } });
+    expect(screen.getByText(/No task matches these filters/)).toBeVisible();
+
+    cleanup();
+    renderWork({ locale: "en", view: "all", items: [], query });
+    expect(screen.getByText("Add a task above or capture an intention.")).toBeVisible();
+  });
+
+  it("says so when the position it restored is not the one that was asked for", () => {
+    renderWork({ locale: "en", view: "all", query, positionAdjusted: true });
+    expect(screen.getByText(/The page you had open is no longer here/)).toBeVisible();
+  });
+
+  it("carries the whole query on the pagination links", () => {
+    renderWork({
+      locale: "en",
+      view: "all",
+      page: 1,
+      hasNext: true,
+      query: { ...query, priority: "high", group: "project" },
+    });
+
+    const next = within(screen.getByRole("navigation", { name: "Pagination" }))
+      .getByRole("link", { name: "Next" });
+    expect(next.getAttribute("href")).toContain("priority=high");
+    expect(next.getAttribute("href")).toContain("group=project");
+    expect(next.getAttribute("href")).toContain("page=2");
   });
 });

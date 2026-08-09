@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L SLICE 2L.3: Work views, filters, ordering, grouping and return continuity
+
+**MIGRATION BUDGET: `1 allocated - 0 spent`.** The phase's single allocation lapses, which is the signed outcome under OD-2L-2 option A. No migration exists, therefore no deployment record and no G8. Hosted parity stays `202608090089`; `workView` is still exactly `today, all, waiting`.
+
+**Added.** `work-views.ts` (the taxonomy and each view's declared default ordering), `work-query.ts` (one parser and one serializer for the whole page description), `work-grouping.ts` (pure), `work-filters.tsx` + `work-filters-copy.ts`, and `operations/work-position.ts` (the return payload).
+
+**One parser, one serializer, so `2L-VIEW-007` is structural.** There is no cookie, preference or storage on the route, the view, the controls or the parser, and a test asserts that across all four files.
+
+**Every parameter fails closed, asserted PER PARAMETER.** A single "malformed input" test would pass while one of eight parsers fell open. A repeated parameter resolves to the default rather than to its first element: two values is a malformed request, and picking one would be guessing.
+
+**`state` cannot widen a view.** Its default reproduces each view's own status predicate exactly as it stood before this slice; `completed` and `cancelled` REPLACE it with a narrower one. There is no value that adds rows.
+
+**Filtering and grouping are different mechanisms on purpose.** Filtering runs in SQL and decides which rows are in the set; grouping runs over the page that came back and cannot issue a query at all - which is how "no unbounded per-user query" is satisfied structurally rather than by care.
+
+**There is deliberately no "order by priority".** `manual_priority` is text, so a database ordering over it would sort `high, low, medium, urgent` - a control that looks like it sorts by importance and does not. Sorting it correctly needs a CASE expression, which PostgREST cannot express without a computed column, which is a migration OD-2L-2 A refuses. Grouping by priority answers the same question honestly, in the taxonomy's own order, and costs nothing.
+
+**Every ordering ends with the id**, or a page boundary is unstable when two rows share a due date and the same row appears on two pages or on none.
+
+**The one place that came close to the migration, recorded rather than spent:** per-project and per-context are relation tables, not `tasks` columns. Rather than a joining view or RPC, the relation's task ids are read first - owner-scoped AND bounded to the one project or context - and the page query is bounded by them. That read grows with the size of that relation, never with the user's whole task set; a relation that matches nothing returns an empty page **without querying tasks at all**; and two relation filters compose by intersection, the only reading that cannot silently widen.
+
+**The return position travels with the link and carries nothing else.** `.strict()`, navigation identifiers and closed vocabularies only, with every forbidden field planted one at a time and the whole position falling back - being *ignored* would not be enough, because a later reader could start honouring it. Every return is a fresh owner-scoped read, asserted by the absence of `unstable_cache`, `revalidate` and `force-static` rather than by trusting today's code.
+
+**An invalid position resolves to the nearest one AND says so.** The nearest is the first page rather than "the last page with rows": the projection is offset-based, and walking backwards would cost more reads than the fact is worth. Recorded rather than claimed as exact.
+
+**Executed:** lint and typecheck zero-error; `npm test` **5197 passing**; build green; accessibility lane green at both viewports including the new filter fixture. **NOT executed:** any hosted probe - no filter has been run against a real database, and the SQL clauses are asserted against an injected builder.
+
 ## 2026-08-09 - PHASE 2L SLICE 2L.2: selection, bulk actions, and a partial result that tells the truth
 
 **Zero migrations. No new RPC, no new write path, no new grant, policy or telemetry event.**

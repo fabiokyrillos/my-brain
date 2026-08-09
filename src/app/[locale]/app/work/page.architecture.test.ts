@@ -130,3 +130,66 @@ describe("the responsive task detail", () => {
     expect(css).toMatch(/\.work-shell:has\(\.task-detail-panel\) \.work-shell-main\{display:none\}/);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * `2L-VIEW-007` and `2L-RETURN-002`/`-004` — the URL is the state, and every
+ * return is a fresh read.
+ * -------------------------------------------------------------------------- */
+
+describe("the Work list's state lives in the URL and nowhere else", () => {
+  const read = (relative: string) =>
+    readFileSync(path.resolve(process.cwd(), relative), "utf8");
+  const code = (relative: string) =>
+    read(relative).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  const WORK = "src/app/[locale]/app/work";
+  const FEATURE = "src/features/daily-cycle";
+
+  it("parses the whole description of the page from the search params, in one place", () => {
+    // One parser, so a link cannot quietly drop a parameter and a page cannot
+    // quietly remember one.
+    expect(code(`${WORK}/page.tsx`)).toMatch(/parseWorkQuery\(await searchParams, parsePage\)/);
+  });
+
+  it("stores no view state anywhere", () => {
+    // `2L-VIEW-007`. No cookie, no preference, no storage — on the route, on the
+    // view, or on the controls.
+    for (const file of [
+      `${WORK}/page.tsx`,
+      `${FEATURE}/work-view.tsx`,
+      `${FEATURE}/work-filters.tsx`,
+      `${FEATURE}/work-query.ts`,
+    ]) {
+      expect(code(file), file).not.toMatch(/localStorage|sessionStorage|document\.cookie|agent_preferences/);
+    }
+  });
+
+  it("re-reads on every load rather than replaying a rendered page", () => {
+    // `2L-RETURN-004`. The route is a Server Component that calls the projection
+    // on each request with the caller's own session; there is no cached page to
+    // return to. Asserted structurally, because a route that started caching
+    // would still render correctly the first time.
+    const source = code(`${WORK}/page.tsx`);
+    expect(source).toMatch(/await requireUser\(locale\)/);
+    expect(source).toMatch(/loadWorkProjection\(supabase, \{/);
+    expect(source).not.toMatch(/unstable_cache|revalidate\s*=|force-static/);
+  });
+
+  it("resolves an invalid position to the nearest one and says so", () => {
+    // `2L-RETURN-005`. Both halves: the fallback load, and the flag the surface
+    // renders a sentence from. A fallback with no statement would move the user
+    // silently, which is the failure the requirement names.
+    const source = code(`${WORK}/page.tsx`);
+    expect(source).toMatch(/positionAdjusted/);
+    expect(source).toMatch(/if \(positionAdjusted\) projection = await load\(/);
+    expect(code(`${FEATURE}/work-view.tsx`)).toMatch(/positionAdjusted \?/);
+  });
+
+  it("keeps the task link's return position out of the component's hands", () => {
+    // The position is serialized once per page in the projection, not per row in
+    // the list: fifty identical encodings would be fifty chances for one to
+    // differ from the others.
+    expect(code(`${FEATURE}/work-projection.ts`)).toMatch(/serializeWorkPosition/);
+    expect(code("src/features/operations/task-list.tsx")).not.toMatch(/serializeWorkPosition/);
+  });
+});

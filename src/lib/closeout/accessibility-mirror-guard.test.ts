@@ -346,6 +346,27 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(mirror).toContain('for="work-bulk-value"');
   });
 
+  it("pins the narrowing controls, which slice 2L.3 added to the lane", () => {
+    // `2L-ACCESS-003`/`-005`. `aria-current` is the assertion that matters: the
+    // active filter must be exposed to a screen reader and not only painted, and
+    // a mirror that dropped it would leave the lane green about a colour.
+    const filters = read("src/features/daily-cycle/work-filters.tsx");
+    const view = read("src/features/daily-cycle/work-view.tsx");
+
+    for (const token of ["work-filters", "work-filter-group", "work-filter-relation", "aria-current"]) {
+      expect(filters, `work-filters.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    for (const token of ["work-group", "work-group-heading", "work-group-count", "work-position-adjusted"]) {
+      expect(view, `work-view.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    // A `<fieldset>`/`<legend>` group, not a div: the group has to announce what
+    // it narrows, and the mirror is only useful if it carries the same shape.
+    expect(filters).toContain("<legend>");
+    expect(mirror).toContain("<legend>");
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted

@@ -532,6 +532,42 @@ function workBulkBar() {
     + `</div></div></section>`;
 }
 
+/**
+ * Mirrors `src/features/daily-cycle/work-filters.tsx` and the grouped list in
+ * `work-view.tsx` — slice 2L.3.
+ *
+ * `2L-ACCESS-001`/`-003`/`-005`. The filters are `<fieldset>`/`<legend>` groups
+ * of links, so what this scans is that each group announces itself, that the
+ * active value is exposed as `aria-current` rather than only as a colour, and
+ * that every chip meets the touch target at a mobile viewport.
+ */
+function workFilters() {
+  const group = (legend: string, values: readonly string[], current: string) =>
+    `<fieldset class="work-filter-group"><legend>${legend}</legend>`
+    + values
+      .map((value: string) =>
+        `<a href="#"${value === current ? ' aria-current="page"' : ""}>${value}</a>`)
+      .join("")
+    + `</fieldset>`;
+
+  return `<div class="work-page">`
+    + `<div class="work-filters">`
+    + group("State", ["Open", "Completed", "Cancelled"], "Open")
+    + group("Due", ["Any", "Overdue", "Today", "From tomorrow", "No due date"], "Any")
+    + group("Priority", ["Any", "Low", "Medium", "High", "Urgent"], "High")
+    + group("Order", ["The view&#39;s default", "Soonest due first"], "The view&#39;s default")
+    + group("Group", ["No grouping", "By priority", "By project"], "By priority")
+    + `<p class="work-filter-relation">This list is limited to one relationship.`
+    + ` <a href="#">See it without that limit</a></p>`
+    + `</div>`
+    + `<p class="work-position-adjusted" role="status">The page you had open is no longer here.`
+    + ` This is the nearest one.</p>`
+    + `<section aria-label="High" class="work-group">`
+    + `<h2 class="work-group-heading">High <span class="work-group-count">2 tasks</span></h2>`
+    + `</section>`
+    + `</div>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -546,6 +582,7 @@ const SURFACES = [
   { name: "Work list", body: () => workList() },
   { name: "Work task panel", body: () => workTaskPanel() },
   { name: "Work bulk bar", body: () => workBulkBar() },
+  { name: "Work filters", body: () => workFilters() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -564,7 +601,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}${workList()}${workTaskPanel()}${workBulkBar()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);

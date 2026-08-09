@@ -288,3 +288,21 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-bulk-result:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
 .work-bulk-result-list{margin:8px 0 0;padding-left:18px;color:var(--ink-soft);font-size:12px}
 @media(max-width:600px){.work-bulk-selection{align-items:flex-start}.work-bulk-form select,.work-bulk-form input{width:100%}}
+
+/* Phase 2L slice 2L.3: narrowing controls, grouping and the moved position.
+
+   The filters are links, so they are styled as the view tabs are - one grammar
+   for "a place you can go", rather than a second one that happens to look like
+   a form control and is not. */
+.work-filters{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.work-filter-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;padding:0;border:0}
+.work-filter-group legend{padding:0;color:var(--ink-soft);font:600 10px var(--font-jetbrains);letter-spacing:.04em;text-transform:uppercase}
+.work-filter-group a{border:1px solid var(--line);border-radius:999px;padding:0 12px;min-height:44px;display:inline-flex;align-items:center;color:var(--ink-soft);font:600 11px var(--font-sans);background:white}
+.work-filter-group a[aria-current="page"]{background:var(--ink);color:white;border-color:var(--ink)}
+.work-filter-group a:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-filter-relation{margin:0;font-size:11px;color:var(--ink-soft)}
+.work-group{margin-bottom:20px}
+.work-group-heading{margin:0 0 8px;font:700 13px var(--font-sans)}
+.work-group-count{color:var(--ink-soft);font:600 11px var(--font-sans)}
+.work-position-adjusted{margin-top:8px!important;color:var(--ink-soft);font-size:11px!important}
+@media(max-width:600px){.work-filters{flex-direction:column;gap:10px}.work-filter-group{width:100%}}

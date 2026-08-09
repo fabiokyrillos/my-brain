@@ -25,11 +25,14 @@ import { isLocale } from "@/lib/preferences";
  */
 export default async function TaskDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; taskId: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const { locale: candidate, taskId } = await params;
   if (!isLocale(candidate)) notFound();
+  const { from } = await searchParams;
 
-  return <TaskDetailSurface locale={candidate} taskId={taskId} />;
+  return <TaskDetailSurface from={from} locale={candidate} taskId={taskId} />;
 }

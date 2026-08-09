@@ -37,7 +37,10 @@ import { loadCandidateRelationOptions } from "@/features/tasks/relation-options"
 import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 
+import { parseWorkPosition } from "@/features/operations/work-position";
+
 import { loadTaskDetailProjection } from "./task-detail-projection";
+import { workHref } from "./work-query";
 import { TaskDetailView } from "./task-detail-view";
 
 export async function TaskDetailSurface({
@@ -51,10 +54,17 @@ export async function TaskDetailSurface({
    * become two surfaces again, which is precisely what `2L-EDIT-007` forbids.
    */
   panel = false,
+  from,
 }: {
   locale: Locale;
   taskId: string;
   panel?: boolean;
+  /**
+   * `2L-RETURN-001`. The serialized position the user came from, straight off
+   * the URL and still untrusted — `parseWorkPosition` is the gate, and it
+   * refuses anything carrying a field that could authorize.
+   */
+  from?: string | string[];
 }) {
   const { supabase, user } = await requireUser(locale);
   const agentName = await getAgentName();
@@ -78,6 +88,7 @@ export async function TaskDetailSurface({
       locale={locale}
       detail={detail}
       panel={panel}
+      backHref={workHref(locale, parseWorkPosition(from))}
       actions={
         detail.task.availableActions.length ? (
           <div className="task-detail-actions">

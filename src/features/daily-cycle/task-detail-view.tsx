@@ -84,6 +84,7 @@ export function TaskDetailView({
   actions,
   controls,
   panel = false,
+  backHref,
 }: {
   locale: Locale;
   detail: TaskDetailProjection;
@@ -101,6 +102,12 @@ export function TaskDetailView({
    * is the failure this requirement is written against.
    */
   panel?: boolean;
+  /**
+   * `2L-RETURN-001`. Where the back affordance leads: the position the user
+   * came from, already resolved by the route. Defaults to the Work list, which
+   * is what a task opened from outside Work should return to.
+   */
+  backHref?: string;
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
   /**
@@ -136,7 +143,7 @@ export function TaskDetailView({
         // The URL-carried return position itself is slice 2L.3's subject.
         <TaskPanelClose label={copy.back} />
       ) : (
-        <Link className="back-link" href={`/${locale}/app/work`}>
+        <Link className="back-link" href={backHref ?? `/${locale}/app/work`}>
           <ArrowLeft size={16} aria-hidden="true" />{copy.back}
         </Link>
       )}

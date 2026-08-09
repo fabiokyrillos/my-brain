@@ -138,12 +138,28 @@ describe("2L-AUDIT-004: the Work view vocabulary is one vocabulary", () => {
     expect(declared).toEqual([...SIGNED_WORK_VIEWS]);
   });
 
-  it("the projection's own view list is the same three", () => {
-    const source = read("src/features/daily-cycle/work-projection.ts");
+  it("the application's own view list is the same three", () => {
+    /*
+     * The declaration **moved** in slice 2L.3, from `work-projection.ts` to
+     * `work-views.ts`, because the projection is `server-only` and the tabs and
+     * the filter links render in the browser. That is a move, not a second
+     * copy — and this guard exists precisely to tell those apart, so it now
+     * reads the new home and the next test asserts the old one is empty.
+     */
+    const source = read("src/features/daily-cycle/work-views.ts");
     const match = /export const workViews = \[([^\]]*)\]/.exec(source);
     expect(match, "workViews is no longer a literal array").not.toBeNull();
     const declared = [...match![1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
     expect(declared).toEqual([...SIGNED_WORK_VIEWS]);
+  });
+
+  it("the projection re-exports that list rather than declaring a second one", () => {
+    // The half that makes the move safe. A file that both re-exported and
+    // declared would satisfy the test above and still be two vocabularies.
+    const source = read("src/features/daily-cycle/work-projection.ts");
+    expect(source).toMatch(/export \{ workViews, type WorkViewId \}/);
+    expect(source, "work-projection.ts declares a second view vocabulary")
+      .not.toMatch(/export const workViews = \[/);
   });
 
   it("proves the extraction is non-vacuous", () => {
