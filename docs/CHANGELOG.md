@@ -2,6 +2,22 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L — WORK AND EXECUTION IS AUTHORIZED FOR PLANNING ONLY (ADR-102). Implementation is NOT authorized.
+
+**Documentation only. No product code, no migration, no deployment, no database change, no RPC, no RLS/grant/policy/Auth change, no provider call.** Hosted parity is unchanged at `202608090089`, 89 migrations, local = remote; signup is closed and the rollout gate is untouched at 25 pass · 3 fail · 2 owner-signature.
+
+**Added.** The Phase 2L planning package: `docs/initiatives/phase-2l/PHASE_2L_PRD.md` (76 requirements across ten families) and `..._IMPLEMENTATION_PLAN.md` (six slices, 2L.0–2L.5, plus the 2L.6 successor-re-audit step, which is deliberately not a slice because it delivers no requirement; ten gates; per-slice budget reconciliation); and under `docs/reports/phase-2l/`, the current-experience audit, twelve ranked UX gaps, the threat model `T-2L-01…T-2L-20` and the traceability contract with eighteen refusals. **ADR-102** records the authorization.
+
+**The audit shrank the phase in four places and grew it in two.** Work's domain already ships fifteen policied verbs, a twelve-column staleness gate, a server-issued single-use confirmation and a **24-hour audited undo** — so quick edit, bulk and undo are *surfacing existing authority*. **The only rendered Undo control in the product is in the command console**; neither the Work list nor the task detail offers one. Kanban, timeline, persisted saved filters and adjustable density are rejected or narrowed with reasons. What grew it: `work` is **not** in `GOVERNED_SURFACES` and `tasks` carries **no classification column**, so Work is the last ungoverned content surface and its posture is an owner decision; and Work is **absent from the automated accessibility lane** while Conversar has ten entries in it.
+
+**Two structural constraints were measured, not assumed.** `public.apply_task_command` takes one `p_task_id` and cannot grow one (ADR-057), so **bulk is iteration** — the same trade `2J-ATTN-010` took. And `private.validate_product_event_properties` pins `workView` to `array['today','all','waiting']`, so **a fourth reported Work view costs a migration** — the only reason this phase has a ceiling.
+
+**Changed.** The **A13** phase-start guard retargets from Phase 2L to the roadmap successor in ADR-102's own commit — the **seventh** application — with the heading check moved to ADR-102 and the series check **gaining** an entry rather than replacing one. The active-milestone guard retargets alongside it and its **"planning" assertion returns**, because ADR-102 gave planning only. `docs/README.md` and `docs/reports/README.md` are corrected: both still described Phase 2K as the unauthorized successor.
+
+**A naming fix that is governance rather than style.** The accessibility family is `2L-ACCESS`, not the shape Phase 2K used: `2K-A11Y` does not match `[A-Z]+-\d{3}`, which is why seven requirements were invisible to every prose count *and* would have been invisible to A13's signal 2.
+
+**Five owner decisions are open, two blocking and three gating**, each a signable proposal with a recommendation: Work's sensitivity posture, the canonical view taxonomy and whether the migration is spent, the bulk-eligible operation set, the selection ceiling, and gesture policy. **None blocks the package's own consistency.** **No successor phase is authorized, scoped or named.**
+
 ## 2026-08-09 - POST-PHASE CORRECTION `202608090089`: Phase 2K's telemetry was inert on the deployed project, and now is not
 
 **Phase 2K reached closeout with its telemetry INERT, and this entry does not soften that.** The probe run immediately after deploying `202608090088` found that every Conversar event was refused `22023 Unsupported product surface`: `private.record_product_event` carried a **hardcoded surface allowlist** without `conversation`, inside producers that `.catch(() => {})`. It is `202608080087`'s defect **one field over** - that migration deleted the *event-name* copy from the same function and left the *surface* copy standing.

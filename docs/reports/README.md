@@ -54,29 +54,37 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`phase-2i/`](./phase-2i/) | Phase 2I — Foundation and Findability (current-experience audit, threat model, traceability contract, gaps, eight slice acceptances, closing report) | **COMPLETE** 2026-08-07 — 61 declared · 61 classified · 0 undelivered; `1 allocated · 0 spent`; hosted parity unchanged at `202608070084` |
 | [`phase-2j/`](./phase-2j/) | Phase 2J — Today, Capture and Attention (audit, threat model, traceability contract, gaps, eight slice acceptances, matrix, closing report, deployment record) | **COMPLETE** 2026-08-08 — 74 declared · 74 classified · 0 unclassified; `2 allocated · 2 spent` (unchanged); **DEPLOYED, hosted parity `202608080087`**. The deployment probe found the declared telemetry events refused by an un-widened third vocabulary copy; the post-2J correction `202608080087` removed that duplication the same day and telemetry is proved live producer → consumer |
 | [`phase-2k/`](./phase-2k/) | Phase 2K — Conversar as the primary interface (current-experience audit, gaps, threat model, traceability contract, slice acceptances) | **CONCLUDED** — planning authorized by ADR-097 (2026-08-08), **implementation authorized through closeout by ADR-101 (2026-08-09)**, which also signed the last two open decisions (OD-2K-1, OD-2K-4). **79** requirements across eleven families — **not the 68 this line and four other documents stated**; the undercount was `2K-A11Y`, whose family name contains digits. 79 declared · 79 classified · 0 unclassified — **67 built, 9 baseline, 3 partial**. **CONCLUDED 2026-08-09, after an extraordinary post-phase correction** — slices 2K.0–2K.6 and 2K.8 executed and merged; 2K.7 is not implemented, by rule. `1 allocated · 1 spent`, **not retroactively reclassified**. **The phase reached closeout with its telemetry INERT on the deployed project**; the owner then authorized one exclusively corrective migration, **`202608090089`, outside this phase's budget and charged to no phase**, which deletes the hardcoded surface copy in `private.record_product_event`. Hosted telemetry proved operational producer → writer → RLS consumer, **13/13**, with zero residue. Matrix and closing report written from executed evidence |
+| [`phase-2l/`](./phase-2l/) | Phase 2L — Work and execution (current-experience audit, UX gaps, threat model, traceability contract) | **PLANNING ONLY** — authorized by ADR-102 (2026-08-09). **Implementation is not authorized.** 76 requirements across ten families and six slices **planned for execution — none executed**; migration ceiling **`1 allocated · 0 spent`**, allocated to slice 2L.3 only. Five owner decisions open, two blocking. No acceptance record, no traceability matrix and no closing report exists, and none may be created before its gate |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**There is no active initiative. Phase 2K — Conversar as the primary interface —
-is concluded** (planning by ADR-097, 2026-08-08; implementation through closeout
-by ADR-101, 2026-08-09), **after an extraordinary post-phase correction the owner
-authorized separately**. The phase reached closeout with its telemetry inert on
-the deployed project; migration `202608090089` closed that, **outside Phase 2K's
-budget and charged to no phase**. Hosted parity is `202608090089`.
+**The active initiative is Phase 2L — Work and execution, and it is authorized
+for PLANNING ONLY** (ADR-102, 2026-08-09). Its governing pair lives in
+`docs/initiatives/phase-2l/`; its planning evidence files here. **Implementation
+is not authorized**, no migration exists, nothing is deployed, and hosted parity
+remains `202608090089`.
 
-**No successor phase is authorized, planned, or given artifacts**, and A13 still
-targets the roadmap successor, which is **not started**. Nothing here covers
-opening signup, executing rollout residuals, or running ADR-055's offline spike.
-Phase 2K's governing pair lives in `docs/initiatives/phase-2k/`; its reports file
-here. Phases 2H, 2I and 2J are closed.
+**Its predecessor, Phase 2K — Conversar as the primary interface, is concluded**
+(planning by ADR-097, 2026-08-08; implementation through closeout by ADR-101,
+2026-08-09), **after an extraordinary post-phase correction the owner authorized
+separately**. The phase reached closeout with its telemetry inert on the deployed
+project; migration `202608090089` closed that, **outside Phase 2K's budget and
+charged to no phase**.
 
-This line has now been stale twice. Until 2026-08-08 it still named Phase 2H as
-active after 2I and 2J had both closed; until 2026-08-09 it still described Phase
-2K as *in planning only*, long after ADR-101 authorized implementation and every
-slice had merged. Both are corrected here rather than left, because an index that
+**No successor to Phase 2L is authorized, planned, or given artifacts**, and A13
+now targets that successor, which is **not started**. Nothing here covers opening
+signup, executing rollout residuals, or running ADR-055's offline spike. Phases
+2H, 2I, 2J and 2K are closed.
+
+This line has now been stale twice, and both times the failure was the same:
+naming an initiative that had stopped being the active one. Until 2026-08-08 it
+still named Phase 2H after 2I and 2J had both closed; until 2026-08-09 it still
+described Phase 2K as *in planning only*, long after ADR-101 authorized
+implementation and every slice had merged. It is corrected with each
+authorization rather than at the next reader's expense, because an index that
 names the wrong active initiative is the one document a new reader trusts first.
 
 ---
@@ -144,6 +152,24 @@ asymmetric by history, not by rule, and the generator accepts either an
 declares no requirement and plans no work — then the threat model, the four
 slice acceptance records, the online-journey blocker and harness acceptances,
 `PHASE_2G_TRACEABILITY_MATRIX.md` and `PHASE_2G_REPORT.md`. Closed 2026-08-06.
+
+### `phase-2l/` — Phase 2L (PLANNING ONLY, authorized 2026-08-09 by ADR-102)
+
+`PHASE_2L_CURRENT_EXPERIENCE_AUDIT.md` (the falsifiable re-derivation of the
+Work surface from source, whose finding is that the *domain* ships in depth
+while the *surface* exposes four buttons and a link),
+`PHASE_2L_UX_GAPS_AND_OPPORTUNITIES.md` (twelve ranked gaps, plus nine
+opportunities recorded as **rejected or deferred** so that refusing them is a
+decision rather than an omission), `PHASE_2L_THREAT_MODEL.md` (T-2L-01…T-2L-20, several of which
+name a residual risk rather than claiming a mitigation) and
+`PHASE_2L_TRACEABILITY_CONTRACT.md`, which **specifies** the fail-closed
+generator and its eighteen refusals — deliberately not built during planning,
+for the reason Phase 2H recorded: a fail-closed generator run against a phase
+with zero acceptance records reports every requirement unresolved. The governing
+pair (PRD, implementation plan) lives in `docs/initiatives/phase-2l/`.
+**No slice acceptance record, no traceability matrix and no closing report
+exists**, and none may be created before its gate. **Nothing is implemented, no
+migration is created, and the budget is `1 allocated · 0 spent`.**
 
 ### `phase-2k/` — Phase 2K (concluded 2026-08-09, after an extraordinary post-phase correction)
 
