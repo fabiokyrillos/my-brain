@@ -1,8 +1,11 @@
 # Phase 2L — Work and execution · PRD
 
-**Status:** planning only. Authorized for planning by ADR-102. **Implementation is not
-authorized.** This document declares requirements; it does not permit a line of
-product code, a migration, a deployment, or the start of any successor phase.
+**Status:** planning authorized by ADR-102; **implementation through closeout
+authorized by ADR-103** (2026-08-09), which also signs all five owner decisions. This
+document declares requirements. It does **not** permit a migration, a deployment, any
+database/RLS/grant/policy/Auth change, a new RPC, a second write path, a service-role
+path, a BYOK spend, a provider call, a signup change, a rollout residual, or the
+planning, scoping, naming or start of any successor phase.
 
 **Governing product document:** `docs/initiatives/product-ux/MY_BRAIN_MOBILE_FIRST_EXPERIENCE_PRD.md`
 (Etapa 4, slices 4.1–4.3 only).
@@ -400,14 +403,21 @@ allocated to 2L.3 and unspent does not become available to 2L.5.
 
 Phase 2L implementation may begin only when all of the following hold:
 
-1. The owner has authorized implementation explicitly, in an ADR.
-2. Every open decision in §10 is signed or is recorded as gating a named slice rather
-   than blocking the phase.
-3. The migration budget in §7 is accepted or amended.
+1. **The owner has authorized implementation explicitly, in an ADR — ADR-103. ✅**
+2. **Every decision in §10 is signed — all five, by ADR-103. ✅** No requirement is
+   blocked or gated on an unsigned decision.
+3. **The migration budget in §7 is accepted — one allocated to 2L.3, expected to lapse
+   unspent under OD-2L-2 A. ✅**
 4. The traceability contract's refusals are runnable and have been proved to refuse
-   against a mutated repository.
+   against a mutated repository. **Owed by slice 2L.5**, which builds the generator;
+   until then no matrix exists and none may be written.
 5. Slice 2L.0's measurements have been executed and any divergence from the audit is
-   recorded.
+   recorded. **Owed by slice 2L.0**, which is the first slice.
+
+Items 4 and 5 are deliberately *inside* the phase rather than prerequisites to it:
+building a fail-closed generator before any acceptance record exists would make it
+report every requirement unresolved, which is the reason Phase 2H recorded for
+specifying it during planning and building it at closeout.
 
 ## 9. Definition of Done
 
