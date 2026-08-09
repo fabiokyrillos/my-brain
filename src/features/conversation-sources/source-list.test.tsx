@@ -18,6 +18,13 @@ import { getConversationSourcesCopy } from "./copy";
 import type { ResolvedSource } from "./resolve-sources";
 import { SourceList } from "./source-list";
 
+// The analytics emitters reach a `"use server"` module, which cannot be
+// imported from a client component under vitest. What this file tests is what
+// the block renders; the producers have their own coverage in the telemetry
+// guard and the pgTAP write path.
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  ConversationAnswerShown: () => null,
+}));
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
