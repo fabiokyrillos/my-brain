@@ -1,6 +1,8 @@
 # Phase 2K — Conversar as the primary interface · closing report
 
-**Status.** Seven slices executed and merged; **ONE OWNER DECISION OUTSTANDING** — the deployed telemetry is inert and needs a second migration (§7a). Slices (2K.0–2K.6, 2K.8); **2K.7 not built, by rule**. **79 requirements declared · 79 classified · 0 unclassified.** Migration budget **`1 allocated · 1 spent`**.
+**Status.** **CONCLUDED — after an extraordinary post-phase correction, and not before it.** Seven slices executed and merged (2K.0–2K.6, 2K.8); **2K.7 not built, by rule**. **79 requirements declared · 79 classified · 0 unclassified.** Migration budget **`1 allocated · 1 spent`** — unchanged, and **not** retroactively reclassified.
+
+**The phase reached closeout with its telemetry inert on the deployed project.** The probe run immediately after deploying `202608090088` found that every Conversar event was refused `22023 Unsupported product surface` by a hardcoded surface allowlist inside `private.record_product_event`, inside producers that swallow the failure. The owner then authorized **one exclusively corrective migration outside this phase's budget** — `202608090089`, which **deletes** that copy rather than adding to it. It is charged to **no phase**, and in particular not to the roadmap successor, which has not started. §7a carries the full record; it is deliberately not smoothed away.
 
 **What the phase set out to do.** Not "build conversational actions" — the audit proved those largely existed. **Make the conversation truthful about itself, and stop destroying pending work when the user goes to check.**
 
@@ -20,20 +22,27 @@ This is the failure the traceability contract was written against, in its own wo
 
 ## 2. Classification
 
-**64 built · 9 baseline · 6 partial · 0 not-built-by-rule in the declared set · 0 undelivered · 0 unclassified.**
+**67 built · 9 baseline · 3 partial · 0 not-built-by-rule in the declared set · 0 undelivered · 0 unclassified.**
+
+**These numbers are emitted, never typed.** At closeout the same generator read **64 built · 6 partial**; three rows moved after the post-phase correction was deployed and proved hosted — `2K-METRICS-004`, `2K-METRICS-007` and `2K-SUGG-005`. Nothing was reclassified by editing a number.
 
 Every row is in `PHASE_2K_TRACEABILITY_MATRIX.md`, emitted by a generator that refuses to write anything when a requirement is unclassified, classified twice, classified without a resolvable citation, or classified in a way that contradicts a signed decision. It refused four times on real findings before it emitted.
 
-### The six partials, each with its remainder and destination
+### The three partials that remain, each with its remainder and destination
 
 | Id | Remainder | Destination |
 |---|---|---|
 | `2K-AUDIT-002` | The prose a zero-source answer produces | Narrowed by 2K.4 to what the provider *says*; carried past close |
 | `2K-EXPL-007` | An interpretation-correction domain — a record, a consumer, a surface | The roadmap successor's own audit |
-| `2K-SUGG-005` | The telemetry event itself | **Discharged in 2K.8** |
 | `2K-A11Y-007` | A real-device mobile session | Carried past close, same standing as G-2J.4b |
-| `2K-METRICS-004` | The **surface** allowlist in `private.record_product_event` — a third live gate the probe found | An owner decision on a second migration |
-| `2K-METRICS-007` | The surface allowlist admitting `conversation`; the producer is **inert** on the deployed project | The same owner decision |
+
+### The three that closed after the phase, and what each was actually waiting on
+
+| Id | What it was waiting on | How it closed |
+|---|---|---|
+| `2K-METRICS-004` | The **surface** allowlist in `private.record_product_event` — a third live gate the probe found, plus an undersized table CHECK the writer's copy was masking | `202608090089` **deleted** the writer's copy and widened the CHECK, preserving `22023` with no second list |
+| `2K-METRICS-007` | The producer was **inert** on the deployed project | A hosted producer→consumer proof, **13/13**, after the correction was deployed |
+| `2K-SUGG-005` | **Not "pending wiring".** 2K.8 wired the event; what outlived that was the **global writer refusal**, a defect in `private.record_product_event` rather than in this requirement | Same correction, same hosted proof |
 
 ### 2K.7 — not built, by rule
 
@@ -121,7 +130,9 @@ Recorded because the pattern is the point: **most were in guards, probes and too
 
 ---
 
-## 7a. The phase does not close clean, and this is why
+## 7a. The phase did not close clean, and this is why
+
+**Left in the past tense deliberately.** Everything in this section was true when the phase reached closeout, and the resolution is appended below rather than written over it.
 
 **The single authorized migration is deployed and hosted parity is `202608090088`. The telemetry it carries is INERT.**
 
@@ -134,6 +145,18 @@ Recorded because the pattern is the point: **most were in guards, probes and too
 **No user-facing capability is affected.** Every product deliverable is deployed and working; telemetry is fail-open. What is lost is the measurement — the funnel will report zeros, indistinguishable from a quiet week, which is exactly the confusion SH.6 cost weeks to.
 
 **Fixing it needs a second migration, and ADR-101's ceiling is one.** Its stop conditions name this case first, so none was created. The choice — widen the list, or delete the third copy the way `202608080087` deleted the second — is the owner's. `PHASE_2K_DEPLOYMENT.md` states both options and recommends the second, because the first leaves a guard-less duplicate in the one function that has now caused this defect twice.
+
+### 7a.1 Resolution — the owner chose deletion, and authorized one extraordinary migration
+
+**The owner chose the second option and authorized `202608090089` explicitly OUTSIDE this phase's budget.** Phase 2K's authorized implementation stays **`1 allocated · 1 spent`**; the correction is charged to **no phase**. The block above is not deleted, and this phase's record permanently says it reached closeout with inert telemetry.
+
+**A second undersized gate was found while fixing the first.** `product_events_surface_check`, on the table, also stopped at `task_command` — `202608090088` widened the event-name CHECK and the property validator and not that one. The writer's hardcoded copy refused first and **masked** it, so fixing only the writer would have moved the refusal rather than removed it. Both were corrected together.
+
+**The `22023` contract survives with no second list.** Deleting the writer's copy alone would have downgraded the refusal to a raw `23514`. The insert is wrapped and only `product_events_surface_check` violations are translated, through `GET STACKED DIAGNOSTICS`, so message and errcode are unchanged and no caller can tell the gate moved. Surface is now validated **after** the event name — an improvement, because surface-first ordering is exactly what made this phase's own negative controls vacuous.
+
+**The regression that could not have caught it now does.** `post_2j_product_event_write_path.sql` was **extended from 20 to 29 assertions**, never weakened and never duplicated, with the surface vocabulary derived from the CHECK at test time. It plants the historical gate to prove the refusal returns and restores it to prove it disappears, and asserts from the catalog that the writer names **no** declared surface.
+
+**Proved on the deployed project, 13/13**, through the authenticated write path, read back under the owner's own RLS session, aggregated by the real consumer, with non-vacuous negative controls exercised on a **valid** surface and zero residue. No BYOK credential, no provider call, no signup. Full table in `PHASE_2K_SLICE_08_ACCEPTANCE.md` and `PHASE_2K_DEPLOYMENT.md`.
 
 ## 8. Posture at close
 
