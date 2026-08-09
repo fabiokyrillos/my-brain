@@ -341,3 +341,76 @@ describe("what a bulk run leaves behind", () => {
     expect(names).toEqual(["task_command_applied", "task_command_applied"]);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * `2L-BULK-011` — the outcome reveals no differentiable existence signal.
+ * -------------------------------------------------------------------------- */
+
+describe("2L-BULK-011: an unestablishable item reveals nothing about whether it exists", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("gives an id the caller does not own the same outcome as one that is gone", () => {
+    /*
+     * Both are *absent from the resolution result*, and for the same reason:
+     * `list_task_command_candidates` is `auth.uid()`-scoped, and
+     * `loadTaskCandidates` raises on a cross-owner row rather than filtering it.
+     * So there is no input by which the code could tell a foreign id from a
+     * deleted one — which is what makes the two outcomes identical rather than
+     * merely equal.
+     */
+    return (async () => {
+      const client = bulkClient({ rows: [] });
+      useClient(client);
+
+      const foreign = await applyBulkWorkCommand(idleBulkCommandState, bulkForm([{ taskId: ID_A }]));
+      const deleted = await applyBulkWorkCommand(idleBulkCommandState, bulkForm([{ taskId: ID_B }]));
+
+      const strip = (value: unknown) => JSON.stringify(value).replaceAll(ID_A, "id").replaceAll(ID_B, "id");
+      expect(strip(foreign.summary?.notApplied)).toBe(strip(deleted.summary?.notApplied));
+      expect(foreign.summary?.notApplied[0]).toMatchObject({ reason: "unresolvable" });
+    })();
+  });
+
+  it("reaches `ineligible` only for a row the caller's own resolution returned", async () => {
+    /*
+     * The decisive property, and the one the slice record argued rather than
+     * proved until now.
+     *
+     * `ineligible` is the one refusal that is *not* byte-identical to the
+     * others, so it is the only place a differentiable signal could hide. It is
+     * reachable only when the row came back from the caller's own owner-scoped
+     * resolution — which means the caller already knew the row existed and was
+     * theirs. The same id, absent from that result, produces `unresolvable`.
+     *
+     * Driven as two runs over the same id rather than argued from the source:
+     * an id the caller does not own cannot reach the distinguishing value.
+     */
+    const returned = bulkClient({ rows: [candidateRow(ID_A, { status: "completed" })] });
+    useClient(returned);
+    const eligible = await applyBulkWorkCommand(idleBulkCommandState, bulkForm([{ taskId: ID_A }]));
+
+    const absent = bulkClient({ rows: [] });
+    useClient(absent);
+    const unowned = await applyBulkWorkCommand(idleBulkCommandState, bulkForm([{ taskId: ID_A }]));
+
+    expect(eligible.summary?.notApplied[0]).toMatchObject({ reason: "ineligible" });
+    expect(unowned.summary?.notApplied[0]).toMatchObject({ reason: "unresolvable" });
+    // And neither run wrote anything: a refusal is decided before the apply.
+    expect(applyCalls(returned)).toEqual([]);
+    expect(applyCalls(absent)).toEqual([]);
+  });
+
+  it("carries no task content into any refusal, whatever the cause", () => {
+    // A refusal that echoed the title would be an existence signal wearing a
+    // helpful hat: it would confirm the row exists and say what it says.
+    return (async () => {
+      const client = bulkClient({ rows: [candidateRow(ID_A, { status: "completed" })] });
+      useClient(client);
+      const state = await applyBulkWorkCommand(
+        idleBulkCommandState,
+        bulkForm([{ taskId: ID_A }, { taskId: ID_B }]),
+      );
+      expect(JSON.stringify(state.summary?.notApplied)).not.toContain("Enviar proposta");
+    })();
+  });
+});

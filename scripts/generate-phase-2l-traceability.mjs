@@ -52,6 +52,44 @@ const CLASSES = new Set(["built", "baseline", "partial", "not-built-by-rule", "u
 /** What counts as naming where a remainder goes. */
 const DESTINATION = /[Dd]estination|[Rr]emainder|deferred to|routed to|carried past close|successor|owner-run/;
 
+/**
+ * A remainder that is not a remainder.
+ *
+ * `partial` means something is still owed: a behaviour, a proof, or a decision.
+ * A row that names a remainder of "none", or says nothing is pending, or points
+ * only at a record that is already complete, is a `partial` being used to
+ * preserve a count — which is the one thing the classification must never be
+ * for. The close of Phase 2L shipped exactly that twice, and an independent
+ * review caught it, so the rule is mechanical from here.
+ *
+ * Each pattern matches an **assertion that nothing is owed**. A row that says
+ * what *is* owed — "Remainder: a real-device session" — matches none of them.
+ */
+const VACUOUS_REMAINDER = [
+  /[Rr]emainder:?\s*(is\s+)?(none|nothing|n\/a)\b/,
+  /\bnone in behaviour\b/i,
+  /\bnothing (is )?(outstanding|pending|owed|missing|left)\b/i,
+  /\bno (behaviour|behavior|proof|evidence|work|decision)[^.;]*\b(outstanding|pending|owed|missing|remains?|left)\b/i,
+  /\bno work outstanding\b/i,
+  /\bnothing (in behaviour|further) (is )?required\b/i,
+];
+
+/**
+ * Whether a `partial` or `undelivered` row actually owes something.
+ *
+ * Returns the offending phrase, or null. Returning the phrase rather than a
+ * boolean is what lets the refusal quote the row back — a failure that says
+ * "this row is vacuous" and does not say which words made it so is a failure
+ * somebody edits until it goes quiet.
+ */
+function vacuousRemainder(citation) {
+  for (const pattern of VACUOUS_REMAINDER) {
+    const match = pattern.exec(citation);
+    if (match) return match[0].trim();
+  }
+  return null;
+}
+
 /** A rule-driven absence must name the rule. */
 const RULE = /ADR-\d{3}|OD-2L-\d/;
 
@@ -158,6 +196,20 @@ export function buildPhase2lTraceability({ root = REPOSITORY_ROOT } = {}) {
         // A partial with no destination is an undelivered requirement with
         // better wording; an undelivered one with none is a requirement dropped.
         fail(`R8/R10: ${id} is "${klass}" but names no remainder or destination`);
+      }
+      if (klass === "partial" || klass === "undelivered") {
+        /*
+         * R18 — a partial has to owe something.
+         *
+         * Naming a destination is not enough: a row can point at a record that
+         * is already complete and still be a `partial` kept for the count. So
+         * the citation is also checked for the shape that says *nothing is
+         * owed*, and a row that says it is refused rather than printed.
+         */
+        const vacuous = vacuousRemainder(citation);
+        if (vacuous !== null) {
+          fail(`R18: ${id} is "${klass}" but its remainder is vacuous ("${vacuous}"); a partial must owe a behaviour, a proof or a decision`);
+        }
       }
       if (klass === "not-built-by-rule" && !RULE.test(citation)) {
         fail(`R9: ${id} is "not-built-by-rule" but names no ADR or signed decision`);
