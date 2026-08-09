@@ -2,6 +2,30 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — PHASE 2K COMPLETE: 79 requirements classified, and the count in five documents was wrong
+
+**Seven slices executed and merged** (2K.0–2K.6, 2K.8); **2K.7 not built, by rule**. **Migration budget `1 allocated · 1 spent`.**
+
+**The correction this phase owes its own record.** ADR-097, ADR-098, `STATE.md`, the reports index and the PRD's own §4 preamble all said *"68 requirements across eleven families"*. Extracting the declarations gives **79**, across those same eleven families, with no duplicate and nothing outside the `2K-` namespace. The undercount is `2K-A11Y`'s seven members, whose family name contains digits and which every prose count missed.
+
+That is precisely the failure the traceability contract was written against: *"one wrong premise would propagate into all three and appear confirmed three times."* It propagated into five. **Corrected by appending, never by rewriting**, and **all 79 are classified** — 64 built, 9 baseline, 6 partial, 0 unclassified. Classifying 68 and reporting completeness would have been the comfortable option.
+
+**What the phase actually changed.** Conversar was the only content surface with **no sensitivity policy** and the only one that **persisted** a copy of user content — a 220-character excerpt in a second table whose classification did not travel with it. Both are closed: `chat` is a governed surface, and new messages persist a structured reference with nowhere to put content, re-read at render time against the **current** classification. Legacy rows keep their references and their excerpts are dropped on the floor, never read.
+
+**A pending action now survives looking at its own evidence** — the phase's highest-value gap. Continuity re-derives with a **new clock** and **always** re-asks; the handle is five identifiers with twelve names refused by name and `.strict()` for anything else, so it is *incapable* of authorizing rather than merely hard to forge.
+
+**An answer can say it found nothing**, derived from the retrieval result rather than the citation count — the ambiguity slice 2K.0 measured, where an empty array means both "nothing retrieved" and "retrieved and uncited". **The memory undo archives** and withdraws the memory from retrieval, so it stops answering questions rather than merely leaving a list. **Two exclusions the answer path computed and threw away** now reach the user, bounded as two booleans because a rate is a count over repeated queries. **One hard-coded example** became at most three deterministic suggestions that cost nothing.
+
+**2K.7 is not built, by rule**, naming ADR-055, OD-2K-A and ADR-099. No `source_type` widening, no backfill, no pipeline, no job type, no index, no spike. **And the retrieval that ships today is untouched** — not removed, disabled, degraded or deprecated. No renewal date is written, deliberately.
+
+**The migration was assembled from `202608080086`'s own text, not retyped**, because the validator is ~280 lines that must be re-declared whole and a hand-copy is how a pre-existing arm gets silently dropped. Its final verification block extracts every name from the CHECK and asserts the validator knows each one **name by name**, refusing to run vacuously — the check that would have caught `202608080087`'s defect a phase earlier.
+
+**Most defects found in this phase were in guards, probes and tooling, not in the product.** A guard fired on the module written to satisfy it, because a *quoted refusal list* read as a use. Two guards said "not **yet**" and both *yets* arrived — a guard whose premise expires fails on correct work. And the traceability generator flagged a record for **upholding** a signed decision, which would have taught the next author to soften the record until the check went quiet.
+
+**Reported NOT PROVED, never inferred:** a screen-reader session; a real-device mobile session; hydrated interactivity in a browser; the zero-source provider prose; the authenticated online journeys.
+
+**Unchanged across seven slices:** no new RLS policy, grant, secret, external service or second write path; no new AI operation kind; no service-role client on any product path; no backfill. Signup closed, rollout gate **25 pass · 3 fail · 2 owner-signature**, untouched — and Phase 2K is **not** progress toward it. **A13 still targets Phase 2L, which is not started.**
+
 ## 2026-08-09 — Phase 2K slice 2K.6: one hard-coded example replaced by at most three deterministic suggestions
 
 **Zero migrations. No provider call, no BYOK spend, no rate-limit slot. Budget stays `1 allocated · 0 spent`.** Baseline `73e298a` (slice 2K.5), CI green on that exact merge SHA across all three jobs.
