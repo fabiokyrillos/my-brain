@@ -1,4 +1,5 @@
 import "server-only";
+import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { pageRange, paginateRows } from "@/lib/pagination";
 import { defaultAgentPreferences, type Locale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
@@ -12,6 +13,7 @@ type TaskRow = Pick<
   Database["public"]["Tables"]["tasks"]["Row"],
   | "id" | "user_id" | "title" | "description" | "status" | "due_at" | "created_by" | "updated_at"
   | "planned_at" | "manual_priority" | "intentional_no_due" | "no_due_reason" | "parent_task_id"
+  | "source_entry_id"
 >;
 
 export const WORK_PAGE_SIZE = 50;
@@ -133,7 +135,10 @@ export async function loadWorkProjection(
 
   let query = supabase
     .from("tasks")
-    .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason,parent_task_id")
+    // `source_entry_id` joined the projection in Phase 2L: it is the only input
+    // OD-2L-1 option B's derivation takes, and reading it here is what keeps the
+    // classification a per-page read rather than a per-task one.
+    .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason,parent_task_id,source_entry_id")
     .eq("user_id", options.userId);
 
   if (options.view === "today") {
@@ -159,7 +164,10 @@ export async function loadWorkProjection(
   const result = await query.range(from, to);
   const rows = (requireSupabaseData(result, `load Work ${options.view} tasks`) ?? []) as TaskRow[];
   const { items: pageRows, hasNext } = paginateRows(rows, WORK_PAGE_SIZE);
-  const relationsByTaskId = await loadTaskRelations(supabase, options.userId, pageRows);
+  const [relationsByTaskId, sourceLevels] = await Promise.all([
+    loadTaskRelations(supabase, options.userId, pageRows),
+    loadSourceEntrySensitivity(supabase, options.userId, pageRows),
+  ]);
   const items = pageRows.flatMap((row) => {
     const relations = relationsByTaskId.get(row.id);
     const item = toWorkItemView({
@@ -180,11 +188,56 @@ export async function loadWorkProjection(
       waitingOnPeople: relations?.waitingOnPeople,
       parent: relations?.parent,
       dependsOn: relations?.dependsOn,
+      sensitivity: deriveTaskSensitivity(row.source_entry_id, sourceLevels),
     });
     return item ? [item] : [];
   });
 
   return { items, hasNext, timezone };
+}
+
+/**
+ * `2L-PRIVACY-006` — the source classifications for one page, in one read.
+ *
+ * OD-2L-1 option B says a task's sensitivity is derived from its source entry
+ * and re-read at presentation time. This is the read, and its three properties
+ * are the requirement rather than an optimisation:
+ *
+ *  - **Owner-scoped in the query**, not only under RLS. RLS is the boundary and
+ *    stays the boundary; stating `user_id` here means the map cannot contain a
+ *    row from another account even if a future policy were loosened, and it
+ *    matches how every other query in this module is written.
+ *  - **Bounded to the ids on the page**, so the cost is one round trip per page
+ *    rather than one per task and never a per-user scan.
+ *  - **Absence is the answer.** Whatever the query does not return — a removed
+ *    entry, a foreign one, one a policy declines — is simply not in the map, and
+ *    `deriveTaskSensitivity` resolves all of those to the most protective level
+ *    through the same branch. There is deliberately nothing here that could tell
+ *    the three apart (`2L-PRIVACY-005`).
+ *
+ * It adds no grant, no `security definer` helper and no service-role client: it
+ * is the caller's own session reading the caller's own rows.
+ */
+async function loadSourceEntrySensitivity(
+  supabase: SupabaseClient,
+  userId: string,
+  pageRows: readonly Pick<TaskRow, "source_entry_id">[],
+): Promise<ReadonlyMap<string, string | null>> {
+  const sourceIds = [...new Set(
+    pageRows.flatMap((row) => (row.source_entry_id ? [row.source_entry_id] : [])),
+  )];
+  if (sourceIds.length === 0) return new Map();
+
+  const result = await supabase
+    .from("entries")
+    .select("id,sensitivity")
+    .eq("user_id", userId)
+    .in("id", sourceIds);
+  const rows = (requireSupabaseData(result, "load Work source classifications") ?? []) as {
+    id: string;
+    sensitivity: string | null;
+  }[];
+  return new Map(rows.map((row) => [row.id, row.sensitivity] as const));
 }
 
 export type TaskRelations = {

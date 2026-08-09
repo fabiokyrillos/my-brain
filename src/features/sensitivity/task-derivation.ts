@@ -55,7 +55,14 @@
  * performs no I/O, holds no client, and cannot widen a scope it never sees.
  */
 
-import { toSensitivityLevel, type SensitivityLevel } from "./contracts";
+import {
+  NO_REVEALS,
+  SENSITIVITY_LEVELS,
+  resolveContent,
+  toSensitivityLevel,
+  type RevealState,
+  type SensitivityLevel,
+} from "./contracts";
 
 /**
  * What classification, if any, applies to one task.
@@ -115,4 +122,64 @@ export function deriveTaskSensitivity(
   // the closed vocabulary, so a row whose classification cannot be read is the
   // row this does not print.
   return { kind: "derived", level: toSensitivityLevel(readableSourceLevels.get(sourceEntryId)) };
+}
+
+/**
+ * Narrows an unvalidated value back to the contract, **fail-closed**.
+ *
+ * A `TaskSensitivity` crosses one boundary that TypeScript does not watch: the
+ * projection mappers, which validate every other field they are handed and
+ * refuse what they cannot recognise. This is that validation for the
+ * classification.
+ *
+ * The direction of the failure is the whole point. An unrecognised value
+ * resolves to the **most protective level** and never to `undetermined`, because
+ * the two absences are different claims: `undetermined` says *this task has no
+ * source*, which is a fact about the task, while an unreadable value says
+ * *something here is wrong*, which is a fact about the code. Letting the second
+ * decay into the first would publish content in the clear because a caller
+ * forgot to derive one — the exact shape of accident `2L-PRIVACY-004` forbids in
+ * the other direction.
+ */
+export function toTaskSensitivity(value: unknown): TaskSensitivity {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { kind: "derived", level: MOST_PROTECTIVE };
+  }
+  const candidate = value as { kind?: unknown; level?: unknown };
+  if (candidate.kind === "undetermined") return UNDETERMINED;
+  if (
+    candidate.kind === "derived"
+    && typeof candidate.level === "string"
+    && (SENSITIVITY_LEVELS as readonly string[]).includes(candidate.level)
+  ) {
+    return { kind: "derived", level: candidate.level as SensitivityLevel };
+  }
+  return { kind: "derived", level: MOST_PROTECTIVE };
+}
+
+/**
+ * What a Work surface renders for one task — the **single** question the list,
+ * the detail, quick edit, selection, preview, result and undo all ask.
+ *
+ * `2L-PRIVACY-007` requires those surfaces to converge on one contract rather
+ * than to agree by inspection. This is the convergence, expressed as the only
+ * function that connects a `TaskSensitivity` to `presentationFor`: a surface
+ * that wanted to decide for itself would have to stop calling this, which is
+ * what `sensitivity-convergence.test.ts` fails on.
+ *
+ * **The `undetermined` arm never asks for a rule.** It does not look a level up,
+ * does not pass `"normal"` to anything, and produces the shown-in-the-clear
+ * answer directly. That matters because OD-2L-1 B says the absence of a source
+ * is never *inferred* to mean `normal` — the rendered result is the same as
+ * `normal`'s, and the reasoning must not be.
+ */
+export function resolveTaskContent(
+  sensitivity: TaskSensitivity,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  if (!isDerivedLevel(sensitivity)) {
+    return { show: true, masked: false, revealable: false };
+  }
+  return resolveContent("work", sensitivity.level, key, state);
 }

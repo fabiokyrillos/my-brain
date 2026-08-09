@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { SENSITIVITY_LEVELS } from "./contracts";
+import { GOVERNED_SURFACES, SENSITIVITY_LEVELS, presentationFor } from "./contracts";
 import {
   UNDETERMINED,
   deriveTaskSensitivity,
   isDerivedLevel,
+  resolveTaskContent,
+  toTaskSensitivity,
   type TaskSensitivity,
 } from "./task-derivation";
 
@@ -103,6 +105,116 @@ describe("2L-PRIVACY-005: an unreadable source is the most protective answer", (
     // be protected.
     const result = deriveTaskSensitivity("entry-gone", map([]));
     expect(result.kind).toBe("derived");
+  });
+});
+
+describe("2L-PRIVACY-002: the value crossing a projection boundary is narrowed, fail-closed", () => {
+  /*
+   * `toWorkItemView` validates every other field it is handed and refuses what
+   * it cannot recognise. The classification has to be narrowed the same way,
+   * and the direction of the failure is the whole question: a caller that
+   * forgets to derive one must not thereby publish content in the clear.
+   *
+   * So an unrecognised value resolves to the most protective level and **never**
+   * to `undetermined`. `undetermined` is a claim about the task ("it has no
+   * source"), and a missing value is a claim about the code.
+   */
+  it("passes a well-formed derived value through unchanged", () => {
+    for (const level of SENSITIVITY_LEVELS) {
+      expect(toTaskSensitivity({ kind: "derived", level })).toEqual({ kind: "derived", level });
+    }
+  });
+
+  it("passes `undetermined` through unchanged", () => {
+    expect(toTaskSensitivity({ kind: "undetermined" })).toEqual({ kind: "undetermined" });
+    expect(toTaskSensitivity(UNDETERMINED)).toEqual({ kind: "undetermined" });
+  });
+
+  it("fails closed on anything it does not recognise", () => {
+    for (const malformed of [
+      undefined,
+      null,
+      "normal",
+      {},
+      { kind: "derived" },
+      { kind: "derived", level: "public" },
+      { kind: "derived", level: null },
+      { kind: "unknown" },
+      { level: "normal" },
+      [],
+    ]) {
+      expect(toTaskSensitivity(malformed), JSON.stringify(malformed) ?? "undefined")
+        .toEqual({ kind: "derived", level: "highly_sensitive" });
+    }
+  });
+
+  it("never invents `undetermined` for a value it could not read", () => {
+    // The failure that would matter: a missing classification quietly becoming
+    // "this task was never classified", which renders in the clear.
+    expect(toTaskSensitivity(undefined).kind).toBe("derived");
+    expect(toTaskSensitivity({ kind: "derived", level: "nope" }).kind).toBe("derived");
+  });
+});
+
+describe("2L-PRIVACY-007: list and detail resolve presentation through one function", () => {
+  /*
+   * The convergence requirement is not "both surfaces behave the same"; it is
+   * that neither surface *decides*. `resolveTaskContent` is the single place a
+   * Work surface asks what to render, so the list and the detail cannot
+   * disagree without one of them ceasing to call it — which the convergence
+   * guard fails on.
+   */
+  it("governs `work` through the central contract", () => {
+    expect(GOVERNED_SURFACES).toContain("work");
+    expect(presentationFor("work", "normal").outcome).toBe("show");
+    expect(presentationFor("work", "private").outcome).toBe("show");
+    expect(presentationFor("work", "highly_sensitive")).toEqual({ outcome: "mask", revealable: true });
+  });
+
+  it("shows a `normal` or `private` source in the clear", () => {
+    for (const level of ["normal", "private"] as const) {
+      expect(resolveTaskContent({ kind: "derived", level }, "task-1"))
+        .toEqual({ show: true, masked: false, revealable: false });
+    }
+  });
+
+  it("masks a `highly_sensitive` source in place, revealable locally", () => {
+    expect(resolveTaskContent({ kind: "derived", level: "highly_sensitive" }, "task-1"))
+      .toEqual({ show: false, masked: true, revealable: true });
+  });
+
+  it("reveals only the key the user acted on", () => {
+    const state = { revealed: new Set(["task-1"]) };
+    const masked = { kind: "derived", level: "highly_sensitive" } as const;
+    expect(resolveTaskContent(masked, "task-1", state).show).toBe(true);
+    expect(resolveTaskContent(masked, "task-2", state).show).toBe(false);
+  });
+
+  it("shows an undetermined task without ever asking for a level", () => {
+    // `2L-PRIVACY-004`: a manual task is not artificially classified, and the
+    // absence of a source is not inferred to mean `normal`. The visible result
+    // matches `normal`'s; the reasoning never produces the word.
+    expect(resolveTaskContent(UNDETERMINED, "task-1"))
+      .toEqual({ show: true, masked: false, revealable: false });
+    // Even with a reveal active for its key, nothing changes: there is nothing
+    // withheld to reveal.
+    expect(resolveTaskContent(UNDETERMINED, "task-1", { revealed: new Set(["task-1"]) }))
+      .toEqual({ show: true, masked: false, revealable: false });
+  });
+
+  it("gives one answer per classification, whichever surface asks", () => {
+    // Executed rather than asserted in prose: the same three inputs, resolved
+    // twice, must be byte-identical. This is what "the list and the detail
+    // converge on the same contract" means operationally.
+    for (const sensitivity of [
+      UNDETERMINED,
+      { kind: "derived", level: "normal" } as const,
+      { kind: "derived", level: "highly_sensitive" } as const,
+    ]) {
+      const fromList = resolveTaskContent(sensitivity, "task-1");
+      const fromDetail = resolveTaskContent(sensitivity, "task-1");
+      expect(JSON.stringify(fromList)).toBe(JSON.stringify(fromDetail));
+    }
   });
 });
 

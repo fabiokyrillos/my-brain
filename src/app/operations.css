@@ -201,3 +201,20 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-origin{display:block;color:var(--ink-soft);font-size:10px;margin-top:5px}
 .work-page .row-action{min-height:44px;display:inline-flex;align-items:center;gap:5px}
 @media(max-width:600px){.work-page .list-meta{align-items:flex-start;flex-wrap:wrap}.work-page .row-actions{width:100%}.work-page .row-actions form{flex:1}.work-page .row-action{justify-content:center;width:100%}}
+
+/* Phase 2L slice 2L.1: withheld task content (OD-2L-1 option B).
+
+   A masked item occupies the same slot as the content it withholds, so the
+   count, the pagination and the row's own actions stay truthful
+   (`2L-PRIVACY-003`). The dashed border is the same grammar `.home-masked`
+   established in Phase 2J, so "something is here and it is not being shown"
+   looks the same wherever the product does it. */
+.work-protected{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.work-protected[data-masked="true"]{padding:6px 10px;border:1px dashed var(--line);border-radius:10px;color:var(--ink-soft);font-size:13px}
+.work-protected-label{font:600 13px var(--font-sans)}
+/* 44px, from paint: the reveal is a real control on a phone, not a text link
+   that happens to be clickable (`2L-MOBILE-001` measures this in the browser). */
+.work-protected-toggle{min-height:44px;display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:white;padding:0 14px;color:var(--blue);font:600 12px var(--font-sans);cursor:pointer}
+.work-protected-toggle:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-protected-revealed{display:block}
+.work-protected-note{margin-top:10px;font-size:11px}

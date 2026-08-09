@@ -93,6 +93,7 @@ function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
     contexts: [],
     people: [],
     waitingOnPeople: [],
+    sensitivity: { kind: "undetermined" },
     ...overrides,
   };
 }

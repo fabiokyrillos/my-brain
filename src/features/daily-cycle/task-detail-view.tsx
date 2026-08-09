@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getWorkCopy } from "@/features/operations/copy";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import { isDerivedLevel } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import type { RelationSummary, WorkItemHumanState, WorkItemPriority } from "./contracts";
 import { describeHistoryEntry, getTaskDetailCopy } from "./task-detail-copy";
@@ -117,8 +120,16 @@ export function TaskDetailView({
       <header className="task-detail-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{task.title}</h1>
-          <p className="task-description">{task.description ?? copy.noDescription}</p>
+          {/*
+            `2L-PRIVACY-001`/`-007`. The detail withholds through the **same**
+            component the list does, so the two cannot drift: neither surface
+            owns a rule, and a surface that stopped asking would fail
+            `sensitivity-convergence.test.ts` rather than silently print.
+          */}
+          <ProtectedContent locale={locale} revealKey={task.taskId} sensitivity={task.sensitivity}>
+            <h1>{task.title}</h1>
+            <p className="task-description">{task.description ?? copy.noDescription}</p>
+          </ProtectedContent>
         </div>
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
       </header>
@@ -170,13 +181,39 @@ export function TaskDetailView({
         {detail.provenance ? (
           <>
             <p className="quiet-state">{copy.provenance.fromEntry}</p>
-            <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
+            {/*
+              The excerpt is the *entry itself*, which is the record whose
+              classification produced the mask above. Printing it while the
+              title is withheld would make the mask theatre, so it goes through
+              the same contract with its own reveal key — revealing the title
+              does not reveal the note, and vice versa.
+            */}
+            <ProtectedContent
+              locale={locale}
+              revealKey={`${task.taskId}:provenance`}
+              sensitivity={task.sensitivity}
+            >
+              <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
+            </ProtectedContent>
             <Link className="panel-view-all" href={`/${locale}/app/inbox/${detail.provenance.entryId}`}>
               {copy.provenance.openEntry}
             </Link>
           </>
         ) : (
-          <p className="quiet-state">{copy.provenance.manual}</p>
+          <>
+            <p className="quiet-state">{copy.provenance.manual}</p>
+            {/*
+              `2L-PRIVACY-004`, stated exactly where a user could otherwise be
+              misled: this is the one screen that tells them the task came from
+              nothing, and therefore the one screen where "so nothing protects
+              it" belongs.
+            */}
+            {isDerivedLevel(task.sensitivity) ? null : (
+              <p className="quiet-state work-protected-note">
+                {getWorkCopy(locale).protected.partialCoverage}
+              </p>
+            )}
+          </>
         )}
       </section>
 

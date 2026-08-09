@@ -61,6 +61,21 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
  * the classification consulted is the **current** one, read at render time.
  * OD-2K-2 removed the stored excerpt precisely so there is no second copy that
  * could carry a stale level alongside it.
+ *
+ * `work` arrives in Phase 2L (`2L-PRIVACY-001`, OD-2L-1 **option B**), and it is
+ * the one governed surface whose subject carries **no classification of its
+ * own**: `tasks` has no `sensitivity` column and OD-2L-1 B forbids adding one.
+ * A task's level is *derived from its source entry* and re-read at presentation
+ * time — `task-derivation.ts` is that derivation, and `resolveTaskContent`
+ * there is the only thing that asks this module about `work`.
+ *
+ * Two consequences worth stating where the rule lives. Coverage is **partial by
+ * construction**: a manually created task has no source to derive from and is
+ * therefore never classified here at all — which is a third answer this module
+ * has no member for, and exactly why the derivation returns its own three-arm
+ * value rather than a `SensitivityLevel`. And a source that cannot be read
+ * resolves to `highly_sensitive`, so the rule below is reached in its most
+ * protective arm precisely when the least is known.
  */
 export const GOVERNED_SURFACES = [
   "hoje",
@@ -69,6 +84,7 @@ export const GOVERNED_SURFACES = [
   "review_summary",
   "notification",
   "chat",
+  "work",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -110,6 +126,12 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   review_summary: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
   notification: { normal: OMIT, private: OMIT, highly_sensitive: OMIT },
   chat: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  // Masked rather than excluded, for the reason the module header gives and for
+  // one that is sharper on Work than anywhere else: a Work list is a list the
+  // user *operates on*. Dropping a row would remove a task from the count, from
+  // the filter and from any selection — so the user would act on a set that is
+  // not the set they own. The row stays, the content does not.
+  work: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

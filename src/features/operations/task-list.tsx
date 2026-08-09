@@ -15,7 +15,10 @@
 import Link from "next/link";
 import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
+import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
+import { getWorkCopy } from "./copy";
+import { ProtectedContent } from "./protected-content";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
@@ -71,11 +74,29 @@ export function TaskList({
     return <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Tudo em ordem" : "All clear"}</strong><p>{emptyHint}</p></div>;
   }
 
+  /*
+   * `2L-PRIVACY-004` — the partial coverage, stated where it could mislead.
+   *
+   * OD-2L-1 option B protects a task through the note it came from, and a task
+   * typed straight into this list has no note. A user looking at a page where
+   * *something* is withheld would otherwise reasonably conclude that everything
+   * sensitive is, so the sentence appears exactly when at least one row is
+   * masked — and never on a page where nothing is, where it would be noise
+   * about a mechanism the user has not met.
+   */
+  // "Is anything withheld" is asked of the **contract**, never of a level: this
+  // file may not name a classification, and `sensitivity-boundary.test.ts`
+  // fails the build if it does.
+  const anyWithheld = tasks.some((task) => resolveTaskContent(task.sensitivity, task.taskId).masked);
+
   return (
     <div className="list-stack">
       {tasks.map((task) => (
         <TaskRow action={action} agentName={agentName} key={task.taskId} locale={locale} task={task} timezone={timezone} />
       ))}
+      {anyWithheld ? (
+        <p className="quiet-state work-protected-note">{getWorkCopy(locale).protected.partialCoverage}</p>
+      ) : null}
     </div>
   );
 }
@@ -104,8 +125,26 @@ function TaskRow({
   return (
     <article className="list-row">
       <div className="list-row-main">
-        {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
-        {task.description && <p>{task.description}</p>}
+        {/*
+          `2L-PRIVACY-001`/`-003`. The title and the description are the only
+          user content this row renders, and they are withheld together: masking
+          one and printing the other would protect nothing.
+
+          The row itself survives — its state, its dates, its relations and its
+          four actions all stay — because the count, the pagination and any
+          later selection have to keep describing the set the user actually
+          owns. `href` keeps the masked row openable without putting the
+          withheld title into the link.
+        */}
+        <ProtectedContent
+          href={openHref}
+          locale={locale}
+          revealKey={task.taskId}
+          sensitivity={task.sensitivity}
+        >
+          {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
+          {task.description && <p>{task.description}</p>}
+        </ProtectedContent>
         <small className="work-origin">{task.origin === "brain" ? (pt ? `Sugerida pelo ${agentName}` : `Suggested by ${agentName}`) : (pt ? "Criada por você" : "Created by you")}</small>
         {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
           || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (

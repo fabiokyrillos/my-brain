@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { getWorkCopy } from "@/features/operations/copy";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
 import { taskDetailCopy } from "./task-detail-copy";
@@ -26,6 +27,10 @@ function task(overrides: Partial<WorkItemView> = {}): WorkItemView {
     people: [{ id: "person-1", label: "Marina Duarte" }],
     waitingOnPeople: [],
     dependsOn: [],
+    // The default fixture is a task with a readable, ordinary source: the
+    // surface's baseline behaviour is "render it", and the masked cases below
+    // override this explicitly so a mask is never accidental.
+    sensitivity: { kind: "derived", level: "normal" },
     ...overrides,
   };
 }
@@ -206,5 +211,63 @@ describe("task history vocabulary", () => {
 
     // Both locales describe the same vocabulary, or one of them silently falls back.
     expect(Object.keys(taskDetailCopy.en.history.actions).sort()).toEqual(covered.sort());
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-PRIVACY-001`, `-003`, `-005`, `-007` — the derived classification, on the
+ * task detail.
+ * -------------------------------------------------------------------------- */
+
+describe("TaskDetailView: withheld content (OD-2L-1 option B)", () => {
+  const secret = { kind: "derived", level: "highly_sensitive" } as const;
+
+  it("withholds the title, the description and the original note together", () => {
+    // The provenance blockquote is a 400-character excerpt of the very entry
+    // whose classification produced the mask, so leaving it printed would make
+    // masking the title theatre.
+    renderDetail(detail({ task: task({ sensitivity: secret }) }), "en");
+
+    expect(screen.queryByText("Revisar o contrato da Aurora")).toBeNull();
+    expect(screen.queryByText("Conferir a cláusula de rescisão.")).toBeNull();
+    expect(screen.queryByText(/Preciso revisar o contrato/)).toBeNull();
+    expect(screen.getAllByText(getWorkCopy("en").protected.label).length).toBeGreaterThan(0);
+  });
+
+  it("keeps every fact about the task that is not its content", () => {
+    // `2L-PRIVACY-003`: the row is withheld, not removed. Dates, state, origin
+    // and history are facts *about* the task and were never the classified
+    // content.
+    renderDetail(detail({ task: task({ sensitivity: secret }) }), "en");
+
+    expect(screen.getByRole("region", { name: "Details" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "History of this task" })).toBeVisible();
+  });
+
+  it("shows an ordinary task untouched", () => {
+    renderDetail(detail(), "en");
+
+    expect(screen.getByText("Revisar o contrato da Aurora")).toBeVisible();
+    expect(screen.getByText(/Preciso revisar o contrato/)).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("en").protected.label)).toBeNull();
+  });
+
+  it("shows a manual task untouched and says why it is not protected", () => {
+    // `2L-PRIVACY-004`. A task with no source has no derivable classification,
+    // and the surface says so rather than letting the user infer protection it
+    // does not have.
+    renderDetail(
+      detail({ task: task({ sensitivity: { kind: "undetermined" } }), provenance: null }),
+      "en",
+    );
+
+    expect(screen.getByText("Revisar o contrato da Aurora")).toBeVisible();
+    expect(screen.getByText(getWorkCopy("en").protected.partialCoverage)).toBeVisible();
+  });
+
+  it("does not decide anything itself: the rule comes from the shared component", () => {
+    const source = readFileSync(join(__dirname, "task-detail-view.tsx"), "utf8");
+    expect(source).toMatch(/ProtectedContent/);
+    expect(source).not.toMatch(/highly_sensitive|presentationFor/);
   });
 });

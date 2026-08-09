@@ -1,4 +1,5 @@
 import type { SensitivityLevel } from "@/features/sensitivity/contracts";
+import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
 
 export const productStates = [
   "saved",
@@ -344,4 +345,18 @@ export type WorkItemView = {
   readonly waitingOnPeople: readonly RelationSummary[];
   readonly parent?: RelationSummary;
   readonly dependsOn?: readonly RelationSummary[];
+  /**
+   * `2L-PRIVACY-001` — what classification, if any, applies to this task.
+   *
+   * Carried on the view next to the title and the description it governs, for
+   * the reason `NeedsAttentionItemView.sensitivity` is: a surface that had to
+   * fetch it separately at render time is a surface that can forget to.
+   *
+   * **Required, and not optional.** An optional field would let a projection
+   * omit it and a component read `undefined`, and the fail-closed narrowing in
+   * `toWorkItemView` would never run. It is also a `TaskSensitivity` rather
+   * than a `SensitivityLevel`, because a manual task has no derivable level at
+   * all and there must be nothing here to misread as `normal` (OD-2L-1 B).
+   */
+  readonly sensitivity: TaskSensitivity;
 };
