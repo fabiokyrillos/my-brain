@@ -1,5 +1,6 @@
 import "server-only";
 import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
+import { detailControlsFor, type DetailControl } from "@/features/task-commands/detail-controls";
 import { pageRange, paginateRows } from "@/lib/pagination";
 import { defaultAgentPreferences, type Locale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
@@ -24,6 +25,19 @@ export type WorkProjectionPage = {
   readonly items: readonly WorkItemView[];
   readonly hasNext: boolean;
   readonly timezone: string;
+  /**
+   * `2L-EDIT-001` — which edit controls each row admits, derived here.
+   *
+   * Computed on the server from `detailControlsFor(row.status)`, because this
+   * is the only place the row's **real** status exists. `WorkItemView` carries
+   * `humanState`, which is deliberately lossy — `inbox` and `todo` are both
+   * "not started" — and an eligibility question answered from it would offer
+   * controls the command path refuses.
+   *
+   * A record rather than a `Map`, because it crosses the server/client boundary
+   * and a plain object is the shape that has always crossed it here.
+   */
+  readonly editControlsByTaskId: Readonly<Record<string, readonly DetailControl[]>>;
 };
 
 export function parseWorkView(value: string | string[] | undefined): WorkViewId {
@@ -193,7 +207,10 @@ export async function loadWorkProjection(
     return item ? [item] : [];
   });
 
-  return { items, hasNext, timezone };
+  const editControlsByTaskId: Record<string, readonly DetailControl[]> = {};
+  for (const row of pageRows) editControlsByTaskId[row.id] = detailControlsFor(row.status);
+
+  return { items, hasNext, timezone, editControlsByTaskId };
 }
 
 /**

@@ -218,3 +218,18 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-protected-toggle:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
 .work-protected-revealed{display:block}
 .work-protected-note{margin-top:10px;font-size:11px}
+
+/* Phase 2L slice 2L.1: quick edit on a Work row (`2L-EDIT-001`).
+
+   A disclosure rather than twelve controls at rest: a row that showed every
+   verb the taxonomy admits would bury the task under the ways to change it,
+   and on a phone it would be unreachable. `<details>` carries the keyboard
+   operation and the expanded/collapsed announcement without a line of JS. */
+.work-quick-edit{width:100%;margin-top:8px}
+.work-quick-edit-summary{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:white;color:var(--ink-soft);font:600 12px var(--font-sans);cursor:pointer;list-style:none}
+.work-quick-edit-summary::-webkit-details-marker{display:none}
+.work-quick-edit-summary:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+.work-quick-edit[open] .work-quick-edit-summary{background:var(--ink);color:white;border-color:var(--ink)}
+.task-detail-controls-inline{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}
+.task-detail-controls-inline .task-control-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+@media(max-width:600px){.work-quick-edit-summary{width:100%;justify-content:center}}

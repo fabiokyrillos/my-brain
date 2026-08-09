@@ -16,9 +16,16 @@ import Link from "next/link";
 import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
 import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
+import type { DetailControl } from "@/features/task-commands/detail-controls";
+import type {
+  TaskDetailCommandHandler,
+  TaskDetailDateBounds,
+  TaskDetailRelationOptions,
+} from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
 import { getWorkCopy } from "./copy";
 import { ProtectedContent } from "./protected-content";
+import { QuickEdit } from "./quick-edit";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
@@ -43,11 +50,29 @@ const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
 
 export type { WorkItemActionHandler };
 
+/**
+ * Everything quick edit needs, injected as one object (`2L-EDIT-001`).
+ *
+ * Optional, and deliberately all-or-nothing: a list rendered without it is the
+ * list exactly as it was, which is what lets the jsdom gate and the Hoje panel
+ * mount `TaskList` without a relation query. Half-supplied would be worse than
+ * absent — a control with no options to point at is a control the user can only
+ * fail to use.
+ */
+export type QuickEditSupport = {
+  readonly action: TaskDetailCommandHandler;
+  /** Derived from the taxonomy per row, server-side. Never computed here. */
+  readonly controlsByTaskId: Readonly<Record<string, readonly DetailControl[]>>;
+  readonly relationOptions: TaskDetailRelationOptions;
+  readonly dateBounds: TaskDetailDateBounds;
+};
+
 export function TaskList({
   action,
   agentName,
   emptyHint,
   locale,
+  quickEdit,
   tasks,
   timezone,
 }: {
@@ -66,6 +91,7 @@ export function TaskList({
   action: WorkItemActionHandler;
   emptyHint: string;
   locale: Locale;
+  quickEdit?: QuickEditSupport;
   tasks: readonly WorkItemView[];
   timezone: string;
 }) {
@@ -92,7 +118,15 @@ export function TaskList({
   return (
     <div className="list-stack">
       {tasks.map((task) => (
-        <TaskRow action={action} agentName={agentName} key={task.taskId} locale={locale} task={task} timezone={timezone} />
+        <TaskRow
+          action={action}
+          agentName={agentName}
+          key={task.taskId}
+          locale={locale}
+          quickEdit={quickEdit}
+          task={task}
+          timezone={timezone}
+        />
       ))}
       {anyWithheld ? (
         <p className="quiet-state work-protected-note">{getWorkCopy(locale).protected.partialCoverage}</p>
@@ -105,12 +139,14 @@ function TaskRow({
   action,
   agentName,
   locale,
+  quickEdit,
   task,
   timezone,
 }: {
   action: WorkItemActionHandler;
   agentName: string;
   locale: Locale;
+  quickEdit?: QuickEditSupport;
   task: WorkItemView;
   timezone: string;
 }) {
@@ -190,6 +226,22 @@ function TaskRow({
         {task.noDueReason && <small>{task.noDueReason}</small>}
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
         <WorkItemActions action={action} locale={locale} task={task} />
+        {/*
+          `2L-EDIT-001`. The controls arrive already derived from the taxonomy
+          against this row's real status — this row does not compute them, and
+          could not: `humanState` is lossy on purpose.
+        */}
+        {quickEdit ? (
+          <QuickEdit
+            action={quickEdit.action}
+            controls={quickEdit.controlsByTaskId[task.taskId] ?? []}
+            dateBounds={quickEdit.dateBounds}
+            locale={locale}
+            relationOptions={quickEdit.relationOptions}
+            taskId={task.taskId}
+            title={task.title}
+          />
+        ) : null}
       </div>
     </article>
   );

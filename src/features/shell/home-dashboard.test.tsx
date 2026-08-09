@@ -47,7 +47,7 @@ function setup(options: {
   vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: "user-1" } } as never);
   vi.mocked(loadInboxProjection).mockResolvedValue({ items, hasNext: false });
   vi.mocked(loadAttentionProjection).mockResolvedValue({ items: attentionItems, hasNext: attentionHasNext, nextCursor: null });
-  vi.mocked(loadWorkProjection).mockResolvedValue({ items: workItems, hasNext: false, timezone: "America/Sao_Paulo" });
+  vi.mocked(loadWorkProjection).mockResolvedValue({ items: workItems, hasNext: false, timezone: "America/Sao_Paulo", editControlsByTaskId: {} });
   vi.mocked(loadHomeSupplementalProjection).mockResolvedValue({ waitingCount, openQuestionPreview });
   return { supabase };
 }

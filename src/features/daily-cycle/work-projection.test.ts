@@ -397,6 +397,48 @@ describe("loadWorkProjection", () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * `2L-EDIT-001` — the editable field set, derived rather than listed.
+ * -------------------------------------------------------------------------- */
+
+describe("loadWorkProjection: the quick-edit control set", () => {
+  it("derives each row's controls from the taxonomy against its real status", async () => {
+    const { detailControlsFor } = await import("@/features/task-commands/detail-controls");
+    const { client } = clientMock({
+      tasks: [task(1, { status: "todo" }), task(2, { status: "completed" })],
+    });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    // Compared against the derivation rather than against a literal set: a
+    // taxonomy change moves both together, and a hand-written list here would
+    // be the second copy `2L-EDIT-001` forbids.
+    const controls = (page as { editControlsByTaskId: Record<string, unknown> }).editControlsByTaskId;
+    expect(controls["task-001"]).toEqual(detailControlsFor("todo"));
+    expect(controls["task-002"]).toEqual(detailControlsFor("completed"));
+    // Non-vacuous: the two statuses genuinely admit different verbs, so a
+    // projection that returned one set for everything would fail.
+    expect(controls["task-001"]).not.toEqual(controls["task-002"]);
+  });
+
+  it("uses the row's real status, which the rendered view deliberately cannot supply", async () => {
+    // `inbox` and `todo` both project to `not_started`; the taxonomy does not
+    // treat them identically. Deriving from `humanState` would guess exactly
+    // here, so the projection is the only place this can be answered.
+    const { detailControlsFor } = await import("@/features/task-commands/detail-controls");
+    const { client } = clientMock({ tasks: [task(1, { status: "inbox" })] });
+
+    const page = await loadWorkProjection()(client, {
+      userId: "user-1", locale: "en", view: "all", page: 1,
+    });
+
+    const controls = (page as { editControlsByTaskId: Record<string, unknown> }).editControlsByTaskId;
+    expect(controls["task-001"]).toEqual(detailControlsFor("inbox"));
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * `2L-PRIVACY-001`, `-002`, `-004`, `-005`, `-006` — OD-2L-1 option B on the
  * Work list.
  * -------------------------------------------------------------------------- */
