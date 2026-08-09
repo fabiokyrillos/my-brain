@@ -170,25 +170,49 @@ export type ConversationCard = {
 /**
  * `2K-CARD-008` — the one place the read-only rule is decided.
  *
- * The renderer calls this and drops any control it was handed for a type that
- * may not have one, so a caller's mistake cannot become a mutating affordance
- * on a person card.
+ * The renderer calls this and drops any control it was handed, so a caller's
+ * mistake cannot become a mutating affordance on a person card.
+ *
+ * ## Why it reads the card's own field rather than re-deriving from the type
+ *
+ * Slice 2K.3 found the case that decides this. A memory card **can** mutate —
+ * 2K.2 gave it a confirm and an archival undo — but a memory appearing as a
+ * *reference*, in a source list or on a resumed card, is read-only: it is
+ * something the conversation pointed at, not something it is proposing to
+ * change. Mutability is therefore a property of the card's **role**, not of its
+ * type alone, and `2K-CARD-009`'s rule that a card declares from its own value
+ * rather than inheriting a sibling's applies here exactly as it does to
+ * reversibility.
+ *
+ * The type-level guarantee is not weakened; it moves to the **builder**.
+ * `readOnlyPreviewCard` always writes `read_only`, and `unavailableCard` is the
+ * only builder that derives mutability from the type — so no builder can
+ * produce a mutable card for a type OD-2K-B keeps read-only, which
+ * `contracts.test.ts` asserts directly.
  */
 export function mayRenderMutatingControl(card: ConversationCard): boolean {
   if (card.state === "unavailable") return false;
-  return cardMutability(card.cardType) === "mutable";
+  return card.mutability === "mutable";
 }
 
 /**
- * `2K-CARD-007` — a read-only preview.
+ * `2K-CARD-007` — a read-only preview of something the conversation referred to.
  *
  * `sensitivity` is optional and defaults **closed**: a caller that has not
- * classified the source gets `highly_sensitive`, so an unclassified snippet is
- * masked until somebody classifies it rather than printed until somebody
- * notices.
+ * classified the source gets the most protective level, so an unclassified
+ * snippet is masked until somebody classifies it rather than printed until
+ * somebody notices.
+ *
+ * It accepts **any** card type and always writes `read_only`. Slice 2K.3 is
+ * what settled that: a memory reached as a *reference* — cited by an answer, or
+ * shown on a resumed card — is something the conversation pointed at, not
+ * something it proposes to change, even though a memory card in its own right
+ * may mutate. Since this builder can only ever write `read_only`, widening the
+ * parameter cannot create a mutable card; it only stops the two read-only roles
+ * needing two builders that would drift.
  */
 export function readOnlyPreviewCard(input: {
-  readonly cardType: ReadOnlyConversationCardType;
+  readonly cardType: ConversationCardType;
   readonly objectId: string;
   readonly snippet?: string | null;
   readonly sensitivity?: SensitivityLevel | string | null;

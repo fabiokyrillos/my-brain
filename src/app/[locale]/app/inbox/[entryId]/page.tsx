@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import type { InterpretationTechnicalDetailsView } from "@/features/daily-cycle/contracts";
@@ -19,10 +20,14 @@ import { getAgentName } from "@/features/profile/agent-identity";
 
 export default async function EntryDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; entryId: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const { locale: rawLocale, entryId } = await params;
+  // `2K-CONT-002`: present only when the user arrived from a conversation.
+  const from = (await searchParams).from;
   if (!isLocale(rawLocale)) notFound();
   const locale = rawLocale;
   const pt = locale === "pt-BR";
@@ -148,6 +153,7 @@ export default async function EntryDetailPage({
   return (
     <div className="content-page entry-detail-page">
       <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Registros" : "Records"}</Link>
+      <ReturnToConversation from={from} locale={locale} />
 
       <EntryReview agentName={agentName}
         view={view}

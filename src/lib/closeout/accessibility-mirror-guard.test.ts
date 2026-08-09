@@ -156,6 +156,32 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     }
   });
 
+  it("pins the 2K.3 return path to the components that emit it", () => {
+    const resumed = read("src/features/conversation-cards/resumed-card.tsx");
+    const returnLink = read("src/features/conversation-cards/return-to-conversation.tsx");
+    const thread = read("src/app/[locale]/app/chat/[conversationId]/page.tsx");
+
+    for (const token of ["conversation-resumed", "conversation-resumed-note", "conversation-resumed-anchor"]) {
+      expect(resumed, `resumed-card.tsx no longer emits .${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors .${token}`).toContain(token);
+    }
+    expect(returnLink, "return-to-conversation.tsx no longer emits .conversation-return")
+      .toContain("conversation-return");
+    expect(mirror).toContain("conversation-return");
+
+    // The resumption takes focus once, so it must be a focusable named region.
+    // The lane's fixture would otherwise scan a plain div and report nothing.
+    for (const attribute of ['role="region"', "tabIndex={-1}"]) {
+      expect(resumed, `resumed-card.tsx no longer emits ${attribute}`).toContain(attribute);
+    }
+    expect(mirror).toContain('role="region"');
+    expect(mirror).toContain('tabindex="-1"');
+
+    // The anchor the fixture links to is the one the thread paints.
+    expect(thread).toContain("messageAnchorId(messageId)");
+    expect(mirror).toContain('id="message-1"');
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted
