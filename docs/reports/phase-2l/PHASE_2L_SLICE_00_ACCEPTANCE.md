@@ -225,3 +225,16 @@ No product surface, no route, no component, no Server Action, no RPC, no migrati
 RLS policy, no grant, no secret, no external service, no provider call, no telemetry
 event, no signup or rollout state. `GOVERNED_SURFACES` is unchanged. Hosted parity
 remains `202608090089`, 89 migrations.
+
+---
+
+## 9. Claims
+
+| id | classification | evidence |
+|---|---|---|
+| `2L-AUDIT-001` | **built** | Section 2 - statuses, actions, policies, eligibility and undo strategies re-derived from `taxonomy.ts` at the implementation baseline; no divergence from the audit's 1.5, and the call-site census is now `phase-2l-work-authority-guard.test.ts` rather than a paragraph |
+| `2L-AUDIT-002` | **built** | Section 2 - `detailControlsFor` iterates `TASK_COMMAND_ACTIONS`, asks `actionPolicy` and takes `choices` from `allowedTargetValues`; the guard additionally asserts `detail-controls.ts` names no status and no priority literal |
+| `2L-AUDIT-003` | **built** | Section 3 - two round trips per item, one `undo_operations` reservation plus one `audit_logs` row per applied item, and a refused item rolls back its own reservation, so the ceiling of 50 is confirmed safe rather than assumed |
+| `2L-AUDIT-004` | **built** | Section 4 - five enforcement points named, all three view declarations identical in the same order, and the writer proved to hold no copy; conclusion: OD-2L-2 A needs no migration |
+| `2L-AUDIT-005` | **built** | Section 5 - `task-derivation.ts` is OD-2L-1 option B as executable code: three outcomes, only two of them levels, and `undetermined` structurally incapable of carrying one |
+| `2L-AUDIT-006` | **built** | Section 6 - the inherited residuals dispositioned with a destination each; `2K-AUDIT-002` and `2K-EXPL-007` leave the phase, `2K-A11Y-007` is inherited as a stated limitation, and none was created here |

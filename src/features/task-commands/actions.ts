@@ -1433,8 +1433,37 @@ export async function undoWorkOperation(
 ): Promise<TaskUndoState> {
   const locale = parseLocale(formData);
   const copy = getWorkCopy(locale).undo;
-  const settledUndo = (status: TaskUndoState["status"], message: string): TaskUndoState =>
-    ({ status, message, announcement: message });
+  /**
+   * `2L-METRICS-005` — the outcome, through the **existing** event.
+   *
+   * `task_command_undone` already admits `commandOrigin: 'work'` and a closed
+   * `undoResult`, both as deployed database constraints. So the Work
+   * affordance reports through the vocabulary the console already reports
+   * through: no new event name, no new property, and therefore no migration —
+   * which matters because a name the deployed CHECK rejects would be a
+   * producer that cannot write, the exact defect `2L-METRICS-003` exists to
+   * catch.
+   *
+   * `failed` is the one state with no member of its own; it maps to `refused`,
+   * which is what the router's own refusals report and is the truthful
+   * neighbour rather than a new value.
+   */
+  const settledUndo = (status: TaskUndoState["status"], message: string): TaskUndoState => {
+    if (status !== "idle") {
+      emit(
+        { locale },
+        "task_command_undone",
+        // Keyed on the operation and its result, so a user who presses twice
+        // produces one event rather than two.
+        `${String(formData.get("undoId") ?? "unknown")}:${status}`,
+        buildTaskCommandUndoneProperties({
+          origin: "work",
+          result: status === "failed" ? "refused" : status,
+        }) as unknown as Record<string, unknown>,
+      );
+    }
+    return { status, message, announcement: message };
+  };
 
   const undoId = z.string().uuid().safeParse(formData.get("undoId"));
   if (!undoId.success) return settledUndo("failed", copy.failed);

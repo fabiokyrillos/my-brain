@@ -135,3 +135,22 @@ probe, and this record does not round it up.
 | `undo_operation` caller modules | 4 | 4 |
 | Product events declared | none | none |
 | RLS policies, grants, roles, secrets | — | none touched |
+
+---
+
+## 7. Claims
+
+| id | classification | evidence |
+|---|---|---|
+| `2L-BULK-001` | **built** | Section 2 - `selection.ts` plus the bar: visible, countable and dismissible without applying, proved in `selection.test.ts` and `bulk-bar.test.tsx` |
+| `2L-BULK-002` | **built** | Section 2 - `selectAllShown` takes the page's own ids as its argument, so no arm of it can mean "everything matching" |
+| `2L-BULK-003` | **built** | Section 2 - the ceiling derives from `WORK_PAGE_SIZE`; a refusal returns the unchanged selection, `selectAllShown` refuses whole, and the bound is on screen from the first selection |
+| `2L-BULK-004` | **built** | Section 2 - derived from two predicates and asserted both by re-derivation and by name; `cancel_task` excluded by name and by test |
+| `2L-BULK-005` | **built** | Section 2 - `previewBulk` partitions by the same predicate the apply path asks, driven over one set of fixtures; rendered continuously so Apply is never reachable without it |
+| `2L-BULK-006` | **built** | Section 2 - `requiresConfirmation` is computed from the set membership, and the Server Action refuses a destructive verb before reading anything |
+| `2L-BULK-007` | **not-built-by-rule** | Section 2 - under OD-2L-3 option A no bulk-eligible operation requires a confirmation, so a confirmation authorizing exactly one previewed set has no subject. A rule-driven absence, signed by ADR-103 |
+| `2L-BULK-008` | **built** | Section 2 - the loop catches per item; the canonical test drives three items with the middle one absent and asserts the RPC calls that actually happened |
+| `2L-BULK-009` | **built** | Section 2 - four kinds with no-change counted apart from both applied and refused; a partial is reachable from exactly one condition |
+| `2L-BULK-010` | **built** | Section 2 - one key per task and verb, asserted distinct at the RPC in `bulk-actions.test.ts` |
+| `2L-BULK-011` | **partial** | Section 1 - foreign and deleted are byte-identical and asserted; ineligible stays distinct and reveals nothing, being reachable only for a row that came back from the caller's own resolution. Remainder: none in behaviour; the divergence from the plan's phrasing is the destination, recorded in this record's section 1 |
+| `2L-BULK-012` | **built** | Section 2 - the undoable subset is derived from the presence of an undo id, never from the outcome label, so an item the domain wrote no reversal for cannot appear |

@@ -154,3 +154,24 @@ screen-reader session; any authenticated online journey; hydrated interactivity.
 In particular **no filter has been run against a real database** — the SQL
 clauses are asserted against an injected builder, which proves the clauses this
 code sends and not the rows Postgres returns for them.
+
+---
+
+## 8. Claims
+
+| id | classification | evidence |
+|---|---|---|
+| `2L-VIEW-001` | **built** | Section 3 - `work-views.ts` declares the three ids and each view's default ordering; names and descriptions stay in copy because they are translated, and the predicates stay in SQL where they are builder clauses |
+| `2L-VIEW-002` | **built** | Section 3 - no fourth reported view; `workViews` unchanged and the vocabulary guard now reads the new declaration site and asserts the old one only re-exports |
+| `2L-VIEW-003` | **built** | Section 3 - completed and cancelled are reachable through the named state filter, linked from the Work surface, and the existing cancelled-task recovery route keeps working and stays linked |
+| `2L-VIEW-004` | **built** | Sections 3 and 4 - filters over task columns plus the two relation filters, each expressible in the URL and asserted per parameter in `work-query.test.ts` |
+| `2L-VIEW-005` | **built** | Section 3 - a closed ordering set, expressible in the URL, with the view's declared default; there is deliberately no by-priority ordering and the reason is recorded |
+| `2L-VIEW-006` | **built** | Section 3 - grouping runs over the page that came back and cannot issue a query at all; each group states its own count, proved in `work-grouping.test.ts` |
+| `2L-VIEW-007` | **built** | Section 3 - one parser and one serializer; no cookie, preference or storage on the route, the view, the controls or the parser, asserted across all four files |
+| `2L-VIEW-008` | **built** | Section 3 - every parameter fails closed per parameter, a repeated one resolves to the default, and the state filter cannot widen a view |
+| `2L-VIEW-009` | **built** | Sections 3 and 5 - pagination carries the whole query, every ordering ends with the id so a page boundary is stable, and a page past the end renders an empty state |
+| `2L-RETURN-001` | **built** | Section 5 - the position travels with each task link, serialized once per page in the projection, and the detail's back affordance resolves it |
+| `2L-RETURN-002` | **built** | Section 5 - carried in the URL and nowhere else; no server-side state, no stored preference, no client-persisted position, asserted on the source |
+| `2L-RETURN-003` | **built** | Section 5 - a strict schema plus a named forbidden list, each field planted one at a time; the whole position falls back rather than being ignored |
+| `2L-RETURN-004` | **built** | Section 5 - every load is a fresh owner-scoped query, asserted by the absence of caching directives rather than by trusting today's code |
+| `2L-RETURN-005` | **built** | Section 5 - a non-first page that comes back empty resolves to the first page and the surface says so; the choice of nearest is recorded rather than claimed as exact |
