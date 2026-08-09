@@ -4,7 +4,9 @@ import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cyc
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { NeedsAttentionItemRow } from "@/features/daily-cycle/needs-attention-item";
 import type { PriorityReason } from "@/features/daily-cycle/today-priorities";
+import { ProtectedContent } from "@/features/operations/protected-content";
 import { presentationFor } from "@/features/sensitivity/contracts";
+import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import { getHomeCopy, withCount } from "./home-copy";
 
@@ -16,11 +18,27 @@ import { getHomeCopy, withCount } from "./home-copy";
  * built its markup in the same function, which is why none of its visual
  * behaviour had a test.
  */
+/**
+ * `2L-PRIVACY-001`/`-007` — Hoje renders task titles, so Hoje has to ask.
+ *
+ * These two views carry the **same** `TaskSensitivity` the Work list carries,
+ * for a reason the contract module's own header gives: before Phase 2J the
+ * product already disagreed with itself about what a classification promised,
+ * and two surfaces of one product meant two answers.
+ *
+ * Phase 2L would have recreated exactly that. `tasks` had no classification at
+ * all until this slice, so Hoje printing a task title was not a divergence —
+ * there was nothing to diverge from. The moment Work began withholding one, a
+ * user could see the same task masked on `/app/work` and printed in full on
+ * `/app`, which is the defect the central contract exists to prevent rather
+ * than a scope boundary.
+ */
 export type HomeTaskView = {
   readonly taskId: string;
   readonly title: string;
   readonly dueLabel: string | null;
   readonly stateLabel: string;
+  readonly sensitivity: TaskSensitivity;
 };
 
 export type HomePriorityView = {
@@ -28,6 +46,7 @@ export type HomePriorityView = {
   readonly title: string;
   readonly reason: PriorityReason;
   readonly dueLabel: string | null;
+  readonly sensitivity: TaskSensitivity;
 };
 
 export type HomeViewModel = {
@@ -182,15 +201,31 @@ export function HomeView({
               <ol className="home-priorities">
                 {view.priorities.map((priority) => (
                   <li key={priority.taskId}>
-                    <Link href={`/${locale}/app/work?view=today`} className="home-task">
-                      <strong>{priority.title}</strong>
-                      <span className="home-task-meta">
-                        <span className="priority-reason" data-reason={priority.reason}>
-                          {sections.priorities.reasons[priority.reason]}
+                    {/*
+                      The whole row is withheld, not only the title. The reason
+                      chip says *why this task is urgent* and the due label says
+                      *when* — both are facts about a task the owner asked to be
+                      protected, and a masked title beside "overdue today" is a
+                      mask that leaks the interesting half. The row stays, so the
+                      count and the ordering keep telling the truth, and one
+                      click restores all of it in place.
+                    */}
+                    <ProtectedContent
+                      href={`/${locale}/app/work?view=today`}
+                      locale={locale}
+                      revealKey={`priority:${priority.taskId}`}
+                      sensitivity={priority.sensitivity}
+                    >
+                      <Link href={`/${locale}/app/work?view=today`} className="home-task">
+                        <strong>{priority.title}</strong>
+                        <span className="home-task-meta">
+                          <span className="priority-reason" data-reason={priority.reason}>
+                            {sections.priorities.reasons[priority.reason]}
+                          </span>
+                          {priority.dueLabel ? <span>{priority.dueLabel}</span> : null}
                         </span>
-                        {priority.dueLabel ? <span>{priority.dueLabel}</span> : null}
-                      </span>
-                    </Link>
+                      </Link>
+                    </ProtectedContent>
                   </li>
                 ))}
               </ol>
@@ -216,13 +251,21 @@ export function HomeView({
           {view.today.length ? (
             <div className="home-list">
               {view.today.map((task) => (
-                <Link href={`/${locale}/app/work?view=today`} className="home-task" key={task.taskId}>
-                  <strong>{task.title}</strong>
-                  <span className="home-task-meta">
-                    {task.dueLabel ? <span>{task.dueLabel}</span> : null}
-                    <span className="status-badge">{task.stateLabel}</span>
-                  </span>
-                </Link>
+                <ProtectedContent
+                  href={`/${locale}/app/work?view=today`}
+                  key={task.taskId}
+                  locale={locale}
+                  revealKey={`today:${task.taskId}`}
+                  sensitivity={task.sensitivity}
+                >
+                  <Link href={`/${locale}/app/work?view=today`} className="home-task">
+                    <strong>{task.title}</strong>
+                    <span className="home-task-meta">
+                      {task.dueLabel ? <span>{task.dueLabel}</span> : null}
+                      <span className="status-badge">{task.stateLabel}</span>
+                    </span>
+                  </Link>
+                </ProtectedContent>
               ))}
             </div>
           ) : (

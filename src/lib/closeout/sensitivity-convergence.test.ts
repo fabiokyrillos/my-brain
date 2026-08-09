@@ -62,6 +62,31 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
     expect(code("src/features/daily-cycle/task-detail-view.tsx")).toMatch(/<ProtectedContent/);
   });
 
+  it("Hoje withholds a protected task too, because Hoje renders task titles", () => {
+    /*
+     * Not in `2L-PRIVACY-007`'s enumeration, and it belongs there anyway.
+     *
+     * `tasks` carried no classification at all before Phase 2L, so Hoje
+     * printing a task title was not a divergence — there was nothing to
+     * diverge from. The moment the Work list began withholding one, a user
+     * could see the same task masked on `/app/work` and printed in full on
+     * `/app`, which is precisely the "two surfaces of one product meant two
+     * answers" this contract module's own header says it exists to prevent.
+     *
+     * Note that `home-view.tsx` now consumes the contract twice, for two
+     * different subjects: `presentationFor("hoje", …)` for the attention
+     * entries Phase 2J governed, and `ProtectedContent` for the task rows this
+     * phase classified. Both are the contract; neither is a second rule.
+     */
+    const home = code("src/features/shell/home-view.tsx");
+    expect(home).toMatch(/<ProtectedContent/);
+    expect(home).toMatch(/presentationFor\(\s*"hoje"/);
+    // And the classification has to reach the row that renders content, rather
+    // than the surface being left to fetch it at render time.
+    expect(read("src/features/shell/home-view.tsx")).toMatch(/sensitivity: TaskSensitivity/);
+    expect(code("src/features/shell/home-dashboard.tsx")).toMatch(/sensitivity: (priority\.item|task)\.sensitivity/);
+  });
+
   it("keeps the Work rule in one place, so a surface cannot answer for itself", () => {
     // The negative half, scoped to `work`: `resolveContent("work", …)` may
     // appear in the contract module and nowhere else. `sensitivity-boundary`

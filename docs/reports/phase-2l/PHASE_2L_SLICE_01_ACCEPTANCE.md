@@ -125,7 +125,33 @@ provenance excerpt, which is the entry whose classification produced the mask.
 - **Nothing reaches telemetry.** No event gained a property, no classification is
   emitted, and no event was declared (`2L-PRIVACY-008`).
 
-### 2.6 The partial coverage is stated, not admitted later
+### 2.6 Hoje was found printing what Work had started withholding
+
+**The diff review turned this up, and it is a defect this slice created rather
+than one it inherited.** Hoje renders task titles — the priority section and the
+"for today" list, both fed by the *same* `loadWorkProjection` items the Work list
+reads. `tasks` carried no classification at all before Phase 2L, so Hoje printing
+a title was not a divergence: there was nothing to diverge from. The moment the
+Work list began withholding one, a user could see the same task masked on
+`/app/work` and printed in full on `/app`.
+
+That is exactly the "two surfaces of one product meant two answers" the central
+contract's own header says it exists to prevent, so it is fixed here rather than
+recorded for later. `HomeTaskView` and `HomePriorityView` carry the same
+`TaskSensitivity`, and both rows mount the same `ProtectedContent`.
+
+**The whole row is withheld, not only the title.** The reason chip says *why this
+task is urgent* and the due label says *when*; both are facts about a task the
+owner asked to be protected, and a masked title beside "Atrasada" is a mask that
+leaks the interesting half. The row stays, so the count and the ordering keep
+telling the truth, and one click restores all of it in place.
+
+`home-view.tsx` now consumes the contract twice, for two different subjects —
+`presentationFor("hoje", …)` for the attention entries Phase 2J governed, and
+`ProtectedContent` for the task rows this phase classified. Both are the
+contract; neither is a second rule, and the convergence guard asserts both.
+
+### 2.7 The partial coverage is stated, not admitted later
 
 `2L-PRIVACY-004` requires the partiality to be visible where a user could be
 misled. Two places, and only two: the Work list, **when at least one row is

@@ -82,7 +82,7 @@ describe("2J-DAY-002: the review is reachable from Hoje", () => {
 describe("2J-DAY-003: what is still open is summarized from what is already loaded", () => {
   it("counts priorities, attention and waiting", () => {
     renderHome({
-      priorities: [{ taskId: "a", title: "Enviar", reason: "overdue", dueLabel: null }],
+      priorities: [{ taskId: "a", title: "Enviar", reason: "overdue", dueLabel: null , sensitivity: { kind: "undetermined" as const }}],
       attention: [attentionItem()],
       waitingCount: 2,
     });
@@ -117,7 +117,7 @@ describe("2J-DAY-004: ending the day changes nothing by itself", () => {
     // "complete all" -- anything that follows from the review goes through the
     // write path that already owns it, with its own confirmation.
     renderHome({
-      priorities: [{ taskId: "a", title: "Enviar", reason: "overdue", dueLabel: null }],
+      priorities: [{ taskId: "a", title: "Enviar", reason: "overdue", dueLabel: null , sensitivity: { kind: "undetermined" as const }}],
       attention: [attentionItem()],
       waitingCount: 2,
     });

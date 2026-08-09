@@ -125,6 +125,9 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     title: priority.item.title,
     reason: priority.reason,
     dueLabel: priority.item.dueAt ? dueFormatter.format(new Date(priority.item.dueAt)) : null,
+    // `2L-PRIVACY-007`. Carried from the same projection the Work list reads,
+    // so Hoje and Work cannot answer differently about the same task.
+    sensitivity: priority.item.sensitivity,
   }));
 
   /*
@@ -142,6 +145,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       title: task.title,
       dueLabel: task.dueAt ? dueFormatter.format(new Date(task.dueAt)) : null,
       stateLabel: humanStateLabels[locale][task.humanState],
+      sensitivity: task.sensitivity,
     }));
 
   const view: HomeViewModel = {
