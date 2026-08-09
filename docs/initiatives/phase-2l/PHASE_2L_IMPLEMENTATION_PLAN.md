@@ -4,12 +4,15 @@
 > (recommended) or `superpowers:executing-plans` to execute this plan slice by slice.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** planning only. **No slice below is authorized.** Authorization to plan is
-ADR-102; authorization to implement is a separate owner decision that does not yet
-exist. Nothing here permits product code, a migration, a deployment or a successor
-phase.
+**Status:** **implementation authorized through closeout by ADR-103** (2026-08-09),
+which also signs the five owner decisions. Planning was authorized by ADR-102.
 
-**Derived from:** `PHASE_2L_PRD.md` (76 requirements, ten families).
+**What ADR-103 does not authorize:** any migration; any deployment; any database, RLS,
+grant, policy or Auth change; a new RPC or a second write path; opening public signup;
+executing a rollout residual; spending a BYOK credential or calling any provider; and
+**planning, scoping, naming or starting any successor phase.**
+
+**Derived from:** `PHASE_2L_PRD.md` (82 requirements, ten families).
 **Evidence:** `docs/reports/phase-2l/PHASE_2L_CURRENT_EXPERIENCE_AUDIT.md`,
 `..._UX_GAPS_AND_OPPORTUNITIES.md`, `..._THREAT_MODEL.md`,
 `..._TRACEABILITY_CONTRACT.md`.
@@ -58,12 +61,12 @@ PostgreSQL / RLS; Vitest; Playwright (desktop + Pixel 7).
 | **G0 — preflight** | Correct repository, branch, clean worktree, fetched remote, exact base SHA, no unrelated changes. |
 | **G1 — current truth** | Slice 2L.0's measurements executed and any divergence from the audit recorded, before product code. |
 | **G2 — reconciliation** | Every parent-roadmap item classified (done in the audit §5; re-confirmed at 2L.0 against the implementation baseline). |
-| **G3 — owner decisions** | OD-2L-1 and OD-2L-2 signed before the slices they block; OD-2L-3/4/5 signed before the slices they gate are accepted. |
-| **G4 — planning convergence** | PRD, plan, threat model, traceability contract, gaps and budget agree. Discharged by the planning package itself. |
-| **G5 — implementation authorization** | An explicit owner ADR after the package is reviewed. **Not yet granted.** |
+| **G3 — owner decisions** | **DISCHARGED by ADR-103**: all five signed — OD-2L-1 **B**, OD-2L-2 **A**, OD-2L-3 **A**, OD-2L-4 **50**, OD-2L-5 **A**. No requirement is blocked or gated on an unsigned decision. |
+| **G4 — planning convergence** | PRD, plan, threat model, traceability contract, gaps and budget agree. Discharged by the corrected planning package. |
+| **G5 — implementation authorization** | **DISCHARGED by ADR-103.** |
 | **G6 — slice acceptance** | Tests first and red for the right reason; focused green; lint and typecheck zero-error; full suite; build; `git diff --check`; full diff review; PR-head CI green; merge; exact-merge-SHA CI green (ADR-090: green ×1); acceptance record. |
-| **G7 — independent closeout** | All 76 classified from executed evidence by a generator that refuses rather than prints an unresolved claim. |
-| **G8 — hosted parity** | Only if a migration is spent: exact merged bytes, chain order, negative controls, RLS/grants, producer→consumer behaviour, zero fixture residue. |
+| **G7 — independent closeout** | All 82 classified from executed evidence by a generator that refuses rather than prints an unresolved claim. |
+| **G8 — hosted parity** | Only if a migration is spent: exact merged bytes, chain order, negative controls, RLS/grants, producer→consumer behaviour, zero fixture residue. **With OD-2L-2 signed as A, no migration is expected and no deployment may be invented.** |
 | **G9 — successor review** | Re-audit the successor against the closed product, present amendments, and **stop for owner authorization**. |
 
 ### Per-slice gate commands
@@ -123,20 +126,27 @@ product code, zero migrations.**
 - [ ] **M2 — the bulk cost measurement.** Establish, by construction and by test, how
       many round trips, audit rows and undo rows an *n*-item iteration produces, and
       whether any per-item failure can leave a state the domain cannot describe.
-      Feeds OD-2L-4. (`2L-AUDIT-003`)
+      **Confirms** the signed ceiling of 50 is safe, and stops if it is not.
+      (`2L-AUDIT-003`)
 - [ ] **M3 — the view enforcement census.** Name every enforcement point of the
       `workView` value set — application constant, table CHECK, property validator —
       and state which a new view would require changing. **A count is not the
-      measurement; the names are.** Feeds OD-2L-2 and the budget. (`2L-AUDIT-004`)
-- [ ] **M4 — the sensitivity representability measurement.** Read the `tasks` columns
-      and the `source_entry_id` relationship; present the result as the *input* to
-      OD-2L-1 rather than as a chosen answer. (`2L-AUDIT-005`)
+      measurement; the names are.** **Confirms** that OD-2L-2 option A needs no
+      migration. (`2L-AUDIT-004`)
+- [ ] **M4 — the derived-sensitivity contract.** Read the `tasks` columns and the
+      `source_entry_id` relationship, then **fix the executable contract OD-2L-1
+      option B requires**: how the source classification is read, owner-scoped and
+      bounded per page; what a manual task resolves to; and what a removed,
+      inaccessible or foreign source resolves to. This is the one place 2L.0 may
+      produce an executable foundation contract rather than only a measurement.
+      (`2L-AUDIT-005`)
 - [ ] **M5 — residual disposition.** Record which inherited residuals belong to this
       phase and which leave it, with a destination for each. (`2L-AUDIT-006`)
 
-**Gate G-2L.0.** All five measurements executed and recorded; both guards proved red
-before green; OD-2L-1 and OD-2L-2 presented to the owner with the measurement in hand.
-**No product code may be written until OD-2L-1 and OD-2L-2 are signed.**
+**Gate G-2L.0.** All five measurements executed and recorded; the guards proved red
+before green; the derived-sensitivity contract fixed; **82 requirements extracted
+mechanically with no duplicate and no unclassifiable family name**; zero migrations.
+Any divergence from the signed decisions is a **stop**, not an adjustment.
 
 **Acceptance record:** `PHASE_2L_SLICE_00_ACCEPTANCE.md`.
 
@@ -148,10 +158,10 @@ before green; OD-2L-1 and OD-2L-2 presented to the owner with the measurement in
 wide screens and a full surface on narrow ones; and an undo affordance on the surfaces
 where operations are actually performed.
 
-**Requirements:** `2L-EDIT-001…010`; `2L-PRIVACY-001…004` (per OD-2L-1);
+**Requirements:** `2L-EDIT-001…010`; `2L-PRIVACY-001…008` (OD-2L-1 option B);
 `2L-ACCESS-001…004`, `2L-ACCESS-006`, `2L-ACCESS-007` for the surfaces it builds.
 
-**Depends on:** 2L.0; OD-2L-1 signed.
+**Depends on:** 2L.0. OD-2L-1 is signed as **option B**, so the derived-sensitivity contract is part of this slice rather than a question it waits on.
 
 **Likely files**
 - Modify: `src/features/operations/task-list.tsx`,
@@ -184,8 +194,17 @@ bounds; `loadTaskCommandUndoOperation` → `public.undo_operation` for the undo.
       opens the server-issued confirmation.
 - [ ] Panel and full-screen render from one component; a viewport change does not
       change the control set.
-- [ ] Whatever OD-2L-1 signs is proved: masking in place with a working local reveal,
-      or the evidenced negative asserted by naming the absent column.
+- [ ] **OD-2L-1 option B, proved in the list and in the detail, from one contract:**
+      a task whose source entry is `highly_sensitive` is masked in place with a
+      working local reveal; a task whose source is `normal` is not; a **manual** task
+      resolves to *no derivable classification* and is never silently treated as
+      `normal`; and a **removed, inaccessible or foreign** source resolves to the most
+      protective presentation, byte-identically across all three causes.
+- [ ] The derived classification is **re-read, never stored** — proved by asserting no
+      write occurs on the read path and no new persisted copy of a title, description
+      or source content exists.
+- [ ] The derivation is bounded **per page**, not per user, and adds no service-role
+      path, no grant and no `security definer` helper.
 
 **Gate G-2L.1.** Focused suite green; full gate; accessibility lane green at both
 viewports **including the new Work entries**; locale-ternary ceiling not raised;
@@ -202,8 +221,8 @@ continues past a refusal, and a per-item result.
 **Requirements:** `2L-BULK-001…012`; `2L-ACCESS-001…006` for the selection bar, the
 preview and the result; `2L-PRIVACY-004`.
 
-**Depends on:** 2L.1 (it reuses the outcome vocabulary and the copy module);
-OD-2L-3 and OD-2L-4 signed before acceptance.
+**Depends on:** 2L.1 (it reuses the outcome vocabulary and the copy module). OD-2L-3
+is signed as **option A** and OD-2L-4 as **50**, so both are inputs rather than gates.
 
 **Likely files**
 - Create: `src/features/operations/selection.ts` (pure selection model + bounds),
@@ -220,8 +239,9 @@ per item, each with its own operation key.
 
 **Tests first**
 - [ ] The bulk-eligible operation set is **derived** from `actionPolicy`; a planted
-      hand-written list fails; `cancel_task` is absent under OD-2L-3 option A and its
-      absence is asserted by name.
+      hand-written list fails; **`cancel_task` is absent, asserted by name**, and the
+      set is exactly status-within-active, priority, due date, planned date and
+      authorized relation assignment (OD-2L-3 A).
 - [ ] The preview's eligible/refused partition equals what the apply path decides —
       asserted by driving both over the same fixtures, not by re-implementing the
       rule.
@@ -231,7 +251,8 @@ per item, each with its own operation key.
 - [ ] Every item failing is reported as a total failure, not as a silent success.
 - [ ] A confirmation for set A cannot be consumed for set B, for a different
       operation, or a second time.
-- [ ] The ceiling refuses rather than truncates, and the bound is stated before it is
+- [ ] **The ceiling is 50** (OD-2L-4): selecting a 51st item is **refused with a
+      stated reason**, never silently truncated, and the bound is visible before it is
       reached.
 - [ ] A foreign, deleted or ineligible id produces an outcome that is **byte-identical**
       across those three causes.
@@ -253,10 +274,12 @@ back affordance that returns the user to exactly where they were.
 
 **Requirements:** `2L-VIEW-001…009`; `2L-RETURN-001…005`; `2L-ACCESS-001…005`.
 
-**Depends on:** 2L.1; **OD-2L-2 signed** (it decides whether the migration is spent).
+**Depends on:** 2L.1. **OD-2L-2 is signed as option A**, so the taxonomy stays at
+`today`/`all`/`waiting` and every additional destination is a filter within them.
 
-**Migration allocation: the phase's single migration, if OD-2L-2 selects option B.**
-Under the recommended option A, this slice spends nothing and the allocation lapses.
+**Migration allocation: none is spent.** The single allocation lapses unspent, which
+is the signed outcome. **If any part of this slice appears to need a migration, the
+slice stops and presents the case — it does not drift to option B.**
 
 **Likely files**
 - Modify: `src/features/daily-cycle/work-projection.ts` — the declared taxonomy,
@@ -267,11 +290,9 @@ Under the recommended option A, this slice spends nothing and the allocation lap
   `src/features/shell/pagination-links.tsx` if it must carry more parameters.
 - Create: `src/features/operations/work-position.ts` — the return payload, `.strict()`,
   navigation identifiers only; and its tests.
-- Create **only under OD-2L-2 option B**: one migration widening the `workView` enum
-  in `private.validate_product_event_properties` **and** any table CHECK that carries
-  the same vocabulary, with a verification block that refuses to run vacuously and
-  asserts the enforcement points name one vocabulary.
-- **Not created under any option:** a saved-view table, a preference column, an index.
+- **Not created:** any migration; a fourth `workView` value; a saved-view table; a
+  preference column; an index. OD-2L-2 is signed as **option A**, so this slice's
+  allocation lapses unspent and the file list has no SQL in it at all.
 
 **Tests first**
 - [ ] Every taxonomy member is declared in one module and consumed everywhere; a
@@ -287,13 +308,14 @@ Under the recommended option A, this slice spends nothing and the allocation lap
 - [ ] Returning issues a **fresh owner-scoped query**; a planted stale snapshot is not
       rendered.
 - [ ] A no-longer-valid position resolves to the nearest valid one **and says so**.
-- [ ] Under option B only: the migration's verification block refuses to run when it
-      cannot extract the vocabulary from the constraint, and the enforcement points
-      are asserted name by name.
+- [ ] **`workView` is unchanged and unwidened**, asserted against the application
+      constant and the deployed validator's declared values by name — so a fourth
+      view cannot arrive without the guard noticing.
 
 **Gate G-2L.3.** All of the above green; full gate; accessibility lane green;
-**budget reconciled in this slice's acceptance record** (`1 allocated · 0 or 1 spent`)
-and, if spent, G8 executed with a live parity reading before 2L.4 begins.
+**budget reconciled in this slice's acceptance record as `1 allocated · 0 spent`**.
+There is no migration and therefore no deployment and no G8 — and inventing either
+would be the fabrication this gate exists to prevent.
 
 ---
 
@@ -302,18 +324,20 @@ and, if spent, G8 executed with a live parity reading before 2L.4 begins.
 **Delivers:** thumb reach, bounded density, stable selection, no hover dependency, and
 — only if OD-2L-5 selects option B — one gesture that accelerates a visible control.
 
-**Requirements:** `2L-MOBILE-001…008`; `2L-ACCESS-001…007` re-run for the mobile
+**Requirements:** `2L-MOBILE-001…010`; `2L-ACCESS-001…007` re-run for the mobile
 layouts.
 
-**Depends on:** 2L.2 and 2L.3; OD-2L-5 signed before acceptance.
+**Depends on:** 2L.2 and 2L.3. **OD-2L-5 is signed as option A — no gesture.**
 
 **Likely files**
 - Modify: `src/app/operations.css` (the mobile breakpoints; `.list-row` was authored
   for a ~1036px stack and says so at `operations.css:99`), the selection bar and row
   components.
 - Modify: `e2e/accessibility.spec.ts` — mobile-specific fixtures.
-- Create only under OD-2L-5 option B: the gesture handler, its threshold-and-release
-  test, and its "the visible control still works" test.
+- Create: `src/lib/closeout/phase-2l-no-gesture-guard.test.ts` — the permanent guard
+  proving no touch, pointer, drag or swipe handler exists on a Work surface.
+- **Not created:** any gesture handler, including one added "in preparation" for a
+  later phase. OD-2L-5 is signed as **option A**.
 
 **Tests first**
 - [ ] Every control on every Work surface measures at or above the minimum **from
@@ -323,13 +347,18 @@ layouts.
       appearance; the count is announced when it changes.
 - [ ] The page body never scrolls horizontally at the mobile viewport, and every
       row's primary action is reachable without horizontal scrolling.
-- [ ] Under option B only: a scroll gesture does **not** apply anything; the gesture
-      requires a threshold and a release; the visible control performs the identical
-      operation; the gesture is absent from the accessibility tree as a *sole* route.
+- [ ] **No gesture exists** (OD-2L-5 A): a permanent guard walks the Work surfaces
+      for a touch, pointer, drag or swipe handler and fails on one — proved red
+      against a planted handler before it is made green, including a handler added
+      "in preparation".
+- [ ] Every Work surface reflows at **200% zoom** and at **320 CSS px** with no lost
+      content, no unreachable control and no clipped text.
+- [ ] **IME composition** is never submitted mid-composition, never treated as a
+      completed value, and never discarded by a re-render.
 
 **Gate G-2L.4.** All of the above green at the mobile project; full gate;
 **a real-device claim is never made** — `2L-MOBILE-008` and `2L-ACCESS-008` require
-this to be reported as an emulated viewport; **zero migrations**.
+this to be reported as an emulated viewport; **zero gestures**; **zero migrations**.
 
 ---
 
@@ -393,11 +422,16 @@ successor artifact and declares no successor requirement.**
 
 ## Deployment
 
-**Not authorized by this plan.** If the 2L.3 migration is spent, deployment is a
-separate owner decision, executed only after exact-merge-SHA CI is green, and followed
-by a hosted probe rather than by trust in a green migration — the argument
-`202608090089` paid for. Under the recommended OD-2L-2 option A there is nothing to
-deploy and hosted parity stays `202608090089`.
+**There is nothing to deploy.** OD-2L-2 is signed as option A, so no migration exists,
+hosted parity stays `202608090089`, and **no deployment record may be created**.
+Inventing a deployment for a phase that changed no schema would be a fabricated
+evidence claim, and `2L-CLOSE-004` requires the parity line to come from a live reading
+rather than from a filename either way.
+
+Hosted *probes* remain permitted where a requirement genuinely needs one — owner scope,
+RLS, producer→writer→consumer, negative controls, partial-bulk behaviour, idempotency —
+executed on disposable fixtures with **zero residue proved owner-scoped**, with no BYOK
+credential, no provider call, no signup change and no service-role on a product path.
 
 ---
 
@@ -406,14 +440,14 @@ deploy and hosted parity stays `202608090089`.
 | Slice | Requirements | Migrations |
 |---|---|---|
 | 2L.0 | `2L-AUDIT-001…006` | 0 |
-| 2L.1 | `2L-EDIT-001…010`, `2L-PRIVACY-001…004` | 0 |
+| 2L.1 | `2L-EDIT-001…010`, `2L-PRIVACY-001…008` | 0 |
 | 2L.2 | `2L-BULK-001…012` | 0 |
-| 2L.3 | `2L-VIEW-001…009`, `2L-RETURN-001…005` | 0 or 1 (OD-2L-2) |
-| 2L.4 | `2L-MOBILE-001…008` | 0 |
+| 2L.3 | `2L-VIEW-001…009`, `2L-RETURN-001…005` | **0** — OD-2L-2 A; the allocation lapses unspent |
+| 2L.4 | `2L-MOBILE-001…010` | 0 |
 | 2L.5 | `2L-ACCESS-001…008`, `2L-METRICS-001…007`, `2L-CLOSE-001…007` | 0 |
 | 2L.6 *(step, not a slice)* | none — it delivers no requirement | 0 |
 
-**6 + 10 + 4 + 12 + 9 + 5 + 8 + 8 + 7 + 7 = 76.** Every declared requirement has
+**6 + 10 + 8 + 12 + 9 + 5 + 10 + 8 + 7 + 7 = 82.** Every declared requirement has
 exactly one slice. `2L-ACCESS` is executed *per slice* and *closed* in 2L.5; that is
 an execution note, not a second assignment.
 

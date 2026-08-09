@@ -200,24 +200,22 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line, "the start must cite its authorization").toMatch(/ADR-102/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
     /*
-     * Moved at Phase 2L's planning authorization, with the line, in the same
-     * commit.
+     * The "planning" half came back at ADR-102 and went again at ADR-103, in
+     * the commit that recorded each. That is not a guard being loosened and
+     * tightened at convenience — it is one rule applied to two different facts.
      *
-     * The "planning" half returns, and returns for the reason it existed under
-     * ADR-097: ADR-102 authorizes planning **only**, and a backlog line
-     * claiming more than the ADR gave is the line a reader acts on before
-     * checking. It was dropped at Phase 2K's close because ADR-101 had by then
-     * authorized implementation and the word had become the stale half — which
-     * is the same rule applied to a different fact, not a relaxation.
+     * The rule: **the line cites every authorization the phase has received and
+     * overstates none of them.** ADR-102 gave planning only, so the word
+     * "planning" was required and its absence would have been an overstatement.
+     * ADR-103 then authorized implementation through closeout, so requiring
+     * "planning" would now force the line to *understate* — the mirror-image
+     * error, and the one that made this assertion drop the word at Phase 2K's
+     * close under ADR-101.
      *
-     * The property is unchanged: the line names the phase, cites **every**
-     * authorization that phase has received, does not overstate what any of
-     * them gave, and does not announce a successor. A phase authorized for
-     * planning only, immediately after a predecessor closed, is exactly when a
-     * backlog is most likely to do both.
+     * What does not move: the line names the phase, cites both ADRs, and does
+     * not announce a successor.
      */
-    expect(line, "ADR-102 gave planning only, and the line must not claim more")
-      .toMatch(/planning/i);
+    expect(line, "the implementation authorization must be cited too").toMatch(/ADR-103/);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2M/);
   });

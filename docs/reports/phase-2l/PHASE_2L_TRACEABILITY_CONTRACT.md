@@ -24,8 +24,11 @@ not a partial matrix, not a matrix with a warning banner. A matrix that exists i
 matrix in which every row survived every refusal below.
 
 **It emits the counts.** No document in this phase may state a requirement count that
-was typed by a human. The PRD's "76" is a claim the generator must reproduce; if it
-does not, the PRD is wrong, not the generator.
+was typed by a human. The PRD's **82** is a claim the generator must reproduce; if it
+does not, the PRD is wrong, not the generator. **The count moved from 76 to 82 when
+ADR-103 signed the decisions** — `2L-PRIVACY` 4 → 8 for OD-2L-1 option B's contract,
+and `2L-MOBILE` +2 for zoom/reflow and IME composition — **by declaration, never by
+renumbering**, and R-15 below is what forced every document to move with it.
 
 **It reads declarations, not prose.** A requirement is a line matching
 `^- \*\*2L-[A-Z]+-\d{3}:\*\*` in `PHASE_2L_PRD.md`. Nothing else is a requirement.
@@ -76,10 +79,12 @@ Any `2L-BULK` requirement classified `built` must cite a **behavioural** test ov
 reported counts and the reported per-item reasons. A test asserting only that the word
 "partial" appears refuses.
 
-### R-07 — A gesture with no visible alternative
-If any gesture ships, every `2L-MOBILE` classification must cite the visible control
-that performs the identical operation and the test proving the visible control works
-with the gesture unavailable. A gesture with no cited alternative refuses.
+### R-07 — A gesture, at all
+OD-2L-5 is signed as **option A**, so the refusal is stronger than "a gesture with no
+visible alternative": **any** touch, pointer, drag or swipe handler on a Work surface
+refuses, including one added "in preparation" for a later phase. `2L-MOBILE-004`
+classified `built` must cite the guard **and** its proof of firing against a planted
+handler — an absence nobody tried to violate is an absence nobody has checked.
 
 ### R-08 — Telemetry carrying content
 Any declared event whose property schema admits free text, or any test fixture in which
@@ -108,16 +113,29 @@ negative that says what was measured *instead*. This is the refusal that exists 
 "an axe pass is not a screen-reader session".
 
 ### R-12 — A classification contradicting a signed decision
-A row claiming a capability an owner decision excluded refuses. Concretely: a bulk
-`cancel_task` under OD-2L-3 option A; a persisted saved view under `2L-VIEW-007`; a
-task sensitivity column under OD-2L-1 options A or B; a second task-mutation write path
-under `2L-EDIT-002`; a set-valued RPC under any option.
+A row claiming a capability an owner decision excluded refuses. Concretely, against the
+**signed** set (ADR-103): a bulk `cancel_task` (OD-2L-3 **A**); a fourth reported
+`workView` value or any migration attributed to this phase (OD-2L-2 **A**); a
+sensitivity column on `tasks`, a backfill, or a durably stored derived classification
+(OD-2L-1 **B**); a selection ceiling other than 50, or a silent truncation (OD-2L-4);
+any touch, pointer, drag or swipe handler on a Work surface (OD-2L-5 **A**); a
+persisted saved view (`2L-VIEW-007`); a second task-mutation write path
+(`2L-EDIT-002`); a set-valued RPC (ADR-057).
 
 **And its inverse, which Phase 2K had to learn.** A row must **not** be flagged for
 *upholding* a signed decision. A guard that fires on a record for saying "this was
 deliberately not built" teaches authors to soften the record until the check goes
 quiet. R-12 tests the claim against the decision, never the presence of the decision's
 vocabulary.
+
+### R-12b — A derived-sensitivity claim with no negative case
+Any `2L-PRIVACY` requirement classified `built` must cite, in the same row, a test in
+which the source entry is **`highly_sensitive`** *and* one in which it is not — a mask
+that is always on is indistinguishable from a mask that is never off. `2L-PRIVACY-004`
+additionally requires a **manual-task** case proving it resolves to *no derivable
+classification* rather than to `normal`, and `2L-PRIVACY-005` a case proving removed,
+inaccessible and foreign sources are byte-identical. A row citing only the positive
+case refuses.
 
 ### R-13 — A successor phase started
 Any declared `2M-` requirement, any governing artifact named for the successor, any

@@ -56,7 +56,53 @@ today under an authority that is already tested, audited and reversible.
 
 ## 2. Signed and inherited decisions
 
-These are already binding when Phase 2L starts. They are restated because several
+### 2.1 The five Phase 2L decisions, signed by the owner (ADR-103)
+
+All five were open when this PRD was first written and are now **closed**. §10 keeps
+the alternatives that were rejected, because a decision with no record of what it
+refused is a preference.
+
+| Decision | Signed as | Consequence for this PRD |
+|---|---|---|
+| **OD-2L-1** — Work's sensitivity posture | **Option B — derive from the source entry** | `2L-PRIVACY-001…008` are written against B's exact contract. Coverage is **partial by construction** and must say so. |
+| **OD-2L-2** — the canonical view taxonomy | **Option A — three views, richer URL filters** | `today`, `all`, `waiting` stay the only *reported* views. *Upcoming*, *completed*, per-project and per-context are **filters**, not views. `workView` is not widened. |
+| **OD-2L-3** — bulk-eligible operations | **Option A — non-destructive, bounded-value only** | Active-status change, priority, due date, planned date and authorized relation assignment. **`cancel_task` is excluded by name.** |
+| **OD-2L-4** — the selection ceiling | **50, matching `WORK_PAGE_SIZE`** | `2L-BULK-003` states 50, refuses above it, and never truncates silently. |
+| **OD-2L-5** — gesture policy | **Option A — no gesture** | No touch, pointer, drag or swipe handler ships on any Work surface this phase, and a guard enforces the absence. |
+
+**The expected close is `1 allocated · 0 spent`.** OD-2L-2 A removes the only reason
+the migration existed. §7 keeps the ceiling as a ceiling, and switching to OD-2L-2
+option B mid-implementation is a **stop**, never an implementer's decision.
+
+### 2.2 The OD-2L-1 option B contract, in full
+
+Signed verbatim by the owner and reproduced here because `2L-PRIVACY-*` is written
+against it clause by clause:
+
+- when a task has `source_entry_id`, presentation consults the **current**
+  classification of the source record;
+- if the source is `highly_sensitive`, the task's content follows the **central**
+  sensitive-presentation policy;
+- the classification is **re-read**, never durably copied onto the task;
+- **no** sensitivity column on `tasks`;
+- **no** backfill;
+- **no** migration for this decision;
+- manually created tasks are **never** artificially classified;
+- a manual task keeps **no derivable classification**;
+- that **partial coverage is presented and documented honestly**;
+- the absence of a source entry is **never** inferred to mean `normal`;
+- a source entry that is removed, inaccessible, or outside the caller's authority
+  produces a **safe state, never exposure**;
+- no read may widen authority or bypass RLS;
+- the list and the detail **converge on the same contract**;
+- bulk, preview, result, undo, accessibility and telemetry all respect it;
+- the implementation persists **no new copy** of a title, a description or sensitive
+  content;
+- **no sensitive information enters telemetry.**
+
+### 2.3 Inherited decisions
+
+These were already binding when Phase 2L started. They are restated because several
 constrain requirements below.
 
 | Decision | Source | Consequence for 2L |
@@ -126,8 +172,17 @@ Phase 2L links to calendar, people and project surfaces; it does not redesign th
 
 ## 4. Requirement families
 
-**Ten families, 76 requirements.** Every requirement carries exactly one `2L-*` id and
+**Ten families, 82 requirements.** Every requirement carries exactly one `2L-*` id and
 is declared exactly once, in the shape `- **2L-FAMILY-000:** …`.
+
+> **The count moved from 76 to 82 when the decisions were signed, and it moved by
+> declaration rather than by renumbering.** OD-2L-1 was signed as option **B**, whose
+> contract has obligations the four option-agnostic `2L-PRIVACY` requirements could not
+> carry without becoming paragraphs — so that family is **4 → 8**. `2L-MOBILE` gained
+> **two**: zoom/reflow and IME composition, both named in the owner's signed slice
+> contract and neither expressible inside an existing requirement. **No id was reused,
+> renamed or renumbered**, and no requirement was removed. Every count below is
+> re-derived mechanically; this sentence is not evidence that it is right.
 
 > **A count that is emitted, not typed.** Phase 2K stated 68 in five documents and
 > declared 79; the undercount was `2K-A11Y`, whose family name contains digits and
@@ -163,11 +218,11 @@ is declared exactly once, in the shape `- **2L-FAMILY-000:** …`.
 
 - **2L-BULK-001:** A user can explicitly select and deselect individual tasks in a Work list, and the selection is visible, countable and dismissible without applying anything.
 - **2L-BULK-002:** Selection is an explicit user act on each item or on a stated "select all shown"; no operation is ever applied to a set the user did not see.
-- **2L-BULK-003:** The selectable set is bounded by a declared maximum, the bound is stated to the user before it is reached, and exceeding it is refused rather than silently truncated.
-- **2L-BULK-004:** Only operations whose per-item semantics are identical, independently safe and derivable from the taxonomy may be offered in bulk; the set of bulk-eligible operations is derived from `actionPolicy` and never hand-written.
+- **2L-BULK-003:** The selectable set is bounded at **50 items, matching `WORK_PAGE_SIZE`** (OD-2L-4); the bound is stated to the user before it is reached, and exceeding it is refused rather than silently truncated.
+- **2L-BULK-004:** The bulk-eligible operation set is **derived from `actionPolicy`, never hand-written**, and under OD-2L-3 option A contains only non-destructive, bounded-value operations: status change within active statuses, priority, due date, planned date and authorized relation assignment. **`cancel_task` is excluded, by name and by test.**
 - **2L-BULK-005:** Before any bulk operation is applied, a preview states the operation, the number of items it would change, the number it would refuse, and the reason class for each refusal — computed from the same eligibility rules the apply path uses.
-- **2L-BULK-006:** A bulk operation containing at least one item the domain marks destructive requires confirmation; a bulk operation containing none is applied directly, and the difference is derived from the policy rather than from the control that was clicked.
-- **2L-BULK-007:** A confirmation authorizes exactly the previewed set and exactly the previewed operation; it cannot be reused for a different set, a different operation or a later attempt.
+- **2L-BULK-006:** Whether an operation needs confirmation is **derived from the policy, never from the control that was clicked**. Under OD-2L-3 option A no destructive operation is bulk-eligible, so the destructive arm is structurally unreachable — and that unreachability is proved, rather than assumed from the absence of a button.
+- **2L-BULK-007:** Where a confirmation is required at all, it authorizes exactly the previewed set and exactly the previewed operation; it cannot be reused for a different set, a different operation or a later attempt.
 - **2L-BULK-008:** A per-item failure or refusal does not abort the remaining items; execution continues and the outcome is reported per item.
 - **2L-BULK-009:** The result of a bulk operation states, in the user's own words, how many items changed, how many did not, and why each one did not — a partial result is never presented as a complete success and never as a total failure.
 - **2L-BULK-010:** Each item in a bulk operation carries its own operation key, so a repeated submission replays per item rather than duplicating any write.
@@ -176,9 +231,9 @@ is declared exactly once, in the shape `- **2L-FAMILY-000:** …`.
 
 ### 4.4 `2L-VIEW` — the canonical Work taxonomy (slice 2L.3)
 
-- **2L-VIEW-001:** Phase 2L declares one canonical set of Work views, each with a name the user reads, a predicate, a default ordering and a stated purpose; the set is declared in one module and consumed everywhere.
-- **2L-VIEW-002:** No view is added whose telemetry identity cannot be recorded truthfully; a view that cannot be reported is either not added or is added with its unmeasurability stated explicitly as a limitation.
-- **2L-VIEW-003:** Completed and cancelled work is reachable from the Work surface through a named destination rather than only through an unlinked nested route.
+- **2L-VIEW-001:** The canonical Work views are exactly **`today`, `all` and `waiting`** (OD-2L-2 option A), each with a name the user reads, a predicate, a default ordering and a stated purpose, declared in one module and consumed everywhere.
+- **2L-VIEW-002:** **No fourth reported view is added and `workView` is not widened.** *Upcoming*, *completed*, per-project and per-context are delivered as **filters within** the canonical views, so every destination a user can reach is one the telemetry vocabulary can already describe truthfully.
+- **2L-VIEW-003:** Completed and cancelled work is reachable from the Work surface through a **named, linked filter** rather than only through an unlinked nested route; the existing recovery route keeps working and is linked from the place the destructive verb is used.
 - **2L-VIEW-004:** Within a view, a user can filter by the attributes the projection already loads, and every filter is expressible in the URL.
 - **2L-VIEW-005:** Within a view, a user can choose an ordering from a declared closed set, and the choice is expressible in the URL.
 - **2L-VIEW-006:** Where grouping is offered, it groups only by attributes the page's own projection already loads, adds no unbounded per-user query, and states the group's item count.
@@ -199,18 +254,24 @@ is declared exactly once, in the shape `- **2L-FAMILY-000:** …`.
 - **2L-MOBILE-001:** Every interactive control on the Work list, the task detail, the selection bar and the bulk result meets the product's touch-target minimum, measured from paint at a mobile viewport rather than asserted from source.
 - **2L-MOBILE-002:** Primary actions on narrow viewports are reachable in the thumb zone without obscuring the content they act on, and the selection and bulk controls do not permanently cover a list row.
 - **2L-MOBILE-003:** No action anywhere on the Work surface depends on hover or on a pointer that can hover.
-- **2L-MOBILE-004:** Any gesture is an accelerator for a control that is visible and operable without it; a gesture is never the only route to any action.
-- **2L-MOBILE-005:** A gesture that would apply a consequential change requires a deliberate completion — a threshold and a release, or a confirmation — so that a scroll or an accidental touch cannot apply it.
+- **2L-MOBILE-004:** **No gesture ships on any Work surface in this phase** (OD-2L-5 option A): every action is reachable through a visible, labelled control, and a permanent guard fails the build if a touch, pointer, drag or swipe handler appears on a Work surface — including one added "in preparation".
+- **2L-MOBILE-005:** No consequential change can be applied by a single accidental touch: a control that changes state is visually and spatially distinct from scrolling affordances, a control mid-flight is disabled rather than re-triggerable, and the one destructive verb stays behind its server-issued confirmation.
 - **2L-MOBILE-006:** Selection survives scrolling, pagination-free re-render, orientation change and the appearance of the on-screen keyboard, and the selected count is announced when it changes.
-- **2L-MOBILE-007:** A row's information density on narrow viewports is bounded so that the primary action of every row is reachable without horizontal scrolling, and the page body never scrolls horizontally.
+- **2L-MOBILE-007:** A row's information density on narrow viewports is bounded so that the primary action of every row is reachable without horizontal scrolling, and the page body never scrolls horizontally. Filters, ordering and grouping controls remain usable at a mobile viewport rather than being hidden there.
 - **2L-MOBILE-008:** Every mobile behaviour claimed by this family is proved at a mobile viewport in the automated lane, and any claim that requires physical hardware is reported as not executed rather than inferred.
+- **2L-MOBILE-009:** Every Work surface reflows without loss of content or function at 200% zoom and at a 320 CSS-pixel width; no control becomes unreachable and no text is clipped.
+- **2L-MOBILE-010:** Text entry behaves correctly during IME composition: a composing sequence is never submitted, never treated as a completed value, and never re-rendered in a way that discards the composition.
 
-### 4.7 `2L-PRIVACY` — sensitive content on Work (cross-cutting)
+### 4.7 `2L-PRIVACY` — sensitive content on Work (cross-cutting; OD-2L-1 option B)
 
-- **2L-PRIVACY-001:** Work's treatment of highly sensitive content is decided by the owner and implemented through the single central sensitivity contract; Work never tests a classification level on its own.
-- **2L-PRIVACY-002:** If the chosen posture is that task content carries no classification, that is recorded as an evidenced negative naming the absent column and the surfaces that therefore differ, never left as an unstated default.
-- **2L-PRIVACY-003:** If content is withheld, it is withheld in place: the row, the count, the filter and the selection remain truthful, and only the content is masked, with a deliberate local reveal.
-- **2L-PRIVACY-004:** A preview, a bulk result, an undo affordance and a telemetry event may never reproduce withheld content, and a masked item may still be selected and operated on without revealing it.
+- **2L-PRIVACY-001:** When a task carries a `source_entry_id`, its presentation resolves through the single central sensitivity contract against the **current** classification of that source record; Work never tests a classification level on its own, and a surface that does fails the build.
+- **2L-PRIVACY-002:** The derived classification is **re-read at presentation time and never durably copied onto the task**: no sensitivity column is added to `tasks`, no backfill is performed, no migration is created for this decision, and no new copy of a title, a description or source content is persisted anywhere.
+- **2L-PRIVACY-003:** Content is withheld **in place**: the row, the count, the filter and the selection stay truthful, only the content is masked, and a deliberate local action reveals it.
+- **2L-PRIVACY-004:** A manually created task has **no derivable classification**, is never artificially classified, and the absence of a source entry is never inferred to mean `normal`; this partial coverage is stated where a user could otherwise be misled and is recorded as a named limitation rather than as completeness.
+- **2L-PRIVACY-005:** A source entry that is removed, inaccessible, or outside the caller's authority resolves to the **most protective** presentation and never to exposure, and those three causes are indistinguishable from one another in what the surface renders.
+- **2L-PRIVACY-006:** The derivation adds **no authority**: it is an owner-scoped read under forced RLS, introduces no service-role path, no new grant and no `security definer` helper, and stays bounded per page rather than per user.
+- **2L-PRIVACY-007:** The list, the task detail, quick edit, selection, bulk preview, bulk result, undo and the accessibility fixtures all resolve presentation through the **same** contract; a surface that diverges from it fails the build rather than merely disagreeing.
+- **2L-PRIVACY-008:** No withheld content and no classification-derived value reaches telemetry, and a masked item may still be selected and operated on without revealing what it says.
 
 ### 4.8 `2L-ACCESS` — accessibility (executed per slice, closed in 2L.5)
 
@@ -269,7 +330,7 @@ must not express a state it cannot reach:
 | Single non-destructive edit | Not required (the control shows the value) | No | N/A | Yes, while the domain admits it |
 | Single destructive operation | Required | Required, server-issued | N/A | Yes inside the window; recovery path afterwards |
 | Bulk non-destructive | Required | Not required | Required | Applied subset only |
-| Bulk containing a destructive item | Required | Required, per item | Required | Applied subset only |
+| Bulk containing a destructive item | — | — | — | **Unreachable under OD-2L-3 option A**, and proved so |
 | Anything with no domain reversal | Required | Required | Required | **Never offered** |
 
 **Two sentences that must not be merged.** "You can undo this for 24 hours" and "you
@@ -302,15 +363,22 @@ not an error code, not an RPC name.
 
 ## 7. Migration budget
 
-**Ceiling: ONE migration, allocated to slice 2L.3 only, and `1 allocated · 0 spent` is
-the preferred close.**
+**Ceiling: ONE migration, allocated to slice 2L.3 only. With OD-2L-2 signed as option
+A, the expected and required close is `1 allocated · 0 spent`.**
 
 The ceiling exists for exactly one reason, named rather than reserved:
 `private.validate_product_event_properties` enforces
 `workView ∈ {today, all, waiting}`, so a **fourth canonical Work view that is reported
-to telemetry** cannot exist without one. If the taxonomy chosen at gate G-2L.3 fits the
-three existing values, or if a new destination is reachable without becoming a reported
-`workView`, the allocation lapses unspent and that is the better outcome.
+to telemetry** cannot exist without one. **OD-2L-2 option A removes that need**: the
+taxonomy stays at the three existing values and every additional destination is a
+filter within them. The allocation therefore lapses unspent, which is the better
+outcome and now the expected one.
+
+**Switching to OD-2L-2 option B mid-implementation is a stop, not a decision.** If any
+slice concludes that a migration is genuinely necessary, work halts and presents the
+cause, the requirement, the alternatives without a migration, the budget impact, the
+risk, and the decision required. **No migration is created or applied before an
+explicit new authorization.**
 
 **Explicitly refused, whatever the implementation discovers:**
 
@@ -318,7 +386,7 @@ three existing values, or if a new destination is reachable without becoming a r
 |---|---|
 | A set-valued or batch `apply_task_command` | ADR-057; iteration reuses every guarantee |
 | A saved-view or saved-filter table | `2L-VIEW-007`; the URL is the state |
-| A sensitivity column on `tasks` | Not authorized by this budget; if the owner chooses classification, it is a budget amendment and a separate decision |
+| A sensitivity column on `tasks` | Refused by OD-2L-1 option B itself, and outside this budget. Option C (classify tasks) stays out of this phase entirely |
 | A second product event name beyond what one migration can carry | A second migration is a stop condition, not a decision the implementer makes |
 | A new `undo_operation` handler | The registered handlers already cover every verb this phase surfaces |
 | A new index | No requirement here changes a query's shape enough to need one; if a measurement says otherwise, it is a stop |
@@ -345,7 +413,7 @@ Phase 2L implementation may begin only when all of the following hold:
 
 Phase 2L closes only when all of the following hold:
 
-1. Every one of the 76 declared requirements is classified exactly once, from executed
+1. Every one of the 82 declared requirements is classified exactly once, from executed
    evidence, by a generator that refuses rather than prints an unresolved claim.
 2. Every partial and undelivered requirement names its remainder and destination.
 3. Lint and typecheck are zero-error; the full test suite passes; the production build
@@ -361,71 +429,77 @@ Phase 2L closes only when all of the following hold:
 
 ---
 
-## 10. Open decisions
+## 10. The decisions, as signed — and what each one refused
 
-Each is presented as a signable proposal. **Two block; three gate.** A blocking
-decision stops a slice from starting; a gating decision stops a slice from being
-accepted.
+**All five are closed (ADR-103). No Phase 2L requirement is blocked or gated on an
+unsigned decision.** The tables below are kept in their original form, with the signed
+option marked, because a decision with no record of what it refused is a preference.
 
-### OD-2L-1 — Work's sensitivity posture · **BLOCKING** slice 2L.1's acceptance and slice 2L.5
+### OD-2L-1 — Work's sensitivity posture · **SIGNED: option B.** Formerly blocking slice 2L.1's acceptance and slice 2L.5
 
 Work is the last content surface outside `GOVERNED_SURFACES`, and `tasks` carries no
 classification column.
 
 | Option | What it means | Cost | Consequence |
 |---|---|---|---|
-| **A — evidenced negative (recommended)** | Task rows carry no classification; Work states this rather than implying a policy. `work` stays out of `GOVERNED_SURFACES` and the absence is recorded, named and tested. | Zero | Honest and cheap; a task extracted from a highly sensitive entry still renders in the clear, and the product still differs across surfaces — but *knowably*. |
-| **B — derive from the source entry** | Join `source_entry_id` and mask a task whose originating entry is `highly_sensitive`. | One extra bounded read per page; no schema | Covers extracted tasks only; manually created tasks stay unclassified, so the rule is partial by construction and must say so. |
-| **C — classify tasks** | A classification column on `tasks`, a CHECK, a write path and a backfill decision. | A migration and a domain decision; **outside §7's budget** | Complete and consistent, and the largest thing in the phase. Would make Phase 2L a schema phase. |
+| A — evidenced negative *(recommended; **not** chosen)* | Task rows carry no classification; Work states this rather than implying a policy. | Zero | Honest and cheap; a task extracted from a highly sensitive entry still renders in the clear. |
+| **B — derive from the source entry · SIGNED** | Consult `source_entry_id`'s **current** classification and apply the central presentation policy when it is `highly_sensitive`. Re-read, never copied; no column, no backfill, no migration. | One extra bounded read per page; **no schema** | Covers extracted tasks. **Manually created tasks stay without a derivable classification, so the rule is partial by construction and must say so.** |
+| C — classify tasks *(rejected for this phase)* | A classification column on `tasks`, a CHECK, a write path and a backfill decision. | A migration and a domain decision; **outside §7's budget** | Complete and consistent, and would make Phase 2L a schema phase. **Stays out of this phase entirely.** |
 
-**Recommendation: A**, with B named as the follow-up if the owner wants coverage. C is
-a separate authorization.
-**Affects:** `2L-PRIVACY-001…004`, `2L-EDIT-003`, `2L-BULK-009`, `2L-ACCESS-002`.
+**Signed: B**, with its full contract at §2.2. The owner chose coverage over
+cheapness and accepted the partial coverage explicitly — which is why
+`2L-PRIVACY-004` makes stating that partiality a requirement rather than a footnote.
+**Affects:** `2L-PRIVACY-001…008`, `2L-EDIT-003`, `2L-BULK-009`, `2L-ACCESS-002`.
 
-### OD-2L-2 — The canonical Work view taxonomy and whether it spends the migration · **BLOCKING** slice 2L.3
+### OD-2L-2 — The canonical Work view taxonomy and whether it spends the migration · **SIGNED: option A.** Formerly blocking slice 2L.3
 
 | Option | Views | Migration |
 |---|---|---|
-| **A — three views, richer filters (recommended)** | Keep `today`, `all`, `waiting` as the reported views; reach *upcoming*, *completed*, per-project and per-context through URL filters within them. | **Zero.** `workView` unchanged. |
-| **B — widen to a fuller taxonomy** | Add at least *upcoming* and *completed* as reported destinations. | **One**, spending the whole budget on the `workView` enum. |
-| **C — widen without reporting** | Add views and do not report them. | Zero, and rejected: a Work view nobody can measure is the "producer with no consumer" failure this repository has paid for twice. |
+| **A — three views, richer filters · SIGNED** | Keep `today`, `all`, `waiting` as the reported views; reach *upcoming*, *completed*, per-project and per-context through URL filters within them. | **Zero.** `workView` unchanged. |
+| B — widen to a fuller taxonomy *(not chosen)* | Add at least *upcoming* and *completed* as reported destinations. | **One**, spending the whole budget on the `workView` enum. |
+| C — widen without reporting *(rejected)* | Add views and do not report them. | Zero, and rejected: a Work view nobody can measure is the "producer with no consumer" failure this repository has paid for twice. |
 
-**Recommendation: A.** It leaves the budget unspent, keeps completed work reachable
-through a filter rather than a new enum member, and avoids the cascade the audit
-records for adding `cancelled` to `workViews`.
+**Signed: A.** It leaves the budget unspent, keeps completed work reachable through a
+filter rather than a new enum member, and avoids the cascade the audit records for
+adding `cancelled` to `workViews`. **Drifting to B during implementation is a stop**,
+not an implementer's choice.
 **Affects:** `2L-VIEW-001…003`, `2L-AUDIT-004`, `2L-METRICS-002`, §7.
 
-### OD-2L-3 — Which operations may be applied in bulk · **GATES** slice 2L.2
+### OD-2L-3 — Which operations may be applied in bulk · **SIGNED: option A.** Formerly gating slice 2L.2
 
 | Option | Set | Note |
 |---|---|---|
-| **A — non-destructive, bounded-value operations only (recommended)** | Status change within active statuses, priority, due date, planned date, and relation assignment. **No `cancel_task`.** | Every member is reversible, one-step eligible and has a closed or validated value. The one destructive verb stays a per-task, per-confirmation operation. |
-| **B — A plus bulk cancel with per-item confirmation** | Adds `cancel_task`. | Each item needs its own server-issued confirmation, so "bulk" becomes *n* confirmations — which is either an honest friction or a dialog the user clicks through *n* times without reading. |
-| **C — status only** | The narrowest set. | Cheapest, and probably too narrow to be worth the selection model. |
+| **A — non-destructive, bounded-value operations only · SIGNED** | Status change within active statuses, priority, due date, planned date, and authorized relation assignment. **No `cancel_task`.** | Every member is reversible, one-step eligible and has a closed or validated value. The one destructive verb stays a per-task, per-confirmation operation. |
+| B — A plus bulk cancel with per-item confirmation *(not chosen)* | Adds `cancel_task`. | Each item needs its own server-issued confirmation, so "bulk" becomes *n* confirmations — either an honest friction or a dialog clicked through *n* times without reading. |
+| C — status only *(not chosen)* | The narrowest set. | Cheapest, and probably too narrow to be worth the selection model. |
 
-**Recommendation: A.**
+**Signed: A.**
 **Affects:** `2L-BULK-004…007`, `2L-BULK-012`, §5.2.
 
-### OD-2L-4 — The selection ceiling · **GATES** slice 2L.2
+### OD-2L-4 — The selection ceiling · **SIGNED: 50.** Formerly gating slice 2L.2
 
 Bulk is iteration, so the ceiling is a real latency and a real number of audit and undo
-rows. Options: **50** (one page, recommended — the set is exactly what the user can
-see), **25** (conservative), or a stated ceiling derived at G-2L.2 from a measured
-per-item cost. Whichever is chosen, `2L-BULK-003` requires it to be *stated to the user*
-and *refused* rather than silently truncated.
-**Recommendation: 50, matching `WORK_PAGE_SIZE`.**
+rows — which is why it is a **security control, not a performance setting**: it is what
+holds off the pressure toward a set-valued RPC. Options considered were **50** (one
+page), **25** (conservative) and a ceiling derived at G-2L.2 from a measured per-item
+cost.
+
+**Signed: 50, matching `WORK_PAGE_SIZE`** — the set is exactly what the user can see.
+`2L-BULK-003` requires it to be *stated to the user* and *refused* rather than silently
+truncated.
 **Affects:** `2L-BULK-003`, `2L-AUDIT-003`.
 
-### OD-2L-5 — Gesture policy on mobile · **GATES** slice 2L.4
+### OD-2L-5 — Gesture policy on mobile · **SIGNED: option A.** Formerly gating slice 2L.4
 
 | Option | Behaviour |
 |---|---|
-| **A — no gesture (recommended for this phase)** | Visible controls only. Nothing to mis-fire, nothing undiscoverable, nothing to teach. |
-| **B — swipe as an accelerator for one non-destructive verb** | A threshold-and-release swipe that duplicates a visible button, never a destructive one, with the visible control being what the accessibility lane scans. |
-| **C — swipe with destructive actions** | Rejected outright: the product's one destructive verb requires a server-issued confirmation by contract, so a swipe could not apply it anyway, and a swipe that opens a confirmation is slower than the button. |
+| **A — no gesture · SIGNED** | Visible controls only. Nothing to mis-fire, nothing undiscoverable, nothing to teach. |
+| B — swipe as an accelerator for one non-destructive verb *(not chosen)* | A threshold-and-release swipe duplicating a visible button, never a destructive one. |
+| C — swipe with destructive actions *(rejected)* | The product's one destructive verb requires a server-issued confirmation by contract, so a swipe could not apply it anyway, and a swipe that opens a confirmation is slower than the button. |
 
-**Recommendation: A**, with B permitted only if `2L-MOBILE-004` and `2L-MOBILE-005`
-are both proved first.
+**Signed: A.** No swipe, drag or gesture handler ships on a Work surface this phase —
+including one added "in preparation" for a later one. `2L-MOBILE-004` makes the absence
+a guard rather than a promise.
 **Affects:** `2L-MOBILE-004`, `2L-MOBILE-005`, `2L-ACCESS-005`.
 
 ### 10.1 Decisions that are NOT open

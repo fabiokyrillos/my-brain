@@ -103,11 +103,12 @@ or a second time — which means the set is a **fingerprint input**, exactly as 
 canonical patch already is for a single command. The existing single-use consumption
 `UPDATE` and the `2E_IDEMPOTENCY_MISMATCH` refusal are the mechanism, not a new one.
 
-**Design consequence the PRD must not lose.** Under OD-2L-3 option A there is no
-destructive verb in the bulk set at all, so no bulk confirmation is minted and this
-threat's surface is empty. **Option B re-opens it**, and the mitigation cost is
-per-item confirmations — which is the honest reading of ADR-047, and is part of why
-option A is recommended.
+**Design consequence, now settled.** OD-2L-3 is **signed as option A**: no destructive
+verb is bulk-eligible, so no bulk confirmation is ever minted and this threat's surface
+is **empty by construction**. It is kept in the model rather than deleted because the
+emptiness is a property of a signed decision, not of the code — adding one destructive
+operation to the bulk set would restore the whole threat, and `2L-BULK-004` is what
+stops that happening quietly.
 
 ---
 
@@ -204,14 +205,16 @@ prevents it.
 **Threat.** A swipe fires during a scroll, or a stray touch on a crowded row applies
 something.
 
-**Mitigation.** `2L-MOBILE-005` requires a deliberate completion — a threshold and a
-release, or a confirmation — and `2L-MOBILE-004` requires the gesture to be an
-accelerator for a visible control rather than the only route. OD-2L-5 option C (swipe
-with destructive actions) is **rejected outright**, and structurally could not work
-anyway: the one destructive verb requires a server-issued confirmation by contract.
+**Mitigation.** `2L-MOBILE-004` forbids any gesture handler on a Work surface and
+proves the absence with a guard. `2L-MOBILE-005` then covers what remains once gestures
+are gone: a control that changes state is spatially distinct from scrolling
+affordances, a control mid-flight is disabled rather than re-triggerable, and the one
+destructive verb stays behind its server-issued confirmation.
 
-**Residual risk.** Zero under OD-2L-5 option A, because there is no gesture. This is
-part of why option A is recommended for this phase.
+**Residual risk: zero, because OD-2L-5 is signed as option A and no gesture exists.**
+The mitigation is an absence enforced by a guard rather than a behaviour that has to be
+got right — the strongest form available. `2L-MOBILE-004` proves the absence against a
+planted handler.
 
 ---
 
@@ -256,10 +259,13 @@ the central sensitivity contract already records for every other surface.
 `2L-VIEW-006` restricts grouping to attributes the page's own projection already loads
 under RLS, so a group label can only name something the user can already read.
 
-**Residual risk.** Under OD-2L-1 option A there is no masking on Work at all, so there
-is nothing to leak *about masking* — and the residual is the honest one the option
-names: extracted task content stays in the clear. **That is the decision's cost, and it
-belongs to the decision, not to this mitigation.**
+**Residual risk, and it is the signed decision's cost rather than a mitigation gap.**
+OD-2L-1 is signed as **option B**, so masking now exists on Work — which means the
+leak channels above become live and `2L-PRIVACY-003` is load-bearing rather than
+conditional. The residual B leaves is different and narrower: **a manually created task
+has no derivable classification at all**, so a user who writes sensitive text directly
+into a task title gets no protection. `2L-PRIVACY-004` makes stating that a
+requirement, and option C — classifying tasks — is explicitly out of this phase.
 
 ---
 
@@ -402,9 +408,13 @@ with the reason named (`workView` is an enum inside the property validator) rath
 reserved; five explicit refusals in the budget; and per-slice reconciliation so an
 unspent allocation cannot migrate to a later slice.
 
-**Residual risk.** The strongest pressure is OD-2L-1 option C (classify tasks), which is
-a genuinely better product and explicitly **outside** this budget. It must reach the
-owner as a budget amendment, not as an implementation detail discovered mid-slice.
+**Residual risk.** Two pressures remain, both now explicitly refused rather than open.
+OD-2L-1 **option C** (classify tasks) is a genuinely better product and is **outside
+this phase**; it must reach the owner as a separate authorization, never as an
+implementation detail discovered mid-slice. And OD-2L-2 **option B** (widen `workView`)
+is the one thing the single allocation was ever for — signing option A means the
+allocation lapses, and **drifting back to B during 2L.3 is a stop condition**, not a
+budget the implementer may spend.
 
 ---
 

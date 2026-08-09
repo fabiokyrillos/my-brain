@@ -130,9 +130,15 @@ are genuinely different products:
 - *classify tasks* — a column, a CHECK, a backfill decision and a write path. A
   migration and then some.
 
-**Trap to avoid.** Silently choosing the first because it is free. "No mask" and "mask
-not applied" look identical from outside; if it is the answer, it has to be written
-down as the answer.
+**Signed: option B** (ADR-103). The owner chose coverage over cheapness and accepted
+the partial coverage explicitly, which is why `2L-PRIVACY-004` makes *stating* the
+partiality a requirement rather than a footnote: a task the user typed by hand still
+has no derivable classification, and saying so is the whole difference between an
+honest partial rule and a mask people over-trust.
+
+**Trap the signed option carries.** "No mask" and "mask not applied" look identical
+from outside — so the manual-task case needs a positive test proving it resolves to
+*no derivable classification*, not merely that nothing was masked.
 
 ---
 
@@ -283,7 +289,7 @@ Recorded so that rejecting them is a decision rather than an omission.
 |---|---|---|
 | **Kanban board** | Reject | Drag is the least accessible primary verb in the product, needs keyboard and touch equivalents, and needs a user-ordering model `dynamic_priority` does not provide. It is a phase. |
 | **Timeline view** | Reject | The parent PRD hedges it, and Phase 2M owns calendar. Two date surfaces designed a phase apart will disagree. |
-| **Persisted saved views/filters** | Reject for 2L | A table, an RLS policy, a retention class, a deletion-cascade entry — bought to replace a URL. |
+| **Persisted saved views/filters** | Reject for 2L | A table, an RLS policy, a retention class, a deletion-cascade entry — bought to replace a URL. Confirmed by OD-2L-2 A. |
 | **Adjustable density** | Defer | A preference with no home; triples the accessibility matrix for a cosmetic gain. |
 | **A set-valued bulk RPC** | Reject | A migration plus a second copy of eligibility, fingerprint, audit and undo. Iteration reuses all of it. |
 | **Task delete/archive** | Reject | The product has no delete for tasks by standing design; `cancel_task` plus the recovery surface is the terminal state. Introducing a second terminal state is a product decision, not a UX slice. |
@@ -303,8 +309,9 @@ Recorded so that rejecting them is a decision rather than an omission.
    absent from the accessibility lane (G-06). Both are decisions the phase must make
    out loud, and G-05 may be the only one that reaches the owner as a real product
    choice.
-3. **The migration question has exactly one honest answer** — everything in G-01
-   through G-06 and G-08 through G-12 costs zero migrations; only widening the
-   *reported* view taxonomy (G-07) and only classifying tasks (G-05's third option)
-   cost anything, and the phase should be scoped so that a zero-spend close is
-   legitimate.
+3. **The migration question has exactly one honest answer, and it is now signed** —
+   everything in G-01 through G-06 and G-08 through G-12 costs zero migrations; only
+   widening the *reported* view taxonomy (G-07) and only classifying tasks (G-05's
+   third option) cost anything, and **both were refused**: OD-2L-2 signed option A and
+   OD-2L-1 signed option B, which needs no schema. **The expected close is
+   `1 allocated · 0 spent`.**
