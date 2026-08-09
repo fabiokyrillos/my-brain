@@ -335,3 +335,12 @@ Three of the six decisions this audit surfaced were signed after it was written 
 - **§7 / §6 — ADR-055.** The audit recorded the expiry as the phase's binding constraint and its resolution as newly-required work. **OD-2K-6** signs the outcome: the *widening* retires at the expiry; the retrieval that exists today over entries and memories is untouched; and the ADR is not renewed artificially to keep a possibility on the roadmap. Slice 2K.0 therefore **records** a retirement rather than deciding one.
 
 **Unchanged by this addendum:** every classification in §6, the constraint table in §7, and the three unmeasured items in §8 — which slice 2K.0 still measures rather than assumes. `OD-2K-5`, one of those measurements, remains open.
+
+### Second addendum — 2026-08-08, after slice 2K.0
+
+Slice 2K.0 executed §8's three measurements. Two corrections to this record, appended rather than merged:
+
+- **§8.1 is closed.** Confirmations carry **no** `expires_at`, TTL or age check; the absence is ADR-047, and three fact-based refusals replace a clock. `TASK_COMMAND_OUTCOMES` has no `expired` member.
+- **§3's closing sentence is superseded on one point.** It reads *"Re-derivation from a pinned clock (`issuedAt`) … Owner decision 4a is the doctrine this module already implements, **extended across a navigation boundary**"*. The first half is a correct description of `session.ts` **within one multi-step command**, where the pinned clock is exactly right and ADR-050 records why. The italicised extension is **wrong** and was corrected by the owner: carrying `issuedAt` across a *navigation* to keep an earlier confirmation consumable would make the continuity payload part of a reusable authorization, contradicting OD-2K-D and `2K-CONT-003`. **Returning always re-derives with a new `issuedAt` and always requires a fresh confirmation.** See `PHASE_2K_SLICE_00_ACCEPTANCE.md` §3.1.
+
+The distinction matters and is easy to lose: a pinned clock **inside** one command is the mechanism that makes its steps agree; a pinned clock **across** a navigation would be the mechanism that lets an old authorization survive one. Same value, opposite property.

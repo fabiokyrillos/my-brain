@@ -47,12 +47,34 @@ No pre-existing change was present, so none was altered.
    - object moved → the **twelve-column** staleness gate raises **`55P03`** (`status`, `due_at`, `planned_at`, `manual_priority`, `completed_at`, `cancelled_at`, `intentional_no_due`, `no_due_reason`, `created_at`, `updated_at` and two more compared with `is distinct from`);
    - already spent, or never issued → the consumption `UPDATE` is guarded on six predicates and `row_count <> 1` raises **`P0001` / `2E_CONFIRMATION_REQUIRED`**;
    - payload changed under the same key → **`P0001` / `2E_IDEMPOTENCY_MISMATCH`**. Re-binding was considered and rejected: *"A changed proposal is a new request; it carries a new key."*
-4. **`issuedAt` is the hinge for continuity.** It reaches the fingerprint through `observedBefore` (one of the seven hashed inputs), so **a re-derivation minted with a fresh clock yields a different fingerprint and cannot consume the earlier confirmation.**
+4. **`issuedAt` reaches the fingerprint through `observedBefore`** (one of the seven hashed inputs), so **a derivation minted with a new clock yields a different fingerprint and cannot consume an earlier confirmation.** *(This measured fact is unchanged. The continuity **consequence** first drawn from it was wrong and was corrected by the owner — see §3.1.)*
 5. **A failed apply does not burn the confirmation.** Consumption is a guarded `UPDATE` inside the mutating transaction; any later raise rolls it back and the retry finds the row still `issued`.
 6. **Write posture.** `enable` + `force` RLS, select-own policy, `revoke all` from `public`/`anon`, and `authenticated` holds **`select` only** — both writers are `SECURITY DEFINER`. No role, including `service_role`, may `INSERT`/`UPDATE`/`DELETE` it (ADR-047 clause 2).
 7. **Vocabulary constraint.** `TASK_COMMAND_OUTCOMES` contains `rejected_stale` and **no `expired`**.
 
-**OD-2K-5 closure.** *Confirmations do not expire on time; they become inapplicable on facts, through three distinct refusals.* Phase 2K's card state `expired` is a **presentation** state over those three refusals and must map onto `rejected_stale` for task commands — it may not widen the closed outcome vocabulary. Continuity (2K.3) must carry the original pinned `issuedAt` or state plainly that a fresh confirmation is required; it must never mint a new clock silently and report the resulting refusal as a fault.
+**OD-2K-5 closure.** *Confirmations do not expire on time; they become inapplicable on **facts**, through three distinct refusals* — `55P03` for a changed object, `2E_CONFIRMATION_REQUIRED` for one absent, already consumed or otherwise inapplicable, and `2E_IDEMPOTENCY_MISMATCH` for a divergent payload under the same key. Phase 2K's card state `expired` is a **presentation** state over those three and maps onto `rejected_stale` for task commands; it may not widen the closed outcome vocabulary, and no TTL is created.
+
+**Continuity consequence (corrected — see §3.1): returning always re-derives with a new `issuedAt` and always requires a fresh confirmation.** No branch reuses an earlier confirmation.
+
+### 3.1 — The continuity consequence I first drew from M1 was wrong, and the owner caught it
+
+The measured facts in §3/M1 are unchanged and remain correct. What was wrong was the **conclusion** drawn from fact 4.
+
+The first draft of this report, and of `2K-CONT-006`, said continuity *"must carry the original pinned `issuedAt` … or state plainly that a fresh confirmation is required"*. That is a contradiction and it is unsafe. `issuedAt` is a fingerprint input; transporting it **for the purpose of keeping an earlier confirmation consumable** turns the continuity context into part of a **reusable authorization** — exactly what OD-2K-D forbids and what `2K-CONT-003` asserts the payload cannot contain. Offering the implementer a choice between the two made it worse: a contract with two readings has no contract.
+
+**The corrected semantics, which now have a single interpretation:**
+
+- the continuity payload carries **identifiers only** — enough to locate the conversation, the message and the object, and to restore the visual position;
+- it carries **none** of: confirmation id, operation key, `issuedAt`, `observedBefore`, fingerprint, patch, computed preview, mutation payload, authorization, reusable confirmation;
+- returning **always** re-derives on the server, **always** with a **new** `issuedAt`;
+- the user **always** confirms again before any mutation; the earlier confirmation is **never** consumed after a return; nothing is ever auto-reapplied;
+- object changed *and* provable from the authorized identifiers → `expired`, show only the safely re-derivable difference, require a new confirmation;
+- object unchanged → show the re-derived preview and request a new confirmation, rendered as **normal, not an error**, and never claiming the old confirmation still holds;
+- a safe difference not reconstructible without forbidden state → **do not invent one**; say generically that the earlier preview no longer applies, show the new one, require a new confirmation.
+
+**The earlier confirmation row.** Because there is no TTL, a previously issued row may persist as history. Continuity does not transport what would be needed to consume it, the product does not attempt to reuse it, and it grants the new card no authority — the new card carries a new derivation and a new fingerprint. Whether such rows should ever be cleaned is a **separate residual** and does not belong to slice 2K.0.
+
+**A differing fingerprint after a return is the intended outcome, not a fault.** It is the mechanism that makes the old confirmation unusable by construction.
 
 ### M2 — What does a zero-source answer produce?
 

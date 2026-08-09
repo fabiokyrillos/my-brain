@@ -24,9 +24,11 @@ A gap that is large but out of boundary is recorded anyway, with its destination
 
 This is worse than a bug because the two behaviours the product most wants — *verify before you trust* and *act inside the conversation* — are mutually destructive.
 
-**Why it is the highest-value gap.** It is the only wholly-absent capability in the phase, it is the one the mobile bar makes most likely (chat sits one tap from home/work/capture), and the machinery to fix it correctly **already exists**: `session.ts` re-derives a command from a pinned `issuedAt`, reproducing the identical `observedBefore` and therefore the identical fingerprint; `withStalenessWitness` and `requireApplicableSession` already refuse a write whose witness is absent or mismatched; `staleShell` already renders "this went stale" carrying no task content.
+**Why it is the highest-value gap.** It is the only wholly-absent capability in the phase, it is the one the mobile bar makes most likely (chat sits one tap from home/work/capture), and the machinery to fix it correctly **already exists**: the server can re-derive a command and rebuild a preview from scratch, `withStalenessWitness` and `requireApplicableSession` already refuse a write whose witness is absent or mismatched, and `staleShell` already renders "this went stale" carrying no task content.
 
-**Recoverable.** Yes, fully, and with **no schema** — decision 4a is the doctrine `session.ts:14-15` already states, extended across a navigation boundary.
+**Recoverable.** Yes, fully, and with **no schema** — decision 4a plus **ADR-100**.
+
+**One distinction the fix turns on, because it is easy to lose.** `session.ts` pins `issuedAt` *within* one multi-step command, and that is exactly right: it is what makes the steps of a single operation agree, and ADR-050 records why. Pinning it **across a navigation** would be the opposite property — the mechanism by which an old authorization survives one. Same value, opposite effect. So the return path re-derives with a **new** clock and **always** re-asks; the earlier confirmation becomes unusable by construction, which is the point rather than a cost.
 
 **Opportunity beyond the fix.** Once return is safe, the citation stops being a dead end and becomes the normal way to read an answer. That is the actual thesis of "Conversar as the primary interface", and it is currently blocked by a client-state lifetime.
 

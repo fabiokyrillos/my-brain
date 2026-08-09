@@ -18,9 +18,11 @@
 
 **Why the obvious mitigation is not the real one.** "Re-read the task before applying" is insufficient and is precisely the silent recompute-and-apply that PRD §12.6 forbids by name: the user would apply a *correct* change they were never shown. The property is not freshness, it is **the user saw what happened**.
 
-**Mitigation.** Re-derivation, never restoration of a computed result. The doctrine already exists at `session.ts:14-15` — *"No state is stored in the client as the source of truth. A preview is recomputed server-side and re-fingerprinted on every render."* On return: re-derive the command from the envelope's pinned `issuedAt`, re-run `loadTaskCandidates` and `rankTaskCandidates`, rebuild the preview, and compare the staleness witness. A mismatch renders the **expired** state and requires a fresh confirmation. Never auto-apply.
+**Mitigation (ADR-100).** Re-derivation, never restoration of a computed result. The doctrine exists at `session.ts:14-15` — *"No state is stored in the client as the source of truth. A preview is recomputed server-side and re-fingerprinted on every render."* On return: re-derive **with a new `issuedAt`**, re-run `loadTaskCandidates` and `rankTaskCandidates`, rebuild the preview, and **always require a fresh confirmation**. A changed object additionally renders the **expired** state. Never auto-apply.
 
-**Falsifying evidence.** A test that mutates the target row between render and return and asserts the surface reports expired **and** that no write occurred. A test that asserts the restored path calls the same builder as the first render. Absence of any code path that applies from a stored preview.
+**The new clock is the mitigation, not an inconvenience it works around.** `issuedAt` is a hashed fingerprint input, so a new one makes the earlier confirmation unusable **by construction** — the property becomes mechanical rather than remembered. Carrying the original clock across the navigation to spare the user a second confirmation was considered and is **forbidden**: it would transport the very value that makes an old confirmation match, which is a reusable authorization under another name. See **T-2K-02**, which this reinforces.
+
+**Falsifying evidence.** A test that mutates the target row between render and return and asserts the surface reports expired **and** that no write occurred. A test that leaves the row **unchanged** and asserts a fresh confirmation is still required, rendered as normal rather than as an error. A test that attempts an apply straight after a return and observes refusal. Absence of any code path that applies from a stored preview, and absence of any path that accepts a clock from the continuity payload.
 
 ---
 

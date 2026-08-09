@@ -173,16 +173,19 @@
 - Modify: `src/app/[locale]/app/chat/[conversationId]/page.tsx` — per-message anchors and stable identity; **this is the one place the single-expression render is decomposed**, minimally, because continuity needs a position to return to.
 - Modify: `src/features/assistant/assistant-composer.tsx` — restore the card's visual reference and request re-derivation.
 - Modify: `src/features/assistant/actions.ts` — the re-derivation entry point.
-- Modify: `src/features/task-commands/session.ts` — only if re-derivation across a navigation needs an explicitly declared entry point; **`TASK_COMMAND_SESSION_VERSION` is bumped if the envelope shape changes at all**.
+- Modify: `src/features/task-commands/session.ts` — only if re-derivation across a navigation needs an explicitly declared entry point; **`TASK_COMMAND_SESSION_VERSION` is bumped if the envelope shape changes at all**. The entry point **mints a new `issuedAt`**; no clock crosses the navigation boundary, so nothing here may accept one from the continuity payload.
 - Modify: `e2e/accessibility.spec.ts` — the restored and expired states.
 
 **Interfaces.** Consumes: `parseTaskCommandSession`, `deriveTaskCommand`, `withStalenessWitness`, `requireApplicableSession`, `staleShell`, `assertActiveAccount`. Produces: the continuity contract later phases may consume.
 
 **Tests first**
-1. The continuity payload schema is a closed set of identifiers; a planted confirmation id fails the guard.
-2. Returning re-derives: the same builder is called as on first render, and **no stored computed preview exists to restore**.
-3. Mutating the target row between departure and return yields `expired` **and no write**.
-4. No path auto-reapplies on return.
+1. The continuity payload schema is a closed set of identifiers. The guard fails against a **planted instance of each** forbidden field: confirmation id, operation key, `issuedAt`, `observedBefore`, fingerprint, patch, computed preview, mutation payload.
+2. Returning re-derives: the same builder is called as on first render, **a new `issuedAt` is minted**, and **no stored computed preview exists to restore**.
+3. Returning **always** requires a fresh confirmation. There is no branch — changed or unchanged — in which the earlier confirmation is consumed. Asserted by attempting an apply immediately after a return and observing that it is refused without a new confirmation.
+4. Mutating the target row between departure and return yields `expired` **and no write**.
+5. Leaving the row **unchanged** still yields a re-derived preview and a fresh confirmation request, rendered as normal rather than as an error, and **never** claiming the earlier confirmation still holds.
+6. When a safe difference cannot be reconstructed from the authorized identifiers alone, the surface says generically that the earlier preview no longer applies and shows the new one. It **does not invent** a difference.
+7. No path auto-reapplies on return.
 5. A handle for another owner's object, a deleted object, and a suspended account all produce **byte-identical** `unavailable` output.
 6. If the envelope shape changed, an envelope minted at the previous version is refused rather than best-effort read.
 
@@ -194,9 +197,9 @@
 **Browser/Playwright.** A local Playwright journey covering the round trip on desktop and Pixel 7, in CI's `database` job.
 **Real device / AT.** **Not proved**; declared.
 
-**Acceptance criteria.** Return re-derives and never restores. Expired is reported and never applied. The payload is provably incapable of authorizing. The three unavailable causes are indistinguishable. No migration spent.
+**Acceptance criteria.** Return re-derives with a new clock and never restores. A fresh confirmation is **always** required, in every branch. Expired is reported and never applied. The payload is provably incapable of authorizing, proved against a planted instance of each forbidden field. The three unavailable causes are indistinguishable. No migration spent, no TTL created, no new persistence for pending confirmations.
 
-**Stopping condition.** Stop if re-derivation cannot reproduce an identical fingerprint for an unchanged object — that would mean the pinned-clock property is broken, which is a defect in a shipped invariant and outranks this slice.
+**Stopping condition.** Stop if the only way to make the returned card usable turns out to require transporting `issuedAt`, a fingerprint, an operation key, a confirmation id or a computed preview — that is a reusable authorization by another name, it is forbidden by OD-2K-D and `2K-CONT-003`, and it is an owner amendment rather than a slice decision. **A differing fingerprint after a return is the expected result, not a failure**: the new derivation mints a new clock, so the earlier confirmation is unusable by construction and a fresh one is always required.
 **Rollback.** Revert; no schema change.
 **Order.** As 2K.1. No deploy.
 
