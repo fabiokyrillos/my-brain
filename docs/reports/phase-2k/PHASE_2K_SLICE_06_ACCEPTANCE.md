@@ -20,7 +20,7 @@
 | `2K-SUGG-002` | **built** | A pure function. No provider, no `recordAIUsage`, no rate-limit slot, no `async`, no client, no fetch — asserted structurally, with each detector proved against a planted violation. The same input produces the identical output on five consecutive runs |
 | `2K-SUGG-003` | **built** | The hard-coded example and its inline locale ternary are gone. The page no longer contains "Marina" or "Experimente:", and `locale-ternary-guard.test.ts` is green |
 | `2K-SUGG-004` | **built** | Copy lives in the feature's typed `copy.ts`, both locales, per ADR-036 |
-| `2K-SUGG-005` | **partial** | The category is a closed enum and `suggestionTelemetryCategory` narrows a suggestion to it through a return type that **has no field a name could occupy**. The event itself belongs to slice **2K.8**, which owns the telemetry vocabulary and its migration. **Remainder:** wiring the event. **Destination:** 2K.8 |
+| `2K-SUGG-005` | **built** | The category is a closed enum and `suggestionTelemetryCategory` narrows a suggestion to it through a return type that **has no field a name could occupy**. The event was **wired in slice 2K.8**, which owns the telemetry vocabulary — so the remainder this row named was discharged inside the phase. What remained afterwards was **not** "pending wiring": it was the **global writer refusal** that made every `conversation`-surface event inert on the deployed project, a defect belonging to `private.record_product_event` rather than to this requirement. Closed by the post-phase correction `202608090089` and proved hosted — see `2K-METRICS-007` |
 
 ---
 
@@ -108,7 +108,7 @@ It is replaced by a statement about what each thing *is*, not whether it exists:
 
 ## 10. Limitations, stated rather than rounded up
 
-1. **`2K-SUGG-005` is partial.** The bounded category and its narrowing exist; the event does not. Wiring it belongs to 2K.8, which owns the telemetry vocabulary and the single budgeted migration. Recorded as a remainder with a destination rather than claimed.
+1. **`2K-SUGG-005` was partial when this slice closed.** The bounded category and its narrowing existed; the event did not. Wiring it belonged to 2K.8, which owns the telemetry vocabulary and the single budgeted migration — and **2K.8 wired it**. Recorded here as a remainder with a destination rather than claimed, and discharged at that destination. What outlived it was a defect in the global writer, not in this requirement.
 2. **Suggestions derive from people and projects only.** The chat index holds no other already-authorized state, and OD-2K-4's other permitted sources — the Hoje / Trabalho / Precisa-de-você projections — would each be a new query on a surface that is not those views. Named as a bounded choice rather than an oversight.
 3. **No screen-reader session.**
 4. **The empty-empty case shows nothing.** A user with no people and no projects sees the empty state's own sentence and no suggestions. That is OD-2K-4's instruction, and it is the honest outcome — but it does mean the surface teaches a brand-new user less than the hard-coded example pretended to.

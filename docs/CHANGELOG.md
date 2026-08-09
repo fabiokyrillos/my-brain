@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - POST-PHASE CORRECTION `202608090089`: Phase 2K's telemetry was inert on the deployed project, and now is not
+
+**Phase 2K reached closeout with its telemetry INERT, and this entry does not soften that.** The probe run immediately after deploying `202608090088` found that every Conversar event was refused `22023 Unsupported product surface`: `private.record_product_event` carried a **hardcoded surface allowlist** without `conversation`, inside producers that `.catch(() => {})`. It is `202608080087`'s defect **one field over** - that migration deleted the *event-name* copy from the same function and left the *surface* copy standing.
+
+**A second gate was undersized, and the first was masking it.** `product_events_surface_check` on the table also stopped at `task_command`; the writer's copy refused first. Deleting only the writer's list would have moved the refusal to a raw `23514` rather than removing it, so both were corrected together.
+
+**The owner chose deletion over addition and authorized ONE exclusively corrective migration OUTSIDE Phase 2K's budget.** Phase 2K's authorized implementation stays **`1 allocated - 1 spent`** and is **not** retroactively reclassified; `202608090089` is charged to **no phase**, in particular not to the roadmap successor, which has not started.
+
+- **The writer's list is deleted**, with no equivalent list in any other format. The migration refuses to run unless it extracts ten-plus surfaces from the CHECK and proves **none appears in the writer's body**.
+- **The `22023 Unsupported product surface` contract is preserved** by translating the check violation through `GET STACKED DIAGNOSTICS` - message and errcode unchanged.
+- **Surface is now validated after the event name**, which is an improvement: surface-first ordering is what made this phase's own negative controls vacuous.
+- **`security definer`, `set search_path = ''`, signature, return shape, validation, ownership assertions, idempotency, grants and revokes are unchanged.** No RLS, policy, grant, security-posture or product-code change.
+- **The permanent regression went 20 -> 29 assertions**, extended and never weakened or duplicated, with the vocabulary derived from the CHECK at test time, and the historical gate planted and restored to prove non-vacuity.
+
+**CI green on the exact merge SHA `eaf98b6`.** **Hosted parity 89 local - 89 remote, head `202608090089`.** **Hosted producer -> writer -> RLS consumer proof, 13/13**, through the authenticated write path with three negative controls exercised on a **valid** surface, idempotency intact, the real aggregator reporting 0 unrecognised, and **zero residue** proved by replaying the same read to zero after the disposable account was deleted. **No BYOK credential, no provider call, no signup, no backfill.**
+
+**Traceability regenerated from source, never hand-edited: 79 declared - 79 classified, 67 built, 9 baseline, 3 partial.** `2K-METRICS-004`, `2K-METRICS-007` and `2K-SUGG-005` moved. **`2K-SUGG-005`'s event was already wired in 2K.8**; what outlived that was the global writer refusal, not pending wiring.
+
+**Still not proved and still not inferred:** screen reader; real-device mobile; hydrated interactivity; zero-source provider prose; authenticated online journeys. **Phase 2L is not started.**
+
 ## 2026-08-09 — PHASE 2K COMPLETE: 79 requirements classified, and the count in five documents was wrong
 
 **Seven slices executed and merged** (2K.0–2K.6, 2K.8); **2K.7 not built, by rule**. **Migration budget `1 allocated · 1 spent`.**

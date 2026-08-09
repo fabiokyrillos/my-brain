@@ -40,11 +40,11 @@ No requirement is duplicated and none is outside the `2K-` namespace, so this is
 | `2K-METRICS-001` | **built** | Three event names and the `conversation` surface are declared in `product-analytics/contracts.ts` and **derived** from it everywhere else. The migration was *assembled* from `202608080086`'s own text rather than retyped |
 | `2K-METRICS-002` | **built** | Every property is a closed enum or a boolean. The guard walks each declared shape and fails anything that is neither, and asserts no content-shaped **key** on any Phase 2K arm |
 | `2K-METRICS-003` | **built, vacuously — and it says so** | Phase 2K declares **no duration at all**, so there is nothing to bucket. Asserted as an absence rather than claimed as a bucketing mechanism this phase never built |
-| `2K-METRICS-004` | **partial** | Both gates the previous defect taught this repository to watch were widened together, with a name-by-name agreement block that refuses to run vacuously. **A THIRD existed and the deployment probe found it**: `private.record_product_event` carries a hardcoded SURFACE allowlist, in the same function `202608080087` edited, and `conversation` is not in it. **Remainder:** that surface allowlist. **Destination:** an owner decision on a second migration — see `PHASE_2K_DEPLOYMENT.md` |
+| `2K-METRICS-004` | **built** | **Closed by the post-phase correction `202608090089`, not by slice 2K.8, and the history is kept rather than smoothed.** At closeout this was **partial**: both gates the previous defect taught this repository to watch were widened together, with a name-by-name agreement block that refuses to run vacuously — and **a THIRD existed that the deployment probe found**, a hardcoded SURFACE allowlist inside `private.record_product_event`, in the same function `202608080087` edited, without `conversation`. A **second** gate was undersized too: `product_events_surface_check` on the table itself, which the writer's copy refused first and so masked. The correction **deletes the writer's copy** rather than adding `conversation` to it (owner decision), widens the table CHECK, and preserves the `22023 Unsupported product surface` contract by translating the check violation through `GET STACKED DIAGNOSTICS` — **no second list in any format**. There is now exactly **one** surface vocabulary, asserted from the catalog |
 | `2K-METRICS-005` | **built** | `post_2j_product_event_write_path.sql` **extended, never duplicated**: three legal payloads added, and the suite's existing set-difference assertions in both directions make an omission fail rather than pass quietly. One added assertion names the three explicitly |
 | `2K-METRICS-006` | **built** | Negative controls: an undeclared event name and an undeclared property are each refused with `22023`. Non-vacuity: accepted events must return a non-null id, and the historical-gate probe asserts it refuses exactly **seven** — the number that rose from four when this phase added three |
-| `2K-METRICS-007` | **partial** | The consumer exists, is RLS-scoped, authenticates as the owner, writes nothing, and distinguishes "not deployed yet" from "a quiet week". **The producer is INERT on the deployed project** — every event is refused `22023 Unsupported product surface`. **Remainder:** the surface allowlist admitting `conversation`. **Destination:** an owner decision on a second migration — see `PHASE_2K_DEPLOYMENT.md` |
-| `2K-METRICS-008` | **built** | Zero fixture residue proved after the hosted probe, **by construction**: every write was refused by the surface gate, so no row was created, and the probe file was deleted. Recorded in `PHASE_2K_DEPLOYMENT.md` |
+| `2K-METRICS-007` | **built** | **Phase 2K reached closeout with this INERT on the deployed project, and that is recorded, not erased.** The consumer existed, RLS-scoped, authenticating as the owner, writing nothing, and distinguishing "not deployed yet" from "a quiet week" — but every event was refused `22023 Unsupported product surface`, inside producers that swallow the failure. **Closed after `202608090089` by a hosted producer→consumer proof, 13/13**: three Phase 2K events written through the **authenticated** `public.record_product_event` (owner from `auth.uid()`, never an argument) by a disposable account, read back **under that account's own RLS session**, and fed to the real `aggregateConversationFunnel`, which reported answers 2 / memories 1 / suggestions 1 with **0 unrecognised**. An event outside the consumer's set was ignored by the funnel |
+| `2K-METRICS-008` | **built** | At closeout this was proved **by construction and for the wrong reason** — every write was refused by the surface gate, so no row could exist. That is a true statement about residue and a worthless one about the probe. **Re-proved after `202608090089` with writes that actually succeeded**: the disposable account owned five rows, the account was deleted, and **the same authenticated read replayed to zero** (`product_events.user_id references auth.users(id) on delete cascade`). A **global** ledger count is deliberately impossible — `service_role` holds no `SELECT` on this table — so the residue claim is owner-scoped, which is the stronger of the two |
 | `2K-CLOSE-001` | **built** | All **79** declared requirements classified exactly once, by a generator that refuses to emit anything otherwise |
 | `2K-CLOSE-002` | **built** | Every `partial` names its remainder and destination, enforced by the generator rather than by review |
 | `2K-CLOSE-003` | **built** | Budget reconciled per slice: 2K.0–2K.6 spent nothing, 2K.8 spent one. `1 allocated · 1 spent` |
@@ -109,8 +109,45 @@ Adding a migration is supposed to be noticed. Five guards noticed, and each was 
 
 ## 7. What remains open at close
 
-1. **`2K-METRICS-007` and `2K-METRICS-008` are partial until the deployment probe runs.** Their remainder is named and their destination is the deployment record.
+1. **`2K-METRICS-007` and `2K-METRICS-008` were partial until the deployment probe ran.** Their remainder was named and their destination was the deployment record. **The probe then found the defect that made the whole telemetry inert** — see the post-phase correction section at the end of this file. Both are now closed against a hosted proof, and the partial state is left on the record rather than back-dated away.
 2. **No screen-reader session, and no real-device mobile session.**
 3. **The zero-source provider prose**, narrowed by 2K.4 to what the provider *says* rather than whether the product *tells the user*.
 4. **Historical citation excerpts** remain the named residual OD-2K-2 declared — contained by a renderer that never reads one.
 5. **Relation references are not editable from a card**, and **interpretation correction has no domain effect**. Both declared, both with destinations.
+
+---
+
+## Post-phase correction — migration `202608090089` (appended 2026-08-09)
+
+**Phase 2K reached closeout with its telemetry inert on the deployed project. That is the first fact of this section, and it is not softened anywhere in it.**
+
+The deployment of `202608090088` succeeded and hosted parity was clean. The probe that ran immediately afterwards found that not one Phase 2K event could be written: `private.record_product_event` carried a **hardcoded surface allowlist** without `conversation`, so every event was refused `22023 Unsupported product surface` — inside producers that `.catch(() => {})`, which is why nothing was visible from the product side. This is `202608080087`'s defect **one field over**: that migration deleted the *event-name* copy from the same function and left the *surface* copy standing, describing it as a non-vocabulary guard.
+
+**A second gate was undersized as well.** `product_events_surface_check`, on the table, also stopped at `task_command`; `202608090088` widened the event-name CHECK and the property validator but not that one. The writer's copy refused first and **masked** it. Both were fixed together, because fixing only the writer would have moved the refusal rather than removed it.
+
+**The owner chose deletion over addition**, and authorized **one extraordinary corrective migration outside Phase 2K's budget**. That budget is unchanged and is not retroactively reclassified: Phase 2K's authorized implementation remains **`1 allocated · 1 spent`**. `202608090089` is charged to **no phase** — in particular not to the roadmap successor, which has not started.
+
+- The writer's list is **deleted**, not extended. No equivalent list was introduced in any other format; the invariant is asserted from the catalog, against whatever is installed.
+- The `22023 Unsupported product surface` contract is **preserved** by translating the CHECK violation through `GET STACKED DIAGNOSTICS`, so no caller can tell the refusal moved.
+- Surface is now validated **after** the event name. That ordering change is an improvement rather than a cost: surface-first ordering is precisely what made this phase's own negative controls vacuous — they were refused before the dimension under test could answer.
+- `security definer`, `set search_path = ''`, ownership and subject assertions, idempotency, return shape, grants and revokes are unchanged. **No RLS change, no policy change, no new grant, no product-code change.**
+
+**The permanent regression was extended, never duplicated and never weakened.** `post_2j_product_event_write_path.sql` goes from **20 to 29** assertions with a surface dimension derived from the CHECK at test time — a list restated there would be the third copy this correction exists to delete. It proves every declared surface is writable through the real writer, that `conversation` is accepted, that all three Phase 2K events are writable **on** that surface, that an undeclared surface is still refused with the same errcode **and** message, and that the writer names no declared surface. It is non-vacuous by assertion: fewer than ten extracted surfaces fails, and the **historical gate is planted** to prove the refusal returns and **restored** to prove it disappears.
+
+**Hosted proof, after deployment: 13/13.** A disposable account, created through the admin API — signup was never opened, no BYOK credential was used, and no provider was called. Events were written through the **authenticated** `public.record_product_event`, the path the browser producers actually reach, so the owner comes from `auth.uid()` and not from an argument.
+
+| Proof | Result |
+| --- | --- |
+| Three Phase 2K events on the `conversation` surface | accepted, event ids returned |
+| Undeclared surface | refused `22023 Unsupported product surface` |
+| Undeclared event, **on a valid surface** | refused `22023 Unsupported product event` |
+| A person's name in the payload | refused `22023 Unsupported product event property` |
+| Idempotency replay | same id, `recorded` true then false |
+| Owner reads its own events under **RLS** | 4 rows |
+| Real `aggregateConversationFunnel` | answers 2 / memories 1 / suggestions 1, **0 unrecognised** |
+| An event outside the consumer's set | ignored by the funnel |
+| Zero residue | 5 owned rows before the account delete, **0 after the same read replayed** |
+
+The negative controls are non-vacuous on purpose: the undeclared **event** and the forbidden **property** are both exercised on a **valid** surface, so the surface gate cannot be what answers.
+
+**Still not proved, and still not inferred:** screen reader; real-device mobile; hydrated interactivity; zero-source provider prose; authenticated online journeys. None of these was executed, and none is claimed.
