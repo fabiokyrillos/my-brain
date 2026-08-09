@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L SLICE 2L.0: measurement, guards and one executable contract
+
+**Zero migrations, zero product surfaces.** One module ships - the derived-sensitivity contract M4 names - because a contract nobody can run is a paragraph.
+
+**Added.** `src/features/sensitivity/task-derivation.ts` (OD-2L-1 option B, executable); three closeout guards - `phase-2l-work-authority-guard.test.ts`, `phase-2l-vocabulary-guard.test.ts` and `phase-2l-requirement-declarations.test.ts`; and `docs/reports/phase-2l/PHASE_2L_SLICE_00_ACCEPTANCE.md`.
+
+**M1 - the authority census is a guard now.** `apply_task_command` has exactly one call site; six sibling RPCs one each; the shared `undo_operation` router four across four domains. **The first census draft was line-oriented and silently missed three call sites** whose RPC name sits on its own line. The extractor is newline-tolerant and a fixture proves it; comments are stripped, with a fixture proving a comment naming the RPC does not fire while a real call beside it does.
+
+**M2 - the signed ceiling of 50 is confirmed, not assumed.** Two round trips per item; one `undo_operations` reservation plus one `audit_logs` row per applied item; at most 100 round trips and 100 rows at the ceiling, bounded and per-page. A refused item rolls back its own reservation, so **there is no partially-written item to describe** - which is what makes truthful per-item results achievable.
+
+**M3 - the view vocabulary by name, at five enforcement points.** All three view declarations are the same three values in the same order, and the writer holds **nothing** - the property `202608080087` and `202608090089` were written to establish, now asserted so this phase cannot reintroduce it. **OD-2L-2 A needs no migration; the allocation lapses unspent.**
+
+**M4 - three outcomes, only two of them levels.** `undetermined` has no `level` field to misread, so "never classified" cannot decay into "normal". Removed, foreign and unreadable are one case, proved byte-identical. Fails closed twice. **`work` does not join `GOVERNED_SURFACES` here** - presentation lands in 2L.1 with its consumer.
+
+**Changed.** The plan's slice-2L.0 line said "zero product code"; corrected to "zero product surfaces … and exactly one executable module", because the plan's own M4 explicitly commissions that module.
+
+**Deviation recorded rather than absorbed:** the plan named two guards and three exist; the third implements gate G-2L.0's own words and adds a check, no capability and no authority.
+
+**Executed:** lint and typecheck zero-error; `npm test` **4967 passed / 0 failing tests**; build green; `git diff --check` clean. **NOT executed:** any hosted probe, real device, screen reader, hydrated interactivity or authenticated journey - this slice ships no surface.
+
 ## 2026-08-09 - PHASE 2L: IMPLEMENTATION AUTHORIZED THROUGH CLOSEOUT (ADR-103), and all five owner decisions signed
 
 **Documentation only. Still zero product code, zero migrations, zero deployments.** ADR-103 discharges gates **G3** and **G5** and authorizes slices **2L.0-2L.5**, the acceptance records, the traceability matrix, the closing report and the 2L.6 successor re-audit. It authorizes **no migration**, no deployment, no database/RLS/grant/policy/Auth change, no new RPC, no second write path, no service-role on a product path, no BYOK spend, no provider call, no signup change, no rollout residual and **no successor phase**.

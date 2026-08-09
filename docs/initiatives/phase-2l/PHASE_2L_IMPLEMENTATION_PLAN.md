@@ -91,7 +91,10 @@ a reason to accept a red suite, and chain guards only speak in CI.
 ## Slice 2L.0 — audit-derived foundations, decisions and guards
 
 **Delivers:** measurement, decisions and the guards later slices are held to. **Zero
-product code, zero migrations.**
+product surfaces, zero migrations** — and exactly one executable module, the
+derived-sensitivity contract M4 names below. "Zero product code" would be the wrong
+phrase and was corrected to this one during execution: a contract nobody can run is a
+paragraph, and M4 exists precisely to stop OD-2L-1 option B being one.
 
 **Requirements:** `2L-AUDIT-001…006`.
 
