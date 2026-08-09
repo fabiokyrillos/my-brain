@@ -381,6 +381,112 @@ function conversationSuggestions() {
     + `</ul></div></section>`;
 }
 
+/**
+ * Mirrors `src/features/operations/task-list.tsx`, `protected-content.tsx`,
+ * `quick-edit.tsx` and `undo-affordance.tsx` — slice 2L.1.
+ *
+ * `2L-ACCESS-001`. Added **in the slice that builds the surface**, never at
+ * closeout: deferring the lane is what produced Phase 2I's partial, and Phase
+ * 2J found a real defect the first time the lane was actually run.
+ *
+ * Two rows, because the interesting assertions need both states. The ordinary
+ * row carries the title link, the status controls, the quick-edit disclosure
+ * and the undo affordance, so the target-size and focus assertions measure
+ * every control this slice ships. The masked row carries the withheld stub, its
+ * reveal, and — the property `2L-PRIVACY-003` is about — the same actions as
+ * any other row, because a protected task stays operable.
+ */
+function workList() {
+  const row = (id: string, main: string) =>
+    `<article class="list-row">`
+    + `<div class="list-row-main">${main}`
+    + `<small class="work-origin">Criada por você</small></div>`
+    + `<div class="list-meta">`
+    + `<span class="status-badge">Não iniciada</span>`
+    + `<div class="row-actions">`
+    + `<form><button class="row-action" type="submit">Concluir</button></form>`
+    + `<form><button class="row-action" type="submit">Aguardar</button></form>`
+    + `</div>`
+    + `<details class="work-quick-edit">`
+    + `<summary class="work-quick-edit-summary">Editar aqui</summary>`
+    + `<div class="task-detail-controls task-detail-controls-inline" aria-label="Editar esta tarefa">`
+    + `<ul class="task-control-list">`
+    + `<li class="task-control"><form>`
+    + `<label for="quick-${id}-title">Título</label>`
+    + `<input id="quick-${id}-title" name="value" type="text">`
+    + `<button class="row-action" type="submit">Aplicar</button>`
+    + `<span class="task-control-name">Renomear</span>`
+    + `</form></li>`
+    + `<li class="task-control"><form>`
+    + `<label for="quick-${id}-due">Prazo</label>`
+    + `<input id="quick-${id}-due" name="value" type="date" min="2024-08-09" max="2028-08-09">`
+    + `<button class="row-action" type="submit">Aplicar</button>`
+    + `<span class="task-control-name">Reagendar</span>`
+    + `</form></li>`
+    + `</ul></div></details>`
+    + `</div></article>`;
+
+  const ordinary = row(
+    "a",
+    `<a class="work-title-link" href="#"><strong>Enviar proposta</strong></a>`
+    + `<p>Versão final para a Aurora.</p>`,
+  );
+  const masked = row(
+    "b",
+    `<span class="work-protected" data-masked="true">`
+    + `<a class="work-title-link work-protected-label" href="#">Conteúdo protegido</a>`
+    + `<button class="work-protected-toggle" type="button">Mostrar conteúdo protegido de Tarefa 2</button>`
+    + `</span>`,
+  );
+
+  return `<div class="work-page"><div class="list-stack">${ordinary}${masked}`
+    + `<p class="quiet-state work-protected-note">A proteção acompanha a anotação de origem da tarefa.`
+    + ` Tarefas que você criou direto aqui não têm origem para acompanhar.</p>`
+    + `</div>`
+    // The outcome region and its undo, which is where `2L-ACCESS-006` lives:
+    // one announcement, and focus moved to the result rather than per control.
+    + `<div class="work-action-result" role="region" aria-label="Resultado da ação" tabindex="-1">`
+    + `<strong>Feito</strong><p>A alteração foi aplicada.</p>`
+    + `<div class="work-undo">`
+    + `<div role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>`
+    + `<form><button class="row-action work-undo-button" type="submit">Desfazer</button>`
+    + `<p class="work-undo-window">Você pode desfazer isto por 24 horas.</p></form>`
+    + `</div></div></div>`;
+}
+
+/**
+ * Mirrors `src/features/daily-cycle/task-detail-view.tsx` in its panel frame —
+ * slice 2L.1, `2L-EDIT-007`.
+ *
+ * The panel is the frame the wide viewport docks beside the list and the narrow
+ * viewport renders as the whole surface. It carries the same control set as the
+ * full-page mount by construction (one component), so what this scans is the
+ * frame's own structure: the close control, the heading order and the withheld
+ * provenance excerpt.
+ */
+function workTaskPanel() {
+  return `<div class="content-page task-detail-page task-detail-panel">`
+    + `<button class="back-link task-panel-close" type="button">Voltar para Trabalho</button>`
+    + `<header class="task-detail-header"><div>`
+    + `<p class="eyebrow">TAREFA</p>`
+    + `<span class="work-protected" data-masked="true">`
+    + `<span class="work-protected-label">Conteúdo protegido</span>`
+    + `<button class="work-protected-toggle" type="button">Mostrar</button>`
+    + `</span>`
+    + `</div><span class="status-badge">Não iniciada</span></header>`
+    + `<section class="task-detail-section" aria-label="Detalhes"><h2>Detalhes</h2>`
+    + `<dl class="task-fields"><div class="task-field"><dt>Prazo</dt><dd>31 de julho</dd></div></dl>`
+    + `</section>`
+    + `<section class="task-detail-section" aria-label="De onde veio"><h2>De onde veio</h2>`
+    + `<p class="quiet-state">Esta tarefa veio de um registro seu.</p>`
+    + `<span class="work-protected" data-masked="true">`
+    + `<span class="work-protected-label">Conteúdo protegido</span>`
+    + `<button class="work-protected-toggle" type="button">Mostrar</button>`
+    + `</span>`
+    + `<a class="panel-view-all" href="#">Abrir o registro original</a>`
+    + `</section></div>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -392,6 +498,8 @@ const SURFACES = [
   { name: "Conversar sources", body: () => conversationSources() },
   { name: "Conversar explanation", body: () => conversationExplanation() },
   { name: "Conversar suggestions", body: () => conversationSuggestions() },
+  { name: "Work list", body: () => workList() },
+  { name: "Work task panel", body: () => workTaskPanel() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -410,7 +518,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${conversationSuggestions()}${workList()}${workTaskPanel()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
