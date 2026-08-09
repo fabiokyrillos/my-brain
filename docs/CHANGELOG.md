@@ -2,6 +2,36 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L: IMPLEMENTATION AUTHORIZED THROUGH CLOSEOUT (ADR-103), and all five owner decisions signed
+
+**Documentation only. Still zero product code, zero migrations, zero deployments.** ADR-103 discharges gates **G3** and **G5** and authorizes slices **2L.0-2L.5**, the acceptance records, the traceability matrix, the closing report and the 2L.6 successor re-audit. It authorizes **no migration**, no deployment, no database/RLS/grant/policy/Auth change, no new RPC, no second write path, no service-role on a product path, no BYOK spend, no provider call, no signup change, no rollout residual and **no successor phase**.
+
+**The owner changed one recommendation.** **OD-2L-1 is signed as option B - derive sensitivity from the source entry** - where the package recommended A. When a task carries `source_entry_id`, presentation consults the **current** classification of that source and applies the **central** policy when it is `highly_sensitive`; the classification is **re-read, never durably copied**; **no column on `tasks`, no backfill, no migration**; a manual task is **never artificially classified** and keeps **no derivable classification**, stated honestly; the absence of a source is **never** read as `normal`; a removed, inaccessible or foreign source resolves to a **safe state**, byte-identically across the three causes. Option **C** stays out of the phase.
+
+**The other four, as recommended.** **OD-2L-2 A** - three canonical views, richer URL filters, `workView` not widened, **the allocation lapses unspent**. **OD-2L-3 A** - bulk excludes `cancel_task` by name, so no bulk confirmation is ever minted. **OD-2L-4 = 50**, matching `WORK_PAGE_SIZE`, refused rather than truncated, and recorded as a **security control**. **OD-2L-5 A** - **no gesture**, enforced by a guard proved against a planted handler.
+
+**The requirement count moved 76 to 82, by declaration and never by renumbering.** `2L-PRIVACY` **4 to 8** for option B's contract; `2L-MOBILE` **+2** for zoom/reflow and IME composition. **No id reused, renamed or removed.** **ADR-102 keeps its original sentence and carries an appended amendment** rather than a silent edit, because it truthfully describes the package it authorized - and `R-15` is satisfied by the amendment, not by a rewrite.
+
+**Changed.** The active-milestone guard now requires **ADR-103** and no longer requires the word "planning": ADR-102 gave planning only, so the word was required; ADR-103 gave implementation, so requiring it would force the line to understate. One rule, two facts. `R-07` in the traceability contract hardens from *"a gesture with no visible alternative"* to **"a gesture, at all"**, and `R-12b` is added - a derived-sensitivity claim citing only the positive case refuses, because a mask that is always on is indistinguishable from a mask that is never off.
+
+**The expected close is `1 allocated - 0 spent`, and there is nothing to deploy.** Hosted parity stays `202608090089`; signup closed; rollout gate untouched at 25 pass - 3 fail - 2 owner-signature.
+
+## 2026-08-09 - PHASE 2L — WORK AND EXECUTION IS AUTHORIZED FOR PLANNING ONLY (ADR-102). Implementation is NOT authorized.
+
+**Documentation only. No product code, no migration, no deployment, no database change, no RPC, no RLS/grant/policy/Auth change, no provider call.** Hosted parity is unchanged at `202608090089`, 89 migrations, local = remote; signup is closed and the rollout gate is untouched at 25 pass · 3 fail · 2 owner-signature.
+
+**Added.** The Phase 2L planning package: `docs/initiatives/phase-2l/PHASE_2L_PRD.md` (82 requirements across ten families) and `..._IMPLEMENTATION_PLAN.md` (six slices, 2L.0–2L.5, plus the 2L.6 successor-re-audit step, which is deliberately not a slice because it delivers no requirement; ten gates; per-slice budget reconciliation); and under `docs/reports/phase-2l/`, the current-experience audit, twelve ranked UX gaps, the threat model `T-2L-01…T-2L-20` and the traceability contract with nineteen refusals. **ADR-102** records the authorization.
+
+**The audit shrank the phase in four places and grew it in two.** Work's domain already ships fifteen policied verbs, a twelve-column staleness gate, a server-issued single-use confirmation and a **24-hour audited undo** — so quick edit, bulk and undo are *surfacing existing authority*. **The only rendered Undo control in the product is in the command console**; neither the Work list nor the task detail offers one. Kanban, timeline, persisted saved filters and adjustable density are rejected or narrowed with reasons. What grew it: `work` is **not** in `GOVERNED_SURFACES` and `tasks` carries **no classification column**, so Work is the last ungoverned content surface and its posture is an owner decision; and Work is **absent from the automated accessibility lane** while Conversar has ten entries in it.
+
+**Two structural constraints were measured, not assumed.** `public.apply_task_command` takes one `p_task_id` and cannot grow one (ADR-057), so **bulk is iteration** — the same trade `2J-ATTN-010` took. And `private.validate_product_event_properties` pins `workView` to `array['today','all','waiting']`, so **a fourth reported Work view costs a migration** — the only reason this phase has a ceiling.
+
+**Changed.** The **A13** phase-start guard retargets from Phase 2L to the roadmap successor in ADR-102's own commit — the **seventh** application — with the heading check moved to ADR-102 and the series check **gaining** an entry rather than replacing one. The active-milestone guard retargets alongside it and its **"planning" assertion returns**, because ADR-102 gave planning only. `docs/README.md` and `docs/reports/README.md` are corrected: both still described Phase 2K as the unauthorized successor.
+
+**A naming fix that is governance rather than style.** The accessibility family is `2L-ACCESS`, not the shape Phase 2K used: `2K-A11Y` does not match `[A-Z]+-\d{3}`, which is why seven requirements were invisible to every prose count *and* would have been invisible to A13's signal 2.
+
+**Five owner decisions are open, two blocking and three gating**, each a signable proposal with a recommendation: Work's sensitivity posture, the canonical view taxonomy and whether the migration is spent, the bulk-eligible operation set, the selection ceiling, and gesture policy. **None blocks the package's own consistency.** **No successor phase is authorized, scoped or named.**
+
 ## 2026-08-09 - POST-PHASE CORRECTION `202608090089`: Phase 2K's telemetry was inert on the deployed project, and now is not
 
 **Phase 2K reached closeout with its telemetry INERT, and this entry does not soften that.** The probe run immediately after deploying `202608090088` found that every Conversar event was refused `22023 Unsupported product surface`: `private.record_product_event` carried a **hardcoded surface allowlist** without `conversation`, inside producers that `.catch(() => {})`. It is `202608080087`'s defect **one field over** - that migration deleted the *event-name* copy from the same function and left the *surface* copy standing.
