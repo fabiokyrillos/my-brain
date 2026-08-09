@@ -166,18 +166,30 @@ describe("2K.1 boundary: the card feature reaches no privileged client and no la
     }
   });
 
-  it("derives no suggestion yet, because 2K.6 owns that", () => {
-    // Asserted so a slice cannot quietly anticipate a later one and then claim
-    // its requirements at close.
-    //
-    // The continuity half of this assertion was **removed in slice 2K.3**,
-    // which delivered continuity — it was written as "not yet" and its "yet"
-    // arrived. What replaces it is stronger and lives in
-    // `phase-2k-continuity-guard.test.ts`: the payload's schema is strict and
-    // refuses each forbidden field by name, which is a statement about what
-    // continuity *is* rather than about whether it exists.
-    for (const file of featureFiles()) {
-      expect(code(file), file).not.toMatch(/\bsuggestion/i);
+  it("has retired both of its own 'not yet' clauses, in favour of stronger ones", () => {
+    /*
+     * This assertion was originally "carries no continuity payload and no
+     * suggestion derivation **yet**". Both yets arrived — continuity in 2K.3,
+     * suggestions in 2K.6 — and a guard whose premise expires is a guard that
+     * fails on correct work.
+     *
+     * What replaced each is a statement about what the thing **is**, rather
+     * than about whether it exists yet:
+     *
+     *   - continuity → `phase-2k-continuity-guard.test.ts`, where a strict
+     *     schema refuses each forbidden field by name;
+     *   - suggestions → `phase-2k-suggestion-guard.test.ts`, where the module
+     *     is proved incapable of constructing a provider, recording usage or
+     *     requesting a rate-limit slot.
+     *
+     * Both are asserted to exist here so this retirement cannot quietly become
+     * "nobody checks either any more".
+     */
+    for (const guard of ["phase-2k-continuity-guard.test.ts", "phase-2k-suggestion-guard.test.ts"]) {
+      expect(
+        () => read(`src/lib/closeout/${guard}`),
+        `${guard} must exist: it carries what this assertion gave up`,
+      ).not.toThrow();
     }
   });
 });

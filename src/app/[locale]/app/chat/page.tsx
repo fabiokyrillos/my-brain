@@ -5,6 +5,8 @@ import { ConversationalQuestions } from "@/features/agent/conversational-questio
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { deriveConversationSuggestions } from "@/features/conversation-cards/suggestions";
+import { SuggestionRow } from "@/features/conversation-cards/suggestion-row";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -23,8 +25,25 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
-  const result = await supabase.from("conversations").select("id,title,updated_at").order("updated_at", { ascending: false }).range(from, to);
+  /*
+   * `2K-SUGG-001/002`. Two small reads under RLS, alongside the one this page
+   * already made, and **no model call** — T-2K-10 is that "contextual
+   * suggestions" invites a billed provider call per page load, spending the
+   * user's own credential on something they did not ask for.
+   *
+   * Ordered by `updated_at` so the input is already deterministic, and bounded
+   * at the cap: three suggestions can never need more than three of each.
+   */
+  const [result, peopleResult, projectsResult] = await Promise.all([
+    supabase.from("conversations").select("id,title,updated_at").order("updated_at", { ascending: false }).range(from, to),
+    supabase.from("people").select("id,name").order("updated_at", { ascending: false }).limit(3),
+    supabase.from("projects").select("id,name").order("updated_at", { ascending: false }).limit(3),
+  ]);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load conversations") ?? []);
+  const suggestions = deriveConversationSuggestions({
+    people: requireSupabaseData(peopleResult, "load suggestion people") ?? [],
+    projects: requireSupabaseData(projectsResult, "load suggestion projects") ?? [],
+  });
 
   return (
     <div className="content-page chat-page">
@@ -74,7 +93,15 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         <div className="chat-empty">
           <MessageCircleMore size={32} />
           <strong>{pt ? "Seu histórico responde junto" : "Your history answers with you"}</strong>
-          <p>{pt ? "Experimente: “O que combinei com Marina?”" : "Try: “What did I agree with Marina?”"}</p>
+          {/*
+            `2K-SUGG-003`. The hard-coded example that used to live here named a
+            person the user may not have, taught exactly one question shape, and
+            never changed. It is replaced by at most three suggestions derived
+            from the user's own people and projects — and by **nothing at all**
+            when they have neither, which is OD-2K-4's "show none rather than
+            invent one".
+          */}
+          <SuggestionRow locale={locale} suggestions={suggestions} />
         </div>
       )}
 
