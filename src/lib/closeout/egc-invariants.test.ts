@@ -64,7 +64,13 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-// Moved by PHASE 2K SLICE 2K.8, which adds `202608090088` — the ONE migration
+// Moved by the POST-2K CORRECTION, which adds `202608090089` — an
+// EXTRAORDINARY migration authorized by the owner OUTSIDE Phase 2K's budget,
+// deleting the third copy of the surface vocabulary from
+// `private.record_product_event`. Phase 2K's implementation budget stays
+// `1 allocated · 1 spent`; this migration is charged to no phase.
+//
+// Previously moved by PHASE 2K SLICE 2K.8, which added `202608090088` — the ONE migration
 // OD-2K-C budgeted and ADR-101 authorized, carrying the Conversar telemetry
 // vocabulary into the table CHECK and the property validator. The ceiling was
 // never an obligation; it is spent because telemetry cannot be delivered
@@ -78,7 +84,7 @@ const REPO = resolve(__dirname, "../../..");
 // same mechanism `202608070084` used for the post-2H correction. Moved
 // deliberately and visibly in the same commit that adds the migration, which is
 // the only way this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608090088";
+const AUTHORIZED_MIGRATION_HEAD = "202608090089";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

@@ -16,7 +16,7 @@
 
 begin;
 
-select plan(20);
+select plan(29);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures.
@@ -413,6 +413,214 @@ select is(
       )),
   3,
   'all three Phase 2K conversation events are written through the real public writer'
+);
+
+
+-- ===========================================================================
+-- POST-2K: THE SURFACE VOCABULARY.
+--
+-- Everything above proves the EVENT-NAME vocabulary reaches the real writer.
+-- Nothing proved the same for SURFACES, and that is exactly how Phase 2K
+-- shipped with inert telemetry: `private.record_product_event` carried a
+-- hardcoded surface list, `conversation` was not in it, and every Conversar
+-- event was refused `22023` inside producers that swallow the failure.
+--
+-- The suite could not have caught it. Every write above uses one surface, and
+-- deliberately so -- the comment on `legal_payloads` says varying it "would
+-- test nothing this file is about". That reasoning was right for its subject
+-- and blind to this one. So the subject is widened here rather than a second
+-- file being written beside it.
+-- ===========================================================================
+
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+-- Derived from the CHECK at test time, exactly as the event names are. A list
+-- restated here would be the third copy this correction exists to delete.
+create temporary table declared_surfaces as
+select distinct match[1] as surface
+  from (
+    select pg_get_constraintdef(oid) as definition
+      from pg_constraint
+     where conname = 'product_events_surface_check'
+       and conrelid = 'public.product_events'::regclass
+  ) constraint_row,
+  lateral regexp_matches(constraint_row.definition, '''([a-z0-9_]+)''', 'g') as match;
+
+-- One valid event, written once per declared surface. `capture_mode_selected`
+-- is used because the writer does not couple surface to event name -- which is
+-- the property under test: every declared surface must be legal with a legal
+-- event.
+create function pg_temp.write_every_declared_surface(p_user uuid)
+returns table(checked_surface text, wrote boolean, failure text)
+language plpgsql
+as $surfaces$
+declare
+  candidate record;
+  written uuid;
+begin
+  for candidate in select d.surface as name from declared_surfaces d order by d.surface
+  loop
+    begin
+      select w.event_id into written
+        from public.record_product_event_for_user(
+          p_user, 'capture_mode_selected', candidate.name, 'pt-BR', 'desktop', '0.0.0-pgtap',
+          '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true
+        ) w;
+      checked_surface := candidate.name;
+      wrote := written is not null;
+      failure := null;
+      return next;
+    exception when others then
+      checked_surface := candidate.name;
+      wrote := false;
+      failure := SQLSTATE || ' ' || SQLERRM;
+      return next;
+    end;
+  end loop;
+end;
+$surfaces$;
+
+-- NON-VACUITY. An assertion over an empty surface vocabulary passes while
+-- proving nothing, which is the failure this whole file exists to prevent.
+select cmp_ok(
+  (select count(*)::int from declared_surfaces), '>=', 10,
+  'the surface vocabulary was actually extracted from the CHECK constraint'
+);
+
+select is_empty(
+  $$ select checked_surface || ' -> ' || coalesce(failure, 'no row returned')
+       from pg_temp.write_every_declared_surface('b7000001-0000-4000-8000-000000000001')
+      where not wrote $$,
+  'every CHECK-declared surface is writable through the real writer'
+);
+
+select is(
+  (select count(*)::int
+     from pg_temp.write_every_declared_surface('b7000001-0000-4000-8000-000000000001')
+    where wrote),
+  (select count(*)::int from declared_surfaces),
+  'the surface loop ran once per declared surface and wrote each of them'
+);
+
+-- The surface the defect refused, named individually.
+select lives_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'conversation', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb,
+       null, null, null, gen_random_uuid(), true) $$,
+  'POST-2K: the conversation surface is accepted by the real writer'
+);
+
+-- The exact combination Phase 2K shipped and that was refused end to end:
+-- a Phase 2K event, on the Conversar surface, through the writer its producers
+-- actually call.
+select is_empty(
+  $$ select name || ' -> ' || coalesce(failure, 'no row')
+       from (
+         select e.name,
+           (select w.event_id from public.record_product_event_for_user(
+              'b7000001-0000-4000-8000-000000000001', e.name, 'conversation', 'pt-BR', 'desktop',
+              '0.0.0-pgtap', e.properties, null, null, null, gen_random_uuid(), true) w) as id,
+           null::text as failure
+         from (values
+           ('conversation_answer_shown', '{"evidence":"evidenced","explained":true}'::jsonb),
+           ('conversation_memory_resolved', '{"outcome":"undone"}'::jsonb),
+           ('conversation_suggestion_shown', '{"category":"person"}'::jsonb)
+         ) as e(name, properties)
+       ) written
+      where written.id is null $$,
+  'POST-2K: all three Phase 2K events are writable ON the conversation surface'
+);
+
+-- Fail-closed. Deleting the writer's copy is only safe if the remaining
+-- declaration still refuses everything the copy refused -- with the same
+-- errcode and the same message, so no caller can tell the difference.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'not_a_surface', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Unsupported product surface',
+  'an undeclared surface is still refused, with the errcode and message the deleted gate raised'
+);
+
+-- THE INVARIANT THIS DEFECT EXISTED FOR WANT OF, one field over: the writer
+-- must not name a single declared surface. Read from the catalog, so it holds
+-- against whatever is actually installed rather than against this file.
+select is_empty(
+  $$ select d.surface
+       from declared_surfaces d,
+            (select pg_get_functiondef(
+               'private.record_product_event(uuid,text,text,text,text,text,jsonb,text,uuid,uuid,uuid,boolean)'::regprocedure
+             ) as body) writer
+      where position('''' || d.surface || '''' in writer.body) > 0 $$,
+  'the writer names no declared surface: there is exactly ONE surface vocabulary'
+);
+
+-- ---------------------------------------------------------------------------
+-- NON-VACUITY OF THE SURFACE ASSERTIONS THEMSELVES.
+--
+-- Everything above would pass against a writer that never had the surface
+-- copy. So the historical shape is planted and the same call re-run: if the
+-- stale gate returns, `conversation` must be refused again.
+-- ---------------------------------------------------------------------------
+
+create temporary table corrected_writer_after_2k as
+select pg_get_functiondef(
+  'private.record_product_event(uuid,text,text,text,text,text,jsonb,text,uuid,uuid,uuid,boolean)'::regprocedure
+) as definition;
+
+create or replace function private.record_product_event(
+  p_user_id uuid,
+  p_event_name text,
+  p_surface text,
+  p_locale text,
+  p_viewport_class text,
+  p_app_version text,
+  p_properties jsonb,
+  p_subject_type text,
+  p_subject_id uuid,
+  p_session_id uuid,
+  p_idempotency_key uuid,
+  p_is_synthetic boolean
+)
+returns table(event_id uuid, recorded boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $stale2k$
+begin
+  -- `202608080087`'s surviving surface gate, verbatim.
+  if p_surface not in (
+    'home', 'capture', 'inbox', 'needs_attention', 'interpretation_review',
+    'technical_details', 'work', 'questions', 'server', 'task_command'
+  ) then
+    raise exception 'Unsupported product surface' using errcode = '22023';
+  end if;
+  return query select gen_random_uuid(), true;
+end;
+$stale2k$;
+
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'conversation', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Unsupported product surface',
+  'NON-VACUITY: with the historical surface gate restored, the conversation surface is refused as it was'
+);
+
+-- Restore, and prove the restore worked rather than assuming it.
+do $$
+begin
+  execute (select definition from corrected_writer_after_2k);
+end $$;
+
+select lives_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'conversation', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  'the corrected writer is restored and the conversation surface is accepted again'
 );
 
 select * from finish();

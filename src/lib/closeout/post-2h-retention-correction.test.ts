@@ -105,6 +105,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // name-by-name — the check that would have caught that defect a phase
       // earlier.
       "202608090088_phase_2k_conversation_telemetry.sql",
+      // The post-2K correction. `202608090088` widened the event-name CHECK
+      // and the property validator but not `product_events_surface_check`,
+      // and `private.record_product_event` still carried a hardcoded SURFACE
+      // list — the copy `202608080087` left behind when it deleted the
+      // event-name one. So Phase 2K closed with inert telemetry. Named here
+      // rather than tolerated, because the property this assertion protects
+      // is "nothing follows that somebody did not deliberately account for".
+      "202608090089_post_2k_product_event_surface_deduplication.sql",
     ]);
   });
 });
