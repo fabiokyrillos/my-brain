@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-08 — Phase 2K slice 2K.0: three measurements, an owner-scope test, and ADR-055 retired unmet
+
+**Measurement only. Zero migrations, zero product code, zero deployment.** The owner authorized **slice 2K.0 alone**. The one non-documentation file added is a database **test**. Budget stays **1 allocated · 0 spent**.
+
+**M1 closed OD-2K-5 by reading `202607260059` in full, and the answer is no.** Task-command confirmations carry **no `expires_at`, no TTL and no age check** — the absence is deliberate and pre-recorded as **ADR-047**. Three *fact-based* refusals replace a clock: `55P03` when the twelve-column staleness gate sees the object moved, `2E_CONFIRMATION_REQUIRED` when the six-predicate consumption `UPDATE` matches no row, and `2E_IDEMPOTENCY_MISMATCH` when the payload changed under the same key — re-binding having been rejected because *"a changed proposal is a new request; it carries a new key."* **The hinge for 2K.3 is `issuedAt`**: it reaches the fingerprint through `observedBefore`, so a re-derivation minted with a fresh clock produces a different fingerprint and **cannot consume the earlier confirmation**. Continuity must carry the original pinned clock or say plainly that a fresh confirmation is needed. And a vocabulary constraint follows: `TASK_COMMAND_OUTCOMES` has **no `expired` member**, ADR-047 refuses to add one, so Phase 2K's `expired` is a card-level state mapping onto `rejected_stale`.
+
+**M2 found something the audit had not: the product has no structural representation of insufficiency at all.** `chatAnswerSchema` is `{ answer, citedSourceIds }` with no insufficiency field; an empty source set sends the literal string `None` into the prompt; and the only disclosure is one sentence asking the model to "say that plainly" — prose, unverifiable, varying with `responseDetail` and `agentStyle`. **The finding that changed a requirement:** `citations.length === 0` is **ambiguous**, produced both by "nothing was retrieved" and by "sources were retrieved and the model cited none". An insufficiency signal derived from the citation count would be wrong in the second case, so `2K-SRC-005` now requires deriving it from the **retrieval result**. No test covers the empty-source case today.
+
+**M3 confirmed the discarded freshness.** `occurred_at` is selected by the RPC, mapped to `ChatSource.occurredAt`, and written into the model prompt as an XML attribute — and appears in **no `.tsx`** and in **no persisted citation**. It reaches the model and never the user.
+
+**The audit's §5.4 gap is closed by a test, not by prose.** `supabase/tests/phase_2k_knowledge_retrieval_ownership.sql` gives both owners the **same vector** so ownership is the only discriminator, asserts the posture from `pg_proc`/`pg_class` rather than from migration text, and carries a **positive control** — the same session retrieving its own two rows, both arms of the `union all` exercised — because "owner A sees none of owner B's rows" is otherwise satisfied by a session that can read nothing at all.
+
+**A hosted read-only probe found a property worth naming.** The deployed RPC returns **zero rows even to `service_role`** (HTTP 200, `array(0)`) because it is `security invoker` and `auth.uid()` is null under that role — it is not a bypass door — while `anon` is refused with `42501` at the *table* level, stronger than the function grant alone. No `INSERT`/`UPDATE`/`DELETE`/`UPSERT` was issued and no account created, so **zero residue by construction**.
+
+**ADR-099 records the ADR-055 retirement OD-2K-6 signed, and records it as unmet rather than dressed up.** The funnel is empty, the spike tier was never executed, and at one real user the planning tier authorizes nothing beyond the spike by ADR-055's own terms. The **widening** leaves the active roadmap; the retrieval that **ships today** over entries and memories is **not removed, disabled, degraded or deprecated**. **No renewal date is written** — that is the artificial renewal OD-2K-6 forbids, and it would rebuild the permanently-pending gate ADR-055 gave itself an expiry to avoid.
+
+**Reported as NOT PROVED rather than as a pass:** the prose a zero-source answer produces. It needs a real OpenAI call — a disposable account has no BYOK credential so the gate refuses before any provider call, and the owner's credential would spend their money and write permanent rows into their real account. The prose is also not a contract. The structural half is fully measured, and that is what the requirement needs.
+
+**Unchanged:** hosted parity `202608080087`; rollout gate **25 pass · 3 fail · 2 owner-signature**; signup closed. **Slice 2K.1 is not started and is not authorized by this merge.**
+
 ## 2026-08-08 — Phase 2K's three blocking decisions are signed, and a false "executed slices" claim is corrected
 
 **Documentation only. Still no product code, no migration, no deployment, no merge.** ADR-098 signs the three decisions ADR-097 left **blocking**; the three that remain open only *gate*, so **no Phase 2K requirement is now blocked on an unsigned decision**. The migration ceiling is unchanged at one, and all three were chosen partly because none of them spends it.
