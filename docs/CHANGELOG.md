@@ -2,6 +2,38 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — Phase 2K slice 2K.3: a pending action survives looking at its own evidence
+
+**Zero migrations. Zero persistence. Budget stays `1 allocated · 0 spent`.** Baseline `799191c` (slice 2K.2), CI green on that exact merge SHA across all three jobs.
+
+**The gap, restated.** The product invited the user to check the sources behind an answer and punished them for accepting: the card, the preview and the pending confirmation lived in a client `useActionState`, and clicking a citation destroyed all of it — silently. The two behaviours the product most wants, *verify before you trust* and *act inside the conversation*, were mutually destructive.
+
+**The handle is incapable of authorizing, not merely hard to forge.** Five fields, all identifiers: conversation, message, object type, object, version. Twelve names are refused **by name** — `issuedAt`, `observedBefore`, `confirmationId`, `operationKey`, `requestFingerprint`, `fingerprint`, `patch`, `preview`, `mutation`, `authorization`, and `session`/`expected` — and the schema is `.strict()`, so a field nobody listed is refused too. Signing it would have made it *authentic*, not *harmless*; an authentic bearer token is still a bearer token (T-2K-02).
+
+**`session` and `expected` are on that list for a reason worth naming.** The task-command envelope carries `issuedAt` and the staleness witness inside it, so transporting the envelope would transport the clock under a different name. That is exactly the shape R17 refuses.
+
+**The return mints its own clock.** `resumeConversationCard` calls `new Date().toISOString()` on arrival. No clock crosses the navigation and none can — the handle has no field for one. A derivation minted with a new clock cannot consume an earlier confirmation, which converts a rule someone must remember into a mechanism that cannot be bypassed.
+
+**`requiresFreshConfirmation` is the literal `true`, as a type.** Mirroring `willMutate: false`: a boolean would let a future edit set it false and still compile, and "there is no branch in which a prior confirmation is reused" is precisely the property that must not be reachable by an edit. Proved at runtime across all three return shapes, because *always* is the requirement and one case would prove only *sometimes*.
+
+**What "re-derive" can honestly mean with an identifier-only payload.** The earlier preview is **not reconstructible** — by design. What is derivable from the authorized identifiers alone is the object's current state, read under RLS at a fresh clock. That is `2K-CONT-006`'s third branch, and it is the only branch this shape can express: the earlier preview no longer applies, here is what the object looks like now, state the action again. A payload rich enough to describe the difference would be a payload rich enough to authorize the change.
+
+**And it reads as normal, not as an error.** ADR-100 is explicit. An unchanged object re-asking is the honest outcome of a genuine recomputation; a red panel would teach the user to read correct behaviour as failure. The resumption is toned `information`.
+
+**A design point the slice forced, and the contract changed rather than the call site.** A memory card **can** mutate — 2K.2 gave it a confirm and an archival undo — but a memory reached as a **reference**, cited by an answer or shown on a resumed card, is read-only: it is something the conversation pointed at, not something it proposes to change. So `mayRenderMutatingControl` now reads the card's own `mutability` field rather than re-deriving from the type, which is the rule `2K-CARD-009` already states for reversibility. The type-level guarantee moved to the **builder**: `readOnlyPreviewCard` always writes `read_only`, so no builder can produce a mutable card for a type OD-2K-B keeps read-only — asserted directly, and every 2K.1 assertion still holds unchanged.
+
+**Two deviations from the plan's file list, both narrowing.** The entry point is `conversation-cards/resume.ts`, a `server-only` module, **not** a Server Action: a `"use server"` export becomes a client-callable endpoint, and the resume needs no client call — so giving it one would add reachable surface on the single path whose whole subject is that returning cannot authorize. And `task-commands/session.ts` was **not** modified and `TASK_COMMAND_SESSION_VERSION` **not** bumped: the plan made both conditional, and the resume never touches the envelope at all, which is the stronger outcome.
+
+**Three guards of my own were too coarse and were made precise.** A refusal *list* reads like a use: `CONTINUITY_FORBIDDEN_FIELDS` contains the quoted string `"requestFingerprint"`, and the 2K.1 word-scan fired on the module written to satisfy it. The detector now matches **identifiers**, not bare words, and is proved to fire on `buildTaskCommandPreview(input)` and not on `["requestFingerprint"]`. Likewise `requiresFreshConfirmation` contains "confirmation" and is the *opposite* of the thing being refused. And 2K.1's "carries no continuity payload **yet**" assertion had its "yet" arrive; it is replaced by something stronger — a strict schema that refuses each field by name, which is a statement about what continuity *is* rather than whether it exists.
+
+**Executed:** tests first and red for the right reason; focused green (695); lint and typecheck zero-error; `npm test` **4760 passed / 0 failing tests** (3 files fail to load on Windows — the known local baseline, green in CI); build green; Playwright 25 passed / 1 skipped at both viewports; `git diff --check` clean.
+
+**Reported NOT PROVED:** a real screen-reader session; hydrated interactivity in a browser. **Deferred to 2K.8 by the plan:** the authenticated answer → open source → return → re-confirm journey.
+
+**Named limitation:** the citation link still renders the legacy stored excerpt as its label. Replacing that is 2K.4's work; this slice added the handle to the link without touching what the link says.
+
+**Unchanged:** retrieval, `chat/actions.ts`, the confirmation contract, `TASK_COMMAND_OUTCOMES`, RLS, grants, secrets and write paths. No TTL, no persisted confirmation. Signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature.
+
 ## 2026-08-09 — Phase 2K slice 2K.2: edit before confirming, discard that writes nothing, and a memory undo that archives
 
 **Zero migrations. Zero deployment. Budget stays `1 allocated · 0 spent`.** Baseline `0865a9a` (slice 2K.1), CI green on that exact merge SHA across all three jobs.
