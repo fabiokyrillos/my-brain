@@ -271,7 +271,10 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
    forbids selection controls permanently covering a list row, and an element
    that scrolls with the list cannot. */
 .work-row-select{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;cursor:pointer}
-.work-row-select input{width:20px;height:20px}
+/* 24px is WCAG 2.2 AA (2.5.8) measured on the CONTROL, not on its label. The
+   44px label around it is reach; this is the target itself, and a 20px box
+   inside a 44px label passes by the label's grace rather than on its own. */
+.work-row-select input{width:24px;height:24px}
 .work-row-select input:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
 .work-bulk-select-all{margin-bottom:8px}
 .work-bulk-bar{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fbfcfe}
@@ -306,3 +309,23 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-group-count{color:var(--ink-soft);font:600 11px var(--font-sans)}
 .work-position-adjusted{margin-top:8px!important;color:var(--ink-soft);font-size:11px!important}
 @media(max-width:600px){.work-filters{flex-direction:column;gap:10px}.work-filter-group{width:100%}}
+
+/* Phase 2L slice 2L.4: mobile Work interaction (`2L-MOBILE-001`).
+
+   The row's title link measured 16px tall - it was an inline anchor around a
+   `<strong>`, which is exactly the shape Phase 2I's 16px defect took. It is now
+   a flex box with the WCAG 2.5.8 minimum.
+
+   24 and not 44, deliberately: the row's ACTIONS are the thumb-reach controls
+   and are already 44, while a 44px title on every row would add half a line of
+   height per task and fight `2L-MOBILE-007`'s density bound. The trade is
+   stated in the slice record rather than left in the stylesheet. */
+.work-title-link{display:inline-flex;align-items:center;min-height:24px}
+.work-protected-toggle{min-height:44px}
+/* `.panel-view-all` is shared with the Hoje and Registros panels; it measured
+   18px. Raising it to the standard is safe everywhere a link is a link. */
+.panel-view-all{display:inline-flex;align-items:center;min-height:24px}
+/* The relation filter's escape hatch sits inside a sentence, so it inherits the
+   sentence's 11px. Inline-flex with the minimum keeps it a real target without
+   breaking the line it lives in. */
+.work-filter-relation a{display:inline-flex;align-items:center;min-height:24px}

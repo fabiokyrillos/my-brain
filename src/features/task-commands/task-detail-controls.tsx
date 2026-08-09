@@ -24,7 +24,7 @@
  * form said afterwards, which is the failure 2E-DESTRUCTIVE-003 names.
  */
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import React, { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/preferences";
 
@@ -131,6 +131,31 @@ export function TaskDetailControls({
    */
   const [dismissed, setDismissed] = useState(false);
 
+  /**
+   * `2L-MOBILE-010` — whether an input method is mid-composition.
+   *
+   * A single-line `<input>` inside a `<form>` submits on Enter, and Enter is
+   * also how an IME **commits** a candidate. On a Japanese, Chinese or Korean
+   * keyboard the first Enter therefore means "that is the word I meant", and
+   * submitting on it would send a half-typed value the user never chose.
+   *
+   * A ref rather than state: this is read inside an event handler and must not
+   * cause a render — a re-render mid-composition is the other half of what this
+   * requirement forbids.
+   */
+  const composing = useRef(false);
+  const compositionProps = {
+    onCompositionStart: () => { composing.current = true; },
+    onCompositionEnd: () => { composing.current = false; },
+    onKeyDown: (event: React.KeyboardEvent) => {
+      // `isComposing` is the platform's own answer where it exists; the ref is
+      // the fallback for the browsers that only fire the composition events.
+      if (event.key === "Enter" && (event.nativeEvent.isComposing || composing.current)) {
+        event.preventDefault();
+      }
+    },
+  };
+
   function operationKeyFor(id: TaskCommandAction): string {
     const existing = keys.current.get(id);
     if (existing !== undefined) return existing;
@@ -143,6 +168,11 @@ export function TaskDetailControls({
     state: TaskDetailCommandState,
     formData: FormData,
   ): Promise<TaskDetailCommandState> {
+    // `2L-MOBILE-010`, the second half. `preventDefault` on the keydown stops
+    // the common path; this stops every other one — a form submitted while a
+    // composition is open carries a value the user has not finished choosing,
+    // and the honest answer is to do nothing rather than to send it.
+    if (composing.current) return state;
     const clicked = formData.get("action");
     if (typeof clicked !== "string") return state;
     const commandAction = clicked as TaskCommandAction;
@@ -256,6 +286,7 @@ export function TaskDetailControls({
                       maxLength={MAX_LENGTH_BY_FIELD[control.field]}
                       name="value"
                       rows={3}
+                      {...compositionProps}
                     />
                   ) : (
                     <input
@@ -263,6 +294,7 @@ export function TaskDetailControls({
                       maxLength={MAX_LENGTH_BY_FIELD[control.field]}
                       name="value"
                       type="text"
+                      {...compositionProps}
                     />
                   )
                 ) : null}
