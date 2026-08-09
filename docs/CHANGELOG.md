@@ -2,6 +2,34 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — Phase 2K slice 2K.5: the two exclusions the answer path already computed and threw away
+
+**Zero migrations. Budget stays `1 allocated · 0 spent`.** Baseline `96be787` (slice 2K.4), CI green on that exact merge SHA across all three jobs.
+
+**Nothing new is computed.** The answer path already dropped everything below the similarity floor at `relevant`, and every archived memory at `memoriesInForce`. The user was told neither, so they could not distinguish *"the Brain found nothing"* from *"the Brain found three things and rejected all of them"*. Two values that already existed now reach the surface — which is why the audit called this the cheapest large win in the phase.
+
+**The payload is two booleans, and that is the boundary.** T-2K-04: explaining what was left out is one refactor away from `search`'s forbidden "3 hidden results", and **"don't show a count" is not enough on its own**, because a *rate* is a count over repeated queries — an over-sharing screenshot or a rephrased question can binary-search existence. So the rule lives in the **payload**, not the rendering: `buildAnswerExplanation` takes four counts and returns two booleans, and that function is the one place the numbers stop travelling. A count that never renders today is a count somebody can render tomorrow.
+
+**Proved by construction rather than by inspection.** Nineteen dropped matches and one dropped match serialize **identically**, so no count is reconstructible by any consumer, present or future. And no digit renders anywhere in the panel, in either locale.
+
+**The two exclusions are treated differently, and not arbitrarily.** The similarity floor is a property of *this query*, not of the corpus — telling the user "the closest matches were too weak" tells them about their own question. Owner-archived memories are facts the audience created and then retired; telling somebody about their own archive is not a disclosure.
+
+**Sensitivity is absent structurally, not by restraint.** Phase 2K masks rather than excludes, so nothing is excluded for sensitivity at all — and the builder reads four named counts, none of which is a classification. Planting one on its input changes nothing about its output. The property holds because there is no path.
+
+**Progressive, and never blocking.** A native `<details>`, closed, rendered last. Native rather than a `useState` toggle because `<details>`/`<summary>` is keyboard-operable, announced, and works before hydration; a custom disclosure would be three of those things at best. It is **not drawn at all** when there is nothing to say — an empty panel invites the user to open it and learn nothing.
+
+**An answer written before this slice carries `null`, which draws nothing.** That is "not recorded", deliberately not "nothing was excluded" — the same distinction 2K.4 made for legacy citation rows, and for the same reason.
+
+**One honest partial, declared rather than implied.** `2K-EXPL-007` asks for two correction paths. Correcting the **source** works and always has — every source links to its object, and memory edit and archive ship and are audited. Correcting the **interpretation** has no domain behind it: no table records it, no action consumes it, no surface reads it. So the panel **says so**, and explains that a button which records nothing would be worse. `interpretationCorrectionHasDomainEffect()` returns `false` and the panel reads it, so the declaration is a value rather than a sentence someone must remember to keep true. Remainder: an interpretation-correction domain. Destination: the roadmap successor's own audit.
+
+**The accessibility fixture renders the panel OPEN while the product ships it closed**, and the guard pins both halves. axe cannot scan what is not in the accessibility tree, so a lane that only ever saw the summary would report green over a body it never looked at — the discrepancy is deliberate and asserted rather than left to become drift.
+
+**Executed:** tests first and red for the right reason; lint and typecheck zero-error; `npm test` **4849 passed / 0 failing tests** (3 files fail to load on Windows — the known local baseline, green in CI); build green; Playwright 29 passed / 1 skipped at both viewports; `git diff --check` clean.
+
+**Reported NOT PROVED:** a real screen-reader session; hydrated interactivity in a browser.
+
+**Unchanged:** retrieval, the similarity floor, the lifecycle filter, `chat-schema.ts`, RLS, grants, secrets and write paths. Signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature.
+
 ## 2026-08-09 — Phase 2K slice 2K.4: the persisted excerpt is gone, and an answer can finally say it found nothing
 
 **Zero migrations. Zero backfill. Budget stays `1 allocated · 0 spent`.** Baseline `a3a5837` (slice 2K.3), CI green on that exact merge SHA across all three jobs.
