@@ -244,3 +244,23 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .work-undo-window{margin:6px 0 0;color:var(--ink-soft);font-size:11px}
 .work-undo-result{margin-top:8px;color:var(--ink-soft);font-size:12px}
 .work-undo-result:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
+
+/* Phase 2L slice 2L.1: the responsive task detail (`2L-EDIT-007`).
+
+   One implementation, two frames. Wide: the list keeps its place and the task
+   docks beside it. Narrow: the task IS the surface, and the list is
+   `display:none` rather than covered - which is the difference between a
+   surface and an untrapped modal. A covered list stays in the accessibility
+   tree and stays reachable by a screen reader while the user believes they are
+   on the task; a removed one leaves nothing behind to escape from. */
+.work-shell{display:block}
+.work-shell-main{min-width:0}
+@media(min-width:1024px){
+  .work-shell:has(.task-detail-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,440px);gap:24px;align-items:start}
+  .task-detail-panel{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow-y:auto;border:1px solid var(--line);border-radius:16px;padding:20px;background:white}
+}
+@media(max-width:1023px){
+  .work-shell:has(.task-detail-panel) .work-shell-main{display:none}
+}
+.task-panel-close{min-height:44px;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;color:var(--blue);font:600 12px var(--font-sans);cursor:pointer}
+.task-panel-close:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}

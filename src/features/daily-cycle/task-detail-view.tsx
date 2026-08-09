@@ -7,6 +7,7 @@ import { isDerivedLevel } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import type { RelationSummary, WorkItemHumanState, WorkItemPriority } from "./contracts";
 import { describeHistoryEntry, getTaskDetailCopy } from "./task-detail-copy";
+import { TaskPanelClose } from "./task-panel-close";
 import type { TaskDetailProjection } from "./task-detail-projection";
 
 /**
@@ -82,9 +83,24 @@ export function TaskDetailView({
   detail,
   actions,
   controls,
+  panel = false,
 }: {
   locale: Locale;
   detail: TaskDetailProjection;
+  /**
+   * `2L-EDIT-007` — which frame this mount is in, and nothing else.
+   *
+   * The same component, the same fields, the same injected actions and the same
+   * control set render in both. What the flag selects is the outer class the
+   * layout keys its two shapes off — a docked panel beside the list on a wide
+   * viewport, a full surface on a narrow one — and, on the panel, a back
+   * affordance that returns to where the user was instead of to the list's
+   * default view.
+   *
+   * It must never select a control. A viewport that changed what a user can do
+   * is the failure this requirement is written against.
+   */
+  panel?: boolean;
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
   /**
@@ -112,10 +128,18 @@ export function TaskDetailView({
     || (task.dependsOn?.length ?? 0) > 0;
 
   return (
-    <div className="content-page task-detail-page">
-      <Link className="back-link" href={`/${locale}/app/work`}>
-        <ArrowLeft size={16} aria-hidden="true" />{copy.back}
-      </Link>
+    <div className={panel ? "content-page task-detail-page task-detail-panel" : "content-page task-detail-page"}>
+      {panel ? (
+        // `router.back()` rather than a link to the list: the panel was opened
+        // from a position — a view, a page, a filter — and a link would send the
+        // user to the list's default instead of to where they actually were.
+        // The URL-carried return position itself is slice 2L.3's subject.
+        <TaskPanelClose label={copy.back} />
+      ) : (
+        <Link className="back-link" href={`/${locale}/app/work`}>
+          <ArrowLeft size={16} aria-hidden="true" />{copy.back}
+        </Link>
+      )}
 
       <header className="task-detail-header">
         <div>
