@@ -335,3 +335,83 @@
     justify-content: center;
   }
 }
+
+/*
+ * `2K-SRC-001` … `2K-SRC-006` — the source block.
+ *
+ * `data-evidence` carries the distinction the product could never make: an
+ * answer with no personal evidence used to render **identically** to an
+ * evidenced one, because the block was drawn only when citations existed.
+ * The three states are toned apart so the difference survives a glance.
+ */
+
+.conversation-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversation-sources-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-sources-list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.conversation-source-support {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tone-information-fg);
+}
+
+.conversation-source-freshness {
+  font-size: 0.75rem;
+  color: var(--tone-archived-fg);
+}
+
+/* The honest "I had nothing". Attention rather than risk: finding nothing is a
+   true outcome, not a failure. */
+.conversation-sources[data-evidence="insufficient"] {
+  padding: 10px 12px;
+  border: 1px solid var(--tone-attention-line);
+  border-radius: 10px;
+  background: var(--tone-attention-bg);
+}
+
+.conversation-sources-insufficient {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--tone-attention-fg);
+}
+
+/* A row written before the product recorded where it looked. It says less. */
+.conversation-sources[data-evidence="unknown"] .conversation-sources-legacy {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-sources-reach {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--tone-archived-fg);
+}

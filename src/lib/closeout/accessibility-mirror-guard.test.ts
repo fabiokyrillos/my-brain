@@ -182,6 +182,34 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(mirror).toContain('id="message-1"');
   });
 
+  it("pins the 2K.4 source block, including both evidence branches", () => {
+    const list = read("src/features/conversation-sources/source-list.tsx");
+    for (const token of [
+      "conversation-sources",
+      "conversation-sources-title",
+      "conversation-sources-list",
+      "conversation-source-support",
+      "conversation-source-freshness",
+      "conversation-sources-insufficient",
+      "conversation-sources-reach",
+      "data-evidence",
+    ]) {
+      expect(list, `source-list.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    /*
+     * Both branches, and this is the assertion that matters. The requirement is
+     * that an evidenced answer and one that found nothing be **visually
+     * distinct**; a lane scanning only one of them would never see the
+     * difference it exists to protect.
+     */
+    expect(mirror).toContain('data-evidence="evidenced"');
+    expect(mirror).toContain('data-evidence="insufficient"');
+    // Freshness renders a machine-readable instant, not only a formatted date.
+    expect(list).toContain("dateTime={occurredAt}");
+    expect(mirror).toContain("<time datetime=");
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted

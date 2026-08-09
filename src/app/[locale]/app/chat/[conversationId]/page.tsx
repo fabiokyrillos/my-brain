@@ -1,23 +1,19 @@
-import { ArrowLeft, BookOpenText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
-import {
-  CONTINUITY_HANDLE_VERSION,
-  messageAnchorId,
-  serializeContinuityHandle,
-  type ContinuityObjectType,
-} from "@/features/conversation-cards/continuity";
+import { messageAnchorId } from "@/features/conversation-cards/continuity";
 import { resumeConversationCard } from "@/features/conversation-cards/resume";
 import { ResumedCard } from "@/features/conversation-cards/resumed-card";
+import { parseCitations, type ParsedCitations } from "@/features/conversation-sources/contracts";
+import { resolveSources, type ResolvedSource } from "@/features/conversation-sources/resolve-sources";
+import { SourceList } from "@/features/conversation-sources/source-list";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
-
-type Citation = { id: string; type: "entry" | "memory"; sourceId: string; excerpt: string };
 
 /**
  * `2K-CONT-001` / `2K-CONT-002` — one message, with a position a link can name.
@@ -40,48 +36,42 @@ function ThreadMessage({
   messageId,
   model,
   role,
+  sources,
 }: {
   agentName: string;
-  citations: readonly Citation[];
+  citations: ParsedCitations;
   content: string;
   conversationId: string;
   locale: Locale;
   messageId: string;
   model: string | null;
   role: string;
+  /** Already re-read against the current classification (`2K-PRIVACY-004`). */
+  sources: readonly ResolvedSource[];
 }) {
   const pt = locale === "pt-BR";
+  /*
+   * `2K-SRC-005`. The block is drawn whenever the message **recorded** anything
+   * about its sources — including when what it recorded is "I found nothing".
+   * The old condition was `citations.length > 0`, which is exactly why an
+   * answer with no personal evidence was indistinguishable from an evidenced
+   * one: the honest case rendered nothing at all.
+   */
+  const hasSourceBlock = role !== "user"
+    && (sources.length > 0 || citations.evidence !== "unknown" || citations.legacy);
+
   return (
     <article className={`chat-message ${role}`} id={messageAnchorId(messageId)}>
       <span>{role === "user" ? (pt ? "Você" : "You") : agentName}</span>
       <p>{content}</p>
-      {citations.length > 0 && (
+      {hasSourceBlock && (
         <div className="message-sources">
-          <strong><BookOpenText size={14} />{pt ? "Fontes internas" : "Internal sources"}</strong>
-          {citations.map((citation) => {
-            /*
-             * `2K-CONT-002`. The link records exactly enough to come back:
-             * which conversation, which message, which object. Nothing else —
-             * the handle is a closed set of identifiers and is **incapable** of
-             * authorizing anything (ADR-100, R17). Replaying this URL produces
-             * a re-derivation prompt, never a write.
-             */
-            const handle = serializeContinuityHandle({
-              v: CONTINUITY_HANDLE_VERSION,
-              c: conversationId,
-              m: messageId,
-              t: citation.type as ContinuityObjectType,
-              o: citation.sourceId,
-            });
-            const base = citation.type === "entry"
-              ? `/${locale}/app/inbox/${citation.sourceId}`
-              : `/${locale}/app/memories/${citation.sourceId}`;
-            return (
-              <Link href={`${base}?from=${handle}`} key={citation.id}>
-                {citation.excerpt}
-              </Link>
-            );
-          })}
+          <SourceList
+            citations={citations}
+            continuity={{ conversationId, messageId }}
+            locale={locale}
+            sources={sources}
+          />
         </div>
       )}
       {model && <small>{model}</small>}
@@ -100,7 +90,7 @@ export default async function ConversationPage({
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const pt = locale === "pt-BR";
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
   const agentName = await getAgentName();
   const [conversationResult, messageResult] = await Promise.all([
     supabase.from("conversations").select("id,title").eq("id", conversationId).maybeSingle(),
@@ -127,6 +117,21 @@ export default async function ConversationPage({
   const raw = (await searchParams).resume;
   const resumed = await resumeConversationCard(Array.isArray(raw) ? raw[0] : raw, locale);
 
+  /*
+   * `2K-PRIVACY-004`, `2K-SRC-004`. Every cited source is **re-read now**,
+   * against its current classification, because OD-2K-2 removed the stored
+   * excerpt — there is no copy left to render.
+   *
+   * Resolved per message and awaited together, so the thread costs one round
+   * of two batched queries per message rather than one query per source. The
+   * plan's stopping condition is an unbounded per-source fan-out; the fix is
+   * more batching, never the stored copy.
+   */
+  const parsed = messages.map((message) => parseCitations(message.citations));
+  const resolved = await Promise.all(
+    parsed.map((citations) => resolveSources(supabase, user.id, citations, locale)),
+  );
+
   return (
     <div className="content-page chat-thread">
       <Link href={`/${locale}/app/chat`} className="back-link">
@@ -140,10 +145,10 @@ export default async function ConversationPage({
       {resumed === null ? null : <ResumedCard locale={locale} resumption={resumed} />}
 
       <div className="message-stream">
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <ThreadMessage
             agentName={agentName}
-            citations={Array.isArray(message.citations) ? (message.citations as Citation[]) : []}
+            citations={parsed[index]!}
             content={message.content}
             conversationId={conversationId}
             key={message.id}
@@ -151,6 +156,7 @@ export default async function ConversationPage({
             messageId={message.id}
             model={message.model}
             role={message.role}
+            sources={resolved[index]!}
           />
         ))}
       </div>

@@ -12,6 +12,10 @@ import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
+import {
+  buildCitationsEnvelope,
+  supportKindForSource,
+} from "@/features/conversation-sources/contracts";
 import { isMemoryInForce } from "@/features/memories/lifecycle";
 import type { ChatState } from "./chat-state";
 import { getAgentName } from "@/features/profile/agent-identity";
@@ -225,11 +229,43 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     // A non-null assertion here turned any weakening of that filter into a
     // TypeError mid-conversation; dropping an unmatched id keeps the hydration
     // total instead, preserving order and shape.
-    const citations = answer.citedSourceIds.flatMap((id) => {
+    /**
+     * `2K-PRIVACY-003` (OD-2K-2) — a **structured reference only**.
+     *
+     * This used to write `excerpt: source.content.slice(0, 220)`. That excerpt
+     * was a copy of the user's content in a second table, and the source row's
+     * `sensitivity` did not travel with it — so reclassifying an entry or
+     * archiving a memory left the quote in the thread, in the clear, forever.
+     * It was the sharpest finding in the phase audit and it was live.
+     *
+     * Carrying the classification alongside the excerpt was considered and
+     * rejected: it keeps two copies of one fact in sync by convention, which is
+     * the shape of defect `202608080087` had to delete. Removing the copy
+     * removes the thing that can diverge. `resolve-sources.ts` re-reads the
+     * source at render time against its **current** classification.
+     *
+     * The fabricated-id stripping is unchanged and still a `flatMap`: weakening
+     * the provider-side filter must keep degrading to a missing citation rather
+     * than to a mid-conversation `TypeError` (`2K-SRC-002`).
+     */
+    const references = answer.citedSourceIds.flatMap((id) => {
       const source = sources.find((item) => item.id === id);
       const sourceId = id.split(":")[1];
       if (!source || !sourceId) return [];
-      return [{ id, type: source.type, sourceId, excerpt: source.content.slice(0, 220) }];
+      return [{ id, type: source.type, sourceId, support: supportKindForSource(source.type) }];
+    });
+
+    /**
+     * `2K-SRC-005` — insufficiency comes from **retrieval**, not from the count.
+     *
+     * Slice 2K.0 measured why: an empty citation array is produced both by
+     * "nothing was retrieved" and by "sources were retrieved and the model
+     * cited none of them". Those are different facts, and `sources` is the one
+     * that answers "did the Brain have anything to work with".
+     */
+    const citations = buildCitationsEnvelope({
+      retrievedAnyQualifyingSource: sources.length > 0,
+      sources: references,
     });
 
     const { error: answerError } = await supabase.from("conversation_messages").insert({

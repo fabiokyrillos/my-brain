@@ -228,8 +228,17 @@ describe("sendChatMessage memory lifecycle filtering", () => {
     return insertedAssistantMessage;
   }
 
+  /**
+   * Reads the envelope slice 2K.4 introduced.
+   *
+   * `citations` stopped being an array of `{…, excerpt}` and became a versioned
+   * object carrying references, the reach, and what **retrieval** found —
+   * because an empty array could not distinguish "nothing was retrieved" from
+   * "sources were retrieved and the model cited none" (measured in 2K.0).
+   */
   function citedTypes(message: Record<string, unknown> | null): string[] {
-    return (message?.citations as { type: string }[] | undefined)?.map((item) => item.type) ?? [];
+    const envelope = message?.citations as { sources?: { type: string }[] } | undefined;
+    return envelope?.sources?.map((item) => item.type) ?? [];
   }
 
   it("keeps a memory that is still in force", async () => {
@@ -297,14 +306,21 @@ describe("sendChatMessage citation hydration", () => {
   it("hydrates a cited source that is present", async () => {
     const message = await run(["entry:33333333-3333-4333-8333-333333333333"]);
 
-    expect(message?.citations).toEqual([
-      {
-        id: "entry:33333333-3333-4333-8333-333333333333",
-        type: "entry",
-        sourceId: "33333333-3333-4333-8333-333333333333",
-        excerpt: "Conteúdo da entrada sobre a Ana.",
-      },
-    ]);
+    expect(message?.citations).toEqual({
+      v: "2026-08-09.1",
+      evidence: "evidenced",
+      reach: ["entry", "memory"],
+      sources: [
+        {
+          id: "entry:33333333-3333-4333-8333-333333333333",
+          type: "entry",
+          sourceId: "33333333-3333-4333-8333-333333333333",
+          support: "direct_record",
+        },
+      ],
+    });
+    // `2K-PRIVACY-003`: no copy of the content is persisted any more.
+    expect(JSON.stringify(message?.citations)).not.toContain("Conteúdo da entrada");
   });
 
   it("drops a cited id with no matching source instead of throwing", async () => {
@@ -316,26 +332,42 @@ describe("sendChatMessage citation hydration", () => {
       "memory:99999999-9999-4999-8999-999999999999",
     ]);
 
-    expect(message?.citations).toEqual([
-      {
-        id: "entry:33333333-3333-4333-8333-333333333333",
-        type: "entry",
-        sourceId: "33333333-3333-4333-8333-333333333333",
-        excerpt: "Conteúdo da entrada sobre a Ana.",
-      },
-    ]);
+    expect(message?.citations).toEqual({
+      v: "2026-08-09.1",
+      evidence: "evidenced",
+      reach: ["entry", "memory"],
+      sources: [
+        {
+          id: "entry:33333333-3333-4333-8333-333333333333",
+          type: "entry",
+          sourceId: "33333333-3333-4333-8333-333333333333",
+          support: "direct_record",
+        },
+      ],
+    });
+    // `2K-PRIVACY-003`: no copy of the content is persisted any more.
+    expect(JSON.stringify(message?.citations)).not.toContain("Conteúdo da entrada");
   });
 
   it("drops a malformed cited id that carries no source id", async () => {
     const message = await run(["entry:33333333-3333-4333-8333-333333333333", "entry"]);
 
-    expect(message?.citations).toHaveLength(1);
+    expect((message?.citations as { sources: unknown[] }).sources).toHaveLength(1);
   });
 
   it("records the answer with no citations when every cited id is fabricated", async () => {
     const message = await run(["memory:99999999-9999-4999-8999-999999999999"]);
 
-    expect(message?.citations).toEqual([]);
+    const envelope = message?.citations as { sources: unknown[]; evidence: string };
+    expect(envelope.sources).toEqual([]);
+    /*
+     * `2K-SRC-005`, and the reason the envelope exists.
+     *
+     * Every cited id was fabricated, so no reference survives — but retrieval
+     * DID find a qualifying source. Deriving insufficiency from the empty array
+     * would report "I had nothing", which is the opposite of what happened.
+     */
+    expect(envelope.evidence).toBe("evidenced");
     expect(message?.content).toBe("Resposta fundamentada.");
   });
 });

@@ -304,6 +304,40 @@ function conversationResumed() {
     + `</section>`;
 }
 
+/**
+ * Mirrors `src/features/conversation-sources/source-list.tsx` — slice 2K.4.
+ *
+ * Both branches, side by side, because the requirement is that they be
+ * **visually distinct**: an evidenced answer and one that found nothing used to
+ * render identically, and a lane that scanned only one of them would never see
+ * the difference it exists to protect.
+ */
+function conversationSources() {
+  const evidenced = `<div class="conversation-sources" data-evidence="evidenced">`
+    + `<strong class="conversation-sources-title">O que eu usei</strong>`
+    + `<ul class="conversation-sources-list"><li>`
+    + `<span class="conversation-source-support">Você escreveu isto</span>`
+    + `<article class="conversation-card" data-card-type="entry" data-state="previewed">`
+    + `<header class="conversation-card-head">`
+    + `<span class="conversation-card-type">Registro</span>`
+    + `<span class="conversation-card-state">Encontrei isto</span></header>`
+    + `<p class="conversation-card-snippet">conversa com a Ana</p></article>`
+    + `<span class="conversation-source-freshness">De <time datetime="2026-07-20T10:00:00Z">20 de jul.</time></span>`
+    + `<a class="conversation-card-open" href="#">Abrir</a>`
+    + `</li></ul>`
+    + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
+    + `</div>`;
+  const insufficient = `<div class="conversation-sources" data-evidence="insufficient">`
+    + `<p class="conversation-sources-insufficient">Não encontrei nada seu sobre isso.`
+    + ` O que respondi acima não vem dos seus registros nem das suas memórias.</p>`
+    + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
+    + `</div>`;
+  return `<section aria-label="Fontes da resposta">`
+    + `<div class="message-sources">${evidenced}</div>`
+    + `<div class="message-sources">${insufficient}</div>`
+    + `</section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -312,6 +346,7 @@ const SURFACES = [
   { name: "Conversar cards", body: () => conversationCards() },
   { name: "Conversar controls", body: () => conversationControls() },
   { name: "Conversar resumed", body: () => conversationResumed() },
+  { name: "Conversar sources", body: () => conversationSources() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -330,7 +365,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
@@ -398,7 +433,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}`);
 
   const targets = page.locator("button, a[href]");
   const total = await targets.count();
