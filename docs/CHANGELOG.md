@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 — Phase 2K slice 2K.6: one hard-coded example replaced by at most three deterministic suggestions
+
+**Zero migrations. No provider call, no BYOK spend, no rate-limit slot. Budget stays `1 allocated · 0 spent`.** Baseline `73e298a` (slice 2K.5), CI green on that exact merge SHA across all three jobs.
+
+**What was removed.** `pt ? "Experimente: «O que combinei com Marina?»" : "Try: …"` — a fixed example, in an inline locale ternary, naming a person the user may not have. A new user learned exactly one question shape; a returning user with a full Brain saw the same string forever. Removing it also discharges a small standing ADR-036 debt.
+
+**Determinism is a security property here, not a style preference.** T-2K-10: "contextual suggestions derived from current state" invites a **model call per page load**, spending the user's own BYOK credential on something they did not ask for, on every render of the primary surface — and caching would reduce the cost without making an unrequested billed call legitimate. So what is asserted is not that the suggestions are cheap but that the module is **incapable of costing anything**: no provider construction, no `recordAIUsage`, no rate-limit admission, and **no `async` at all**, because an async export would be the first sign it had started reaching for something. Same reasoning ADR-094 used when it refused to rank priorities with a model call.
+
+**The value is a `{category, name}` pair and never a sentence.** OD-2K-4 permits a suggestion to **name** a person or project the user can currently read — a suggestion that cannot say "Marina" is not contextual — and forbids that name from ever entering telemetry, which may carry a **closed category** only. Keeping the two apart **in the type** is what makes that enforceable: a rendered sentence could be logged whole; a pair cannot. `suggestionTelemetryCategory` returns `{category}` through a return type that has no field a name could occupy, so the narrowing happens once in a signature rather than at each call site by convention. The sentence is built in `copy.ts`; the derivation module produces no string at all.
+
+**Sensitivity, stated rather than assumed.** `people` and `projects` carry **no `sensitivity` column** — the threat model records this as the reason mutating cards for them were excluded, and the generated types confirm it. There is no classification to consult and nothing to mask: these are the user's own names, on their own screen, behind RLS. Stated because **"no mask" and "mask not applied" look identical from the outside**.
+
+**Three smaller decisions.** The cap is **interleaved** rather than "all the people first": three slots and two sources, and taking every person first would let a user with three people never see a project suggestion, which makes the feature look like it only knows one kind of thing. They are **text, not controls** — a suggestion says what the user could type, and a control that submitted it would put words in their mouth with the composer one field away; the accessibility fixture asserts the **absence** too, so the mirror cannot silently stop representing it. And a **blank name is dropped** rather than rendered.
+
+**Zero is a legitimate answer.** A user with no people and no projects gets nothing, and the surface falls back to what it already said. Inventing an example for them is precisely what this slice removes.
+
+**A guard of mine retired, for the second time.** Slice 2K.1 asserted the card feature "carries no continuity payload and no suggestion derivation **yet**". Both yets have now arrived — continuity in 2K.3, suggestions in 2K.6 — and **a guard whose premise expires is a guard that fails on correct work**. It is replaced by statements about what each thing *is*: the continuity payload's strict schema refuses each forbidden field by name, and the suggestions module is proved incapable of costing anything. The retired assertion now asserts that **both replacement guards exist**, so the retirement cannot quietly become "nobody checks either any more".
+
+**Executed:** tests first and red for the right reason; lint and typecheck zero-error; `npm test` **4878 passed / 0 failing tests** (3 files fail to load on Windows — the known local baseline, green in CI); the locale-ternary ceiling green with **one fewer** ternary; build green; Playwright 31 passed / 1 skipped at both viewports; `git diff --check` clean.
+
+**`2K-SUGG-005` is PARTIAL and recorded as such.** The bounded category and its narrowing exist; the **event** belongs to slice 2K.8, which owns the telemetry vocabulary and the single budgeted migration. Remainder named, destination named — not claimed.
+
+**Reported NOT PROVED:** a real screen-reader session.
+
+**Unchanged:** retrieval, `chat-schema.ts`, RLS, grants, secrets and write paths. No suggestion originates from retrieved content and none carries a mutation payload. Signup closed; rollout gate 25 pass · 3 fail · 2 owner-signature.
+
 ## 2026-08-09 — Phase 2K slice 2K.5: the two exclusions the answer path already computed and threw away
 
 **Zero migrations. Budget stays `1 allocated · 0 spent`.** Baseline `96be787` (slice 2K.4), CI green on that exact merge SHA across all three jobs.
