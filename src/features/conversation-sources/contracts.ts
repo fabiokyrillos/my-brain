@@ -43,6 +43,8 @@
 
 import { z } from "zod";
 
+import { answerExplanationSchema, type AnswerExplanation } from "./explanation";
+
 /**
  * How a source supports an answer.
  *
@@ -117,6 +119,17 @@ const envelopeSchema = z
     evidence: z.enum(["evidenced", "no_qualifying_evidence"]),
     reach: z.array(z.enum(ANSWER_REACH)),
     sources: z.array(referenceSchema).max(20),
+    /**
+     * `2K-EXPL-002/003/004` — added in slice 2K.5, and **optional** rather than
+     * versioned.
+     *
+     * An envelope written by 2K.4 carries none, and its absence is meaningful:
+     * that answer predates the disclosure, so the surface says nothing about
+     * exclusions rather than claiming there were none. Bumping the version
+     * would have made those rows unparseable and thrown away their references
+     * as well, which is a worse answer to a smaller problem.
+     */
+    explanation: answerExplanationSchema.optional(),
   })
   .strict();
 
@@ -139,6 +152,11 @@ export type ParsedCitations = {
   readonly evidence: EvidenceState;
   readonly reach: readonly AnswerReach[];
   readonly sources: readonly PersistedSourceReference[];
+  /**
+   * What retrieval left out (`2K-EXPL-002..004`), or `null` when the answer
+   * recorded none — which is different from "nothing was excluded".
+   */
+  readonly explanation: AnswerExplanation | null;
   /** True when this row predates the envelope, so the surface can say less. */
   readonly legacy: boolean;
 };
@@ -147,6 +165,7 @@ export const NO_CITATIONS: ParsedCitations = {
   evidence: "unknown",
   reach: [],
   sources: [],
+  explanation: null,
   legacy: false,
 };
 
@@ -164,6 +183,7 @@ export function parseCitations(raw: unknown): ParsedCitations {
       evidence: envelope.data.evidence,
       reach: envelope.data.reach,
       sources: envelope.data.sources,
+      explanation: envelope.data.explanation ?? null,
       legacy: false,
     };
   }
@@ -191,6 +211,7 @@ export function parseCitations(raw: unknown): ParsedCitations {
     evidence: "unknown",
     reach: [],
     sources,
+    explanation: null,
     legacy: true,
   };
 }
@@ -205,11 +226,13 @@ export function parseCitations(raw: unknown): ParsedCitations {
 export function buildCitationsEnvelope(input: {
   readonly retrievedAnyQualifyingSource: boolean;
   readonly sources: readonly PersistedSourceReference[];
+  readonly explanation?: AnswerExplanation;
 }): CitationsEnvelope {
   return {
     v: CITATIONS_ENVELOPE_VERSION,
     evidence: input.retrievedAnyQualifyingSource ? "evidenced" : "no_qualifying_evidence",
     reach: [...ANSWER_REACH],
     sources: [...input.sources],
+    ...(input.explanation === undefined ? {} : { explanation: input.explanation }),
   };
 }

@@ -415,3 +415,64 @@
   line-height: 1.45;
   color: var(--tone-archived-fg);
 }
+
+/*
+ * `2K-EXPL-001` — the disclosure panel.
+ *
+ * A native `<details>`, so the summary is already a focusable, announced,
+ * keyboard-operable control. The 44px minimum is applied to it for the same
+ * reason as every other control here: the lane measures from paint.
+ */
+
+.conversation-explanation {
+  border-top: 1px solid var(--tone-archived-line);
+  padding-top: 10px;
+}
+
+.conversation-explanation > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tone-information-fg);
+  cursor: pointer;
+}
+
+.conversation-explanation > summary:focus-visible {
+  outline: 2px solid var(--tone-information-fg);
+  outline-offset: 2px;
+}
+
+.conversation-explanation-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--tone-archived-fg);
+}
+
+.conversation-explanation-body > ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.conversation-explanation-body > p {
+  margin: 0;
+}
+
+.conversation-explanation-correct-title {
+  font-weight: 600;
+  color: var(--ink, #14233b);
+}
+
+/* The honest "there is no path yet". Toned down rather than out: it is
+   information the user needs, not an apology. */
+.conversation-explanation-no-effect {
+  font-style: italic;
+}

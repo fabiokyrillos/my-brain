@@ -35,6 +35,27 @@ export type ConversationSourcesCopy = {
   readonly freshnessLabel: string;
   /** A row with no date. Absent, never fabricated. */
   readonly freshnessUnknown: string;
+  /**
+   * `2K-EXPL-001` … `2K-EXPL-007` — how the answer was reached.
+   *
+   * Every sentence here is **bounded**: it may say *that* something was left
+   * out and never *how much*. A count is what `search` is forbidden to show,
+   * and a rate is a count over repeated queries — so the copy carries no
+   * placeholder a number could ever be interpolated into.
+   *
+   * `interpretationNoEffect` is the honest half of `2K-EXPL-007`: correcting
+   * the **source** works and always has; flagging the **interpretation** has no
+   * domain behind it this phase, and saying so is better than a control that
+   * records nothing.
+   */
+  readonly explanation: {
+    readonly summary: string;
+    readonly weakMatches: string;
+    readonly archivedMemories: string;
+    readonly correctSourceTitle: string;
+    readonly correctSource: string;
+    readonly interpretationNoEffect: string;
+  };
 };
 
 const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
@@ -51,6 +72,14 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     legacyUnknown: "Esta resposta é de antes de eu passar a anotar onde procurei.",
     freshnessLabel: "De",
     freshnessUnknown: "Sem data",
+    explanation: {
+      summary: "Como cheguei aqui",
+      weakMatches: "Encontrei outras coisas suas, mas nenhuma perto o bastante do que você perguntou — deixei todas de fora.",
+      archivedMemories: "Algumas memórias suas combinavam, mas você as arquivou, então não usei nenhuma delas.",
+      correctSourceTitle: "Se algo aqui está errado",
+      correctSource: "Abra a fonte acima e corrija ou arquive lá. É isso que muda as próximas respostas.",
+      interpretationNoEffect: "Ainda não dá para me dizer que eu entendi errado: eu não teria onde guardar isso, e um botão que não faz nada seria pior do que dizer isso claramente.",
+    },
   },
   en: {
     title: "What I used",
@@ -65,6 +94,14 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     legacyUnknown: "This answer predates my keeping track of where I looked.",
     freshnessLabel: "From",
     freshnessUnknown: "No date",
+    explanation: {
+      summary: "How I got here",
+      weakMatches: "I found other things of yours, but none close enough to what you asked — I left them all out.",
+      archivedMemories: "Some of your memories matched, but you archived them, so I used none of them.",
+      correctSourceTitle: "If something here is wrong",
+      correctSource: "Open the source above and fix or archive it there. That is what changes future answers.",
+      interpretationNoEffect: "You cannot yet tell me I read it wrong: I would have nowhere to keep that, and a button that does nothing would be worse than saying so plainly.",
+    },
   },
 };
 

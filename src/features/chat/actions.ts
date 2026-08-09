@@ -16,6 +16,7 @@ import {
   buildCitationsEnvelope,
   supportKindForSource,
 } from "@/features/conversation-sources/contracts";
+import { buildAnswerExplanation } from "@/features/conversation-sources/explanation";
 import { isMemoryInForce } from "@/features/memories/lifecycle";
 import type { ChatState } from "./chat-state";
 import { getAgentName } from "@/features/profile/agent-identity";
@@ -263,9 +264,32 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
      * cited none of them". Those are different facts, and `sources` is the one
      * that answers "did the Brain have anything to work with".
      */
+    /**
+     * `2K-EXPL-003/004` — the two exclusions this path already computed and
+     * threw away.
+     *
+     * Everything below the similarity floor was dropped at `relevant`, and
+     * every archived memory was dropped by `inForce`. The user was told
+     * neither, so they could not distinguish "the Brain found nothing" from
+     * "the Brain found three things and rejected all of them". Nothing new is
+     * computed here; two facts that already existed reach the surface.
+     *
+     * Counts go **in** and booleans come **out**: `buildAnswerExplanation` is
+     * the one place the numbers stop travelling, because a rate is a count over
+     * repeated queries (T-2K-04).
+     */
+    const aboveFloorMemories = relevant.filter((match) => match.source_type === "memory");
+    const explanation = buildAnswerExplanation({
+      retrieved: (matches ?? []).length,
+      aboveFloor: relevant.length,
+      aboveFloorMemories: aboveFloorMemories.length,
+      inForceMemories: aboveFloorMemories.filter((match) => inForce.has(match.source_id)).length,
+    });
+
     const citations = buildCitationsEnvelope({
       retrievedAnyQualifyingSource: sources.length > 0,
       sources: references,
+      explanation,
     });
 
     const { error: answerError } = await supabase.from("conversation_messages").insert({

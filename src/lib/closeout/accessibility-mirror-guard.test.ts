@@ -210,6 +210,29 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(mirror).toContain("<time datetime=");
   });
 
+  it("pins the 2K.5 disclosure panel, and scans it open", () => {
+    const panel = read("src/features/conversation-sources/explanation-panel.tsx");
+    for (const token of [
+      "conversation-explanation",
+      "conversation-explanation-body",
+      "conversation-explanation-correct-title",
+      "conversation-explanation-no-effect",
+    ]) {
+      expect(panel, `explanation-panel.tsx no longer emits .${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors .${token}`).toContain(token);
+    }
+    expect(panel).toContain("<details");
+    expect(panel).toContain("<summary>");
+    /*
+     * The fixture renders it **open** while the product ships it closed. axe
+     * cannot scan what is not in the accessibility tree, so a lane that only
+     * ever saw the summary would report green over a body it never looked at.
+     * Asserted so the discrepancy stays deliberate rather than becoming drift.
+     */
+    expect(mirror).toContain('class="conversation-explanation" open');
+    expect(panel, "the product must still ship it closed").not.toMatch(/<details[^>]*\sopen/);
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted
