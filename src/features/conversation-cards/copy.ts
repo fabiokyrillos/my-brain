@@ -33,6 +33,22 @@ export type ConversationCardsCopy = {
     /** OD-2K-3: archived or withdrawn from use. Never "deleted". */
     readonly archival: string;
   };
+  /**
+   * `2K-CONT-004/006` — coming back.
+   *
+   * `note` is the sentence ADR-100 requires and the one easiest to get wrong.
+   * It must read as **normal**, not as an error: the preview really was
+   * recomputed, so asking again is the honest outcome rather than a fault. And
+   * it must not describe a difference, because the handle carries nothing that
+   * could reconstruct one — inventing one is what `2K-CONT-006` forbids.
+   */
+  readonly resumed: {
+    readonly regionLabel: string;
+    readonly note: string;
+    readonly backToMessage: string;
+  };
+  /** The link back, rendered on the object the user went to look at. */
+  readonly returnToConversation: string;
 };
 
 const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
@@ -68,6 +84,12 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
       undoWindow: (hours) => `Você pode desfazer por ${hours} horas.`,
       archival: "Desfazer aqui arquiva a memória e a tira de uso. Ela continua guardada.",
     },
+    resumed: {
+      regionLabel: "De volta à conversa",
+      note: "Recalculei isto agora, então preciso que você confirme de novo. Nada foi feito enquanto você esteve fora.",
+      backToMessage: "Voltar para onde você estava",
+    },
+    returnToConversation: "Voltar para a conversa",
   },
   en: {
     states: {
@@ -101,6 +123,12 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
       undoWindow: (hours) => `You can undo this for ${hours} hours.`,
       archival: "Undoing here archives the memory and withdraws it from use. It stays on file.",
     },
+    resumed: {
+      regionLabel: "Back in the conversation",
+      note: "I worked this out again just now, so I need you to confirm it again. Nothing happened while you were away.",
+      backToMessage: "Back to where you were",
+    },
+    returnToConversation: "Back to the conversation",
   },
 };
 

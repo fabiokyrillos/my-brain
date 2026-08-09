@@ -268,3 +268,70 @@
     width: 100%;
   }
 }
+
+/*
+ * `2K-CONT-004/006` — the resumption, and the way back to it.
+ *
+ * Toned as `information`, never as `risk`. ADR-100 is explicit that an
+ * unchanged object re-asking is **normal rather than an error**, and a red
+ * panel would teach the user to read a correct outcome as a fault.
+ */
+
+.conversation-resumed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--tone-information-line);
+  border-radius: 14px;
+  background: var(--tone-information-bg);
+}
+
+.conversation-resumed:focus-visible {
+  outline: 2px solid var(--tone-information-fg);
+  outline-offset: 2px;
+}
+
+.conversation-resumed-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--tone-information-fg);
+}
+
+.conversation-resumed-anchor,
+.conversation-return {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--tone-information-line);
+  border-radius: 10px;
+  background: white;
+  color: var(--tone-information-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.conversation-resumed-anchor:focus-visible,
+.conversation-return:focus-visible {
+  outline: 2px solid var(--tone-information-fg);
+  outline-offset: 2px;
+}
+
+/* On a detail page the return sits under the back link rather than beside it,
+   so the two never compete for the same tap area at Pixel 7 width. */
+.conversation-return {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .conversation-resumed-anchor,
+  .conversation-return {
+    align-self: stretch;
+    justify-content: center;
+  }
+}

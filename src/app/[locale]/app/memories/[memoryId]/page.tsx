@@ -2,6 +2,7 @@ import { ArrowLeft, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
 import { setMemoryLifecycle, updateMemory } from "@/features/memories/actions";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
@@ -27,10 +28,14 @@ import { requireSupabaseData } from "@/lib/supabase/result";
  */
 export default async function MemoryDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; memoryId: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const { locale: candidate, memoryId } = await params;
+  // `2K-CONT-002`: present only when the user arrived from a conversation.
+  const from = (await searchParams).from;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const copy = getMemoryCopy(locale);
@@ -106,6 +111,7 @@ export default async function MemoryDetailPage({
         <ArrowLeft size={16} />
         {copy.backToList}
       </Link>
+      <ReturnToConversation from={from} locale={locale} />
 
       <header className="entity-hero">
         <BrainCircuit size={28} />

@@ -280,6 +280,30 @@ function conversationControls() {
     + `</section>`;
 }
 
+/**
+ * Mirrors `src/features/conversation-cards/resumed-card.tsx` and
+ * `return-to-conversation.tsx` — slice 2K.3's return path.
+ *
+ * `2K-A11Y-001/003/004/006`. The resumption is a named landmark that takes
+ * focus once on arrival, so its region semantics are what this scans; the two
+ * links are what the target-size and focus-paint checks measure.
+ */
+function conversationResumed() {
+  return `<section aria-label="Retomada da conversa">`
+    + `<div class="conversation-resumed" role="region" aria-label="De volta à conversa" tabindex="-1">`
+    + `<p class="conversation-resumed-note">Recalculei isto agora, então preciso que você confirme`
+    + ` de novo. Nada foi feito enquanto você esteve fora.</p>`
+    + `<article class="conversation-card" data-card-type="entry" data-state="previewed">`
+    + `<header class="conversation-card-head">`
+    + `<span class="conversation-card-type">Registro</span>`
+    + `<span class="conversation-card-state">Encontrei isto</span></header></article>`
+    + `<a class="conversation-resumed-anchor" href="#message-1">Voltar para onde você estava</a>`
+    + `</div>`
+    + `<a class="conversation-return" href="#">Voltar para a conversa</a>`
+    + `<article class="chat-message assistant" id="message-1"><span>Brain</span><p>Resposta.</p></article>`
+    + `</section>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
@@ -287,6 +311,7 @@ const SURFACES = [
   { name: "Library", body: () => librarySurface() },
   { name: "Conversar cards", body: () => conversationCards() },
   { name: "Conversar controls", body: () => conversationControls() },
+  { name: "Conversar resumed", body: () => conversationResumed() },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -305,7 +330,7 @@ for (const surface of SURFACES) {
  * ------------------------------------------------------------------ */
 
 test("2J-ACCESS-005: every focusable control paints a visible focus indicator", async ({ page }) => {
-  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}`);
+  await render(page, `${paletteTrigger()}${searchSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}`);
   const focusables = page.locator("button, a[href], input, select, [tabindex]:not([tabindex='-1'])");
   const total = await focusables.count();
   expect(total).toBeGreaterThan(3);
@@ -373,7 +398,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}`);
 
   const targets = page.locator("button, a[href]");
   const total = await targets.count();

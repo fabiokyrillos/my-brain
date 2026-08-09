@@ -107,11 +107,23 @@ describe("2K-CARD-002: no component in the feature re-derives the state", () => 
 
 describe("2K-CARD-005: the task pipeline keeps its single implementation", () => {
   it("builds no task preview, fingerprint or confirmation inside the card feature", () => {
+    /*
+     * Matched as **identifiers**, not as bare words.
+     *
+     * Slice 2K.3 is what forced the distinction: `continuity.ts` declares
+     * `CONTINUITY_FORBIDDEN_FIELDS`, a list of quoted names the payload
+     * refuses. A word-level scan reads that refusal as a use — which would
+     * make the guard fire on the module written to satisfy it. A quoted string
+     * in a refusal list is the opposite of calling the thing it names.
+     */
+    const BUILDS_TASK_MACHINERY =
+      /(?<!["'`])\b(buildTaskCommandPreview|deriveTaskCommand|issue_task_command_confirmation|requestFingerprint)\b(?!["'`])/;
     for (const file of featureFiles()) {
-      expect(code(file), file).not.toMatch(
-        /buildTaskCommandPreview|deriveTaskCommand|issue_task_command_confirmation|requestFingerprint/,
-      );
+      expect(BUILDS_TASK_MACHINERY.test(code(file)), file).toBe(false);
     }
+    // Non-vacuity: it fires on a real use and not on a quoted refusal.
+    expect(BUILDS_TASK_MACHINERY.test("const p = buildTaskCommandPreview(input);")).toBe(true);
+    expect(BUILDS_TASK_MACHINERY.test('const refused = ["requestFingerprint"] as const;')).toBe(false);
   });
 
   it("keeps the composer rendering the console's own task renderer", () => {
@@ -154,11 +166,18 @@ describe("2K.1 boundary: the card feature reaches no privileged client and no la
     }
   });
 
-  it("carries no continuity payload and no suggestion derivation yet", () => {
-    // 2K.3 and 2K.6 own those. Asserted so this slice cannot quietly anticipate
-    // them and then claim their requirements at close.
+  it("derives no suggestion yet, because 2K.6 owns that", () => {
+    // Asserted so a slice cannot quietly anticipate a later one and then claim
+    // its requirements at close.
+    //
+    // The continuity half of this assertion was **removed in slice 2K.3**,
+    // which delivered continuity — it was written as "not yet" and its "yet"
+    // arrived. What replaces it is stronger and lives in
+    // `phase-2k-continuity-guard.test.ts`: the payload's schema is strict and
+    // refuses each forbidden field by name, which is a statement about what
+    // continuity *is* rather than about whether it exists.
     for (const file of featureFiles()) {
-      expect(code(file), file).not.toMatch(/issuedAt|observedBefore|operationKey|suggestion/i);
+      expect(code(file), file).not.toMatch(/\bsuggestion/i);
     }
   });
 });

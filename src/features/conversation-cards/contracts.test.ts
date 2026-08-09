@@ -92,6 +92,30 @@ describe("2K-CARD-003/007/008: mutability is a property of the type, not of the 
     }
   });
 
+  it("no builder can produce a mutable card for a type OD-2K-B keeps read-only", () => {
+    /*
+     * The type-level guarantee, asserted at the builders rather than at the
+     * renderer. `mayRenderMutatingControl` reads the card's own `mutability`
+     * field — because a memory reached as a *reference* is read-only even
+     * though a memory card in its own right may mutate (slice 2K.3) — so what
+     * must hold is that nothing can *write* `mutable` for these five.
+     */
+    for (const type of READ_ONLY_CONVERSATION_CARD_TYPES) {
+      expect(readOnlyPreviewCard({ cardType: type, objectId: "id" }).mutability, type).toBe("read_only");
+      expect(unavailableCard(type).mutability, type).toBe("read_only");
+    }
+  });
+
+  it("makes a reference to a mutable type read-only, which is the 2K.3 case", () => {
+    // A memory cited by an answer, or shown on a resumed card, is something the
+    // conversation pointed at — not something it proposes to change.
+    const reference = readOnlyPreviewCard({ cardType: "memory", objectId: "m1" });
+    expect(reference.mutability).toBe("read_only");
+    expect(mayRenderMutatingControl(reference)).toBe(false);
+    // And the type itself is still mutable, so this is a property of the role.
+    expect(cardMutability("memory")).toBe("mutable");
+  });
+
   it("says read-only for every read-only type, which is the rule 2K-CARD-008 renders", () => {
     for (const type of READ_ONLY_CONVERSATION_CARD_TYPES) {
       expect(cardMutability(type), type).toBe("read_only");
