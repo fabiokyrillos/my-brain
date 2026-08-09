@@ -48,6 +48,10 @@ const eventNames = [
   "capture_mode_selected",
   "voice_transcription_finished",
   "attention_item_resolved",
+  // Phase 2K slice 2K.8.
+  "conversation_answer_shown",
+  "conversation_memory_resolved",
+  "conversation_suggestion_shown",
 ] as const;
 
 const basePayload = {
@@ -118,10 +122,13 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
     resolutionAction: "retry",
     resolutionBucket: "under_5s",
   },
+  conversation_answer_shown: { evidence: "evidenced", explained: true },
+  conversation_memory_resolved: { outcome: "undone" },
+  conversation_suggestion_shown: { category: "person" },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of thirty product events", () => {
+  it("defines the complete closed taxonomy of thirty-three product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -134,6 +141,7 @@ describe("product analytics contracts", () => {
       "questions",
       "server",
       "task_command",
+      "conversation",
     ]);
   });
 

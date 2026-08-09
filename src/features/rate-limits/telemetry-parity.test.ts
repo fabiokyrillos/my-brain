@@ -36,7 +36,15 @@ import { parseProductEventPayload, productEventNames } from "@/features/product-
  * because 2H's list still contained the name, while the list actually enforced
  * lived two migrations later.
  */
-const MIGRATION = "supabase/migrations/202608080086_phase_2j_experience_telemetry.sql";
+/*
+ * The migration that most recently re-declared the vocabulary.
+ *
+ * It moves with the chain, and it must: this file asserts that **every**
+ * name in `productEventNames` survives in the CHECK, so reading an older
+ * migration would report a name "dropped" that was simply added after it.
+ * Phase 2K slice 2K.8 moved it from `202608080086`.
+ */
+const MIGRATION = "supabase/migrations/202608090088_phase_2k_conversation_telemetry.sql";
 
 function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");

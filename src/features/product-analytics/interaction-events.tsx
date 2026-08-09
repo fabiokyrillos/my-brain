@@ -179,6 +179,96 @@ export function TaskCandidatesPresented({ entryId, interpretationId, candidateCo
   })} />;
 }
 
+/*
+ * Phase 2K slice 2K.8 -- the three Conversar producers.
+ *
+ * Every one carries a closed enum or a boolean and NOTHING else: no question,
+ * no answer, no source excerpt, no person's or project's name. That is
+ * `2K-METRICS-002` enforced by the payload's shape, and it is checked twice
+ * more before a row exists -- by `arePropertiesValid` in the application and by
+ * `private.validate_product_event_properties` in the database.
+ *
+ * All three are session-deduplicated and fail-open, like every producer above:
+ * a measurement that could break the surface it measures is not worth having.
+ */
+
+/**
+ * `2K-METRICS-002`. Did the answer have personal evidence behind it?
+ *
+ * Keyed by message id so one answer counts once per session, not once per
+ * scroll past it -- the thread renders up to 200 messages and an un-keyed
+ * event would report reading as answering.
+ */
+export function ConversationAnswerShown({ evidence, explained, messageId, locale }: {
+  evidence: ProductEventPropertiesByName["conversation_answer_shown"]["evidence"];
+  explained: boolean;
+  messageId: string;
+  locale: ProductEventLocale;
+}) {
+  return <VisibilityEvent onVisible={() => recordOnce({
+    logicalKey: `conversation-answer-shown:${messageId}`,
+    name: "conversation_answer_shown",
+    surface: "conversation",
+    locale,
+    properties: { evidence, explained },
+  })} />;
+}
+
+/**
+ * `2K-METRICS-002`. What became of a memory card.
+ *
+ * Scoped to memory deliberately: task commands already have four events of
+ * their own, and a second name covering them would double-count one act.
+ * `undone` is the ARCHIVAL undo -- the row survives, and the vocabulary says so.
+ */
+export function ConversationMemoryResolved({ outcome, locale }: {
+  outcome: ProductEventPropertiesByName["conversation_memory_resolved"]["outcome"];
+  locale: ProductEventLocale;
+}) {
+  return <VisibilityEvent onVisible={() => recordRepeatable({
+    name: "conversation_memory_resolved",
+    surface: "conversation",
+    locale,
+    properties: { outcome },
+  })} />;
+}
+
+/**
+ * `2K-SUGG-005` / `2K-METRICS-002`. That a suggestion was shown, and of which
+ * kind.
+ *
+ * **The category and nothing else.** OD-2K-4 permits a suggestion to name a
+ * person or project on screen and forbids that name from ever reaching
+ * telemetry; the caller passes categories, never suggestions, so there is no
+ * name in scope here to leak.
+ *
+ * Deduplicated by category rather than by suggestion: three suggestions of the
+ * same kind are one fact about the surface, and keying by id would put an
+ * identifier into the dedupe key for no gain.
+ */
+export function ConversationSuggestionsShown({ categories, locale }: {
+  categories: readonly ProductEventPropertiesByName["conversation_suggestion_shown"]["category"][];
+  locale: ProductEventLocale;
+}) {
+  const distinct = [...new Set(categories)];
+  return (
+    <>
+      {distinct.map((category) => (
+        <VisibilityEvent
+          key={category}
+          onVisible={() => recordOnce({
+            logicalKey: `conversation-suggestion-shown:${category}`,
+            name: "conversation_suggestion_shown",
+            surface: "conversation",
+            locale,
+            properties: { category },
+          })}
+        />
+      ))}
+    </>
+  );
+}
+
 export function WorkViewViewed({ view, locale }: {
   view: "today" | "all" | "waiting";
   locale: ProductEventLocale;

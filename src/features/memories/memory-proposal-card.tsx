@@ -48,6 +48,7 @@ import { useActionState, useId, useState } from "react";
 
 import { ConversationCardView } from "@/features/conversation-cards/card";
 import { unavailableCard } from "@/features/conversation-cards/contracts";
+import { ConversationMemoryResolved } from "@/features/product-analytics/interaction-events";
 import type { Locale } from "@/lib/preferences";
 
 import { getMemoryCopy } from "./copy";
@@ -177,6 +178,16 @@ export function MemoryProposalCard({
         {undone.status === "error" ? (
           <p className="entity-edit-feedback error">{undone.message}</p>
         ) : null}
+
+        {/*
+          `2K-METRICS-002`. What became of this card, as one closed enum.
+          `undone` is the ARCHIVAL undo: the row survives, and the vocabulary
+          says `undone` rather than `deleted` for the same reason the copy does.
+        */}
+        <ConversationMemoryResolved
+          locale={locale === "en" ? "en" : "pt-BR"}
+          outcome={archived ? "undone" : state.status === "duplicate" ? "no_change" : "accepted"}
+        />
       </div>
     );
   }

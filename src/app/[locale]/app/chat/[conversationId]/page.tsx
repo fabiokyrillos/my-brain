@@ -70,6 +70,7 @@ function ThreadMessage({
             citations={citations}
             continuity={{ conversationId, messageId }}
             locale={locale}
+            messageId={messageId}
             sources={sources}
           />
         </div>

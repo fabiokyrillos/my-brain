@@ -26,6 +26,7 @@
  * nothing to the client bundle of a page that renders it.
  */
 
+import { ConversationSuggestionsShown } from "@/features/product-analytics/interaction-events";
 import type { Locale } from "@/lib/preferences";
 
 import { getConversationCardsCopy } from "./copy";
@@ -53,6 +54,14 @@ export function SuggestionRow({
           </li>
         ))}
       </ul>
+      {/*
+        `2K-SUGG-005`. Categories, never suggestions: there is no name in scope
+        at the call site, so none can reach the event.
+      */}
+      <ConversationSuggestionsShown
+        categories={suggestions.map((suggestion) => suggestion.category)}
+        locale={locale === "en" ? "en" : "pt-BR"}
+      />
     </div>
   );
 }

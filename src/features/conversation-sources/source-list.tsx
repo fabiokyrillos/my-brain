@@ -33,6 +33,7 @@ import {
   serializeContinuityHandle,
 } from "@/features/conversation-cards/continuity";
 import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
+import { ConversationAnswerShown } from "@/features/product-analytics/interaction-events";
 import type { Locale } from "@/lib/preferences";
 
 import type { ParsedCitations } from "./contracts";
@@ -87,12 +88,15 @@ export function SourceList({
   citations,
   continuity = null,
   locale,
+  messageId = null,
   sources,
 }: {
   citations: ParsedCitations;
   /** Present in a thread, absent wherever a source list has no position. */
   continuity?: { conversationId: string; messageId: string } | null;
   locale: Locale;
+  /** Keys the answer event, so one answer counts once rather than once per scroll. */
+  messageId?: string | null;
   sources: readonly ResolvedSource[];
 }) {
   const copy = getConversationSourcesCopy(locale);
@@ -159,6 +163,19 @@ export function SourceList({
         ever opened.
       */}
       <ExplanationPanel explanation={citations.explanation} locale={locale} />
+
+      {/*
+        `2K-METRICS-002`. The evidence state and whether anything was excluded —
+        a closed enum and a boolean. No question, no answer, no excerpt.
+      */}
+      {messageId === null ? null : (
+        <ConversationAnswerShown
+          evidence={citations.evidence}
+          explained={citations.explanation !== null}
+          locale={locale === "en" ? "en" : "pt-BR"}
+          messageId={messageId}
+        />
+      )}
     </div>
   );
 }

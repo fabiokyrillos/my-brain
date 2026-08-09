@@ -8,6 +8,14 @@ import { idleTaskCommandState } from "@/features/task-commands/console-state";
 import { AssistantComposer, type AssistantComposerAction } from "./assistant-composer";
 import { idleAssistantComposerState, type AssistantComposerState } from "./composer-state";
 
+// `MemoryProposalCard` now emits a product event, and the emitter reaches a
+// `"use server"` module that cannot be imported from a client component under
+// vitest. What this file tests is composer routing; the producer has its own
+// coverage in `phase-2k-telemetry-guard.test.ts` and in the pgTAP write path,
+// which writes every declared name through the real public writer.
+vi.mock("@/features/product-analytics/interaction-events", () => ({
+  ConversationMemoryResolved: () => null,
+}));
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));

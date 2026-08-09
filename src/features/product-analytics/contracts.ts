@@ -170,6 +170,30 @@ export const productEventNames = [
   "capture_mode_selected",
   "voice_transcription_finished",
   "attention_item_resolved",
+  /*
+   * Phase 2K slice 2K.8. Three events, and the count is the point again.
+   *
+   * `2K-METRICS-007` requires a **consumer** before close. So this vocabulary
+   * is exactly what `scripts/phase-2k-conversation-funnel-reader.mjs` asks
+   * questions of, and no wider: does an answer have personal evidence behind
+   * it, does a memory card reach a resolution, and does a suggestion ever get
+   * shown. A fourth name nothing reads would be the SH.6 failure with a
+   * different label.
+   *
+   * Every property is a closed enum or a boolean. **There is no key that can
+   * hold a question, an answer, a source excerpt, a person or a project name**
+   * -- which is `2K-METRICS-002` enforced by the shape rather than by writers
+   * behaving. `conversation_suggestion_shown` in particular carries the
+   * suggestion CATEGORY and never its text, which OD-2K-4 requires by name.
+   *
+   * Migration `202608090088` carries the same three literals into the table
+   * CHECK and into `private.validate_product_event_properties`. Both live
+   * gates, audited together -- the failure `202608080087` had to correct was a
+   * third copy nobody knew existed.
+   */
+  "conversation_answer_shown",
+  "conversation_memory_resolved",
+  "conversation_suggestion_shown",
 ] as const;
 
 export type ProductEventName = (typeof productEventNames)[number];
@@ -195,6 +219,18 @@ export const productSurfaces = [
   // unanswerable. Which mount a command was driven from travels as the
   // `commandOrigin` *property*, which is a bounded category.
   "task_command",
+  /*
+   * Phase 2K slice 2K.8. Conversar had **no surface at all**, so the phase
+   * could have shipped every requirement and been unable to answer "did
+   * anyone use it?".
+   *
+   * Named `conversation` rather than `chat` to match the tables the events
+   * describe -- `conversations`, `conversation_messages` -- so an analyst
+   * reading the funnel and an operator reading the database are talking about
+   * the same thing. It is distinct from `task_command`, which stays the
+   * surface for the command console wherever it mounts.
+   */
+  "conversation",
 ] as const;
 
 export type ProductSurface = (typeof productSurfaces)[number];
@@ -344,6 +380,51 @@ export type ProductEventPropertiesByName = {
     attentionReason: TrackedAttentionReasonAnalytics;
     resolutionAction: AttentionResolutionAction;
     resolutionBucket: ResolutionBucket;
+  };
+  /**
+   * `2K-METRICS-002`. Did the answer have personal evidence behind it, and
+   * did it have anything to explain?
+   *
+   * `evidence` is the envelope's own three-value state, not a count and not
+   * derived from `citations.length` -- slice 2K.0 measured that an empty
+   * citation array is produced both by "nothing was retrieved" and by
+   * "retrieved and the model cited none", so a count here would report the
+   * wrong fact half the time.
+   *
+   * `explained` is a **boolean by existence**: whether anything was excluded
+   * at all. It is deliberately not "how much" -- T-2K-04 records that a rate
+   * is a count over repeated queries, so the disclosure that reaches a user
+   * and the one that reaches the ledger are bounded the same way.
+   */
+  conversation_answer_shown: {
+    evidence: "evidenced" | "no_qualifying_evidence" | "unknown";
+    explained: boolean;
+  };
+  /**
+   * `2K-METRICS-002`. What became of a memory card.
+   *
+   * Scoped to **memory** deliberately: task commands already have four
+   * events of their own, and a second name covering them would double-count
+   * the same act. The memory card is the one this phase created and the one
+   * nothing measures.
+   *
+   * `undone` is the archival undo (OD-2K-3). The vocabulary says `undone`
+   * and never `deleted`, for the same reason the copy does: the row survives.
+   */
+  conversation_memory_resolved: {
+    outcome: "accepted" | "no_change" | "failed" | "undone";
+  };
+  /**
+   * `2K-SUGG-005` / `2K-METRICS-002`. That a suggestion was shown, and of
+   * which kind.
+   *
+   * **The category and nothing else.** OD-2K-4 permits a suggestion to name
+   * a person or project on screen and forbids that name from ever entering
+   * telemetry; `suggestionTelemetryCategory` narrows to exactly this shape,
+   * whose type has no field a name could occupy.
+   */
+  conversation_suggestion_shown: {
+    category: "person" | "project";
   };
 };
 
@@ -593,6 +674,23 @@ function arePropertiesValid<Name extends ProductEventName>(
         && isOneOf(value.attentionReason, trackedAttentionReasonAnalytics)
         && isOneOf(value.resolutionAction, attentionResolutionActions)
         && isOneOf(value.resolutionBucket, resolutionBuckets);
+    /*
+     * Phase 2K slice 2K.8. `hasExactKeys` is what makes `2K-METRICS-002`
+     * structural: an extra key -- a question, a source excerpt, a person's
+     * name -- is refused here as well as by the database validator, so a
+     * writer cannot smuggle one past the application on its way to a gate
+     * that would also have refused it.
+     */
+    case "conversation_answer_shown":
+      return hasExactKeys(value, ["evidence", "explained"])
+        && isOneOf(value.evidence, ["evidenced", "no_qualifying_evidence", "unknown"])
+        && typeof value.explained === "boolean";
+    case "conversation_memory_resolved":
+      return hasExactKeys(value, ["outcome"])
+        && isOneOf(value.outcome, ["accepted", "no_change", "failed", "undone"]);
+    case "conversation_suggestion_shown":
+      return hasExactKeys(value, ["category"])
+        && isOneOf(value.category, ["person", "project"]);
   }
 }
 

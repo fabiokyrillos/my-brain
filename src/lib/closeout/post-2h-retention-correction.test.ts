@@ -99,6 +99,12 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // property this assertion protects is "nothing follows that somebody did
       // not deliberately account for".
       "202608080087_post_2j_product_event_writer_deduplication.sql",
+      // Phase 2K slice 2K.8: the one migration OD-2K-C budgeted and ADR-101
+      // authorized. It widens the same two gates `202608080087` reduced to
+      // two, and its own verification block asserts they still agree
+      // name-by-name — the check that would have caught that defect a phase
+      // earlier.
+      "202608090088_phase_2k_conversation_telemetry.sql",
     ]);
   });
 });

@@ -16,7 +16,7 @@
 
 begin;
 
-select plan(19);
+select plan(20);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures.
@@ -88,7 +88,13 @@ insert into legal_payloads (event_name, properties) values
   -- Phase 2J, added to the CHECK by `202608080086`, same story.
   ('capture_mode_selected',        '{"captureMode":"voice"}'),
   ('voice_transcription_finished', '{"outcome":"succeeded","draftEdited":false,"additionalSegment":false}'),
-  ('attention_item_resolved',      '{"attentionReason":"retry_processing","resolutionAction":"retry","resolutionBucket":"under_5s"}');
+  ('attention_item_resolved',      '{"attentionReason":"retry_processing","resolutionAction":"retry","resolutionBucket":"under_5s"}'),
+  -- Phase 2K, added to the CHECK by `202608090088`. Every property is a
+  -- closed enum or a boolean: there is no key here that could hold a
+  -- question, an answer, a source excerpt, or a person's or project's name.
+  ('conversation_answer_shown',     '{"evidence":"evidenced","explained":true}'),
+  ('conversation_memory_resolved',  '{"outcome":"undone"}'),
+  ('conversation_suggestion_shown', '{"category":"person"}');
 
 -- The real writer, exercised exactly as production calls it, once per declared
 -- name. Failures are collected rather than raised so the assertion can name
@@ -352,7 +358,7 @@ begin
   end if;
   -- A non-null id on the accepted path. Returning `null::uuid` here would make
   -- the harness score EVERY event as unwritten (it reads `event_id is not null`),
-  -- so the count assertion below would read 30 instead of 4 and the non-vacuity
+  -- so the count assertion below would read 33 instead of 7 and the non-vacuity
   -- proof would be measuring the fixture rather than the gate.
   return query select gen_random_uuid(), true;
 end;
@@ -369,9 +375,15 @@ select is(
   (select count(*)::int
      from pg_temp.write_every_declared_event('b7000001-0000-4000-8000-000000000001')
     where not wrote),
-  4,
-  'NON-VACUITY: the historical gate refuses exactly the four events it was measured refusing on hosted'
+  7,
+  'NON-VACUITY: the historical gate refuses exactly the seven events added since it froze'
 );
+
+-- The number rose from four to seven when Phase 2K added three names, and
+-- that is the point rather than an inconvenience: the historical gate froze
+-- at `202607280061` and every name added after it is one the gate would have
+-- silently refused. Four was `rate_limit_refused` plus Phase 2J's three;
+-- seven is those plus Phase 2K's three.
 
 -- Restore, and prove the restore worked rather than assuming it.
 do $$
@@ -383,6 +395,24 @@ select is_empty(
   $$ select checked_event from pg_temp.write_every_declared_event('b7000001-0000-4000-8000-000000000001')
       where not wrote $$,
   'the corrected writer is restored and accepts every declared event again'
+);
+
+-- ---------------------------------------------------------------------------
+-- `2K-METRICS-005`. Phase 2K's own three, named rather than only covered
+-- derivedly, so a closing report can cite this line rather than an inference.
+-- ---------------------------------------------------------------------------
+
+select is(
+  (select count(*)::int
+     from pg_temp.write_every_declared_event('b7000001-0000-4000-8000-000000000001')
+    where wrote
+      and checked_event in (
+        'conversation_answer_shown',
+        'conversation_memory_resolved',
+        'conversation_suggestion_shown'
+      )),
+  3,
+  'all three Phase 2K conversation events are written through the real public writer'
 );
 
 select * from finish();
