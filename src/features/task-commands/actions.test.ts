@@ -16,8 +16,10 @@ import {
   selectTaskCommandCandidate,
   startTaskCommand,
   undoTaskCommand,
+  undoWorkOperation,
 } from "./actions";
 import { idleTaskCommandState } from "./console-state";
+import { idleTaskUndoState } from "./task-undo-state";
 import { parseTaskCommandSession } from "./session";
 
 // `undo-listing.ts` is a server-only projection; the repository's convention
@@ -830,6 +832,99 @@ describe("undo", () => {
     const state = await undoTaskCommand(idleTaskCommandState, form({ undoId: UNDO_ID }));
     expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(true);
     expect(state.heading).toBe("Undone.");
+  });
+});
+
+/*
+ * `2L-EDIT-008` — the Work surfaces' undo.
+ *
+ * The same mechanism, deliberately reached through this module: the Phase 2L
+ * authority census pins which modules may call the shared `undo_operation`
+ * router, and a fifth caller beside the Work list would be a second route into
+ * a reversal with a second chance to forget the ownership re-read. What is
+ * asserted here is that the row is re-read first and that the vocabulary a row
+ * can render stays distinct where the domain distinguishes it.
+ */
+describe("undo, from a Work surface (2L-EDIT-008)", () => {
+  const undoForm = (undoId: string) => {
+    const data = new FormData();
+    data.set("undoId", undoId);
+    data.set("locale", "en");
+    return data;
+  };
+
+  it("calls the router for an available operation and says it is done", async () => {
+    const bench = harness();
+    const state = await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(true);
+    expect(state.status).toBe("undone");
+    expect(state.message).toBe("Undone.");
+    // The announcement is the message: a row's undo is one sentence, and a
+    // screen-reader user should hear exactly what a sighted one reads.
+    expect(state.announcement).toBe(state.message);
+  });
+
+  it("refuses an expired operation without calling the router", async () => {
+    const bench = harness();
+    bench.undoRow = {
+      id: UNDO_ID,
+      action_type: "apply_task_command",
+      entity_ids: [TASK_ID],
+      created_at: "2026-07-01T00:00:00.000Z",
+      expires_at: "2026-07-02T00:00:00.000Z",
+      status: "available",
+    };
+    const state = await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+
+    expect(state.status).toBe("expired");
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(false);
+  });
+
+  it("keeps already-spent and expired distinct, as the domain does", async () => {
+    const bench = harness();
+    bench.undoRow = {
+      id: UNDO_ID,
+      action_type: "apply_task_command",
+      entity_ids: [TASK_ID],
+      created_at: "2026-07-28T11:00:00.000Z",
+      expires_at: "2099-01-01T00:00:00.000Z",
+      status: "undone",
+    };
+    const state = await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+
+    expect(state.status).toBe("unavailable");
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(false);
+  });
+
+  it("gives one answer for an id that is not the caller's, does not exist, or is not a task command", async () => {
+    // 2E-OWNERSHIP-002. The three collapse because the re-read returns nothing
+    // in the first two cases and a foreign `action_type` in the third, and a
+    // surface that distinguished them would be an existence oracle.
+    const bench = harness();
+    bench.undoRow = null;
+    const missing = await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+
+    bench.undoRow = {
+      id: UNDO_ID,
+      action_type: "confirm_entry_task_candidates",
+      entity_ids: [TASK_ID],
+      created_at: "2026-07-28T11:00:00.000Z",
+      expires_at: "2099-01-01T00:00:00.000Z",
+      status: "available",
+    };
+    const foreign = await undoWorkOperation(idleTaskUndoState, undoForm(UNDO_ID));
+
+    expect(JSON.stringify(missing)).toBe(JSON.stringify(foreign));
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(false);
+  });
+
+  it("refuses a malformed id before it reaches anything", async () => {
+    const bench = harness();
+    const state = await undoWorkOperation(idleTaskUndoState, undoForm("not-a-uuid"));
+
+    expect(state.status).toBe("failed");
+    expect(bench.rpcCalls.some((call) => call.fn === "undo_operation")).toBe(false);
   });
 });
 

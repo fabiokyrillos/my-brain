@@ -18,6 +18,7 @@ type WorkProjectionModule = {
     items: readonly unknown[];
     hasNext: boolean;
     timezone: string;
+    editControlsByTaskId: Record<string, unknown>;
   }>;
 };
 
@@ -414,7 +415,7 @@ describe("loadWorkProjection: the quick-edit control set", () => {
     // Compared against the derivation rather than against a literal set: a
     // taxonomy change moves both together, and a hand-written list here would
     // be the second copy `2L-EDIT-001` forbids.
-    const controls = (page as { editControlsByTaskId: Record<string, unknown> }).editControlsByTaskId;
+    const controls = page.editControlsByTaskId;
     expect(controls["task-001"]).toEqual(detailControlsFor("todo"));
     expect(controls["task-002"]).toEqual(detailControlsFor("completed"));
     // Non-vacuous: the two statuses genuinely admit different verbs, so a
@@ -433,7 +434,7 @@ describe("loadWorkProjection: the quick-edit control set", () => {
       userId: "user-1", locale: "en", view: "all", page: 1,
     });
 
-    const controls = (page as { editControlsByTaskId: Record<string, unknown> }).editControlsByTaskId;
+    const controls = page.editControlsByTaskId;
     expect(controls["task-001"]).toEqual(detailControlsFor("inbox"));
   });
 });

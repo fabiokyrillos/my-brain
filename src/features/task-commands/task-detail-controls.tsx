@@ -28,6 +28,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/preferences";
 
+import { UndoAffordance, type TaskUndoHandler } from "@/features/operations/undo-affordance";
+
 import { ConfirmDialog } from "./confirm-dialog";
 import {
   idleTaskDetailCommandState,
@@ -84,6 +86,7 @@ export function TaskDetailControls({
   relationOptions,
   dateBounds,
   variant = "section",
+  undoAction,
 }: {
   action: TaskDetailCommandHandler;
   locale: Locale;
@@ -94,6 +97,8 @@ export function TaskDetailControls({
   relationOptions: TaskDetailRelationOptions;
   dateBounds: TaskDetailDateBounds;
   variant?: TaskDetailControlsVariant;
+  /** `2L-EDIT-008`. Injected like every other action this component calls. */
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getTaskDetailControlsCopy(locale);
   const router = useRouter();
@@ -366,6 +371,8 @@ export function TaskDetailControls({
               {copy.refresh}
             </button>
           )}
+          {/* `2L-EDIT-008`, the same affordance the Work list mounts. */}
+          {undoAction ? <UndoAffordance action={undoAction} locale={locale} undo={state.undo} /> : null}
         </div>
       )}
     </Frame>

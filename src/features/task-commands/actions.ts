@@ -115,6 +115,8 @@ import {
   type TaskCommandControl,
 } from "./console-state";
 import { loadTaskCommandUndoOperation } from "./undo-listing";
+import type { TaskUndoState } from "./task-undo-state";
+import { getWorkCopy } from "@/features/operations/copy";
 
 /**
  * Emits the parse-match-preview measurement.
@@ -1396,6 +1398,67 @@ export async function undoTaskCommand(
     title: context.copy.console.undone,
     description: context.copy.undoStates.available.description,
   });
+}
+
+/**
+ * `2L-EDIT-008` — the same undo, for the surfaces that are not the console.
+ *
+ * ## Why it lives here rather than beside the Work list
+ *
+ * `public.undo_operation` is a shared router owned by four domains, and the
+ * Phase 2L authority census pins **which modules may call it**. Adding a fifth
+ * caller — an obvious-looking `operations/actions.ts` undo — would fail that
+ * guard, and rightly: a second route into a reversal is a second place the
+ * ownership re-read could be forgotten. So the Work affordance reuses this
+ * module's existing call site, and the census is unchanged.
+ *
+ * ## Why it is not `undoTaskCommand` with a different return type
+ *
+ * `undoTaskCommand` answers *into a conversation*: its state carries a heading,
+ * a detail, a reason, a session and a terminal flag, because the console is a
+ * multi-step exchange. A row's undo is one sentence. Returning the console's
+ * state to a list row would put a vocabulary the row has no place for into it,
+ * and reshaping the console's state would change a tested surface for a reason
+ * that is not the console's.
+ *
+ * What is genuinely shared is the *mechanism*, and it is shared verbatim:
+ * `loadTaskCommandUndoOperation` re-reads the row before the router is called,
+ * so "not yours", "does not exist" and "not a task-command operation" collapse
+ * to one answer (2E-OWNERSHIP-002), and *spent* and *expired* stay distinct
+ * without widening the SQL error vocabulary (2E-UNDO-007).
+ */
+export async function undoWorkOperation(
+  _previous: TaskUndoState,
+  formData: FormData,
+): Promise<TaskUndoState> {
+  const locale = parseLocale(formData);
+  const copy = getWorkCopy(locale).undo;
+  const settledUndo = (status: TaskUndoState["status"], message: string): TaskUndoState =>
+    ({ status, message, announcement: message });
+
+  const undoId = z.string().uuid().safeParse(formData.get("undoId"));
+  if (!undoId.success) return settledUndo("failed", copy.failed);
+
+  const { supabase } = await requireUser(locale);
+  const now = new Date().toISOString();
+  const operation = await loadTaskCommandUndoOperation(supabase, { undoId: undoId.data, now });
+  if (operation === null) return settledUndo("unavailable", copy.unavailable);
+  if (operation.state !== "available") {
+    return settledUndo(
+      operation.state === "expired" ? "expired" : "unavailable",
+      operation.state === "expired" ? copy.expired : copy.unavailable,
+    );
+  }
+
+  const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
+  // Every failure is one sentence here, deliberately. The console distinguishes
+  // `2E_CREATION_UNDONE` because it can offer the user the next step in the same
+  // exchange; a row can only say that nothing changed, and inventing a second
+  // sentence it cannot act on would be noise.
+  if (error) return settledUndo("failed", copy.failed);
+
+  refreshCommandSurfaces(locale);
+  return settledUndo("undone", copy.done);
 }
 
 function undoResult(

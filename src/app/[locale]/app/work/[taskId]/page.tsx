@@ -3,6 +3,7 @@ import { loadTaskDetailProjection } from "@/features/daily-cycle/task-detail-pro
 import { TaskDetailView } from "@/features/daily-cycle/task-detail-view";
 import { applyWorkItemAction } from "@/features/operations/actions";
 import { WorkItemActions } from "@/features/operations/work-item-actions";
+import { undoWorkOperation } from "@/features/task-commands/actions";
 import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
 import { dateBounds, detailControlsFor } from "@/features/task-commands/detail-controls";
 import { TaskDetailControls } from "@/features/task-commands/task-detail-controls";
@@ -65,7 +66,7 @@ export default async function TaskDetailPage({
       actions={
         detail.task.availableActions.length ? (
           <div className="task-detail-actions">
-            <WorkItemActions action={applyWorkItemAction} locale={locale} task={detail.task} />
+            <WorkItemActions action={applyWorkItemAction} locale={locale} task={detail.task} undoAction={undoWorkOperation} />
           </div>
         ) : null
       }
@@ -86,6 +87,7 @@ export default async function TaskDetailPage({
             }}
             taskId={taskId}
             title={detail.task.title}
+            undoAction={undoWorkOperation}
           />
         ) : null
       }

@@ -4,7 +4,7 @@ import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
 import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
 import { PaginationLinks } from "@/features/shell/pagination-links";
-import { runTaskCommand } from "@/features/task-commands/actions";
+import { runTaskCommand, undoWorkOperation } from "@/features/task-commands/actions";
 import { CommandConsole } from "@/features/task-commands/command-console";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
 import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
@@ -98,8 +98,10 @@ export function WorkView({
       locale={locale}
       tasks={items}
       timezone={timezone}
+      undoAction={undoWorkOperation}
       quickEdit={editControlsByTaskId && relationOptions && dateBounds ? {
         action: applyTaskDetailCommand,
+        undoAction: undoWorkOperation,
         controlsByTaskId: editControlsByTaskId,
         relationOptions,
         dateBounds,

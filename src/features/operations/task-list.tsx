@@ -26,6 +26,7 @@ import type { Locale } from "@/lib/preferences";
 import { getWorkCopy } from "./copy";
 import { ProtectedContent } from "./protected-content";
 import { QuickEdit } from "./quick-edit";
+import type { TaskUndoHandler } from "./undo-affordance";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
@@ -61,6 +62,8 @@ export type { WorkItemActionHandler };
  */
 export type QuickEditSupport = {
   readonly action: TaskDetailCommandHandler;
+  /** `2L-EDIT-008`. A quick edit is an operation too, and reversible the same way. */
+  readonly undoAction?: TaskUndoHandler;
   /** Derived from the taxonomy per row, server-side. Never computed here. */
   readonly controlsByTaskId: Readonly<Record<string, readonly DetailControl[]>>;
   readonly relationOptions: TaskDetailRelationOptions;
@@ -75,6 +78,7 @@ export function TaskList({
   quickEdit,
   tasks,
   timezone,
+  undoAction,
 }: {
   /** The assistant’s configured name (UX-06), injected for the same reason the action is. */
   agentName: string;
@@ -94,6 +98,8 @@ export function TaskList({
   quickEdit?: QuickEditSupport;
   tasks: readonly WorkItemView[];
   timezone: string;
+  /** `2L-EDIT-008`. Injected, like every other action this surface calls. */
+  undoAction?: TaskUndoHandler;
 }) {
   const pt = locale === "pt-BR";
   if (tasks.length === 0) {
@@ -126,6 +132,7 @@ export function TaskList({
           quickEdit={quickEdit}
           task={task}
           timezone={timezone}
+          undoAction={undoAction}
         />
       ))}
       {anyWithheld ? (
@@ -142,6 +149,7 @@ function TaskRow({
   quickEdit,
   task,
   timezone,
+  undoAction,
 }: {
   action: WorkItemActionHandler;
   agentName: string;
@@ -149,6 +157,7 @@ function TaskRow({
   quickEdit?: QuickEditSupport;
   task: WorkItemView;
   timezone: string;
+  undoAction?: TaskUndoHandler;
 }) {
   const pt = locale === "pt-BR";
   // The producer of `open_task` is `work-projection.ts`; this is its consumer.
@@ -225,7 +234,7 @@ function TaskRow({
         )}
         {task.noDueReason && <small>{task.noDueReason}</small>}
         <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
-        <WorkItemActions action={action} locale={locale} task={task} />
+        <WorkItemActions action={action} locale={locale} task={task} undoAction={undoAction} />
         {/*
           `2L-EDIT-001`. The controls arrive already derived from the taxonomy
           against this row's real status — this row does not compute them, and
@@ -240,6 +249,7 @@ function TaskRow({
             relationOptions={quickEdit.relationOptions}
             taskId={task.taskId}
             title={task.title}
+            undoAction={quickEdit.undoAction}
           />
         ) : null}
       </div>

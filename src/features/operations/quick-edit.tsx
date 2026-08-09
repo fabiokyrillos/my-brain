@@ -38,6 +38,7 @@ import {
   type TaskDetailRelationOptions,
 } from "@/features/task-commands/task-detail-controls";
 import type { DetailControl } from "@/features/task-commands/detail-controls";
+import type { TaskUndoHandler } from "./undo-affordance";
 import type { Locale } from "@/lib/preferences";
 
 import { getWorkCopy } from "./copy";
@@ -50,6 +51,7 @@ export function QuickEdit({
   relationOptions,
   taskId,
   title,
+  undoAction,
 }: {
   action: TaskDetailCommandHandler;
   controls: readonly DetailControl[];
@@ -59,6 +61,8 @@ export function QuickEdit({
   taskId: string;
   /** The rendered title. A resolution query hint only, never a gate. */
   title: string;
+  /** `2L-EDIT-008`. A quick edit is reversible exactly as the detail's is. */
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getWorkCopy(locale).quickEdit;
   if (controls.length === 0) return null;
@@ -74,6 +78,7 @@ export function QuickEdit({
         relationOptions={relationOptions}
         taskId={taskId}
         title={title}
+        undoAction={undoAction}
         variant="inline"
       />
     </details>

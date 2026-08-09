@@ -9,6 +9,7 @@
  */
 
 import type { WorkSurfaceAction } from "@/features/task-commands/taxonomy";
+import type { TaskUndoOffer } from "@/features/task-commands/task-undo-state";
 
 export type WorkItemActionStatus = "idle" | "applied" | "no_change" | "refused" | "failed";
 
@@ -31,6 +32,15 @@ export type WorkItemActionState = {
   /** A refusal the user can act on by reloading the list. */
   readonly refreshable: boolean;
   readonly retryable: boolean;
+  /**
+   * `2L-EDIT-008`/`-009` — the reversal the database wrote, or null.
+   *
+   * Populated straight from `apply_task_command`'s own answer, which returns an
+   * `undoId` on `applied` and `null` on `no_change`. So an operation with no
+   * domain reversal cannot offer one, and the surface takes no decision it
+   * could take wrongly.
+   */
+  readonly undo: TaskUndoOffer | null;
 };
 
 export const idleWorkItemActionState: WorkItemActionState = {
@@ -43,4 +53,5 @@ export const idleWorkItemActionState: WorkItemActionState = {
   announcement: "",
   refreshable: false,
   retryable: false,
+  undo: null,
 };

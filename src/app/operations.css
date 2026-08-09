@@ -233,3 +233,14 @@ a.entry-outcome-title:focus-visible{outline:3px solid rgba(53,108,185,.28);outli
 .task-detail-controls-inline{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}
 .task-detail-controls-inline .task-control-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
 @media(max-width:600px){.work-quick-edit-summary{width:100%;justify-content:center}}
+
+/* Phase 2L slice 2L.1: the undo affordance (`2L-EDIT-008`).
+
+   Inside the outcome region rather than beside it: "this happened" and "you can
+   take it back" are one thought, and a control floating outside the result
+   would have no announced relationship to the operation it reverses. */
+.work-undo{margin-top:10px}
+.work-undo-button{min-height:44px}
+.work-undo-window{margin:6px 0 0;color:var(--ink-soft);font-size:11px}
+.work-undo-result{margin-top:8px;color:var(--ink-soft);font-size:12px}
+.work-undo-result:focus-visible{outline:3px solid rgba(53,108,185,.28);outline-offset:2px}
