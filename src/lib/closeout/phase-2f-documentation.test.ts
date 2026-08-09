@@ -199,10 +199,26 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line).toMatch(/Phase 2K/);
     expect(line, "the start must cite its authorization").toMatch(/ADR-097/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
-    // ADR-097 authorizes planning only. A backlog line that says Phase 2K is
-    // active without saying what that authorization withheld is the line a
-    // reader acts on before checking the ADR.
-    expect(line, "the active-milestone line overstates ADR-097's authorization").toMatch(/planning/i);
+    /*
+     * Moved at Phase 2K's close, with the line, in the same commit.
+     *
+     * This assertion used to require the word "planning", because ADR-097
+     * authorized planning **only** and a backlog line claiming more than the
+     * ADR gave is the line a reader acts on before checking. ADR-101 then
+     * authorized implementation through closeout, and the phase closed — so
+     * "planning" became the stale half and keeping it would have made the
+     * guard demand a false statement.
+     *
+     * The property is unchanged and is the one the comment above insists on:
+     * the line names the phase, cites **every** authorization that phase
+     * received, and does not overstate what any of them gave. What replaces
+     * "planning" is the successor check — because a closed phase with no
+     * authorized successor is exactly when a backlog is most likely to
+     * announce one.
+     */
+    expect(line, "the close must cite the implementation authorization too").toMatch(/ADR-101/);
+    expect(line, "no successor is authorized, and the backlog must not imply one")
+      .not.toMatch(/Phase 2L/);
   });
 });
 
