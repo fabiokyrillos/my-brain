@@ -9,6 +9,9 @@ import { requireSupabaseData } from "@/lib/supabase/result";
 import type { createClient } from "@/lib/supabase/server";
 import type { WorkItemView } from "./contracts";
 import { toWorkItemView, type ProjectionActionSource } from "./projection-mappers";
+import { serializeWorkPosition } from "@/features/operations/work-position";
+import { DEFAULT_WORK_QUERY, type WorkOrder, type WorkQuery } from "./work-query";
+import { WORK_VIEWS, workViews, type WorkViewId } from "./work-views";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 type TaskRow = Pick<
@@ -18,11 +21,36 @@ type TaskRow = Pick<
   | "source_entry_id"
 >;
 
-// Re-exported so existing importers are unchanged; the declaration itself
-// lives in a client-safe module, because the selection ceiling derives from it.
+// Re-exported so existing importers are unchanged; the declarations themselves
+// live in client-safe modules, because the selection ceiling derives from the
+// page size and the tabs render the taxonomy in the browser.
 export { WORK_PAGE_SIZE };
-export const workViews = ["today", "all", "waiting"] as const;
-export type WorkViewId = (typeof workViews)[number];
+export { workViews, type WorkViewId };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * `2L-VIEW-004`/`-005` — the narrowing this projection accepts.
+ *
+ * Every member narrows a `tasks` column the page query was already selecting,
+ * which is what `2L-VIEW-004` means by "the attributes the projection already
+ * loads" — except the two relation filters, which are the one deliberate
+ * two-step and are bounded per relation rather than per user.
+ */
+export type WorkFilters = Pick<
+  WorkQuery,
+  "state" | "due" | "priority" | "origin" | "projectId" | "contextId" | "order"
+>;
+
+const DEFAULT_WORK_FILTERS: WorkFilters = {
+  state: DEFAULT_WORK_QUERY.state,
+  due: DEFAULT_WORK_QUERY.due,
+  priority: DEFAULT_WORK_QUERY.priority,
+  origin: DEFAULT_WORK_QUERY.origin,
+  projectId: DEFAULT_WORK_QUERY.projectId,
+  contextId: DEFAULT_WORK_QUERY.contextId,
+  order: DEFAULT_WORK_QUERY.order,
+};
 
 export type WorkProjectionPage = {
   readonly items: readonly WorkItemView[];
@@ -135,8 +163,20 @@ function availableActions(status: string, detailHref: string): readonly Projecti
   return [open, { id: "complete_task" }, { id: "wait_task" }];
 }
 
-export function taskDetailHref(locale: Locale, taskId: string): string {
-  return `/${locale}/app/work/${taskId}`;
+/**
+ * `2L-RETURN-001`/`-002` — the link to a task, carrying where the user was.
+ *
+ * The position travels **with the link** rather than in history or in storage,
+ * so a task opened from `?view=all&priority=high&page=3` returns there after a
+ * refresh, from a shared link, and on a device that has no history for it.
+ *
+ * `from` is omitted when the position is the default: a parameter that says
+ * "the default" is a longer URL describing the same thing, and one state should
+ * have one URL.
+ */
+export function taskDetailHref(locale: Locale, taskId: string, from?: string): string {
+  const base = `/${locale}/app/work/${taskId}`;
+  return from ? `${base}?from=${from}` : base;
 }
 
 export async function loadWorkProjection(
@@ -147,6 +187,12 @@ export async function loadWorkProjection(
     view: WorkViewId;
     page: number;
     now?: Date;
+    /**
+     * `2L-VIEW-004`/`-005`. Absent means the declared defaults — the page
+     * exactly as it was before this slice, which is what lets Hoje keep calling
+     * this with a view and a page and nothing else.
+     */
+    filters?: WorkFilters;
   },
 ): Promise<WorkProjectionPage> {
   const profileResult = await supabase
@@ -159,6 +205,31 @@ export async function loadWorkProjection(
     ? profile.timezone
     : defaultAgentPreferences.timezone;
 
+  const filters: WorkFilters = options.filters ?? DEFAULT_WORK_FILTERS;
+  const now = options.now ?? new Date();
+  const nextDay = startOfNextLocalDay(now, timezone);
+  const startOfToday = new Date(nextDay.getTime() - DAY_MS);
+
+  /*
+   * The relation filters are resolved **first**, so the page query can be
+   * bounded by their ids. An empty result means no task matches, which is a
+   * narrower answer and never a wider one — and it costs the page query
+   * nothing, because there is nothing left to ask for.
+   */
+  /*
+   * The position each row's link carries back. Serialized once per page rather
+   * than per row: it is the same value for every row on the page, and fifty
+   * identical encodings would be fifty chances for one to differ.
+   */
+  const returnPosition = options.filters
+    ? serializeWorkPosition({ ...DEFAULT_WORK_QUERY, ...filters, view: options.view, page: options.page })
+    : undefined;
+
+  const relationTaskIds = await loadRelationFilterTaskIds(supabase, options.userId, filters);
+  if (relationTaskIds !== null && relationTaskIds.length === 0) {
+    return { items: [], hasNext: false, timezone, editControlsByTaskId: {}, statusByTaskId: {} };
+  }
+
   let query = supabase
     .from("tasks")
     // `source_entry_id` joined the projection in Phase 2L: it is the only input
@@ -167,24 +238,49 @@ export async function loadWorkProjection(
     .select("id,user_id,title,description,status,due_at,created_by,updated_at,planned_at,manual_priority,intentional_no_due,no_due_reason,parent_task_id,source_entry_id")
     .eq("user_id", options.userId);
 
+  // The view's own shape, unchanged from before this slice.
   if (options.view === "today") {
-    query = query
-      .not("due_at", "is", null)
-      .lt("due_at", startOfNextLocalDay(options.now ?? new Date(), timezone).toISOString())
-      .not("status", "in", "(completed,cancelled)")
-      .order("due_at", { ascending: true })
-      .order("id", { ascending: true });
+    query = query.not("due_at", "is", null).lt("due_at", nextDay.toISOString());
   } else if (options.view === "waiting") {
-    query = query
-      .eq("status", "waiting")
-      .order("updated_at", { ascending: false })
-      .order("id", { ascending: true });
-  } else {
-    query = query
-      .neq("status", "cancelled")
-      .order("updated_at", { ascending: false })
-      .order("id", { ascending: true });
+    query = query.eq("status", "waiting");
   }
+
+  /*
+   * The status predicate: each view's own default, or the **narrower** one
+   * `state` names.
+   *
+   * `open` reproduces exactly what each view did before this slice, so the
+   * default page is byte-for-byte the page it was. `completed` and `cancelled`
+   * *replace* that predicate rather than adding to it, which is why no value of
+   * `state` can widen a view — the property `2L-VIEW-008` is about.
+   */
+  if (filters.state === "completed") {
+    query = query.eq("status", "completed");
+  } else if (filters.state === "cancelled") {
+    query = query.eq("status", "cancelled");
+  } else if (options.view === "today") {
+    query = query.not("status", "in", "(completed,cancelled)");
+  } else if (options.view === "all") {
+    query = query.neq("status", "cancelled");
+  }
+
+  if (filters.due === "overdue") {
+    query = query.not("due_at", "is", null).lt("due_at", startOfToday.toISOString());
+  } else if (filters.due === "today") {
+    query = query.gte("due_at", startOfToday.toISOString()).lt("due_at", nextDay.toISOString());
+  } else if (filters.due === "upcoming") {
+    query = query.gte("due_at", nextDay.toISOString());
+  } else if (filters.due === "none") {
+    query = query.is("due_at", null);
+  }
+
+  if (filters.priority !== "any") query = query.eq("manual_priority", filters.priority);
+  // `created_by` holds the persisted provenance; `origin` is what a user reads.
+  if (filters.origin === "you") query = query.eq("created_by", "user");
+  if (filters.origin === "brain") query = query.eq("created_by", "agent");
+  if (relationTaskIds !== null) query = query.in("id", relationTaskIds);
+
+  query = applyOrder(query, filters.order, options.view);
 
   const { from, to } = pageRange(options.page, WORK_PAGE_SIZE);
   const result = await query.range(from, to);
@@ -207,7 +303,10 @@ export async function loadWorkProjection(
       noDueReason: row.no_due_reason,
       status: row.status,
       createdBy: row.created_by,
-      availableActions: availableActions(row.status, taskDetailHref(options.locale, row.id)),
+      availableActions: availableActions(
+        row.status,
+        taskDetailHref(options.locale, row.id, returnPosition),
+      ),
       projects: relations?.projects,
       contexts: relations?.contexts,
       people: relations?.people,
@@ -377,4 +476,70 @@ export async function loadTaskRelations(
   }
 
   return relationsByTaskId;
+}
+
+/**
+ * The ordering, from the user's choice or from the view's declared default.
+ *
+ * `id` is always the last key. Without it a page boundary is unstable when two
+ * rows share a due date or an update instant, and the same row can appear on
+ * two pages or on none — which would make `2L-VIEW-009`'s "pagination composes"
+ * false in exactly the case nobody checks.
+ */
+function applyOrder<T extends { order: (column: string, options: { ascending: boolean }) => T }>(
+  query: T,
+  order: WorkOrder,
+  view: WorkViewId,
+): T {
+  const resolved = order === "default" ? WORK_VIEWS[view].defaultOrder : order;
+  const ordered = resolved === "due_asc"
+    ? query.order("due_at", { ascending: true })
+    : resolved === "due_desc"
+      ? query.order("due_at", { ascending: false })
+      : resolved === "updated_asc"
+        ? query.order("updated_at", { ascending: true })
+        : query.order("updated_at", { ascending: false });
+  return ordered.order("id", { ascending: true });
+}
+
+/**
+ * The task ids a relation filter admits, or null when none was asked for.
+ *
+ * `task_projects` and `task_contexts` are separate tables, so this is the one
+ * two-step in the page load. It is owner-scoped **and** bounded to the single
+ * relation, so the read grows with the size of that project or context rather
+ * than with the size of the user's whole task set — the property
+ * `2L-VIEW-006` demands of grouping and which a filter has no excuse to lack.
+ *
+ * Two filters compose by **intersection**, which is the only reading of "in
+ * this project and this context" that cannot silently widen.
+ */
+async function loadRelationFilterTaskIds(
+  supabase: SupabaseClient,
+  userId: string,
+  filters: WorkFilters,
+): Promise<string[] | null> {
+  if (!filters.projectId && !filters.contextId) return null;
+
+  const sets: string[][] = [];
+  if (filters.projectId) {
+    const result = await supabase
+      .from("task_projects")
+      .select("task_id")
+      .eq("user_id", userId)
+      .eq("project_id", filters.projectId);
+    const rows = (requireSupabaseData(result, "load Work project filter") ?? []) as { task_id: string }[];
+    sets.push(rows.map((row) => row.task_id));
+  }
+  if (filters.contextId) {
+    const result = await supabase
+      .from("task_contexts")
+      .select("task_id")
+      .eq("user_id", userId)
+      .eq("context_id", filters.contextId);
+    const rows = (requireSupabaseData(result, "load Work context filter") ?? []) as { task_id: string }[];
+    sets.push(rows.map((row) => row.task_id));
+  }
+
+  return sets.reduce((left, right) => left.filter((id) => right.includes(id)));
 }

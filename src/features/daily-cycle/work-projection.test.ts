@@ -13,6 +13,7 @@ type WorkProjectionModule = {
       view: "today" | "all" | "waiting";
       page: number;
       now?: Date;
+      filters?: Record<string, unknown>;
     },
   ) => Promise<{
     items: readonly unknown[];
@@ -29,7 +30,7 @@ type Result = { data: unknown; error: unknown };
 
 function queryStub(result: Result) {
   const stub: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "neq", "not", "lt", "order", "range", "in"]) {
+  for (const method of ["select", "eq", "neq", "not", "lt", "gte", "is", "order", "range", "in"]) {
     stub[method] = vi.fn(() => stub);
   }
   stub.maybeSingle = vi.fn(async () => result);
@@ -566,5 +567,144 @@ describe("loadWorkProjection: the derived classification (OD-2L-1 option B)", ()
       expect(stub.upsert).toBeUndefined();
     }
     expect(from).not.toHaveBeenCalledWith("undo_operations");
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `2L-VIEW-004`/`-005`/`-008` — the filters and the ordering, in SQL.
+ * -------------------------------------------------------------------------- */
+
+describe("loadWorkProjection: filters narrow, and never widen", () => {
+  const base = { userId: "user-1", locale: "en" as const, view: "all" as const, page: 1 };
+  const defaults = {
+    state: "open" as const,
+    due: "any" as const,
+    priority: "any" as const,
+    origin: "any" as const,
+    projectId: null,
+    contextId: null,
+    order: "default" as const,
+  };
+
+  it("reproduces each view's own status predicate when nothing is narrowed", async () => {
+    const { client, tasksQuery } = clientMock();
+    await loadWorkProjection()(client, { ...base, filters: defaults });
+    expect(tasksQuery.neq).toHaveBeenCalledWith("status", "cancelled");
+  });
+
+  it("replaces the view's status predicate rather than adding to it", async () => {
+    // `completed` and `cancelled` are NARROWER answers, not extra ones. If
+    // `state` could add rows, a typo would show a user their cancelled work.
+    const completed = clientMock();
+    await loadWorkProjection()(completed.client, { ...base, filters: { ...defaults, state: "completed" } });
+    expect(completed.tasksQuery.eq).toHaveBeenCalledWith("status", "completed");
+    expect(completed.tasksQuery.neq).not.toHaveBeenCalledWith("status", "cancelled");
+
+    const cancelled = clientMock();
+    await loadWorkProjection()(cancelled.client, { ...base, filters: { ...defaults, state: "cancelled" } });
+    expect(cancelled.tasksQuery.eq).toHaveBeenCalledWith("status", "cancelled");
+    expect(cancelled.tasksQuery.neq).not.toHaveBeenCalledWith("status", "cancelled");
+  });
+
+  it("narrows by due window against the caller's own local day", async () => {
+    const { client, tasksQuery } = clientMock({ timezone: "America/Sao_Paulo" });
+    await loadWorkProjection()(client, {
+      ...base,
+      now: new Date("2026-07-18T01:30:00.000Z"),
+      filters: { ...defaults, due: "upcoming" },
+    });
+    expect(tasksQuery.gte).toHaveBeenCalledWith("due_at", "2026-07-18T03:00:00.000Z");
+  });
+
+  it("narrows by priority and by origin using the persisted columns", async () => {
+    const { client, tasksQuery } = clientMock();
+    await loadWorkProjection()(client, {
+      ...base,
+      filters: { ...defaults, priority: "high", origin: "brain" },
+    });
+    expect(tasksQuery.eq).toHaveBeenCalledWith("manual_priority", "high");
+    expect(tasksQuery.eq).toHaveBeenCalledWith("created_by", "agent");
+  });
+
+  it("orders by the view's declared default when the user chose none", async () => {
+    const today = clientMock();
+    await loadWorkProjection()(today.client, { ...base, view: "today", filters: defaults });
+    expect(today.tasksQuery.order).toHaveBeenNthCalledWith(1, "due_at", { ascending: true });
+
+    const all = clientMock();
+    await loadWorkProjection()(all.client, { ...base, view: "all", filters: defaults });
+    expect(all.tasksQuery.order).toHaveBeenNthCalledWith(1, "updated_at", { ascending: false });
+  });
+
+  it("always ends the ordering with the id, so a page boundary is stable", async () => {
+    const { client, tasksQuery } = clientMock();
+    await loadWorkProjection()(client, { ...base, filters: { ...defaults, order: "due_desc" } });
+    expect(tasksQuery.order).toHaveBeenNthCalledWith(1, "due_at", { ascending: false });
+    expect(tasksQuery.order).toHaveBeenNthCalledWith(2, "id", { ascending: true });
+  });
+});
+
+describe("loadWorkProjection: the relation filter is bounded per relation", () => {
+  const base = { userId: "user-1", locale: "en" as const, view: "all" as const, page: 1 };
+  const defaults = {
+    state: "open" as const,
+    due: "any" as const,
+    priority: "any" as const,
+    origin: "any" as const,
+    projectId: null,
+    contextId: null,
+    order: "default" as const,
+  };
+  const PROJECT = "9f1c2f2e-1111-4111-8111-111111111111";
+
+  function relationClient(taskIds: string[]) {
+    const profileQuery = queryStub({ data: { timezone: "America/Sao_Paulo" }, error: null });
+    const tasksQuery = queryStub({ data: [task(1)], error: null });
+    const relationQuery = queryStub({ data: taskIds.map((id) => ({ task_id: id })), error: null });
+    const emptyQuery = queryStub({ data: [], error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "profiles") return profileQuery;
+      if (table === "tasks") return tasksQuery;
+      if (table === "task_projects") return relationQuery;
+      return emptyQuery;
+    });
+    return { client: { from }, from, tasksQuery, relationQuery };
+  }
+
+  it("reads the relation owner-scoped and bounded to the one project", async () => {
+    const { client, relationQuery, tasksQuery } = relationClient(["task-001"]);
+    await loadWorkProjection()(client, { ...base, filters: { ...defaults, projectId: PROJECT } });
+
+    expect(relationQuery.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(relationQuery.eq).toHaveBeenCalledWith("project_id", PROJECT);
+    expect(tasksQuery.in).toHaveBeenCalledWith("id", ["task-001"]);
+  });
+
+  it("returns an empty page without querying tasks at all when nothing matches", async () => {
+    const { client, from } = relationClient([]);
+    const page = await loadWorkProjection()(client, {
+      ...base,
+      filters: { ...defaults, projectId: PROJECT },
+    });
+
+    expect(page.items).toEqual([]);
+    expect(page.hasNext).toBe(false);
+    expect(from).not.toHaveBeenCalledWith("tasks");
+  });
+
+  it("adds no relation read when no relation filter was asked for", async () => {
+    /*
+     * `task_projects` is read once regardless — that is the page's own relation
+     * hydration, which predates this slice. What must not appear is the
+     * *filter's* read, and the two are distinguishable only by their arguments:
+     * the hydration asks `.in("task_id", …)`, the filter asks
+     * `.eq("project_id", …)`. Counting calls would have compared two reads that
+     * happen to be one each for different reasons.
+     */
+    const { client, relationQuery } = relationClient(["task-001"]);
+    await loadWorkProjection()(client, { ...base, filters: defaults });
+
+    expect(relationQuery.eq).not.toHaveBeenCalledWith("project_id", expect.anything());
+    expect(relationQuery.eq).not.toHaveBeenCalledWith("context_id", expect.anything());
   });
 });

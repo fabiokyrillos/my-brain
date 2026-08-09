@@ -15,6 +15,10 @@ import type {
 } from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
+import { WorkFilters } from "./work-filters";
+import { getWorkFiltersCopy } from "./work-filters-copy";
+import { groupWorkItems } from "./work-grouping";
+import { isNarrowed, toWorkQueryParams, workHref, type WorkQuery } from "./work-query";
 import { workViews, type WorkViewId } from "./work-projection";
 import { withAgentName } from "@/lib/agent-name";
 
@@ -55,6 +59,8 @@ export function WorkView({
   relationOptions,
   dateBounds,
   statusByTaskId,
+  query,
+  positionAdjusted = false,
 }: {
   locale: Locale;
   timezone: string;
@@ -69,9 +75,25 @@ export function WorkView({
   dateBounds?: TaskDetailDateBounds;
   /** Each row's real status, which the preview's eligibility partition needs. */
   statusByTaskId?: Readonly<Record<string, string>>;
+  /** The complete description of what the user is looking at (`2L-VIEW-007`). */
+  query?: WorkQuery;
+  /** `2L-RETURN-005` — the position moved, and the user is told. */
+  positionAdjusted?: boolean;
 }) {
   const text = withAgentName(copy[locale], agentName);
   const active = text.views[view];
+  const filtersCopy = getWorkFiltersCopy(locale);
+  const groups = query
+    ? groupWorkItems(items, query.group, { ungrouped: filtersCopy.ungrouped, priority: filtersCopy.priority })
+    : [{ key: "all", label: null, items }];
+  /*
+   * `2L-VIEW-009` and the universal-state contract: an empty page that is empty
+   * BECAUSE of the narrowing is a different fact from a view with nothing in it,
+   * and the two say different things to a user — one of them is actionable.
+   */
+  const emptyHint = query && isNarrowed(query) && items.length === 0
+    ? filtersCopy.emptyFiltered
+    : active.empty;
 
   return <div className="content-page work-page">
     <WorkViewViewed locale={locale} view={view} />
@@ -81,25 +103,42 @@ export function WorkView({
         <h1>{text.title}</h1>
         <p>{active.description}</p>
         {view === "waiting" && <p className="work-view-note">{text.waitingNote}</p>}
+        {positionAdjusted ? (
+          <p className="work-position-adjusted" role="status">{filtersCopy.positionAdjusted}</p>
+        ) : null}
       </div>
       {view === "all" && <InlineCreateForm action={createRecord} kind="task" locale={locale} />}
     </header>
     <nav className="work-view-tabs" aria-label={text.navigation}>
       {workViews.map((candidate) => <Link
         aria-current={candidate === view ? "page" : undefined}
-        href={`/${locale}/app/work?view=${candidate}`}
+        // Switching view keeps the narrowing but returns to page 1: page 7 of
+        // Hoje is very rarely page 7 of Todas.
+        href={query ? workHref(locale, { ...query, view: candidate, page: 1 }) : `/${locale}/app/work?view=${candidate}`}
         key={candidate}
       >
         {text.views[candidate].label}
       </Link>)}
     </nav>
     <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
-    <TaskList
-      agentName={agentName}
+    {query ? <WorkFilters locale={locale} query={query} /> : null}
+    {groups.map((group) => (
+      <section
+        aria-label={group.label ?? undefined}
+        className={group.label ? "work-group" : undefined}
+        key={group.key}
+      >
+        {group.label ? (
+          <h2 className="work-group-heading">
+            {group.label} <span className="work-group-count">{filtersCopy.groupCount(group.items.length)}</span>
+          </h2>
+        ) : null}
+        <TaskList
+          agentName={agentName}
       action={applyWorkItemAction}
-      emptyHint={active.empty}
+      emptyHint={emptyHint}
       locale={locale}
-      tasks={items}
+      tasks={group.items}
       timezone={timezone}
       undoAction={undoWorkOperation}
       bulk={statusByTaskId && relationOptions && dateBounds ? {
@@ -116,7 +155,9 @@ export function WorkView({
         relationOptions,
         dateBounds,
       } : undefined}
-    />
+        />
+      </section>
+    ))}
     {/*
       2E-DESTRUCTIVE-006's explicit affordance. It lives here rather than in the
       navigation because `capabilities.ts`'s `nested: true` drives active-state
@@ -132,7 +173,9 @@ export function WorkView({
       path="work"
       page={page}
       hasNext={hasNext}
-      query={{ view }}
+      // `2L-VIEW-009`: pagination composes with everything else, so the links
+      // carry the whole query rather than the view alone.
+      query={query ? toWorkQueryParams({ ...query, page: 1 }) : { view }}
     />
   </div>;
 }
