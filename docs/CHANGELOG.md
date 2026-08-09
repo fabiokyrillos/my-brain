@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2L SLICE 2L.4: mobile Work interaction, the no-gesture guard, reflow and IME
+
+**Zero gestures. Zero migrations.**
+
+**The lane found three real defects, which is the point of measuring from paint.** The target-size check measured `button, a[href]` - every control Phase 2J's surfaces had. Work adds a checkbox and two pickers, so the locator was widened to `button, a[href], input, select, summary` and the four Work fixtures were added to it. It failed three times: the row's **title link**, the way into a task, measured **16px** - the same shape as the defect Phase 2I shipped; `.panel-view-all`, shared with Hoje and Registros, measured **18px**; and the relation filter's escape hatch, inside a sentence, measured **12px**. All are now 24px, the WCAG 2.5.8 minimum this lane already asserts. A check widened without being run would have been green about controls it never looked at.
+
+**24 and not 44, deliberately:** the row's ACTIONS are the thumb-reach controls and are already 44, while a 44px title on every row would add half a line of height per task and fight the density bound.
+
+**Added.** `src/lib/closeout/phase-2l-no-gesture-guard.test.ts` - a permanent guard over a NAMED set of thirteen Work surfaces, matching the four families OD-2L-5 names in both shapes (a JSX prop and a listener registration), plus the libraries that would bind them and the `touch-action` CSS a drag implementation reaches for first. It fires on a handler added **in preparation** - the clause that matters, because a handler that does nothing yet is what a review waves through. It does not fire on a comment, which is the mistake this repository has already paid for. And it asserts its own completeness against the Work components discovered on disk.
+
+**IME composition is never submitted** (`2L-MOBILE-010`). A single-line input inside a form submits on Enter, and Enter is also how an IME commits a candidate - so on a Japanese, Chinese or Korean keyboard the first Enter would send a half-typed value the user never chose. Guarded on the keydown via `isComposing`, guarded again inside the submit handler because the keydown is the common path and not the only one, and never discarded by a re-render because the text inputs are uncontrolled and the composition flag is a ref.
+
+**The browser lane now proves, at a real viewport:** no horizontal body scroll; every row action inside the viewport; the bulk bar's box does not intersect any row's box (geometric, not "it is not `position: fixed`"); every control visible and sized **without hovering**; and reflow at **320 CSS px** and at an emulated **200% zoom**.
+
+**NOT executed, and reported as such:** `2L-MOBILE-008` and `2L-ACCESS-008`. Everything above is an **emulated viewport** - Pixel 7 emulation is a viewport and a user agent, not a phone, with no real touch digitiser, no real on-screen keyboard and no real IME. The composition events are synthesised: what is proved is that the component honours them, not that a real IME emits them in the order assumed.
+
+**Executed:** lint and typecheck zero-error; `npm test` **5213 passed / 0 failing tests**; build green; accessibility lane green at both viewports, 26 tests on mobile.
+
 ## 2026-08-09 - PHASE 2L SLICE 2L.3: Work views, filters, ordering, grouping and return continuity
 
 **MIGRATION BUDGET: `1 allocated - 0 spent`.** The phase's single allocation lapses, which is the signed outcome under OD-2L-2 option A. No migration exists, therefore no deployment record and no G8. Hosted parity stays `202608090089`; `workView` is still exactly `today, all, waiting`.

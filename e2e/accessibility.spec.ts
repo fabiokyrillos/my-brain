@@ -669,9 +669,16 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
 
-  const targets = page.locator("button, a[href]");
+  /*
+   * `2L-MOBILE-001` widened this locator. Before slice 2L.4 it measured
+   * `button, a[href]` — which is every control Phase 2J's surfaces had. Work
+   * adds a row checkbox and two pickers, and a contract that measured only the
+   * shapes that happened to exist would have been green about controls it never
+   * looked at.
+   */
+  const targets = page.locator("button, a[href], input, select, summary");
   const total = await targets.count();
   for (let index = 0; index < total; index += 1) {
     const box = await targets.nth(index).boundingBox();
@@ -717,4 +724,126 @@ test("2J-ACCESS-003: result counts are announced politely without stealing focus
     // A live region that can take focus would move the user on every keystroke.
     await expect(statuses.nth(index)).not.toHaveAttribute("tabindex", /.*/);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * `2L-MOBILE-002`, `-003`, `-007`, `-009` — the Work surfaces on a phone.
+ * ------------------------------------------------------------------ */
+
+const WORK_MOBILE = () => `${workFilters()}${workList()}${workBulkBar()}`;
+
+test("2L-MOBILE-007: the Work page body never scrolls horizontally", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "a horizontal-scroll contract is about a narrow viewport");
+  await render(page, WORK_MOBILE());
+
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.scrollWidth, "the page body scrolls sideways at a phone width")
+    .toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
+test("2L-MOBILE-007: every row's primary action is reachable without scrolling sideways", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "a reach contract is about a narrow viewport");
+  await render(page, WORK_MOBILE());
+
+  const width = await page.evaluate(() => document.documentElement.clientWidth);
+  const actions = page.locator(".list-row .row-action");
+  const total = await actions.count();
+  expect(total).toBeGreaterThan(0);
+  for (let index = 0; index < total; index += 1) {
+    const box = await actions.nth(index).boundingBox();
+    if (!box) continue;
+    expect(box.x, "a row action starts off-screen").toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, "a row action extends past the viewport")
+      .toBeLessThanOrEqual(width + 1);
+  }
+});
+
+test("2L-MOBILE-002: the selection bar does not permanently cover a list row", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "an occlusion contract is about a narrow viewport");
+  await render(page, WORK_MOBILE());
+
+  // Not "it is not `position: fixed`" — that is one way to cover a row and not
+  // the only one. The assertion is geometric: the bar's box and every row's box
+  // do not intersect.
+  const bar = await page.locator(".work-bulk-bar").boundingBox();
+  expect(bar, "the bulk bar did not render").not.toBeNull();
+  const rows = page.locator(".list-row");
+  const total = await rows.count();
+  for (let index = 0; index < total; index += 1) {
+    const row = await rows.nth(index).boundingBox();
+    if (!row || !bar) continue;
+    const overlaps = bar.x < row.x + row.width
+      && bar.x + bar.width > row.x
+      && bar.y < row.y + row.height
+      && bar.y + bar.height > row.y;
+    expect(overlaps, `the bulk bar overlaps row ${index}`).toBe(false);
+  }
+});
+
+test("2L-MOBILE-003: no Work action is reachable only on hover", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "hover dependence matters where there is no pointer");
+  await render(page, WORK_MOBILE());
+
+  // Every control is measured **without** hovering. A control that only paints
+  // on `:hover` computes to zero size or `visibility: hidden` here.
+  const controls = page.locator(".work-page button, .work-page a[href], .work-filters a[href]");
+  const total = await controls.count();
+  expect(total).toBeGreaterThan(4);
+  for (let index = 0; index < total; index += 1) {
+    const control = controls.nth(index);
+    const box = await control.boundingBox();
+    const style = await control.evaluate((node) => {
+      const computed = getComputedStyle(node);
+      return { visibility: computed.visibility, opacity: computed.opacity, display: computed.display };
+    });
+    expect(box, "a control has no box until it is hovered").not.toBeNull();
+    expect(style.visibility).not.toBe("hidden");
+    expect(style.display).not.toBe("none");
+    expect(Number(style.opacity)).toBeGreaterThan(0);
+  }
+});
+
+test("2L-MOBILE-009: the Work surfaces reflow at 320 CSS pixels", async ({ page }) => {
+  // 320px is the WCAG 1.4.10 reflow width, and it is asserted at BOTH projects
+  // rather than only on the mobile one: a desktop layout that cannot reach it
+  // is a layout a zoomed-in desktop user cannot use either.
+  await page.setViewportSize({ width: 320, height: 800 });
+  await render(page, WORK_MOBILE());
+
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.scrollWidth, "content is clipped or scrolls sideways at 320px")
+    .toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+  // And nothing became unreachable in the process.
+  const controls = page.locator(".work-page button, .work-filters a[href]");
+  const total = await controls.count();
+  expect(total).toBeGreaterThan(4);
+  for (let index = 0; index < total; index += 1) {
+    expect(await controls.nth(index).boundingBox(), "a control disappeared at 320px").not.toBeNull();
+  }
+});
+
+test("2L-MOBILE-009: the Work surfaces reflow at 200% zoom", async ({ page }) => {
+  /*
+   * 200% zoom is emulated the way the spec defines it — halving the CSS
+   * viewport at the same device width — because Playwright has no page-zoom
+   * control and a `transform: scale()` would test a transform rather than a
+   * reflow.
+   */
+  await page.setViewportSize({ width: 640, height: 512 });
+  await page.emulateMedia({ media: "screen" });
+  await render(page, WORK_MOBILE());
+
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.scrollWidth, "content is clipped at 200% zoom")
+    .toBeLessThanOrEqual(overflow.clientWidth + 1);
 });

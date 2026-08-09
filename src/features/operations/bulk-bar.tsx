@@ -140,6 +140,17 @@ export function BulkBar({
         {state.announcement}
       </div>
 
+      {/*
+        `2L-MOBILE-006` — the count is announced when it changes.
+        A separate polite region from the outcome one above: they change at
+        different times and for different reasons, and one region carrying both
+        would replace "3 selected" with the result of a run the user has not
+        started yet.
+      */}
+      <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+        {copy.selected(selected.length)}
+      </div>
+
       <div className="work-bulk-selection">
         <strong>{copy.selected(selected.length)}</strong>
         <span className="work-bulk-hint">{copy.ceilingHint(SELECTION_CEILING)}</span>
