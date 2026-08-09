@@ -44,7 +44,7 @@
 
 begin;
 
-select plan(11);
+select plan(10);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: two owners, one entry-with-embedding and one memory each
@@ -131,10 +131,28 @@ select is(
   'both retrieved tables have RLS ENABLED and FORCED'
 );
 
+-- WHERE THE ANON BOUNDARY ACTUALLY IS, AND WHY THE FIRST DRAFT WAS WRONG
+--
+-- This assertion originally read `has_function_privilege('anon', …, 'execute')
+-- is false`, on the strength of `202607160006`'s `revoke all on function … from
+-- anon`. CI failed it: the answer is **true**. Postgres grants EXECUTE on a new
+-- function to `PUBLIC`, and revoking from `anon` does not remove a grant held
+-- through `PUBLIC` -- so `anon` may indeed call this function.
+--
+-- The hosted probe run in the same slice said the same thing from the other
+-- side: `anon` is refused with `42501 permission denied for table
+-- entry_embeddings`, naming the **table**, not the function.
+--
+-- So the boundary is the table grant, and the function-level revoke is not what
+-- protects this RPC. That is asserted here. The function-level privilege is
+-- deliberately **not** asserted in either direction: pinning it `true` would
+-- lock in the weaker state, and pinning it `false` would be a lie.
 select is(
-  (select has_function_privilege('anon', 'public.match_internal_knowledge(extensions.vector, integer)', 'execute')),
-  false,
-  'anon cannot execute the retrieval RPC'
+  (select count(*)::int
+   from (values ('public.entry_embeddings'), ('public.memories')) as retrieved(name)
+   where has_table_privilege('anon', retrieved.name, 'select')),
+  0,
+  'anon cannot SELECT either retrieved table, which is the boundary that actually holds'
 );
 
 -- ---------------------------------------------------------------------------

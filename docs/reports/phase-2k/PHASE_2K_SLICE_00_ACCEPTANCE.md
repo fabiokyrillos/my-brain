@@ -91,11 +91,26 @@ Design decisions that make it non-vacuous:
 
 - **Two owners, identical vectors.** Both owners' rows and the query vector are the same 1536-dimension vector, so every row scores identically and **ownership is the only discriminator**. Different vectors would let an assertion pass because a row merely ranked below the limit.
 - **Section 0 — non-vacuity**, read as table owner before any role switch: both owners really do have retrievable rows.
-- **Section 1 — structural, from `pg_proc`/`pg_class` rather than from the migration text**: `prosecdef = false` (SECURITY INVOKER), both tables RLS `ENABLED` **and** `FORCED`, `anon` lacks execute.
+- **Section 1 — structural, from `pg_proc`/`pg_class` rather than from the migration text**: `prosecdef = false` (SECURITY INVOKER), both tables RLS `ENABLED` **and** `FORCED`, and `anon` cannot `SELECT` either retrieved table — see §4.1, which is where the first draft was wrong.
 - **Section 2 — positive control**, the part that makes the denial mean anything: the same session, in the same transaction, retrieves **its own two rows**, both arms of the `union all` exercised.
 - **Section 3 — the boundary**, asserted in **both directions**.
 
-**Execution status: NOT YET EXECUTED LOCALLY.** This workstation has no Docker, so the local Supabase stack and pgTAP cannot run here. Its evidence comes from CI's `database` job, which runs `supabase db reset` over the whole chain and then the pgTAP suite. **This report does not claim it passed** — §9 records the CI result.
+**Execution status: NOT EXECUTABLE LOCALLY.** This workstation has no Docker, so the local Supabase stack and pgTAP cannot run here. Its evidence comes from CI's `database` job, which runs `supabase db reset` over the whole chain and then the pgTAP suite. §9 records the CI result.
+
+### 4.1 — CI failed the first draft of this test, and the failure was a real finding
+
+**This is the slice's most useful defect, and it was mine.** CI run `31287884333` failed the `database` job on two counts, both in the new suite:
+
+1. **`plan(11)` with ten assertions.** An arithmetic error — "Bad plan. You planned 11 tests but ran 10." Corrected to `plan(10)`.
+2. **Test 5 asserted `has_function_privilege('anon', 'match_internal_knowledge', 'execute')` is `false`. It is `true`.**
+
+The second is the finding. `202607160006` carries `revoke all on function … from anon`, and the first draft trusted it. **Postgres grants `EXECUTE` on a new function to `PUBLIC`, and revoking from `anon` does not remove a grant held through `PUBLIC`** — so `anon` may in fact call this function.
+
+**The hosted probe had already said so and I did not hear it.** It returned `42501 permission denied for table entry_embeddings` — naming the **table**, not the function. The refusal never came from the function grant at all.
+
+**Corrected conclusion: the boundary that actually holds is the table grant, not the function-level revoke.** `anon` can enter the function and is stopped at the first table it touches, under `security invoker` plus forced RLS. The suite now asserts exactly that — `anon` can `SELECT` neither `entry_embeddings` nor `memories` — and deliberately asserts the function-level privilege in **neither** direction: pinning it `true` would lock in the weaker state, and pinning it `false` would be a lie.
+
+**No product change follows.** The RPC is not reachable in a way that returns data, which the hosted probe proved directly. What changed is the *account of why*, and a test that now guards the real mechanism instead of a decorative one. This is the repository's own recorded pattern — suspect the probe before the product — arriving for the eighth time.
 
 ## 5. Hosted probes
 
@@ -104,7 +119,7 @@ One probe, **read-only, zero writes**, executed against the linked project.
 | Call | Result | What it establishes |
 |---|---|---|
 | `POST /rest/v1/rpc/match_internal_knowledge` as **service_role** | **HTTP 200 → `array(0)`** | The deployed function exists with the expected signature and is callable — so the refusal below is not "the endpoint is broken". It returns **zero rows even to service_role**, because it is `security invoker` and `auth.uid()` is null under that role. The RPC is not a bypass door. |
-| the same call as **anon/publishable** | **HTTP 401 → `42501 permission denied for table entry_embeddings`** | `anon` is refused, and refused at the *table* level — stronger than the function grant alone. |
+| the same call as **anon/publishable** | **HTTP 401 → `42501 permission denied for table entry_embeddings`** | `anon` is refused **at the table**. Read carefully, this says the function grant is *not* what refuses it — see §4.1, where CI proved that reading correct and my first test wrong. |
 
 **Zero residue by construction.** The probe issues no `INSERT`, `UPDATE`, `DELETE` or `UPSERT` and creates no account. Nothing was written, so nothing had to be cleaned. The probe script was run from a temporary file outside the repository and from a temporary copy inside it that was deleted and its absence asserted in the same command; `git status` afterwards showed only the intended new pgTAP file.
 
@@ -133,7 +148,9 @@ Recorded as limitations, **not** upgraded to passes.
 
 ## 8. Deviations
 
-**None.** No measurement required a functional change, no conclusion required a migration, and nothing invaded slice 2K.1.
+**One, and it was corrected inside the slice rather than carried.** The first draft of the pgTAP suite failed CI on two defects of my own making — a `plan(11)` for ten assertions, and an assertion that `anon` lacks `EXECUTE` on the RPC when it holds it through `PUBLIC`. Both are fixed; §4.1 records the finding the second one produced. **No product change was required and none was made**, no migration was needed, the budget is untouched, and nothing invaded slice 2K.1.
+
+No measurement required a functional change, and no conclusion depended on a migration.
 
 ## 9. Tests and results
 
