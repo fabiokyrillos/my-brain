@@ -80,7 +80,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
 
   const workProjection = settled(
     workSettled,
-    { items: [], hasNext: false, timezone: "UTC", editControlsByTaskId: {} } as Awaited<ReturnType<typeof loadWorkProjection>>,
+    { items: [], hasNext: false, timezone: "UTC", editControlsByTaskId: {}, statusByTaskId: {} } as Awaited<ReturnType<typeof loadWorkProjection>>,
     "work",
   );
   const supplemental = settled(

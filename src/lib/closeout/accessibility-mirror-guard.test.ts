@@ -312,6 +312,40 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(mirror).toMatch(/<button class="back-link task-panel-close"/);
   });
 
+  it("pins selection, preview and result, which slice 2L.2 added to the lane", () => {
+    /*
+     * `2L-ACCESS-001`/`-005`/`-006`. Each class below carries an assertion:
+     * `work-row-select` is the checkbox the mobile target-size check measures,
+     * `work-bulk-form` holds the two pickers the focus walk visits, and
+     * `work-bulk-result` is the focusable landmark the result moves focus to.
+     */
+    const list = read("src/features/operations/task-list.tsx");
+    const bar = read("src/features/operations/bulk-bar.tsx");
+
+    for (const token of ["work-row-select"]) {
+      expect(list, `task-list.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    for (const token of [
+      "work-bulk-bar",
+      "work-bulk-selection",
+      "work-bulk-hint",
+      "work-bulk-form",
+      "work-bulk-preview",
+      "work-bulk-result",
+      "work-bulk-result-list",
+      'aria-live="polite"',
+    ]) {
+      expect(bar, `bulk-bar.tsx no longer emits ${token}`).toContain(token);
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
+    }
+    // Every `<label>` in the real bar resolves to a control, and the mirror is
+    // only useful if it carries the same property.
+    expect(bar).toContain("htmlFor");
+    expect(mirror).toContain('for="work-bulk-action"');
+    expect(mirror).toContain('for="work-bulk-value"');
+  });
+
   it("states its own limits, so a green lane is never read as more than it is", () => {
     // The three sentences below are the difference between an honest partial
     // and the over-claim `2I-CLOSE-002` exists to prevent. They are asserted

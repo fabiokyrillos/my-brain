@@ -48,7 +48,7 @@ vi.mock("@/features/daily-cycle/attention-projection", () => ({
 import { HomeDashboard } from "./home-dashboard";
 
 function healthy() {
-  loadWorkProjection.mockResolvedValue({ items: [], hasNext: false, timezone: "America/Sao_Paulo", editControlsByTaskId: {} });
+  loadWorkProjection.mockResolvedValue({ items: [], hasNext: false, timezone: "America/Sao_Paulo", editControlsByTaskId: {}, statusByTaskId: {} });
   loadHomeSupplementalProjection.mockResolvedValue({ waitingCount: 0, openQuestionPreview: null });
   loadInboxProjection.mockResolvedValue({ items: [], hasNext: false });
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });

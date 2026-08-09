@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { applyWorkItemAction, createRecord } from "@/features/operations/actions";
+import { applyBulkWorkCommand, applyWorkItemAction, createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
 import { WorkViewViewed } from "@/features/product-analytics/interaction-events";
@@ -54,6 +54,7 @@ export function WorkView({
   editControlsByTaskId,
   relationOptions,
   dateBounds,
+  statusByTaskId,
 }: {
   locale: Locale;
   timezone: string;
@@ -66,6 +67,8 @@ export function WorkView({
   editControlsByTaskId?: Readonly<Record<string, readonly DetailControl[]>>;
   relationOptions?: TaskDetailRelationOptions;
   dateBounds?: TaskDetailDateBounds;
+  /** Each row's real status, which the preview's eligibility partition needs. */
+  statusByTaskId?: Readonly<Record<string, string>>;
 }) {
   const text = withAgentName(copy[locale], agentName);
   const active = text.views[view];
@@ -99,6 +102,13 @@ export function WorkView({
       tasks={items}
       timezone={timezone}
       undoAction={undoWorkOperation}
+      bulk={statusByTaskId && relationOptions && dateBounds ? {
+        action: applyBulkWorkCommand,
+        undoAction: undoWorkOperation,
+        statusByTaskId,
+        relationOptions,
+        dateBounds,
+      } : undefined}
       quickEdit={editControlsByTaskId && relationOptions && dateBounds ? {
         action: applyTaskDetailCommand,
         undoAction: undoWorkOperation,

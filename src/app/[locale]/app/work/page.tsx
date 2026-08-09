@@ -51,6 +51,7 @@ export default async function WorkPage({
     items={projection.items}
     hasNext={projection.hasNext}
     editControlsByTaskId={projection.editControlsByTaskId}
+    statusByTaskId={projection.statusByTaskId}
     relationOptions={{
       project: relations.projects,
       context: relations.contexts,

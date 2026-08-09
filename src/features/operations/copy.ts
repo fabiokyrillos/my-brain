@@ -65,6 +65,41 @@ export type WorkCopy = {
    * second is true is a false promise, so there is no shared string they could
    * be assembled from.
    */
+  /**
+   * `2L-BULK-005`/`-009` — selection, preview and result.
+   *
+   * The counts are function parameters rather than interpolated at the call
+   * site, so the sentence is one string per locale rather than three fragments
+   * a component assembles. `partial` takes **both** numbers because
+   * `2L-BULK-009` requires a partial to name counts on both sides: a sentence
+   * that said only "2 applied" would be a partial reported as a success.
+   */
+  readonly bulk: {
+    /** The landmark name for the whole bar — distinct from the field labels inside it. */
+    readonly barLabel: string;
+    readonly selected: (count: number) => string;
+    readonly ceilingHint: (ceiling: number) => string;
+    readonly ceilingReached: (ceiling: number) => string;
+    readonly clear: string;
+    readonly selectAllShown: string;
+    readonly selectRow: (item: string) => string;
+    readonly apply: string;
+    readonly chooseOperation: string;
+    readonly chooseValue: string;
+    readonly previewHeading: string;
+    readonly previewCounts: (eligible: number, refused: number) => string;
+    readonly previewNothing: string;
+    readonly reasons: Record<"ineligible_status", string>;
+    readonly resultRegionLabel: string;
+    readonly allApplied: (count: number) => string;
+    readonly partial: (applied: number, refused: number) => string;
+    readonly noneApplied: (count: number) => string;
+    readonly nothingSelected: string;
+    readonly itemReasons: Record<"unresolvable" | "ineligible" | "invalid_value" | "failed", string>;
+    readonly valueRefused: string;
+    readonly notBulkEligible: string;
+    readonly malformed: string;
+  };
   readonly undo: {
     readonly label: string;
     readonly window: string;
@@ -92,6 +127,39 @@ const ptBR: WorkCopy = {
     summaryFor: (item) => `Editar ${item} aqui`,
     hint: "As mudanças valem na hora, sem sair da lista.",
   },
+  bulk: {
+    barLabel: "Ações em lote",
+    selected: (count) => `${count} selecionada${count === 1 ? "" : "s"}`,
+    ceilingHint: (ceiling) => `Você pode selecionar até ${ceiling} tarefas de uma vez.`,
+    ceilingReached: (ceiling) =>
+      `Você já selecionou ${ceiling} tarefas, o máximo de uma vez. Tire uma da seleção para escolher outra.`,
+    clear: "Limpar seleção",
+    selectAllShown: "Selecionar as que estão nesta página",
+    selectRow: (item) => `Selecionar ${item}`,
+    apply: "Aplicar às selecionadas",
+    chooseOperation: "O que fazer com as selecionadas",
+    chooseValue: "Novo valor",
+    previewHeading: "Antes de aplicar",
+    previewCounts: (eligible, refused) =>
+      `${eligible} vão mudar; ${refused} não podem receber esta mudança agora.`,
+    previewNothing: "Nenhuma das selecionadas pode receber esta mudança agora.",
+    reasons: { ineligible_status: "O estado atual da tarefa não permite esta mudança." },
+    resultRegionLabel: "Resultado da ação em lote",
+    allApplied: (count) => `Pronto: ${count} tarefa${count === 1 ? "" : "s"} atualizada${count === 1 ? "" : "s"}.`,
+    partial: (applied, refused) =>
+      `${applied} atualizada${applied === 1 ? "" : "s"}; ${refused} não mudou${refused === 1 ? "" : "ram"}.`,
+    noneApplied: (count) => `Nada mudou: ${count} tarefa${count === 1 ? "" : "s"} não pôde receber esta mudança.`,
+    nothingSelected: "Nenhuma tarefa selecionada.",
+    itemReasons: {
+      unresolvable: "Esta tarefa não está mais aqui.",
+      ineligible: "O estado desta tarefa mudou desde que você a selecionou.",
+      invalid_value: "Este valor não vale para esta tarefa.",
+      failed: "Não foi possível aplicar. Nada mudou nesta tarefa.",
+    },
+    valueRefused: "Revise o valor antes de aplicar às selecionadas.",
+    notBulkEligible: "Esta ação não pode ser aplicada a várias tarefas de uma vez.",
+    malformed: "Não foi possível ler a seleção. Nada mudou.",
+  },
   undo: {
     label: "Desfazer",
     window: "Você pode desfazer isto por 24 horas.",
@@ -118,6 +186,39 @@ const en: WorkCopy = {
     summary: "Edit here",
     summaryFor: (item) => `Edit ${item} here`,
     hint: "Changes apply immediately, without leaving the list.",
+  },
+  bulk: {
+    barLabel: "Bulk actions",
+    selected: (count) => `${count} selected`,
+    ceilingHint: (ceiling) => `You can select up to ${ceiling} tasks at a time.`,
+    ceilingReached: (ceiling) =>
+      `You already have ${ceiling} tasks selected, which is the most at one time. Remove one to choose another.`,
+    clear: "Clear selection",
+    selectAllShown: "Select the ones on this page",
+    selectRow: (item) => `Select ${item}`,
+    apply: "Apply to selected",
+    chooseOperation: "What to do with the selected tasks",
+    chooseValue: "New value",
+    previewHeading: "Before applying",
+    previewCounts: (eligible, refused) =>
+      `${eligible} will change; ${refused} cannot take this change right now.`,
+    previewNothing: "None of the selected tasks can take this change right now.",
+    reasons: { ineligible_status: "The task's current state does not allow this change." },
+    resultRegionLabel: "Bulk action result",
+    allApplied: (count) => `Done: ${count} task${count === 1 ? "" : "s"} updated.`,
+    partial: (applied, refused) =>
+      `${applied} updated; ${refused} did not change.`,
+    noneApplied: (count) => `Nothing changed: ${count} task${count === 1 ? "" : "s"} could not take this change.`,
+    nothingSelected: "No tasks selected.",
+    itemReasons: {
+      unresolvable: "This task is no longer here.",
+      ineligible: "This task's state changed since you selected it.",
+      invalid_value: "That value does not apply to this task.",
+      failed: "We could not apply this. Nothing changed on this task.",
+    },
+    valueRefused: "Review the value before applying it to the selected tasks.",
+    notBulkEligible: "This action cannot be applied to several tasks at once.",
+    malformed: "We could not read the selection. Nothing changed.",
   },
   undo: {
     label: "Undo",

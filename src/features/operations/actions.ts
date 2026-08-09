@@ -21,6 +21,13 @@ import { requireUser } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
+import { applyDetailCommand } from "@/features/task-commands/detail-command";
+import { buildDetailPatch, detailControlFor } from "@/features/task-commands/detail-controls";
+import { isBulkEligibleAction } from "./bulk-eligibility";
+import { idleBulkCommandState, type BulkCommandState } from "./bulk-command-state";
+import { summariseBulk, type BulkItemOutcome, type BulkSummary } from "./bulk-result";
+import { getWorkCopy } from "./copy";
+import { SELECTION_CEILING } from "./selection";
 import type { CreateRecordState } from "./inline-create-form";
 import { idleWorkItemActionState, type WorkItemActionState } from "./work-action-state";
 import { getWorkActionsCopy } from "./work-actions-copy";
@@ -397,6 +404,181 @@ export async function applyWorkItemAction(
     refreshable: result.failure === "stale_pre_state" || result.failure === "task_not_found",
     retryable: result.retryable,
   });
+}
+
+/* -------------------------------------------------------------------------- *
+ * `2L-BULK-*` — one operation, applied to a set the user selected.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The set, as a validated envelope.
+ *
+ * One JSON field rather than three parallel repeated fields, because parallel
+ * arrays are correct only while their order is, and an ordering bug here would
+ * apply one item's operation key to another item's task — which is the one
+ * mistake idempotency cannot protect against.
+ *
+ * The bound is `SELECTION_CEILING` and it is enforced **here** as well as in the
+ * selection model. The model stops a user reaching fifty-one; this stops a
+ * hand-assembled request doing it, and they are different threats.
+ */
+const bulkItemSchema = z.object({
+  taskId: z.string().uuid(),
+  /** The rendered title, carried as the resolution query hint only. */
+  title: z.string().max(AI_INPUT_BOUNDS.workItemTitle),
+  /** One key per item, so a repeated submission replays per item (`2L-BULK-010`). */
+  operationKey: z.string().uuid(),
+});
+
+const bulkCommandSchema = z.object({
+  locale: z.enum(locales),
+  action: z.string().max(64),
+  value: z.string().max(4000).optional(),
+  items: z.string().max(64_000),
+});
+
+export async function applyBulkWorkCommand(
+  _previous: BulkCommandState,
+  formData: FormData,
+): Promise<BulkCommandState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getWorkCopy(locale).bulk;
+
+  const parsed = bulkCommandSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return refusedBulk(copy.malformed);
+
+  /*
+   * `2L-BULK-004`, at the boundary. The action is checked against the **derived**
+   * set before anything is read, so a hand-assembled request naming
+   * `cancel_task` is refused here rather than reaching a confirmation branch
+   * that OD-2L-3 option A says must be unreachable.
+   */
+  if (!isBulkEligibleAction(parsed.data.action)) return refusedBulk(copy.notBulkEligible);
+  const action = parsed.data.action;
+
+  let items: z.infer<typeof bulkItemSchema>[];
+  try {
+    items = z.array(bulkItemSchema).min(1).max(SELECTION_CEILING).parse(JSON.parse(parsed.data.items));
+  } catch {
+    return refusedBulk(copy.malformed);
+  }
+  // Two entries for one task would spend one key against two requests, or two
+  // keys against one row. Neither is a set the user selected.
+  if (new Set(items.map((item) => item.taskId)).size !== items.length) {
+    return refusedBulk(copy.malformed);
+  }
+
+  const control = detailControlFor(action);
+  if (control === null) return refusedBulk(copy.notBulkEligible);
+
+  const { supabase, user } = await requireUser(locale);
+  const profile = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+  const timeZone = isValidTimeZone(profile.data?.timezone)
+    ? profile.data.timezone
+    : defaultAgentPreferences.timezone;
+
+  const nowMs = Date.now();
+  const today = new Date(new Date(nowMs).toLocaleString("en-US", { timeZone }));
+  const patch = buildDetailPatch(control, parsed.data.value, today);
+  // The value is refused **once**, before any item is touched. Fifty identical
+  // refusals for one bad date would be fifty rows of noise about one mistake.
+  if (patch.status === "refused") {
+    return refusedBulk(getWorkCopy(locale).bulk.valueRefused);
+  }
+
+  const outcomes: BulkItemOutcome[] = [];
+  for (const item of items) {
+    /*
+     * `2L-BULK-008` — one item's refusal must not abort the rest.
+     *
+     * Sequential rather than concurrent, deliberately. Each iteration is its own
+     * transaction with its own observation instant, and fifty concurrent writes
+     * against one account would contend on the same rows the reaper and the
+     * audit trigger touch. Bounded at fifty by the schema above, this is at most
+     * a hundred round trips — the cost slice 2L.0 measured and confirmed safe.
+     */
+    try {
+      const outcome = await applyDetailCommand(supabase, {
+        ownerId: user.id,
+        taskId: item.taskId,
+        title: item.title,
+        action,
+        patch: patch.patch,
+        operationKey: item.operationKey,
+        now: new Date().toISOString(),
+        timeZone,
+      });
+      outcomes.push(toBulkOutcome(item.taskId, outcome));
+    } catch (error) {
+      const known =
+        error instanceof TaskCommandApplyError || error instanceof TaskCandidateQueryError;
+      if (!known) throw error;
+      // A precondition fault on one item is that item's failure and nobody
+      // else's. Rethrowing would abandon the items already applied and leave
+      // the user with a page that reports nothing about writes that happened.
+      outcomes.push({ taskId: item.taskId, outcome: "failed", reason: "failed" });
+    }
+  }
+
+  const summary = summariseBulk(outcomes);
+  if (summary.appliedCount > 0) refreshWorkSurfaces(locale);
+  // The same event a single edit emits, once per applied item, with no new name
+  // and no new property. A bulk apply that emitted nothing would make the funnel
+  // wrong rather than quiet.
+  for (const item of summary.applied) {
+    emitApplied(locale, itemKey(items, item.taskId), "applied", false);
+  }
+
+  return {
+    status: "settled",
+    action,
+    message: bulkMessage(copy, summary),
+    announcement: bulkMessage(copy, summary),
+    summary,
+  };
+}
+
+function itemKey(
+  items: readonly { readonly taskId: string; readonly operationKey: string }[],
+  taskId: string,
+): string {
+  return items.find((item) => item.taskId === taskId)?.operationKey ?? taskId;
+}
+
+function refusedBulk(message: string): BulkCommandState {
+  return { ...idleBulkCommandState, status: "refused", message, announcement: message };
+}
+
+/** One command outcome, reduced to what the result may say about one item. */
+function toBulkOutcome(
+  taskId: string,
+  outcome: Awaited<ReturnType<typeof applyDetailCommand>>,
+): BulkItemOutcome {
+  if (outcome.status === "refused") {
+    const refusal = outcome.refusal.kind;
+    // Foreign, deleted and never-existed all arrive as `unresolvable`, which is
+    // what makes them indistinguishable (`2L-BULK-011`).
+    if (refusal === "unresolvable") return { taskId, outcome: "refused", reason: "unresolvable" };
+    if (refusal === "ineligible") return { taskId, outcome: "refused", reason: "ineligible" };
+    return { taskId, outcome: "refused", reason: "invalid_value" };
+  }
+  const result = outcome.result;
+  if (result.outcome === "no_change") return { taskId, outcome: "no_change" };
+  if (result.outcome === "applied") {
+    return {
+      taskId,
+      outcome: "applied",
+      undo: { undoId: result.undoId, expiresAt: result.undoExpiresAt },
+    };
+  }
+  return { taskId, outcome: "failed", reason: "failed" };
+}
+
+function bulkMessage(copy: ReturnType<typeof getWorkCopy>["bulk"], summary: BulkSummary): string {
+  if (summary.kind === "empty") return copy.nothingSelected;
+  if (summary.kind === "all_applied") return copy.allApplied(summary.appliedCount + summary.unchangedCount);
+  if (summary.kind === "none_applied") return copy.noneApplied(summary.refusedCount);
+  return copy.partial(summary.appliedCount + summary.unchangedCount, summary.refusedCount);
 }
 
 /**
