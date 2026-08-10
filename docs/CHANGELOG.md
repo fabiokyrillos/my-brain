@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-09 - PHASE 2M AUTHORIZED FOR PLANNING ONLY (ADR-104), and the A13 guard retargets
+
+**Documentation only. Zero product code, zero migration, zero deploy, zero database/RLS/grant/policy/Auth change, zero notification sent, zero service-worker change, zero permission requested, zero telemetry event created, zero provider call, zero BYOK use, zero signup or rollout change.** Baseline `5e6174b`; 89 migrations; hosted parity `202608090089` read **live and read-only** on 2026-08-09; signup closed; rollout gate untouched.
+
+**The package.** `docs/initiatives/phase-2m/PHASE_2M_PRD.md` and `..._IMPLEMENTATION_PLAN.md`; audit, UX gaps, threat model and traceability contract under `docs/reports/phase-2m/`. **94 requirements across thirteen families and six slices are planned for execution and none is executed.** Migration ceiling **TWO, obligation ZERO** - one conditional on declaring a telemetry event, one conditional on OD-2M-4 authorizing outbound delivery; if neither condition holds the ceiling is **ZERO**.
+
+**The audit corrected the inherited picture in seven load-bearing places, and three of them changed a decision.**
+
+**(1) `planned_at` is write-then-display.** It is stored, audited, editable by command and rendered on the task list and the task detail - and a search over every PostgREST predicate and ordering position finds **no read of it anywhere**: not a view, not a filter, not an ordering, not Hoje's priorities, not the heartbeat. There is also no `clear_planned` counterpart to `clear_due`. The interface shows the word "Planejado" and the product does nothing with it.
+
+**(2) A service worker EXISTS and is registered in production.** `public/sw.js` is registered by `src/app/layout.tsx`, calls `skipWaiting()` and `clients.claim()`, and caches static assets only. **The Phase 2L successor re-audit's "no service worker" is wrong**, and the guard that asserts the absence of push scans `.ts`/`.tsx` under `src/features/pwa`, `src/features/agent` and `src/app` - so it **cannot see that file**. What is absent is the push handler, not the worker, and any push work would modify a worker already installed on every production client.
+
+**(3) Five review and planning schedule preferences are inert.** `daily_review_time`, `weekly_review_day`, `weekly_review_time`, `planning_day` and `planning_time` are read by the settings surface and by nothing else; reviews are generated on demand only and the reviews page says so in both locales. A control with no consumer is the failure this repository has already recorded in the other direction.
+
+**(4) There is no event entity, and the parent PRD's calendar slice does not need one.** The committed-versus-suggested distinction it asks for is already representable from `tasks.due_at`, `tasks.planned_at`, `reminders.remind_at`, `summaries` period ranges and unconfirmed extracted dates. **This changed the brief's initial recommendation for OD-2M-3 from option C to option A** - `planned_at` is an intention, and the event model is deferred with its trigger named. The change of recommendation is reported rather than smoothed.
+
+**(5) Reminder sensitivity is derivable and nobody has derived it.** `reminders.entry_id` is the same relationship `task-derivation.ts` consumes for tasks, so a calendar lane rendering reminder titles beside masked task titles would reproduce, one entity over, the divergence slice 2L.1 found on Hoje.
+
+**(6) Telemetry has five enforcement points, enumerable by name** - the event-name CHECK, `private.validate_product_event_properties`, `productEventNames`, the surface CHECK and `productSurfaces`. The writer holds no vocabulary copy since `202608080087` and `202608090089` deleted them.
+
+**(7) Two independent implementations of "the user's local day" exist** - TypeScript `localDayBounds` and PL/pgSQL inside `run_user_heartbeat` - and `localDayBounds` returns `start + 24h`, which is not a 23-hour or 25-hour DST day's end. They agree today only because they are asked different questions.
+
+**Seven owner decisions are open (OD-2M-1 ... OD-2M-7)**, each a signable proposal with options, a recommendation and impact. The recommendations: derive sensitivity for both tasks and reminders; one migration widening every enforcement point at once, before any producer; `planned_at` as intention; **no outbound delivery this phase** with governance shipped and push available as a separately signed conditional slice; owner-run real-device verification with an executed/not-executed record and no emulated substitute; **no gesture on the calendar**, pre-specifying drag so a later authorization is cheap; and **recurrence separated out** as its own initiative rather than a slice.
+
+**A13 retargets in this same commit** - the eighth application of the rule - so the guard is never unenforced between the authorization and the retarget. **ADR-104's heading does not name the successor**, which would itself be a start signal, and the whole-series heading check gains a row.
+
 ## 2026-08-09 - PHASE 2L CLOSEOUT CORRECTED: three documentary inconsistencies, fixed from evidence
 
 **82 declared, 82 classified: 73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered.** The count was **regenerated from the slice records, never typed**. No functional code, no UX change, no migration, no deploy, no database/RLS/grant/policy/Auth change, no `2M-*` artifact, and **A13 is not retargeted**.

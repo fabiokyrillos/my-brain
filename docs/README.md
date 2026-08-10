@@ -84,7 +84,8 @@ fails the build on an addition to it.
 | [`initiatives/phase-2i/`](./initiatives/phase-2i/) | `PHASE_2I_PRD.md`, `PHASE_2I_IMPLEMENTATION_PLAN.md` — Foundation and Findability, authorized by ADR-092 (2026-08-07). Scope was the parent mobile-first PRD's Etapa 0 + Etapa 1. **Complete 2026-08-07.** |
 | [`initiatives/phase-2j/`](./initiatives/phase-2j/) | `PHASE_2J_PRD.md`, `PHASE_2J_IMPLEMENTATION_PLAN.md` — Today, Capture and Attention, authorized for planning by ADR-094 and for implementation by ADR-095 (2026-08-08). Scope was the parent mobile-first PRD's Etapa 2. **Complete 2026-08-08.** |
 | [`initiatives/phase-2k/`](./initiatives/phase-2k/) | `PHASE_2K_PRD.md`, `PHASE_2K_IMPLEMENTATION_PLAN.md` — Conversar as the primary interface, authorized for planning by ADR-097 (2026-08-08) and for implementation through closeout by ADR-101 (2026-08-09). Scope was the parent mobile-first PRD's Etapa 3. **Concluded 2026-08-09**, after an extraordinary post-phase correction charged to no phase. |
-| [`initiatives/phase-2l/`](./initiatives/phase-2l/) | `PHASE_2L_PRD.md`, `PHASE_2L_IMPLEMENTATION_PLAN.md` — Work and execution, authorized for planning by ADR-102 and for **implementation through closeout by ADR-103** (both 2026-08-09), which also signed all five owner decisions. Scope is the parent mobile-first PRD's Etapa 4, slices 4.1–4.3. **No migration is authorized.** |
+| [`initiatives/phase-2l/`](./initiatives/phase-2l/) | `PHASE_2L_PRD.md`, `PHASE_2L_IMPLEMENTATION_PLAN.md` — Work and execution, authorized for planning by ADR-102 and for **implementation through closeout by ADR-103** (both 2026-08-09), which also signed all five owner decisions. Scope is the parent mobile-first PRD's Etapa 4, slices 4.1–4.3. **Complete 2026-08-09**, closeout corrected the same day. |
+| [`initiatives/phase-2m/`](./initiatives/phase-2m/) | `PHASE_2M_PRD.md`, `PHASE_2M_IMPLEMENTATION_PLAN.md` — Calendar, daily planning and notifications, authorized for **planning only** by ADR-104 (2026-08-09). Scope is the parent mobile-first PRD's Etapa 4, slices 4.4–4.7. **No implementation, no migration and no deployment is authorized**, and seven owner decisions (OD-2M-1 … OD-2M-7) are open. |
 
 **The roadmap successor has no governing artifact and must not acquire one
 without owner authorization.** The A13 guard in
@@ -94,14 +95,15 @@ successor `*_PRD.md` or `*_IMPLEMENTATION_PLAN.md` appears anywhere under
 the successor in its heading, or a migration or source file is named for its
 implementation.
 
-**The retarget precedent, now applied seven times.** Phase 2G was started the
+**The retarget precedent, now applied eight times.** Phase 2G was started the
 sanctioned way — ADR-083 and the guard's retarget in one commit — then Phase 2H
-by ADR-085, Phase 2I by ADR-092, Phase 2J by ADR-094, Phase 2K by ADR-097, and
-Phase 2L by **ADR-102** (2026-08-09), each moving the guard to the next
+by ADR-085, Phase 2I by ADR-092, Phase 2J by ADR-094, Phase 2K by ADR-097,
+Phase 2L by ADR-102, and Phase 2M by **ADR-104** (2026-08-09), each moving the
+guard to the next
 unauthorized lettered phase in the same change that recorded the authorization.
 The invariant is never unenforced in between, and **no ADR names the successor's
 scope**: inventing one would be the error the guard exists to prevent — which is
-why ADR-102's heading says *"retargets to the roadmap successor"* rather than
+why ADR-104's heading says *"retargets to the roadmap successor"* rather than
 naming it, and why a test asserts that property across the **whole series**
 instead of leaving it to memory. Each retarget **adds** a series entry rather
 than replacing one, so a future retarget cannot quietly drop an earlier check.
