@@ -48,8 +48,14 @@ export async function assertActiveAccount(
  */
 export async function requireUser(locale: Locale) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/${locale}/auth/login`);
+  // Product call sites need only the owner id. `getClaims()` verifies the
+  // signed token locally when the project uses asymmetric signing keys, so a
+  // routine network `getUser()` lookup does not sit in every page transition.
+  // RLS, lifecycle, and consent remain the authoritative boundaries below.
+  const { data } = await supabase.auth.getClaims();
+  const userId = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+  if (!userId) redirect(`/${locale}/auth/login`);
+  const user = { id: userId };
 
   const lifecycle = await supabase
     .from("account_lifecycle")

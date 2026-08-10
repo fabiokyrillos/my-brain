@@ -40,7 +40,10 @@ function fakeClient(
   ],
 ) {
   return {
-    auth: { getUser: vi.fn(async () => ({ data: { user } })) },
+    auth: {
+      getClaims: vi.fn(async () => ({ data: { claims: user ? { sub: user.id } : null } })),
+      getUser: vi.fn(async () => ({ data: { user: null } })),
+    },
     from: vi.fn((table: string) => {
       if (table === "policy_acceptances") {
         return {
@@ -78,6 +81,8 @@ describe("requireUser lifecycle gate", () => {
     const result = await requireUser("pt-BR");
 
     expect(result.user.id).toBe("user-1");
+    expect(client.auth.getClaims).toHaveBeenCalledOnce();
+    expect(client.auth.getUser).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
   });
 

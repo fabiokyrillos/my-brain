@@ -13,9 +13,11 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
-  const values = await loadSettingsFormValues(supabase, user.id);
-  const credential = await loadCredentialMetadata(supabase, user.id);
-  const pending = await loadPendingEntryCount(supabase, user.id);
+  const [values, credential, pending] = await Promise.all([
+    loadSettingsFormValues(supabase, user.id),
+    loadCredentialMetadata(supabase, user.id),
+    loadPendingEntryCount(supabase, user.id),
+  ]);
 
   return (
     <div className="settings-page">
