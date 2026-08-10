@@ -13,7 +13,7 @@
  * Every behaviour below is carried over unchanged from the list implementation.
  */
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clock3, RotateCcw } from "lucide-react";
 import type { WorkItemView } from "@/features/daily-cycle/contracts";
@@ -56,6 +56,7 @@ export function WorkItemActions({
   const copy = getWorkActionsCopy(locale);
   const router = useRouter();
   const result = useRef<HTMLDivElement | null>(null);
+  const [pendingAction, setPendingAction] = useState<WorkSurfaceAction | null>(null);
 
   /**
    * The operation keys, one per **(row, action)** pair (2F-SURFACE-006).
@@ -121,15 +122,21 @@ export function WorkItemActions({
           // button rendered outside its declared eligible statuses would be
           // offering a refusal.
           if (!isWorkSurfaceAction(available.id)) return [];
-          const Icon = actionIcon[available.id];
+          const actionId = available.id;
+          const Icon = actionIcon[actionId];
           return [
-            <form action={formAction} key={available.id}>
+            <form action={formAction} key={actionId} onSubmit={() => setPendingAction(actionId)}>
               <input type="hidden" name="taskId" value={task.taskId} />
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="title" value={task.title} />
-              <input type="hidden" name="action" value={available.id} />
-              <button className="row-action" disabled={pending} type="submit">
-                <Icon size={13} /> {copy.actions[available.id]}
+              <input type="hidden" name="action" value={actionId} />
+              <button
+                aria-busy={pending && pendingAction === actionId}
+                className={`row-action${pending && pendingAction === actionId ? " optimistic" : ""}`}
+                disabled={pending}
+                type="submit"
+              >
+                <Icon size={13} /> {pending && pendingAction === actionId ? copy.pendingAnnouncement : copy.actions[actionId]}
               </button>
             </form>,
           ];

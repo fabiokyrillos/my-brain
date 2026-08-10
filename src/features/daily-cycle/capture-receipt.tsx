@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import type { CaptureReceipt } from "./contracts";
 
@@ -16,7 +17,7 @@ export function CaptureReceiptView({
     <div className="capture-receipt" role="status">
       <p>{copy.messages[receipt.messageKey]}</p>
       {receipt.safeHref && (
-        <a href={receipt.safeHref}>{locale === "pt-BR" ? "Ver registro" : "View record"}</a>
+        <Link href={receipt.safeHref}>{locale === "pt-BR" ? "Ver registro" : "View record"}</Link>
       )}
     </div>
   );

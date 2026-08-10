@@ -39,6 +39,7 @@ import {
   type VisibleNavigationKey,
 } from "./capabilities";
 import { useDismissableDisclosure } from "./use-dismissable-disclosure";
+import { NavigationPendingIndicator } from "./navigation-pending";
 
 const icons = {
   home: Home,
@@ -186,6 +187,7 @@ export function NavigationLinks({
       >
         <Icon size={options.capture ? 24 : options.compact ? 20 : 18} aria-hidden="true" />
         <span>{t.nav[key]}</span>
+        <NavigationPendingIndicator locale={locale} />
       </Link>
     );
   };
