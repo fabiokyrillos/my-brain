@@ -42,9 +42,10 @@ import { parseProductEventPayload, productEventNames } from "@/features/product-
  * It moves with the chain, and it must: this file asserts that **every**
  * name in `productEventNames` survives in the CHECK, so reading an older
  * migration would report a name "dropped" that was simply added after it.
- * Phase 2K slice 2K.8 moved it from `202608080086`.
+ * Phase 2K slice 2K.8 moved it from `202608080086`, and Phase 2M slice 2M.1
+ * moved it from `202608090088`.
  */
-const MIGRATION = "supabase/migrations/202608090088_phase_2k_conversation_telemetry.sql";
+const MIGRATION = "supabase/migrations/202608110090_phase_2m_daily_cycle_telemetry.sql";
 
 function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");

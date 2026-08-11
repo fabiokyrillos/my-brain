@@ -16,7 +16,7 @@
 
 begin;
 
-select plan(29);
+select plan(39);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures.
@@ -94,7 +94,18 @@ insert into legal_payloads (event_name, properties) values
   -- question, an answer, a source excerpt, or a person's or project's name.
   ('conversation_answer_shown',     '{"evidence":"evidenced","explained":true}'),
   ('conversation_memory_resolved',  '{"outcome":"undone"}'),
-  ('conversation_suggestion_shown', '{"category":"person"}');
+  ('conversation_suggestion_shown', '{"category":"person"}'),
+  -- Phase 2M, added to the CHECK by `202608110090`, BEFORE any producer exists.
+  -- Every property is a closed enum or a bounded count: there is no key here
+  -- that could hold a task title, a reminder title, review text, a person, a
+  -- project -- or a date or a time the user chose, which is the shape a
+  -- calendar phase would reach for first.
+  ('calendar_viewed',               '{"orientation":"week"}'),
+  ('day_planned',                   '{"operation":"set","itemCount":1}'),
+  ('day_review_opened',             '{"scope":"day"}'),
+  ('day_review_action_applied',     '{"scope":"next_day","actionKind":"carry_forward"}'),
+  ('notification_consent_changed',  '{"channel":"push","state":"granted"}'),
+  ('notification_suppressed',       '{"channel":"push","reason":"quiet_hours"}');
 
 -- The real writer, exercised exactly as production calls it, once per declared
 -- name. Failures are collected rather than raised so the assertion can name
@@ -375,15 +386,19 @@ select is(
   (select count(*)::int
      from pg_temp.write_every_declared_event('b7000001-0000-4000-8000-000000000001')
     where not wrote),
-  7,
-  'NON-VACUITY: the historical gate refuses exactly the seven events added since it froze'
+  13,
+  'NON-VACUITY: the historical gate refuses exactly the thirteen events added since it froze'
 );
 
--- The number rose from four to seven when Phase 2K added three names, and
--- that is the point rather than an inconvenience: the historical gate froze
--- at `202607280061` and every name added after it is one the gate would have
--- silently refused. Four was `rate_limit_refused` plus Phase 2J's three;
--- seven is those plus Phase 2K's three.
+-- The number rose from four to seven when Phase 2K added three names, and from
+-- seven to thirteen when Phase 2M added six. That is the point rather than an
+-- inconvenience: the historical gate froze at `202607280061` and every name
+-- added after it is one the gate would have silently refused. Four was
+-- `rate_limit_refused` plus Phase 2J's three; seven is those plus Phase 2K's
+-- three; thirteen is those plus Phase 2M's six.
+--
+-- The number is stated rather than left to fail for a correct reason, which is
+-- why widening the vocabulary requires editing this line on purpose.
 
 -- Restore, and prove the restore worked rather than assuming it.
 do $$
@@ -413,6 +428,91 @@ select is(
       )),
   3,
   'all three Phase 2K conversation events are written through the real public writer'
+);
+
+-- ---------------------------------------------------------------------------
+-- `2M-METRICS-002`. Phase 2M's own six, named rather than only covered
+-- derivedly, so the deployment record can cite this line rather than an
+-- inference. They are proved here BEFORE any producer for them exists, which
+-- is the ordering `2M-METRICS-001` makes a rule.
+-- ---------------------------------------------------------------------------
+
+select is(
+  (select count(*)::int
+     from pg_temp.write_every_declared_event('b7000001-0000-4000-8000-000000000001')
+    where wrote
+      and checked_event in (
+        'calendar_viewed',
+        'day_planned',
+        'day_review_opened',
+        'day_review_action_applied',
+        'notification_consent_changed',
+        'notification_suppressed'
+      )),
+  6,
+  'all six Phase 2M daily-cycle events are written through the real public writer'
+);
+
+-- The content prohibition, on the shape a calendar phase would reach for first.
+-- `2M-METRICS-004` names a user-chosen DATE explicitly, and this is the
+-- assertion that it has nowhere to go.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'day_planned', 'server', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"operation":"set","itemCount":1,"plannedDate":"2026-08-12"}'::jsonb,
+       null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Unsupported product event property',
+  '2M-METRICS-004: a user-chosen date is refused -- the payload has nowhere to put one'
+);
+
+-- A negative control ON A VALID SURFACE and for a valid event, so the refusal
+-- above cannot be explained by the surface or the name being wrong. The
+-- ordering defect `202608090089` recorded is exactly this: controls answered by
+-- a gate other than the one under test.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'calendar_viewed', 'calendar', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"orientation":"month"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Invalid product event property',
+  '2M-CAL-007: an orientation outside the declared three is refused on the calendar surface itself'
+);
+
+-- Idempotency, proved rather than assumed. The writer's `on conflict do
+-- nothing` is what makes a producer safe to retry, and a widening that broke it
+-- would turn every retry into a duplicate row in an append-only ledger.
+create temporary table idempotency_probe as
+select w.recorded
+  from public.record_product_event_for_user(
+    'b7000001-0000-4000-8000-000000000001', 'calendar_viewed', 'calendar', 'pt-BR', 'desktop',
+    '0.0.0-pgtap', '{"orientation":"day"}'::jsonb, null, null, null,
+    'b7000003-0000-4000-8000-000000000003'::uuid, true) w;
+
+insert into idempotency_probe
+select w.recorded
+  from public.record_product_event_for_user(
+    'b7000001-0000-4000-8000-000000000001', 'calendar_viewed', 'calendar', 'pt-BR', 'desktop',
+    '0.0.0-pgtap', '{"orientation":"day"}'::jsonb, null, null, null,
+    'b7000003-0000-4000-8000-000000000003'::uuid, true) w;
+
+select is(
+  (select count(*)::int from idempotency_probe where recorded),
+  1,
+  'a repeated idempotency key records exactly once, however many times it is replayed'
+);
+
+select is(
+  (select count(*)::int from idempotency_probe),
+  2,
+  'and the replay really did happen: two attempts were made, not one'
+);
+
+select is(
+  (select count(*)::int from public.product_events
+    where idempotency_key = 'b7000003-0000-4000-8000-000000000003'),
+  1,
+  'and leaves exactly one row behind, so a retried producer cannot inflate the ledger'
 );
 
 
@@ -532,6 +632,41 @@ select is_empty(
   'POST-2K: all three Phase 2K events are writable ON the conversation surface'
 );
 
+-- Phase 2M's surface, named individually. OD-2M-2 signed `calendar` as its own,
+-- and `202608110090` is the migration that declared it.
+select lives_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'calendar_viewed', 'calendar', 'pt-BR', 'mobile',
+       '0.0.0-pgtap', '{"orientation":"agenda"}'::jsonb,
+       null, null, null, gen_random_uuid(), true) $$,
+  'PHASE 2M: the calendar surface is accepted by the real writer'
+);
+
+-- The exact combination the producers in slices 2M.1 to 2M.3 will use: a Phase
+-- 2M event, on the calendar surface, through the writer those producers call.
+-- Phase 2K shipped without this proof and its telemetry was inert for a phase.
+--
+-- The two notification events are absent on purpose: they are emitted by the
+-- server and carry `server`, which the loop above already writes every event
+-- on.
+select is_empty(
+  $$ select name || ' -> no row'
+       from (
+         select e.name,
+           (select w.event_id from public.record_product_event_for_user(
+              'b7000001-0000-4000-8000-000000000001', e.name, 'calendar', 'pt-BR', 'desktop',
+              '0.0.0-pgtap', e.properties, null, null, null, gen_random_uuid(), true) w) as id
+         from (values
+           ('calendar_viewed', '{"orientation":"day"}'::jsonb),
+           ('day_planned', '{"operation":"cleared","itemCount":50}'::jsonb),
+           ('day_review_opened', '{"scope":"next_day"}'::jsonb),
+           ('day_review_action_applied', '{"scope":"day","actionKind":"reschedule"}'::jsonb)
+         ) as e(name, properties)
+       ) written
+      where written.id is null $$,
+  'PHASE 2M: every calendar-attributed event is writable ON the calendar surface'
+);
+
 -- Fail-closed. Deleting the writer's copy is only safe if the remaining
 -- declaration still refuses everything the copy refused -- with the same
 -- errcode and the same message, so no caller can tell the difference.
@@ -610,6 +745,18 @@ select throws_ok(
   'NON-VACUITY: with the historical surface gate restored, the conversation surface is refused as it was'
 );
 
+-- The same planted gate, asked about Phase 2M's surface. `calendar` was not in
+-- the frozen list either, so a widening that only *looked* applied would be
+-- caught here rather than in production inside a `.catch(() => {})`.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'calendar', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Unsupported product surface',
+  'NON-VACUITY: with the historical surface gate restored, the calendar surface is refused too'
+);
+
 -- Restore, and prove the restore worked rather than assuming it.
 do $$
 begin
@@ -621,6 +768,13 @@ select lives_ok(
        'b7000001-0000-4000-8000-000000000001', 'capture_mode_selected', 'conversation', 'pt-BR', 'desktop',
        '0.0.0-pgtap', '{"captureMode":"text"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
   'the corrected writer is restored and the conversation surface is accepted again'
+);
+
+select lives_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'calendar_viewed', 'calendar', 'pt-BR', 'desktop',
+       '0.0.0-pgtap', '{"orientation":"week"}'::jsonb, null, null, null, gen_random_uuid(), true) $$,
+  'and the calendar surface is accepted again, with a Phase 2M event on it'
 );
 
 select * from finish();

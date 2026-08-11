@@ -64,7 +64,15 @@ const REPO = resolve(__dirname, "../../..");
  * version sits between it and the next one**, so the initiative's central claim
  * — reachable with no schema change — stays checkable after the chain moves on.
  */
-// Moved by the POST-2K CORRECTION, which adds `202608090089` — an
+// Moved by PHASE 2M SLICE 2M.1, which adds `202608110090` — MIGRATION 1 OF THE
+// TWO ADR-105 allocated, NON-TRANSFERABLE. It widens the event-name CHECK,
+// `private.validate_product_event_properties` and the surface CHECK in one
+// file, declaring the `calendar` surface OD-2M-2 signed, and it lands **before
+// any producer exists** (`2M-METRICS-001`). Phase 2M's budget moves to
+// `2 allocated · 1 spent`; migration 2 is notification consent, subscription
+// and delivery in slice 2M.4b, and a third is a stop condition.
+//
+// Previously moved by the POST-2K CORRECTION, which added `202608090089` — an
 // EXTRAORDINARY migration authorized by the owner OUTSIDE Phase 2K's budget,
 // deleting the third copy of the surface vocabulary from
 // `private.record_product_event`. Phase 2K's implementation budget stays
@@ -84,7 +92,7 @@ const REPO = resolve(__dirname, "../../..");
 // same mechanism `202608070084` used for the post-2H correction. Moved
 // deliberately and visibly in the same commit that adds the migration, which is
 // the only way this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608090089";
+const AUTHORIZED_MIGRATION_HEAD = "202608110090";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

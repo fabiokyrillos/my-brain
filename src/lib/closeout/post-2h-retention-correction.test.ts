@@ -113,6 +113,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // rather than tolerated, because the property this assertion protects
       // is "nothing follows that somebody did not deliberately account for".
       "202608090089_post_2k_product_event_surface_deduplication.sql",
+      // Phase 2M slice 2M.1: MIGRATION 1 of the two ADR-105 allocated,
+      // NON-TRANSFERABLE. It widens the event-name CHECK, the property
+      // validator and the surface CHECK in one file — declaring the `calendar`
+      // surface OD-2M-2 signed — and it lands BEFORE any producer exists,
+      // which is `2M-METRICS-001`. It touches no schedule and no retention job,
+      // and it does not re-declare the writer, which is only possible because
+      // the two corrections above deleted its vocabulary copies.
+      "202608110090_phase_2m_daily_cycle_telemetry.sql",
     ]);
   });
 });

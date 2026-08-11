@@ -120,7 +120,11 @@ describe("2L-AUDIT-004: the Work view vocabulary is one vocabulary", () => {
   it("names the effective validator migration, so a reader can check it", () => {
     // Recorded rather than asserted loosely: if a later migration redefines the
     // validator, this value moves and the reviewer sees which file to read.
-    expect(validator.name).toBe("202608090088_phase_2k_conversation_telemetry.sql");
+    // Moved by Phase 2M slice 2M.1's `202608110090`, which re-declares the
+    // validator whole to add six arms. The pin moves in the same commit as the
+    // migration; the equality this describe block asserts is what proves the
+    // re-declaration lost nothing.
+    expect(validator.name).toBe("202608110090_phase_2m_daily_cycle_telemetry.sql");
   });
 
   it("the database validator allows exactly the three signed views", () => {
@@ -174,7 +178,11 @@ describe("2L-METRICS-004: the surface vocabulary has one canonical declaration",
   const check = latestMigrationMatching(/add constraint product_events_surface_check/);
 
   it("names the effective surface-CHECK migration", () => {
-    expect(check.name).toBe("202608090089_post_2k_product_event_surface_deduplication.sql");
+    // Moved by Phase 2M slice 2M.1's `202608110090`, which declares the
+    // `calendar` surface OD-2M-2 signed. The pin moves in the same commit as
+    // the migration, which is the only way it is allowed to change; the
+    // equality below then holds this file's list against the application's.
+    expect(check.name).toBe("202608110090_phase_2m_daily_cycle_telemetry.sql");
   });
 
   it("the table CHECK and the application contract name the same surfaces", () => {

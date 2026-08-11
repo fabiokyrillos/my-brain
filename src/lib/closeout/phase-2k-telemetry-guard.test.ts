@@ -15,18 +15,53 @@
  * event names. So content-freeness is asserted **by shape**, at every gate.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
   productEventNames,
   productSurfaces,
-  type ProductEventName,
 } from "@/features/product-analytics/contracts";
 
 const REPO = join(__dirname, "..", "..", "..");
 const read = (path: string) => readFileSync(join(REPO, path), "utf8");
+
+/**
+ * The event names the migration chain admitted **immediately before** the named
+ * migration — the last preceding file that rewrites `event_name in (...)`.
+ *
+ * Derived from the chain rather than restated, so it cannot become a fourth
+ * copy of the vocabulary.
+ */
+function admittedBefore(migrationPath: string): string[] {
+  const directory = join(REPO, "supabase/migrations");
+  const target = migrationPath.slice(migrationPath.lastIndexOf("/") + 1);
+  let latest: string[] = [];
+  for (const file of readdirSync(directory).filter((name) => name.endsWith(".sql")).sort()) {
+    if (file >= target) break;
+    const sql = readFileSync(join(directory, file), "utf8");
+    const at = sql.search(/event_name\s+in\s*\(/);
+    if (at < 0) continue;
+    const open = sql.indexOf("(", at);
+    let depth = 0;
+    let close = -1;
+    for (let index = open; index < sql.length; index += 1) {
+      if (sql[index] === "(") depth += 1;
+      else if (sql[index] === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          close = index;
+          break;
+        }
+      }
+    }
+    if (close < 0) continue;
+    const values = [...sql.slice(open + 1, close).matchAll(/'([a-z_]+)'/g)].map((match) => match[1]);
+    if (values.length > 0) latest = values;
+  }
+  return latest;
+}
 
 const MIGRATION = "supabase/migrations/202608090088_phase_2k_conversation_telemetry.sql";
 const CONTRACTS = "src/features/product-analytics/contracts.ts";
@@ -79,12 +114,40 @@ describe("2K-METRICS-001: the vocabulary is declared once and derived everywhere
   });
 
   it("loses no pre-existing name to the re-declaration", () => {
-    // The failure mode a `create or replace` invites: the function is rewritten
-    // whole, so an arm dropped by a hand-copy would deploy clean and refuse at
-    // runtime, inside a path that swallows the error.
+    /*
+     * The failure mode a `create or replace` invites: the function is rewritten
+     * whole, so an arm dropped by a hand-copy would deploy clean and refuse at
+     * runtime, inside a path that swallows the error.
+     *
+     * The comparison is against **the vocabulary as it stood when this
+     * migration was written** — the previous migration that rewrote the CHECK —
+     * and not against today's `productEventNames`. It used to be the latter,
+     * which was correct only while Phase 2K was the newest telemetry
+     * migration: Phase 2M's `202608110090` then added six names, and asserting
+     * this file contains them would demand that a 2026-08-09 migration name
+     * events invented on 2026-08-11. The property under test is that
+     * `202608090088` lost nothing that came *before* it, and that is what is
+     * asserted.
+     */
     const migration = read(MIGRATION);
-    for (const name of productEventNames as readonly ProductEventName[]) {
+    for (const name of admittedBefore(MIGRATION)) {
       expect(migration, `${name} lost from the migration`).toContain(`'${name}'`);
+    }
+  });
+
+  it("compares against a real predecessor vocabulary, not an empty one", () => {
+    // Without this, a derivation that silently returned nothing would make the
+    // assertion above pass while proving nothing — the exact shape of failure
+    // the whole file exists to prevent.
+    const inherited = admittedBefore(MIGRATION);
+    expect(inherited.length).toBeGreaterThanOrEqual(30);
+    expect(inherited).toContain("rate_limit_refused");
+    expect(inherited).toContain("attention_item_resolved");
+    expect(inherited).not.toContain("conversation_answer_shown");
+    // And every inherited name is still declared by the application today, so
+    // the derivation cannot drift into naming something that no longer exists.
+    for (const name of inherited) {
+      expect(productEventNames as readonly string[], `${name} is no longer declared`).toContain(name);
     }
   });
 });
@@ -172,9 +235,17 @@ describe("2K-METRICS-005: the vocabulary is proved through the REAL public write
 
   it("keeps the historical-gate non-vacuity proof honest about its own number", () => {
     // The gate froze at `202607280061`; every name added since is one it would
-    // silently refuse. Four became seven when Phase 2K added three, and the
-    // assertion says seven rather than being left to fail for a correct reason.
-    expect(read(WRITE_PATH)).toContain("the historical gate refuses exactly the seven events");
+    // silently refuse. Four became seven when Phase 2K added three and seven
+    // became thirteen when Phase 2M added six, and the assertion states the
+    // number rather than being left to fail for a correct reason.
+    //
+    // Derived rather than typed: the number IS the count of names the chain
+    // admits beyond the twenty-six the frozen gate knew.
+    const frozen = admittedBefore("supabase/migrations/202608070081_phase_2h_rate_limiting.sql");
+    const added = productEventNames.filter((name) => !frozen.includes(name));
+    expect(frozen).toHaveLength(26);
+    expect(added).toHaveLength(13);
+    expect(read(WRITE_PATH)).toContain("the historical gate refuses exactly the thirteen events");
   });
 });
 

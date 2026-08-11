@@ -2,6 +2,35 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2M SLICE 2M.1, MIGRATION 1 OF TWO: the daily-cycle telemetry vocabulary and the `calendar` surface
+
+**No producer ships with this change, and that is the point.** `2M-METRICS-001` makes "migration before producers" a rule because this repository has paid for the reverse twice — `202608080087` and `202608090089` are both extraordinary post-phase corrections for the same defect, and Phase 2K reached closeout with its telemetry entirely inert. The calendar route, the planner, the review flow and the notification settings arrive in later pull requests, after this one is merged, applied, deployed and parity-verified.
+
+**Migration `202608110090`** widens all three database enforcement points in one file: `product_events_event_name_check`, `private.validate_product_event_properties` and `product_events_surface_check`. Migration budget moves to **`2 allocated · 1 spent`, NON-TRANSFERABLE** — migration 2 is notification consent, subscription and delivery in slice 2M.4b, and a **third is a stop condition**.
+
+**The four questions were written down before any name was chosen** (`2M-METRICS-005`), and each event answers exactly one:
+
+| Question | Event(s) | Surface |
+|---|---|---|
+| Is the calendar reached at all, and in which orientation? | `calendar_viewed` | `calendar` |
+| How often is a plan made — set or cleared, one item or many? | `day_planned` | `calendar`, `work` |
+| How often does a review produce an action, and which? | `day_review_opened`, `day_review_action_applied` | `calendar` |
+| How often is a notification silenced, and by which control? Do people opt in and then revoke? | `notification_suppressed`, `notification_consent_changed` | `server` |
+
+Their **single consumer** is `scripts/phase-2m-daily-cycle-funnel.mjs`, read by `npm run measure:2m:funnel` through the owner's own authenticated session — never service-role, and it writes nothing.
+
+**One new surface, not two.** OD-2M-2 signed `calendar` as its own rather than a fold into `work`: OD-2L-2 A keeps Work at exactly three views, so attributing a calendar to `work` would both make "did anyone open it" unanswerable and describe it as a Work view. The planner and the day review are sub-routes of `/app/calendar` and attribute there too. The two notification events carry `server`, because they are emitted by the Server Action that writes a consent row and by the sender that decides not to send — inventing a `notifications` surface for them would be a vocabulary entry that lies about where the event happened.
+
+**There is no date and no time on any event.** A calendar phase is exactly where a `plannedDate` or an `anchorDate` would feel harmless, and it is the shape `2M-METRICS-004` names explicitly: a behavioural fingerprint that says which days somebody works and which they protect. `day_planned` records that a plan was made and how many items it touched — bounded by OD-2L-4's ceiling of 50 — never which day. The refusal is proved at the parser **and** in the database.
+
+**The writer is not re-declared.** That is only possible because `202608080087` deleted its event-name copy and `202608090089` deleted its surface copy, and the migration asserts the absence **name-by-name from the catalog**, refusing to run vacuously. RLS, forced RLS, the policy set, `service_role`'s lack of SELECT and DELETE, the append-only posture and the writer's `security definer` / empty `search_path` are all asserted unchanged rather than assumed.
+
+**Proved through the real writer.** `supabase/tests/post_2j_product_event_write_path.sql` grows from 29 to **39 assertions**: every declared name and every declared surface written through `record_product_event_for_user`; the six new events named individually; the `calendar` surface named individually; the four calendar-attributed events written **on** the calendar surface; a **planted historical gate** proving the completeness assertion can still see the defect it exists for — it now refuses exactly **thirteen** events and refuses the `calendar` surface too — with the restore proved rather than assumed; **non-vacuous negative controls** (a user-chosen date, and an out-of-enum orientation on a valid surface for a valid event name); owner scope; and idempotency under replay.
+
+**Guards moved deliberately, each in this commit.** `phase-2m-telemetry-guard.test.ts`'s "declares no calendar surface yet" assertion is inverted, as the plan said it would be — "a migration plus this line". `phase-2k-telemetry-guard.test.ts` now compares against the chain's **predecessor** vocabulary rather than today's, because asserting that a 2026-08-09 migration names events invented on 2026-08-11 is a demand no migration can meet; its "thirteen" is derived from the chain rather than typed. The pins in `egc-invariants.test.ts`, `phase-2l-vocabulary-guard.test.ts`, `post-2h-retention-correction.test.ts` and `rate-limits/telemetry-parity.test.ts` all move with the chain, in the same commit as the migration.
+
+**Nothing is deployed by this commit.** The hosted application and the parity reading are recorded separately.
+
 ## 2026-08-11 - PHASE 2M SLICE 2M.0: one local-day contract, three implementations found, four guards
 
 **Foundations only. Zero visible surface, zero migration, zero deploy, zero provider call.** `npm test` 5331 passed; lint, typecheck and build clean.
