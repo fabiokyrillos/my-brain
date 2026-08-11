@@ -3290,3 +3290,152 @@ against the deployed project.
 viewport is a viewport, not a device.**
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+## §50 — The owner funded the stop condition, and running one probe found three (2026-08-11)
+
+> **A numbering collision a successor will hit, recorded rather than silently
+> renumbered.** This file already contains a `§50` dated 2026-08-06, in the
+> block at lines ~1003–1414 that runs `§47 … §50` and is then *followed* by
+> `§34`. That block predates the live sequence and its numbering was already
+> wrong when it landed. **The live sequence is the one that ends at `§49`
+> (2026-08-11), and this is its successor.** Read by date, not by number, and do
+> not renumber the old block — every prior record cites it as it stands.
+
+**Baseline in: `f877714`. Baseline out: `285cdc2` (PR #178).** 91 migrations,
+**hosted parity `202608110090` — unchanged, because migration 3 is NOT
+deployed.** Budget **`3 allocated · 2 spent`**, all three non-transferable.
+Signup closed, rollout gate untouched, Phase 2N not started.
+
+### The third migration was authorized, and the rule moved up rather than dissolved
+
+`2M-PLAN-002` was proved unbuildable without schema **before slice 2M.2 was
+started** — §49 recorded it with the cause in a named line. The owner chose
+option **(b)**. **ADR-106** authorizes migration 3, for `clear_planned` and
+nothing else; it does **not** reallocate migration 2, which stays reserved for
+push in 2M.4b.
+
+**A fourth migration is the stop condition now**, and so is migration 3 carrying
+anything but the one verb. The precedent is deliberately narrow and the ADR says
+so: **not** *"a migration may be added when the work is hard"*, but *a signed
+requirement proved impossible without schema, reported before the slice started,
+with its cause located in a named line and its three resolutions costed*. The
+declarations guard asserts the new budget, ADR-106's three narrowing properties
+and the traceability contract's refusal, so it cannot widen by being re-read.
+
+### Assemble a re-declared function; never retype it
+
+`public.apply_task_command` is 1458 lines and its `case` arms cannot be extended
+in place. Migration 3 was **assembled from `202607270060`'s own text**, then
+edited at seven sites. **A mechanical diff of the two bodies, ignoring comments,
+shows exactly those seven changes and nothing else** — which is the only
+affordable proof that no pre-existing branch was dropped. Do this for every
+future re-declaration; a hand-copy is how one disappears in silence.
+
+The seven: the closed action enum; the policy arm; the `plannedAt` patch rule
+(now a JSON null for this action and **only** this action); the delta against the
+claimed pre-state; the delta against the locked row; the write; and the recorded
+`applied_state` the undo guard reads back. Sites four through seven share
+`patch_planned_at`, which step 8 leaves null — so each is the `set_planned`
+expression with the action list widened, and none needs a branch.
+
+### The one deliberate asymmetry, and why it is not an oversight
+
+**`clear_planned` reconciles no reminders and `clear_due` does.** An intention
+never armed one (OD-2M-3 A), so declaring a reminder effect here would close a
+`scheduled` row the task's **deadline** still wants. The pgTAP suite proves it
+with a task carrying both a planned day and a live deadline reminder: after the
+clear, the count is **1** and not 0.
+
+### Two app-side defects the requirement exposed
+
+1. **`buildCanonicalPatch` would have sent an empty patch.** The verb carries no
+   patch field and the RPC *requires* the `plannedAt` key — the preview offering
+   a control the database then refuses.
+2. **The `planned_at` delta coalesced with `??`.** Null reads as absent, so a
+   cleared plan would have rendered as **unchanged** while the write removed it.
+   `due_at` had always tested for `undefined`; `planned_at` had never needed to,
+   because until this requirement **no command could send a null**. *A nullish
+   default is a bug waiting for the first legitimate null.*
+
+### Running one probe found that three were dead
+
+The open obligation was to execute `scripts/phase-2k-conversation-funnel-reader.mjs`
+once against the deployed project. **It was executed and it failed**:
+`supabaseKey is required`, before a row was read. `getLinkedSupabaseCredentials`
+returns a **publishable** key and has never returned an `anonKey`; all three
+readers destructured `anonKey` and passed `undefined` to `createClient`.
+
+**The third defect in that file, and the third that had never fired.** The same
+defect was in Phase 2J's reader **and in Phase 2M's own** — the **declared single
+consumer** of the six events `202608110090` admitted, so `2M-METRICS-003` was
+resting on a script that could not execute. It was found by running the
+neighbour and **checking rather than assuming**.
+
+All three fixed. Both readers then ran against the deployed project and **exited
+0**. **Recorded honestly:** each ran as a freshly minted disposable owner,
+deleted immediately (`HTTP 200`), so each reports **zero events for that owner**
+— executability proved, the real owner's funnel **not** measured. The procedure
+is `admin/generate_link` → `email_otp` → `/auth/v1/verify`; the hosted password
+grant still answers `captcha_failed`.
+
+**Three is now the count of Phase 2K reader defects, and zero was the count of
+its runs. "Corrected" is not "runnable", and a guard over a script's *shape* is
+not a guard over its *executability*.**
+
+### What shipped besides the verb
+
+**`2M-PLAN-001`** — one declared meaning for `planned_at` in
+`src/features/planning/planned-at.ts`, with a corpus scan refusing a second. It
+found two: the task detail rendered the column with `timeStyle` (a day the user
+chose, shown as a time they reserved) and the Work list carried an inline locale
+ternary. **The guard strips comments first**, because its first run failed on the
+comment documenting the defect it had just removed — *a scan that cannot tell
+code from prose makes deleting the explanation the cheapest fix.*
+
+**`2M-PLAN-003`** — the read side the column never had: five filter members and
+two orderings, **inside the three views** and never as a fourth, so every
+destination stays describable by the deployed `workView` enum and it cost **no
+migration**. Both orderings carry `nullsFirst: false`; PostgREST defaults to
+nulls **first** descending, so the second is a correction, not decoration.
+
+**`2M-PLAN-004`…`-010`** — the planner at `/app/calendar/plan`, under the
+calendar because migration 1 declared that surface and a `/app/plan` route would
+have needed a value the CHECK does not admit. Overload is a **count**, the hours
+the user actually declared, and the explicit statement that **no duration is
+known** — the obvious bar would be a lie with a number on it.
+
+### What is NOT proved, and where it goes
+
+**There is no Playwright lane for the planner.** The calendar's local lane is
+legitimate only because `calendar-mirror-guard.test.ts` re-derives its markup
+from the components each run; a planner spec without one would be a fixture
+prettier than the value. So **`2M-MOBILE-004` and `2M-ACCESS-004` are PARTIAL for
+the planner and `2M-TIME-006` is PARTIAL for two surfaces**, destination **slice
+2M.3**, which touches the same surface and can carry one mirrored lane and one
+guard for both.
+
+**Migration 3 is not deployed.** Hosted parity is `202608110090`, and every
+artifact says so rather than implying the schema moved.
+
+**NOT PROVED ANYWHERE:** a real screen reader and a real phone.
+
+### Traps this stretch paid for
+
+1. **Assemble, never retype**, and prove it with a mechanical diff.
+2. **A nullish default is a bug waiting for the first legitimate null.**
+3. **A probe that has never run has never been correct**, however many times it
+   has been repaired.
+4. **A guard over shape is not a guard over executability.**
+5. **A scan that cannot tell code from prose** makes deleting the explanation the
+   cheapest way to pass it.
+6. **A locator that ignores the structure the surface is organized by** finds the
+   surface working and calls it broken — again, in jsdom this time.
+
+### What is outstanding, exactly
+
+**Slice 2M.3**, **2M.4a**, **2M.4b** (**migration 2**), then deploy — which must
+apply **`202608110091` and then migration 2, in that order** — hosted proof, and
+the loop **stops** at `CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`. Slice
+2M.5 and closeout come after the owner's evidence returns, never before.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
