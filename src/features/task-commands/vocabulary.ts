@@ -32,7 +32,7 @@ import { TASK_PRIORITIES, TASK_STATUSES, type TaskPriority, type TaskStatus } fr
  * constant and asserts it equals the command policy version, which is what
  * PRD §10.4 means by "enforced by test".
  */
-export const TASK_VOCABULARY_VERSION = "2026-08-05.1";
+export const TASK_VOCABULARY_VERSION = "2026-08-11.1";
 
 /** Accent-folded, lowercased, punctuation-collapsed — the temporal module's rule. */
 export function normalizeVocabularyTerm(value: string): string {
