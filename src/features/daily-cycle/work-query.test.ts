@@ -111,6 +111,7 @@ describe("2L-VIEW-004/005/006/009: the parts compose", () => {
       view: "all",
       state: "completed",
       due: "overdue",
+      planned: "any",
       priority: "high",
       origin: "brain",
       projectId: "9f1c2f2e-1111-4111-8111-111111111111",

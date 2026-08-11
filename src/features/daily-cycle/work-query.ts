@@ -39,6 +39,27 @@ export type WorkState = (typeof WORK_STATES)[number];
 export const WORK_DUE_FILTERS = ["any", "overdue", "today", "upcoming", "none"] as const;
 export type WorkDueFilter = (typeof WORK_DUE_FILTERS)[number];
 
+/**
+ * `2M-PLAN-003` — the read side `planned_at` never had.
+ *
+ * The audit that opened Phase 2M found the column written, audited, editable
+ * and rendered, with **no predicate, ordering or filter anywhere**. This is the
+ * predicate, and it is deliberately a **filter within the three views** rather
+ * than a fourth view: OD-2L-2 A keeps `today`, `all` and `waiting` the only
+ * *reported* destinations, so every place a user can reach stays describable by
+ * the deployed `workView` telemetry enum — which is what let the read side ship
+ * without a migration.
+ *
+ * The members are the questions a plan can answer, not the shapes of a
+ * timestamp. `today` is "what did I say I would do today"; `overdue` is "what
+ * did I mean to do and have not" — and it is emphatically **not** a deadline
+ * being missed, because an intention that passed is a fact about a day, never a
+ * failure (OD-2M-3 A). `none` is the one a user reaches for when deciding what
+ * to plan next, which is the planner's own entry point.
+ */
+export const WORK_PLANNED_FILTERS = ["any", "today", "overdue", "upcoming", "none"] as const;
+export type WorkPlannedFilter = (typeof WORK_PLANNED_FILTERS)[number];
+
 export const WORK_PRIORITIES = ["any", "low", "medium", "high", "urgent"] as const;
 export type WorkPriorityFilter = (typeof WORK_PRIORITIES)[number];
 
@@ -55,7 +76,21 @@ export type WorkOriginFilter = (typeof WORK_ORIGINS)[number];
  * express without a computed column, which is a migration OD-2L-2 A refuses.
  * Grouping by priority answers the same question honestly and costs nothing.
  */
-export const WORK_ORDERS = ["default", "due_asc", "due_desc", "updated_desc", "updated_asc"] as const;
+export const WORK_ORDERS = [
+  "default",
+  "due_asc",
+  "due_desc",
+  // `2M-PLAN-003`'s ordering half. Both directions put an *absent* plan last —
+  // see `comparePlannedAt` in `@/features/planning/planned-at`, which is the
+  // declaration, and `applyOrder`, which expresses the same rule to PostgREST
+  // with `nullsFirst: false` on both. A descending order that floated every
+  // unplanned task to the top would bury the planned ones the control was
+  // chosen to surface.
+  "planned_asc",
+  "planned_desc",
+  "updated_desc",
+  "updated_asc",
+] as const;
 export type WorkOrder = (typeof WORK_ORDERS)[number];
 
 export const WORK_GROUPINGS = ["none", "priority", "project", "context"] as const;
@@ -73,6 +108,7 @@ export type WorkQuery = {
   readonly view: WorkViewId;
   readonly state: WorkState;
   readonly due: WorkDueFilter;
+  readonly planned: WorkPlannedFilter;
   readonly priority: WorkPriorityFilter;
   readonly origin: WorkOriginFilter;
   readonly projectId: string | null;
@@ -87,6 +123,7 @@ export const DEFAULT_WORK_QUERY: WorkQuery = {
   view: "today",
   state: "open",
   due: "any",
+  planned: "any",
   priority: "any",
   origin: "any",
   projectId: null,
@@ -126,6 +163,7 @@ export function parseWorkQuery(
     view: one(params.view, workViews, DEFAULT_WORK_QUERY.view),
     state: one(params.state, WORK_STATES, DEFAULT_WORK_QUERY.state),
     due: one(params.due, WORK_DUE_FILTERS, DEFAULT_WORK_QUERY.due),
+    planned: one(params.planned, WORK_PLANNED_FILTERS, DEFAULT_WORK_QUERY.planned),
     priority: one(params.priority, WORK_PRIORITIES, DEFAULT_WORK_QUERY.priority),
     origin: one(params.origin, WORK_ORIGINS, DEFAULT_WORK_QUERY.origin),
     projectId: relationId(params.project),
@@ -149,6 +187,7 @@ export function toWorkQueryParams(query: WorkQuery): Record<string, string> {
   if (query.view !== DEFAULT_WORK_QUERY.view) params.view = query.view;
   if (query.state !== DEFAULT_WORK_QUERY.state) params.state = query.state;
   if (query.due !== DEFAULT_WORK_QUERY.due) params.due = query.due;
+  if (query.planned !== DEFAULT_WORK_QUERY.planned) params.planned = query.planned;
   if (query.priority !== DEFAULT_WORK_QUERY.priority) params.priority = query.priority;
   if (query.origin !== DEFAULT_WORK_QUERY.origin) params.origin = query.origin;
   if (query.projectId) params.project = query.projectId;
@@ -170,6 +209,7 @@ export function workHref(locale: string, query: WorkQuery): string {
 export function isNarrowed(query: WorkQuery): boolean {
   return query.state !== DEFAULT_WORK_QUERY.state
     || query.due !== DEFAULT_WORK_QUERY.due
+    || query.planned !== DEFAULT_WORK_QUERY.planned
     || query.priority !== DEFAULT_WORK_QUERY.priority
     || query.origin !== DEFAULT_WORK_QUERY.origin
     || query.projectId !== null

@@ -246,6 +246,7 @@ describe("WorkView: narrowing, grouping and the position", () => {
     view: "all" as const,
     state: "open" as const,
     due: "any" as const,
+    planned: "any" as const,
     priority: "any" as const,
     origin: "any" as const,
     projectId: null,
