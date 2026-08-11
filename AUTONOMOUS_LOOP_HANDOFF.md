@@ -3144,3 +3144,149 @@ Two open obligations that may **not** be closed by writing a document:
   once against the deployed project.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+## §49 — The deployment journey ran, and three product defects were behind it (2026-08-11)
+
+**Baseline in: `76e2d02`. Baseline out: `216ea8d`, merge-SHA CI green on all
+three jobs.** 90 migrations, parity `202608110090`, budget `2 allocated · 1
+spent` non-transferable, signup closed, rollout gate untouched, Phase 2N not
+started. **Zero migrations spent in this stretch.**
+
+### What was owed, and what it cost to pay it
+
+`e2e/online-calendar.spec.ts` was the obligation slice 2M.1 left open and that
+`docs/TODO.md` recorded as one that **may not be closed by writing a document**.
+It ran. **12/12, desktop and Pixel 7** — closing the remainder of `2M-CAL-010`
+and the authenticated half of `2M-ACCESS-003`.
+
+It failed six ways first, over eight runs. **Five causes were in the probe.
+Three product defects were behind the sixth.** The full account is
+`docs/reports/phase-2m/PHASE_2M_ONLINE_CALENDAR_EXECUTION.md`; what follows is
+what a successor needs and could not reconstruct.
+
+### The gates had stopped being server-side, and the control is what proved it
+
+`5edc205` ("perf: make authenticated navigation responsive", 2026-08-10) added
+`src/app/[locale]/app/loading.tsx`. **A segment's `loading.tsx` wraps its
+children in Suspense while its own `layout.tsx` renders outside it**, so from
+that commit every `/{locale}/app/**` request flushed the shell before reaching
+`requireUser`, and the `redirect()` became a client-side navigation. An
+authenticated, unconsented account got **`200` and 63 KB of shell** where
+`SH-LIFECYCLE-008` and `SH-LEGAL-008/009` specify a 307. **An interposition that
+ships the shell and asks the browser to leave lasts exactly as long as hydration
+does.**
+
+The first six failures all read `net::ERR_ABORTED` on the calendar, and every
+instinct said *the calendar is broken*. **What settled it was running a spec this
+phase has never touched.** `online-reminders.spec.ts` failed 11 of 12 the same
+way. It now passes 12/12. **Run the control before believing the diagnosis** —
+the whole online lane had been dead for a day, and no one would have found out
+from the calendar alone.
+
+The gate now runs in the segment layout, above the boundary; the pages keep
+their own call. `src/lib/closeout/server-side-gate-guard.test.ts` pairs every
+`loading.tsx` with a gated layout and fails on exactly this.
+
+### `2M-CAL-010` was self-defeating, and the first fix was wrong in a way worth keeping
+
+The undo sat inside the item's disclosure — where the requirement asks for it —
+and **a successful reschedule is precisely what moves the item off the day being
+viewed.** The revalidated calendar unmounted the outcome and the undo at the
+instant there was something to undo. **No jsdom test could have found it**: the
+disappearance is the server re-running its query.
+
+The first fix reported the outcome upward from an effect inside
+`TaskDetailControls`. **It never fired.** React applies the settled state and the
+revalidated tree together, so the subtree is already gone when effects run. **A
+component cannot report its own outcome if the outcome is what removes it.** The
+recording lives in a wrapper around the action, owned by `CalendarView`;
+`CalendarOutcome` renders the answer.
+
+### The undo button had never rendered, on any surface, since Phase 2L
+
+`apply_task_command` returns the window as
+`to_char(undo_expires_at, 'YYYY-MM-DD"T"HH24:MI:SS.USOF')`. Postgres `OF` emits
+`+00` for UTC; ECMAScript accepts only `Z` or `±HH:mm`; `Date.parse` answered
+`NaN`; `UndoAffordance` fails closed on an unparseable expiry. **The fail-closed
+branch was not unreachable — it was the only reachable one.**
+
+Its own comment recorded the reasoning that hid it: *"the column is `not null`
+with a default so this is unreachable through the database"*. **The column was
+never the input. What crosses the boundary is a rendering of the column, and a
+rendering has its own contract.**
+
+Every `2E`/`2L` test passed throughout. All of them wrote `expiresAt` as `…Z`;
+they proved the `undo_operations` row and the `undo_operation` RPC, both of which
+work; **none asserted the button**. Fixed app-side in
+`src/features/task-commands/rendered-instant.ts`, **no migration** — `apply.ts`
+already documents that the RPC's rendering is not an ISO promise.
+
+### The five probe defects, and the one wrong inference
+
+A lane-blind locator matching two correct elements (`tasks_create_due_reminder`
+puts a reminder and a deadline on the same day under the same title); copy
+borrowed from the surface next door; a UTC-sliced date compared against a local
+one (a bare date is 23:59:59 local, already tomorrow in UTC);
+`audit_logs?target_id=…&select=action`, **neither column having ever existed** —
+**Phase 2K's `occurred_at` again, five days later**; and a raised *test* timeout
+that left `expect` at Playwright's five seconds.
+
+**The staleness case was suspected of resting on a false premise and was not.**
+The pre-state is re-read server-side, the day was empty, and it looked like the
+stale submit had succeeded. Once the four probe defects were repaired it passed
+on its own terms. **Do not rewrite a failing test until its cause is known.**
+
+### The blocker found before 2M.2 was started
+
+**`clear_planned` cannot be delivered in this phase, and this was established
+before a line of 2M.2 was written.**
+
+The taxonomy is only half the verb. `apply_task_command` carries its own action
+allowlist and per-action patch rules **in SQL**, and `set_planned` *requires*
+`plannedAt` to be a string matching `iso_instant_pattern`
+(`202607270060:164`) — **a null is refused**, so `set_planned` cannot be made to
+clear. Adding the verb means replacing the RPC, which is a migration.
+
+`PHASE_2M_IMPLEMENTATION_PLAN.md:44-47` names both migrations
+**non-transferably** — 1 is telemetry and is spent, 2 is notification consent,
+subscription and delivery in 2M.4b — and `PHASE_2M_PRD.md:608` lists **a third
+migration as a stop condition, not a judgement call.**
+
+Three honest resolutions, **none of which an implementer may pick alone**:
+**(a)** ship 2M.2 without it and classify `2M-PLAN-002` as blocked with its cause
+named; **(b)** the owner authorizes a third migration; **(c)** the owner
+reassigns migration 2, which unfunds the signed OD-2M-4 push and ends 2M.4b.
+
+`2M-PLAN-001` and `-003` … `-010` are unaffected and need no migration. **Nothing
+in 2M.2 was started pending this.**
+
+### Traps this stretch paid for
+
+1. **Run the control before believing the diagnosis.** Six failures pointed at
+   the calendar; a spec the phase never touched pointed at the lane.
+2. **A rendering has its own contract.** A comment reasoning about the *column*
+   hid a defect in the *value that crossed the boundary*, for two phases.
+3. **A fixture that is prettier than the value tests the fixture.** Every undo
+   test wrote `…Z`; the RPC has never sent one.
+4. **A component cannot report its own outcome if the outcome is what removes
+   it.** Effects do not run in a subtree the same commit unmounted.
+5. **A guard over a `loading.tsx` is a guard over an authorization boundary.** A
+   perf change moved a gate without touching a line of auth code.
+6. **A query written from remembered column names fails at the database.** Twice
+   now, five days apart, in two different phases.
+
+### What is outstanding, exactly
+
+**Slice 2M.2** (blocked on the owner decision above for `2M-PLAN-002` only),
+**2M.3**, **2M.4a**, **2M.4b** (**migration 2**), then deploy, hosted proof, and
+the loop **stops** at `CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`. Slice
+2M.5 and closeout come after the owner's evidence returns, never before.
+
+One open obligation that may **not** be closed by writing a document: run the
+repaired `scripts/phase-2k-conversation-funnel-reader.mjs --access-token` once
+against the deployed project.
+
+**NOT PROVED ANYWHERE:** a real screen reader and a real phone. **An emulated
+viewport is a viewport, not a device.**
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
