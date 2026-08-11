@@ -33,6 +33,7 @@ import {
   WORK_GROUPINGS,
   WORK_ORDERS,
   WORK_ORIGINS,
+  WORK_PLANNED_FILTERS,
   WORK_PRIORITIES,
   WORK_STATES,
   workHref,
@@ -112,6 +113,20 @@ export function WorkFilters({ locale, query }: { locale: Locale; query: WorkQuer
         labelFor={(value) => copy.due[value]}
         locale={locale}
         values={WORK_DUE_FILTERS}
+      />
+      {/*
+        `2M-PLAN-003`. A filter within the three views, never a fourth view:
+        every destination it can reach is still one the deployed `workView`
+        telemetry enum describes, which is what let the read side ship without
+        a migration.
+      */}
+      <FilterGroup
+        apply={(value) => narrow({ planned: value })}
+        current={query.planned}
+        label={copy.groups.planned}
+        labelFor={(value) => copy.planned[value]}
+        locale={locale}
+        values={WORK_PLANNED_FILTERS}
       />
       <FilterGroup
         apply={(value) => narrow({ priority: value })}

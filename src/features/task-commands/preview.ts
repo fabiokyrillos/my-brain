@@ -72,7 +72,8 @@ export type TaskCommandCanonicalPatch = {
   readonly title?: string;
   readonly description?: string;
   readonly dueAt?: string | null;
-  readonly plannedAt?: string;
+  /** Nullable since `2M-PLAN-002`: `clear_planned` sends an explicit null. */
+  readonly plannedAt?: string | null;
   readonly manualPriority?: string;
   readonly intentionalNoDue?: boolean;
   readonly noDueReason?: string | null;
@@ -454,7 +455,17 @@ export function buildCanonicalPatch(input: {
         : command.patch.note;
   }
   if (command.patch.priority !== undefined) draft.manualPriority = command.patch.priority;
-  if (command.patch.plannedAt !== undefined) draft.plannedAt = command.patch.plannedAt;
+
+  // `clear_planned` carries no patch field, and the RPC still *requires* the
+  // `plannedAt` key — with a JSON null and nothing else. Written as an explicit
+  // branch on the action rather than as "null when the patch is empty", for the
+  // same reason `clear_due` is: the key has to be present and its value has to
+  // be a null the action itself decides, never one inferred from an absence.
+  if (command.action === "clear_planned") {
+    draft.plannedAt = null;
+  } else if (command.patch.plannedAt !== undefined) {
+    draft.plannedAt = command.patch.plannedAt;
+  }
 
   if (command.action === "clear_due") {
     draft.dueAt = null;
@@ -604,12 +615,18 @@ function buildDeltas(input: {
         break;
       }
       case "planned_at": {
-        const after = patch.plannedAt ?? pre.plannedAt;
+        // `!== undefined`, never `??`. The nullish form read a *cleared* plan as
+        // an absent one and fell back to the pre-state, so `clear_planned` would
+        // have rendered "unchanged" while the write removed the day — the
+        // preview contradicting the operation it previews. `due_at` has always
+        // tested for `undefined`; this field never needed to until `2M-PLAN-002`
+        // made a null patch value reachable.
+        const after = patch.plannedAt !== undefined ? patch.plannedAt : pre.plannedAt;
         push(
           "planned_at",
           nullableInstant(pre.plannedAt),
-          nullableInstant(after ?? null),
-          !sameInstant(pre.plannedAt, after ?? null),
+          nullableInstant(after),
+          !sameInstant(pre.plannedAt, after),
         );
         break;
       }

@@ -18,6 +18,7 @@ import type {
   WorkGrouping,
   WorkOrder,
   WorkOriginFilter,
+  WorkPlannedFilter,
   WorkPriorityFilter,
   WorkState,
 } from "./work-query";
@@ -26,6 +27,7 @@ export type WorkFiltersCopy = {
   readonly groups: {
     readonly state: string;
     readonly due: string;
+    readonly planned: string;
     readonly priority: string;
     readonly origin: string;
     readonly order: string;
@@ -33,6 +35,12 @@ export type WorkFiltersCopy = {
   };
   readonly state: Record<WorkState, string>;
   readonly due: Record<WorkDueFilter, string>;
+  /**
+   * `2M-PLAN-003`. The words never say "atrasado"/"late" about a plan: an
+   * intention that passed is a fact about a day, not a failure (OD-2M-3 A), and
+   * `due` two lines up is where that word belongs.
+   */
+  readonly planned: Record<WorkPlannedFilter, string>;
   readonly priority: Record<WorkPriorityFilter, string>;
   readonly origin: Record<WorkOriginFilter, string>;
   readonly order: Record<WorkOrder, string>;
@@ -53,6 +61,7 @@ const ptBR: WorkFiltersCopy = {
   groups: {
     state: "Situação",
     due: "Prazo",
+    planned: "Dia planejado",
     priority: "Prioridade",
     origin: "Origem",
     order: "Ordem",
@@ -60,12 +69,21 @@ const ptBR: WorkFiltersCopy = {
   },
   state: { open: "Em aberto", completed: "Concluídas", cancelled: "Canceladas" },
   due: { any: "Qualquer", overdue: "Atrasadas", today: "Hoje", upcoming: "A partir de amanhã", none: "Sem prazo" },
+  planned: {
+    any: "Qualquer",
+    today: "Planejadas para hoje",
+    overdue: "Planejadas e não feitas",
+    upcoming: "Planejadas a partir de amanhã",
+    none: "Sem dia planejado",
+  },
   priority: { any: "Qualquer", low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" },
   origin: { any: "Qualquer", you: "Criadas por você", brain: "Sugeridas" },
   order: {
     default: "Padrão da visão",
     due_asc: "Prazo mais próximo",
     due_desc: "Prazo mais distante",
+    planned_asc: "Dia planejado mais próximo",
+    planned_desc: "Dia planejado mais distante",
     updated_desc: "Alteradas há menos tempo",
     updated_asc: "Alteradas há mais tempo",
   },
@@ -82,6 +100,7 @@ const en: WorkFiltersCopy = {
   groups: {
     state: "State",
     due: "Due",
+    planned: "Planned day",
     priority: "Priority",
     origin: "Origin",
     order: "Order",
@@ -89,12 +108,21 @@ const en: WorkFiltersCopy = {
   },
   state: { open: "Open", completed: "Completed", cancelled: "Cancelled" },
   due: { any: "Any", overdue: "Overdue", today: "Today", upcoming: "From tomorrow", none: "No due date" },
+  planned: {
+    any: "Any",
+    today: "Planned for today",
+    overdue: "Planned and not done",
+    upcoming: "Planned from tomorrow",
+    none: "No planned day",
+  },
   priority: { any: "Any", low: "Low", medium: "Medium", high: "High", urgent: "Urgent" },
   origin: { any: "Any", you: "Created by you", brain: "Suggested" },
   order: {
     default: "The view's default",
     due_asc: "Soonest due first",
     due_desc: "Latest due first",
+    planned_asc: "Nearest planned day first",
+    planned_desc: "Furthest planned day first",
     updated_desc: "Changed most recently",
     updated_asc: "Changed least recently",
   },

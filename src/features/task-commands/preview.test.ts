@@ -69,6 +69,14 @@ const OTHER_PERSON_ID = "7a7a7a7a-7777-4777-8777-777777777777";
 const TITLE = "Send the report";
 const TERMINAL_AT = "2026-07-20T10:00:00.000Z";
 const EXISTING_DUE = "2026-08-01T15:30:00.000Z";
+/**
+ * A planned day the task already holds.
+ *
+ * Deliberately not `tomorrow`, which is what the `set_planned` fixture phrase
+ * resolves to: a pre-state equal to the proposal would make that action's
+ * fixture a `no_change` and quietly weaken every case built on it.
+ */
+const EXISTING_PLANNED = "2026-08-02T15:00:00.000Z";
 
 /**
  * The resolved entity's *stored* name, deliberately different from the reference
@@ -304,7 +312,18 @@ function describeInconsistentReferences(rows: readonly TaskCandidateRow[]): stri
  * on `no_change` and mistakes an unrendered delta for an unchanged one.
  */
 function changeMakingRow(action: TaskCommandAction): Partial<TaskCandidateRow> {
-  return actionPolicy(action).changedFields.includes("due_at") ? { dueAt: EXISTING_DUE } : {};
+  const changed = actionPolicy(action).changedFields;
+  return {
+    ...(changed.includes("due_at") ? { dueAt: EXISTING_DUE } : {}),
+    // `clear_planned` (`2M-PLAN-002`) proposes no value of its own, so a task
+    // with no planned day would make its only delta `null → null` and the
+    // per-action completeness cases would be asserting against a `no_change`.
+    // Given to every action that writes the column, exactly as `due_at` is:
+    // `set_planned` patches a different day, so it still proposes a change, and
+    // giving it a prior value makes its delta a real before/after rather than a
+    // fill-from-empty.
+    ...(changed.includes("planned_at") ? { plannedAt: EXISTING_PLANNED } : {}),
+  };
 }
 
 type PreviewCase = {

@@ -234,7 +234,11 @@ describe("provider interface", () => {
     expect(iface).toContain("parseTaskCommand(input: TaskCommandParseInput)");
   });
 
-  it("keeps the fifteen actions the PRD tabulates", () => {
-    expect(TASK_COMMAND_ACTIONS).toHaveLength(15);
+  it("keeps the sixteen actions the PRDs tabulate", () => {
+    // Fifteen from Phase 2E's §11.2, plus `clear_planned` from `2M-PLAN-002`.
+    // A count rather than a list here on purpose: this file is about the
+    // provider contract, and `taxonomy.test.ts` is where the membership and the
+    // order are pinned.
+    expect(TASK_COMMAND_ACTIONS).toHaveLength(16);
   });
 });

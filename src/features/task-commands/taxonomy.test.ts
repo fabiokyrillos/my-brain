@@ -45,7 +45,7 @@ describe("task status vocabulary", () => {
 });
 
 describe("action taxonomy", () => {
-  it("declares exactly the fifteen actions the PRD names", () => {
+  it("declares exactly the sixteen actions the PRDs name", () => {
     expect([...TASK_COMMAND_ACTIONS]).toEqual([
       "complete_task",
       "reopen_task",
@@ -57,6 +57,11 @@ describe("action taxonomy", () => {
       "reschedule_due",
       "clear_due",
       "set_planned",
+      // Phase 2M slice 2M.2 (`2M-PLAN-002`, funded by ADR-106). Listed here in
+      // its taxonomy position rather than appended, because this assertion is
+      // about the declared order — the remote smoke's taxonomy reader compares
+      // against it element for element.
+      "clear_planned",
       "set_priority",
       "assign_project",
       "assign_context",

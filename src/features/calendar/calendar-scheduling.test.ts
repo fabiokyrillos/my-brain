@@ -102,16 +102,25 @@ describe("2M-CAL-009: the derivation reads the policy, not a name", () => {
 });
 
 describe("what the calendar cannot do yet, stated rather than hidden", () => {
-  it("cannot clear a planned day, because the verb does not exist", () => {
+  it("gained clear_planned by derivation alone, exactly as it was written to", () => {
     /*
-     * `2M-PLAN-002` closes this asymmetry in slice 2M.2. Asserted as an absence
-     * with its destination named, so the day `clear_planned` is added this line
-     * fails and whoever adds it has to notice that the calendar starts offering
-     * it — which is the correct outcome, and should be a decision rather than a
-     * surprise.
+     * This case used to assert the **absence** of `clear_planned`, with its
+     * destination named: "the day `clear_planned` is added this line fails and
+     * whoever adds it has to notice that the calendar starts offering it —
+     * which is the correct outcome, and should be a decision rather than a
+     * surprise." Slice 2M.2 added it (`2M-PLAN-002`), the line failed, and this
+     * is the decision: the calendar offers it, and offering it is right,
+     * because a surface that can put an intention on a day must be able to take
+     * it off again.
+     *
+     * The mechanism is the whole point and is asserted rather than assumed.
+     * **No file in `src/features/calendar` was edited to make this true.** The
+     * verb's policy declares `planned_at`, `CALENDAR_SCHEDULING_FIELDS` names
+     * that column, and the derivation did the rest — which is the property a
+     * hand-written list of verbs would not have had.
      */
-    expect(TASK_COMMAND_ACTIONS).not.toContain("clear_planned");
+    expect(TASK_COMMAND_ACTIONS).toContain("clear_planned");
     expect(schedulingControlsFor("todo").map((control) => control.action))
-      .not.toContain("clear_planned");
+      .toContain("clear_planned");
   });
 });

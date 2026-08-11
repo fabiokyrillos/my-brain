@@ -498,3 +498,42 @@ export function recordAttentionItemResolved(input: {
   });
 }
 
+
+/**
+ * `2M-METRICS-005` Q2 — *how often is a plan made, and is it ever unmade?*
+ *
+ * The producer for `day_planned`, whose vocabulary was deployed in migration 1
+ * (`202608110090`) **before this or any other producer existed**, which is
+ * `2M-METRICS-001` and is the discipline `202608080087` and `202608090089` were
+ * both bought by.
+ *
+ * Two properties and no third. `operation` distinguishes a plan being made from
+ * one being removed — the value `cleared` was admitted by that migration in
+ * anticipation of `2M-PLAN-002`, and a funnel that could not see a removal would
+ * report planning as monotonic when it is not. `itemCount` is bounded 1..50 by
+ * the deployed validator, which is OD-2L-4's selection ceiling: one for a single
+ * row, up to fifty for a bulk apply.
+ *
+ * **The day is deliberately absent**, exactly as the calendar's anchor is. Which
+ * days somebody plans is the most fingerprinting value this phase could record
+ * and it answers no declared question; `2M-METRICS-004` refuses the key and the
+ * deployed validator refuses the payload.
+ *
+ * Not `recordOnce`-keyed on a task: planning three tasks in three actions is
+ * three plans, and a logical key that collapsed them would under-count the
+ * question this event exists to answer. The key varies by operation and count so
+ * a re-render cannot double-count one action.
+ */
+export function recordDayPlanned(input: {
+  operation: "set" | "cleared";
+  itemCount: number;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    logicalKey: `day-planned:${input.operation}:${input.itemCount}:${Date.now()}`,
+    name: "day_planned",
+    surface: "calendar",
+    locale: input.locale,
+    properties: { operation: input.operation, itemCount: input.itemCount },
+  });
+}

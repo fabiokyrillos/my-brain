@@ -72,8 +72,17 @@ async function main() {
     process.exit(1);
   }
 
-  const { url, anonKey } = await getLinkedSupabaseCredentials();
-  const client = createClient(url, anonKey, {
+  /*
+   * `publishableKey`, not `anonKey`. `getLinkedSupabaseCredentials` returns a
+   * publishable key under that exact name and has never returned an
+   * `anonKey`, so this destructure produced `undefined` and `createClient`
+   * threw *"supabaseKey is required"* before a single row was read. **The
+   * THIRD defect in this file, and the third that had never fired**, because
+   * the two above were also only reachable by running it -- which nothing did
+   * until Phase 2M slice 2M.2 discharged the obligation to run it once.
+   */
+  const { url, publishableKey } = await getLinkedSupabaseCredentials();
+  const client = createClient(url, publishableKey, {
     auth: { persistSession: false },
     ...(args.accessToken
       ? { global: { headers: { Authorization: `Bearer ${args.accessToken}` } } }

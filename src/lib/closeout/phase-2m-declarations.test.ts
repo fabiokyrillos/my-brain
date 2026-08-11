@@ -218,11 +218,50 @@ describe("Phase 2M's authorization chain is recorded, not assumed", () => {
     }
   });
 
-  it("states the migration budget as two allocated, non-transferable, and zero spent", () => {
+  it("states the migration budget as three allocated, non-transferable, and one spent", () => {
     const prd = read(PRD);
+    // The authorization-time figure is a historical fact and stays readable:
+    // ADR-105 fixed `2 allocated · 0 spent`, and rewriting that sentence would
+    // make the budget look as though it had always been three.
     expect(prd).toMatch(/\*\*`2 allocated · 0 spent` at authorization/);
+    expect(prd, "the current budget must be stated, not only the original one")
+      .toMatch(/\*\*`3 allocated · 1 spent` after ADR-106/);
     expect(prd).toMatch(/NON-TRANSFERABLE/);
-    expect(prd, "a third migration must be a stop condition").toMatch(/third migration is a stop condition/i);
+    expect(prd, "a third migration was a stop condition, and it was raised as one")
+      .toMatch(/third migration is a stop condition/i);
+    expect(prd, "the rule must move up rather than dissolve: a fourth is now the stop")
+      .toMatch(/\*\*a fourth migration is a stop condition\*\*/i);
+  });
+
+  /*
+   * ADR-106 is the one place a Phase 2M migration was added after
+   * authorization, and the risk it carries is precedent: "a migration may be
+   * added when the work is hard" is a different rule from the one the owner
+   * signed. These assertions pin the three properties that keep it narrow —
+   * exclusivity to `clear_planned`, non-substitution for migration 2, and no
+   * scope or successor expansion — so a later reading cannot widen it silently.
+   */
+  it("records ADR-106 as an accepted, single-purpose migration authorization", () => {
+    const block = adrBlock("ADR-106");
+    expect(block).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(block, "the third migration must be exclusive to clear_planned")
+      .toMatch(/`clear_planned` and nothing else/);
+    expect(block, "it must not reallocate the push migration")
+      .toMatch(/does not substitute for, reallocate or reduce migration 2/);
+    expect(block, "it must not widen the phase or start the successor")
+      .toMatch(/does not widen Phase 2M's functional scope/);
+    expect(block, "the budget must be restated in full")
+      .toMatch(/`3 allocated · 1 spent`/);
+    expect(block, "the stop condition must move up rather than disappear")
+      .toMatch(/A fourth migration remains a stop condition/);
+  });
+
+  it("keeps the traceability contract's budget refusal in step with ADR-106", () => {
+    const contract = read("docs/reports/phase-2m/PHASE_2M_TRACEABILITY_CONTRACT.md");
+    expect(contract).toMatch(/\*\*`3 allocated`, NON-TRANSFERABLE\*\* after ADR-106/);
+    expect(contract, "a fourth migration must be the refusal now").toMatch(/a \*\*fourth\*\* migration, in any form/);
+    expect(contract, "migration 3 must be refused any content but clear_planned")
+      .toMatch(/other than\s+`clear_planned`/);
   });
 
   it("keeps recurrence out by rule rather than as a partial", () => {

@@ -52,8 +52,12 @@ async function main() {
     process.exit(1);
   }
 
-  const { url, anonKey } = await getLinkedSupabaseCredentials();
-  const client = createClient(url, anonKey, { auth: { persistSession: false } });
+  // `publishableKey`, not `anonKey` -- the same defect Phase 2K's reader
+  // carried, found by running that one. `getLinkedSupabaseCredentials` has
+  // never returned an `anonKey`, so every invocation of this file died on
+  // "supabaseKey is required" before reading a row.
+  const { url, publishableKey } = await getLinkedSupabaseCredentials();
+  const client = createClient(url, publishableKey, { auth: { persistSession: false } });
 
   const signIn = await client.auth.signInWithPassword({
     email: args.email,

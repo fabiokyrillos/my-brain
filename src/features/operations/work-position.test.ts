@@ -95,8 +95,12 @@ describe("2L-RETURN-003: it refuses, by name, every field that could authorize",
 
   it("carries no content — every value is an identifier or a closed vocabulary", () => {
     const position = toWorkPosition(full);
+    // `l` is `2M-PLAN-003`'s planned filter, a member of a closed vocabulary
+    // like every other key here. Pinned by the whole key set rather than by
+    // membership, so a key that started carrying content would fail this line
+    // even if it also passed the whitespace check below.
     expect(Object.keys(position).sort()).toEqual(
-      ["c", "d", "g", "k", "n", "o", "p", "r", "s", "v", "w"],
+      ["c", "d", "g", "k", "l", "n", "o", "p", "r", "s", "v", "w"],
     );
     expect(position.v).toBe(WORK_POSITION_VERSION);
     // No title, no name, no description, no free text of any kind.

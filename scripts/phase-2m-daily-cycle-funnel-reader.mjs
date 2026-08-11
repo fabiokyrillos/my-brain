@@ -122,8 +122,17 @@ async function main() {
     process.exit(1);
   }
 
-  const { url, anonKey } = await getLinkedSupabaseCredentials();
-  const client = createClient(url, anonKey, {
+  /*
+   * `publishableKey`, not `anonKey`. The same defect Phase 2K's and Phase 2J's
+   * readers carried, and this one matters most: this file is the **declared
+   * single consumer** of the six events migration `202608110090` admitted, so
+   * `2M-METRICS-003` -- "every declared event has a real consumer; an event
+   * nothing reads is not delivered" -- was resting on a script that could not
+   * execute. Found by running Phase 2K's, which was the obligation, and
+   * checked here rather than assumed.
+   */
+  const { url, publishableKey } = await getLinkedSupabaseCredentials();
+  const client = createClient(url, publishableKey, {
     auth: { persistSession: false },
     ...(args.accessToken
       ? { global: { headers: { Authorization: `Bearer ${args.accessToken}` } } }

@@ -40,6 +40,7 @@ import {
   WORK_GROUPINGS,
   WORK_ORDERS,
   WORK_ORIGINS,
+  WORK_PLANNED_FILTERS,
   WORK_PRIORITIES,
   WORK_STATES,
   workViews,
@@ -75,9 +76,20 @@ export const POSITION_FORBIDDEN_FIELDS = [
 /**
  * Short keys because this travels in a URL — not to obscure it.
  *
- * `v` version, `w` view, `s` state, `d` due, `r` priority, `o` origin,
- * `p` project, `c` context, `k` order, `g` group, `n` page. Every one is a
- * navigation identifier or a member of a closed vocabulary; none is content.
+ * `v` version, `w` view, `s` state, `d` due, `l` planned, `r` priority,
+ * `o` origin, `p` project, `c` context, `k` order, `g` group, `n` page. Every
+ * one is a navigation identifier or a member of a closed vocabulary; none is
+ * content.
+ *
+ * **`l` is optional, and the version is deliberately NOT bumped.**
+ * `2M-PLAN-003` added the planned filter after links carrying this payload were
+ * already in the wild, and every one of them was written when no such filter
+ * existed — so "absent" means exactly the declared default, and reading it that
+ * way is what `2L-VIEW-008` requires: falling back can only narrow or leave the
+ * set unchanged, and `any` is what those links already meant. A version bump
+ * would invalidate them all to express the same thing. A *required* `l` would
+ * be worse still: `.strict()` would refuse every existing position, and a
+ * refused position silently drops the user's place.
  */
 const positionSchema = z
   .object({
@@ -85,6 +97,7 @@ const positionSchema = z
     w: z.enum(workViews),
     s: z.enum(WORK_STATES),
     d: z.enum(WORK_DUE_FILTERS),
+    l: z.enum(WORK_PLANNED_FILTERS).optional(),
     r: z.enum(WORK_PRIORITIES),
     o: z.enum(WORK_ORIGINS),
     p: z.string().uuid().nullable(),
@@ -103,6 +116,7 @@ export function toWorkPosition(query: WorkQuery): WorkPosition {
     w: query.view,
     s: query.state,
     d: query.due,
+    l: query.planned,
     r: query.priority,
     o: query.origin,
     p: query.projectId,
@@ -118,6 +132,7 @@ export function fromWorkPosition(position: WorkPosition): WorkQuery {
     view: position.w,
     state: position.s,
     due: position.d,
+    planned: position.l ?? DEFAULT_WORK_QUERY.planned,
     priority: position.r,
     origin: position.o,
     projectId: position.p,

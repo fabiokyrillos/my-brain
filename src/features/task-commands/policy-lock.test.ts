@@ -55,8 +55,12 @@ describe("policy digest", () => {
   it("pins the action taxonomy to its declared version", () => {
     const canonical = TASK_COMMAND_ACTIONS.map((action) => [action, actionPolicy(action)]);
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-08-05.1",
-      digest: "7390ce73be772c2c",
+      // Moved by slice 2M.2: `clear_planned` is the sixteenth policy row
+      // (`2M-PLAN-002`, ADR-106). The digest moving is the whole mechanism —
+      // it is what forced this line to be visited, and visiting it is what
+      // asked whether `TASK_COMMAND_POLICY_VERSION` moved too. It did.
+      version: "2026-08-11.1",
+      digest: "5d220a2f520ed5ec",
     });
   });
 
@@ -115,8 +119,12 @@ describe("policy digest", () => {
     expect({ version: TASK_COMMAND_POLICY_VERSION, digest: digest(canonical) }).toEqual({
       // The digest is unchanged from `2026-07-25.1`, and that is the point:
       // Slice 2E.3 added `targetStatus` to the action policies and touched no
-      // status or priority literal. Only the version moved.
-      version: "2026-08-05.1",
+      // status or priority literal. Only the version moved. It is still
+      // unchanged after slice 2M.2, for the same reason — a sixteenth *action*
+      // is not a ninth status or a fifth priority, and this digest not moving
+      // is the evidence that the database's own closed literals were left
+      // alone.
+      version: "2026-08-11.1",
       digest: "e8c8bb1bd473e41f",
     });
   });
@@ -135,7 +143,7 @@ describe("policy digest", () => {
       version: TASK_VOCABULARY_VERSION,
       digest: digest(canonicalVocabularyEntries()),
     }).toEqual({
-      version: "2026-08-05.1",
+      version: "2026-08-11.1",
       digest: "ee9b0095c8418659",
     });
   });
@@ -146,7 +154,7 @@ describe("policy digest", () => {
     expect(TEMPORAL_LEXICON_VERSION).toBe(TASK_COMMAND_POLICY_VERSION);
     const canonical = TEMPORAL_LEXICON.map((entry) => [entry.id, entry.rule, String(entry.pattern)]);
     expect({ version: TEMPORAL_LEXICON_VERSION, digest: digest(canonical) }).toEqual({
-      version: "2026-08-05.1",
+      version: "2026-08-11.1",
       digest: "a5b7f3be24a9abe1",
     });
   });
@@ -286,6 +294,15 @@ const PRD_TABLE: Record<TaskCommandAction, Row> = {
     destructive: false, oneStep: true, confirm: false, undo: "restore_fields",
   },
   set_planned: {
+    eligibleFrom: NON_TERMINAL, allowedTargetValues: null,
+    changedFields: ["planned_at"],
+    destructive: false, oneStep: true, confirm: false, undo: "restore_fields",
+  },
+  // `2M-PLAN-002`, the sixteenth row. `clear_due` above it carries `reminders`
+  // in its changes and this does not — a deadline arms a reminder and an
+  // intention never did (OD-2M-3 A) — which the reminder-impact case below
+  // turns into an assertion rather than leaving as a comment.
+  clear_planned: {
     eligibleFrom: NON_TERMINAL, allowedTargetValues: null,
     changedFields: ["planned_at"],
     destructive: false, oneStep: true, confirm: false, undo: "restore_fields",

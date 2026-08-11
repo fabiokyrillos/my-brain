@@ -39,12 +39,13 @@ export { workViews, type WorkViewId };
  */
 export type WorkFilters = Pick<
   WorkQuery,
-  "state" | "due" | "priority" | "origin" | "projectId" | "contextId" | "order"
+  "state" | "due" | "planned" | "priority" | "origin" | "projectId" | "contextId" | "order"
 >;
 
 const DEFAULT_WORK_FILTERS: WorkFilters = {
   state: DEFAULT_WORK_QUERY.state,
   due: DEFAULT_WORK_QUERY.due,
+  planned: DEFAULT_WORK_QUERY.planned,
   priority: DEFAULT_WORK_QUERY.priority,
   origin: DEFAULT_WORK_QUERY.origin,
   projectId: DEFAULT_WORK_QUERY.projectId,
@@ -236,6 +237,30 @@ export async function loadWorkProjection(
     query = query.gte("due_at", nextDay.toISOString());
   } else if (filters.due === "none") {
     query = query.is("due_at", null);
+  }
+
+  /*
+   * `2M-PLAN-003` — the predicate `planned_at` never had.
+   *
+   * Both edges come from `localDayBounds`, the same one contract the view and
+   * the `due` filter use (`2M-TIME-001`); deriving either by adding 24 hours is
+   * the defect slice 2M.0 removed, and a plan filter written independently
+   * would have reintroduced it on exactly the two days a year a local day is
+   * not 24 hours long.
+   *
+   * `overdue` here means "I meant to do this and have not", never "this is
+   * late": `planned_at` arms nothing and makes nothing fail (OD-2M-3 A). It
+   * narrows like every other member — no value of `planned` can widen the view,
+   * because every branch adds a predicate and `any` adds none.
+   */
+  if (filters.planned === "overdue") {
+    query = query.not("planned_at", "is", null).lt("planned_at", startOfToday.toISOString());
+  } else if (filters.planned === "today") {
+    query = query.gte("planned_at", startOfToday.toISOString()).lt("planned_at", nextDay.toISOString());
+  } else if (filters.planned === "upcoming") {
+    query = query.gte("planned_at", nextDay.toISOString());
+  } else if (filters.planned === "none") {
+    query = query.is("planned_at", null);
   }
 
   if (filters.priority !== "any") query = query.eq("manual_priority", filters.priority);
@@ -450,19 +475,32 @@ export async function loadTaskRelations(
  * two pages or on none — which would make `2L-VIEW-009`'s "pagination composes"
  * false in exactly the case nobody checks.
  */
-function applyOrder<T extends { order: (column: string, options: { ascending: boolean }) => T }>(
+function applyOrder<
+  T extends { order: (column: string, options: { ascending: boolean; nullsFirst?: boolean }) => T },
+>(
   query: T,
   order: WorkOrder,
   view: WorkViewId,
 ): T {
   const resolved = order === "default" ? WORK_VIEWS[view].defaultOrder : order;
+  // `nullsFirst: false` on BOTH planned directions, which is the asymmetry
+  // `comparePlannedAt` declares and the reason these two cannot be written as a
+  // plain ascending/descending pair: a task with no intention is not a task
+  // with a very late one, and a descending order that put every unplanned row
+  // first would bury exactly the rows the control was chosen to surface.
+  // PostgREST defaults to nulls last for ascending and nulls FIRST for
+  // descending, so the second is a correction and not decoration.
   const ordered = resolved === "due_asc"
     ? query.order("due_at", { ascending: true })
     : resolved === "due_desc"
       ? query.order("due_at", { ascending: false })
-      : resolved === "updated_asc"
-        ? query.order("updated_at", { ascending: true })
-        : query.order("updated_at", { ascending: false });
+      : resolved === "planned_asc"
+        ? query.order("planned_at", { ascending: true, nullsFirst: false })
+        : resolved === "planned_desc"
+          ? query.order("planned_at", { ascending: false, nullsFirst: false })
+          : resolved === "updated_asc"
+            ? query.order("updated_at", { ascending: true })
+            : query.order("updated_at", { ascending: false });
   return ordered.order("id", { ascending: true });
 }
 

@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getPlannedAtCopy } from "@/features/planning/planned-at";
 import type { WorkItemView } from "./contracts";
 
 vi.mock("server-only", () => ({}));
@@ -136,7 +137,10 @@ describe("WorkView", () => {
       }],
     });
 
-    expect(screen.getByText(/Planned:/)).toBeVisible();
+    // `2M-PLAN-001`: the prefix is the declared one now, and the value is a
+    // date with no clock component — a day the user chose, not a time they
+    // reserved.
+    expect(screen.getByText(new RegExp(getPlannedAtCopy("en").prefix))).toBeVisible();
     expect(screen.getByText("Urgent")).toBeVisible();
     expect(screen.getByText("No due date")).toBeVisible();
     expect(screen.getByText("Someday, not now")).toBeVisible();
@@ -161,7 +165,7 @@ describe("WorkView", () => {
       }],
     });
 
-    expect(screen.queryByText(/Planned:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(getPlannedAtCopy("en").prefix))).not.toBeInTheDocument();
     expect(screen.queryByText("No due date")).not.toBeInTheDocument();
     expect(screen.queryByText(/^(Low|Medium|High|Urgent)$/)).not.toBeInTheDocument();
   });
@@ -242,6 +246,7 @@ describe("WorkView: narrowing, grouping and the position", () => {
     view: "all" as const,
     state: "open" as const,
     due: "any" as const,
+    planned: "any" as const,
     priority: "any" as const,
     origin: "any" as const,
     projectId: null,

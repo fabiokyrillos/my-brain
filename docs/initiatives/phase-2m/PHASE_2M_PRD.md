@@ -310,7 +310,7 @@ traceability generator, never typed into a report.
 - **2M-METRICS-003:** Every declared event has a **real consumer** before closeout: a reader that asks a question of it. An event nothing reads is not delivered.
 - **2M-METRICS-004:** No event property can carry content. The property whitelist is the mechanism; there is no key that could hold a title, a description, a name, a date the user chose, a time the user chose, a free timezone string, review text, a payload, an endpoint, a subscription or any sensitive value. Free-form properties are refused outright.
 - **2M-METRICS-005:** The measurements this phase records are stated as questions before any producer is written — how often a plan is made, how often a review produces an action, how often a notification is silenced — and an event that answers none of them is not created.
-- **2M-METRICS-006:** Every event carries a declared question, a producer, a writer, a consumer, a test, a negative control and a proof of writability on the deployed project; an event missing any one of the seven is not delivered. A **third** migration, or a migration outside the two named allocations, fails the phase rather than being absorbed.
+- **2M-METRICS-006:** Every event carries a declared question, a producer, a writer, a consumer, a test, a negative control and a proof of writability on the deployed project; an event missing any one of the seven is not delivered. A **fourth** migration, or a migration outside the three named allocations (ADR-106 added the third, for `clear_planned` only), fails the phase rather than being absorbed.
 
 ### 4.12 `2M-DEVICE` — real-device verification (slice 2M.5)
 
@@ -375,13 +375,16 @@ takes only the locale.
 
 ## 7. Migration budget
 
-**`2 allocated · 0 spent` at authorization. Exactly two, and they are
+**`3 allocated · 1 spent` after ADR-106. All three are NON-TRANSFERABLE.**
+
+ADR-105 fixed the budget at **`2 allocated · 0 spent` at authorization. Exactly two, and they are
 NON-TRANSFERABLE.**
 
 | # | Allocation | Slice | Contents, and nothing else |
 |---|---|---|---|
 | 1 | **Telemetry vocabulary and the `calendar` surface** | 2M.1, **before any producer** | the event-name CHECK, `private.validate_product_event_properties`, and the surface CHECK declaring `calendar` — **one migration, all enforcement points at once** |
 | 2 | **Notification consent, subscription and delivery** | 2M.4b | consent, subscription, delivery state, revocation, the timestamps those need, ownership, RLS, minimum retention, deduplication, and **content-free** audit |
+| 3 | **`clear_planned`** — ADR-106 | 2M.2 | the verb's admission to `public.apply_task_command`'s allowlist, its patch rule, its delta, its write, its recorded applied state, and the assertions that prove them. **Nothing else** — no table, column, policy, grant, role, vocabulary or second verb |
 
 **Non-transferable means what it says.** Migration 1 may not carry consent or
 subscription schema; migration 2 may not carry vocabulary. Unspent capacity in
@@ -390,11 +393,23 @@ one does not become capacity in the other.
 **Migration 2 may not store** a task title, a description, a name, record
 content, user-supplied notification text, or any free-form payload column.
 
-**A third migration is a stop condition**, not a decision the implementer makes.
-Everything outside these two — the calendar surface, the planner, review-to-
+**A third migration is a stop condition**, not a decision the implementer makes
+— and it was raised as one. `2M-PLAN-002` was proved unbuildable without schema
+**before slice 2M.2 was started** (`AUTONOMOUS_LOOP_HANDOFF.md` §49), the three
+resolutions were put to the owner, and **the owner authorized migration 3 in
+ADR-106**, exclusively for `clear_planned`. The rule is unchanged by that
+exercise of it: **a fourth migration is a stop condition**, so is any use of
+migration 3 for anything but `clear_planned`, and so is reallocating migration 2.
+
+Everything outside these three — the calendar surface, the planner, review-to-
 action, the sensitivity derivation, the local-day contract — is specified to
 need **zero schema change**, which is the reason the calendar is built over
 sources that already exist.
+
+**Sections 12's refusal list is amended by ADR-106 in exactly one place.** "A
+third migration" is no longer among the things still refused; **a fourth is**,
+and so is migration 3 carrying anything but `clear_planned`. Every other refusal
+in that list stands unchanged.
 
 ---
 
@@ -605,7 +620,8 @@ checkpoint, closeout, and the successor re-audit. It authorizes **nothing else**
 Still refused, whatever implementation discovers: recurrence in any form · an
 event/appointment entity · external calendar integration · email · content in a
 push payload · a provider call or BYOK spend · AI generating or moving a plan ·
-a third migration · schema outside the two named destinations · changing a signed
+a **fourth** migration, or migration 3 carrying anything but `clear_planned`
+(ADR-106) · schema outside the three named destinations · changing a signed
 decision · RLS, grant or policy beyond the approved model · an unplanned external
 service · opening public signup · executing the public rollout · starting or
 formally planning the roadmap successor.

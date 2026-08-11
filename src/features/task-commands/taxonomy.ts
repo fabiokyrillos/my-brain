@@ -52,6 +52,7 @@ export const TASK_COMMAND_ACTIONS = [
   "reschedule_due",
   "clear_due",
   "set_planned",
+  "clear_planned",
   "set_priority",
   "assign_project",
   "assign_context",
@@ -128,8 +129,19 @@ export type TaskCommandUnsupportedReason = (typeof TASK_COMMAND_UNSUPPORTED_REAS
  * fingerprint and unexpired confirmation minted under `.2` is invalidated by
  * this bump, and `fingerprint.test.ts` exercises that consequence rather than
  * assuming it (2G-CREATE-004).
+ *
+ * `2026-08-11.1` — Slice 2M.2 adds `clear_planned`, the sixteenth mutation
+ * action (`2M-PLAN-002`, funded by ADR-106's third migration). This is a
+ * genuine widening of what a sentence may be classified as — "tira o dia
+ * planejado" was `unsupported_action` under `2026-08-05.1` and is a proposal
+ * under this one — so every stored fingerprint and every unexpired confirmation
+ * minted under the previous version is invalidated, deliberately. The bump is
+ * not optional bookkeeping: `apply_task_command` hashes this value into the
+ * replay fingerprint, so a taxonomy that gained an action without it would let
+ * a confirmation issued for the old vocabulary authorize a payload the old
+ * vocabulary could not express.
  */
-export const TASK_COMMAND_POLICY_VERSION = "2026-08-05.1";
+export const TASK_COMMAND_POLICY_VERSION = "2026-08-11.1";
 
 /**
  * The window in which a Phase 2E operation stays undoable (2E-UNDO-006).
@@ -401,6 +413,20 @@ const POLICIES: Record<TaskCommandAction, TaskCommandActionPolicy> = {
     eligibleFrom: ACTIVE_ONLY,
     requiredPatchFields: ["plannedAt"],
     allowedPatchFields: ["plannedAt"],
+    changedFields: ["planned_at"],
+  }),
+  // `2M-PLAN-002` — the counterpart `clear_due` has had since Phase 2E, over
+  // the other scheduling column. Shaped exactly like it: no patch field, so the
+  // derived control is a single button; `restore_fields`, so the removed day
+  // comes back from the recorded pre-state.
+  //
+  // **It does not touch reminders, and `clear_due` does.** That is the one
+  // deliberate difference and it follows from OD-2M-3 A: `planned_at` is an
+  // intention, never a commitment, so nothing was ever armed from it —
+  // `set_planned` already declares no reminder effect for the same reason.
+  // Declaring one here would close a reminder the user's deadline still wants.
+  clear_planned: policy({
+    eligibleFrom: ACTIVE_ONLY,
     changedFields: ["planned_at"],
   }),
   set_priority: policy({

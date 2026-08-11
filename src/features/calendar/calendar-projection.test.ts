@@ -438,10 +438,12 @@ describe("2M-CAL-009: what a calendar item can be rescheduled with", () => {
     // would have let through.
     expect(actions).not.toContain("rename_task");
     expect(actions).not.toContain("cancel_task");
-    // `clear_planned` does not exist yet. Asserted as an absence with its
-    // destination named, so slice 2M.2 adding it fails this line and has to
-    // notice that the calendar starts offering it.
-    expect(actions).not.toContain("clear_planned");
+    // `clear_planned` arrived in slice 2M.2 (`2M-PLAN-002`). This line was an
+    // asserted absence with its destination named; it failed on the day the
+    // verb was added, which is what forced the question of whether the calendar
+    // should offer it. It should: a surface that puts an intention on a day has
+    // to be able to take it off.
+    expect(actions).toContain("clear_planned");
   });
 
   it("offers nothing on an item that is not a task", async () => {

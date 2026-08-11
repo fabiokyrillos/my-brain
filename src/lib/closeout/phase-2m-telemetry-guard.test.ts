@@ -533,15 +533,17 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
      * a forgotten producer a failing diff rather than a closeout surprise.
      *
      * `calendar_viewed`   — slice 2M.1 part 2, SHIPPED
-     * `day_planned`       — slice 2M.2
+     * `day_planned`       — slice 2M.2, SHIPPED
      * `day_review_opened` / `day_review_action_applied` — slice 2M.3
      * `notification_consent_changed` — slice 2M.4a
      * `notification_suppressed`      — slice 2M.4b
      */
     const producers = producerSites();
-    expect([...producers.keys()].sort()).toEqual(["calendar_viewed"]);
-    expect(producers.get("calendar_viewed"))
-      .toEqual(["src/features/product-analytics/interaction-events.tsx"]);
+    expect([...producers.keys()].sort()).toEqual(["calendar_viewed", "day_planned"]);
+    for (const name of ["calendar_viewed", "day_planned"]) {
+      expect(producers.get(name), name)
+        .toEqual(["src/features/product-analytics/interaction-events.tsx"]);
+    }
   });
 
   it("2M-METRICS-004: the shipped producer carries no date and no time", () => {
