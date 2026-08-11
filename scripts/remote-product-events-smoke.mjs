@@ -43,23 +43,49 @@ function baseEvent(overrides = {}) {
   };
 }
 
+/**
+ * A real authenticated session, without solving a CAPTCHA.
+ *
+ * THE SECOND REASON THIS SMOKE COULD NOT RUN.
+ *
+ * It signed in with `signInWithPassword`, and Signup Hardening SH.5 enabled
+ * Turnstile on this project — so GoTrue answers `captcha_failed` to any caller
+ * that has not solved a widget, and no amount of correct credentials helps. The
+ * script died on its first user before writing anything.
+ *
+ * `admin/generate_link` mints a recovery token and `/auth/v1/verify` exchanges
+ * it for a session. That is the CAPTCHA-free path `sh5-password-policy-probe.mjs`
+ * established and `sh6-quota-acceptance.mjs` uses, reused here rather than
+ * reinvented.
+ *
+ * The session is then installed on a **publishable-key** client, so every read
+ * and write below is bounded by RLS as the owner — never by service-role. That
+ * distinction is the whole subject of several assertions in this file, and a
+ * shortcut here would quietly answer them all in advance.
+ */
 async function createTestUser(index) {
+  const email = `phase-2x-events-${index}-${suffix}@example.test`;
   const created = dataOrThrow(
-    await admin.auth.admin.createUser({
-      email: `phase-2x-events-${index}-${suffix}@example.test`,
-      password,
-      email_confirm: true,
-    }),
+    await admin.auth.admin.createUser({ email, password, email_confirm: true }),
     `create product-events test user ${index}`,
   ).user;
   assert(created, `Product-events test user ${index} was not returned`);
   createdUsers.push(created.id);
 
-  const client = createClient(credentials.url, credentials.publishableKey, clientOptions);
-  dataOrThrow(
-    await client.auth.signInWithPassword({ email: created.email, password }),
-    `sign in product-events test user ${index}`,
+  const link = dataOrThrow(
+    await admin.auth.admin.generateLink({ type: "recovery", email }),
+    `mint recovery token for product-events test user ${index}`,
   );
+  const hashedToken = link.properties?.hashed_token;
+  assert(hashedToken, `No recovery token was returned for product-events test user ${index}`);
+
+  const client = createClient(credentials.url, credentials.publishableKey, clientOptions);
+  const verified = dataOrThrow(
+    await client.auth.verifyOtp({ type: "recovery", token_hash: hashedToken }),
+    `exchange recovery token for product-events test user ${index}`,
+  );
+  assert(verified.session?.access_token, `No session for product-events test user ${index}`);
+
   createdClients.push({ client, userId: created.id });
   return { client, user: created };
 }
@@ -130,6 +156,77 @@ function eventMatrix({ entryId, taskId, questionId }) {
       surface: "task_command",
       properties: { commandOrigin: "work", undoResult: "undone", policyVersion: "2026-07-25.2" },
     },
+    /*
+     * THIRTEEN NAMES THAT WERE MISSING, AND THE FINDING THAT FOUND THEM.
+     *
+     * The assertion above -- `matrix.map(name).join("|") === expectedEventNames.join("|")`
+     * -- is exact and ordered, and this matrix stopped at Phase 2E's four. So
+     * this smoke has been **unrunnable since `202608070081`** added
+     * `rate_limit_refused` in Phase 2H: it fails on its first assertion, before
+     * it can write anything. Phase 2J and Phase 2K then added three names each
+     * and the gap widened silently, because a manual script that is never run
+     * reports nothing at all.
+     *
+     * That is `2E-ANALYTICS-006`'s own failure mode one level up. The
+     * vocabulary reader stopped this smoke from *drifting*; nothing stopped it
+     * from being *abandoned*. It is repaired here rather than replaced, because
+     * a second hosted proof script beside a broken one is how there came to be
+     * three copies of a vocabulary.
+     *
+     * Phase 2H (`202608070081`). No subject: a refusal names no entity.
+     */
+    { name: "rate_limit_refused", surface: "server", properties: { operation: "ai", failureKind: "rate_limited" } },
+    /* Phase 2J (`202608080086`). */
+    { name: "capture_mode_selected", surface: "capture", properties: { captureMode: "voice" } },
+    {
+      name: "voice_transcription_finished",
+      surface: "capture",
+      properties: { outcome: "succeeded", draftEdited: true, additionalSegment: false },
+    },
+    {
+      name: "attention_item_resolved",
+      surface: "needs_attention",
+      properties: { attentionReason: "retry_processing", resolutionAction: "bulk_retry", resolutionBucket: "under_60s" },
+      ...entrySubject,
+    },
+    /*
+     * Phase 2K (`202608090088` and `202608090089`). The `conversation` surface
+     * is the one whose absence from the writer's hardcoded list made Phase 2K's
+     * telemetry inert for a phase — so it is exercised here through the real
+     * authenticated writer, which is the only place that defect was visible.
+     */
+    { name: "conversation_answer_shown", surface: "conversation", properties: { evidence: "evidenced", explained: true } },
+    { name: "conversation_memory_resolved", surface: "conversation", properties: { outcome: "accepted" } },
+    { name: "conversation_suggestion_shown", surface: "conversation", properties: { category: "project" } },
+    /*
+     * Phase 2M (`202608110090`). The `calendar` surface, and the six events
+     * that answer this phase's four declared questions.
+     *
+     * `day_planned` carries the task subject deliberately: it is the one Phase
+     * 2M event about a specific record, and routing it through
+     * `assert_product_event_subject_owner` proves the ownership gate still
+     * answers for a name added after that gate was written.
+     *
+     * No event here carries a date or a time. That is the property
+     * `2M-METRICS-004` is about, and a smoke that wrote one would be the first
+     * place it could leak.
+     */
+    { name: "calendar_viewed", surface: "calendar", properties: { orientation: "week" } },
+    {
+      name: "day_planned",
+      surface: "calendar",
+      properties: { operation: "set", itemCount: 3 },
+      p_subject_type: "task",
+      p_subject_id: taskId,
+    },
+    { name: "day_review_opened", surface: "calendar", properties: { scope: "day" } },
+    {
+      name: "day_review_action_applied",
+      surface: "calendar",
+      properties: { scope: "next_day", actionKind: "carry_forward" },
+    },
+    { name: "notification_consent_changed", surface: "server", properties: { channel: "push", state: "granted" } },
+    { name: "notification_suppressed", surface: "server", properties: { channel: "push", reason: "quiet_hours" } },
   ];
 }
 

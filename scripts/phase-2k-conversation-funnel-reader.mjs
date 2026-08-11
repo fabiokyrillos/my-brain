@@ -2,6 +2,23 @@
  * Phase 2K slice 2K.8 — the Conversar funnel's runner (`2K-METRICS-007`).
  *
  *   node scripts/phase-2k-conversation-funnel-reader.mjs --email … --password …
+ *   node scripts/phase-2k-conversation-funnel-reader.mjs --access-token …
+ *
+ * ## Two corrections, found while proving Phase 2M's reader and applied here
+ *
+ * This file carried both defects and neither had ever fired, because a manual
+ * script that is never run reports nothing at all:
+ *
+ *   1. it selected, filtered and ordered by `occurred_at`, and
+ *      `public.product_events` **has no such column** — its only timestamp is
+ *      `created_at` (`202607170024:51`). Every invocation would have died on
+ *      *"column product_events.occurred_at does not exist"*; and
+ *   2. it signed in with `grant_type=password`, which Turnstile has refused
+ *      since Signup Hardening SH.5. `--access-token` is the way in that works.
+ *
+ * `2K-METRICS-007` requires a consumer that asks a question of the events. A
+ * consumer that cannot execute is the failure that requirement exists to
+ * prevent, one level up, so it is corrected rather than recorded.
  *
  * Reads one owner's Phase 2K events through **that owner's own authenticated
  * session** and prints the report. It **writes nothing**: measuring must not
@@ -36,6 +53,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--email") args.email = argv[++index];
     else if (flag === "--password") args.password = argv[++index];
+    else if (flag === "--access-token") args.accessToken = argv[++index];
     else if (flag === "--days") args.windowDays = Number(argv[++index]);
   }
   return args;
@@ -43,8 +61,10 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.email || !args.password) {
-    console.error("usage: --email <address> --password <password> [--days N]");
+  const hasPassword = Boolean(args.email && args.password);
+  if (!hasPassword && !args.accessToken) {
+    console.error("usage: --access-token <jwt> | --email <address> --password <password> [--days N]");
+    console.error("this project enforces Turnstile, so the password path answers captcha_failed");
     process.exit(1);
   }
   if (!Number.isFinite(args.windowDays) || args.windowDays <= 0) {
@@ -53,15 +73,25 @@ async function main() {
   }
 
   const { url, anonKey } = await getLinkedSupabaseCredentials();
-  const client = createClient(url, anonKey, { auth: { persistSession: false } });
-
-  const signIn = await client.auth.signInWithPassword({
-    email: args.email,
-    password: args.password,
+  const client = createClient(url, anonKey, {
+    auth: { persistSession: false },
+    ...(args.accessToken
+      ? { global: { headers: { Authorization: `Bearer ${args.accessToken}` } } }
+      : {}),
   });
-  if (signIn.error) {
-    console.error(`sign-in failed: ${signIn.error.message}`);
-    process.exit(1);
+
+  if (hasPassword) {
+    const signIn = await client.auth.signInWithPassword({
+      email: args.email,
+      password: args.password,
+    });
+    if (signIn.error) {
+      console.error(`sign-in failed: ${signIn.error.message}`);
+      if (signIn.error.message?.includes("captcha")) {
+        console.error("use --access-token: Turnstile refuses grant_type=password from a script");
+      }
+      process.exit(1);
+    }
   }
 
   const since = new Date(Date.now() - args.windowDays * 24 * 60 * 60 * 1000).toISOString();
@@ -69,10 +99,10 @@ async function main() {
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const page = await client
       .from("product_events")
-      .select("event_name,properties,occurred_at")
+      .select("event_name,properties,created_at")
       .in("event_name", PHASE_2K_EVENT_NAMES)
-      .gte("occurred_at", since)
-      .order("occurred_at", { ascending: true })
+      .gte("created_at", since)
+      .order("created_at", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (page.error) {
@@ -103,7 +133,7 @@ async function main() {
     console.log("producer -- this reader cannot tell you which, and you should open one thread.");
   }
 
-  await client.auth.signOut();
+  if (hasPassword) await client.auth.signOut();
 }
 
 main().catch((error) => {

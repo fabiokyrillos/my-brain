@@ -375,6 +375,73 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
     expect(funnel).toContain("unrecognised");
   });
 
+  it("2M-METRICS-003: the consumer queries a column the ledger actually has", () => {
+    /*
+     * The defect this exists for, found by running the reader against the
+     * deployed project rather than by reading it.
+     *
+     * `public.product_events` has exactly one timestamp — `created_at`
+     * (`202607170024`). Both this phase's reader and Phase 2K's asked for
+     * `occurred_at`, which does not exist, so every invocation died on
+     * *"column product_events.occurred_at does not exist"*. Neither had ever
+     * fired, because a manual script nobody runs reports nothing at all — the
+     * same silence SH.6's producer-without-a-consumer had.
+     *
+     * The column list is derived from the migration that creates the table, so
+     * this cannot pass by comparing a hardcoded name against itself.
+     */
+    const created = read("supabase/migrations/202607170024_phase_2x_product_events.sql");
+    const body = created.slice(
+      created.indexOf("create table public.product_events ("),
+      created.indexOf("constraint product_events_subject_pair_check"),
+    );
+    const columns = new Set(
+      [...body.matchAll(/^ {2}([a-z_]+) (uuid|text|jsonb|boolean|timestamptz)/gm)].map((match) => match[1]),
+    );
+    expect(columns.size, "no columns were extracted from the create table").toBeGreaterThan(8);
+    expect(columns.has("created_at")).toBe(true);
+    expect(columns.has("occurred_at"), "the ledger grew an occurred_at; this guard is now wrong").toBe(false);
+
+    for (const consumer of [FUNNEL, READER, "scripts/phase-2k-conversation-funnel-reader.mjs"]) {
+      const source = read(consumer);
+      const selected = [
+        ...source.matchAll(/\.(?:select|gte|lte|order|eq)\(\s*"([a-z_,]+)"/g),
+      ].flatMap((match) => match[1].split(","));
+      for (const column of selected) {
+        expect(columns.has(column), `${consumer} reads product_events.${column}, which does not exist`)
+          .toBe(true);
+      }
+    }
+  });
+
+  it("2M-METRICS-002/003: the hosted proof exists, cleans up, and does not overclaim", () => {
+    /*
+     * The proof is a separate file from the reader on purpose: it needs
+     * `service_role` to create and destroy a disposable owner, and the reader
+     * must never have it — which is the assertion above this one.
+     */
+    const proof = read("scripts/phase-2m-daily-cycle-funnel-proof.mjs");
+    // It reads through the consumer's own code path, not a query of its own.
+    expect(proof).toContain("readDailyCycleRows");
+    expect(proof).toContain("aggregateDailyCycleFunnel");
+    // Non-vacuous controls, each named.
+    for (const control of [
+      "undeclared-event-name", "undeclared-surface", "planted-date",
+      "out-of-enum-value", "idempotent-replay", "RLS-bound-against-a-real-row",
+    ]) {
+      expect(proof, `the proof does not run the ${control} control`).toContain(control);
+    }
+    // Fixtures are disposable, marked, and their removal is proved rather than
+    // assumed — owner-scoped, because `product_events` is unreadable to
+    // `service_role` and a global count would prove nothing.
+    expect(proof).toContain("p_is_synthetic: true");
+    expect(proof).toContain("deleteUser");
+    expect(proof).toContain("zero residue");
+    // And it says plainly which half it cannot prove.
+    expect(proof, "the proof must not present a harness as a producer")
+      .toContain("no product producer exists yet");
+  });
+
   it("2M-METRICS-005: every declared event answers a question stated before it", () => {
     // The four questions are written into the migration header and into the
     // consumer, and each event is named beneath the one it answers. A seventh

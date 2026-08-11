@@ -88,6 +88,11 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
     reason:
       "2H-RATE-004: teardown for the four disposable accounts the rate-limit concurrency proof creates in the LOCAL stack. The limiter itself holds no deletion capability at all -- rate_limit_events rows leave with the account by cascade, so nothing in 2H.3 needed one",
   },
+  "scripts/phase-2m-daily-cycle-funnel-proof.mjs": {
+    class: "operator-script",
+    reason:
+      "2M-METRICS-002/003: teardown for the two disposable owners the hosted funnel proof creates on the DEPLOYED project. The deletion is the proof of zero residue rather than an incidental cleanup: product_events grants service_role neither SELECT nor DELETE, so the rows cannot be counted or removed directly, and the only honest evidence that none survives is that no owner of them does. Nothing in the funnel path -- neither the reader nor the aggregation module -- holds this capability or any service-role client at all, which phase-2m-telemetry-guard.test.ts asserts separately",
+  },
 };
 
 /** Scanned roots. `docs/` is excluded: prose may name what code may not do. */
@@ -207,7 +212,20 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
         || file === "scripts/phase-2h-rate-limit-race.mjs",
     );
     expect(recoveryProof).toHaveLength(2);
-    expect(operatorScripts).toHaveLength(14 + recoveryProof.length);
+
+    // Plus Phase 2M's hosted funnel proof, counted on its own line for the same
+    // reason every other addition is. It is the first entry whose deletion IS
+    // the evidence rather than tidiness: `product_events` grants `service_role`
+    // neither SELECT nor DELETE, so its rows cannot be counted or removed
+    // directly, and "no owner of them survives" is the only honest proof of
+    // zero residue available. Removing this call would not leave rows behind
+    // tidily — it would leave the claim unprovable.
+    const funnelProof = operatorScripts.filter(
+      (file) => file === "scripts/phase-2m-daily-cycle-funnel-proof.mjs",
+    );
+    expect(funnelProof).toHaveLength(1);
+
+    expect(operatorScripts).toHaveLength(14 + recoveryProof.length + funnelProof.length);
     expect(operatorScripts).not.toContain("supabase/functions/delete-account/reap.ts");
   });
 

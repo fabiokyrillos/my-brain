@@ -67,9 +67,11 @@ notifications.** Planning was authorized by ADR-104 (2026-08-09) and
 **implementation through closeout by ADR-105** (2026-08-11), which signed all
 seven owner decisions. Its governing pair lives in
 `docs/initiatives/phase-2m/`; its evidence files here. **Two migrations are
-authorized and non-transferable**, both still unspent; hosted parity remains
-`202608090089`; and the phase carries a **mandatory owner hardware checkpoint**
-after its push slice.
+authorized and non-transferable**; **the first is spent and deployed** —
+`202608110090`, the daily-cycle telemetry vocabulary and the `calendar` surface,
+applied 2026-08-11, so **hosted parity is `202608110090`** — and the second is
+notification consent, subscription and delivery in slice 2M.4b. The phase carries
+a **mandatory owner hardware checkpoint** after its push slice.
 
 **Its predecessor, Phase 2L — Work and execution, is complete** (planning by
 ADR-102, implementation through closeout by ADR-103, both 2026-08-09), with its
@@ -176,11 +178,23 @@ generator and its twenty-seven refusals — deliberately not built during planni
 for the reason Phase 2H recorded: a fail-closed generator run against a phase
 with zero acceptance records reports every requirement unresolved. The governing
 pair (PRD, implementation plan) lives in `docs/initiatives/phase-2m/`.
-**No slice acceptance record, no traceability matrix and no closing report
-exists yet**, and none may be created before its gate. **Two migrations are
-authorized and non-transferable** — telemetry plus the `calendar` surface in
-slice 2M.1, and push consent/subscription/delivery in slice 2M.4b — and both are
-still unspent.
+
+`PHASE_2M_SLICE_00_ACCEPTANCE.md` records the foundations slice — the single
+local-day contract, the three implementations it replaced, and four guards.
+`PHASE_2M_DEPLOYMENT.md` records **migration 1**, applied to the hosted project
+on 2026-08-11 after CI went green on its exact merge SHA: the dry run, the
+apply, the live read-only parity reading, the hosted proof through the real
+authenticated writer with six non-vacuous negative controls, zero residue proved
+owner-scoped, and **three probe defects found and corrected** — a remote smoke
+that had been unrunnable since Phase 2H, and two funnel readers that queried a
+column `product_events` does not have while signing in through a path Turnstile
+refuses.
+
+**No traceability matrix and no closing report exists yet**, and neither may be
+created before its gate. **Two migrations are authorized and non-transferable** —
+telemetry plus the `calendar` surface in slice 2M.1, **spent and deployed**, and
+push consent/subscription/delivery in slice 2M.4b, still unspent. A third is a
+stop condition.
 
 ### `phase-2l/` — Phase 2L (planning ADR-102; implementation through closeout ADR-103, both 2026-08-09)
 
