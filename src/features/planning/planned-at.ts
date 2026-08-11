@@ -53,6 +53,7 @@
  */
 
 import type { CalendarCommitment } from "@/features/calendar/calendar-query";
+import { detailControlsFor, type DetailControl } from "@/features/task-commands/detail-controls";
 import {
   TASK_COMMAND_ACTIONS,
   actionPolicy,
@@ -88,6 +89,25 @@ export const PLANNED_AT_COLUMN = "planned_at";
 export const PLANNED_AT_WRITE_ACTIONS: readonly TaskCommandAction[] =
   TASK_COMMAND_ACTIONS.filter((action) =>
     actionPolicy(action).changedFields.includes("planned_at"));
+
+/**
+ * Every control a task's current status admits **for this column**.
+ *
+ * The planner's analogue of `schedulingControlsFor`, and derived the same way:
+ * `detailControlsFor(status)` is the authority on eligibility and this only
+ * narrows what it returned, by asking the taxonomy which actions declare
+ * `planned_at`. Nothing here names a verb, so `clear_planned` appeared the day
+ * it was added and a verb that stopped touching the column would disappear.
+ *
+ * Deliberately narrower than the calendar's subset: the calendar is about two
+ * columns and the planner is about one. A planner offering `reschedule_due`
+ * would be letting the user move a *deadline* from a surface whose whole
+ * premise is that an intention is not one.
+ */
+export function plannedControlsFor(status: string): readonly DetailControl[] {
+  return detailControlsFor(status).filter((control) =>
+    actionPolicy(control.action).changedFields.includes("planned_at"));
+}
 
 /**
  * The day a stored instant means, in the user's own zone.

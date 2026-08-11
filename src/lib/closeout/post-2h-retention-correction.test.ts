@@ -121,6 +121,18 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // and it does not re-declare the writer, which is only possible because
       // the two corrections above deleted its vocabulary copies.
       "202608110090_phase_2m_daily_cycle_telemetry.sql",
+      // Phase 2M slice 2M.2: MIGRATION 3, which ADR-105 had declared a STOP
+      // CONDITION and which the owner authorized in ADR-106 after slice 2M.1
+      // raised it as one -- `2M-PLAN-002` was proved unbuildable without
+      // schema, because `apply_task_command` carries its own SQL allowlist and
+      // `set_planned` refuses a null `plannedAt`. It carries `clear_planned` and
+      // nothing else: no table, no column, no policy, no grant, no role, no
+      // vocabulary and no second verb. It touches no schedule and no retention
+      // job. Named here rather than tolerated, because the property this
+      // assertion protects is "nothing follows that somebody did not
+      // deliberately account for" -- and an authorized migration is exactly the
+      // case where naming it is the whole point.
+      "202608110091_phase_2m_clear_planned.sql",
     ]);
   });
 });

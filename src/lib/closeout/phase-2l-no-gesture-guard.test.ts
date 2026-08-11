@@ -152,6 +152,15 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * second occasion.
      */
     "src/features/calendar/calendar-outcome.tsx",
+    /*
+     * Added by slice 2M.2. The planner lives under `/app/calendar` and is
+     * governed by the same OD-2M-6 A signature, and it is the surface where a
+     * "drag a task onto a day" affordance would be most tempting of all --
+     * every other planner has one. It is named here rather than left to the
+     * `src/features/calendar` discovery sweep below, which cannot see another
+     * directory.
+     */
+    "src/features/planning/planner-view.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {
@@ -170,6 +179,20 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
     expect(discovered.length, "no calendar component was discovered").toBeGreaterThan(0);
     const missing = discovered.filter((file) => !(CALENDAR_SURFACES as readonly string[]).includes(file));
     expect(missing, "a calendar surface exists that the no-gesture guard does not scan").toEqual([]);
+  });
+
+  it("names every planner component there is", () => {
+    // The same discovery assertion, over the other directory OD-2M-6 A governs.
+    // Without it, a planner component added later would be invisible to the ban
+    // -- which is exactly how `calendar-outcome.tsx` came to be named above.
+    const discovered: string[] = [];
+    for (const entry of readdirSync(join(REPO, "src/features/planning"))) {
+      if (!entry.endsWith(".tsx") || entry.endsWith(".test.tsx")) continue;
+      discovered.push(`src/features/planning/${entry}`);
+    }
+    expect(discovered.length, "no planner component was discovered").toBeGreaterThan(0);
+    const missing = discovered.filter((file) => !(CALENDAR_SURFACES as readonly string[]).includes(file));
+    expect(missing, "a planner surface exists that the no-gesture guard does not scan").toEqual([]);
   });
 
   it("keeps every calendar action reachable by a visible, labelled link", () => {

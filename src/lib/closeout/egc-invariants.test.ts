@@ -92,7 +92,14 @@ const REPO = resolve(__dirname, "../../..");
 // same mechanism `202608070084` used for the post-2H correction. Moved
 // deliberately and visibly in the same commit that adds the migration, which is
 // the only way this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608110090";
+// Moved by Phase 2M slice 2M.2 to `202608110091`, the `clear_planned` migration
+// **ADR-106 authorized by owner decision** after slice 2M.1 raised the third
+// migration as the stop condition ADR-105 declared it to be. The budget is now
+// `3 allocated · 2 spent`, all three non-transferable, and migration 2 stays
+// reserved for push in 2M.4b — this move funds nothing else. Moved deliberately
+// and visibly in the same commit that adds the migration, which is the only way
+// this pin is allowed to change.
+const AUTHORIZED_MIGRATION_HEAD = "202608110091";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

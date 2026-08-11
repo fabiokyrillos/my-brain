@@ -41,14 +41,17 @@
  * control**, which is what OD-2M-6 A signed and `2M-MOBILE-003` guards. There is
  * no gesture here and none can be added: the no-gesture guard names this file.
  *
- * ## What it deliberately does not offer
+ * ## What it gained without being edited
  *
- * **Clearing a planned day.** `clear_planned` does not exist in the taxonomy —
- * `clear_due` closes a deadline and `set_planned` has no counterpart — so the
- * derivation finds nothing to render and the surface offers nothing. Inventing
- * the verb here would be a second authority for a write path; closing the
- * asymmetry is `2M-PLAN-002`'s job in slice 2M.2, and when it lands this
- * component gains the control without a line changing.
+ * **Clearing a planned day.** This paragraph used to record an absence:
+ * `clear_planned` did not exist, `set_planned` had no counterpart, the
+ * derivation found nothing to render and the surface offered nothing — with the
+ * note that "when it lands this component gains the control without a line
+ * changing". Slice 2M.2 landed it (`2M-PLAN-002`, funded by ADR-106), and **not
+ * a line of this file changed**. The control is here because
+ * `schedulingControlsFor` asks the taxonomy which actions declare a scheduling
+ * column, and the new verb declares `planned_at`. A hand-written list of three
+ * verbs would have needed an edit, and would not have got one.
  */
 
 import {

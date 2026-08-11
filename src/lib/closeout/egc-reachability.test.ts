@@ -92,6 +92,14 @@ const INVENTORY: readonly RouteEntry[] = [
    * it could need is already reachable from the page it sends the user to.
    */
   { route: "calendar", sections: [] },
+  /*
+   * `2M-PLAN-004`, and the same claim for the same reason. The planner renders
+   * two lists of tasks and no relationship or association collection at all; it
+   * links each row to that task's Work detail, which is where every writer it
+   * could need already lives. It creates nothing itself, which is the
+   * requirement rather than an omission.
+   */
+  { route: "calendar/plan", sections: [] },
   { route: "capture", sections: [] },
   { route: "chat", sections: [] },
   { route: "chat/[conversationId]", sections: [] },
