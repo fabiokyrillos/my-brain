@@ -28,6 +28,11 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     sensitivity: { kind: "undetermined" },
     href: "/pt-BR/app/work/t1",
     elapsed: false,
+    // The default fixture is a **read-only** item, so every assertion in this
+    // file about masking, structure and lanes is made against a surface with no
+    // command path — which is what a component test of those properties should
+    // be looking at. Rescheduling has its own fixture and its own file.
+    reschedule: null,
     ...overrides,
   };
 }

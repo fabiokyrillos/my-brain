@@ -5,6 +5,9 @@ import { loadCalendarProjection, requireProfileTimeZone } from "@/features/calen
 import { parseCalendarQuery } from "@/features/calendar/calendar-query";
 import { getCalendarCopy } from "@/features/calendar/copy";
 import { CalendarViewed } from "@/features/product-analytics/interaction-events";
+import { undoWorkOperation } from "@/features/task-commands/actions";
+import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
+import { dateBounds } from "@/features/task-commands/detail-controls";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { localDateOf } from "@/lib/time/local-day";
@@ -80,7 +83,23 @@ export default async function CalendarPage({
 
   return (
     <>
-      <CalendarView locale={locale} projection={projection} query={query} today={today} />
+      <CalendarView
+        /*
+         * `2M-CAL-009`. The **existing** command path, injected — not a calendar
+         * one. `applyTaskDetailCommand` is the same Server Action the task detail
+         * and the Work list submit to, and `undoWorkOperation` is the same undo
+         * router `undo_operations` has had since Phase 2E. Nothing in
+         * `src/features/calendar/` writes to `tasks`, and the direct-write guard's
+         * empty `tasks` allowlist is what keeps that true rather than customary.
+         */
+        dateBounds={dateBounds(now)}
+        locale={locale}
+        projection={projection}
+        query={query}
+        rescheduleAction={applyTaskDetailCommand}
+        today={today}
+        undoAction={undoWorkOperation}
+      />
       {/* Q1's producer. It ships after the vocabulary was deployed, not before. */}
       <CalendarViewed locale={locale} orientation={query.orientation} />
     </>

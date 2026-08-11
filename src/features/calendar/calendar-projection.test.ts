@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { DEFAULT_CALENDAR_LANES, type CalendarLane, type CalendarQuery } from "./calendar-query";
+import { POSITION_FORBIDDEN_FIELDS, parseCalendarPosition } from "./calendar-position";
+import {
+  TASK_COMMAND_ACTIONS,
+  actionPolicy,
+  isEligibleStatus,
+} from "@/features/task-commands/taxonomy";
 
 type Result = { data: unknown; error: unknown };
 
@@ -16,6 +22,7 @@ type ItemView = {
   sensitivity: { kind: string; level?: string };
   href: string | null;
   elapsed: boolean;
+  reschedule: { taskId: string; controls: readonly { action: string }[] } | null;
 };
 
 type ProjectionResult = {
@@ -334,9 +341,133 @@ describe("2M-CAL-008: opening an item goes to the surface that already exists", 
       reminders: { data: [{ id: "r1", title: "R", remind_at: "2026-08-15T19:00:00.000Z", status: "pending", entry_id: null, task_id: null }], error: null },
     }), { lanes: ["deadline", "reminder"] });
     const byLane = Object.fromEntries(result.days[0].items.map((item) => [item.lane, item.href]));
-    expect(byLane.deadline).toBe("/pt-BR/app/work/t1");
-    expect(byLane.reminder).toBe("/pt-BR/app/reminders");
+    // The **path** is the existing surface. The query carries the return
+    // position added by part 3, which is `2M-CAL-008`'s other half and is
+    // asserted for what it decodes to rather than for its bytes below.
+    expect(byLane.deadline?.split("?")[0]).toBe("/pt-BR/app/work/t1");
+    expect(byLane.reminder?.split("?")[0]).toBe("/pt-BR/app/reminders");
     // No calendar-owned detail route: `2M-CAL-008` requires the existing one.
     for (const href of Object.values(byLane)) expect(href).not.toContain("/app/calendar/");
+  });
+
+  it("carries the caller's own position back, decoded rather than trusted", async () => {
+    /*
+     * `2M-CAL-008`. The evidence that matters is not that a `from=` appeared —
+     * it is that the payload **round-trips to the position the user was at**.
+     * Asserting the base64 would pin an encoding; asserting the decode pins the
+     * property, and it fails if the projection ever serializes a stale query.
+     */
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "T", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+    }), { lanes: ["deadline", "reminder"], orientation: "week" });
+
+    const href = result.days.flatMap((day) => day.items).map((item) => item.href)[0];
+    const from = new URL(href ?? "", "https://example.test").searchParams.get("from");
+    expect(from, "the item link carries no return position").toBeTruthy();
+
+    const decoded = parseCalendarPosition(from ?? undefined);
+    expect(decoded).toEqual({
+      orientation: "week",
+      anchor: { year: 2026, month: 8, day: 15 },
+      lanes: ["deadline", "reminder"],
+    });
+  });
+
+  it("never puts a subject, a title or a classification in the return position", async () => {
+    /*
+     * `2L-RETURN-003`, inherited. A return position describes **where**, and the
+     * subject is already in the path — a payload that also named the task would
+     * put an owned id in a link for no reason, and one that named a title would
+     * put content there. Read from the decoded JSON rather than from the type,
+     * because the type is what a future edit would change first.
+     */
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Um título sensível", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+    }), { lanes: ["deadline"] });
+
+    const href = result.days.flatMap((day) => day.items).map((item) => item.href)[0] ?? "";
+    const from = new URL(href, "https://example.test").searchParams.get("from") ?? "";
+    const payload = JSON.parse(Buffer.from(from, "base64url").toString("utf8")) as Record<string, unknown>;
+
+    expect(Object.keys(payload).sort()).toEqual(["d", "l", "o", "v"]);
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("t1");
+    expect(serialized).not.toContain("título");
+    for (const forbidden of POSITION_FORBIDDEN_FIELDS) {
+      expect(Object.keys(payload), `the return position carries ${forbidden}`).not.toContain(forbidden);
+    }
+  });
+});
+
+describe("2M-CAL-009: what a calendar item can be rescheduled with", () => {
+  const task = (status: string) => ({
+    id: "t1", title: "T", due_at: "2026-08-15T18:00:00.000Z", planned_at: null,
+    status, source_entry_id: null,
+  });
+
+  it("offers only the scheduling verbs, derived from the taxonomy", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at" ? { data: [task("todo")], error: null } : { data: [], error: null }),
+    }), { lanes: ["deadline"] });
+
+    const target = result.days.flatMap((day) => day.items)[0]?.reschedule;
+    expect(target?.taskId).toBe("t1");
+    const actions = (target?.controls ?? []).map((control) => control.action).sort();
+    /*
+     * Derived rather than typed: the expectation is recomputed here from the
+     * same policies the projection consulted, so this fails when a verb's
+     * `changedFields` change and passes when a new scheduling verb is added —
+     * which is exactly what `clear_planned` will be in slice 2M.2.
+     */
+    const expected = TASK_COMMAND_ACTIONS
+      .filter((action) => isEligibleStatus(action, "todo"))
+      .filter((action) => actionPolicy(action).changedFields
+        .some((field) => field === "due_at" || field === "planned_at"))
+      .slice()
+      .sort();
+    expect(actions).toEqual(expected);
+    // The property the derivation exists for, stated once so a reader does not
+    // have to run the filter in their head.
+    expect(actions).toContain("reschedule_due");
+    expect(actions).toContain("set_planned");
+    // Not a scheduling verb, and the most likely thing a hand-written list
+    // would have let through.
+    expect(actions).not.toContain("rename_task");
+    expect(actions).not.toContain("cancel_task");
+    // `clear_planned` does not exist yet. Asserted as an absence with its
+    // destination named, so slice 2M.2 adding it fails this line and has to
+    // notice that the calendar starts offering it.
+    expect(actions).not.toContain("clear_planned");
+  });
+
+  it("offers nothing on an item that is not a task", async () => {
+    const result = await load(client({
+      reminders: { data: [{ id: "r1", title: "R", remind_at: "2026-08-15T19:00:00.000Z", status: "pending", entry_id: null, task_id: null }], error: null },
+      summaries: { data: [{ id: "s1", period_start: "2026-08-15T00:00:00.000Z", period_end: "2026-08-16T00:00:00.000Z", period_type: "daily" }], error: null },
+    }), { lanes: ["reminder", "review"] });
+
+    for (const item of result.days.flatMap((day) => day.items)) {
+      expect(item.reschedule, `${item.lane} offered a task reschedule`).toBeNull();
+    }
+  });
+
+  it("carries the answer and never the status the answer came from", async () => {
+    /*
+     * The boundary property. A client handed a status would be deciding
+     * eligibility in a place that cannot re-check it, which is the second
+     * authority `2M-CAL-009` forbids — and `humanState`'s lossiness on Work is
+     * the same lesson one surface over.
+     */
+    const result = await load(client({
+      tasks: (column) => (column === "due_at" ? { data: [task("todo")], error: null } : { data: [], error: null }),
+    }), { lanes: ["deadline"] });
+
+    const item = result.days.flatMap((day) => day.items)[0];
+    expect(Object.keys(item ?? {})).not.toContain("status");
+    expect(Object.keys(item?.reschedule ?? {}).sort()).toEqual(["controls", "taskId"]);
   });
 });

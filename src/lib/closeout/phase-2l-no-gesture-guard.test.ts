@@ -137,6 +137,13 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
   const CALENDAR_SURFACES = [
     "src/features/calendar/calendar-view.tsx",
     "src/features/calendar/calendar-item.tsx",
+    /*
+     * Added by slice 2M.1 part 3, and it is the file the ban was written for:
+     * a reschedule control is exactly where drag-to-move would be implemented.
+     * The discovery assertion below is what made adding it mandatory rather
+     * than remembered.
+     */
+    "src/features/calendar/calendar-reschedule.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {
