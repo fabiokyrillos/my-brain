@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
+import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
 import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
 import type { DetailControl } from "@/features/task-commands/detail-controls";
 import type {
@@ -341,8 +342,19 @@ function TaskRow({
         {!task.dueAt && task.intentionalNoDue && (
           <span className="status-badge">{pt ? "Sem prazo" : "No due date"}</span>
         )}
+        {/*
+          `2M-PLAN-001`. This line used to be `pt ? "Planejado: " : "Planned: "`
+          with a `timeStyle: "short"` beside it — a second declaration of what
+          the column means, three files from a calendar that had independently
+          decided the same column was an *intention*. Both halves were wrong in
+          the same direction: the ternary said it here, and the clock component
+          presented a day the user chose as a time they reserved.
+        */}
         {task.plannedAt && (
-          <span>{pt ? "Planejado: " : "Planned: "}{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.plannedAt))}</span>
+          <span>
+            {`${getPlannedAtCopy(locale).prefix} `}
+            {formatPlannedDay(task.plannedAt, locale, timezone)}
+          </span>
         )}
         {task.priority && (
           <span className="status-badge">{priorityCopy[task.priority][pt ? "pt" : "en"]}</span>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getWorkCopy } from "@/features/operations/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
+import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
 import { isDerivedLevel } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 import type { RelationSummary, WorkItemHumanState, WorkItemPriority } from "./contracts";
@@ -185,7 +186,17 @@ export function TaskDetailView({
               ? dateTime(task.dueAt)
               : task.noDueReason ?? copy.fields.noDue}
           </Field>
-          {task.plannedAt ? <Field label={copy.fields.planned}>{dateTime(task.plannedAt)}</Field> : null}
+          {/*
+            `2M-PLAN-001`. The label and the formatting both come from the
+            declaration, and the second is the substantive change: this field
+            rendered `dateTime(...)` — a day the user chose, presented as a time
+            they reserved, which is precisely what OD-2M-3 A says `planned_at`
+            is not. The field is now shown even when empty, because "no planned
+            day" is an answer and an absent row is not.
+          */}
+          <Field label={getPlannedAtCopy(locale).label}>
+            {formatPlannedDay(task.plannedAt, locale, detail.timezone) ?? getPlannedAtCopy(locale).none}
+          </Field>
           <Field label={copy.fields.priority}>
             {task.priority ? priorityCopy[task.priority][pt ? "pt" : "en"] : copy.none}
           </Field>
