@@ -11,7 +11,15 @@ import { withAgentName } from "@/lib/agent-name";
  * it would put a database token in front of someone who has no way to read it.
  */
 export type TaskDetailCopy = {
+  /** The back affordance when the return position is a Work one, or unreadable. */
   readonly back: string;
+  /**
+   * The same affordance when the user arrived from the calendar. Both name the
+   * destination rather than the gesture, which is why there have to be two:
+   * `resolveTaskBackTarget` says which, and the label is never guessed at the
+   * render site.
+   */
+  readonly backToCalendar: string;
   readonly eyebrow: string;
   readonly sections: {
     readonly details: string;
@@ -58,6 +66,7 @@ export type TaskDetailCopy = {
 
 const ptBR: TaskDetailCopy = {
   back: "Trabalho",
+  backToCalendar: "Calendário",
   eyebrow: "TAREFA",
   sections: {
     details: "Detalhes",
@@ -113,6 +122,7 @@ const ptBR: TaskDetailCopy = {
 
 const en: TaskDetailCopy = {
   back: "Work",
+  backToCalendar: "Calendar",
   eyebrow: "TASK",
   sections: {
     details: "Details",

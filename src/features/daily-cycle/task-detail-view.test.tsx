@@ -62,6 +62,41 @@ function renderDetail(value: TaskDetailProjection, locale: Locale = "pt-BR") {
 }
 
 describe("TaskDetailView", () => {
+  /**
+   * `2M-CAL-008`. Found by the deployment journey, which pressed a back link
+   * labelled "Trabalho" expecting the calendar and waited ninety seconds for a
+   * page it was already able to reach. The href had learned about the calendar
+   * and the words had not.
+   */
+  describe("the back affordance names where it goes", () => {
+    it.each([
+      ["pt-BR", "calendar", "Calendário"],
+      ["pt-BR", "work", "Trabalho"],
+      ["en", "calendar", "Calendar"],
+      ["en", "work", "Work"],
+    ] as const)("%s / %s reads %s", (locale, destination, label) => {
+      render(
+        <TaskDetailView
+          agentName="Brain"
+          locale={locale}
+          detail={detail()}
+          actions={null}
+          backHref="/x"
+          backDestination={destination}
+        />,
+      );
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", "/x");
+    });
+
+    it("names Work when the route says nothing, matching the href default", () => {
+      renderDetail(detail());
+      expect(screen.getByRole("link", { name: "Trabalho" })).toHaveAttribute(
+        "href",
+        "/pt-BR/app/work",
+      );
+    });
+  });
+
   it("separates what the task is, what it relates to, where it came from and what happened to it", () => {
     renderDetail(detail());
 

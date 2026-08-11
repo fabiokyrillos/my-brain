@@ -28,9 +28,27 @@ import type { Locale } from "@/lib/preferences";
 
 import { workHref } from "./work-query";
 
-export function resolveTaskBackHref(locale: Locale, from?: string | string[]): string {
+/**
+ * Where Back goes **and what it is called**.
+ *
+ * The two are one decision. The deployment journey caught them apart: the href
+ * had learned about the calendar and the label had not, so a link that returned
+ * to the right day said "Trabalho". Resolving the destination here — from the
+ * same parse, rather than by re-reading the string at the render site — is what
+ * stops the two drifting again.
+ */
+export type TaskBackTarget = {
+  readonly href: string;
+  readonly destination: "calendar" | "work";
+};
+
+export function resolveTaskBackTarget(locale: Locale, from?: string | string[]): TaskBackTarget {
   const calendar = parseCalendarPosition(from);
   return calendar
-    ? calendarReturnHref(locale, calendar)
-    : workHref(locale, parseWorkPosition(from));
+    ? { href: calendarReturnHref(locale, calendar), destination: "calendar" }
+    : { href: workHref(locale, parseWorkPosition(from)), destination: "work" };
+}
+
+export function resolveTaskBackHref(locale: Locale, from?: string | string[]): string {
+  return resolveTaskBackTarget(locale, from).href;
 }
