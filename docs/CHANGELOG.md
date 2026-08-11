@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2K HISTORICAL CORRECTION: the declared consumer could never have executed
+
+**Documentary only.** Zero migration, zero deployment, zero functional code, zero database, RLS, grant, policy or Auth change. Hosted parity stays `202608110090` across 90 migrations; Phase 2M's budget stays `2 allocated · 1 spent`; signup closed; the rollout gate untouched.
+
+**The fact.** Phase 2K declared `scripts/phase-2k-conversation-funnel-reader.mjs` as the consumer that satisfies `2K-METRICS-007` — *"a consumer exists before close"*. It could not run. It selected, filtered **and** ordered by `product_events.occurred_at`, a column the ledger has never had (`202607170024:51` creates it with `created_at` and nothing else), and it authenticated with `grant_type=password`, which hosted Turnstile has refused since **SH.5**, four days before the phase closed. Either defect alone kills every invocation. **Found on 2026-08-11, during Phase 2M, by running the probes rather than reading them.**
+
+**What is NOT withdrawn.** The 13/13 hosted proof of 2026-08-09 stands in full: the writes through the authenticated `public.record_product_event`, the read-back under the owner's own RLS session, the real `aggregateConversationFunnel` (`scripts/phase-2k-conversation-funnel.mjs`, defect-free and unchanged), the three negative controls on a **valid** surface, the idempotency replay and the owner-scoped zero-residue proof.
+
+**What is withdrawn is one clause.** That proof reached the aggregation through **a query written for the occasion**, not through the consumer's own code path — which is exactly why the broken reader stayed invisible. A probe that reconstructs the path it is meant to exercise measures the reconstruction. So the *a consumer exists* half of `2K-METRICS-007` was not true at close.
+
+**`2K-METRICS-007`: `built` → `partial`**, with a remainder (one execution of the repaired reader against the deployed project, on a real owner session) and a destination (an open obligation in `docs/TODO.md`). **Counts regenerated from the slice record, never hand-edited: 79 declared · 79 classified — 66 built, 9 baseline, 4 partial.** The close's reading of 67/9/3 is preserved beside the new one rather than deleted.
+
+**Four things this correction deliberately does not do.** It does not claim, invent or back-date a historical execution — correcting the script now does not prove it ran then. It does not credit Phase 2K with the repair: that is Phase 2M's (PR #169, merge `611dd01`, commit `d456571`) and is charged to no phase. It does not rewrite Phase 2K's budget, which stays `1 allocated · 1 spent` with `202608090089` charged to no phase. And it does not close the requirement — the repaired reader **has still not been run**.
+
+**Why no guard fired for nine days.** `phase-2k-telemetry-guard.test.ts` asserted the reader's *shape* exhaustively — reads all three event names, authenticates as the owner and never as service-role, writes nothing, distinguishes "not deployed yet" from "a quiet week" — and every one of those assertions was true of a file that could not run. **A guard over a script's shape is not a guard over its executability.** `2E-ANALYTICS-006` stopped the probes **drifting**; nothing stopped them being **abandoned**. The structural half is now covered by `phase-2m-telemetry-guard.test.ts`, which derives the ledger's real column list from the create-table migration and fails any consumer reading a column the table does not have. The other half is not structural, and is not pretended to be.
+
+Records: `PHASE_2K_REPORT.md` §7b · `PHASE_2K_DEPLOYMENT.md` §9 · `PHASE_2K_SLICE_08_ACCEPTANCE.md`'s second post-phase correction · the regenerated `PHASE_2K_TRACEABILITY_MATRIX.md`.
+
 ## 2026-08-11 - PHASE 2M SLICE 2M.1, PART 2: the calendar surface
 
 **The gap this closes.** The product could record a deadline, a planned day, a reminder, a review and an extracted date, and had **nowhere to show them together on a timeline**. `/app/calendar` is that surface, built over the five sources that already exist — **zero schema, no event entity** (OD-2M-3 A refused one), and the committed-versus-suggested distinction derived from which lane an item is in rather than from a stored flag.
