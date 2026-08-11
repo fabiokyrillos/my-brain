@@ -3007,3 +3007,140 @@ after the owner's evidence returns, never before.
    reads.** Re-run untouched before debugging; it happened three times again.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+---
+
+## §48 — Phase 2K's declared consumer is corrected, and slice 2M.1 is finished (2026-08-11)
+
+**Where the repository actually is.** `main` at `b4bfe7d`; working tree clean;
+no open PR. **90 migrations**, hosted parity **`202608110090`**, unchanged by this
+stretch. Migration budget **`2 allocated · 1 spent`, NON-TRANSFERABLE** — a third is
+a stop condition. Signup closed, rollout gate untouched, Phase 2N not started,
+A13 green.
+
+Two pull requests landed, each with CI green on its **exact merge SHA**:
+
+| PR | Merge SHA | What |
+|---|---|---|
+| **#173** | `f3cb0e4` | Phase 2K's `2K-METRICS-007` claim corrected — documentary only |
+| **#174** | `b4bfe7d` | Slice 2M.1 part 3 — rescheduling from the calendar |
+
+### The historical correction, and the thing it does not say
+
+**Phase 2K's declared consumer could never have executed.**
+`scripts/phase-2k-conversation-funnel-reader.mjs` selected, filtered *and* ordered
+by `product_events.occurred_at` — a column the ledger has never had — and
+authenticated with `grant_type=password`, which Turnstile has refused since SH.5,
+four days before that phase closed. Either alone is fatal to every invocation.
+
+**The 13/13 hosted proof of 2026-08-09 stands and is not withdrawn.** The writes
+through the authenticated writer, the RLS read-back, the real
+`aggregateConversationFunnel`, the negative controls on a valid surface and the
+owner-scoped residue proof are all unaffected.
+
+**What is withdrawn is one clause.** That proof reached the aggregation through a
+query written for the occasion, not through the consumer's own code path — which
+is exactly why the broken reader stayed invisible. *A probe that reconstructs the
+path it is meant to exercise measures the reconstruction.*
+
+So `2K-METRICS-007` moved **`built` → `partial`**, counts regenerated from the
+slice record rather than typed: **79 declared · 79 classified — 66 built,
+9 baseline, 4 partial**, where the close read 67/9/3 and that reading is preserved
+beside the new one. **No historical execution is claimed, invented or back-dated.**
+The repair belongs to Phase 2M (PR #169) and is charged to no phase; Phase 2K's
+budget stays `1 allocated · 1 spent`; and **the repaired reader has still not been
+run**, which is an open obligation in `docs/TODO.md` that may not be closed by
+writing a document.
+
+**Why no guard fired for nine days.** `phase-2k-telemetry-guard.test.ts` asserted
+the reader's *shape* exhaustively — reads all three names, authenticates as the
+owner and never as service-role, writes nothing, distinguishes "not deployed yet"
+from "a quiet week" — and every one of those assertions was true of a file that
+could not run. **A guard over a script's shape is not a guard over its
+executability.**
+
+### Slice 2M.1 is complete, and part 3's three decisions
+
+**Rescheduling happens on the calendar, through the command path that already
+existed.** Zero migration, zero RPC, zero Server Action, zero table, zero column.
+`direct-write-guard.test.ts` still holds its `tasks` allowlist **empty**.
+
+1. **The verb subset is derived, and a list would have been the defect.** The
+   obvious implementation is `["reschedule_due", "clear_due", "set_planned"]` — a
+   second copy of taxonomy knowledge, the shape `202608080087` and `202608090089`
+   were both written to delete one layer down. A scheduling action is one whose
+   policy's `changedFields` touch `due_at` or `planned_at`. **`reminders` is
+   deliberately not in that field list**: including it would put *complete* and
+   *cancel* on the calendar as rescheduling controls.
+2. **The projection carries the answer, never the status.**
+   `CalendarItemView.reschedule` is `{taskId, controls}` or `null` — a client
+   handed a status would decide eligibility where it cannot re-check it.
+3. **The return position reuses Phase 2L's *mechanism*, not its data shape.**
+   `POSITION_FORBIDDEN_FIELDS` is imported rather than copied; `WorkPosition`'s
+   field list is not reused, because a calendar position is not a Work query. One
+   `from`, two vocabularies, discriminated by version literal, and the calendar
+   parser answers **`null` rather than a default** so a Work return can never
+   become a calendar return pointing at today.
+
+**Masking withholds the words, not the ability to move a date** — the controls sit
+beside `ProtectedContent`, because hiding them behind the reveal would make a
+privacy setting into a capability gate. **No destructive verb reaches the calendar
+at all**: `cancel_task` changes no date, so the destructive surface is empty by
+construction rather than by care.
+
+**It deliberately cannot clear a planned day.** `clear_planned` does not exist in
+the taxonomy; the absence is asserted **with its destination named**
+(`2M-PLAN-002`, slice 2M.2), so the day it is added the test fails and whoever
+adds it has to notice the calendar starts offering it.
+
+### What was executed, and the line under it
+
+**42 browser journeys passed** on desktop and Pixel 7 in both locales
+(`e2e/calendar.spec.ts`): structure, lane and commitment in text rather than
+colour, empty distinguishable from failed, an elapsed item still reschedulable, a
+masked item withholding its title and keeping its controls, keyboard operation
+with a visible focus ring, tab order, no horizontal page scroll at 320/375/412 px,
+every control ≥24 px from paint, reflow at an emulated 200% zoom.
+
+**WRITTEN AND NOT EXECUTED: `e2e/online-calendar.spec.ts`** — the applied
+reschedule, the audit row, the undo, the staleness refusal, the return to the
+exact position and the cancelled-task case. It needs the deployment carrying this
+slice. **This is the first thing the next loop should run** once Vercel has
+redeployed `main`.
+
+**NOT PROVED ANYWHERE:** a real screen reader and a real phone. **An emulated
+viewport is a viewport, not a device.**
+
+### Traps this stretch paid for
+
+1. **A guard over a script's shape is not a guard over its executability.** Nine
+   days of a consumer that could not run, under a guard that asserted four true
+   things about it.
+2. **A probe that reconstructs the path it is meant to exercise measures the
+   reconstruction.** That is why Phase 2K's 13/13 did not catch its own reader.
+3. **A browser journey must not encode a control count.** The tab-order test
+   tabbed a fixed four times and failed on both projects; the number of stops
+   depends on what the taxonomy admits, and the property is what to assert.
+4. **A mirror guard earns its keep on its first run.** It found two real drifts
+   before CI did — an unnamed class and a line-wrapped sentence its own regex
+   depended on.
+5. **Local guard failures immediately after editing their corpus are still
+   mid-write reads.** It happened again; re-run untouched before debugging.
+
+### What is outstanding, exactly
+
+**Slice 2M.2** (planner, `clear_planned`, `planned_at` read-side semantics, bulk
+reschedule at the signed ceiling of 50), **2M.3** (reviews and the five inert
+preferences), **2M.4a** (notification governance, CI-provable), **2M.4b**
+(**migration 2** plus opt-in content-free push, then deploy and the hosted proof)
+— and then the loop **stops** at
+`CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`. Slice 2M.5 and closeout come
+after the owner's evidence returns, never before.
+
+Two open obligations that may **not** be closed by writing a document:
+
+- run `e2e/online-calendar.spec.ts` against the deployment;
+- run the repaired `scripts/phase-2k-conversation-funnel-reader.mjs --access-token`
+  once against the deployed project.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
