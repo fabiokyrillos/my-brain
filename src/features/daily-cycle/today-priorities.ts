@@ -25,6 +25,7 @@
  */
 
 import type { WorkItemView } from "./contracts";
+import { localDayBounds } from "@/lib/time/local-day";
 
 /** `2J-HOJE-004`. A ceiling, never a quota. */
 export const MAX_TODAY_PRIORITIES = 3;
@@ -49,52 +50,19 @@ const QUALIFYING_MANUAL = new Set(["urgent", "high"]);
 const MANUAL_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 
 /**
- * The local calendar day boundaries for `timezone`, as epoch milliseconds.
+ * The local calendar day boundaries for `timezone`.
  *
- * Computed from the projection's own timezone rather than the server's, because
- * "due today" is a statement about the user's day. `work-projection.ts` already
- * resolves and returns that timezone; this function must be given it rather
- * than reaching for a default, so a missing timezone is a caller error and not
- * a silently wrong answer at 23:00.
+ * **This used to be its own implementation, and it was wrong.** It computed
+ * `end = start + 24h`, which is not the end of a 23-hour or a 25-hour local
+ * day: on a spring-forward day the window overshot an hour into tomorrow, and
+ * on a fall-back day it stopped an hour early. Nothing noticed, because Hoje was
+ * the only caller and São Paulo has not observed DST since 2019.
+ *
+ * `2M-TIME-001` makes one module the answer for the whole product, and this is
+ * now a re-export of it so that existing callers and tests keep their import
+ * while there is exactly one definition behind it.
  */
-export function localDayBounds(now: Date, timeZone: string): { start: number; end: number } {
-  // `en-CA` yields YYYY-MM-DD, which is the only reason it is used here.
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const today = formatter.format(now);
-  // Re-read the offset at that instant instead of assuming a fixed one, so a
-  // DST transition inside the day cannot shift the boundary.
-  const offsetMs = zoneOffsetMs(now, timeZone);
-  const start = Date.parse(`${today}T00:00:00.000Z`) - offsetMs;
-  return { start, end: start + 24 * 60 * 60 * 1000 };
-}
-
-function zoneOffsetMs(at: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(at);
-  const lookup = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
-  const asUtc = Date.UTC(
-    lookup("year"),
-    lookup("month") - 1,
-    lookup("day"),
-    lookup("hour") % 24,
-    lookup("minute"),
-    lookup("second"),
-  );
-  return asUtc - Math.floor(at.getTime() / 1000) * 1000;
-}
+export { localDayBounds };
 
 /**
  * `2J-HOJE-003` — the state a due date is actually in, for one task.

@@ -232,13 +232,22 @@ describe("Phase 2M's authorization chain is recorded, not assumed", () => {
       .toMatch(/closes \*\*not-built-by-rule\*\* against OD-2M-7 rather than as a partial/);
   });
 
-  it("creates no execution or closeout artifact before its gate", () => {
-    // The plan's gates forbid these before their time, and the taxonomy is such
-    // that they would have to live in this directory.
+  it("creates no closeout artifact before its gate", () => {
+    /*
+     * Two artifacts have a gate at the **end** of the phase and nowhere else:
+     * the regenerated matrix and the closing report. Neither may exist while a
+     * slice is still outstanding, because a matrix written early is a
+     * classification of work that has not happened.
+     *
+     * Slice acceptance records are **not** on this list any more. They were,
+     * while ADR-104 authorized planning only and no slice could legitimately
+     * have one. ADR-105 authorized execution, so a slice that has run is
+     * *required* to have one — and a guard that still forbade them would be
+     * asserting the phase had not started, which stopped being true.
+     */
     const forbidden = [
       "docs/reports/phase-2m/PHASE_2M_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2m/PHASE_2M_REPORT.md",
-      "docs/reports/phase-2m/PHASE_2M_SLICE_00_ACCEPTANCE.md",
     ];
     for (const relative of forbidden) {
       let exists = true;
@@ -249,5 +258,11 @@ describe("Phase 2M's authorization chain is recorded, not assumed", () => {
       }
       expect(exists, `${relative} exists before its gate`).toBe(false);
     }
+  });
+
+  it("requires an acceptance record for every slice that has run", () => {
+    // The mirror of the rule above: an executed slice with no record is work
+    // nobody can classify, which `R-01` refuses at close. Slice 2M.0 has run.
+    expect(() => read("docs/reports/phase-2m/PHASE_2M_SLICE_00_ACCEPTANCE.md")).not.toThrow();
   });
 });
