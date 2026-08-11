@@ -33,22 +33,33 @@ const onlineConfigured = onlineEnvironment.configured;
 
 type Locale = "pt-BR" | "en";
 
+/**
+ * The words this journey looks for, taken from the modules that own them.
+ *
+ * Two were wrong on the first run and both were wrong the same way — copied
+ * from the surface *next door* rather than from the one under test.
+ * `resultRegion` was `taskDetailControlsCopy.resultRegionLabel`
+ * ("Resultado da alteração"), not the Work list's "Resultado da ação"; `back`
+ * is `taskDetailCopy`'s, which names its destination rather than the gesture,
+ * so it is never the word "Voltar". *A journey that guesses at copy tests the
+ * guess.*
+ */
 const COPY = {
   "pt-BR": {
     calendar: "Calendário",
     reschedule: "Datas",
     apply: "Aplicar",
-    resultRegion: "Resultado da ação",
+    resultRegion: "Resultado da alteração",
     undo: "Desfazer",
-    back: "Voltar",
+    back: "Calendário",
   },
   en: {
     calendar: "Calendar",
     reschedule: "Dates",
     apply: "Apply",
-    resultRegion: "Action result",
+    resultRegion: "Change result",
     undo: "Undo",
-    back: "Back",
+    back: "Calendar",
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 
@@ -111,6 +122,22 @@ async function openCalendar(page: Page, locale: Locale, date: string, orientatio
   await expect(page.getByRole("heading", { level: 1, name: COPY[locale].calendar })).toBeVisible();
 }
 
+/**
+ * The item **in a named lane**, because a title is not unique across lanes.
+ *
+ * Seeding a task with a `due_at` fires `tasks_create_due_reminder`
+ * (`202607160007`), which inserts a reminder one hour earlier carrying the same
+ * title. That is the product working: the day genuinely holds two commitments,
+ * a reminder at 11:00 and the deadline at noon, and the calendar shows both.
+ * The first run of this file matched `.calendar-item` by text alone and failed
+ * on a strict-mode violation against two correct elements — *a locator that
+ * ignores the dimension the surface is organized by will find the surface
+ * working and call it broken.*
+ */
+function laneItem(page: Page, lane: "deadline" | "reminder", title: string) {
+  return page.locator(`.calendar-item[data-lane="${lane}"]`, { hasText: title });
+}
+
 test.describe("the calendar reschedules through the existing command path", () => {
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
@@ -123,6 +150,29 @@ test.describe("the calendar reschedules through the existing command path", () =
   test.afterAll(async () => {
     await deleteAccount(owner?.id);
   });
+
+  /**
+   * The zone the **product** decides local days in, read rather than assumed.
+   *
+   * `calendar-projection.ts` takes it from `profiles.timezone`, so that is where
+   * this takes it from too. Hard-coding the runner's zone would make the
+   * journey pass or fail on where it happened to be run from, which is the
+   * opposite of what a date test should depend on.
+   */
+  async function accountTimeZone(): Promise<string> {
+    const [row] = await admin(`profiles?user_id=eq.${owner.id}&select=timezone`);
+    const zone = row?.timezone;
+    expect(typeof zone, "the account has no profile time zone to compare against").toBe("string");
+    return zone as string;
+  }
+
+  /** The stored deadline as the *user* sees its day: `YYYY-MM-DD` in their zone. */
+  async function localDayOfDueAt(taskId: string, timeZone: string): Promise<string> {
+    const [row] = await admin(`tasks?id=eq.${taskId}&select=due_at`);
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date(String(row.due_at)));
+  }
 
   /** A task on a given day, seeded as a **fixture** and never as a product claim. */
   async function seedTask(title: string, dueDays: number) {
@@ -165,7 +215,7 @@ test.describe("the calendar reschedules through the existing command path", () =
       await signInOnline(page, { email: owner.email, locale });
       await openCalendar(page, locale, from);
 
-      const item = page.locator(".calendar-item", { hasText: title });
+      const item = laneItem(page, "deadline", title);
       await expect(item).toBeVisible();
 
       await item.locator(".calendar-reschedule-summary").click();
@@ -178,24 +228,41 @@ test.describe("the calendar reschedules through the existing command path", () =
       await expect(result).toBeVisible();
 
       // The database moved, read back through the service role as an
-      // observation rather than as a write.
-      const [row] = await admin(`tasks?id=eq.${taskId}&select=due_at`);
-      expect(String(row.due_at).slice(0, 10)).toBe(to);
+      // observation rather than as a write — and compared **in the account's
+      // own zone**. A bare date resolves to 23:59:59 local (`END_OF_DAY`), which
+      // in America/Sao_Paulo is already the next day in UTC, so slicing the
+      // stored ISO string reported a correct write as an off-by-one. *A date
+      // assertion that ignores the zone is asserting about UTC, whatever it
+      // says it is about.*
+      const zone = await accountTimeZone();
+      expect(await localDayOfDueAt(taskId, zone)).toBe(to);
 
       // `2M-CAL-010`: an audit row, and an undo offered here.
-      const audit = await admin(`audit_logs?target_id=eq.${taskId}&select=actor,action&order=created_at.desc&limit=5`);
+      /*
+       * `audit_logs` is `(action_type, entity_type, entity_id, actor)` —
+       * `202607160003:128`. The first version of this query asked for
+       * `target_id` and `action`, neither of which has ever existed, and
+       * PostgREST answered `42703` rather than an empty list. It is the same
+       * defect Phase 2K's funnel reader carried for nine days: *a query written
+       * from what the columns are called in one's head fails at the database,
+       * not at the assertion.*
+       */
+      const audit = await admin(
+        `audit_logs?entity_id=eq.${taskId}&entity_type=eq.task`
+        + "&select=actor,action_type&order=created_at.desc&limit=5",
+      );
       expect(audit.length, "the reschedule left no audit row").toBeGreaterThan(0);
       expect(audit.map((entry) => entry.actor)).toContain("user");
+      expect(audit.map((entry) => entry.action_type)).toContain("task_command_applied");
 
       const undo = result.getByRole("button", { name: new RegExp(COPY[locale].undo, "i") });
       await expect(undo).toBeVisible();
       await undo.click();
 
       await expect
-        .poll(async () => {
-          const [after] = await admin(`tasks?id=eq.${taskId}&select=due_at`);
-          return String(after.due_at).slice(0, 10);
-        }, { message: "undo did not put the deadline back" })
+        .poll(async () => localDayOfDueAt(taskId, zone), {
+          message: "undo did not put the deadline back",
+        })
         .toBe(from);
     });
   }
@@ -211,7 +278,9 @@ test.describe("the calendar reschedules through the existing command path", () =
     await signInOnline(page, { email: owner.email, locale: "pt-BR" });
     await openCalendar(page, "pt-BR", anchor, "week");
 
-    const link = page.locator(".calendar-item", { hasText: title }).locator("a.calendar-item-link");
+    // The deadline lane, not the reminder the seed's trigger also created: the
+    // return position is a property of the item that links into `/app/work`.
+    const link = laneItem(page, "deadline", title).locator("a.calendar-item-link");
     await expect(link).toBeVisible();
     const href = await link.getAttribute("href");
     expect(href, "the item link carries no return position").toContain("from=");
@@ -219,7 +288,13 @@ test.describe("the calendar reschedules through the existing command path", () =
     await link.click();
     await expect(page).toHaveURL(/\/app\/work\//);
 
-    await page.getByRole("link", { name: new RegExp(COPY["pt-BR"].back, "i") }).first().click();
+    // `.back-link`, not the label alone: the shell's own navigation carries a
+    // "Calendário" link too, and that one goes to the calendar's *default*
+    // position — which would pass a weaker assertion while proving nothing
+    // about the position travelling in the URL.
+    const back = page.locator("a.back-link");
+    await expect(back).toHaveText(new RegExp(COPY["pt-BR"].back, "i"));
+    await back.click();
     await expect(page).toHaveURL(new RegExp(`/app/calendar\\?.*date=${anchor}`));
     await expect(page).toHaveURL(/orientation=week/);
   });
@@ -240,7 +315,7 @@ test.describe("the calendar reschedules through the existing command path", () =
     await signInOnline(page, { email: owner.email, locale: "pt-BR" });
     await openCalendar(page, "pt-BR", anchor);
 
-    const item = page.locator(".calendar-item", { hasText: title });
+    const item = laneItem(page, "deadline", title);
     await item.locator(".calendar-reschedule-summary").click();
 
     // Another device changes the row after the page read it.
@@ -269,6 +344,17 @@ test.describe("the calendar reschedules through the existing command path", () =
     const title = `Cancelada ${crypto.randomUUID().slice(0, 8)}`;
     const taskId = await seedTask(title, 6);
     await admin(`tasks?id=eq.${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    // The fixture cancels the derived reminder too, because `apply_task_command`
+    // does (`202607260059`, close-and-insert: every `scheduled` reminder of a
+    // cancelled task becomes `cancelled`). Without this line the shortcut leaves
+    // behind a row the product never would, and the case would read that residue
+    // as the calendar failing to drop a cancelled task. *A fixture that takes a
+    // shortcut around the product must take the whole shortcut, including the
+    // parts of it that were tidying up.*
+    await admin(`reminders?task_id=eq.${taskId}&status=eq.scheduled`, {
       method: "PATCH",
       body: JSON.stringify({ status: "cancelled" }),
     });
