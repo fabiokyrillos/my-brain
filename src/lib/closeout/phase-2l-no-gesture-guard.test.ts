@@ -144,6 +144,14 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * than remembered.
      */
     "src/features/calendar/calendar-reschedule.tsx",
+    /*
+     * Added when `2M-CAL-010`'s outcome was hoisted out of the item that
+     * produced it. It renders an undo — a control a "swipe to undo" would be
+     * fitted to — and the discovery assertion below required naming it here
+     * before the suite would go green, which is the guard doing its job on its
+     * second occasion.
+     */
+    "src/features/calendar/calendar-outcome.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

@@ -25,7 +25,6 @@
  */
 
 import { ProtectedContent } from "@/features/operations/protected-content";
-import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
 import type {
   TaskDetailCommandHandler,
   TaskDetailDateBounds,
@@ -58,7 +57,6 @@ export function CalendarItem({
   locale,
   rescheduleAction,
   timezone,
-  undoAction,
 }: {
   /**
    * `2M-CAL-009`. The reschedule wiring, **injected** rather than imported.
@@ -73,7 +71,6 @@ export function CalendarItem({
   locale: Locale;
   rescheduleAction?: TaskDetailCommandHandler;
   timezone: string;
-  undoAction?: TaskUndoHandler;
 }) {
   const copy = getCalendarCopy(locale);
   const laneName = copy.lanes.names[item.lane];
@@ -143,7 +140,6 @@ export function CalendarItem({
           locale={locale}
           target={item.reschedule}
           title={item.title ?? ""}
-          undoAction={undoAction}
         />
       ) : null}
     </li>

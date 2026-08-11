@@ -27,11 +27,12 @@
  */
 
 import Link from "next/link";
-import { useId } from "react";
+import { useId, useMemo, useState } from "react";
 
 import type { Locale } from "@/lib/preferences";
 
 import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
+import type { TaskDetailCommandState } from "@/features/task-commands/detail-action-state";
 import type {
   TaskDetailCommandHandler,
   TaskDetailDateBounds,
@@ -39,6 +40,7 @@ import type {
 
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
+import { CalendarOutcome } from "./calendar-outcome";
 import {
   CALENDAR_LANES,
   DAYS_BY_ORIENTATION,
@@ -106,6 +108,36 @@ export function CalendarView({
   const bound = boundState(query, today);
   const headingId = useId();
   const lanesId = useId();
+
+  /**
+   * `2M-CAL-010`. The outcome of the last applied command, held **here**.
+   *
+   * Not in the item that applied it: a successful reschedule moves the task off
+   * the day being viewed, the revalidated projection drops it, and the item —
+   * with any outcome and undo inside it — unmounts. `calendar-outcome.tsx` has
+   * the full account.
+   *
+   * **Recorded by wrapping the action, not by a callback from the control.**
+   * The first attempt reported from an effect inside `TaskDetailControls`; it
+   * never fired, because React applies the settled state and the revalidated
+   * tree together, so the subtree is already gone when effects run. A component
+   * cannot report its own outcome if the outcome is what removes it. Wrapping
+   * the action puts the recording in a closure owned by *this* component, which
+   * the day's contents cannot unmount, and it happens before React is told
+   * anything.
+   */
+  const [outcome, setOutcome] = useState<TaskDetailCommandState | null>(null);
+  const recordingAction = useMemo<TaskDetailCommandHandler | undefined>(() => {
+    if (!rescheduleAction) return undefined;
+    return async (state, formData) => {
+      const next = await rescheduleAction(state, formData);
+      // `awaiting_confirmation` is not an outcome — it is a question, and no
+      // scheduling verb can even reach it (nothing that moves a date is
+      // destructive). Announcing it would be announcing a prompt as an answer.
+      if (next.status !== "idle" && next.status !== "awaiting_confirmation") setOutcome(next);
+      return next;
+    };
+  }, [rescheduleAction]);
 
   const rangeLabel = projection.days.length === 1
     ? formatDayLabel(projection.days[0].date, locale)
@@ -193,6 +225,13 @@ export function CalendarView({
 
       <p aria-live="polite" className="calendar-summary">{copy.summary(projection.itemCount)}</p>
 
+      {/*
+        Above the days, not inside one: the day the operation was performed on
+        may no longer be the day the task is in, and the answer belongs to
+        neither — it belongs to the calendar.
+      */}
+      <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
+
       {query.orientation === "week" ? (
         <table className="calendar-week">
           <caption className="visually-hidden">{rangeLabel}</caption>
@@ -220,9 +259,8 @@ export function CalendarView({
                           item={item}
                           key={item.id}
                           locale={locale}
-                          rescheduleAction={rescheduleAction}
+                          rescheduleAction={recordingAction}
                           timezone={projection.timezone}
-                          undoAction={undoAction}
                         />
                       ))}
                     </ul>
@@ -250,9 +288,8 @@ export function CalendarView({
                       item={item}
                       key={item.id}
                       locale={locale}
-                      rescheduleAction={rescheduleAction}
+                      rescheduleAction={recordingAction}
                       timezone={projection.timezone}
-                      undoAction={undoAction}
                     />
                   ))}
                 </ul>
