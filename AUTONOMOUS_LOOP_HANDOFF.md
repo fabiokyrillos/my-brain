@@ -2847,7 +2847,7 @@ single row by which the table grew during this work is genuine application traff
 ## §47 — Phase 2M migration 1 is spent and deployed, the calendar ships, and three probes were found dead (2026-08-11)
 
 **Where the repository actually is.** `main` at `054da4d`; working tree clean; no
-open PR. **91 migrations**, hosted parity **`202608110090`**, local = remote on
+open PR. **90 migrations**, hosted parity **`202608110090`**, local = remote on
 every row, read live and read-only on 2026-08-11. Migration budget
 **`2 allocated · 1 spent`, NON-TRANSFERABLE** — a third is a stop condition.
 Signup closed, rollout gate untouched, Phase 2N not started, A13 green.
