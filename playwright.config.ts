@@ -29,6 +29,21 @@ export default defineConfig({
     ? [["json", { outputFile: "playwright-results.json" }]]
     : undefined,
   timeout: isOnlineLane ? 90_000 : 30_000,
+  /**
+   * The same fact about latency, applied one level down.
+   *
+   * Raising only the *test* timeout was half a fix: a `toBeVisible` still gave
+   * up after Playwright's 5-second default, so a Server Action round trip to
+   * the hosted database — `apply_task_command` hashes a twelve-column
+   * pre-state, writes, audits and reserves an undo — expired the assertion
+   * while the form was still showing "Aplicando…". The journey then reported a
+   * *missing outcome region* for an outcome that was on its way, which is the
+   * wrong finding about a working product.
+   *
+   * Scoped to this lane for the same reason the test timeout is: the CI
+   * journeys run against a local stack and must keep failing fast.
+   */
+  expect: { timeout: isOnlineLane ? 20_000 : 5_000 },
   use: { baseURL: "http://localhost:3000", trace: "on-first-retry" },
   webServer: {
     command: isCI ? "npm run start" : "npm run dev",

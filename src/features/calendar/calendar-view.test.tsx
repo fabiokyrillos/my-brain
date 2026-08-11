@@ -1,9 +1,19 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  idleTaskDetailCommandState,
+  type TaskDetailCommandState,
+} from "@/features/task-commands/detail-action-state";
 
 import type { CalendarItemView, CalendarProjection } from "./calendar-contracts";
 import { CalendarView } from "./calendar-view";
 import { DEFAULT_CALENDAR_LANES, type CalendarQuery } from "./calendar-query";
+import { schedulingControlsFor } from "./calendar-scheduling";
+import { getCalendarCopy } from "./copy";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 /**
  * `2M-CAL-003`/`-006`/`-011`, `2M-PRIVACY-001`/`-005`/`-006`, `2M-ACCESS-002`/
@@ -262,5 +272,76 @@ describe("2M-CAL-002: the two lanes with no user text say what they are", () => 
     // `null` means there is nothing to render, never that something is hidden --
     // so no mask affordance appears for either.
     expect(document.querySelectorAll("[data-masked='true']")).toHaveLength(0);
+  });
+});
+
+/**
+ * `2M-CAL-010` — the answer outlives the item that produced it.
+ *
+ * This is the case the deployment journey had to find first, and it is written
+ * the way the journey demonstrated the defect: apply, then re-render the
+ * calendar **without** the task, which is precisely what the revalidated
+ * projection does after a successful reschedule. Anything holding the outcome
+ * inside the item fails here; the recorder in `CalendarView` does not.
+ */
+describe("2M-CAL-010: the outcome survives the task leaving the day", () => {
+  const applied: TaskDetailCommandState = {
+    ...idleTaskDetailCommandState,
+    status: "applied",
+    action: "reschedule_due",
+    heading: "Prazo alterado",
+    detail: "O prazo agora é 20 de agosto.",
+  };
+
+  /** The one fixture in this file that carries a command path. */
+  const reschedulable = () =>
+    item({ reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } });
+
+  function rescheduling(days: CalendarProjection["days"]) {
+    const action = vi.fn(async () => applied);
+    const result = render(
+      <CalendarView
+        dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+        locale="pt-BR"
+        projection={projection({ days })}
+        query={query()}
+        rescheduleAction={action}
+        today={TODAY}
+      />,
+    );
+    return { ...result, action };
+  }
+
+  it("announces the outcome on the calendar after the day has emptied", async () => {
+    const user = userEvent.setup();
+    const { rerender, action } = rescheduling([
+      { date: "2026-08-15", isToday: true, items: [reschedulable()] },
+    ]);
+
+    await user.click(screen.getByText(getCalendarCopy("pt-BR").reschedule.summary));
+    await user.click(screen.getAllByRole("button")[0]);
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    // The revalidated projection: the task is on another day now, so this day
+    // has nothing at all — the exact state the journey observed.
+    rerender(
+      <CalendarView
+        dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+        locale="pt-BR"
+        projection={projection({ days: [{ date: "2026-08-15", isToday: true, items: [] }] })}
+        query={query()}
+        rescheduleAction={action}
+        today={TODAY}
+      />,
+    );
+
+    expect(screen.queryByText("Entregar o relatório")).toBeNull();
+    const region = screen.getByRole("region", { name: "Resultado da alteração" });
+    expect(region).toHaveTextContent("Prazo alterado");
+  });
+
+  it("says nothing before anything has been applied", () => {
+    rescheduling([{ date: "2026-08-15", isToday: true, items: [reschedulable()] }]);
+    expect(screen.queryByRole("region", { name: "Resultado da alteração" })).toBeNull();
   });
 });

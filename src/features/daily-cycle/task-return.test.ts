@@ -4,7 +4,7 @@ import { serializeCalendarPosition } from "@/features/calendar/calendar-position
 import { POSITION_FORBIDDEN_FIELDS, serializeWorkPosition } from "@/features/operations/work-position";
 import { DEFAULT_WORK_QUERY } from "./work-query";
 
-import { resolveTaskBackHref } from "./task-return";
+import { resolveTaskBackHref, resolveTaskBackTarget } from "./task-return";
 
 /**
  * `2M-CAL-008` — a task opened from the calendar returns to the calendar, and a
@@ -80,5 +80,34 @@ describe("resolveTaskBackHref", () => {
   it("keeps the locale it was given", () => {
     expect(resolveTaskBackHref("en", CALENDAR).startsWith("/en/app/calendar")).toBe(true);
     expect(resolveTaskBackHref("pt-BR", CALENDAR).startsWith("/pt-BR/app/calendar")).toBe(true);
+  });
+});
+
+/**
+ * The affordance has to *say* where it goes.
+ *
+ * The deployment journey found this: the link carried a correct calendar
+ * position and was labelled "Trabalho", because the label was a constant while
+ * only the href had learned about the calendar. A back affordance that names
+ * the wrong destination is worse than an unnamed one — the user reads it,
+ * believes it, and is moved somewhere else. So the destination is part of the
+ * decision, resolved by the same parser that resolves the href and never
+ * inferred a second time from the string.
+ */
+describe("resolveTaskBackTarget", () => {
+  it("names the calendar when the position is a calendar one", () => {
+    const target = resolveTaskBackTarget("pt-BR", CALENDAR);
+    expect(target.destination).toBe("calendar");
+    expect(target.href).toBe(resolveTaskBackHref("pt-BR", CALENDAR));
+  });
+
+  it("names Work for a Work position, and for everything unreadable", () => {
+    const work = resolveTaskBackTarget("en", serializeWorkPosition(DEFAULT_WORK_QUERY));
+    expect(work.destination).toBe("work");
+    for (const value of [undefined, "", "not-a-payload", ["a", "b"]] as const) {
+      const fallback = resolveTaskBackTarget("en", value as string | string[] | undefined);
+      expect(fallback.destination, `${String(value)} was not read as Work`).toBe("work");
+      expect(fallback.href).toBe(resolveTaskBackHref("en", value as string | string[] | undefined));
+    }
   });
 });

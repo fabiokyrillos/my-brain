@@ -156,3 +156,44 @@ describe("UndoAffordance", () => {
     expect(source).not.toMatch(/\.rpc\(|from\s+["']@\/lib\/supabase|use server/);
   });
 });
+
+/**
+ * The shape the RPC actually sends, which no fixture in this file used.
+ *
+ * Every case above expresses `expiresAt` as `…Z`, and every one of them passed
+ * for two phases while the control never rendered in production.
+ * `apply_task_command` formats the window with Postgres `OF`, which writes
+ * `+00` for UTC — a two-digit offset ECMAScript does not accept — so the real
+ * value parsed to `NaN` and the fail-closed branch swallowed the button.
+ *
+ * *A fixture that is prettier than the value tests the fixture.* These cases
+ * use the rendering verbatim, so the day the format changes they fail here
+ * rather than in someone's browser.
+ */
+describe("UndoAffordance against the instant the RPC renders", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const RENDERED = {
+    undoId: "9f1c2f2e-1111-4111-8111-111111111111",
+    // `to_char(x, 'YYYY-MM-DD"T"HH24:MI:SS.USOF')`, byte for byte.
+    expiresAt: "2026-08-10T12:00:00.000000+00",
+  };
+
+  it("offers the control for a window that has not closed", () => {
+    renderUndo(RENDERED, { now: new Date("2026-08-09T12:00:00.000Z") });
+    expect(screen.getByRole("button", { name: /undo/i })).toBeTruthy();
+  });
+
+  it("still withdraws it once that same window has closed", () => {
+    const { container } = renderUndo(RENDERED, { now: new Date("2026-08-11T12:00:00.000Z") });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("reads a whole-hour negative offset too", () => {
+    renderUndo(
+      { ...RENDERED, expiresAt: "2026-08-10T09:00:00.000000-03" },
+      { now: new Date("2026-08-09T12:00:00.000Z") },
+    );
+    expect(screen.getByRole("button", { name: /undo/i })).toBeTruthy();
+  });
+});

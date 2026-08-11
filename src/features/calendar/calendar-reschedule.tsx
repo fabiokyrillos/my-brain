@@ -20,8 +20,13 @@
  *    are all inherited, because they live below that action and this component
  *    cannot reach past it;
  *  - undo is `undoWorkOperation`, offered **where the operation happened**
- *    (`2M-CAL-010`, `2M-MOBILE-004`) — inside this disclosure, on the calendar,
- *    rather than on a surface the user would have to navigate to.
+ *    (`2M-CAL-010`, `2M-MOBILE-004`) — on the calendar, rather than on a surface
+ *    the user would have to navigate to. Not inside *this* disclosure, though it
+ *    was at first: the deployment journey showed that a successful reschedule
+ *    moves the task off the day being viewed, so the revalidated calendar
+ *    unmounts this component and takes the undo with it at the exact moment
+ *    there is something to undo. The outcome is therefore reported upward and
+ *    rendered by `CalendarOutcome`, which the day's contents cannot unmount.
  *
  * This is `quick-edit.tsx` one surface over, deliberately identical in shape:
  * `2L-EDIT-007`'s *"one implementation with one set of controls"* becomes true of
@@ -52,7 +57,6 @@ import {
   type TaskDetailDateBounds,
   type TaskDetailRelationOptions,
 } from "@/features/task-commands/task-detail-controls";
-import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
 import type { Locale } from "@/lib/preferences";
 
 import type { CalendarRescheduleTarget } from "./calendar-contracts";
@@ -82,7 +86,6 @@ export function CalendarReschedule({
   locale,
   target,
   title,
-  undoAction,
 }: {
   action: TaskDetailCommandHandler;
   dateBounds: TaskDetailDateBounds;
@@ -96,7 +99,6 @@ export function CalendarReschedule({
    * discloses nothing that the caller's own session does not already own.
    */
   title: string;
-  undoAction?: TaskUndoHandler;
 }) {
   const copy = getCalendarCopy(locale).reschedule;
 
@@ -117,9 +119,9 @@ export function CalendarReschedule({
         dateBounds={dateBounds}
         locale={locale}
         relationOptions={NO_RELATIONS}
+        renderResult={false}
         taskId={target.taskId}
         title={title}
-        undoAction={undoAction}
         variant="inline"
       />
     </details>

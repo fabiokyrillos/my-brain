@@ -87,6 +87,7 @@ export function TaskDetailControls({
   dateBounds,
   variant = "section",
   undoAction,
+  renderResult = true,
 }: {
   action: TaskDetailCommandHandler;
   locale: Locale;
@@ -99,6 +100,18 @@ export function TaskDetailControls({
   variant?: TaskDetailControlsVariant;
   /** `2L-EDIT-008`. Injected like every other action this component calls. */
   undoAction?: TaskUndoHandler;
+  /**
+   * Whether the outcome is rendered *here*.
+   *
+   * `2M-CAL-010`. On a task detail the outcome belongs here, because the task is
+   * still on the page after it changes. On a **date-partitioned** surface it
+   * cannot live here at all: a successful `reschedule_due` moves the task to
+   * another day, the revalidated calendar no longer lists it, and this whole
+   * subtree unmounts at the exact moment there is something to undo. Such a
+   * surface passes false and announces the outcome itself, from a component the
+   * day's contents cannot unmount.
+   */
+  renderResult?: boolean;
 }) {
   const copy = getTaskDetailControlsCopy(locale);
   const router = useRouter();
@@ -385,7 +398,7 @@ export function TaskDetailControls({
         )}
       </ConfirmDialog>
 
-      {state.status === "idle" || state.status === "awaiting_confirmation" ? null : (
+      {state.status === "idle" || state.status === "awaiting_confirmation" || !renderResult ? null : (
         <div
           aria-label={copy.resultRegionLabel}
           className="work-action-result"

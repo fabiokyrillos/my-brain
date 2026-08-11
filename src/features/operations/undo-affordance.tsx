@@ -40,6 +40,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 
+import { parseRenderedInstant } from "@/features/task-commands/rendered-instant";
 import { idleTaskUndoState, type TaskUndoOffer, type TaskUndoState } from "@/features/task-commands/task-undo-state";
 import type { Locale } from "@/lib/preferences";
 
@@ -82,11 +83,18 @@ export function UndoAffordance({
     if (state.status !== "idle") result.current?.focus();
   }, [state.status]);
 
-  const expiry = undo ? Date.parse(undo.expiresAt) : Number.NaN;
+  const expiry = undo ? parseRenderedInstant(undo.expiresAt) : Number.NaN;
   const instant = (now ?? new Date()).getTime();
-  // An unparseable expiry stops the offer rather than extending it: the column
-  // is `not null` with a default so this is unreachable through the database,
-  // and refusing to offer is the failure that costs the user nothing.
+  // An unparseable expiry stops the offer rather than extending it, and refusing
+  // to offer is the failure that costs the user nothing.
+  //
+  // This line used to call `Date.parse` directly and justify itself with "the
+  // column is `not null` with a default so this is unreachable through the
+  // database". The column was never the input: `apply_task_command` renders it
+  // with Postgres `OF`, which writes `+00` for UTC, which `Date.parse` rejects.
+  // So the branch below was not unreachable — it was the *only* reachable one,
+  // and this control never rendered at all until the calendar's deployment
+  // journey looked for it. `parseRenderedInstant` documents the whole account.
   const offerable = undo !== null && Number.isFinite(expiry) && expiry > instant;
 
   if (!offerable && state.status === "idle") return null;

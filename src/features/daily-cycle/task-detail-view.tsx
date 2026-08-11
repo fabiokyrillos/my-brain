@@ -85,6 +85,7 @@ export function TaskDetailView({
   controls,
   panel = false,
   backHref,
+  backDestination = "work",
 }: {
   locale: Locale;
   detail: TaskDetailProjection;
@@ -108,6 +109,14 @@ export function TaskDetailView({
    * is what a task opened from outside Work should return to.
    */
   backHref?: string;
+  /**
+   * `2M-CAL-008`. Which surface `backHref` leads to, so the affordance can name
+   * it. Resolved by the route from the same parse that produced the href —
+   * never re-derived here, because a label that guesses is how it came to say
+   * "Trabalho" while pointing at the calendar. Defaults to Work, matching
+   * `backHref`'s own default.
+   */
+  backDestination?: "calendar" | "work";
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
   /**
@@ -120,6 +129,7 @@ export function TaskDetailView({
   agentName: string;
 }) {
   const copy = getTaskDetailCopy(locale, agentName);
+  const backLabel = backDestination === "calendar" ? copy.backToCalendar : copy.back;
   const pt = locale === "pt-BR";
   const { task } = detail;
   const dateTime = (value: string) =>
@@ -141,10 +151,10 @@ export function TaskDetailView({
         // from a position — a view, a page, a filter — and a link would send the
         // user to the list's default instead of to where they actually were.
         // The URL-carried return position itself is slice 2L.3's subject.
-        <TaskPanelClose label={copy.back} />
+        <TaskPanelClose label={backLabel} />
       ) : (
         <Link className="back-link" href={backHref ?? `/${locale}/app/work`}>
-          <ArrowLeft size={16} aria-hidden="true" />{copy.back}
+          <ArrowLeft size={16} aria-hidden="true" />{backLabel}
         </Link>
       )}
 

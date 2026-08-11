@@ -145,6 +145,41 @@ describe("2M-CAL-010 / 2M-MOBILE-004: it happens where the user is", () => {
     expect(typeof seen[0].get("operationKey")).toBe("string");
   });
 
+  /**
+   * The defect the deployment journey found, in the half that belongs here.
+   *
+   * A successful reschedule moves the task off the day being viewed, so the
+   * revalidated calendar unmounts this component — and an outcome rendered
+   * *inside* it would go with it. So it renders none, and `CalendarView`
+   * records the answer by wrapping the action. See `calendar-outcome.tsx`.
+   */
+  it("renders no outcome region of its own, because it may not outlive one", async () => {
+    const user = userEvent.setup();
+    const outcome: TaskDetailCommandState = {
+      ...idleTaskDetailCommandState,
+      status: "applied",
+      action: "reschedule_due",
+      heading: "Prazo alterado",
+      detail: "O prazo agora é 20 de agosto.",
+    };
+    const action = vi.fn(async () => outcome);
+    render(
+      <CalendarReschedule
+        action={action}
+        dateBounds={BOUNDS}
+        locale="pt-BR"
+        target={{ taskId: TASK_ID, controls: schedulingControlsFor("todo") }}
+        title="Enviar proposta"
+      />,
+    );
+
+    await user.click(screen.getByText(getCalendarCopy("pt-BR").reschedule.summary));
+    await user.click(screen.getAllByRole("button")[0]);
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(screen.queryByRole("region", { name: "Resultado da alteração" })).toBeNull();
+  });
+
   it("renders both locales from the typed record", () => {
     for (const locale of ["pt-BR", "en"] as const) {
       const { unmount } = renderReschedule("todo", locale);
