@@ -9,9 +9,40 @@
  */
 
 import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
+import type { DetailControl } from "@/features/task-commands/detail-controls";
 import type { LocalDate } from "@/lib/time/local-day";
 
 import type { CalendarCommitment, CalendarLane } from "./calendar-query";
+
+/**
+ * What an item needs to be rescheduled **in place** (`2M-CAL-009`).
+ *
+ * ## Why the controls travel already derived, and the status does not
+ *
+ * The projection is the only thing that has read the task, so it is the only
+ * thing that knows the row's real `status` — and `detailControlsFor(status)`, the
+ * single authority on which verbs that status admits, runs there. What crosses
+ * the boundary is therefore the **answer**, not the input.
+ *
+ * That is not a style preference. Sending the status instead would mean the
+ * client decides which verbs to offer, which is a second eligibility decision in
+ * a place that cannot re-check it — and `humanState`'s lossiness on Work is the
+ * same lesson one surface over (`2L-EDIT-001`).
+ *
+ * `null` means *this item is not a reschedulable task*: a reminder, a review, an
+ * unconfirmed date, or a task whose status admits no scheduling verb. It is not
+ * a permission signal — a task the caller does not own never reaches the
+ * projection at all, because every read is owner-scoped.
+ */
+export type CalendarRescheduleTarget = {
+  /** The task's own id, which is what `apply_task_command` resolves against. */
+  readonly taskId: string;
+  /**
+   * The scheduling controls this task's status admits, derived by
+   * `schedulingControlsFor` from the taxonomy — never a list written by hand.
+   */
+  readonly controls: readonly DetailControl[];
+};
 
 /**
  * One thing on one day.
@@ -53,6 +84,12 @@ export type CalendarItemView = {
    * browser's, which `2M-TIME-003` forbids.
    */
   readonly elapsed: boolean;
+  /**
+   * `2M-CAL-009`. What this item can be rescheduled with, or `null`.
+   *
+   * Deliberately **not** `readonly status: string`: see `CalendarRescheduleTarget`.
+   */
+  readonly reschedule: CalendarRescheduleTarget | null;
 };
 
 /** One day column, whether or not anything is in it. */

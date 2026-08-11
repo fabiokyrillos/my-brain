@@ -22,7 +22,10 @@ import type {
   CalendarItemView,
   CalendarLaneFailure,
   CalendarProjection,
+  CalendarRescheduleTarget,
 } from "./calendar-contracts";
+import { serializeCalendarPosition } from "./calendar-position";
+import { schedulingControlsFor } from "./calendar-scheduling";
 import {
   COMMITMENT_BY_LANE,
   DAYS_BY_ORIENTATION,
@@ -303,6 +306,28 @@ export async function loadCalendarProjection(
    * distinction `2M-CAL-011` draws between empty and failed, applied to the one
    * case where the read succeeded and the data did not.
    */
+  /**
+   * `2M-CAL-008`. The position the user is at, serialized once for every link.
+   *
+   * Computed here rather than per item because it is the same value for every
+   * item on the page — and because computing it once is what makes it impossible
+   * for two links on one screen to disagree about where Back goes.
+   */
+  const returnPosition = serializeCalendarPosition(query);
+  const withReturn = (href: string) => `${href}?from=${returnPosition}`;
+
+  /**
+   * `2M-CAL-009`. What a task item offers, or `null`.
+   *
+   * Derived from the row's **real** status through the taxonomy's own predicate.
+   * A status that admits nothing yields `null` rather than an empty control set,
+   * so the surface never renders a disclosure with nothing behind it.
+   */
+  const rescheduleFor = (row: TaskRow): CalendarRescheduleTarget | null => {
+    const controls = schedulingControlsFor(row.status);
+    return controls.length === 0 ? null : { taskId: row.id, controls };
+  };
+
   const push = (item: Omit<CalendarItemView, "date" | "elapsed" | "commitment">) => {
     const at = new Date(item.at);
     if (!Number.isFinite(at.getTime())) {
@@ -327,7 +352,8 @@ export async function loadCalendarProjection(
       at: row.due_at,
       title: row.title,
       sensitivity: deriveTaskSensitivity(row.source_entry_id, sourceLevels),
-      href: `/${locale}/app/work/${row.id}`,
+      href: withReturn(`/${locale}/app/work/${row.id}`),
+      reschedule: rescheduleFor(row),
     });
   }
 
@@ -339,7 +365,8 @@ export async function loadCalendarProjection(
       at: row.planned_at,
       title: row.title,
       sensitivity: deriveTaskSensitivity(row.source_entry_id, sourceLevels),
-      href: `/${locale}/app/work/${row.id}`,
+      href: withReturn(`/${locale}/app/work/${row.id}`),
+      reschedule: rescheduleFor(row),
     });
   }
 
@@ -352,6 +379,8 @@ export async function loadCalendarProjection(
       // OD-2M-1 A. The same derivation, through the relationship nobody had used.
       sensitivity: deriveReminderSensitivity(row.entry_id, sourceLevels),
       href: `/${locale}/app/reminders`,
+      // Not a task: there is nothing here `apply_task_command` could move.
+      reschedule: null,
     });
   }
 
@@ -367,6 +396,8 @@ export async function loadCalendarProjection(
       title: null,
       sensitivity: UNDETERMINED,
       href: `/${locale}/app/reviews`,
+      // Not a task: there is nothing here `apply_task_command` could move.
+      reschedule: null,
     });
   }
 
@@ -381,6 +412,8 @@ export async function loadCalendarProjection(
       title: null,
       sensitivity: UNDETERMINED,
       href: `/${locale}/app/inbox/${row.id}`,
+      // Not a task: there is nothing here `apply_task_command` could move.
+      reschedule: null,
     });
   }
 

@@ -2,6 +2,27 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2M SLICE 2M.1, PART 3: rescheduling from the calendar
+
+**The gap this closes.** The calendar could show that something was due on Thursday and offered no way to move it — every reschedule meant leaving the surface. It now happens in place, through the command path that already existed: `applyTaskDetailCommand` → `list_task_command_candidates` → `apply_task_command`, with the operation key, the request fingerprint, the twelve-column staleness gate, the server-issued confirmation, the audit row and the registered undo all inherited rather than reimplemented. **Zero migration, zero RPC, zero Server Action, zero table, zero column**, and `direct-write-guard.test.ts` still holds its `tasks` allowlist empty.
+
+**Four things worth reading the diff for:**
+
+- **The verb subset is derived, and a list would have been the defect.** The obvious implementation is `["reschedule_due", "clear_due", "set_planned"]` — a second copy of taxonomy knowledge, which is the shape `202608080087` and `202608090089` were both written to delete one layer down. A scheduling action is instead one whose policy's `changedFields` touch `due_at` or `planned_at`; nothing in `src/features/calendar/` names a verb, and the component asserts that by reading its own source. **`reminders` is deliberately not in that field list** — `reschedule_due` declares it as a linked effect and so do `complete_task`, `reopen_task` and `cancel_task`, so including it would put *complete* and *cancel* on the calendar as rescheduling controls.
+- **The projection carries the answer, never the status.** `CalendarItemView.reschedule` is `{taskId, controls}` or `null`. Sending the status would put the eligibility decision in a place that cannot re-check it — the second authority `2M-CAL-009` forbids, and `humanState`'s lossiness on Work is the same lesson one surface over.
+- **The return position reuses Phase 2L's mechanism, not its data shape.** All four properties are kept, `POSITION_FORBIDDEN_FIELDS` imported rather than copied; what is not reused is `WorkPosition`'s field list, because a calendar position is not a Work query. One `from` parameter, two vocabularies, discriminated by each payload's version literal — and the calendar parser answers `null` rather than a default, so a Work return can never become a calendar return pointing at today.
+- **Masking withholds the words, not the ability to move a date.** The controls render beside `ProtectedContent` rather than inside it: hiding them behind the reveal would turn a privacy setting into a capability gate. **No destructive verb reaches the calendar at all** — `cancel_task` changes no date, so the destructive surface is empty by construction rather than by care.
+
+**It deliberately cannot clear a planned day.** `clear_planned` does not exist in the taxonomy, so the derivation finds nothing and the surface offers nothing. The absence is asserted **with its destination named** (`2M-PLAN-002`, slice 2M.2), so the day it is added the test fails and whoever adds it has to notice the calendar starts offering it.
+
+**Executed:** 42 browser journeys on desktop and Pixel 7 in both locales — structure, lane and commitment in text rather than colour, empty distinguishable from failed, an elapsed item still reschedulable, a masked item withholding its title while keeping its controls, keyboard operation with a visible focus ring, tab order, no horizontal page scroll at 320/375/412 px, every control ≥24 px from paint, and reflow at an emulated 200% zoom. Plus lint and typecheck zero-error, `npm test` 5492 passed, build green.
+
+**Two defects the new guards found before CI did.** The mirror guard fired twice on its first run — the lane did not name `calendar-item-elapsed`, and its "what this cannot prove" sentence had been line-wrapped past the regex. And the tab-order journey **encoded a control count**, tabbing a fixed four times; rewritten to assert the property, with the focus trail in the failure message.
+
+**Written and NOT executed:** `e2e/online-calendar.spec.ts` — the applied reschedule, the audit row, the undo, the staleness refusal and the return to the exact position. It needs the deployment carrying this slice. **Not proved anywhere:** a real screen reader and a real phone; an emulated viewport is a viewport, not a device.
+
+Record: `docs/reports/phase-2m/PHASE_2M_SLICE_01_ACCEPTANCE.md`.
+
 ## 2026-08-11 - PHASE 2K HISTORICAL CORRECTION: the declared consumer could never have executed
 
 **Documentary only.** Zero migration, zero deployment, zero functional code, zero database, RLS, grant, policy or Auth change. Hosted parity stays `202608110090` across 90 migrations; Phase 2M's budget stays `2 allocated · 1 spent`; signup closed; the rollout gate untouched.

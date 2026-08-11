@@ -52,6 +52,20 @@ export type CalendarCopy = {
     readonly open: (label: string) => string;
     readonly at: (time: string) => string;
   };
+  /**
+   * `2M-CAL-009`/`-010` — rescheduling in place.
+   *
+   * The disclosure's label names **what it opens**, not what it does: "Reagendar"
+   * on a closed `<details>` would promise a single action and open three. The
+   * unavailable sentence exists because a task whose status admits no scheduling
+   * verb must say so rather than render nothing, which reads as a loading state
+   * — `2M-CAL-011`'s empty-versus-failed distinction, one control down.
+   */
+  readonly reschedule: {
+    readonly summary: string;
+    readonly hint: string;
+    readonly unavailable: string;
+  };
   readonly summary: (count: number) => string;
   readonly todayLabel: string;
 };
@@ -106,6 +120,11 @@ const PT_BR: CalendarCopy = {
     open: (label) => `Abrir ${label}`,
     at: (time) => `às ${time}`,
   },
+  reschedule: {
+    summary: "Datas",
+    hint: "Altere o prazo ou o dia que você pretende trabalhar nisso. Nada muda até você confirmar.",
+    unavailable: "Este item não tem datas que possam ser alteradas aqui.",
+  },
   summary: (count) => (count === 1 ? "1 item neste período" : `${count} itens neste período`),
   todayLabel: "Hoje",
 };
@@ -159,6 +178,11 @@ const EN: CalendarCopy = {
     elapsed: "Already passed",
     open: (label) => `Open ${label}`,
     at: (time) => `at ${time}`,
+  },
+  reschedule: {
+    summary: "Dates",
+    hint: "Change the deadline or the day you intend to work on this. Nothing changes until you confirm.",
+    unavailable: "This item has no dates that can be changed here.",
   },
   summary: (count) => (count === 1 ? "1 item in this period" : `${count} items in this period`),
   todayLabel: "Today",

@@ -31,6 +31,12 @@ import { useId } from "react";
 
 import type { Locale } from "@/lib/preferences";
 
+import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
+import type {
+  TaskDetailCommandHandler,
+  TaskDetailDateBounds,
+} from "@/features/task-commands/task-detail-controls";
+
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import {
@@ -71,15 +77,30 @@ function formatDayLabel(date: string, locale: Locale): string {
 }
 
 export function CalendarView({
+  dateBounds,
   locale,
   projection,
   query,
+  rescheduleAction,
   today,
+  undoAction,
 }: {
+  /**
+   * `2M-CAL-009`. The reschedule wiring, threaded from the route.
+   *
+   * Optional as a triple, and the three travel together: an item renders its
+   * controls only when all three are present, so a caller cannot supply an
+   * action without the bounds the picker needs, or bounds without an action to
+   * send them to. Absent means a read-only calendar, which is what every
+   * component test that is not about rescheduling mounts.
+   */
+  dateBounds?: TaskDetailDateBounds;
   locale: Locale;
   projection: CalendarProjection;
   query: CalendarQuery;
+  rescheduleAction?: TaskDetailCommandHandler;
   today: LocalDate;
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getCalendarCopy(locale);
   const bound = boundState(query, today);
@@ -195,10 +216,13 @@ export function CalendarView({
                     <ul className="calendar-day-items">
                       {day.items.map((item) => (
                         <CalendarItem
+                          dateBounds={dateBounds}
                           item={item}
                           key={item.id}
                           locale={locale}
+                          rescheduleAction={rescheduleAction}
                           timezone={projection.timezone}
+                          undoAction={undoAction}
                         />
                       ))}
                     </ul>
@@ -222,10 +246,13 @@ export function CalendarView({
                 <ul className="calendar-day-items">
                   {day.items.map((item) => (
                     <CalendarItem
+                      dateBounds={dateBounds}
                       item={item}
                       key={item.id}
                       locale={locale}
+                      rescheduleAction={rescheduleAction}
                       timezone={projection.timezone}
+                      undoAction={undoAction}
                     />
                   ))}
                 </ul>

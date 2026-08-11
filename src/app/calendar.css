@@ -206,3 +206,65 @@
     min-width: 11rem;
   }
 }
+
+/*
+ * `2M-CAL-009`/`-010`, `2M-MOBILE-002` — rescheduling in place.
+ *
+ * A disclosure rather than three controls at rest: a cell that showed a date
+ * picker per item would bury the item under the ways to move it, and at 375 px
+ * it would not fit at all. The summary is the visible, labelled control OD-2M-6
+ * A signed, and it is styled as a target rather than as text so the 24px minimum
+ * `2L-MOBILE`'s lane already asserts is met by the thing a thumb aims at.
+ *
+ * There is deliberately no `touch-action` anywhere in this file. That property
+ * is where a drag implementation starts, and the no-gesture guard reads this
+ * stylesheet for exactly that reason.
+ */
+.calendar-reschedule {
+  margin-block-start: var(--space-2, 0.5rem);
+}
+
+.calendar-reschedule-summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding-block: var(--space-1, 0.25rem);
+  font-size: 0.75rem;
+  color: var(--text-muted, #555);
+}
+
+.calendar-reschedule-summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0b5fff);
+  outline-offset: 2px;
+}
+
+.calendar-reschedule-hint,
+.calendar-reschedule-unavailable {
+  margin-block: var(--space-1, 0.25rem);
+  font-size: 0.75rem;
+  color: var(--text-muted, #555);
+}
+
+/*
+ * The controls themselves are `task-detail-controls`, styled once in
+ * `task-commands.css`. What is set here is only how they sit inside a calendar
+ * cell: wrapping rather than overflowing, which is `2M-MOBILE-001`'s no
+ * horizontal page scroll read at the narrowest column the grid produces.
+ */
+.calendar-reschedule .task-control-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.calendar-reschedule .task-control form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.calendar-reschedule input[type="date"] {
+  max-width: 100%;
+}

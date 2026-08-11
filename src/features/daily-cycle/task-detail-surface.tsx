@@ -37,10 +37,9 @@ import { loadCandidateRelationOptions } from "@/features/tasks/relation-options"
 import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 
-import { parseWorkPosition } from "@/features/operations/work-position";
+import { resolveTaskBackHref } from "./task-return";
 
 import { loadTaskDetailProjection } from "./task-detail-projection";
-import { workHref } from "./work-query";
 import { TaskDetailView } from "./task-detail-view";
 
 export async function TaskDetailSurface({
@@ -74,6 +73,10 @@ export async function TaskDetailSurface({
   // exist, which is the only answer that does not confirm its existence.
   if (!detail) notFound();
 
+  // `2M-CAL-008`. One parameter, two vocabularies, one decision — extracted so
+  // it is testable without an authenticated request. See `task-return.ts`.
+  const backHref = resolveTaskBackHref(locale, from);
+
   // Derived from the taxonomy against this task's own status, so a control can
   // only be rendered for a transition the command path would also accept
   // (2F-SURFACE-009).
@@ -88,7 +91,7 @@ export async function TaskDetailSurface({
       locale={locale}
       detail={detail}
       panel={panel}
-      backHref={workHref(locale, parseWorkPosition(from))}
+      backHref={backHref}
       actions={
         detail.task.availableActions.length ? (
           <div className="task-detail-actions">

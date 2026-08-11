@@ -25,9 +25,15 @@
  */
 
 import { ProtectedContent } from "@/features/operations/protected-content";
+import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
+import type {
+  TaskDetailCommandHandler,
+  TaskDetailDateBounds,
+} from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
 
 import type { CalendarItemView } from "./calendar-contracts";
+import { CalendarReschedule } from "./calendar-reschedule";
 import { getCalendarCopy } from "./copy";
 
 /**
@@ -47,13 +53,27 @@ function formatTime(instant: string, locale: Locale, timeZone: string): string {
 }
 
 export function CalendarItem({
+  dateBounds,
   item,
   locale,
+  rescheduleAction,
   timezone,
+  undoAction,
 }: {
+  /**
+   * `2M-CAL-009`. The reschedule wiring, **injected** rather than imported.
+   *
+   * Absent means this render carries no command path — the item still renders,
+   * still links out and still masks. A component that imported the Server Action
+   * itself would make every mount of it a mutation surface, including the ones a
+   * test constructs to check masking.
+   */
+  dateBounds?: TaskDetailDateBounds;
   item: CalendarItemView;
   locale: Locale;
+  rescheduleAction?: TaskDetailCommandHandler;
   timezone: string;
+  undoAction?: TaskUndoHandler;
 }) {
   const copy = getCalendarCopy(locale);
   const laneName = copy.lanes.names[item.lane];
@@ -107,6 +127,25 @@ export function CalendarItem({
           </ProtectedContent>
         )}
       </span>
+      {/*
+        `2M-CAL-009`/`-010`. Rendered **beside** the title rather than inside
+        `ProtectedContent`: masking withholds the words, not the ability to move
+        the date. A user who can see that something is due on Thursday and cannot
+        read what it is may still push it to Friday, and the controls disclose
+        nothing — they carry a task id the caller already owns and a date the
+        caller is choosing. Hiding them behind the reveal would make the mask a
+        capability gate, which is not what `2M-PRIVACY-001` asks for.
+      */}
+      {item.reschedule && rescheduleAction && dateBounds ? (
+        <CalendarReschedule
+          action={rescheduleAction}
+          dateBounds={dateBounds}
+          locale={locale}
+          target={item.reschedule}
+          title={item.title ?? ""}
+          undoAction={undoAction}
+        />
+      ) : null}
     </li>
   );
 }
