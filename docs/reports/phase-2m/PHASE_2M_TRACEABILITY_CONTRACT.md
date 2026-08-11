@@ -97,13 +97,18 @@ their **names** fails. The names at this baseline are the event-name CHECK,
 CHECK, and `productSurfaces`.
 
 ### R-13 — A migration outside the budget, or in the wrong destination
-The budget is **`2 allocated`, NON-TRANSFERABLE**: migration 1 is the telemetry
-vocabulary and the `calendar` surface; migration 2 is notification consent,
-subscription and delivery. Three failures, each separately:
+The budget is **`3 allocated`, NON-TRANSFERABLE** after ADR-106: migration 1 is
+the telemetry vocabulary and the `calendar` surface; migration 2 is notification
+consent, subscription and delivery; migration 3 is **`clear_planned` and nothing
+else**, authorized by ADR-106 on the stop condition slice 2M.1 raised **before**
+slice 2M.2 was started. Three failures, each separately:
 
-- a **third** migration, in any form;
-- migration 1 carrying consent or subscription schema, or migration 2 carrying
-  vocabulary — capacity is not fungible between them;
+- a **fourth** migration, in any form;
+- any of the three carrying another's contents — migration 1 carrying consent or
+  subscription schema, migration 2 carrying vocabulary, or **migration 3
+  carrying any verb, table, column, policy, grant, role or vocabulary other than
+  `clear_planned`** — capacity is not fungible between them, and ADR-106
+  explicitly does not reallocate migration 2;
 - migration 2 carrying **any** content-bearing column: a task title, a
   description, a name, record content, user-supplied notification text or a
   free-form payload column.

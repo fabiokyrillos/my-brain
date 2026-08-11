@@ -41,11 +41,15 @@ checkpoint**, which an implementer cannot schedule.
 6. **Zero classification persisted.** OD-2L-1 B holds throughout.
 7. **One local-day definition.** Application and database agree, and the
    agreement is tested.
-8. **Exactly two migrations, NON-TRANSFERABLE.** Migration 1 is the telemetry
-   vocabulary and the `calendar` surface, in slice 2M.1, **before any producer**.
-   Migration 2 is notification consent, subscription and delivery, in slice
-   2M.4b. Neither may carry the other's contents. **A third is a stop
-   condition.**
+8. **Exactly three migrations, NON-TRANSFERABLE.** Migration 1 is the telemetry
+   vocabulary and the `calendar` surface, in slice 2M.1, **before any producer**
+   — **spent**, `202608110090`. Migration 2 is notification consent,
+   subscription and delivery, in slice 2M.4b — **reserved**. Migration 3 is
+   **`clear_planned` and nothing else**, in slice 2M.2, authorized by **ADR-106**
+   on the stop condition slice 2M.1 raised — **reserved**. None may carry
+   another's contents, and ADR-106 explicitly **does not** reallocate migration
+   2. **A fourth is a stop condition**, and so is migration 3 carrying anything
+   but `clear_planned`.
 9. **CI green on the exact merge SHA** for every slice, one complete run
    (ADR-090).
 10. **No emulated run may be recorded as a real-device claim.**
@@ -188,8 +192,11 @@ case; the no-gesture guard extended to calendar files if OD-2M-6 signs A.
 
 1. One declared meaning for `planned_at`, in one module, read by every surface
    (`2M-PLAN-001`).
-2. `clear_planned` through the existing validated command path, closing the
-   asymmetry with `clear_due` (`2M-PLAN-002`).
+2. **Migration 3** — `clear_planned` through the existing validated command
+   path, closing the asymmetry with `clear_due` (`2M-PLAN-002`), authorized by
+   **ADR-106** and carrying nothing else. `public.apply_task_command` is
+   re-declared whole; the policy version is bumped in the same change; applied,
+   linted, deployed and parity-verified (**G8**).
 3. Read-side semantics: a filter and an ordering, **within** the three-view Work
    taxonomy as filters, never as a fourth view (`2M-PLAN-003`).
 4. The planner surface — choose today's focus from what exists, create nothing
