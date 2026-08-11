@@ -3,6 +3,7 @@ import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { WORK_PAGE_SIZE } from "./work-page-size";
 import { detailControlsFor, type DetailControl } from "@/features/task-commands/detail-controls";
 import { pageRange, paginateRows } from "@/lib/pagination";
+import { isSupportedTimeZone, localDayBounds } from "@/lib/time/local-day";
 import { defaultAgentPreferences, type Locale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -27,7 +28,6 @@ type TaskRow = Pick<
 export { WORK_PAGE_SIZE };
 export { workViews, type WorkViewId };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * `2L-VIEW-004`/`-005` — the narrowing this projection accepts.
@@ -86,64 +86,25 @@ export function parseWorkView(value: string | string[] | undefined): WorkViewId 
     : "today";
 }
 
-function validTimezone(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-    return value.includes("/") || value === "UTC";
-  } catch {
-    return false;
-  }
-}
+/*
+ * The zone rule is the local-day contract's, not a third copy of it. It was
+ * identical here in behaviour, and two identical rules are one rule waiting to
+ * diverge — which is precisely how this module and Hoje came to disagree about
+ * what a day is.
+ */
 
-function zonedParts(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
-  return {
-    year: value("year"),
-    month: value("month"),
-    day: value("day"),
-    hour: value("hour"),
-    minute: value("minute"),
-    second: value("second"),
-  };
-}
-
-function timezoneOffsetAt(instant: number, timezone: string) {
-  const parts = zonedParts(new Date(instant), timezone);
-  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - instant;
-}
-
-function localMidnightUtc(year: number, month: number, day: number, timezone: string) {
-  const target = Date.UTC(year, month - 1, day);
-  let instant = target;
-  for (let iteration = 0; iteration < 3; iteration += 1) {
-    const candidate = target - timezoneOffsetAt(instant, timezone);
-    if (candidate === instant) break;
-    instant = candidate;
-  }
-  return new Date(instant);
-}
-
-function startOfNextLocalDay(now: Date, timezone: string) {
-  const current = zonedParts(now, timezone);
-  const nextDate = new Date(Date.UTC(current.year, current.month - 1, current.day + 1));
-  return localMidnightUtc(
-    nextDate.getUTCFullYear(),
-    nextDate.getUTCMonth() + 1,
-    nextDate.getUTCDate(),
-    timezone,
-  );
-}
+/*
+ * The local-day helpers this module used to own were deleted by `2M-TIME-001`.
+ *
+ * They were the *second* implementation of the user's local day, and they were
+ * wrong in the mirror-image way to the first: `startOfToday` was derived as
+ * `startOfNextLocalDay − 24h`, so today's **start** was an hour off on exactly
+ * the two days a year when a local day is not 24 hours long — moving the
+ * `today` view and the `overdue`/`today`/`upcoming` due filters onto the wrong
+ * boundary. Their fixed-point resolution also landed in the *previous* day in a
+ * zone whose local midnight does not exist, which `src/lib/time/local-day.ts`
+ * documents and refuses.
+ */
 
 /**
  * `open_task` leads, and every other action follows it.
@@ -201,14 +162,17 @@ export async function loadWorkProjection(
     .eq("user_id", options.userId)
     .maybeSingle();
   const profile = requireSupabaseData(profileResult, "load Work profile timezone");
-  const timezone = validTimezone(profile?.timezone)
+  const timezone = isSupportedTimeZone(profile?.timezone)
     ? profile.timezone
     : defaultAgentPreferences.timezone;
 
   const filters: WorkFilters = options.filters ?? DEFAULT_WORK_FILTERS;
   const now = options.now ?? new Date();
-  const nextDay = startOfNextLocalDay(now, timezone);
-  const startOfToday = new Date(nextDay.getTime() - DAY_MS);
+  // `2M-TIME-001`: both edges come from the one local-day contract. Deriving
+  // either from the other by subtracting 24 hours is the defect this replaced.
+  const day = localDayBounds(now, timezone);
+  const startOfToday = new Date(day.start);
+  const nextDay = new Date(day.end);
 
   /*
    * The relation filters are resolved **first**, so the page query can be

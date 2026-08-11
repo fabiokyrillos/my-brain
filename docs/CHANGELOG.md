@@ -2,6 +2,30 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2M SLICE 2M.0: one local-day contract, three implementations found, four guards
+
+**Foundations only. Zero visible surface, zero migration, zero deploy, zero provider call.** `npm test` 5331 passed; lint, typecheck and build clean.
+
+**The audit predicted two implementations of the user's local day. There were three.**
+
+| Implementation | Day start | Day end | Verdict |
+|---|---|---|---|
+| `today-priorities.localDayBounds` | local midnight | `start + 24h` | **wrong** on a 23h/25h day |
+| `work-projection` private helpers | `nextDay - 24h` | local midnight | **wrong**, mirror image |
+| `run_user_heartbeat` (SQL) | `local_date::timestamp at time zone tz` | `(local_date + 1)::...` | **correct** |
+
+Both TypeScript copies made the same fixed-24-hour assumption in **opposite directions**. On the two days a year when a local day is not 24 hours long, Hoje's due-today window overshot into tomorrow while the Work `today` view and the `overdue`/`today`/`upcoming` filters started an hour early. Nothing noticed, because each was asked a different question on a different surface and Sao Paulo has observed no DST since 2019.
+
+**A fourth defect the audit had not predicted.** Resolving a wall-clock date to an instant by fixed-point iteration **silently lands in the previous day where local midnight does not exist**. `America/Santiago` springs forward at midnight: on 2026-09-06 the local times 00:00-00:59 never happen, and the naive answer is `2026-09-05T23:00` local - a boundary inside the previous day. The contract resolves the two bracketing offsets, keeps only candidates whose local date is the requested one, and takes the earliest.
+
+**A fixture error in this slice's own test was caught by the test.** The first version asserted 2026-09-05 was the 23-hour day, because the probe that produced the fixture used the naive algorithm. Re-derived from the runtime's tz database: the 5th is 24 hours and the 6th is 23, because the transition is at 24:00 on the 5th and the skipped hour belongs to the 6th. Recorded rather than smoothed.
+
+**The proofs.** 22 TypeScript cases and 16 pgTAP assertions over the same dates in `America/New_York`, `Europe/Lisbon`, `Australia/Sydney`, `America/Santiago` and `Pacific/Auckland` - both hemispheres, both directions, 23, 24 and 25 hours - plus consecutive-day tiling, refusal of a fixed-offset abbreviation like `EST`, refusal of an invalid instant, and a pgTAP assertion that `run_user_heartbeat` still contains the expression the TypeScript mirrors.
+
+**Four guards.** (1) **Recurrence**, ten implementation shapes across four trees, with mutation cases for a recurrence column, a series table, an occurrence model, a recurring flag and an expander added in preparation - and a **control** proving it does not fire on the product's own deterministic refusal, on `recurring_info`, on `historical_recurrence` or on `String.repeat`. (2) **The push boundary, now covering `public/` and `.js`.** The guard it supersedes scans `.ts`/`.tsx` under `src/` only, so **the only assertion claiming push was absent could not have detected a push handler in `public/sw.js`** - the one file where a push handler goes, and a worker that is registered in production. Its allowlist is empty, and slice 2M.4b will add one entry **by name**. (3) **Producer-before-migration**, the property whose absence cost `202608080087` and `202608090089`: every event name and surface the application declares must already be admitted by the migration chain, and every declared name must have a property branch. (4) **A fourth-local-day-copy guard** whose mutation cases are the two historical lines verbatim.
+
+**One product behaviour changed, stated rather than buried.** Hoje's due-today window and the Work `today` view and due filters now use correct local-day boundaries: identical on 363 days a year, correct on the two where they were an hour wrong.
+
 ## 2026-08-11 - PHASE 2M IMPLEMENTATION AUTHORIZED THROUGH CLOSEOUT (ADR-105), all seven decisions signed
 
 **Documentation only in this change. Still zero product code, zero migration, zero deploy, zero notification sent, zero permission requested, zero telemetry event created, zero provider call.** The package is corrected to record the signatures; nothing is built yet.
