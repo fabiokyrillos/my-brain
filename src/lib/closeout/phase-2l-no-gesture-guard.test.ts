@@ -118,6 +118,57 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
     expect(missing, "a Work surface exists that the no-gesture guard does not scan").toEqual([]);
   });
 
+  /**
+   * `2M-MOBILE-003`, OD-2M-6 option A — the same ban, one surface over.
+   *
+   * The calendar is where drag-to-reschedule is most tempting: it is the
+   * interaction every other calendar has, and it is the one OD-2M-6 refused —
+   * because it makes the primary path unreachable by keyboard, unusable by
+   * screen reader, and adds a second hardware-dependent verification to a phase
+   * that already carries one. The refusal covers a handler added *"in
+   * preparation"*, so the guard names the calendar's files rather than waiting
+   * for one to appear.
+   *
+   * Its own describe block rather than an addition to `WORK_SURFACES`, because
+   * the two lists answer to two different decisions: OD-2L-5 governs Work and
+   * OD-2M-6 governs the calendar, and a single list would make a future
+   * amendment to one silently amend the other.
+   */
+  const CALENDAR_SURFACES = [
+    "src/features/calendar/calendar-view.tsx",
+    "src/features/calendar/calendar-item.tsx",
+  ] as const;
+
+  it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {
+    const offenders = CALENDAR_SURFACES
+      .map((file) => ({ file, found: findGestures(read(file)) }))
+      .filter((entry) => entry.found.length > 0);
+    expect(offenders).toEqual([]);
+  });
+
+  it("names every calendar component there is", () => {
+    const discovered: string[] = [];
+    for (const entry of readdirSync(join(REPO, "src/features/calendar"))) {
+      if (!entry.endsWith(".tsx") || entry.endsWith(".test.tsx")) continue;
+      discovered.push(`src/features/calendar/${entry}`);
+    }
+    expect(discovered.length, "no calendar component was discovered").toBeGreaterThan(0);
+    const missing = discovered.filter((file) => !(CALENDAR_SURFACES as readonly string[]).includes(file));
+    expect(missing, "a calendar surface exists that the no-gesture guard does not scan").toEqual([]);
+  });
+
+  it("keeps every calendar action reachable by a visible, labelled link", () => {
+    // `2M-MOBILE-003`'s other half, and the reason the ban costs nothing here:
+    // navigation, orientation and lane visibility are `<Link>`s, so every action
+    // is keyboard-operable and screen-reader-addressable without a gesture to
+    // replace. A control implemented as an unlabelled div would pass the gesture
+    // ban and fail the requirement.
+    const view = stripComments(read("src/features/calendar/calendar-view.tsx"));
+    expect(view).toMatch(/<Link\b/);
+    expect(view).not.toMatch(/<div[^>]*onClick/);
+    expect(view).not.toMatch(/role="button"/);
+  });
+
   it("keeps the CSS free of a drag escape hatch too", () => {
     // `touch-action` is where a drag implementation starts, and it would sit in
     // the stylesheet rather than in a component.

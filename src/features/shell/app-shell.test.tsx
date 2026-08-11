@@ -92,6 +92,9 @@ describe("AppShell", () => {
       "/pt-BR/app/files",
       "/pt-BR/app/reviews",
       "/pt-BR/app/questions",
+      // `2M-CAL-001`. In the organization group, ahead of reminders: a calendar
+      // is the surface a reminder appears on.
+      "/pt-BR/app/calendar",
       "/pt-BR/app/reminders",
       "/pt-BR/app/history",
       "/pt-BR/app/costs",
@@ -151,6 +154,9 @@ describe("AppShell", () => {
       "/pt-BR/app/files",
       "/pt-BR/app/reviews",
       "/pt-BR/app/questions",
+      // `2M-CAL-001`. In the organization group, ahead of reminders: a calendar
+      // is the surface a reminder appears on.
+      "/pt-BR/app/calendar",
       "/pt-BR/app/reminders",
       "/pt-BR/app/history",
       "/pt-BR/app/costs",

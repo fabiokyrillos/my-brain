@@ -56,10 +56,53 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
      * the wrong reason: the component consumes the contract, and each surface
      * mounts the component.
      */
-    expect(code("src/features/operations/protected-content.tsx"))
-      .toMatch(/resolveTaskContent\(/);
+    const component = code("src/features/operations/protected-content.tsx");
+    // Phase 2M made the component multi-surface, so it now *references* the
+    // resolvers in a lookup rather than calling one by name. Both must be
+    // reachable from it, and the lookup must be what the render path uses --
+    // asserted in three parts so a component that imported a resolver and then
+    // ignored it would still fail.
+    expect(component).toMatch(/resolveTaskContent/);
+    expect(component).toMatch(/resolveCalendarContent/);
+    expect(component).toMatch(/RESOLVER\[surface\]\(/);
     expect(code("src/features/operations/task-list.tsx")).toMatch(/<ProtectedContent/);
     expect(code("src/features/daily-cycle/task-detail-view.tsx")).toMatch(/<ProtectedContent/);
+  });
+
+  it("the calendar reads the contract, through the same component (2M-PRIVACY-001)", () => {
+    /*
+     * `calendar` joined `GOVERNED_SURFACES` in Phase 2M, in the same change that
+     * shipped its first consumer -- which `2M-PRIVACY-001` requires by name,
+     * because a governed surface with no consumer is a rule nobody obeys.
+     *
+     * OD-2M-1 option A names **two** subjects on this surface, and the second is
+     * the point: a calendar that masked a task title and printed the reminder
+     * title beside it would recreate, one entity over, the divergence slice 2L.1
+     * found on Hoje. So the assertion is that the item component wraps content in
+     * `ProtectedContent` and that the projection derives BOTH.
+     */
+    expect(code("src/features/calendar/calendar-item.tsx")).toMatch(/<ProtectedContent/);
+    expect(code("src/features/calendar/calendar-item.tsx")).toMatch(/surface="calendar"/);
+    const projection = code("src/features/calendar/calendar-projection.ts");
+    expect(projection).toMatch(/deriveTaskSensitivity\(/);
+    expect(projection).toMatch(/deriveReminderSensitivity\(/);
+  });
+
+  it("keeps the calendar rule in one place too, so no surface answers for itself", () => {
+    // The same negative half `work` gets, for the surface added beside it.
+    const walk = (dir: string, found: string[] = []): string[] => {
+      const absolute = join(REPO, dir);
+      for (const entry of readdirSync(absolute)) {
+        const full = join(absolute, entry);
+        if (statSync(full).isDirectory()) walk(join(dir, entry), found);
+        else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(join(dir, entry));
+      }
+      return found;
+    };
+    const callers = walk("src")
+      .filter((file) => /resolveContent\(\s*\n?\s*["']calendar["']/.test(code(file)))
+      .map((file) => file.replace(/\\/g, "/"));
+    expect(callers).toEqual(["src/features/sensitivity/task-derivation.ts"]);
   });
 
   it("Hoje withholds a protected task too, because Hoje renders task titles", () => {

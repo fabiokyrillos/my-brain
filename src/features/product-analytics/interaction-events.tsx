@@ -3,6 +3,7 @@
 import { startTransition, useEffect, useRef, type ReactNode } from "react";
 import type {
   AttentionResolutionAction,
+  CalendarOrientation,
   CaptureModeAnalytics,
   ProductEventLocale,
   ProductEventName,
@@ -279,6 +280,36 @@ export function WorkViewViewed({ view, locale }: {
     surface: "work",
     locale,
     properties: { workView: view },
+  })} />;
+}
+
+/**
+ * `2M-CAL-001` / Q1 — *is the calendar reached at all, and in which
+ * orientation?*
+ *
+ * The first producer of the vocabulary migration `202608110090` admitted, and it
+ * ships **after** that migration was merged, deployed and parity-verified, which
+ * is what `2M-METRICS-001` makes a rule.
+ *
+ * It carries the orientation and nothing else. Not the anchor date: a calendar's
+ * anchor is the single most fingerprinting value this phase could record — it
+ * says which days somebody works and which they protect — and it answers no
+ * declared question. `2M-METRICS-004` refuses the key, the parser refuses the
+ * payload, and the deployed validator refuses it again.
+ *
+ * `recordOnce` keys on the orientation, so paging through a week does not emit a
+ * second event for the same shape while switching to the agenda does.
+ */
+export function CalendarViewed({ orientation, locale }: {
+  orientation: CalendarOrientation;
+  locale: ProductEventLocale;
+}) {
+  return <VisibilityEvent onVisible={() => recordOnce({
+    logicalKey: `calendar-viewed:${orientation}`,
+    name: "calendar_viewed",
+    surface: "calendar",
+    locale,
+    properties: { orientation },
   })} />;
 }
 

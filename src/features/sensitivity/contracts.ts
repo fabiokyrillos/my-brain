@@ -77,6 +77,23 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
  * resolves to `highly_sensitive`, so the rule below is reached in its most
  * protective arm precisely when the least is known.
  */
+/**
+ * `calendar` arrives in Phase 2M (`2M-PRIVACY-001`, OD-2M-1 **option A**), and
+ * it is the first governed surface that renders **two** kinds of subject whose
+ * classification lives somewhere else.
+ *
+ * Tasks derive through `task-derivation.ts` exactly as they do on `work`.
+ * Reminders derive through the *same* mechanism via `reminders.entry_id` — the
+ * relationship the audit found had never been used, which is precisely why
+ * OD-2M-1 refused option B: a calendar that masked a task title and printed the
+ * reminder title beside it would recreate, one entity over, the divergence slice
+ * 2L.1 found on Hoje.
+ *
+ * The other two lanes carry no user text at all. A review appears as its period
+ * and renders through `review_summary` when opened (`2M-REVIEW-008`), and an
+ * unconfirmed extracted date is a date — so neither needs a rule here, and
+ * inventing one would suggest a protection that is not being performed.
+ */
 export const GOVERNED_SURFACES = [
   "hoje",
   "attention",
@@ -85,6 +102,7 @@ export const GOVERNED_SURFACES = [
   "notification",
   "chat",
   "work",
+  "calendar",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -132,6 +150,12 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   // the filter and from any selection — so the user would act on a set that is
   // not the set they own. The row stays, the content does not.
   work: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  // Masked rather than excluded, and on a calendar the reason is sharper than
+  // anywhere else: dropping a row would leave a **day that looks empty**. A user
+  // who cannot see that Thursday is full would plan into it, which is a worse
+  // outcome than a masked title and is also a lie about their own data. The row
+  // keeps its lane, its instant and its position; the words do not.
+  calendar: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

@@ -84,6 +84,14 @@ type RouteEntry = {
  */
 const INVENTORY: readonly RouteEntry[] = [
   { route: "", sections: [] },
+  /*
+   * `2M-CAL-001`. It renders no relationship or association collection, and
+   * that is the claim rather than an omission: the calendar reads five existing
+   * sources and links to the surfaces that own them — a task's Work detail, the
+   * reminders list, the reviews page, the entry in the inbox — so every writer
+   * it could need is already reachable from the page it sends the user to.
+   */
+  { route: "calendar", sections: [] },
   { route: "capture", sections: [] },
   { route: "chat", sections: [] },
   { route: "chat/[conversationId]", sections: [] },
