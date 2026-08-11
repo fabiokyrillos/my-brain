@@ -1,0 +1,208 @@
+/*
+ * The calendar surface (`2M-CAL-*`, `2M-MOBILE-001`/`-002`, `2M-ACCESS-005`).
+ *
+ * ## No `touch-action`, and no drag affordance
+ *
+ * OD-2M-6 signed visible controls only. `touch-action` is where a drag
+ * implementation starts, so its absence is asserted by
+ * `phase-2l-no-gesture-guard.test.ts` rather than left to review.
+ *
+ * ## Colour is decoration, never the distinction
+ *
+ * `2M-ACCESS-005` forbids colour as the only carrier of the lane or of the
+ * committed-versus-suggested distinction, so every lane's name and every
+ * commitment is rendered as **text** by `calendar-item.tsx`. What is below adds
+ * a border weight and a shape on top of words that already say it — which also
+ * means the surface degrades correctly under forced colours and at 200% zoom,
+ * where a colour-only design would collapse into one undifferentiated list.
+ */
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.calendar-description {
+  color: var(--text-muted, #555);
+  margin: 0;
+}
+
+/*
+ * The three control rows. Wrapping rather than scrolling: `2M-MOBILE-001`
+ * forbids horizontal page scroll at 375 px, and a control row that scrolled
+ * would hide destinations behind a gesture the phase refused.
+ */
+.calendar-orientation ul,
+.calendar-lanes ul,
+.calendar-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.calendar-orientation a,
+.calendar-lanes a,
+.calendar-navigation a {
+  display: inline-flex;
+  align-items: center;
+  /*
+   * `2M-MOBILE-002`. 44 px is the declared minimum target, and it is set as a
+   * min-height plus padding rather than a fixed size so a longer word in either
+   * locale grows the control instead of clipping it.
+   */
+  min-height: 44px;
+  padding: 0 var(--space-3, 0.75rem);
+  border: 1px solid var(--border, #ccc);
+  border-radius: var(--radius-2, 0.5rem);
+  text-decoration: none;
+}
+
+.calendar-orientation a[aria-current="true"] {
+  border-width: 2px;
+  font-weight: 600;
+}
+
+.calendar-lanes a[aria-pressed="false"] {
+  /* Off is said by opacity AND by a dashed edge, never by colour alone. */
+  border-style: dashed;
+  opacity: 0.65;
+}
+
+.calendar-navigation a[aria-disabled="true"] {
+  opacity: 0.5;
+}
+
+.calendar-range,
+.calendar-summary {
+  margin: 0;
+}
+
+.calendar-bound,
+.calendar-partial {
+  margin: 0;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-inline-start: 4px solid var(--border-strong, #888);
+  background: var(--surface-2, #f4f4f5);
+}
+
+/* Day and agenda: a list, because that is the shape they are. */
+.calendar-days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.calendar-day h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  font-size: 1rem;
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.calendar-day[data-today="true"] h2 {
+  font-weight: 700;
+}
+
+.calendar-today {
+  border: 1px solid currentColor;
+  border-radius: var(--radius-1, 0.25rem);
+  font-size: 0.75rem;
+  padding: 0 0.35rem;
+}
+
+/*
+ * Week: a real table, so assistive technology gets the two-dimensional relation
+ * without a single `role` (`2M-ACCESS-002`).
+ *
+ * It scrolls **inside its own container** rather than scrolling the page, which
+ * is what keeps `2M-MOBILE-001` true at 375 px without hiding a column.
+ */
+.calendar-week {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.calendar-week th,
+.calendar-week td {
+  border: 1px solid var(--border, #ccc);
+  min-width: 8.5rem;
+  padding: var(--space-2, 0.5rem);
+  text-align: start;
+  vertical-align: top;
+}
+
+.calendar-week th[data-today="true"],
+.calendar-week td[data-today="true"] {
+  border-width: 2px;
+}
+
+.calendar-day-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.calendar-item {
+  border: 1px solid var(--border, #ccc);
+  border-radius: var(--radius-2, 0.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: var(--space-2, 0.5rem);
+}
+
+/*
+ * The commitment axis, carried by border weight and style **in addition to**
+ * the words `calendar-item.tsx` already renders.
+ */
+.calendar-item[data-commitment="committed"] { border-inline-start-width: 4px; }
+.calendar-item[data-commitment="intended"] { border-inline-start-width: 4px; border-inline-start-style: dashed; }
+.calendar-item[data-commitment="suggested"] { border-style: dotted; }
+.calendar-item[data-commitment="recorded"] { opacity: 0.85; }
+
+.calendar-item[data-elapsed="true"] .calendar-item-time {
+  text-decoration: line-through;
+}
+
+.calendar-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  font-size: 0.75rem;
+  color: var(--text-muted, #555);
+}
+
+.calendar-item-body {
+  overflow-wrap: anywhere;
+}
+
+.calendar-empty {
+  color: var(--text-muted, #555);
+  margin: 0;
+}
+
+/*
+ * `2M-MOBILE-001`. One-handed at 375 px and 412 px: the week's own container is
+ * what scrolls, the control rows wrap, and nothing on the page is wider than the
+ * viewport. `2M-ACCESS`'s reflow case is the same rule read at 200% zoom.
+ */
+@media (max-width: 30rem) {
+  .calendar-week th,
+  .calendar-week td {
+    min-width: 11rem;
+  }
+}

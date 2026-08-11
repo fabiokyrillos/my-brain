@@ -99,6 +99,25 @@ export const navigationCapabilities = [
   { key: "files", route: "files", group: "context", visibility: "more", nested: false, aliases: [] },
   { key: "reviews", route: "reviews", group: "reflection", visibility: "more", nested: false, aliases: [] },
   { key: "questions", route: "questions", group: "reflection", visibility: "more", nested: false, aliases: [] },
+  /*
+   * `2M-CAL-001`. Its own destination, outside `/app/work` and **not** a
+   * `workView` value — OD-2L-2 A keeps Work at exactly three views, so a
+   * calendar reachable as a Work tab is the thing that decision refused.
+   *
+   * In the `organization` group beside `reminders`, and `more` rather than
+   * `primary`, which is a **deliberate restraint rather than a ranking**.
+   * `2I-SHELL-001` pins the four primary destinations as a delivered baseline
+   * and exists to stop a later slice changing them quietly; `2M-CAL-001`
+   * requires a route and says nothing about prominence. Promoting a destination
+   * into the desktop rail and the mobile overflow is an information-architecture
+   * decision this phase was not authorized to make, so it is left to the owner
+   * and recorded as a residual rather than taken unilaterally.
+   *
+   * `nested: true` because the daily planner and the day review are sub-routes
+   * (slices 2M.2 and 2M.3), so `/app/calendar/...` keeps this destination active
+   * rather than clearing the highlight mid-navigation.
+   */
+  { key: "calendar", route: "calendar", group: "organization", visibility: "more", nested: true, aliases: [] },
   { key: "reminders", route: "reminders", group: "organization", visibility: "more", nested: false, aliases: [] },
   { key: "history", route: "history", group: "transparency", visibility: "more", nested: false, aliases: [] },
   { key: "costs", route: "costs", group: "transparency", visibility: "more", nested: false, aliases: [] },

@@ -2,6 +2,23 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2M SLICE 2M.1, PART 2: the calendar surface
+
+**The gap this closes.** The product could record a deadline, a planned day, a reminder, a review and an extracted date, and had **nowhere to show them together on a timeline**. `/app/calendar` is that surface, built over the five sources that already exist — **zero schema, no event entity** (OD-2M-3 A refused one), and the committed-versus-suggested distinction derived from which lane an item is in rather than from a stored flag.
+
+**Four things worth reading the diff for:**
+
+- **Reminder sensitivity is derived, for the first time.** OD-2M-1 A: `reminders.entry_id` is the same relationship `task-derivation.ts` consumes for tasks, and the audit found nobody had ever used it. `deriveReminderSensitivity` delegates to the task path rather than reimplementing it, so the three outcomes are identical by construction — and a calendar that masked a task title while printing the reminder title beside it, which is the divergence slice 2L.1 found on Hoje one entity over, is now impossible.
+- **The URL is the whole state, and it fails closed *narrower*.** `2M-CAL-005` has a half the Work contract never needed: never a wider **date range** either. So `orientation` defaults to `day` (the narrowest), a malformed or out-of-range anchor resolves to **today** (one day wide), and an unknown lane token is **dropped** rather than widening. The navigation bound is declared once, ±365 days, and reaching it is a visible state rather than an empty grid.
+- **A lane that fails is named.** `2M-CAL-011`'s partial state is real: each of the five lanes is independently fallible, and a failure is reported rather than dropped — because a dropped lane shows a day that *looks empty*, which is the same lie masking-rather-than-excluding exists to avoid. The same rule now covers a row whose instant will not parse, a case found while writing the tests.
+- **Every control is a link.** OD-2M-6 A signed visible controls only, so navigation, orientation and lane visibility are `<Link>`s — keyboard-operable and screen-reader-addressable for free, and what makes "the URL is the state" true rather than aspirational: the control *is* the URL. The no-gesture guard is extended to name the calendar's files in its own describe block, so a handler cannot appear "in preparation".
+
+**`calendar_viewed` is the first producer of the vocabulary deployed on 2026-08-11**, and it carries the orientation and nothing else — not the anchor date, which is the most fingerprinting value this phase could record and answers no declared question. The guard that asserted "no producer exists yet" is **replaced rather than deleted** by a producer census: every producer must name an event and a surface the migration chain already admits, and the events still waiting for one are listed by name.
+
+**Navigation: `more`, not `primary`, and that is a restraint rather than a ranking.** `2I-SHELL-001` pins the four primary destinations as a delivered baseline; `2M-CAL-001` requires a route and says nothing about prominence. Promoting a destination into the rail is an IA decision this phase was not authorized to make, so it sits in the `organization` group beside Reminders and the promotion question goes to the owner.
+
+**Not in this part, and named rather than implied:** rescheduling from the calendar (`2M-CAL-009`, `-010`) and the Playwright journeys (`2M-MOBILE-005`). Both land in part 3 with the slice's acceptance record. `npm test` 5439 passed; lint, typecheck and build clean.
+
 ## 2026-08-11 - PHASE 2M MIGRATION 1 DEPLOYED, and three probe defects found in the process
 
 **Applied to the hosted project on 2026-08-11**, after the merge and with CI green on the exact merge SHA `6ca0314`. The dry run showed exactly one pending migration; the migration file was verified byte-identical to the merge SHA before the push. Hosted parity moved `202608090089` → **`202608110090`**, local = remote on every row, **90 migrations**. Budget: **`2 allocated · 1 spent`**.

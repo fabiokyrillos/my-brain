@@ -29,6 +29,7 @@ const messages = {
        */
       inbox: "Registros",
       work: "Trabalho",
+      calendar: "Calendário",
       tasks: "Tarefas",
       waiting: "Aguardando",
       projects: "Projetos",
@@ -87,6 +88,7 @@ const messages = {
       today: "Today",
       inbox: "Records",
       work: "Work",
+      calendar: "Calendar",
       tasks: "Tasks",
       waiting: "Waiting",
       projects: "Projects",

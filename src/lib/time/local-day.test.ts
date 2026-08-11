@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addLocalDays,
+  compareLocalDates,
+  formatLocalDate,
   isSupportedTimeZone,
+  localDateOf,
   localDayBounds,
+  localDayBoundsForDate,
   localDayLengthHours,
+  localRangeBounds,
+  parseLocalDate,
+  startOfLocalWeek,
   startOfNextLocalDay,
 } from "./local-day";
 
@@ -189,5 +197,157 @@ describe("2M-TIME-003: an uncomputable day is reported, never defaulted", () => 
     for (const good of ["UTC", "America/Sao_Paulo", "Australia/Sydney", "Europe/Lisbon"]) {
       expect(isSupportedTimeZone(good)).toBe(true);
     }
+  });
+});
+
+/**
+ * `2M-CAL-004`/`-005`, `2M-TIME-002` — the calendar's date arithmetic.
+ *
+ * The calendar names its days in the URL, so it asks the contract about a
+ * **date** rather than about an instant. These are the same properties proved
+ * above, asked the other way round: a named 23-hour day is still 23 hours, a
+ * named day whose local midnight does not exist still starts when it genuinely
+ * starts, and a week containing a transition is not 168 hours.
+ */
+describe("2M-CAL-004: a named local day, and a run of them", () => {
+  it("parses only a real ISO date, and refuses everything else", () => {
+    expect(parseLocalDate("2026-08-15")).toEqual({ year: 2026, month: 8, day: 15 });
+    // A real leap day, and the fixture error this assertion caught in its own
+    // first draft: **2026 is not a leap year**, and the draft asserted that
+    // `2026-02-29` parsed. Recorded rather than smoothed, for the same reason
+    // slice 2M.0's Santiago fixture error is — a hand-written date fixture is
+    // the one input a date test cannot check for you.
+    expect(parseLocalDate("2024-02-29")).toEqual({ year: 2024, month: 2, day: 29 });
+    for (const bad of [
+      "2026-8-5", "2026-13-01", "2026-00-10", "2026-02-30", "2026-04-31",
+      // Not a leap year, so the 29th does not exist.
+      "2026-02-29",
+      "20260815", "2026-08-15T00:00:00Z", "not-a-date", "", "  ", null, undefined, 42, {},
+      ["2026-08-15"],
+    ]) {
+      expect(parseLocalDate(bad), String(bad)).toBeNull();
+    }
+  });
+
+  it("refuses a year `Date.UTC` would silently move, rather than accepting it", () => {
+    /*
+     * `Date.UTC(1, 0, 1)` is **1901**, not year 1: the two-digit-year legacy
+     * mapping applies to 0–99. The round-trip check refuses those dates instead
+     * of returning a year the caller did not write — which is the whole reason
+     * the parser round-trips rather than trusting three regex captures.
+     */
+    for (const iso of ["0001-01-01", "0099-06-15"]) {
+      expect(parseLocalDate(iso), iso).toBeNull();
+    }
+    expect(parseLocalDate("0100-01-01")).toEqual({ year: 100, month: 1, day: 1 });
+  });
+
+  it("round-trips through its formatted form", () => {
+    for (const iso of ["2026-01-01", "2026-08-15", "2026-12-31", "2024-02-29", "0100-01-01"]) {
+      expect(formatLocalDate(parseLocalDate(iso)!)).toBe(iso);
+    }
+  });
+
+  it("shifts by calendar days across a month, a year and a leap day", () => {
+    expect(addLocalDays({ year: 2026, month: 1, day: 31 }, 1)).toEqual({ year: 2026, month: 2, day: 1 });
+    expect(addLocalDays({ year: 2026, month: 12, day: 31 }, 1)).toEqual({ year: 2027, month: 1, day: 1 });
+    expect(addLocalDays({ year: 2026, month: 3, day: 1 }, -1)).toEqual({ year: 2026, month: 2, day: 28 });
+    expect(addLocalDays({ year: 2024, month: 3, day: 1 }, -1)).toEqual({ year: 2024, month: 2, day: 29 });
+  });
+
+  it("orders dates without ever building an instant", () => {
+    const earlier = { year: 2026, month: 8, day: 15 };
+    const later = { year: 2026, month: 8, day: 16 };
+    expect(compareLocalDates(earlier, later)).toBeLessThan(0);
+    expect(compareLocalDates(later, earlier)).toBeGreaterThan(0);
+    expect(compareLocalDates(earlier, { ...earlier })).toBe(0);
+    expect(compareLocalDates({ year: 2025, month: 12, day: 31 }, { year: 2026, month: 1, day: 1 }))
+      .toBeLessThan(0);
+  });
+
+  it("reads the date an instant falls on, in the user's zone and not the host's", () => {
+    // 2026-08-15T02:00Z is still the 14th in São Paulo and already the 15th in
+    // Sydney. A calendar that read the host's zone would put the same instant on
+    // two different days for two users.
+    const instant = new Date("2026-08-15T02:00:00Z");
+    expect(localDateOf(instant, "America/Sao_Paulo")).toEqual({ year: 2026, month: 8, day: 14 });
+    expect(localDateOf(instant, "Australia/Sydney")).toEqual({ year: 2026, month: 8, day: 15 });
+    expect(() => localDateOf(instant, "EST")).toThrow(/unsupported time zone/);
+  });
+
+  it("agrees with the instant-based contract on an ordinary day", () => {
+    // The two entry points must not be two implementations. Same day, same
+    // edges, asked both ways.
+    const zone = "America/Sao_Paulo";
+    const byInstant = localDayBounds(noonLocal(zone, 2026, 8, 15), zone);
+    const byDate = localDayBoundsForDate({ year: 2026, month: 8, day: 15 }, zone);
+    expect(byDate).toEqual(byInstant);
+  });
+
+  it("gives a named 23-hour day 23 hours, and a named 25-hour day 25", () => {
+    expect(localDayLengthHours(localDayBoundsForDate({ year: 2026, month: 3, day: 8 }, "America/New_York")))
+      .toBe(23);
+    expect(localDayLengthHours(localDayBoundsForDate({ year: 2026, month: 11, day: 1 }, "America/New_York")))
+      .toBe(25);
+    expect(localDayLengthHours(localDayBoundsForDate({ year: 2026, month: 10, day: 4 }, "Australia/Sydney")))
+      .toBe(23);
+    expect(localDayLengthHours(localDayBoundsForDate({ year: 2026, month: 4, day: 5 }, "Australia/Sydney")))
+      .toBe(25);
+  });
+
+  it("starts the day that has no local midnight when it genuinely starts", () => {
+    // `America/Santiago` springs forward AT midnight on 2026-09-06, so
+    // 00:00-00:59 never happens and the day begins at 01:00 local.
+    const bounds = localDayBoundsForDate({ year: 2026, month: 9, day: 6 }, "America/Santiago");
+    expect(localDayLengthHours(bounds)).toBe(23);
+    const startParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Santiago", hour: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(bounds.start));
+    expect(startParts.find((part) => part.type === "hour")?.value).toBe("01");
+  });
+
+  it("makes a week of days tile with no gap and no overlap, across a transition", () => {
+    const zone = "America/New_York";
+    const week = localRangeBounds({ year: 2026, month: 3, day: 2 }, 7, zone);
+    let cursor = { year: 2026, month: 3, day: 2 };
+    let edge = week.start;
+    for (let index = 0; index < 7; index += 1) {
+      const day = localDayBoundsForDate(cursor, zone);
+      expect(day.start).toBe(edge);
+      edge = day.end;
+      cursor = addLocalDays(cursor, 1);
+    }
+    expect(edge).toBe(week.end);
+  });
+
+  it("makes a week containing a spring-forward 167 hours, not 168", () => {
+    // The assertion that would have passed against a `start + 7 * 24h` range and
+    // is the reason the range is composed from its two ends.
+    const zone = "America/New_York";
+    const springWeek = localRangeBounds({ year: 2026, month: 3, day: 2 }, 7, zone);
+    expect((springWeek.end - springWeek.start) / (60 * 60 * 1000)).toBe(167);
+
+    const fallWeek = localRangeBounds({ year: 2026, month: 10, day: 26 }, 7, zone);
+    expect((fallWeek.end - fallWeek.start) / (60 * 60 * 1000)).toBe(169);
+
+    const ordinary = localRangeBounds({ year: 2026, month: 8, day: 10 }, 7, zone);
+    expect((ordinary.end - ordinary.start) / (60 * 60 * 1000)).toBe(168);
+  });
+
+  it("refuses a range of zero or a fractional number of days", () => {
+    for (const bad of [0, -1, 1.5, Number.NaN]) {
+      expect(() => localRangeBounds({ year: 2026, month: 8, day: 15 }, bad, "UTC")).toThrow();
+    }
+  });
+
+  it("starts a week on Monday, in both locales and every zone", () => {
+    // 2026-08-15 is a Saturday.
+    expect(startOfLocalWeek({ year: 2026, month: 8, day: 15 })).toEqual({ year: 2026, month: 8, day: 10 });
+    // A Sunday belongs to the week that began six days earlier, not to the next.
+    expect(startOfLocalWeek({ year: 2026, month: 8, day: 16 })).toEqual({ year: 2026, month: 8, day: 10 });
+    // A Monday is its own week start.
+    expect(startOfLocalWeek({ year: 2026, month: 8, day: 17 })).toEqual({ year: 2026, month: 8, day: 17 });
+    // And it crosses a month boundary without special-casing one.
+    expect(startOfLocalWeek({ year: 2026, month: 9, day: 2 })).toEqual({ year: 2026, month: 8, day: 31 });
   });
 });

@@ -459,17 +459,24 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
     }
   });
 
-  it("2M-METRICS-001: still ships no producer, which is why the migration comes first", () => {
-    /*
-     * The property that makes this pull request safe to merge before the
-     * calendar exists: the six names are admitted by the chain and emitted by
-     * nothing. Producers arrive after this is deployed and parity-verified.
-     *
-     * Scanned over application source only. The vocabulary declaration, the
-     * consumer, the guards and the pgTAP suite legitimately name these events.
-     */
-    const roots = ["src/features", "src/app", "src/lib"];
-    const offenders: string[] = [];
+  /**
+   * `2M-METRICS-001` — the producer census, which replaced the absence.
+   *
+   * Until migration 1 was deployed this asserted that **no** producer existed,
+   * and the plan said so: the six names were admitted by the chain and emitted
+   * by nothing. That assertion did its job and has been replaced rather than
+   * deleted, because "no producer yet" stops being true the moment the first
+   * slice ships one and a guard that asserted it forever would have to be
+   * disabled instead of moved.
+   *
+   * What survives is the property that actually matters and is durable: a
+   * producer may name only an event the **migration chain already admits**, on a
+   * **surface it already admits** — checked against the chain rather than
+   * against a list written here — and every event still waiting for its
+   * producer is named, so the remaining work is visible instead of assumed.
+   */
+  function producerSites(): Map<string, string[]> {
+    const found = new Map<string, string[]>();
     const walk = (relative: string) => {
       for (const entry of readdirSync(join(REPO, relative), { withFileTypes: true })) {
         const child = `${relative}/${entry.name}`;
@@ -478,15 +485,84 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
           continue;
         }
         if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+        // The vocabulary declaration is not a producer; a call site is.
         if (child === "src/features/product-analytics/contracts.ts") continue;
         const source = readFileSync(join(REPO, child), "utf8");
         for (const name of PHASE_2M_EVENTS) {
-          if (source.includes(`"${name}"`)) offenders.push(`${child} -> ${name}`);
+          if (!source.includes(`name: "${name}"`)) continue;
+          found.set(name, [...(found.get(name) ?? []), child]);
         }
       }
     };
-    for (const root of roots) walk(root);
-    expect(offenders, `a Phase 2M producer exists before its migration is deployed:\n${offenders.join("\n")}`)
-      .toEqual([]);
+    for (const root of ["src/features", "src/app", "src/lib"]) walk(root);
+    return found;
+  }
+
+  it("2M-METRICS-001: every producer names an event the deployed chain admits", () => {
+    const admittedNames = new Set(admittedValues("event_name"));
+    const producers = producerSites();
+    expect(admittedNames.size, "no vocabulary was extracted from the chain").toBeGreaterThan(30);
+    for (const [name, sites] of producers) {
+      expect(admittedNames.has(name), `${sites.join(", ")} emits '${name}', which the chain does not admit`)
+        .toBe(true);
+    }
+  });
+
+  it("2M-METRICS-001: every producer's surface is admitted too", () => {
+    // The half `202608090089` was written to correct: Phase 2K's names were
+    // admitted and its SURFACE was not, so every event was refused at the last
+    // real write path inside a `.catch(() => {})`.
+    const admittedSurfaces = new Set(admittedValues("surface"));
+    const producers = producerSites();
+    for (const [name, sites] of producers) {
+      for (const site of sites) {
+        const source = readFileSync(join(REPO, site), "utf8");
+        const block = source.slice(source.indexOf(`name: "${name}"`));
+        const surface = /surface:\s*"([a-z_]+)"/.exec(block)?.[1];
+        expect(surface, `${site} emits '${name}' without a literal surface`).toBeDefined();
+        expect(admittedSurfaces.has(surface!), `${site} emits '${name}' on the undeclared surface '${surface}'`)
+          .toBe(true);
+      }
+    }
+  });
+
+  it("names the events still waiting for a producer, so the remainder is visible", () => {
+    /*
+     * `2M-METRICS-003` closes only when all six have a real producer. This is
+     * the running tally, updated by the slice that ships each one — which makes
+     * a forgotten producer a failing diff rather than a closeout surprise.
+     *
+     * `calendar_viewed`   — slice 2M.1 part 2, SHIPPED
+     * `day_planned`       — slice 2M.2
+     * `day_review_opened` / `day_review_action_applied` — slice 2M.3
+     * `notification_consent_changed` — slice 2M.4a
+     * `notification_suppressed`      — slice 2M.4b
+     */
+    const producers = producerSites();
+    expect([...producers.keys()].sort()).toEqual(["calendar_viewed"]);
+    expect(producers.get("calendar_viewed"))
+      .toEqual(["src/features/product-analytics/interaction-events.tsx"]);
+  });
+
+  it("2M-METRICS-004: the shipped producer carries no date and no time", () => {
+    // The one place a calendar phase would leak a behavioural fingerprint, and
+    // the assertion is on the payload the producer actually builds rather than
+    // on the type that describes it.
+    const source = readFileSync(join(REPO, "src/features/product-analytics/interaction-events.tsx"), "utf8");
+    const block = source.slice(source.indexOf('name: "calendar_viewed"'));
+    const properties = /properties:\s*\{([^}]*)\}/.exec(block)?.[1] ?? "";
+    /*
+     * Compared as KEYS, never as substrings — which is the trap this
+     * repository has already stepped in once. Phase 2K's first draft scanned a
+     * property blob for `title` and fired on the enum *value*
+     * `normalized_exact_title`; the first draft of this assertion scanned for
+     * `at` and fired on `orientation`. A key list is the thing the requirement
+     * is about, so a key list is what gets checked.
+     */
+    const keys = properties.split(",").map((entry) => entry.split(":")[0].trim()).filter(Boolean);
+    expect(keys).toEqual(["orientation"]);
+    for (const forbidden of ["date", "anchor", "anchorDate", "time", "timezone", "at", "day"]) {
+      expect(keys, `the calendar producer carries a '${forbidden}' key`).not.toContain(forbidden);
+    }
   });
 });

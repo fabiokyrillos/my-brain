@@ -12,6 +12,7 @@
 @import "./files.css";
 @import "./costs.css";
 @import "./task-commands.css";
+@import "./calendar.css";
 /* After task-commands.css: the composer hosts `TaskCommandResult`, and the two
    rules that reach into it there are extended by selector rather than overridden
    by order — but a later import keeps the composer's own box winning if that

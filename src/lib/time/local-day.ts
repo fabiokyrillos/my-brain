@@ -199,3 +199,140 @@ export function startOfNextLocalDay(now: Date, timeZone: string): Date {
 export function localDayLengthHours(bounds: LocalDayBounds): number {
   return (bounds.end - bounds.start) / (60 * 60 * 1000);
 }
+
+/**
+ * A calendar date the user can name, as three numbers rather than a `Date`.
+ *
+ * `2M-CAL-004` puts the anchor in the URL, and a URL says `2026-08-15` — a
+ * *wall-clock date*, not an instant. Parsing it into a `Date` first would pick
+ * an instant before anybody had said in which zone, which is the mistake this
+ * whole module exists to stop being made a fourth time.
+ */
+export type LocalDate = {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+};
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parses `YYYY-MM-DD`, or returns `null`.
+ *
+ * Strict on purpose: `2026-8-5`, `2026-02-30` and `2026-13-01` are all refused
+ * rather than coerced, because a calendar that silently rounded a malformed
+ * anchor would answer a question the user did not ask — and `2M-CAL-005`
+ * requires an unparseable parameter to resolve to the *declared default*, which
+ * only the caller can supply.
+ */
+export function parseLocalDate(value: unknown): LocalDate | null {
+  if (typeof value !== "string") return null;
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Round-tripping through UTC rejects 2026-02-30 and 2026-04-31 without a
+  // month-length table, and without touching a zone.
+  const roundTrip = new Date(Date.UTC(year, month - 1, day));
+  if (
+    roundTrip.getUTCFullYear() !== year
+    || roundTrip.getUTCMonth() + 1 !== month
+    || roundTrip.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+/** `YYYY-MM-DD`, the only form an anchor takes in a URL or in copy. */
+export function formatLocalDate(date: LocalDate): string {
+  return `${String(date.year).padStart(4, "0")}-${String(date.month).padStart(2, "0")}-`
+    + `${String(date.day).padStart(2, "0")}`;
+}
+
+/** The calendar date `now` falls on, in `timeZone`. */
+export function localDateOf(now: Date, timeZone: string): LocalDate {
+  if (!isSupportedTimeZone(timeZone)) {
+    throw new Error(`unsupported time zone: ${String(timeZone)}`);
+  }
+  const instant = now.getTime();
+  if (!Number.isFinite(instant)) throw new Error("localDateOf received an invalid Date");
+  const parts = zonedParts(instant, timeZone);
+  return { year: parts.year, month: parts.month, day: parts.day };
+}
+
+/** `date` shifted by whole calendar days. Never by a fixed number of hours. */
+export function addLocalDays(date: LocalDate, days: number): LocalDate {
+  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+/** Whether `a` is before `b`, comparing calendar dates rather than instants. */
+export function compareLocalDates(a: LocalDate, b: LocalDate): number {
+  if (a.year !== b.year) return a.year - b.year;
+  if (a.month !== b.month) return a.month - b.month;
+  return a.day - b.day;
+}
+
+/**
+ * The bounds of a **named** local day — the calendar's unit of everything.
+ *
+ * This is `localDayBounds` asked about a date instead of about an instant, and
+ * it shares `startOfLocalDate` with it rather than reimplementing the rule. That
+ * matters: `phase-2m-local-day-guard.test.ts` fails the build on a fourth copy,
+ * and a calendar that resolved its own day boundaries would be exactly that.
+ *
+ * A 23-hour day is 23 hours here too, and a date whose local midnight does not
+ * exist starts at the first instant that does.
+ */
+export function localDayBoundsForDate(date: LocalDate, timeZone: string): LocalDayBounds {
+  if (!isSupportedTimeZone(timeZone)) {
+    throw new Error(`unsupported time zone: ${String(timeZone)}`);
+  }
+  const start = startOfLocalDate(date.year, date.month, date.day, timeZone);
+  const next = addLocalDays(date, 1);
+  const end = startOfLocalDate(next.year, next.month, next.day, timeZone);
+  return { start, end };
+}
+
+/**
+ * The bounds of a run of `dayCount` consecutive local days beginning at `date`.
+ *
+ * Composed from `localDayBoundsForDate` at both ends rather than multiplying a
+ * day length, so a week containing a transition is 167 or 169 hours long and the
+ * calendar's last column ends where the day genuinely does.
+ */
+export function localRangeBounds(
+  date: LocalDate,
+  dayCount: number,
+  timeZone: string,
+): LocalDayBounds {
+  if (!Number.isInteger(dayCount) || dayCount < 1) {
+    throw new Error(`localRangeBounds needs at least one day, received ${String(dayCount)}`);
+  }
+  return {
+    start: localDayBoundsForDate(date, timeZone).start,
+    end: localDayBoundsForDate(addLocalDays(date, dayCount - 1), timeZone).end,
+  };
+}
+
+/**
+ * The Monday-based week `date` belongs to.
+ *
+ * Monday rather than Sunday, and stated rather than assumed: the product's
+ * locales are `pt-BR` and `en`, whose conventions disagree — and a week that
+ * silently changed its first column with the locale would make a shared URL
+ * describe two different ranges (`2M-CAL-004`). One rule, both locales.
+ */
+export function startOfLocalWeek(date: LocalDate): LocalDate {
+  const utc = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  // `getUTCDay()` is 0 for Sunday; Monday-based offset puts Sunday six days in.
+  const offset = (utc.getUTCDay() + 6) % 7;
+  return addLocalDays(date, -offset);
+}

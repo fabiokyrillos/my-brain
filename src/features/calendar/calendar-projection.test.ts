@@ -1,0 +1,342 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+import { DEFAULT_CALENDAR_LANES, type CalendarLane, type CalendarQuery } from "./calendar-query";
+
+type Result = { data: unknown; error: unknown };
+
+type ItemView = {
+  id: string;
+  lane: CalendarLane;
+  commitment: string;
+  at: string;
+  date: string;
+  title: string | null;
+  sensitivity: { kind: string; level?: string };
+  href: string | null;
+  elapsed: boolean;
+};
+
+type ProjectionResult = {
+  days: readonly { date: string; isToday: boolean; items: readonly ItemView[] }[];
+  failedLanes: readonly { lane: CalendarLane }[];
+  itemCount: number;
+  timezone: string;
+  rangeStart: { year: number; month: number; day: number };
+  rangeEnd: { year: number; month: number; day: number };
+};
+
+type ProjectionModule = {
+  loadCalendarProjection?: (supabase: unknown, input: Record<string, unknown>) => Promise<ProjectionResult>;
+};
+
+const modulePath = `./${"calendar-projection"}.ts`;
+const projection = await vi.importActual<ProjectionModule>(modulePath)
+  .catch(() => ({})) as ProjectionModule;
+
+/**
+ * A table-addressed stub.
+ *
+ * Keyed by table AND by which column the query filtered on, because `tasks` is
+ * read **twice** — once for `due_at` and once for `planned_at` — and a stub that
+ * answered the same rows to both would make the deadline and intention lanes
+ * indistinguishable, which is the one thing these tests are about.
+ */
+function client(tables: Record<string, Result | ((column: string, select: string) => Result)>) {
+  return {
+    from(table: string) {
+      const entry = tables[table] ?? { data: [], error: null };
+      let column = "";
+      let select = "";
+      const stub: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "in", "lt", "gte", "neq", "not", "is", "order", "range"]) {
+        stub[method] = vi.fn((first: unknown) => {
+          if (method === "select" && typeof first === "string") select = first;
+          if ((method === "gte" || method === "lt") && typeof first === "string" && !column) {
+            column = first;
+          }
+          return stub;
+        });
+      }
+      stub.then = (onFulfilled: (value: Result) => unknown, onRejected?: (reason: unknown) => unknown) => {
+        const result = typeof entry === "function" ? entry(column, select) : entry;
+        return Promise.resolve(result).then(onFulfilled, onRejected);
+      };
+      return stub;
+    },
+  };
+}
+
+/**
+ * The `entries` table is read **twice** and for two different questions: once as
+ * the suggestion lane, once as the owner-scoped classification map. Keying the
+ * stub on the select is what tells them apart — and the first draft that did
+ * not was how the projection's missing guard against an unreadable instant was
+ * found, because the classification rows reached the lane and had no date.
+ */
+function entriesStub(options: { levels?: Result; suggestions?: Result }) {
+  return (_column: string, select: string): Result => (
+    select.includes("sensitivity")
+      ? options.levels ?? { data: [], error: null }
+      : options.suggestions ?? { data: [], error: null }
+  );
+}
+
+const ZONE = "America/Sao_Paulo";
+const NOW = new Date("2026-08-15T15:00:00.000Z"); // 12:00 local
+const ANCHOR = { year: 2026, month: 8, day: 15 };
+
+function query(overrides: Partial<CalendarQuery> = {}): CalendarQuery {
+  return { orientation: "day", anchor: ANCHOR, lanes: DEFAULT_CALENDAR_LANES, ...overrides };
+}
+
+const load = (supabase: unknown, overrides: Partial<CalendarQuery> = {}) =>
+  projection.loadCalendarProjection!(supabase, {
+    userId: "user-1", locale: "pt-BR", timezone: ZONE, query: query(overrides), now: NOW,
+  });
+
+describe("2M-CAL-002: five lanes over sources that already exist", () => {
+  it("renders a deadline, an intention, a reminder, a review and a suggestion", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Entregar relatório", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [{ id: "t2", title: "Escrever rascunho", due_at: null, planned_at: "2026-08-15T13:00:00.000Z", status: "todo", source_entry_id: null }], error: null }),
+      reminders: { data: [{ id: "r1", title: "Ligar para a Ana", remind_at: "2026-08-15T20:00:00.000Z", status: "pending", entry_id: null, task_id: null }], error: null },
+      summaries: { data: [{ id: "s1", period_start: "2026-08-15T03:00:00.000Z", period_end: "2026-08-16T02:59:00.000Z", period_type: "daily" }], error: null },
+      entries: entriesStub({ suggestions: { data: [{ id: "e1", occurred_at: "2026-08-15T14:00:00.000Z", status: "ready" }], error: null } }),
+    }));
+
+    expect(result.days).toHaveLength(1);
+    const lanes = result.days[0].items.map((item) => item.lane);
+    expect([...lanes].sort()).toEqual(["deadline", "intention", "reminder", "review", "suggestion"]);
+    expect(result.itemCount).toBe(5);
+  });
+
+  it("derives commitment from the lane, and never paints an intention as a commitment", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Deadline", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [{ id: "t2", title: "Intention", due_at: null, planned_at: "2026-08-15T13:00:00.000Z", status: "todo", source_entry_id: null }], error: null }),
+    }));
+    const byLane = Object.fromEntries(result.days[0].items.map((item) => [item.lane, item.commitment]));
+    expect(byLane.deadline).toBe("committed");
+    expect(byLane.intention).toBe("intended");
+    expect(byLane.intention).not.toBe(byLane.deadline);
+  });
+
+  it("shows no cancelled or completed work, so an empty day means nothing is scheduled", async () => {
+    // The status filter is what makes "empty" mean something, and it is asserted
+    // on the query rather than on the result -- a stub returns whatever it is
+    // told, so the only honest check is which statuses were asked for.
+    const statuses: unknown[] = [];
+    const supabase = {
+      from() {
+        const stub: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "in", "lt", "gte", "order", "range"]) {
+          stub[method] = vi.fn((first: unknown, second: unknown) => {
+            if (method === "in" && first === "status") statuses.push(second);
+            return stub;
+          });
+        }
+        stub.then = (onFulfilled: (value: Result) => unknown) =>
+          Promise.resolve({ data: [], error: null }).then(onFulfilled);
+        return stub;
+      },
+    };
+    await load(supabase);
+    for (const asked of statuses) {
+      expect(asked).not.toContain("cancelled");
+      expect(asked).not.toContain("completed");
+    }
+    expect(statuses.length).toBeGreaterThan(0);
+  });
+});
+
+describe("2M-CAL-011: a lane that fails is named, and the rest still render", () => {
+  it("keeps the other lanes and reports the failure rather than showing an empty day", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Survives", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+      reminders: { data: null, error: { message: "boom" } },
+    }));
+    expect(result.failedLanes.map((failure) => failure.lane)).toEqual(["reminder"]);
+    expect(result.days[0].items.map((item) => item.lane)).toEqual(["deadline"]);
+  });
+
+  it("reports nothing when every lane succeeded and the day is genuinely empty", async () => {
+    const result = await load(client({}));
+    expect(result.failedLanes).toEqual([]);
+    expect(result.itemCount).toBe(0);
+    expect(result.days[0].items).toEqual([]);
+  });
+
+  it("reports a lane whose row carries an unreadable instant, rather than dropping it", async () => {
+    /*
+     * Every column read is `not null` in the schema, so this should be
+     * impossible — and "should be impossible" is the class of assumption that
+     * takes a surface down. The honest behaviour is the same as a failed read:
+     * the lane is named, the others render, and the day does not quietly look
+     * emptier than it is.
+     *
+     * This case is here because the first draft of this file found it: the
+     * classification rows reached the suggestion lane and had no date, and the
+     * projection threw rather than degrading.
+     */
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Survives", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+      reminders: { data: [{ id: "r1", title: "Broken", remind_at: "not-an-instant", status: "pending", entry_id: null, task_id: null }], error: null },
+    }));
+    expect(result.failedLanes.map((failure) => failure.lane)).toEqual(["reminder"]);
+    expect(result.days[0].items.map((item) => item.lane)).toEqual(["deadline"]);
+    expect(result.itemCount).toBe(1);
+  });
+
+  it("never reports a lane the user did not ask for", async () => {
+    const result = await load(
+      client({ reminders: { data: null, error: { message: "boom" } } }),
+      { lanes: ["deadline"] },
+    );
+    expect(result.failedLanes).toEqual([]);
+  });
+});
+
+describe("2M-PRIVACY-001/-003/-005: both subjects derive, and absence is most protective", () => {
+  it("derives a task's level from its source entry", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Sensitive", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: "e-secret" }], error: null }
+        : { data: [], error: null }),
+      entries: entriesStub({ levels: { data: [{ id: "e-secret", sensitivity: "highly_sensitive" }], error: null } }),
+    }));
+    expect(result.days[0].items[0].sensitivity).toEqual({ kind: "derived", level: "highly_sensitive" });
+  });
+
+  it("derives a REMINDER's level through reminders.entry_id — OD-2M-1 option A", async () => {
+    // The finding the audit made and nobody had acted on. Without this a
+    // calendar would mask a task title and print the reminder title beside it.
+    const result = await load(client({
+      reminders: { data: [{ id: "r1", title: "Consulta", remind_at: "2026-08-15T18:00:00.000Z", status: "pending", entry_id: "e-secret", task_id: null }], error: null },
+      entries: entriesStub({ levels: { data: [{ id: "e-secret", sensitivity: "highly_sensitive" }], error: null } }),
+    }), { lanes: ["reminder"] });
+    expect(result.days[0].items[0].lane).toBe("reminder");
+    expect(result.days[0].items[0].sensitivity).toEqual({ kind: "derived", level: "highly_sensitive" });
+  });
+
+  it("takes the most protective level when a source is absent from the map", async () => {
+    // Removed, foreign and unreadable are one thing here, and there is no
+    // branch that could tell a reader which (`2M-PRIVACY-003`).
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Orphan", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: "e-gone" }], error: null }
+        : { data: [], error: null }),
+      entries: entriesStub({ levels: { data: [], error: null } }),
+    }));
+    expect(result.days[0].items[0].sensitivity).toEqual({ kind: "derived", level: "highly_sensitive" });
+  });
+
+  it("fails closed when the classification read itself fails", async () => {
+    // An unreadable map is an EMPTY map, not an absent question: every item
+    // resolves to the most protective level rather than to `undetermined`.
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Unknown", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: "e-1" }], error: null }
+        : { data: [], error: null }),
+      entries: entriesStub({ levels: { data: null, error: { message: "boom" } } }),
+    }));
+    expect(result.days[0].items[0].sensitivity).toEqual({ kind: "derived", level: "highly_sensitive" });
+  });
+
+  it("leaves a manual task undetermined, and never reads that as normal", async () => {
+    // `2M-PRIVACY-002`. `undetermined` carries no `level` field at all, which is
+    // what stops "never classified" decaying into "normal" by a destructure.
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "Manual", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+    }));
+    expect(result.days[0].items[0].sensitivity).toEqual({ kind: "undetermined" });
+    expect(result.days[0].items[0].sensitivity).not.toHaveProperty("level");
+  });
+
+  it("renders no title at all for the two lanes that have no user text", async () => {
+    const result = await load(client({
+      summaries: { data: [{ id: "s1", period_start: "2026-08-15T13:00:00.000Z", period_end: "2026-08-15T20:00:00.000Z", period_type: "daily" }], error: null },
+      entries: entriesStub({ suggestions: { data: [{ id: "e1", occurred_at: "2026-08-15T14:00:00.000Z", status: "ready" }], error: null } }),
+    }), { lanes: ["review", "suggestion"] });
+    for (const item of result.days[0].items) expect(item.title).toBeNull();
+  });
+
+  it("counts everything, masked or not, so a count is never an oracle", async () => {
+    // `2M-PRIVACY-006`.
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [
+          { id: "t1", title: "Open", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null },
+          { id: "t2", title: "Masked", due_at: "2026-08-15T19:00:00.000Z", planned_at: null, status: "todo", source_entry_id: "e-secret" },
+        ], error: null }
+        : { data: [], error: null }),
+      entries: entriesStub({ levels: { data: [{ id: "e-secret", sensitivity: "highly_sensitive" }], error: null } }),
+    }));
+    expect(result.itemCount).toBe(2);
+    expect(result.days[0].items).toHaveLength(2);
+  });
+});
+
+describe("2M-TIME-002/-003: the range is the local-day contract's, never the host's", () => {
+  it("builds one column per day and marks today", async () => {
+    const result = await load(client({}), { orientation: "week", anchor: ANCHOR });
+    expect(result.days).toHaveLength(7);
+    // 2026-08-15 is a Saturday, so a Monday-based week runs the 10th to the 16th.
+    expect(result.days[0].date).toBe("2026-08-10");
+    expect(result.days[6].date).toBe("2026-08-16");
+    expect(result.days.filter((day) => day.isToday).map((day) => day.date)).toEqual(["2026-08-15"]);
+  });
+
+  it("puts an item on the day it falls on in the USER's zone", async () => {
+    // 2026-08-16T02:00Z is still the 15th in São Paulo. A calendar that grouped
+    // by the ISO string's date would put it on the 16th for everybody.
+    const result = await load(client({
+      reminders: { data: [{ id: "r1", title: "Late", remind_at: "2026-08-16T02:00:00.000Z", status: "pending", entry_id: null, task_id: null }], error: null },
+    }), { lanes: ["reminder"] });
+    expect(result.days[0].date).toBe("2026-08-15");
+    expect(result.days[0].items).toHaveLength(1);
+  });
+
+  it("refuses an unsupported zone rather than defaulting to one", async () => {
+    await expect(projection.loadCalendarProjection!(client({}), {
+      userId: "user-1", locale: "pt-BR", timezone: "EST", query: query(), now: NOW,
+    })).rejects.toThrow(/unsupported time zone/);
+  });
+
+  it("marks an item elapsed from the server clock, never the browser's", async () => {
+    const result = await load(client({
+      reminders: { data: [
+        { id: "past", title: "Past", remind_at: "2026-08-15T10:00:00.000Z", status: "pending", entry_id: null, task_id: null },
+        { id: "future", title: "Future", remind_at: "2026-08-15T20:00:00.000Z", status: "pending", entry_id: null, task_id: null },
+      ], error: null },
+    }), { lanes: ["reminder"] });
+    const byId = Object.fromEntries(result.days[0].items.map((item) => [item.id, item.elapsed]));
+    expect(byId["reminder:past"]).toBe(true);
+    expect(byId["reminder:future"]).toBe(false);
+  });
+});
+
+describe("2M-CAL-008: opening an item goes to the surface that already exists", () => {
+  it("links a task to its Work detail and a reminder to Reminders", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at"
+        ? { data: [{ id: "t1", title: "T", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null }], error: null }
+        : { data: [], error: null }),
+      reminders: { data: [{ id: "r1", title: "R", remind_at: "2026-08-15T19:00:00.000Z", status: "pending", entry_id: null, task_id: null }], error: null },
+    }), { lanes: ["deadline", "reminder"] });
+    const byLane = Object.fromEntries(result.days[0].items.map((item) => [item.lane, item.href]));
+    expect(byLane.deadline).toBe("/pt-BR/app/work/t1");
+    expect(byLane.reminder).toBe("/pt-BR/app/reminders");
+    // No calendar-owned detail route: `2M-CAL-008` requires the existing one.
+    for (const href of Object.values(byLane)) expect(href).not.toContain("/app/calendar/");
+  });
+});

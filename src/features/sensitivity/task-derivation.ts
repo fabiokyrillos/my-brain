@@ -125,6 +125,42 @@ export function deriveTaskSensitivity(
 }
 
 /**
+ * `2M-PRIVACY-005`, OD-2M-1 option A — a **reminder's** classification, derived
+ * by the same mechanism through `reminders.entry_id`.
+ *
+ * ## Why this is an alias and not a second implementation
+ *
+ * `reminders.entry_id uuid references public.entries(id)` is the same
+ * relationship `tasks.source_entry_id` is: a nullable pointer at the entry a row
+ * came from. The audit's finding was not that reminders needed a *different*
+ * rule — it was that **nobody had applied the existing one**. So this delegates
+ * rather than reimplementing, and the three outcomes are identical by
+ * construction:
+ *
+ *   - a reminder with a readable source → the source's **current** level;
+ *   - a reminder whose source is absent from the owner-scoped map → the **most
+ *     protective** level, with no branch distinguishing removed from foreign
+ *     from unreadable (`2M-PRIVACY-003`);
+ *   - a reminder created by hand, with no `entry_id` → `undetermined`, which
+ *     carries no level to misread (`2M-PRIVACY-002`).
+ *
+ * A separate function rather than reusing the task name at the call site,
+ * because a reader of `calendar-projection.ts` should be able to see *which*
+ * relationship is being consulted — and because a future divergence, if one is
+ * ever justified, has a place to happen visibly instead of by adding a parameter
+ * to the task path.
+ *
+ * **Nothing is persisted.** `reminders` has no classification column, this adds
+ * none, and OD-2L-1 B forbids one (`2M-PRIVACY-004`).
+ */
+export function deriveReminderSensitivity(
+  entryId: string | null | undefined,
+  readableSourceLevels: ReadonlyMap<string, string | null>,
+): TaskSensitivity {
+  return deriveTaskSensitivity(entryId, readableSourceLevels);
+}
+
+/**
  * Narrows an unvalidated value back to the contract, **fail-closed**.
  *
  * A `TaskSensitivity` crosses one boundary that TypeScript does not watch: the
@@ -182,4 +218,30 @@ export function resolveTaskContent(
     return { show: true, masked: false, revealable: false };
   }
   return resolveContent("work", sensitivity.level, key, state);
+}
+
+/**
+ * `2M-PRIVACY-001` — the same question, asked for the **calendar** surface.
+ *
+ * A second function rather than a `surface` parameter on the one above, for the
+ * reason `sensitivity-convergence.test.ts` enforces: the literal surface names
+ * live in **this module and nowhere else**, so a guard can assert that no
+ * surface answers for itself by grepping for `resolveContent("<name>"`. A
+ * parameter would move the literal to every call site and make that check
+ * impossible to write.
+ *
+ * The `undetermined` arm is identical and deliberately does not consult a rule:
+ * a manual task or a hand-made reminder has no source, and OD-2L-1 B says that
+ * absence is never *inferred* to mean `normal`. The rendered result matches
+ * `normal`'s; the reasoning must not.
+ */
+export function resolveCalendarContent(
+  sensitivity: TaskSensitivity,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  if (!isDerivedLevel(sensitivity)) {
+    return { show: true, masked: false, revealable: false };
+  }
+  return resolveContent("calendar", sensitivity.level, key, state);
 }

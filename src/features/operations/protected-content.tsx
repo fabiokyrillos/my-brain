@@ -35,10 +35,32 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { NO_REVEALS } from "@/features/sensitivity/contracts";
-import { resolveTaskContent, type TaskSensitivity } from "@/features/sensitivity/task-derivation";
+import {
+  resolveCalendarContent,
+  resolveTaskContent,
+  type TaskSensitivity,
+} from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
 
 import { getWorkCopy } from "./copy";
+
+/**
+ * The governed surfaces this component can render for.
+ *
+ * `2M-PRIVACY-001` adds the calendar, and it is the same component rather than a
+ * second one for the reason the header gives: a convergence maintained by two
+ * components each remembering the rule is a convergence one refactor away from
+ * ending. The *resolver* differs per surface — the surface literals live in
+ * `task-derivation.ts` and nowhere else — while the mask, the reveal and the
+ * accessible name stay identical, which is what makes "a masked title looks the
+ * same everywhere" true rather than a coincidence.
+ */
+export type ProtectedSurface = "work" | "calendar";
+
+const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
+  work: resolveTaskContent,
+  calendar: resolveCalendarContent,
+};
 
 export function ProtectedContent({
   children,
@@ -47,6 +69,7 @@ export function ProtectedContent({
   locale,
   revealKey,
   sensitivity,
+  surface = "work",
 }: {
   /** What the surface would have rendered. Never read here, only withheld or passed through. */
   children: ReactNode;
@@ -74,11 +97,13 @@ export function ProtectedContent({
   /** Unique per item, so one reveal cannot leak into another. */
   revealKey: string;
   sensitivity: TaskSensitivity;
+  /** Which governed surface is asking. Defaults to `work`, which shipped first. */
+  surface?: ProtectedSurface;
 }) {
   const copy = getWorkCopy(locale).protected;
   const [revealed, setRevealed] = useState(false);
 
-  const content = resolveTaskContent(
+  const content = RESOLVER[surface](
     sensitivity,
     revealKey,
     revealed ? { revealed: new Set([revealKey]) } : NO_REVEALS,

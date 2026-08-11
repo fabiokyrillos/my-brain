@@ -70,7 +70,12 @@ describe("navigation capabilities", () => {
       // members. Declared order is rendered order, so this pins both.
       { key: "context", items: ["projects", "people", "organizations", "contexts", "memories", "files"] },
       { key: "reflection", items: ["reviews", "questions"] },
-      { key: "organization", items: ["reminders"] },
+      // `2M-CAL-001` puts the calendar here rather than among the primaries:
+      // `2I-SHELL-001` pins those four as a delivered baseline, and promoting a
+      // destination into the rail is an IA decision Phase 2M was not authorized
+      // to make. It leads the group because a calendar is the surface a reminder
+      // appears *on*.
+      { key: "organization", items: ["calendar", "reminders"] },
       { key: "transparency", items: ["history", "costs"] },
       { key: "preferences", items: ["settings"] },
     ]);
