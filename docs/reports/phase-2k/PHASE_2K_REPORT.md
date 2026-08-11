@@ -4,6 +4,8 @@
 
 **The phase reached closeout with its telemetry inert on the deployed project.** The probe run immediately after deploying `202608090088` found that every Conversar event was refused `22023 Unsupported product surface` by a hardcoded surface allowlist inside `private.record_product_event`, inside producers that swallow the failure. The owner then authorized **one exclusively corrective migration outside this phase's budget** — `202608090089`, which **deletes** that copy rather than adding to it. It is charged to **no phase**, and in particular not to the roadmap successor, which has not started. §7a carries the full record; it is deliberately not smoothed away.
 
+**A second correction was appended on 2026-08-11 and it moves a row downward.** Phase 2M found that this phase's **declared consumer** for `2K-METRICS-007` could never have executed — it read a ledger column that does not exist and authenticated through a grant Turnstile has refused since SH.5. The row is now **`partial`**, the classification counts are regenerated from source, and **no historical execution is claimed**. §7b carries it.
+
 **What the phase set out to do.** Not "build conversational actions" — the audit proved those largely existed. **Make the conversation truthful about itself, and stop destroying pending work when the user goes to check.**
 
 ---
@@ -22,26 +24,27 @@ This is the failure the traceability contract was written against, in its own wo
 
 ## 2. Classification
 
-**67 built · 9 baseline · 3 partial · 0 not-built-by-rule in the declared set · 0 undelivered · 0 unclassified.**
+**66 built · 9 baseline · 4 partial · 0 not-built-by-rule in the declared set · 0 undelivered · 0 unclassified.**
 
-**These numbers are emitted, never typed.** At closeout the same generator read **64 built · 6 partial**; three rows moved after the post-phase correction was deployed and proved hosted — `2K-METRICS-004`, `2K-METRICS-007` and `2K-SUGG-005`. Nothing was reclassified by editing a number.
+**These numbers are emitted, never typed.** At closeout the same generator read **64 built · 6 partial**; three rows moved after the post-phase correction was deployed and proved hosted — `2K-METRICS-004`, `2K-METRICS-007` and `2K-SUGG-005` — and the reading became **67 built · 9 baseline · 3 partial**. **On 2026-08-11 one row moved back**: `2K-METRICS-007` was reclassified **`built` → `partial`** after Phase 2M found that this phase's declared consumer could never have executed. §7b carries the correction. Nothing was reclassified by editing a number, in either direction.
 
 Every row is in `PHASE_2K_TRACEABILITY_MATRIX.md`, emitted by a generator that refuses to write anything when a requirement is unclassified, classified twice, classified without a resolvable citation, or classified in a way that contradicts a signed decision. It refused four times on real findings before it emitted.
 
-### The three partials that remain, each with its remainder and destination
+### The four partials that remain, each with its remainder and destination
 
 | Id | Remainder | Destination |
 |---|---|---|
 | `2K-AUDIT-002` | The prose a zero-source answer produces | Narrowed by 2K.4 to what the provider *says*; carried past close |
 | `2K-EXPL-007` | An interpretation-correction domain — a record, a consumer, a surface | The roadmap successor's own audit |
 | `2K-A11Y-007` | A real-device mobile session | Carried past close, same standing as G-2J.4b |
+| `2K-METRICS-007` | One execution of the repaired consumer against the deployed project, on a real owner session | A post-phase obligation in `docs/TODO.md`; the repair itself is Phase 2M's and is charged to no phase. §7b |
 
 ### The three that closed after the phase, and what each was actually waiting on
 
 | Id | What it was waiting on | How it closed |
 |---|---|---|
 | `2K-METRICS-004` | The **surface** allowlist in `private.record_product_event` — a third live gate the probe found, plus an undersized table CHECK the writer's copy was masking | `202608090089` **deleted** the writer's copy and widened the CHECK, preserving `22023` with no second list |
-| `2K-METRICS-007` | The producer was **inert** on the deployed project | A hosted producer→consumer proof, **13/13**, after the correction was deployed |
+| `2K-METRICS-007` | The producer was **inert** on the deployed project | A hosted producer→consumer proof, **13/13**, after the correction was deployed. **Superseded on 2026-08-11 and moved back to `partial`** — the writer-side and RLS evidence stands, but the proof reached the aggregation through a query written for the occasion, and the *declared* consumer could never have executed. §7b |
 | `2K-SUGG-005` | **Not "pending wiring".** 2K.8 wired the event; what outlived that was the **global writer refusal**, a defect in `private.record_product_event` rather than in this requirement | Same correction, same hosted proof |
 
 ### 2K.7 — not built, by rule
@@ -156,7 +159,38 @@ Recorded because the pattern is the point: **most were in guards, probes and too
 
 **The regression that could not have caught it now does.** `post_2j_product_event_write_path.sql` was **extended from 20 to 29 assertions**, never weakened and never duplicated, with the surface vocabulary derived from the CHECK at test time. It plants the historical gate to prove the refusal returns and restores it to prove it disappears, and asserts from the catalog that the writer names **no** declared surface.
 
-**Proved on the deployed project, 13/13**, through the authenticated write path, read back under the owner's own RLS session, aggregated by the real consumer, with non-vacuous negative controls exercised on a **valid** surface and zero residue. No BYOK credential, no provider call, no signup. Full table in `PHASE_2K_SLICE_08_ACCEPTANCE.md` and `PHASE_2K_DEPLOYMENT.md`.
+**Proved on the deployed project, 13/13**, through the authenticated write path, read back under the owner's own RLS session, aggregated by the real consumer, with non-vacuous negative controls exercised on a **valid** surface and zero residue. No BYOK credential, no provider call, no signup. Full table in `PHASE_2K_SLICE_08_ACCEPTANCE.md` and `PHASE_2K_DEPLOYMENT.md`. **One clause of that sentence was corrected on 2026-08-11 — see §7b.**
+
+## 7b. The declared consumer could never have executed (appended 2026-08-11)
+
+**§7a stands. This section neither revises it nor closes anything; it records a defect found after the phase and moves one requirement downward because of it.**
+
+### The fact, and when it was found
+
+**Discovered on 2026-08-11, during Phase 2M**, by running a probe rather than reading it. `scripts/phase-2k-conversation-funnel-reader.mjs` — the consumer this phase *declared* for `2K-METRICS-007` — carried two independent, invocation-fatal defects:
+
+1. it selected, filtered and ordered by **`product_events.occurred_at`**, a column the ledger has never had. `202607170024:51` declares `created_at` and nothing else, so every invocation would have died on *"column product_events.occurred_at does not exist"*;
+2. it authenticated with **`grant_type=password`**, which hosted Turnstile has refused since SH.5 — four days before this phase closed.
+
+**So Phase 2K's declared consumer could not have executed at closeout, and it never was executed.**
+
+### What survives, stated precisely
+
+§7a's 13/13 stands. The events were accepted through the authenticated writer, read back under the owner's own RLS session, and aggregated by the real `aggregateConversationFunnel`, which has no defect and is unchanged. **What does not survive is one clause**: the rows reached that aggregation through a query written for the occasion, not through the consumer's own code path — which is exactly why the broken reader stayed invisible. A probe that reconstructs the path it is meant to exercise measures the reconstruction.
+
+So the half of `2K-METRICS-007` that says *a consumer exists* — something an owner can run to ask a question of the events — **was not true**, and the phase closed saying it was.
+
+### What changed here, and what deliberately did not
+
+- **`2K-METRICS-007`: `built` → `partial`.** Remainder: one execution of the repaired reader against the deployed project, on a real owner session. Destination: `docs/TODO.md`, carried past close. Counts regenerated from the slice record, never typed — **66 built · 9 baseline · 4 partial**.
+- **No historical execution is claimed or invented.** The requirement is not closed by a later repair.
+- **The repair is Phase 2M's**, landed in PR #169 (merge `611dd01`, commit `d456571`): `created_at`, and `--access-token` in place of the password grant. **It is charged to no phase, and Phase 2K is not credited with it.**
+- **The repaired reader has still not been run.** Corrected and executable is not executed.
+- **The budget is not reclassified**: `1 allocated · 1 spent`, `202608090089` still charged to no phase. This correction spends nothing and deploys nothing; hosted parity is untouched by it.
+
+### The lesson, which is this phase's own lesson one level up
+
+**A producer with no consumer is invisible on both sides** — ADR-084, which this phase quoted while closing. Here the *consumer* was the invisible half, and every guard over it was true of a file that could not run: `phase-2k-telemetry-guard.test.ts` asserted the reader's shape thoroughly and could not assert its executability. `2E-ANALYTICS-006` stopped the probes **drifting**; nothing stopped them being **abandoned**. The structural half is now guarded — `phase-2m-telemetry-guard.test.ts` derives the ledger's real columns from the create-table migration and fails any consumer that reads one the table does not have — and the other half is not structural: only running it proves it runs.
 
 ## 8. Posture at close
 

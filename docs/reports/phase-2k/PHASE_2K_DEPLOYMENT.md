@@ -1,6 +1,6 @@
 # Phase 2K — deployment record
 
-**The single authorized migration was deployed, and the telemetry it carried was INERT on the deployed project. This record said so then and still says so.** §8, appended after the owner's decision, records the extraordinary correction that made it operational.
+**The single authorized migration was deployed, and the telemetry it carried was INERT on the deployed project. This record said so then and still says so.** §8, appended after the owner's decision, records the extraordinary correction that made it operational. **§9, appended on 2026-08-11, records a second defect found afterwards — the declared consumer could never have executed — and reclassifies `2K-METRICS-007` downward because of it. Read §8 with §9.**
 
 **Date.** 2026-08-09. **Authorization.** ADR-101, for `202608090088` and nothing else. **Then, separately:** an owner decision of 2026-08-09 authorizing **one exclusively corrective migration, `202608090089`, outside Phase 2K's budget** — see §8.
 
@@ -181,3 +181,41 @@ Writes went through the **authenticated** `public.record_product_event`, the pat
 Screen reader; real-device mobile; hydrated interactivity; zero-source provider prose; authenticated online journeys. **None of these sessions was executed and none is claimed.** `2K-A11Y-007`, `2K-AUDIT-002` and `2K-EXPL-007` remain partial with their remainders and destinations unchanged.
 
 **Phase 2L is not started.** No successor phase is authorized, planned, or given artifacts. The rollout gate reads **25/3/2** and signup remains closed; this correction is not progress toward either.
+
+---
+
+## 9. The consumer half of §8.6 was proved around a broken script (appended 2026-08-11)
+
+**§1–§8 stand as written. This section does not revise them, and it does not close anything.** It records a defect discovered after the phase, and the one requirement status it moves — downward.
+
+### The fact
+
+**Phase 2K's declared consumer for `2K-METRICS-007` could never have executed**, on the day it was claimed or on any day before it. `scripts/phase-2k-conversation-funnel-reader.mjs` carried two independent, invocation-fatal defects:
+
+1. it selected, filtered and ordered by **`product_events.occurred_at`** — a column the ledger has never had. `202607170024:51` creates the table with `created_at` as its only timestamp, so every invocation would have died on *"column product_events.occurred_at does not exist"*;
+2. it signed in with **`grant_type=password`**, which hosted Turnstile has refused since SH.5 — four days before this phase closed. The endpoint answers `400 captcha_failed` for any scripted caller, which is SH-CAPTCHA-002 working as designed.
+
+Found on **2026-08-11, during Phase 2M**, by running the probe rather than reading it. The same two defects were in Phase 2M's own reader and in `scripts/remote-product-events-smoke.mjs`, which had been unrunnable since `202608070081`.
+
+### What §8.6 actually proved, restated precisely
+
+Everything in §8.6's table happened. The events were written through the authenticated `public.record_product_event`, read back under the owner's own RLS session, and aggregated by the **real** `aggregateConversationFunnel` — `scripts/phase-2k-conversation-funnel.mjs`, which has no defect and is unchanged to this day.
+
+**What it did not do is read through the consumer's own code path.** The rows reached the aggregation through a query the probe wrote for the occasion, which used `created_at` and therefore worked. That is precisely why the broken reader stayed invisible: the probe routed around the defect it should have exposed. A probe that reconstructs the path it is meant to exercise measures the reconstruction.
+
+### The status this section moves
+
+| Id | Status | Why |
+|---|---|---|
+| `2K-METRICS-007` | **built → partial** | Producer → writer → RLS-scoped aggregation is proved and stays proved. *A consumer exists* — something an owner can run to ask a question of the events — was **not** true at close. **Remainder:** one execution of the repaired reader against the deployed project, on a real owner session. **Destination:** a post-phase obligation in `docs/TODO.md` |
+
+Nothing else moves. `2K-METRICS-004`, `2K-METRICS-005`, `2K-METRICS-006` and `2K-METRICS-008` are unaffected: none of them claimed anything about the reader's executability, and §8.6's writer-side and residue evidence is untouched.
+
+Counts **regenerated from the slice record**, never typed: **79 declared · 79 classified — 66 built, 9 baseline, 4 partial.** The previous line, `67 built · 9 baseline · 3 partial` in §8.7, is left standing above as what was true then.
+
+### What is not claimed
+
+- **No historical execution is invented.** The reader was not run at closeout, is not recorded as having been run, and this section does not close the requirement on the strength of a later repair.
+- **The repair belongs to Phase 2M**, not to this phase. It landed in PR #169, merge `611dd01`, commit `d456571`, on 2026-08-11: `created_at` in place of `occurred_at`, and `--access-token` in place of the password grant.
+- **The repaired reader has still not been executed** against the deployed project. Corrected and executable is not executed.
+- **Phase 2K's budget is unchanged and is not reclassified:** `1 allocated · 1 spent`, with `202608090089` still charged to no phase. This correction spends nothing — no migration, no deployment, no hosted change. **Hosted parity is untouched by it.**
