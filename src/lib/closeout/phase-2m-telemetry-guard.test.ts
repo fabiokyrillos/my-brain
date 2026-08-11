@@ -187,11 +187,239 @@ describe("2M-AUDIT-002: the enforcement points are enumerated, not counted", () 
       .not.toMatch(/p_surface\s+(not\s+)?in\s*\(\s*'/);
   });
 
-  it("declares no calendar surface yet, because migration 1 has not been spent", () => {
-    // Slice 2M.1 changes this, and the change is a migration plus this line.
-    // Asserting the current state means the transition is visible as a decision
-    // rather than as a diff nobody read.
-    expect((productSurfaces as readonly string[]).includes("calendar")).toBe(false);
-    expect(admittedValues("surface")).not.toContain("calendar");
+  it("declares the calendar surface, and the migration chain admits it", () => {
+    /*
+     * This assertion was the inverse until migration 1 was spent: it read
+     * "declares no calendar surface yet, because migration 1 has not been
+     * spent", and the plan said the change would be "a migration plus this
+     * line". It is now that migration plus this line, so the transition is
+     * visible as a decision rather than as a diff nobody read.
+     *
+     * OD-2M-2 signed `calendar` as its own surface. `2M-PRIVACY-001` requires
+     * it to join `GOVERNED_SURFACES` in the same change that ships its first
+     * consumer, which is a **later** pull request — this one deliberately ships
+     * no producer and no surface.
+     */
+    expect((productSurfaces as readonly string[]).includes("calendar")).toBe(true);
+    expect(admittedValues("surface")).toContain("calendar");
+  });
+});
+
+/**
+ * `2M-METRICS-002` … `-005` — migration 1's own properties.
+ *
+ * The migration is `202608110090`. It widens the three database enforcement
+ * points in one file, and lands with the two application vocabularies and with
+ * **no producer**, which is `2M-METRICS-001`'s ordering.
+ */
+describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
+  const MIGRATION = "supabase/migrations/202608110090_phase_2m_daily_cycle_telemetry.sql";
+  const WRITE_PATH = "supabase/tests/post_2j_product_event_write_path.sql";
+  const FUNNEL = "scripts/phase-2m-daily-cycle-funnel.mjs";
+  const READER = "scripts/phase-2m-daily-cycle-funnel-reader.mjs";
+  const read = (path: string) => readFileSync(join(REPO, path), "utf8");
+
+  const PHASE_2M_EVENTS = [
+    "calendar_viewed",
+    "day_planned",
+    "day_review_opened",
+    "day_review_action_applied",
+    "notification_consent_changed",
+    "notification_suppressed",
+  ] as const;
+
+  /**
+   * Keys that could hold free text or a user-chosen value. None may appear on
+   * any Phase 2M event.
+   *
+   * The date and time entries are the ones this phase adds to the inherited
+   * list, and they are the point: a calendar phase is exactly where a
+   * `plannedDate` or an `anchorDate` would feel harmless, and it is a
+   * behavioural fingerprint — it says which days somebody works and which they
+   * protect.
+   */
+  const CONTENT_SHAPED = [
+    "title", "description", "name", "personName", "projectName", "text",
+    "content", "summary", "excerpt", "snippet", "label", "note", "query",
+    "date", "plannedDate", "anchorDate", "dueDate", "remindAt", "time",
+    "timezone", "endpoint", "subscription", "payload", "reviewText",
+  ];
+
+  it("declares all six events in the canonical application vocabulary", () => {
+    for (const name of PHASE_2M_EVENTS) {
+      expect(productEventNames as readonly string[], name).toContain(name);
+    }
+  });
+
+  it("carries the identical six into the migration's CHECK", () => {
+    const check = read(MIGRATION).match(/check \(event_name in \(([\s\S]*?)\n {2}\)\);/)?.[1] ?? "";
+    expect(check, "CHECK block not found").not.toBe("");
+    for (const name of PHASE_2M_EVENTS) {
+      expect(check, `${name} missing from the CHECK`).toContain(`'${name}'`);
+    }
+  });
+
+  it("carries them into the validator too — both live gates, in one file", () => {
+    const migration = read(MIGRATION);
+    const validator = migration.slice(
+      migration.indexOf("create or replace function private.validate_product_event_properties"),
+    );
+    for (const name of PHASE_2M_EVENTS) {
+      // Once in the key whitelist, once in the value check. A name in only one
+      // is a name the database would accept and then refuse, or accept
+      // unchecked.
+      expect(validator.split(`'${name}'`).length - 1, `${name} appears in only one case block`)
+        .toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("loses no pre-existing name to the re-declaration", () => {
+    // The failure mode a `create or replace` invites. Compared against the
+    // chain's own previous vocabulary, so it cannot pass by comparing a list
+    // against itself.
+    const migration = read(MIGRATION);
+    const inherited = admittedValues("event_name").filter(
+      (name) => !(PHASE_2M_EVENTS as readonly string[]).includes(name),
+    );
+    expect(inherited.length, "no inherited vocabulary was extracted").toBeGreaterThanOrEqual(33);
+    for (const name of inherited) {
+      expect(migration, `${name} lost from the migration`).toContain(`'${name}'`);
+    }
+  });
+
+  it("loses no pre-existing surface either", () => {
+    const migration = read(MIGRATION);
+    for (const surface of productSurfaces as readonly string[]) {
+      expect(migration, `${surface} lost from the surface CHECK`).toContain(`'${surface}'`);
+    }
+    expect(productSurfaces.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("2M-METRICS-004: declares only closed enums and one bounded count", () => {
+    const contracts = read("src/features/product-analytics/contracts.ts");
+    for (const name of PHASE_2M_EVENTS) {
+      const start = contracts.indexOf(`  ${name}: {`);
+      expect(start, `${name} property shape not found`).toBeGreaterThan(0);
+      const shape = contracts.slice(start, contracts.indexOf("};", start));
+      const fields = [...shape.matchAll(/^\s{4}(\w+):\s*(.+);$/gm)];
+      expect(fields.length, `${name} declares no fields`).toBeGreaterThan(0);
+      for (const [, field, type] of fields) {
+        // `itemCount` is this phase's only number, and it is bounded in three
+        // places: the type, `isBoundedInteger` in the parser, and
+        // `require_product_event_integer` in the database.
+        const bounded = field === "itemCount"
+          ? type.trim() === "number"
+          : /^(boolean|[A-Z]\w+)$/.test(type.trim()) || /^"[^"]+"(\s*\|\s*"[^"]+")*$/.test(type.trim());
+        expect(bounded, `${name}.${field} is "${type.trim()}", which is not a closed enum, a boolean or the bounded count`)
+          .toBe(true);
+      }
+    }
+  });
+
+  it("2M-METRICS-004: names no content-shaped KEY on any Phase 2M event", () => {
+    // Scanned per arm and only over the KEY WHITELIST: the requirement is about
+    // what a key can hold, and an enum VALUE that happens to read like a word
+    // is not a key.
+    const migration = read(MIGRATION);
+    for (const name of PHASE_2M_EVENTS) {
+      const arm = migration.match(
+        new RegExp(`when '${name}' then\\s*\\n\\s*allowed_keys := array\\[([^\\]]*)\\]`),
+      );
+      expect(arm, `${name} declares no key whitelist`).not.toBeNull();
+      const keys = (arm?.[1] ?? "").match(/'([^']+)'/g) ?? [];
+      expect(keys.length, `${name} whitelists no key`).toBeGreaterThan(0);
+      for (const key of CONTENT_SHAPED) {
+        expect(keys, `${name} admits a "${key}" key`).not.toContain(`'${key}'`);
+      }
+    }
+  });
+
+  it("fires on a planted date key, so the assertion above is not vacuous", () => {
+    const planted = "when 'day_planned' then\n      allowed_keys := array['operation', 'plannedDate'];";
+    const arm = planted.match(/when 'day_planned' then\s*\n\s*allowed_keys := array\[([^\]]*)\]/);
+    const keys = (arm?.[1] ?? "").match(/'([^']+)'/g) ?? [];
+    expect(keys).toContain("'plannedDate'");
+  });
+
+  it("2M-METRICS-002: proves every value through the REAL writer, with negative controls", () => {
+    const writePath = read(WRITE_PATH);
+    for (const name of PHASE_2M_EVENTS) {
+      expect(writePath, `${name} has no legal payload in the write-path suite`)
+        .toContain(`'${name}'`);
+    }
+    expect(writePath).toContain("all six Phase 2M daily-cycle events are written through the real public writer");
+    expect(writePath).toContain("PHASE 2M: the calendar surface is accepted by the real writer");
+    // Negative controls that are NOT vacuous: refused by the gate under test,
+    // on a valid surface and for a valid event name.
+    expect(writePath).toContain("a user-chosen date is refused");
+    expect(writePath).toContain("an orientation outside the declared three is refused on the calendar surface itself");
+    // Idempotency and owner scope.
+    expect(writePath).toContain("a repeated idempotency key records exactly once");
+    expect(writePath).toContain("the authenticated write is owned by the session identity, not by an argument");
+  });
+
+  it("2M-METRICS-003: a consumer exists, reads all six, and is RLS-scoped", () => {
+    const funnel = read(FUNNEL);
+    for (const name of PHASE_2M_EVENTS) {
+      expect(funnel, `the consumer does not read ${name}`).toContain(name);
+    }
+    const reader = read(READER);
+    expect(reader).toContain("signInWithPassword");
+    expect(reader).not.toMatch(/service_role|SERVICE_ROLE|serviceRoleKey/);
+    // Measuring must not perturb what is measured.
+    expect(reader).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(|record_product_event/);
+    // "Not deployed yet", "no producer yet" and "a quiet week" must be
+    // distinguishable, which is the confusion SH.6 stayed invisible inside.
+    expect(reader).toContain("process.exit(2)");
+    expect(reader).toContain("does not know the Phase 2M event vocabulary yet");
+    expect(funnel).toContain("unrecognised");
+  });
+
+  it("2M-METRICS-005: every declared event answers a question stated before it", () => {
+    // The four questions are written into the migration header and into the
+    // consumer, and each event is named beneath the one it answers. A seventh
+    // name would have no question to sit under.
+    const migration = read(MIGRATION);
+    const funnel = read(FUNNEL);
+    for (const source of [migration, funnel]) {
+      expect(source).toMatch(/Q1\./);
+      expect(source).toMatch(/Q2\./);
+      expect(source).toMatch(/Q3\./);
+      expect(source).toMatch(/Q4\./);
+    }
+    for (const name of PHASE_2M_EVENTS) {
+      expect(migration, `${name} is not named under a declared question`).toContain(name);
+    }
+  });
+
+  it("2M-METRICS-001: still ships no producer, which is why the migration comes first", () => {
+    /*
+     * The property that makes this pull request safe to merge before the
+     * calendar exists: the six names are admitted by the chain and emitted by
+     * nothing. Producers arrive after this is deployed and parity-verified.
+     *
+     * Scanned over application source only. The vocabulary declaration, the
+     * consumer, the guards and the pgTAP suite legitimately name these events.
+     */
+    const roots = ["src/features", "src/app", "src/lib"];
+    const offenders: string[] = [];
+    const walk = (relative: string) => {
+      for (const entry of readdirSync(join(REPO, relative), { withFileTypes: true })) {
+        const child = `${relative}/${entry.name}`;
+        if (entry.isDirectory()) {
+          walk(child);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+        if (child === "src/features/product-analytics/contracts.ts") continue;
+        const source = readFileSync(join(REPO, child), "utf8");
+        for (const name of PHASE_2M_EVENTS) {
+          if (source.includes(`"${name}"`)) offenders.push(`${child} -> ${name}`);
+        }
+      }
+    };
+    for (const root of roots) walk(root);
+    expect(offenders, `a Phase 2M producer exists before its migration is deployed:\n${offenders.join("\n")}`)
+      .toEqual([]);
   });
 });

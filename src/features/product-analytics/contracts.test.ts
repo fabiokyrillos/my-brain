@@ -52,6 +52,13 @@ const eventNames = [
   "conversation_answer_shown",
   "conversation_memory_resolved",
   "conversation_suggestion_shown",
+  // Phase 2M slice 2M.1. Four questions, six names, one reader.
+  "calendar_viewed",
+  "day_planned",
+  "day_review_opened",
+  "day_review_action_applied",
+  "notification_consent_changed",
+  "notification_suppressed",
 ] as const;
 
 const basePayload = {
@@ -125,10 +132,16 @@ const propertiesByEvent: Record<(typeof eventNames)[number], Record<string, unkn
   conversation_answer_shown: { evidence: "evidenced", explained: true },
   conversation_memory_resolved: { outcome: "undone" },
   conversation_suggestion_shown: { category: "person" },
+  calendar_viewed: { orientation: "week" },
+  day_planned: { operation: "set", itemCount: 3 },
+  day_review_opened: { scope: "day" },
+  day_review_action_applied: { scope: "next_day", actionKind: "carry_forward" },
+  notification_consent_changed: { channel: "push", state: "granted" },
+  notification_suppressed: { channel: "push", reason: "quiet_hours" },
 };
 
 describe("product analytics contracts", () => {
-  it("defines the complete closed taxonomy of thirty-three product events", () => {
+  it("defines the complete closed taxonomy of thirty-nine product events", () => {
     expect(contracts.productEventNames).toEqual(eventNames);
     expect(contracts.productSurfaces).toEqual([
       "home",
@@ -142,6 +155,8 @@ describe("product analytics contracts", () => {
       "server",
       "task_command",
       "conversation",
+      // Phase 2M slice 2M.1, OD-2M-2 — its own surface, never a `workView`.
+      "calendar",
     ]);
   });
 
@@ -301,6 +316,63 @@ describe("product analytics contracts", () => {
     expect(parse?.({ ...validCapture, answer: "resposta privada" })).toBeNull();
     expect(parse?.({ ...validCapture, prompt: "prompt privado" })).toBeNull();
     expect(parse?.({ ...validCapture, error: "erro bruto" })).toBeNull();
+  });
+
+  /**
+   * Phase 2M slice 2M.1, `2M-METRICS-004`.
+   *
+   * The parser is the first of the two gates. A calendar phase is exactly where
+   * a `plannedDate` or an `anchorDate` would feel harmless, so the refusal is
+   * asserted at the application boundary as well as in the database — a writer
+   * cannot smuggle one past the parser on its way to a validator that would
+   * also have refused it.
+   */
+  it("bounds every Phase 2M daily-cycle event, and gives a date nowhere to go", () => {
+    const parse = contracts.parseProductEventPayload;
+    const on = (name: string, properties: unknown) => parse?.({ ...basePayload, name, properties });
+
+    expect(on("calendar_viewed", { orientation: "day" })).not.toBeNull();
+    expect(on("calendar_viewed", { orientation: "month" })).toBeNull();
+    expect(on("calendar_viewed", { orientation: "day", anchorDate: "2026-08-12" })).toBeNull();
+
+    expect(on("day_planned", { operation: "set", itemCount: 1 })).not.toBeNull();
+    expect(on("day_planned", { operation: "cleared", itemCount: 50 })).not.toBeNull();
+    // OD-2L-4's ceiling, and the floor: zero items is not a planning action.
+    expect(on("day_planned", { operation: "set", itemCount: 51 })).toBeNull();
+    expect(on("day_planned", { operation: "set", itemCount: 0 })).toBeNull();
+    expect(on("day_planned", { operation: "moved", itemCount: 1 })).toBeNull();
+    expect(on("day_planned", { operation: "set", itemCount: 1, plannedDate: "2026-08-12" })).toBeNull();
+
+    expect(on("day_review_opened", { scope: "next_day" })).not.toBeNull();
+    expect(on("day_review_opened", { scope: "week" })).toBeNull();
+
+    expect(on("day_review_action_applied", { scope: "day", actionKind: "archive" })).not.toBeNull();
+    expect(on("day_review_action_applied", { scope: "day", actionKind: "cancel" })).toBeNull();
+    expect(on("day_review_action_applied", { scope: "day" })).toBeNull();
+
+    expect(on("notification_consent_changed", { channel: "push", state: "revoked" })).not.toBeNull();
+    expect(on("notification_consent_changed", { channel: "email", state: "revoked" })).toBeNull();
+    expect(on("notification_consent_changed", { channel: "push", state: "muted" })).toBeNull();
+    // The endpoint is the one value a subscription record could leak.
+    expect(on("notification_consent_changed", {
+      channel: "push", state: "granted", endpoint: "https://push.example/abc",
+    })).toBeNull();
+
+    expect(on("notification_suppressed", { channel: "push", reason: "daily_cap" })).not.toBeNull();
+    expect(on("notification_suppressed", { channel: "push", reason: "expired" })).toBeNull();
+    expect(on("notification_suppressed", { channel: "push", reason: "quiet_hours", title: "Reunião" })).toBeNull();
+  });
+
+  it("accepts the calendar surface, and still refuses one that was never declared", () => {
+    const parse = contracts.parseProductEventPayload;
+    const calendar = {
+      ...basePayload,
+      surface: "calendar",
+      name: "calendar_viewed",
+      properties: { orientation: "agenda" },
+    };
+    expect(parse?.(calendar)).not.toBeNull();
+    expect(parse?.({ ...calendar, surface: "planner" })).toBeNull();
   });
 
   it("accepts only JSON-serializable product data", () => {

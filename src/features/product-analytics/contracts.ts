@@ -111,6 +111,85 @@ export function toResolutionBucket(elapsedMs: number): ResolutionBucket {
   return "over_60s";
 }
 
+/* -------------------------------------------------------------------------- */
+/* Phase 2M slice 2M.1 — the daily-cycle vocabularies                          */
+/*                                                                            */
+/* Declared here as runtime literals so the producers, the validator and the   */
+/* funnel reader all narrow against one list. Every one is a closed enum;       */
+/* `plannedItemCount` below is the phase's only number, and it is bounded.      */
+/* -------------------------------------------------------------------------- */
+
+/** `2M-CAL-007`'s three orientations. Never the anchor date. */
+export const calendarOrientations = ["day", "week", "agenda"] as const;
+export type CalendarOrientation = (typeof calendarOrientations)[number];
+
+/**
+ * `2M-PLAN-002`. `cleared` exists because the phase closes the `clear_planned`
+ * asymmetry, and a funnel that could not see a removal would report planning as
+ * monotonic when it is not.
+ */
+export const planOperations = ["set", "cleared"] as const;
+export type PlanOperation = (typeof planOperations)[number];
+
+/**
+ * OD-2L-4's selection ceiling, reused rather than restated as a new limit.
+ * One is the single-item case; 50 is the bulk case's maximum.
+ */
+export const PLANNED_ITEM_COUNT_CEILING = 50 as const;
+
+/** `2M-REVIEW-001` and `-002` are two flows, and each is asked about separately. */
+export const dayReviewScopes = ["day", "next_day"] as const;
+export type DayReviewScope = (typeof dayReviewScopes)[number];
+
+/** The five operations `2M-REVIEW-003` enumerates, by the requirement's own names. */
+export const dayReviewActionKinds = [
+  "carry_forward",
+  "reschedule",
+  "plan",
+  "archive",
+  "follow_up",
+] as const;
+export type DayReviewActionKind = (typeof dayReviewActionKinds)[number];
+
+/**
+ * A closed enum of one, for the reason `rate_limit_refused.failureKind` is:
+ * `push` is the name of *this* control, and widening it later would mean the
+ * event had started reporting a different one. `2M-NOTIFY-005` requires the
+ * governance controls proved **per channel** rather than inherited, and a
+ * channel-less event could not support that reading.
+ */
+export const notificationChannels = ["push"] as const;
+export type NotificationChannel = (typeof notificationChannels)[number];
+
+/** `2M-NOTIFY-010`'s five distinguishable states, exactly. */
+export const notificationConsentStates = [
+  "granted",
+  "denied",
+  "revoked",
+  "unsupported",
+  "expired",
+] as const;
+export type NotificationConsentState = (typeof notificationConsentStates)[number];
+
+/**
+ * The six controls that can decide not to send.
+ *
+ * "Silenced" is not one number: a user who set quiet hours and a user who hit
+ * the daily cap have said different things, and `2M-NOTIFY-004`'s claim that
+ * every control has a consumer is only checkable if the ledger can tell them
+ * apart. `expired` is deliberately absent — an expired subscription is a
+ * consent-state transition, recorded once by `notification_consent_changed`.
+ */
+export const notificationSuppressionReasons = [
+  "quiet_hours",
+  "daily_cap",
+  "cooldown",
+  "duplicate",
+  "not_consented",
+  "type_muted",
+] as const;
+export type NotificationSuppressionReason = (typeof notificationSuppressionReasons)[number];
+
 export const productEventNames = [
   "capture_started",
   "capture_save_succeeded",
@@ -194,6 +273,38 @@ export const productEventNames = [
   "conversation_answer_shown",
   "conversation_memory_resolved",
   "conversation_suggestion_shown",
+  /*
+   * Phase 2M slice 2M.1. Six events, four questions, one reader.
+   *
+   * The questions were written down before any name was chosen, which is what
+   * `2M-METRICS-005` asks for:
+   *
+   *   Q1 is the calendar reached at all, and in which orientation?
+   *   Q2 how often is a plan made -- set or cleared, one item or many?
+   *   Q3 how often does a review produce an action, and which action?
+   *   Q4 how often is a notification silenced, and by which control? And do
+   *      people opt in and then revoke?
+   *
+   * Their consumer is `scripts/phase-2m-daily-cycle-funnel.mjs`. A seventh name
+   * nothing reads would be SH.6's failure wearing this phase's label.
+   *
+   * **There is no date and no time on any of them.** A calendar phase is
+   * exactly where an `anchorDate` or a `plannedDate` property would feel
+   * harmless, and it is the shape `2M-METRICS-004` names explicitly: a
+   * behavioural fingerprint that says which days somebody works and which they
+   * protect. `day_planned` records that a plan was made and how many items it
+   * touched, never which day.
+   *
+   * Migration `202608110090` carries the same six literals into the table
+   * CHECK and into `private.validate_product_event_properties`, and lands
+   * BEFORE any producer exists.
+   */
+  "calendar_viewed",
+  "day_planned",
+  "day_review_opened",
+  "day_review_action_applied",
+  "notification_consent_changed",
+  "notification_suppressed",
 ] as const;
 
 export type ProductEventName = (typeof productEventNames)[number];
@@ -231,6 +342,27 @@ export const productSurfaces = [
    * surface for the command console wherever it mounts.
    */
   "conversation",
+  /*
+   * Phase 2M slice 2M.1, OD-2M-2. Its own surface rather than a fold into
+   * `work`.
+   *
+   * OD-2L-2 A keeps Work at exactly three views, so attributing the calendar to
+   * `work` would both make "did anyone open the calendar" unanswerable from the
+   * ledger and describe it as a Work view -- which is the thing that decision
+   * refused. The daily planner and the day review are sub-routes of
+   * `/app/calendar` and attribute here too.
+   *
+   * The notification events carry `server` instead: they are emitted by the
+   * Server Action that writes a consent row and by the sender that decides not
+   * to send, neither of which happens on a browser surface. Inventing a
+   * `notifications` surface for them would be a vocabulary entry that lies
+   * about where the event happened.
+   *
+   * Migration `202608110090` carries this literal into
+   * `product_events_surface_check`, which has been the ONLY declaration of the
+   * surface vocabulary since `202608090089` deleted the writer's copy.
+   */
+  "calendar",
 ] as const;
 
 export type ProductSurface = (typeof productSurfaces)[number];
@@ -425,6 +557,51 @@ export type ProductEventPropertiesByName = {
    */
   conversation_suggestion_shown: {
     category: "person" | "project";
+  };
+  /**
+   * Q1. `2M-CAL-007`'s three orientations, and nothing else.
+   *
+   * Not the anchor date, not the visible lanes, not the item count. A
+   * calendar's anchor date is the single most fingerprinting value this phase
+   * could record, and it answers no declared question.
+   */
+  calendar_viewed: {
+    orientation: CalendarOrientation;
+  };
+  /**
+   * Q2. Whether an intention was set or removed, and how many items one action
+   * touched.
+   *
+   * `itemCount` is this phase's only number. It is a count of *affected items*,
+   * bounded by OD-2L-4's ceiling of 50 — never a date, never a duration, and it
+   * identifies nothing.
+   */
+  day_planned: {
+    operation: PlanOperation;
+    itemCount: number;
+  };
+  /** Q3, denominator. */
+  day_review_opened: {
+    scope: DayReviewScope;
+  };
+  /** Q3, numerator. */
+  day_review_action_applied: {
+    scope: DayReviewScope;
+    actionKind: DayReviewActionKind;
+  };
+  /**
+   * Q4. `expired` lives here rather than among the suppression reasons: a
+   * subscription that expired is a consent-state transition, and recording it
+   * in both places would make the funnel's numerator and denominator disagree.
+   */
+  notification_consent_changed: {
+    channel: NotificationChannel;
+    state: NotificationConsentState;
+  };
+  /** Q4. Which control decided not to send — never what was not sent. */
+  notification_suppressed: {
+    channel: NotificationChannel;
+    reason: NotificationSuppressionReason;
   };
 };
 
@@ -691,6 +868,34 @@ function arePropertiesValid<Name extends ProductEventName>(
     case "conversation_suggestion_shown":
       return hasExactKeys(value, ["category"])
         && isOneOf(value.category, ["person", "project"]);
+    /*
+     * Phase 2M slice 2M.1. `hasExactKeys` is what makes `2M-METRICS-004`
+     * structural rather than aspirational: an extra key — a task title, a
+     * reminder title, review text, or the date the user chose — is refused here
+     * before the payload reaches the RPC, and refused again in the database if
+     * it somehow did.
+     */
+    case "calendar_viewed":
+      return hasExactKeys(value, ["orientation"])
+        && isOneOf(value.orientation, calendarOrientations);
+    case "day_planned":
+      return hasExactKeys(value, ["operation", "itemCount"])
+        && isOneOf(value.operation, planOperations)
+        && isBoundedInteger(value.itemCount, 1, PLANNED_ITEM_COUNT_CEILING);
+    case "day_review_opened":
+      return hasExactKeys(value, ["scope"]) && isOneOf(value.scope, dayReviewScopes);
+    case "day_review_action_applied":
+      return hasExactKeys(value, ["scope", "actionKind"])
+        && isOneOf(value.scope, dayReviewScopes)
+        && isOneOf(value.actionKind, dayReviewActionKinds);
+    case "notification_consent_changed":
+      return hasExactKeys(value, ["channel", "state"])
+        && isOneOf(value.channel, notificationChannels)
+        && isOneOf(value.state, notificationConsentStates);
+    case "notification_suppressed":
+      return hasExactKeys(value, ["channel", "reason"])
+        && isOneOf(value.channel, notificationChannels)
+        && isOneOf(value.reason, notificationSuppressionReasons);
   }
 }
 
