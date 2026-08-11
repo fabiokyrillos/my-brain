@@ -2841,3 +2841,169 @@ way, a disposable account for the one thing that needed committed rows, and the
 single row by which the table grew during this work is genuine application traffic.
 
 **Phase 2K remains unstarted. A13 green. Rollout gate 25 · 3 · 2, signup closed.**
+
+---
+
+## §47 — Phase 2M migration 1 is spent and deployed, the calendar ships, and three probes were found dead (2026-08-11)
+
+**Where the repository actually is.** `main` at `054da4d`; working tree clean; no
+open PR. **91 migrations**, hosted parity **`202608110090`**, local = remote on
+every row, read live and read-only on 2026-08-11. Migration budget
+**`2 allocated · 1 spent`, NON-TRANSFERABLE** — a third is a stop condition.
+Signup closed, rollout gate untouched, Phase 2N not started, A13 green.
+
+Three pull requests landed, each with CI green on its **exact merge SHA**:
+
+| PR | Merge SHA | What |
+|---|---|---|
+| **#168** | `6ca0314` | Migration 1 created — the daily-cycle telemetry vocabulary and the `calendar` surface, **with no producer** |
+| **#169** | `611dd01` | Migration 1 **applied to the hosted project**, proved there, and three probe defects repaired |
+| **#170** | `054da4d` | Slice 2M.1 part 2 — the calendar surface at `/app/calendar` |
+
+### What migration 1 declares, and why it is shaped that way
+
+Six events answering four questions **written down before any name was chosen**
+(`2M-METRICS-005`), and **one** new surface (OD-2M-2 named exactly one):
+
+| Event | Question | Surface | Producer |
+|---|---|---|---|
+| `calendar_viewed` | is the calendar reached, and in which orientation | `calendar` | **shipped**, 2M.1 part 2 |
+| `day_planned` | how often is a plan made — set or cleared, one item or many | `calendar`, `work` | slice 2M.2 |
+| `day_review_opened` | denominator | `calendar` | slice 2M.3 |
+| `day_review_action_applied` | numerator, and which action | `calendar` | slice 2M.3 |
+| `notification_consent_changed` | opt-in, and revocation | `server` | slice 2M.4a |
+| `notification_suppressed` | how often silenced, by which control | `server` | slice 2M.4b |
+
+The notification events carry **`server`** rather than a second new surface,
+because they are emitted by the Server Action that writes a consent row and by
+the sender that decides not to send — a `notifications` surface would be a
+vocabulary entry that lies about where the event happened. The planner and the
+day review are planned as **sub-routes of `/app/calendar`**, which is what makes
+attributing them to `calendar` honest; if a later slice moves them, the
+attribution has to move with them or stop being true.
+
+**There is no date and no time on any event.** That is `2M-METRICS-004`'s
+sharpest edge in a calendar phase, refused at the parser and again in the
+deployed validator, and proved hosted with a planted `plannedDate` on a valid
+event and a valid surface.
+
+### The three dead probes, and the lesson under them
+
+Running the probes rather than reading them found all three:
+
+1. **`scripts/remote-product-events-smoke.mjs` had been unrunnable since
+   `202608070081`.** Its first assertion compares its hand-written event matrix
+   to `productEventNames` by **exact ordered equality**, and the matrix stopped
+   at Phase 2E's four names. Phase 2H added one, 2J three, 2K three — and each
+   widened the gap in silence, because *a manual script that is never run reports
+   nothing at all*. Thirteen names were added; the assertion means something
+   again.
+2. **Both funnel readers signed in with `grant_type=password`**, which Turnstile
+   has refused since SH.5. Both now take `--access-token`; the smoke mints
+   sessions through `admin/generate_link` + `verifyOtp`.
+3. **Both funnel readers queried `product_events.occurred_at` — a column that
+   does not exist.** The ledger's only timestamp is `created_at`
+   (`202607170024:51`). **Phase 2K's declared consumer for `2K-METRICS-007` could
+   therefore never have executed**, though the phase closed claiming it.
+
+`2E-ANALYTICS-006`'s vocabulary reader stopped the smoke from **drifting**;
+nothing stopped it from being **abandoned**. A guard against divergence is not a
+guard against disuse. `phase-2m-telemetry-guard.test.ts` now derives the ledger's
+real column list from the create-table migration and fails any consumer that
+reads a column the table does not have.
+
+### The hosted proof, and the half of it that is honestly missing
+
+`npm run test:remote:product-events` wrote **all 39** declared event names
+through the real *authenticated* writer on the deployed project.
+`npm run measure:2m:proof` then proved producer → writer → **consumer**, reading
+through the reader's own code path, with six non-vacuous controls — undeclared
+name, undeclared surface, a user-chosen date, an out-of-enum value, a replayed
+idempotency key, and RLS isolation **against a foreign row that exists**. Zero
+residue, proved **owner-scoped**: `product_events` grants `service_role` neither
+SELECT nor DELETE, so the only honest evidence is that no owner of those rows
+survives.
+
+**The producer half is not proved and is recorded as not proved.** At migration
+time there was no producer — which is `2M-METRICS-001`'s whole point — so the
+corpus was written by a harness standing in for the calendar, the planner, the
+day review and the sender. A harness is not a producer. Full record:
+`docs/reports/phase-2m/PHASE_2M_DEPLOYMENT.md` §7.
+
+### What the calendar is, and what it deliberately is not
+
+`/app/calendar`, over the five sources that already exist — **zero schema, no
+event entity**. Deadlines (`tasks.due_at`), intentions (`tasks.planned_at`),
+reminders (`reminders.remind_at`), reviews (`summaries` periods) and unconfirmed
+extracted dates (`entries.occurred_at` where `is_retroactive`). The commitment
+axis has **four** values, not two: an intention is not a commitment, and painting
+it as one is the silent reclassification OD-2M-3 option B was refused for.
+
+**Reminder sensitivity is derived for the first time in this repository.**
+`reminders.entry_id` is the same relationship `task-derivation.ts` consumes for
+tasks; `deriveReminderSensitivity` delegates to the task path rather than
+reimplementing it, so the three outcomes are identical by construction.
+
+Three properties worth not re-deriving:
+
+- **Fail-closed means narrower *and* nearer.** `orientation` resolves to `day`, a
+  malformed or out-of-range anchor resolves to **today** (one day wide), and an
+  unknown lane token is **dropped**. The bound is declared once, ±365 days, and
+  reaching it is a visible state.
+- **A lane that fails is named.** Five independently fallible reads; a dropped
+  lane would show a day that *looks empty*, which is the lie masking-rather-than-
+  excluding exists to avoid. Extended to a row whose instant will not parse — a
+  case found while writing the tests, not predicted.
+- **Every control is a `<Link>`.** OD-2M-6 A costs nothing here because the
+  control *is* the URL, which is also what makes "the URL is the state" true
+  rather than aspirational.
+
+**Navigation is `more`, not `primary`, and that is a restraint rather than a
+ranking.** `2I-SHELL-001` pins the four primary destinations as a delivered
+baseline; `2M-CAL-001` requires a route and says nothing about prominence.
+Promoting a destination into the rail is an IA decision Phase 2M was not
+authorized to make. **It is an open owner question, recorded in `docs/TODO.md`.**
+
+### What is outstanding, exactly
+
+**Slice 2M.1 is not finished.** Part 3 owes:
+
+- `2M-CAL-009` / `-010` — rescheduling **from** the calendar through the existing
+  validated command path. The reuse is already identified and needs no new
+  Server Action, RPC, table or column: `TaskDetailControls`
+  (`src/features/task-commands/task-detail-controls.tsx`) takes `controls`,
+  `relationOptions`, `dateBounds`, the `applyTaskDetailCommand` handler and an
+  `undoAction`, and `detailControlsFor(status)` already filters by status. The
+  calendar projection must carry each task item's **real status** and task id for
+  that, which it does not yet.
+- `2M-MOBILE-005` — the Playwright journeys, desktop and mobile, both locales.
+- The slice acceptance record,
+  `docs/reports/phase-2m/PHASE_2M_SLICE_01_ACCEPTANCE.md`.
+
+Then slices **2M.2** (planner, `clear_planned`), **2M.3** (reviews, the five
+inert preferences reaching their declared end state), **2M.4a** (notification
+governance, CI-provable), **2M.4b** (**migration 2** plus opt-in content-free
+push, then deploy and the hosted proof) — and then the loop **stops** at
+`CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`. Slice 2M.5 and closeout come
+after the owner's evidence returns, never before.
+
+### Traps this stretch paid for, so the next one does not
+
+1. **A guard that pins a *pre-condition* has to be replaced, not deleted.**
+   `phase-2m-telemetry-guard.test.ts` asserted "no producer exists yet"; when the
+   first one shipped it became a **producer census** — every producer must name
+   an event and a surface the chain admits, and the events still awaiting one are
+   listed. A guard that only ever said "not yet" would have been switched off.
+2. **Check keys, not substrings.** The producer's content assertion fired on
+   `orientation` because it contains `at` — the same trap Phase 2K records
+   stepping in with `title` inside `normalized_exact_title`.
+3. **A hand-written date fixture is the one input a date test cannot check for
+   you.** A draft asserted `2026-02-29` parses. 2026 is not a leap year. Slice
+   2M.0 recorded the same class of error with `America/Santiago`.
+4. **A stub keyed only by table hides a second reader.** `entries` is read twice —
+   as the suggestion lane and as the classification map — and the stub that could
+   not tell them apart is what exposed a real missing guard in the projection.
+5. **Local guard failures immediately after editing their corpus are mid-write
+   reads.** Re-run untouched before debugging; it happened three times again.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
