@@ -73,8 +73,8 @@ async function main() {
   }
 
   /*
-   * `publishableKey`, not `anonKey`. `getLinkedSupabaseCredentials` returns
-   * `{ url, publishableKey, serviceRoleKey }` and has never returned an
+   * `publishableKey`, not `anonKey`. `getLinkedSupabaseCredentials` returns a
+   * publishable key under that exact name and has never returned an
    * `anonKey`, so this destructure produced `undefined` and `createClient`
    * threw *"supabaseKey is required"* before a single row was read. **The
    * THIRD defect in this file, and the third that had never fired**, because
