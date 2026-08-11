@@ -1,18 +1,23 @@
 # Phase 2M — threat model
 
-**Status:** planning evidence. Every threat below is stated against the
-repository as it is at `5e6174bb3f50da5f8560c5b7702642b0b1e83545`, with the
+**Status:** governing evidence. Every threat below is stated against the
+repository as it is at `62753ce8a5e35888902694f0857ecb2436a8d25c`, with the
 existing control named where one exists and the gap named where none does.
+Planning authorized by **ADR-104**; implementation through closeout by
+**ADR-105**, which signed all seven decisions — including **push, opt-in and
+content-free**, which makes the fourth boundary below real.
 
 **Trust boundaries this phase would touch**
 
 1. `authenticated` → Postgres, mediated by RLS and validated RPCs. *Unchanged.*
 2. Server Action → command path → audit + undo. *Reused, never duplicated.*
 3. Presentation → sensitivity derivation. *Extended to new surfaces.*
-4. **Application → outside the application.** This does not exist yet. If
-   OD-2M-4 signs outbound delivery, Phase 2M creates the **first** egress of
-   user-linked data in this product, and everything in §T-16 … §T-22 becomes
-   live rather than hypothetical.
+4. **Application → outside the application.** This does not exist yet. **OD-2M-4
+   is signed as option B**, so Phase 2M creates the **first** egress of
+   user-linked data in this product. Every threat below that names push is
+   therefore **live rather than hypothetical**, and each is a slice 2M.4a/2M.4b
+   obligation rather than a note. The mitigation that carries the most weight is
+   structural: the payload type has **nowhere to put content**.
 
 ---
 

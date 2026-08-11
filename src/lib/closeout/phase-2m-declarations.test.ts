@@ -171,22 +171,70 @@ describe("R-27: every document that states this phase's count agrees with the ex
   });
 });
 
-describe("Phase 2M is authorized for planning only, and the documents say so", () => {
-  it("records ADR-104 as an accepted, planning-only owner decision", () => {
-    const decisions = read("docs/DECISIONS.md");
-    const start = decisions.indexOf("## ADR-104 —");
-    expect(start, "ADR-104 not found").toBeGreaterThan(0);
+/**
+ * The authorization chain, asserted rather than remembered.
+ *
+ * ADR-104 authorized planning; ADR-105 authorized implementation through
+ * closeout and signed all seven decisions. Both must be present and both must
+ * be accepted, because a package that describes signed decisions while the
+ * signature has been removed is exactly the "unexplained phase start" the A13
+ * guard refuses one level up.
+ */
+describe("Phase 2M's authorization chain is recorded, not assumed", () => {
+  const decisions = read("docs/DECISIONS.md");
+
+  function adrBlock(adr: string): string {
+    const start = decisions.indexOf(`## ${adr} —`);
+    expect(start, `${adr} not found`).toBeGreaterThan(0);
     const next = decisions.indexOf("\n## ADR-", start + 1);
-    const block = decisions.slice(start, next === -1 ? undefined : next);
+    return decisions.slice(start, next === -1 ? undefined : next);
+  }
+
+  it("records ADR-104 as an accepted, planning-only owner decision", () => {
+    const block = adrBlock("ADR-104");
     expect(block).toMatch(/\*\*Status:\*\* Accepted/);
     expect(block).toMatch(/authorizes \*\*planning only\*\*/);
     expect(block, "a planning-only ADR must refuse implementation explicitly")
       .toMatch(/does \*\*not\*\* authorize implementation/);
   });
 
-  it("creates no execution or closeout artifact", () => {
-    // The gates in the implementation plan forbid these before their time, and
-    // the taxonomy is such that they would have to live in this directory.
+  it("records ADR-105 as the accepted implementation authorization", () => {
+    const block = adrBlock("ADR-105");
+    expect(block).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(block).toMatch(/authorizes slices \*\*2M\.0–2M\.5\*\*/);
+    expect(block, "the budget must be stated as non-transferable")
+      .toMatch(/NON-TRANSFERABLE/);
+    expect(block, "a third migration is a stop condition, not a judgement call")
+      .toMatch(/third migration/i);
+  });
+
+  it("carries all seven signed decisions in the PRD, each naming what it signed", () => {
+    const prd = read(PRD);
+    for (const decision of [
+      "OD-2M-1", "OD-2M-2", "OD-2M-3", "OD-2M-4", "OD-2M-5", "OD-2M-6", "OD-2M-7",
+    ]) {
+      expect(prd, `${decision} is not marked signed in the PRD`)
+        .toMatch(new RegExp(`### ${decision} —[^\\n]*\\*\\*SIGNED`));
+    }
+  });
+
+  it("states the migration budget as two allocated, non-transferable, and zero spent", () => {
+    const prd = read(PRD);
+    expect(prd).toMatch(/\*\*`2 allocated · 0 spent` at authorization/);
+    expect(prd).toMatch(/NON-TRANSFERABLE/);
+    expect(prd, "a third migration must be a stop condition").toMatch(/third migration is a stop condition/i);
+  });
+
+  it("keeps recurrence out by rule rather than as a partial", () => {
+    const prd = read(PRD);
+    expect(prd).toMatch(/2M-RECUR-001:\*\* Recurrence is \*\*out of scope by rule\*\*/);
+    expect(prd, "the family must close not-built-by-rule, never partial")
+      .toMatch(/closes \*\*not-built-by-rule\*\* against OD-2M-7 rather than as a partial/);
+  });
+
+  it("creates no execution or closeout artifact before its gate", () => {
+    // The plan's gates forbid these before their time, and the taxonomy is such
+    // that they would have to live in this directory.
     const forbidden = [
       "docs/reports/phase-2m/PHASE_2M_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2m/PHASE_2M_REPORT.md",

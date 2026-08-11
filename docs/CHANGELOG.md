@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-11 - PHASE 2M IMPLEMENTATION AUTHORIZED THROUGH CLOSEOUT (ADR-105), all seven decisions signed
+
+**Documentation only in this change. Still zero product code, zero migration, zero deploy, zero notification sent, zero permission requested, zero telemetry event created, zero provider call.** The package is corrected to record the signatures; nothing is built yet.
+
+**The baseline moved during owner review, and the audit was re-executed rather than carried forward.** PR #166 (*"perf: make authenticated navigation responsive"*) merged at `62753ce` with CI green on that exact merge SHA, adding `src/app/[locale]/app/loading.tsx`, a navigation-pending affordance and edits to `work-item-actions.tsx`, `capture-receipt.tsx`, `inbox-item.tsx`, `navigation-links.tsx` and `require-user.ts`. The planning branch was rebased onto it and each load-bearing negative was **re-run**: `planned_at` still has no predicate, ordering or filter anywhere; `public/sw.js` is unchanged and still carries no push handler; no gesture handler exists on any Work surface, **including the file PR #166 edited**. Recorded as `PHASE_2M_CURRENT_EXPERIENCE_AUDIT.md` section 0.
+
+**The seven signatures.**
+
+- **OD-2M-1 A** - the calendar renders **tasks and reminders**, both through derived sensitivity and `ProtectedContent`. Reminder classification derives through `reminders.entry_id`, the same relationship `task-derivation.ts` consumes for tasks. **Nothing is persisted.** Option B was refused because the audit had already shown reminder sensitivity was derivable and simply had not been derived.
+- **OD-2M-2** - one vocabulary migration **before any producer**, widening the event-name CHECK, `private.validate_product_event_properties` and the surface CHECK in one change, and declaring **`calendar` as its own surface** rather than folding calendar events into an existing one.
+- **OD-2M-3 A** - `planned_at` is the **intention to work on something that day**, never a commitment and never a reserved time. Option B was refused because it would silently reclassify data users already entered under the other meaning; option C, the event entity, is **not authorized**.
+- **OD-2M-4 B** - **push, opt-in, with a generic content-free payload.** This is the **first egress of user-linked data in this product**. VAPID with the private key never exposed to a client; quiet hours, the daily cap and the cooldown applied **on the server before sending**; revocation honoured immediately; expired subscriptions retired rather than retried; only content-free metadata recorded; no `service_role` on a product path; and the browser prompt raised **only after an explicit user action**. Email stays refused, and so does any content in the payload.
+- **OD-2M-5** - **the owner executes the real-device proof**, and push delivery plus real compatibility **block closeout**. No emulated run may satisfy one.
+- **OD-2M-6 A** - **visible controls only.** No drag, swipe, pointer or touch gesture on any calendar, planner, review or notification surface, including one added "in preparation".
+- **OD-2M-7** - **recurrence is out of Phase 2M** and gets its own initiative. The family closes **not-built-by-rule** with a named destination.
+
+**Migration budget: `2 allocated - 0 spent`, NON-TRANSFERABLE.** Migration 1 carries telemetry vocabulary and the `calendar` surface, in slice 2M.1, before any producer. Migration 2 models notification consent, subscription, delivery state, revocation, ownership, RLS, minimum retention, deduplication and content-free audit, in slice 2M.4b - and **may store no title, description, name, record content, user-supplied text or free-form payload column**. Neither may carry the other's contents, and **a third migration is a stop condition**.
+
+**The requirement count stays at 94, and no id was reused, renamed, renumbered or removed.** Ten requirements were **narrowed from "whatever the owner signs" to what the owner signed** - `2M-NOTIFY-003`, `-010` and `-011`, `2M-METRICS-002`, `-004` and `-006`, `2M-MOBILE-003`, `2M-PRIVACY-005`, `2M-DEVICE-002` and `2M-RECUR-004`. Narrowing an unsigned requirement to its signature is not a scope change; inventing a new id for the same obligation would have been.
+
+**Slice 2M.4 splits into 2M.4a (governance) and 2M.4b (delivery)**, so the whole notification family does not wait on hardware. After 2M.4b is merged, deployed and green, the loop **stops at a mandatory owner hardware checkpoint** for iOS Safari and Android Chrome.
+
 ## 2026-08-09 - PHASE 2M AUTHORIZED FOR PLANNING ONLY (ADR-104), and the A13 guard retargets
 
 **Documentation only. Zero product code, zero migration, zero deploy, zero database/RLS/grant/policy/Auth change, zero notification sent, zero service-worker change, zero permission requested, zero telemetry event created, zero provider call, zero BYOK use, zero signup or rollout change.** Baseline `5e6174b`; 89 migrations; hosted parity `202608090089` read **live and read-only** on 2026-08-09; signup closed; rollout gate untouched.

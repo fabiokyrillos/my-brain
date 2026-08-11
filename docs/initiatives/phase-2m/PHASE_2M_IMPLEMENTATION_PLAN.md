@@ -1,24 +1,25 @@
 # Phase 2M — Calendar, daily planning and notifications · implementation plan
 
-**Status:** planning artifact. Authorized by **ADR-104** for **planning only**.
-Nothing here is authorized to run. The plan is derived from
+**Status:** governing artifact. Planning authorized by **ADR-104**;
+**implementation through closeout authorized by ADR-105**, which signed all
+seven decisions. Slices 2M.0–2M.5 may execute, each on its own branch and PR. The plan is derived from
 `docs/initiatives/phase-2m/PHASE_2M_PRD.md` and from
 `docs/reports/phase-2m/PHASE_2M_CURRENT_EXPERIENCE_AUDIT.md`; every slice's
 requirements are the PRD's, and no requirement is introduced here.
 
-**Baseline:** `main` at `5e6174bb3f50da5f8560c5b7702642b0b1e83545`; 89
-migrations; hosted parity `202608090089` (live read-only reading, 2026-08-09);
-signup closed.
+**Baseline:** `main` at `62753ce8a5e35888902694f0857ecb2436a8d25c`, CI green on
+that exact merge SHA; 89 migrations; hosted parity `202608090089` (live
+read-only reading); signup closed. The baseline moved during owner review (PR
+#166) and every audit finding was **re-executed** rather than carried forward.
 
 **Scope:** Phase 2M declares 94 requirements across thirteen families, and this
-plan executes none of them — it says when each would be executed if the owner
-authorizes implementation.
+plan executes all of them across six slices.
 
 **Shape:** six slices plus a stop step, the same shape Phase 2L used. It differs
-in two ways that both add time and both are stated rather than smoothed: it may
-spend a migration, which brings back parity verification and a deployment
-record; and it depends on **owner-run hardware**, which an implementer cannot
-schedule.
+in two ways that both add time and both are stated rather than smoothed: it
+spends **two** migrations, which brings back parity verification and a
+deployment record for each; and it stops at an **owner-run hardware
+checkpoint**, which an implementer cannot schedule.
 
 ---
 
@@ -27,21 +28,24 @@ schedule.
 1. **Test-first.** A behaviour without a failing test first is not started.
 2. **No second write path.** Every task mutation goes through the existing
    validated command path. A guard fails the build if a second appears.
-3. **Migration before producers.** If any product event is declared, the
-   migration that admits it is applied and parity-verified **before** the first
-   producer exists. This repository has paid for the reverse twice
+3. **Migration before producers.** The migration that admits an event is
+   applied, deployed and parity-verified **before** the first producer exists,
+   and a guard fails the build on a producer naming an unadmitted event. This repository has paid for the reverse twice
    (`202608080087`, `202608090089`).
 4. **Nothing moves by itself.** No plan, task, reminder or day changes without a
    typed, confirmed operation with an audit row and, where the domain supports
    it, an undo.
-5. **Nothing leaves the application** unless OD-2M-4 signs it, and then only
-   content-free.
+5. **What leaves the application is content-free.** OD-2M-4 signed push, opt-in,
+   with a generic payload. No title, description, name, record content or
+   user-supplied text ever reaches it.
 6. **Zero classification persisted.** OD-2L-1 B holds throughout.
 7. **One local-day definition.** Application and database agree, and the
    agreement is tested.
-8. **A ceiling is not an obligation.** Migration ceiling 2 (1 if OD-2M-4 is not
-   signed for delivery; 0 if no event is declared). Spending fewer is the
-   preferred outcome.
+8. **Exactly two migrations, NON-TRANSFERABLE.** Migration 1 is the telemetry
+   vocabulary and the `calendar` surface, in slice 2M.1, **before any producer**.
+   Migration 2 is notification consent, subscription and delivery, in slice
+   2M.4b. Neither may carry the other's contents. **A third is a stop
+   condition.**
 9. **CI green on the exact merge SHA** for every slice, one complete run
    (ADR-090).
 10. **No emulated run may be recorded as a real-device claim.**
@@ -53,7 +57,7 @@ schedule.
 | Gate | Meaning |
 |---|---|
 | **G0** | Preflight: clean worktree, `main` synced, no competing branch or PR, baseline SHA, migration count and hosted parity confirmed |
-| **G1** | The slice's gating decision is **signed and published** before the slice begins |
+| **G1** | All seven decisions are signed (ADR-105); the slice restates the ones it is executing against |
 | **G2** | Requirements declared in the PRD, tests written first |
 | **G3** | Lint, typecheck, unit and behavioural suites green |
 | **G4** | Playwright desktop + mobile, both locales where copy or locale is affected |
@@ -82,8 +86,11 @@ git diff --check
 
 ## Slice 2M.0 — audit-derived foundations, decisions and guards
 
-**Gating decisions:** OD-2M-7 (recurrence) must be signed before this slice ends;
-OD-2M-1, OD-2M-2, OD-2M-3 and OD-2M-6 must be signed before 2M.1 begins.
+**Signed decisions this slice executes against:** OD-2M-7 (recurrence is out,
+with its own initiative), OD-2M-5 (the owner runs the hardware proof and push
+delivery blocks closeout), OD-2M-4 (push is authorized, content-free).
+
+**No visible surface ships in this slice.**
 
 **Requirements:** `2M-AUDIT-001` … `-008`, `2M-RECUR-001` … `-003`.
 
@@ -122,9 +129,10 @@ as a failing test before any correction.
 
 ## Slice 2M.1 — the calendar surface
 
-**Gating decisions:** OD-2M-1, OD-2M-3, OD-2M-6 signed. OD-2M-2 signed **if any
-event is to be declared** — and if so, the migration lands here, before any
-producer.
+**Signed decisions this slice executes against:** OD-2M-1 A (tasks **and**
+reminders, both protected), OD-2M-2 (migration 1 lands **here**, before any
+producer, declaring `calendar` as its own surface), OD-2M-3 A (`planned_at` is
+an intention), OD-2M-6 A (visible controls only, no drag).
 
 **Requirements:** `2M-CAL-001` … `-011`, `2M-PRIVACY-001` … `-006`,
 `2M-TIME-001` … `-003`, `2M-MOBILE-001`, `2M-MOBILE-002`, `2M-ACCESS-001` …
@@ -134,10 +142,13 @@ producer.
 
 **Delivers:**
 
-1. **The migration, if OD-2M-2 spends one** — event-name CHECK, property
-   validator, and the surface CHECK if `calendar` is declared — applied,
-   linted, parity-verified, deployed and recorded (**G8**), **before** any
-   producer exists.
+1. **Migration 1** — the event-name CHECK, `private.validate_product_event_properties`
+   and the surface CHECK declaring **`calendar`** — created, tested, merged,
+   applied, linted, deployed, parity-verified and recorded (**G8**), **before any
+   producer exists**. Only events with a declared question and a real consumer;
+   every existing event and surface preserved; **no hardcoded list in the
+   writer**; every value proved through the real path; non-vacuous negative
+   controls; no free-form properties.
 2. The calendar route, outside `/app/work` and not a `workView` value
    (`2M-CAL-001`).
 3. The five lanes over existing sources, with committed-versus-suggested derived
@@ -166,7 +177,7 @@ case; the no-gesture guard extended to calendar files if OD-2M-6 signs A.
 
 ## Slice 2M.2 — the daily planner and `planned_at` semantics
 
-**Gating decisions:** OD-2M-3 signed.
+**Signed decisions this slice executes against:** OD-2M-3 A — `planned_at` is the intention to work on something that day, and never a commitment or a reserved time.
 
 **Requirements:** `2M-PLAN-001` … `-010`, `2M-TIME-004`, `2M-TIME-006`,
 `2M-MOBILE-004`, `2M-ACCESS-004`.
@@ -199,7 +210,7 @@ transition tests in both directions and both hemispheres.
 
 ## Slice 2M.3 — reviews, closure, and the inert preferences
 
-**Gating decisions:** the `2M-AUDIT-005` end-state record is published.
+**Prerequisite:** the `2M-AUDIT-005` end-state record for the five inert preferences is published in slice 2M.0.
 
 **Requirements:** `2M-REVIEW-001` … `-008`, `2M-TIME-005`, `2M-ACCESS-006`.
 
@@ -231,19 +242,18 @@ cost, consent and provenance are a separate decision.
 
 ---
 
-## Slice 2M.4 — notification consent, content and frequency
+## Slice 2M.4a — notification governance
 
-**Gating decisions:** **OD-2M-4 signed.** If it signs option A (no outbound
-delivery), this slice ships the governance half and `2M-NOTIFY-011` closes the
-outbound half `not-built-by-rule`. If it signs option B, this slice **splits**:
-2M.4a governance, 2M.4b delivery with its own migration and its own security
-review.
+**Signed decisions this slice executes against:** OD-2M-4 B — push is
+authorized, opt-in, with a generic content-free payload. **Governance ships
+first, and 2M.4b may not begin until 2M.4a is merged with CI green on its merge
+SHA.**
 
-**Requirements:** `2M-NOTIFY-001` … `-011`, `2M-MOBILE-003`, `2M-MOBILE-005`.
+**Requirements:** `2M-NOTIFY-001` … `-010`, `2M-MOBILE-003`, `2M-MOBILE-005`.
 
 **Depends on:** 2M.3.
 
-**Delivers (2M.4a — governance, always):**
+**Delivers:**
 
 1. An explicit consent record with a declared shape, a recorded time and a
    one-step revocation (`2M-NOTIFY-001`, `-002`).
@@ -258,18 +268,57 @@ review.
    (`2M-NOTIFY-006`, `-007`).
 6. In-app rows remain where content is shown, and any change to what they carry
    is deliberate and recorded (`2M-NOTIFY-008`).
-7. Delivery auditability and distinguishable revoked / expired / failed states
-   with bounded retry (`2M-NOTIFY-009`, `-010`).
-
-**Delivers (2M.4b — only if OD-2M-4 signs B):** the consent/subscription
-migration, the sender, the `push` handler added to the **already-registered**
-`public/sw.js` with its update-ordering and stale-worker behaviour defined, the
-permission UX, and quiet-hours enforcement **at send time**. Blocks closeout on
-**G9**.
+7. Delivery auditability and the five distinguishable states — `granted`,
+   `denied`, `unsupported`, `revoked`, `expired` — with bounded retry
+   (`2M-NOTIFY-009`, `-010`).
+8. **Tests for the service worker that already exists**, and the push-absence
+   guard **widened to cover `public/` and `.js`** — landing *before* anything is
+   added to `public/sw.js`, so the guard is never behind the file it governs.
+9. The benefit explained on the surface **before** any prompt, and the prompt
+   raised **only after an explicit user action** (`2M-NOTIFY-003`).
 
 **Tests first:** a guard that fails on any permission request outside the
-designated surface; a payload-shape test that fails if a content field is added;
-per-channel quiet-hours tests.
+designated surface or on first load; a payload-shape test that fails if a
+content field is added; per-channel quiet-hours, cap and cooldown tests.
+
+---
+
+## Slice 2M.4b — opt-in push delivery
+
+**Signed decisions this slice executes against:** OD-2M-4 B and OD-2M-5.
+
+**Requirements:** `2M-NOTIFY-011`, and the delivery half of `2M-NOTIFY-005`,
+`-006`, `-009`, `-010`.
+
+**Depends on:** 2M.4a **merged, CI green on its merge SHA**.
+
+**Migration 2 lands here, and models only:** consent, subscription, delivery
+state, revocation, the timestamps those need, ownership, RLS, minimum retention,
+deduplication and **content-free** audit. **It may not store** a task title, a
+description, names, record content, user-supplied notification text or any
+free-form payload column.
+
+**Delivers:**
+
+1. The sender: **VAPID**, private key held only in the server environment and
+   **never exposed to any client**.
+2. The generic content-free payload — `notificationCopy(locale)` and a
+   destination, and nothing else.
+3. Quiet hours, the daily cap and the cooldown applied **on the server, before
+   sending**.
+4. Revocation honoured immediately; an expired subscription retired rather than
+   retried; no duplicate delivery.
+5. The `push` and `notificationclick` handlers added to the
+   **already-registered** `public/sw.js`, with update ordering and stale-worker
+   behaviour defined and tested.
+6. Only content-free metadata recorded. **No `service_role` on a product path.**
+
+**Refused here, explicitly:** email, external calendar, signup, any content in
+the payload.
+
+**After merge:** deploy, verify hosted parity, run the hosted proof
+(producer → writer → RLS consumer) and prove **zero residue**. Then **stop at
+the owner hardware checkpoint** (G9).
 
 ---
 
@@ -279,7 +328,7 @@ per-channel quiet-hours tests.
 `-005`, `2M-TIME-007`, `2M-CLOSE-001` … `-006`, and the closing classification
 of every family.
 
-**Depends on:** 2M.4.
+**Depends on:** 2M.4b **and the owner's hardware evidence returned**.
 
 **Delivers:**
 
@@ -313,13 +362,30 @@ satisfied nor superseded, and stops.
 
 ## Deployment
 
-- **If no migration is spent:** nothing is deployed; the closing record says so
-  and the live parity reading proves it.
-- **If a migration is spent:** it is applied and linted locally, deployed, and
-  **hosted parity is read live and read-only** with the reading recorded by date
-  — before the producers that depend on it exist, and again at closeout.
-- No Edge Function change is planned. If one becomes necessary, edge parity is
-  verified explicitly rather than assumed.
+**Two deployments, one per migration, each after its slice is merged with CI
+green on the exact merge SHA.**
+
+1. **Migration 1** (slice 2M.1) — applied and linted locally, deployed, hosted
+   parity read **live and read-only** and recorded by date, **before any producer
+   exists**. Then the hosted proof: every declared event written through the real
+   path, producer → writer → RLS consumer, with **non-vacuous negative controls**
+   and **zero residue**, proved owner-scoped rather than by a global count.
+2. **Migration 2** (slice 2M.4b) — the same sequence, plus a proof that no
+   content-bearing column exists and that no payload metadata carries content.
+
+An Edge Function change is expected for the sender in 2M.4b; **edge parity is
+verified explicitly** rather than assumed.
+
+## The owner hardware checkpoint
+
+After 2M.4b is implemented, merged, deployed and green, the loop **stops** and
+delivers a checklist for the owner to execute on iOS Safari (including the
+installed PWA where required) and Android Chrome. The phase is **not** recorded
+as blocked; it is recorded as
+
+> `CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`
+
+and the loop resumes when the evidence returns.
 
 ---
 

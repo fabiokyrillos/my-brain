@@ -1,14 +1,25 @@
 # Phase 2M — Calendar, daily planning and notifications · PRD
 
-**Status:** planning artifact. Authorized by **ADR-104** for **planning only**.
-This document authorizes no implementation, no migration, no deploy, no
-database change and no outbound delivery of any kind.
+**Status:** governing artifact. Planning authorized by **ADR-104**;
+**implementation through closeout authorized by ADR-105**, which signed all
+seven open decisions. Slices 2M.0–2M.5 may execute.
 
-**Baseline:** `main` at `5e6174bb3f50da5f8560c5b7702642b0b1e83545`; 89
-migrations; hosted parity `202608090089`, confirmed live and read-only on
-2026-08-09; public signup closed; Phase 2L complete (82 declared, 82 classified:
-73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered; migration
-budget 1 allocated · 0 spent).
+**Baseline:** `main` at `62753ce8a5e35888902694f0857ecb2436a8d25c`, with CI green
+on that exact merge SHA; 89 migrations; hosted parity `202608090089`, confirmed
+live and read-only; public signup closed; Phase 2L complete (82 declared, 82
+classified: 73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered;
+migration budget 1 allocated · 0 spent).
+
+**The baseline moved during owner review, and the audit was re-proved rather
+than carried forward.** The package was written against `5e6174b`; PR #166
+(*"perf: make authenticated navigation responsive"*) then merged, adding
+`src/app/[locale]/app/loading.tsx`, a navigation-pending affordance and edits to
+`work-item-actions.tsx`, `capture-receipt.tsx`, `inbox-item.tsx`,
+`navigation-links.tsx` and `require-user.ts`. **None of the seven audit findings
+is affected**, and each was re-executed at the new baseline rather than assumed:
+`planned_at` still has no predicate, ordering or filter anywhere; `public/sw.js`
+is unchanged and still carries no push handler; no gesture handler exists on any
+Work surface. See `PHASE_2M_CURRENT_EXPERIENCE_AUDIT.md` §0.
 
 **Evidence base:** `docs/reports/phase-2m/PHASE_2M_CURRENT_EXPERIENCE_AUDIT.md`.
 Every claim of current state in this PRD is a reference to that document, which
@@ -70,7 +81,43 @@ a user govern what they are told and when.
 
 ---
 
-## 2. Inherited decisions this phase may not reopen
+## 2. Signed decisions
+
+### 2.1 The seven Phase 2M decisions, signed by the owner (ADR-105)
+
+| | Subject | **Signed** |
+|---|---|---|
+| **OD-2M-1** | what the calendar renders and how it is protected | **option A** — the calendar renders **tasks and reminders**, both protected by derived sensitivity and `ProtectedContent` |
+| **OD-2M-2** | the migration and the event vocabulary | **authorized** — one vocabulary migration **before any producer**, and the calendar gets its **own `calendar` surface** |
+| **OD-2M-3** | the semantics of `planned_at` | **option A** — `planned_at` is the **intention to work on something that day**, not a commitment and not a reserved time |
+| **OD-2M-4** | whether anything leaves the application | **option B** — **push, opt-in, with a generic content-free payload** |
+| **OD-2M-5** | real-device verification | **the owner executes it**, and the push-delivery and real-compatibility requirements **block closeout** |
+| **OD-2M-6** | gesture policy on the calendar | **option A** — **visible controls only**; no drag and no other gesture in this phase |
+| **OD-2M-7** | recurrence | **out of Phase 2M**, with its own separate initiative |
+
+### 2.2 What each signature refused
+
+- **OD-2M-1 A** refuses rendering any title directly and refuses leaving reminder
+  titles unprotected beside masked task titles. Reminder sensitivity is derived
+  through `reminders.entry_id` by the same mechanism `task-derivation.ts` uses
+  for tasks. **Nothing is persisted.**
+- **OD-2M-2** refuses a producer that precedes its migration, refuses a
+  hardcoded vocabulary list in the writer, and refuses folding calendar events
+  into an existing surface — `calendar` is declared as its own.
+- **OD-2M-3 A** refuses option B (commitment), which would silently reclassify
+  data users already entered under the other meaning, and refuses option C, the
+  separate event/appointment entity. **No event entity is authorized.**
+- **OD-2M-4 B** refuses content of any kind in a payload that leaves the
+  application, refuses email, and refuses a permission prompt that is not
+  preceded by an explicit user action.
+- **OD-2M-5** refuses any emulated substitute for a real-device claim.
+- **OD-2M-6 A** refuses drag-to-reschedule and every other gesture in this phase,
+  including one added "in preparation".
+- **OD-2M-7** refuses a recurrence field, a series table, an occurrence table, an
+  exception model, a repeating rule, preparatory UI and a preparatory event.
+  Recurrence closes **not-built-by-rule** with a named destination.
+
+### 2.3 Inherited decisions this phase may not reopen
 
 | Decision | Effect on Phase 2M |
 |---|---|
@@ -202,15 +249,15 @@ traceability generator, never typed into a report.
 
 - **2M-NOTIFY-001:** Notification behaviour is governed by an explicit, per-user consent record with a declared shape, a recorded time, and a revocation that takes effect without a further step.
 - **2M-NOTIFY-002:** Nothing is delivered on any channel the user has not opted into. Absence of a consent record means **no delivery**, never a default-on.
-- **2M-NOTIFY-003:** No permission of any kind is requested on first load, on sign-in, or from any surface the user did not navigate to for that purpose.
+- **2M-NOTIFY-003:** No permission of any kind is requested on first load, on sign-in, or from any surface the user did not navigate to for that purpose. The browser prompt may only be raised **after an explicit user action**, and only after the benefit has been explained on that same surface.
 - **2M-NOTIFY-004:** The user can control notifications by **type**, by **frequency** and by **quiet period**, and every control the surface offers has a consumer that reads it.
 - **2M-NOTIFY-005:** Quiet hours, the daily cap, the 24-hour per-item cooldown and deduplication continue to hold on every channel, and are proved on each channel rather than inherited by assumption from the in-app path.
 - **2M-NOTIFY-006:** Any payload that leaves the application's control carries **no content**: no task title, no reminder title, no description, no person, no project, no entry text, no count that could identify an item. It carries `notificationCopy(locale)` and a destination, and nothing else.
 - **2M-NOTIFY-007:** The content prohibition is enforced by construction — the payload type has nowhere to put content — and a guard fails the build if a content-carrying parameter is added to the payload or to `notificationCopy`.
 - **2M-NOTIFY-008:** The existing in-app notification rows continue to be the surface where content is shown, behind authentication, and any change to what they carry is deliberate and recorded.
 - **2M-NOTIFY-009:** Every delivery is auditable: what was sent, to which channel, why, when, and under which consent record — without recording the content, which there is none of.
-- **2M-NOTIFY-010:** A revoked consent, an expired subscription and a delivery failure are each distinguishable states with defined behaviour, and none of them is retried indefinitely.
-- **2M-NOTIFY-011:** If OD-2M-4 is not signed for outbound delivery, this family closes with the in-app half delivered and the outbound half classified **not-built-by-rule** against the unsigned decision — the phase still closes.
+- **2M-NOTIFY-010:** Permission `granted`, `denied`, `unsupported`, `revoked` and `expired` are five distinguishable states with defined behaviour and defined copy, and no failure is retried indefinitely. The existing `public/sw.js` gains tests, and the push-absence guard is widened to cover `public/` and `.js` before any handler is added to it.
+- **2M-NOTIFY-011:** Push delivery, authorized by OD-2M-4 option B, uses VAPID with the private key held only in the server environment and never exposed to any client; sends only the generic content-free payload; enforces quiet hours, the daily cap and the cooldown **on the server before sending**; honours a revoked consent immediately; retires an expired subscription rather than retrying it indefinitely; never duplicates a delivery; records only content-free metadata; and uses no `service_role` client on a product path.
 
 ### 4.6 `2M-TIME` — timezone, day boundaries and DST (cross-cutting)
 
@@ -227,7 +274,7 @@ traceability generator, never typed into a report.
 - **2M-RECUR-001:** Recurrence is **out of scope by rule**. No series model, no occurrence model, no expander, no exception row and no repeat field ships in this phase.
 - **2M-RECUR-002:** The existing deterministic refusal (`recurrence_requested`, with copy in both locales) remains correct and is re-asserted by a test, so the product's stated limit and its behaviour cannot diverge.
 - **2M-RECUR-003:** A guard fails the build if a recurrence field, column, parameter or expander appears in this phase's surfaces, including one added "in preparation".
-- **2M-RECUR-004:** The destination for recurrence is named explicitly in the closing record as a separately authorized initiative with its own decision, not as a deferred slice of this phase.
+- **2M-RECUR-004:** The destination for recurrence is named explicitly in the closing record as a **separately authorized initiative** with its own decision, not as a deferred slice of this phase, and the family closes **not-built-by-rule** against OD-2M-7 rather than as a partial.
 
 ### 4.8 `2M-PRIVACY` — sensitive content on the new surfaces (cross-cutting)
 
@@ -235,15 +282,15 @@ traceability generator, never typed into a report.
 - **2M-PRIVACY-002:** A manual task with no source entry stays `undetermined` and is never artificially classified; absence of a source is never read as `normal`.
 - **2M-PRIVACY-003:** A task whose source entry is absent from the owner-scoped map takes the most protective outcome, and no branch distinguishes "removed", "foreign" and "unreadable".
 - **2M-PRIVACY-004:** No classification is persisted anywhere by this phase — not on `tasks`, not on `reminders`, not on `notifications`, not on any new row.
-- **2M-PRIVACY-005:** Reminder titles rendered on any new surface are governed by the same derivation, via `reminders.entry_id`, or the surface does not render them; the choice is OD-2M-1's and is recorded either way.
+- **2M-PRIVACY-005:** OD-2M-1 option A: reminder titles rendered on any new surface are governed by the **same derivation**, via `reminders.entry_id`, with the same three outcomes and the same fail-closed absence rule as tasks. A surface that renders a reminder title without it fails the build.
 - **2M-PRIVACY-006:** No refusal, empty state, count, aria label, error message or telemetry property on any new surface differs in a way that reveals the existence, classification or content of a record the reader may not see.
 
 ### 4.9 `2M-MOBILE` — mobile interaction
 
 - **2M-MOBILE-001:** Every calendar, planner, review and notification-settings surface is usable one-handed at 375 px and at 412 px, in both locales, with no horizontal page scroll.
 - **2M-MOBILE-002:** Every interactive target meets the declared minimum size, and controls that change or delete something are not adjacent to controls that navigate.
-- **2M-MOBILE-003:** Gesture policy follows OD-2M-6. Whatever is signed, **every action reachable by a gesture is also reachable by a visible, labelled control and by the keyboard**, and a guard enforces the surfaces the decision names.
-- **2M-MOBILE-004:** An accidental activation is recoverable: every gesture-initiated or touch-initiated change is confirmed or undoable, with the affordance where the action happened.
+- **2M-MOBILE-003:** OD-2M-6 option A: **no drag, swipe, pointer or touch gesture ships on any calendar, planner, review or notification surface**, including one added "in preparation". Every action is reachable through a visible, labelled control and by the keyboard, and the no-gesture guard is extended to name the new surfaces.
+- **2M-MOBILE-004:** An accidental activation is recoverable: every touch-initiated change is confirmed or undoable, with the affordance where the action happened.
 - **2M-MOBILE-005:** The mobile journeys for calendar, planner, review and notification settings run in the desktop and mobile Playwright projects in both locales.
 
 ### 4.10 `2M-ACCESS` — accessibility (executed per slice, closed in 2M.5)
@@ -259,16 +306,16 @@ traceability generator, never typed into a report.
 ### 4.11 `2M-METRICS` — content-free telemetry (slice 2M.5)
 
 - **2M-METRICS-001:** The vocabulary migration lands **before** any producer exists, and a guard fails the build if a producer names an event the deployed vocabulary does not admit.
-- **2M-METRICS-002:** The migration widens every enforcement point the audit enumerated in one change — the event-name CHECK, the property validator, and the surface CHECK if a new surface is declared — and its assertions prove that no pre-existing name or surface was lost.
+- **2M-METRICS-002:** Migration 1 widens every enforcement point the audit enumerated in one change — the event-name CHECK, `private.validate_product_event_properties` and the surface CHECK, which **declares `calendar` as its own surface** — and its assertions prove that no pre-existing name or surface was lost, introduce no hardcoded list in the writer, and prove every value through the real write path with **non-vacuous** negative controls.
 - **2M-METRICS-003:** Every declared event has a **real consumer** before closeout: a reader that asks a question of it. An event nothing reads is not delivered.
-- **2M-METRICS-004:** No event property can carry content. The property whitelist is the mechanism; there is no key that could hold a title, a description, a name, a date the user chose, or a free string.
+- **2M-METRICS-004:** No event property can carry content. The property whitelist is the mechanism; there is no key that could hold a title, a description, a name, a date the user chose, a time the user chose, a free timezone string, review text, a payload, an endpoint, a subscription or any sensitive value. Free-form properties are refused outright.
 - **2M-METRICS-005:** The measurements this phase records are stated as questions before any producer is written — how often a plan is made, how often a review produces an action, how often a notification is silenced — and an event that answers none of them is not created.
-- **2M-METRICS-006:** If the migration is not spent, every requirement depending on it closes **not-built-by-rule** against the budget, with the destination named — never as a partial with an invented remainder.
+- **2M-METRICS-006:** Every event carries a declared question, a producer, a writer, a consumer, a test, a negative control and a proof of writability on the deployed project; an event missing any one of the seven is not delivered. A **third** migration, or a migration outside the two named allocations, fails the phase rather than being absorbed.
 
 ### 4.12 `2M-DEVICE` — real-device verification (slice 2M.5)
 
 - **2M-DEVICE-001:** The requirements that **cannot** be verified in an emulated viewport are named individually before implementation begins, and no other requirement claims real-device evidence.
-- **2M-DEVICE-002:** For each, the phase records which **blocks its slice** and which **blocks closeout**, and the two lists are different.
+- **2M-DEVICE-002:** For each, the phase records which **blocks its slice** and which **blocks closeout**, and the two lists are different. Under OD-2M-5, **push delivery and real-device compatibility block closeout**, and the owner executes the proof.
 - **2M-DEVICE-003:** A checklist exists for **iOS Safari** and for **Android Chrome**, naming the OS version, the browser, the exact steps and the expected observation for each item.
 - **2M-DEVICE-004:** A real-device claim is recorded as **executed** with the device, date and observation, or as **not executed** — and an emulated run may never be recorded as satisfying one. A closeout that claims otherwise is refused.
 - **2M-DEVICE-005:** The two inherited Phase 2L residuals (`2L-MOBILE-008`, `2L-ACCESS-008`) are executed in the same owner-run session or are re-stated as still open with their destination; they are not silently absorbed.
@@ -328,19 +375,26 @@ takes only the locale.
 
 ## 7. Migration budget
 
-**Ceiling: 2. Obligation: 0.** A ceiling is not a licence to spend.
+**`2 allocated · 0 spent` at authorization. Exactly two, and they are
+NON-TRANSFERABLE.**
 
-| # | Candidate | Condition | Contents |
+| # | Allocation | Slice | Contents, and nothing else |
 |---|---|---|---|
-| 1 | **Telemetry vocabulary** | required only if the phase declares any new product event or surface | the event-name CHECK, `private.validate_product_event_properties`, and the surface CHECK if a `calendar` surface is declared — **one migration, all points at once**, landing before any producer |
-| 2 | **Notification consent and delivery** | required **only** if OD-2M-4 is signed for outbound delivery | consent record, channel subscription, delivery audit, RLS, grants — with its own decision, its own slice and its own security review |
+| 1 | **Telemetry vocabulary and the `calendar` surface** | 2M.1, **before any producer** | the event-name CHECK, `private.validate_product_event_properties`, and the surface CHECK declaring `calendar` — **one migration, all enforcement points at once** |
+| 2 | **Notification consent, subscription and delivery** | 2M.4b | consent, subscription, delivery state, revocation, the timestamps those need, ownership, RLS, minimum retention, deduplication, and **content-free** audit |
 
-If OD-2M-4 is not signed, **the ceiling is 1**. If the phase declares no new
-event, **the ceiling is 0** and every dependent requirement closes
-`not-built-by-rule` per **2M-METRICS-006**.
+**Non-transferable means what it says.** Migration 1 may not carry consent or
+subscription schema; migration 2 may not carry vocabulary. Unspent capacity in
+one does not become capacity in the other.
 
-Everything else in this PRD is achievable with **zero schema change**, which is
-the reason the calendar is specified over sources that already exist.
+**Migration 2 may not store** a task title, a description, a name, record
+content, user-supplied notification text, or any free-form payload column.
+
+**A third migration is a stop condition**, not a decision the implementer makes.
+Everything outside these two — the calendar surface, the planner, review-to-
+action, the sensitivity derivation, the local-day contract — is specified to
+need **zero schema change**, which is the reason the calendar is built over
+sources that already exist.
 
 ---
 
@@ -363,11 +417,14 @@ merge SHA; and — for anything platform-dependent — a real-device record that
 
 ---
 
-## 10. Open decisions — options, recommendation and impact
+## 10. The decisions, as signed — and what each one refused
 
-Each is **blocking** for the slice named. None is decided by this document.
+All seven are **signed by the owner in ADR-105**. The options are kept below
+because a decision is only legible next to what it declined; the recommendation
+that preceded each signature is kept for the same reason. Where the owner
+changed a recommendation, that is stated rather than smoothed.
 
-### OD-2M-1 — What the calendar renders, and how it is protected · blocks 2M.1
+### OD-2M-1 — What the calendar renders, and how it is protected · **SIGNED: option A.** Formerly blocking slice 2M.1
 
 | Option | What it means | Impact |
 |---|---|---|
@@ -383,7 +440,7 @@ tasks stay `undetermined`; a source absent from the owner-scoped map is
 fail-closed; and **nothing is persisted**. `calendar` joins `GOVERNED_SURFACES`
 in the same change that ships its first consumer.
 
-### OD-2M-2 — The migration and the event vocabulary · blocks 2M.5, gates 2M.1
+### OD-2M-2 — The migration and the event vocabulary · **SIGNED: authorized, with `calendar` as its own surface.** Formerly blocking 2M.5 and gating 2M.1
 
 **Recommendation:** one migration, spent **before** any producer, widening all
 of the enforcement points the audit enumerated in a single change, with
@@ -395,7 +452,7 @@ whether a `calendar` surface is declared (which adds the surface CHECK and
 surface. **Ceiling is proposed, not required**: if the phase declares no event
 worth a consumer, the right answer is to spend nothing.
 
-### OD-2M-3 — The semantics of `planned_at` · blocks 2M.1 and 2M.2
+### OD-2M-3 — The semantics of `planned_at` · **SIGNED: option A.** Formerly blocking slices 2M.1 and 2M.2
 
 | Option | Meaning | Impact |
 |---|---|---|
@@ -424,7 +481,7 @@ Under A, B is **refused with a reason**: reclassifying data users already
 entered, without asking them, is exactly the silent-move this phase forbids
 everywhere else.
 
-### OD-2M-4 — Whether anything leaves the application · blocks 2M.4
+### OD-2M-4 — Whether anything leaves the application · **SIGNED: option B — push, opt-in, content-free.** Formerly blocking slice 2M.4
 
 | Option | Impact |
 |---|---|
@@ -450,7 +507,7 @@ production. B is therefore not a greenfield addition — it modifies a worker
 already installed on every production client, which is a stale-worker and
 update-ordering problem before it is a delivery problem.
 
-### OD-2M-5 — Real-device verification: who runs it, and what blocks · blocks closeout
+### OD-2M-5 — Real-device verification · **SIGNED: the owner executes it, and push delivery plus real compatibility block closeout**
 
 **Recommendation:** the phase declares **before implementation** which
 requirements are hardware-dependent; splits them into *blocks-its-slice* and
@@ -464,7 +521,7 @@ re-stated as open.
 **The owner runs these.** An implementer cannot schedule owner hardware, so any
 plan that assumes otherwise is wrong on its first day.
 
-### OD-2M-6 — Gesture policy on the calendar · blocks 2M.1
+### OD-2M-6 — Gesture policy on the calendar · **SIGNED: option A — visible controls only.** Formerly gating slice 2M.1
 
 | Option | Impact |
 |---|---|
@@ -489,7 +546,7 @@ also reachable by a visible labelled control and by the keyboard, and the
 no-gesture guard is extended to name the calendar's files so a handler cannot
 appear "in preparation".
 
-### OD-2M-7 — Recurrence · blocks 2M.0
+### OD-2M-7 — Recurrence · **SIGNED: out of Phase 2M, with its own initiative.** Formerly gating slice 2M.0
 
 **Recommendation: explicit separation. Recurrence does not belong to Phase 2M.**
 
@@ -539,10 +596,18 @@ notifications **and** a recurrence domain and still close.
 
 ---
 
-## 12. What this document does not authorize
+## 12. What this document still does not authorize
 
-No implementation. No migration. No deploy. No database, RLS, grant, policy,
-Auth or signup change. No notification sent. No service-worker change. No
-permission requested. No telemetry event created. No provider call. No BYOK use.
-No rollout. No acceptance report, no final matrix, no closing report. No merge of
-the planning PR. No start of the roadmap successor.
+ADR-105 authorizes slices 2M.0–2M.5, the two named migrations, deployments after
+each merge with CI green on the merge SHA, hosted proofs, the owner hardware
+checkpoint, closeout, and the successor re-audit. It authorizes **nothing else**.
+
+Still refused, whatever implementation discovers: recurrence in any form · an
+event/appointment entity · external calendar integration · email · content in a
+push payload · a provider call or BYOK spend · AI generating or moving a plan ·
+a third migration · schema outside the two named destinations · changing a signed
+decision · RLS, grant or policy beyond the approved model · an unplanned external
+service · opening public signup · executing the public rollout · starting or
+formally planning the roadmap successor.
+
+Each of those is a **stop condition**, not a judgement call.

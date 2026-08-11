@@ -5,10 +5,34 @@ and declares no requirement. It records **what the repository actually does
 today** for every subject Phase 2M's candidate scope names, with the file and
 line that proves it.
 
-**Baseline:** `main` at `5e6174bb3f50da5f8560c5b7702642b0b1e83545`, 89
+**Baseline:** `main` at `62753ce8a5e35888902694f0857ecb2436a8d25c`, 89
 migrations, hosted parity `202608090089` **confirmed by a live read-only
-`supabase migration list --linked` on 2026-08-09** — 89 rows, local equal to
-remote on every one, zero local-only, zero remote-only. Public signup closed.
+`supabase migration list --linked`** — 89 rows, local equal to remote on every
+one, zero local-only, zero remote-only. Public signup closed.
+
+---
+
+## 0. The baseline moved during owner review, and the findings were re-executed
+
+This audit was first written against `5e6174b`. Between then and the owner's
+signature, **PR #166 (*"perf: make authenticated navigation responsive"*)
+merged**, adding `src/app/[locale]/app/loading.tsx`, a navigation-pending
+affordance, and edits to `work-item-actions.tsx`, `capture-receipt.tsx`,
+`inbox-item.tsx`, `navigation-links.tsx` and `require-user.ts`. CI is green on
+its merge SHA `62753ce`.
+
+**Nothing was carried forward on the earlier baseline's authority.** Each
+load-bearing negative was re-executed at `62753ce`:
+
+| Finding | Re-execution at `62753ce` | Result |
+|---|---|---|
+| `planned_at` has no read-side predicate (§1.2) | search over `src/**/*.{ts,tsx}` excluding tests for `planned_at` in `.eq(`, `.gte(`, `.lt(`, `.not(`, `.order(` | **still empty** |
+| `public/sw.js` carries no push handler (§4.3) | the file is untouched since `6e2bf59`, a clone-ordering fix | **unchanged** |
+| No gesture on any Work surface (§10) | `work-item-actions.tsx` was edited by PR #166; searched for `onTouch`, `onPointer`, `onDrag`, `onSwipe`, `addEventListener` | **none present**; the no-gesture guard passes |
+| Migration count and parity | `ls supabase/migrations`, live `migration list --linked` | **89, `202608090089`, local = remote** |
+
+PR #166 touches no calendar, planning, review, notification, timezone,
+sensitivity or telemetry contract. **All seven findings below stand.**
 
 **Method.** Every absence below is proved by a search and by naming the contract
 that would have to carry the thing if it existed. "We did not find it" is not

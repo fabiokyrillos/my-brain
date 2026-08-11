@@ -200,27 +200,23 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line, "the start must cite its authorization").toMatch(/ADR-104/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
     /*
-     * The "planning" half came back at ADR-102, went again at ADR-103, and comes
-     * back at ADR-104, in the commit that recorded each. That is not a guard
-     * being loosened and tightened at convenience — it is one rule applied to
-     * three different facts.
+     * The "planning" half came back at ADR-102, went again at ADR-103, came back
+     * at ADR-104 and goes again at ADR-105 — in the commit that recorded each.
+     * That is not a guard being loosened and tightened at convenience; it is one
+     * rule applied to four different facts.
      *
      * The rule: **the line cites every authorization the phase has received and
-     * overstates none of them.** ADR-102 gave planning only, so the word
+     * overstates none of them.** ADR-104 gave planning only, so the word
      * "planning" was required and its absence would have been an overstatement.
-     * ADR-103 then authorized implementation through closeout, so requiring
-     * "planning" would have forced the line to *understate* — the mirror-image
-     * error, and the one that made this assertion drop the word at Phase 2K's
-     * close under ADR-101. ADR-104 authorizes **planning only** again, so the
-     * word is required again, and asserting its *absence* would now be the
-     * overstatement.
+     * ADR-105 then authorized implementation through closeout, so requiring
+     * "planning" alone would now force the line to *understate* — the
+     * mirror-image error, and the one that made this assertion drop the word at
+     * Phase 2K's close under ADR-101.
      *
      * What does not move: the line names the phase, cites every ADR it has, and
      * does not announce a successor.
      */
-    expect(line, "a planning-only authorization must say so").toMatch(/planning/i);
-    expect(line, "no implementation is authorized, so no implementation ADR may be cited")
-      .not.toMatch(/ADR-105/);
+    expect(line, "the implementation authorization must be cited too").toMatch(/ADR-105/);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2N/);
   });

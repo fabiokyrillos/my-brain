@@ -1,7 +1,8 @@
 # Phase 2M — traceability contract
 
-**Status:** planning artifact. It defines what the closeout generator must
-**refuse**. No generator, no matrix and no acceptance record may be created
+**Status:** governing artifact. Planning authorized by **ADR-104**;
+implementation through closeout by **ADR-105**, which signed all seven
+decisions. It defines what the closeout generator must **refuse**. No generator, no matrix and no acceptance record may be created
 before its gate; this document only fixes the rules they will be held to.
 
 ---
@@ -95,10 +96,22 @@ their **names** fails. The names at this baseline are the event-name CHECK,
 `private.validate_product_event_properties`, `productEventNames`, the surface
 CHECK, and `productSurfaces`.
 
-### R-13 — A migration outside the budget
-Any migration present that the budget does not admit fails the close, and the
-budget is reconciled against the migrations actually in the tree — not against
-the plan's intention.
+### R-13 — A migration outside the budget, or in the wrong destination
+The budget is **`2 allocated`, NON-TRANSFERABLE**: migration 1 is the telemetry
+vocabulary and the `calendar` surface; migration 2 is notification consent,
+subscription and delivery. Three failures, each separately:
+
+- a **third** migration, in any form;
+- migration 1 carrying consent or subscription schema, or migration 2 carrying
+  vocabulary — capacity is not fungible between them;
+- migration 2 carrying **any** content-bearing column: a task title, a
+  description, a name, record content, user-supplied notification text or a
+  free-form payload column.
+
+The budget is reconciled against the migrations actually in the tree — not
+against the plan's intention. `2 allocated · 2 spent` is the expected close only
+if both were genuinely necessary and applied; a migration created to use up an
+allocation fails.
 
 ### R-14 — A hosted claim that was not executed
 Any claim about the hosted project — parity, deployment, a live reading — that
@@ -116,18 +129,24 @@ Any delivery claim classified `built` without an explicit consent record, a
 recorded time and a working revocation fails.
 
 ### R-17 — A payload with unauthorized content
-Any payload leaving the application carrying a title, a description, a person, a
-project, an entry, or any content, fails — regardless of the classification
-claimed.
+OD-2M-4 signed push **content-free**. Any payload leaving the application
+carrying a title, a description, a person, a project, an entry, or any content,
+fails — regardless of the classification claimed. So does a VAPID private key
+reachable from a client, a delivery record carrying content, a permission prompt
+raised without an explicit user action, and any `service_role` client on a
+product path.
 
 ### R-18 — A timezone claim with no proof
 A timezone, day-boundary or DST claim classified `built` without a test that
 executes across the transition, in both directions, fails.
 
-### R-19 — Recurrence without occurrence semantics
-Any recurrence-shaped artifact — a series field, a repeat parameter, an expander
-— classified anything other than the phase's declared exclusion fails. Recurrence
-is out of scope by rule; a partial recurrence is worse than none.
+### R-19 — Recurrence, in any form
+OD-2M-7 signed recurrence **out of Phase 2M**. The family closes
+**not-built-by-rule** against that signature, with a named destination — never
+`partial`, never `built`, never `undelivered`. Any recurrence-shaped artifact
+fails the close: a `recurrence` field, a series table, an occurrence table, an
+exception model, a repeating rule, preparatory UI or a preparatory event. The
+existing deterministic refusal must still hold, asserted by test.
 
 ### R-20 — A gesture with no visible alternative
 Any gesture-reachable action without an equivalent visible, labelled control and
