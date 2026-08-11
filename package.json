@@ -29,6 +29,7 @@
     "measure:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs",
     "measure:2j:funnel": "node scripts/phase-2j-experience-funnel-reader.mjs",
     "measure:2m:funnel": "node scripts/phase-2m-daily-cycle-funnel-reader.mjs",
+    "measure:2m:proof": "node scripts/phase-2m-daily-cycle-funnel-proof.mjs",
     "ops:account-health": "node scripts/phase-2h-account-health.mjs",
     "ops:deletion-reaper-schedule": "node scripts/phase-2h-deletion-reaper-schedule.mjs",
     "ops:health": "node scripts/phase-2h-operator-health.mjs",
