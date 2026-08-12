@@ -161,6 +161,18 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * directory.
      */
     "src/features/planning/planner-view.tsx",
+    /*
+     * Added by slice 2M.4a, which is where `2M-MOBILE-003` asked for them: "the
+     * no-gesture guard is extended to name the new surfaces", and the new
+     * surfaces of slices 2M.3 and 2M.4a are the day review and the notification
+     * governance section. The review is the more tempting of the two -- a
+     * "swipe a row away to archive it" is the single most common gesture in
+     * every review product there is, and `archive` here is a **confirmed
+     * destructive** verb, so a swipe would be a one-gesture route to a
+     * transition the taxonomy requires a dialog for.
+     */
+    "src/features/day-review/day-review-view.tsx",
+    "src/features/notifications/notification-settings.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {
@@ -179,6 +191,22 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
     expect(discovered.length, "no calendar component was discovered").toBeGreaterThan(0);
     const missing = discovered.filter((file) => !(CALENDAR_SURFACES as readonly string[]).includes(file));
     expect(missing, "a calendar surface exists that the no-gesture guard does not scan").toEqual([]);
+  });
+
+  it("names every day-review and notification component there is", () => {
+    // The same discovery assertion, over the two directories slices 2M.3 and
+    // 2M.4a added. Without it a component added later would be invisible to the
+    // ban -- which is exactly how `calendar-outcome.tsx` came to be named above.
+    const discovered: string[] = [];
+    for (const directory of ["src/features/day-review", "src/features/notifications"]) {
+      for (const entry of readdirSync(join(REPO, directory))) {
+        if (!entry.endsWith(".tsx") || entry.endsWith(".test.tsx")) continue;
+        discovered.push(`${directory}/${entry}`);
+      }
+    }
+    expect(discovered.length, "no day-review or notification component was discovered").toBeGreaterThan(1);
+    const missing = discovered.filter((file) => !(CALENDAR_SURFACES as readonly string[]).includes(file));
+    expect(missing, "a surface exists that the no-gesture guard does not scan").toEqual([]);
   });
 
   it("names every planner component there is", () => {
