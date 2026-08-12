@@ -397,8 +397,20 @@ async function main() {
 
     console.log("\n9. Retention is registered and armed by nobody");
 
+    /*
+     * Stated for what it is. `private.prune_notification_deliveries` lives in
+     * the `private` schema, which PostgREST does not expose at all, so this
+     * proves it is unreachable THROUGH THE DATA API and nothing more — it would
+     * pass for a function that had been granted to everybody.
+     *
+     * The privilege itself is proved properly where it can be: the pgTAP suite
+     * asserts `has_function_privilege` is false for `authenticated`, `anon` AND
+     * `service_role`. Recording the weaker claim as the stronger one is exactly
+     * the probe-side defect this repository has paid for repeatedly, so the two
+     * are kept apart.
+     */
     const sweep = await admin.rpc("prune_notification_deliveries", { p_limit: 1 });
-    check("the retention sweep is not reachable by service_role",
+    check("the retention sweep is unreachable through the data API (privilege proved in pgTAP, not here)",
       Boolean(sweep.error), `code=${sweep.error?.code ?? "REACHABLE"}`);
   } finally {
     console.log("\n10. Cleanup, and zero residue proved owner-scoped");
