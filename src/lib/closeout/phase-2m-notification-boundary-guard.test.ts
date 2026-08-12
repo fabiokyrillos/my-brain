@@ -243,7 +243,7 @@ describe("governance ships before delivery, and the directory proves it", () => 
     }
   });
 
-  it("keeps the push-absence allowlist to the three files 2M.4b earned", () => {
+  it("keeps the push allowlist to exactly the files 2M.4b earned", () => {
     /*
      * The ordering that makes a guard mean something: the guard watched the
      * file before anything was added to it, and now that something has been
@@ -257,6 +257,26 @@ describe("governance ships before delivery, and the directory proves it", () => 
     const allowed = /const ALLOWED: readonly string\[\] = \[([\s\S]*?)\];/.exec(guard)?.[1] ?? "MISSING";
     const names = [...allowed.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
     expect(names, "the push allowlist gained or lost an entry").toEqual([
+      "public/sw.js",
+      "src/features/notifications/consent-reader.ts",
+      "src/features/notifications/push-controls.tsx",
+      "supabase/functions/_shared/web-push.test.ts",
+      "supabase/functions/_shared/web-push.ts",
+      "supabase/functions/send-push/deliver.test.ts",
+      "supabase/functions/send-push/deliver.ts",
+      "supabase/functions/send-push/index.ts",
+    ]);
+
+    /*
+     * And the half that matters most, asserted separately.
+     *
+     * The sender may grow files — it is a runtime the browser cannot load. The
+     * APPLICATION may not: every entry on that side is a file that ships to a
+     * page. Splitting the assertion means a future sender refactor cannot
+     * quietly buy room for a fourth push artifact in `src/` or `public/`, which
+     * a single growing list would have allowed without anyone noticing.
+     */
+    expect(names.filter((name) => !name.startsWith("supabase/"))).toEqual([
       "public/sw.js",
       "src/features/notifications/consent-reader.ts",
       "src/features/notifications/push-controls.tsx",

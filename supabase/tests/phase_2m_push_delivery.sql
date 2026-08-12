@@ -21,7 +21,7 @@
 
 begin;
 
-select plan(61);
+select plan(90);
 
 -- Fixtures -------------------------------------------------------------------
 --
@@ -35,16 +35,27 @@ insert into auth.users (
   ('2f4b0001-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
    'push-owner-a@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
   ('2f4b0002-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
-   'push-owner-b@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
+   'push-owner-b@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+  -- Owner C exists for section 8 alone, so the retirement sequence runs from a
+  -- clean state rather than unpicking the state sections 4-7 deliberately built.
+  ('2f4b0003-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+   'push-owner-c@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 -- `handle_new_user` creates profiles and agent_preferences. Pin the zone and
 -- the quiet window to known values so the assertions are exact rather than
 -- dependent on whatever the defaults happen to be.
 update public.profiles set timezone = 'America/Sao_Paulo'
- where user_id in ('2f4b0001-0000-4000-8000-000000000001', '2f4b0002-0000-4000-8000-000000000002');
+ where user_id in ('2f4b0001-0000-4000-8000-000000000001', '2f4b0002-0000-4000-8000-000000000002',
+                   '2f4b0003-0000-4000-8000-000000000003');
 update public.agent_preferences
    set quiet_start = '22:30', quiet_end = '07:00', max_followups_per_day = 3
  where user_id in ('2f4b0001-0000-4000-8000-000000000001', '2f4b0002-0000-4000-8000-000000000002');
+-- Owner C's window is start = end, which the predicate defines as NEVER quiet.
+-- A narrow window would leave section 8 with a one-in-1440 chance of a red run,
+-- and a flake in this repository is a defect rather than weather.
+update public.agent_preferences
+   set quiet_start = '03:00', quiet_end = '03:00', max_followups_per_day = 5
+ where user_id = '2f4b0003-0000-4000-8000-000000000003';
 
 -- 1. Structure and posture ---------------------------------------------------
 
@@ -104,7 +115,7 @@ select results_eq(
   $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.begin_push_delivery(uuid,text,text)'::regprocedure $$,
   array[true], 'begin_push_delivery has an explicit safe search_path');
 select results_eq(
-  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.finish_push_delivery(uuid,text,uuid[])'::regprocedure $$,
+  $$ select 'search_path=""' = any(proconfig) from pg_proc where oid = 'public.finish_push_delivery(uuid,text,uuid[],uuid[])'::regprocedure $$,
   array[true], 'finish_push_delivery has an explicit safe search_path');
 
 -- The two worker functions are service_role's and nobody else's.
@@ -115,7 +126,7 @@ select results_eq(
   $$ select has_function_privilege('service_role', 'public.begin_push_delivery(uuid,text,text)', 'execute') $$,
   array[true], 'service_role can execute begin_push_delivery');
 select results_eq(
-  $$ select has_function_privilege('authenticated', 'public.finish_push_delivery(uuid,text,uuid[])', 'execute') $$,
+  $$ select has_function_privilege('authenticated', 'public.finish_push_delivery(uuid,text,uuid[],uuid[])', 'execute') $$,
   array[false], 'authenticated cannot execute finish_push_delivery');
 
 select results_eq(
@@ -445,6 +456,301 @@ select throws_ok(
        '2f4b0001-0000-4000-8000-000000000001', 'reminder', repeat('f', 64)) $$,
   '42501', null,
   'an authenticated caller cannot drive the sender against another user');
+
+-- 8. Retirement, the two retry ceilings, and the states in between -----------
+--
+-- Everything below is owner C's, from a clean start. Sections 4-7 proved the
+-- controls that REFUSE; this proves what happens to a subscription and a consent
+-- once delivery has been permitted and then goes wrong -- which is where
+-- `2M-NOTIFY-010`'s "no failure is retried indefinitely" actually lives.
+--
+-- ROLE DISCIPLINE, and it is not decoration.
+--
+-- `service_role` is NOT assumed to hold `SELECT` on these tables. This
+-- repository has already been caught by that assumption once -- `product_events`
+-- is unreadable to `service_role`, and a probe that read it globally proved
+-- nothing. So below, `service_role` CALLS the two worker functions and reads
+-- nothing; every raw table read is made either from the owner's own
+-- `authenticated` session (where it is a scope claim and must be) or with the
+-- role reset (where it is a state claim and the role is irrelevant). Row ids the
+-- worker calls need are pinned to literals by the superuser first, so no
+-- assertion smuggles a `SELECT` into a `service_role` block.
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"2f4b0003-0000-4000-8000-000000000003","role":"authenticated"}', true);
+select set_config('request.jwt.claim.sub', '2f4b0003-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+
+-- The endpoint is a URL the SERVER will later POST to. An endpoint that
+-- resolves inside the deployment is a request-forgery primitive with a user id
+-- attached, and `https` alone does not refuse one.
+select throws_ok(
+  $$ select public.register_push_subscription('https://127.0.0.1/push', 'p256dh-c', 'auth-c') $$,
+  '22023', null, 'a loopback endpoint is refused even though it is https');
+select throws_ok(
+  $$ select public.register_push_subscription('https://localhost/push', 'p256dh-c', 'auth-c') $$,
+  '22023', null, 'a dotless internal hostname is refused');
+select throws_ok(
+  $$ select public.register_push_subscription('https://10.0.0.5/push', 'p256dh-c', 'auth-c') $$,
+  '22023', null, 'a private-range endpoint is refused');
+-- The trap the naive check would miss: an authority that STARTS with a
+-- legitimate-looking host and still resolves to loopback.
+select throws_ok(
+  $$ select public.register_push_subscription('https://push.test@127.0.0.1/x', 'p256dh-c', 'auth-c') $$,
+  '22023', null, 'a userinfo prefix cannot smuggle a loopback host past the check');
+
+-- `2M-NOTIFY-002`: absence of a consent record refuses, with no row required to
+-- say so. Asserted BEFORE C registers anything, which is the only moment this
+-- state exists.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+select results_eq(
+  $$ select (public.begin_push_delivery(
+       '2f4b0003-0000-4000-8000-000000000003', 'reminder', repeat('1', 64)) ->> 'reason') $$,
+  array['not_consented'],
+  'a user with NO consent record at all is refused -- absence is not permission');
+
+reset role;
+select results_eq(
+  $$ select count(*)::int from public.notification_deliveries
+      where user_id = '2f4b0003-0000-4000-8000-000000000003' and outcome <> 'suppressed' $$,
+  array[0],
+  'the refusal wrote a suppression row and nothing else -- no partial delivery state');
+
+-- The preference write CREATES the row when there is none.
+--
+-- A bare UPDATE matching nothing succeeds silently, and the function would have
+-- returned success having discarded the quiet hours the user just set -- the
+-- "sets quiet hours once and is still pushed at 03:00" failure arriving through
+-- the back door of the reuse that was supposed to prevent it.
+reset role;
+delete from public.agent_preferences where user_id = '2f4b0003-0000-4000-8000-000000000003';
+select set_config('request.jwt.claims',
+  '{"sub":"2f4b0003-0000-4000-8000-000000000003","role":"authenticated"}', true);
+select set_config('request.jwt.claim.sub', '2f4b0003-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select lives_ok(
+  $$ select public.update_notification_preferences(
+       array['reminder','follow_up','review','digest']::text[], 'immediate',
+       '03:00'::time, '03:00'::time, 5::smallint) $$,
+  'preferences are accepted for a user with no agent_preferences row');
+select results_eq(
+  $$ select quiet_start::text || '|' || quiet_end::text || '|' || max_followups_per_day::text
+       from public.agent_preferences where user_id = '2f4b0003-0000-4000-8000-000000000003' $$,
+  array['03:00:00|03:00:00|5'],
+  'the quiet hours really persisted rather than being silently discarded');
+
+-- Setting a preference must never be a way to reach `granted`.
+select results_eq(
+  $$ select state from public.notification_consents
+      where user_id = '2f4b0003-0000-4000-8000-000000000003' and channel = 'push' $$,
+  array['unsupported'],
+  'editing preferences created an `unsupported` consent, never a `granted` one');
+
+-- A granted consent with NO LIVE DEVICE is not a deliverable consent.
+select lives_ok(
+  $$ select public.register_push_subscription(
+       'https://push.test/endpoint-c', 'p256dh-c', 'auth-c') $$,
+  'owner C registers a real subscription');
+reset role;
+update public.push_subscriptions set state = 'revoked'
+ where user_id = '2f4b0003-0000-4000-8000-000000000003';
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+select results_eq(
+  $$ select (public.begin_push_delivery(
+       '2f4b0003-0000-4000-8000-000000000003', 'reminder', repeat('2', 64)) ->> 'reason') $$,
+  array['not_consented'],
+  'a granted consent with no ACTIVE device is refused rather than permitted with an empty send list');
+
+-- Back to a real, deliverable state, and then the per-device ceiling.
+--
+-- The subscription's id is PINNED to a literal here, by the superuser. Every
+-- `finish_push_delivery` call below then names it directly instead of looking it
+-- up, which is what keeps the `service_role` blocks free of any `SELECT` on a
+-- table `service_role` is not asserted to be able to read.
+reset role;
+update public.push_subscriptions
+   set state = 'active', id = '2f4b0003-0000-4000-8000-0000000000c1'
+ where user_id = '2f4b0003-0000-4000-8000-000000000003';
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+
+select results_eq(
+  $$ select (public.begin_push_delivery(
+       '2f4b0003-0000-4000-8000-000000000003', 'reminder', repeat('3', 64)) -> 'permitted')::text $$,
+  array['true'],
+  'owner C can be delivered to -- the positive control section 8 rests on');
+
+-- The permitted result carries the subscription the sender must POST to, and
+-- carries it as identity plus keys and nothing else.
+select results_eq(
+  $$ select jsonb_array_length(
+       public.begin_push_delivery(
+         '2f4b0003-0000-4000-8000-000000000003', 'digest', repeat('4', 64)) -> 'subscriptions') $$,
+  array[1],
+  'the permitted result hands the sender exactly the one active subscription');
+
+-- Pin the in-flight delivery's id too, for the same reason.
+reset role;
+update public.notification_deliveries set id = '2f4b0003-0000-4000-8000-0000000000d1'
+ where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('3', 64);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+
+-- THE TWO CEILINGS, exercised together on the `3` delivery.
+--
+-- Each `finish(..., 'failed', ...)` costs the DELIVERY one attempt and the
+-- DEVICE one strike. The third of each retires its own subject, and neither
+-- ceiling can be outrun because both columns carry a CHECK.
+select results_eq(
+  $$ select (public.finish_push_delivery(
+       '2f4b0003-0000-4000-8000-0000000000d1', 'failed', '{}'::uuid[],
+       array['2f4b0003-0000-4000-8000-0000000000c1']::uuid[]) ->> 'outcome') $$,
+  array['pending'],
+  'the first device failure leaves the delivery in flight');
+
+reset role;
+select results_eq(
+  $$ select failure_count::int from public.push_subscriptions
+      where id = '2f4b0003-0000-4000-8000-0000000000c1' $$,
+  array[1],
+  'and the device carries one strike -- failure_count has a writer, not just a CHECK');
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+
+select results_eq(
+  $$ select (public.finish_push_delivery(
+       '2f4b0003-0000-4000-8000-0000000000d1', 'failed', '{}'::uuid[],
+       array['2f4b0003-0000-4000-8000-0000000000c1']::uuid[]) ->> 'outcome') $$,
+  array['pending'],
+  'the second failure is still in flight, holding its dedupe slot');
+
+-- Deduplication is not walked around by a retry: while the delivery is still
+-- `pending`, the same item asks again and is refused by the unique index rather
+-- than by a read-then-write check two workers could interleave.
+select results_eq(
+  $$ select (public.begin_push_delivery(
+       '2f4b0003-0000-4000-8000-000000000003', 'reminder', repeat('3', 64)) ->> 'reason') $$,
+  array['duplicate'],
+  'a retry cannot walk around deduplication while the first is still in flight');
+
+select results_eq(
+  $$ select (public.finish_push_delivery(
+       '2f4b0003-0000-4000-8000-0000000000d1', 'failed', '{}'::uuid[],
+       array['2f4b0003-0000-4000-8000-0000000000c1']::uuid[]) ->> 'outcome') $$,
+  array['retired'],
+  'the THIRD delivery failure retires it -- no failure is retried indefinitely');
+
+-- A stale worker must not overwrite newer work.
+select results_eq(
+  $$ select (public.finish_push_delivery(
+       '2f4b0003-0000-4000-8000-0000000000d1', 'delivered') -> 'changed')::text $$,
+  array['false'],
+  'a finished delivery is never re-finished -- a late worker changes nothing');
+
+reset role;
+select results_eq(
+  $$ select state || '|' || failure_count::text from public.push_subscriptions
+      where id = '2f4b0003-0000-4000-8000-0000000000c1' $$,
+  array['expired|3'],
+  'and the third device strike retires the DEVICE -- the ceiling a sibling delivery cannot reset');
+
+-- The consent follows the last device out, and `2M-NOTIFY-010` gives that state
+-- a name the surface can render rather than leaving a granted consent that can
+-- never deliver.
+select results_eq(
+  $$ select state from public.notification_consents
+      where user_id = '2f4b0003-0000-4000-8000-000000000003' and channel = 'push' $$,
+  array['expired'],
+  'the consent expires with the last device rather than staying granted forever');
+
+select results_eq(
+  $$ select outcome from public.notification_deliveries
+      where id = '2f4b0003-0000-4000-8000-0000000000d1' $$,
+  array['retired'],
+  'and the retired outcome really is unchanged, not merely reported unchanged');
+
+-- 9. A gone subscription is retired rather than retried ----------------------
+--
+-- A 404/410 from the push service means the browser threw the subscription
+-- away. That is a different fact from a failure, and it retires IMMEDIATELY
+-- rather than after three strikes: retrying a subscription the browser has
+-- discarded cannot ever succeed.
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"2f4b0003-0000-4000-8000-000000000003","role":"authenticated"}', true);
+select set_config('request.jwt.claim.sub', '2f4b0003-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+-- Re-registering revives the lapsed device and clears its strikes: this is the
+-- user pressing the control again, the one action that should clear a lapse.
+select lives_ok(
+  $$ select public.register_push_subscription(
+       'https://push.test/endpoint-c', 'p256dh-c2', 'auth-c2') $$,
+  're-registering revives an expired subscription');
+select results_eq(
+  $$ select state || '|' || failure_count::text from public.push_subscriptions
+      where user_id = '2f4b0003-0000-4000-8000-000000000003' $$,
+  array['active|0'],
+  'and it comes back active with its strikes cleared');
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+select results_eq(
+  $$ select (public.begin_push_delivery(
+       '2f4b0003-0000-4000-8000-000000000003', 'review', repeat('5', 64)) -> 'permitted')::text $$,
+  array['true'],
+  'the revived device can be delivered to again');
+
+reset role;
+update public.notification_deliveries set id = '2f4b0003-0000-4000-8000-0000000000d2'
+ where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('5', 64);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+select results_eq(
+  $$ select (public.finish_push_delivery(
+       '2f4b0003-0000-4000-8000-0000000000d2', 'failed',
+       array['2f4b0003-0000-4000-8000-0000000000c1']::uuid[]) ->> 'outcome') $$,
+  array['pending'],
+  'a gone report on the first attempt leaves the delivery itself in flight');
+
+reset role;
+select results_eq(
+  $$ select state || '|' || failure_count::text from public.push_subscriptions
+      where id = '2f4b0003-0000-4000-8000-0000000000c1' $$,
+  array['expired|0'],
+  'but the GONE subscription is retired at once, with no strikes needed');
+
+-- 10. The client-reportable states, and their positive control ---------------
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"2f4b0003-0000-4000-8000-000000000003","role":"authenticated"}', true);
+select set_config('request.jwt.claim.sub', '2f4b0003-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select lives_ok(
+  $$ select public.record_push_consent_state('denied') $$,
+  'a browser-observed `denied` is recorded');
+select results_eq(
+  $$ select state from public.notification_consents
+      where user_id = '2f4b0003-0000-4000-8000-000000000003' and channel = 'push' $$,
+  array['denied'],
+  'and the consent really carries it -- the positive control for the three refusals above');
 
 reset role;
 select * from finish();

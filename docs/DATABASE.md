@@ -15,6 +15,7 @@ Todas as entidades do usuário carregam `user_id uuid not null`; horários usam 
 - Controle: `notifications`, `audit_logs`, `undo_operations`, `heartbeat_runs`, `jobs`.
 - Custos de IA: `ai_model_pricing`, `ai_usage_events`.
 - Comportamento de produto: `product_events`.
+- Notificações push (Fase 2M fatia 2M.4b): `notification_consents`, `push_subscriptions`, `notification_deliveries`.
 
 ## Regras importantes
 
@@ -311,3 +312,114 @@ Duas coisas nesta migration são diferentes do padrão do BYOK e a ADR-080 regis
 2. **Os tetos são parâmetros obrigatórios, sem default**, limitados por `private.auth_event_ceiling_cap()` (executável por ninguém). `rate_limit_email_sent = 2/hora` é artefato do SMTP padrão e muda quando o Resend entrar; um default na assinatura congelaria em DDL um valor do provedor. A lista de argumentos foi fixada de primeira de propósito: `create or replace` não estende parâmetros (ADR-057).
 
 `prune_auth_event_attempts()` varre 30 dias, é `SECURITY DEFINER` com `search_path` vazio e **não é executável por papel algum** — apagar linhas aqui zera tetos, então um grant seria uma alavanca de negação de serviço.
+
+## Phase 2M — Slice 2M.4b: consentimento, subscription e a auditoria sem conteúdo
+
+Migration `202608120092`, a **terceira e última** alocada pela fase. Três tabelas,
+seis funções, RLS habilitada **e forçada** nas três.
+
+### O que a migration deliberadamente NÃO cria
+
+**Nenhuma coluna de quiet hours e nenhuma coluna de teto diário.** Essa ausência é
+a decisão, não um esquecimento: `agent_preferences.quiet_start`, `.quiet_end` e
+`.max_followups_per_day` já detêm essa autoridade e são lidas pelo heartbeat desde
+`202607160007`. Uma segunda cópia seria uma segunda fonte de verdade para a mesma
+promessa ao usuário, e o modo de falha é concreto — alguém configura silêncio uma
+vez e mesmo assim é notificado às 03:00, porque a outra cópia nunca foi escrita.
+`update_notification_preferences` escreve nas colunas que já existem, e o faz por
+**upsert**: um `update` puro que não casasse nenhuma linha teria sucesso em
+silêncio e a função devolveria `{"updated": true}` tendo descartado exatamente o
+horário que o usuário acabou de configurar.
+
+O timezone é `profiles.timezone`, já a entrada de todo limite de dia local do
+produto. E a entrega **não precisa de schema algum**: `public.jobs.type` não tem
+CHECK, mas nem isso foi usado — o índice único parcial sobre linhas `pending` de
+`notification_deliveries` **já é** o lease, então uma linha de job seria um segundo
+lease sobre o primeiro.
+
+### A proibição de conteúdo é estrutural
+
+A única coluna de valor escolhido pelo chamador em toda a migration é
+`notification_deliveries.dedupe_hash`, e um CHECK a restringe a exatamente 64
+caracteres hexadecimais minúsculos. **Uma coluna que só pode guardar um digest
+SHA-256 não pode guardar um título.** `public.notifications` não serviria: ela
+carrega `title` e `body`, que é precisamente o conteúdo que `2M-NOTIFY-009` proíbe
+registrar, e é a superfície in-app que `2M-NOTIFY-008` exige intocada.
+
+Um bloco `do $$` no fim da migration afirma isso contra o catálogo — nenhuma das
+três tabelas pode ganhar uma coluna `title`, `body`, `payload`, `metadata`,
+`data`… — junto com RLS forçada nas três e a ausência de política de escrita.
+
+### Quem escreve
+
+`authenticated` tem **SELECT e nada mais** nas três tabelas, e **nenhuma política
+de INSERT, UPDATE ou DELETE**. Toda escrita passa por uma das seis funções:
+
+| função | papel | o que garante |
+|---|---|---|
+| `register_push_subscription` | `authenticated` | o único caminho até `granted`; valida todo argumento **antes** da primeira escrita, então uma recusa não deixa estado parcial |
+| `revoke_push_consent` | `authenticated` | consentimento **e** toda subscription na mesma transação — marcar só o consentimento deixaria uma subscription contra a qual o sender ainda entregaria (T-09) |
+| `record_push_consent_state` | `authenticated` | os três estados que só o navegador observa; **recusa `granted`**, porque consentimento é concluído de uma subscription real e nunca afirmado por um cliente |
+| `update_notification_preferences` | `authenticated` | tipo e frequência no consentimento; quiet hours e teto em `agent_preferences` |
+| `begin_push_delivery` | `service_role` | os **seis** controles, no servidor, antes de enviar |
+| `finish_push_delivery` | `service_role` | retentativa limitada, aposentadoria e idempotência contra worker atrasado |
+
+Nenhuma das quatro primeiras recebe um id de usuário: o dono vem de `auth.uid()`,
+então não existe argumento onde um chamador pudesse pôr o id de outra pessoa.
+
+### O endpoint é validado porque é uma URL para a qual o servidor vai fazer POST
+
+`https` obrigatório, e além disso são recusadas as formas que nunca são legítimas:
+loopback, faixas privadas, link-local, host sem ponto, e um prefixo `user:pass@`
+que esconderia um loopback atrás de um host de aparência legítima. É uma
+**blocklist de formas**, não uma allowlist de fornecedores — uma allowlist de
+vendors precisaria de uma migration a cada vez que um navegador mudasse de host,
+e uma quarta migration é condição de parada. A allowlist **positiva** de serviços
+de push vive no sender, onde custa um redeploy.
+
+### Retentativa é limitada duas vezes, e por motivos diferentes
+
+- **Por entrega**, com `notification_deliveries.attempts` sob CHECK ≤ 3: a
+  terceira falha aposenta a entrega.
+- **Por dispositivo**, com `push_subscriptions.failure_count` sob CHECK ≤ 3: a
+  terceira falha aposenta o aparelho.
+
+A segunda existe porque "indefinidamente" se mede por aparelho e não por mensagem.
+Uma subscription que falha sempre sem nunca devolver 410 seria retentada para
+sempre — uma entrega nova de três tentativas por vez. Uma subscription **ida**
+(404/410) é aposentada de imediato, sem strikes, porque retentar algo que o
+navegador descartou não pode dar certo. Quando o último aparelho sai, o
+consentimento passa a `expired`, que é um estado que a superfície sabe renderizar.
+
+### `duplicate` e `cooldown` são coisas diferentes
+
+`duplicate` é "já está **em voo**" e é imposto pelo índice único parcial sobre
+`outcome = 'pending'` — dois workers competindo pelo mesmo item não podem ambos
+inserir, então a dedupe sobrevive à concorrência em vez de perder uma corrida
+read-then-write. `cooldown` é "**entregue** a este item há menos de 24 horas".
+Um rascunho anterior deixava uma linha entregue contar como duplicata, o que
+tornava o cooldown **inalcançável**; escrever a suíte pgTAP encontrou isso.
+
+O índice é escopado a `pending` **sozinho**, e esse escopo é o argumento de
+correção: uma linha `delivered` não pode segurar a vaga para sempre, ou o cooldown
+de 24 horas viraria um banimento permanente.
+
+### Retenção
+
+`private.retention_windows` ganha a linha `notification_deliveries` com **90 dias**
+— o valor **assinado** pela PRD §14.1 e pela ADR-082, lido do registro em vez de
+escrito como número na varredura. `private.prune_notification_deliveries` é
+`SECURITY DEFINER` com `search_path` vazio e **não é executável por papel algum**,
+nem `service_role`, e **não é agendada por ninguém**: agendar **é** autorizar, e
+armá-la é ato de operador.
+
+### A armadilha de gramática que quase foi implantada
+
+O primeiro rascunho escrevia `pg_catalog.coalesce(...)`, `pg_catalog.least(...)` e
+`pg_catalog.greatest(...)`. **Esses lookups não resolvem**: `coalesce`, `nullif`,
+`greatest` e `least` são gramática SQL e não têm entrada em `pg_proc`, e sob
+`search_path = ''` não existe fallback. plpgsql só faz a análise da expressão na
+**primeira execução**, então a migration teria sido aplicada em silêncio e falhado
+no primeiro envio real. Quem pegou foi `src/lib/supabase/sql-grammar-guard.test.ts`
+— a guarda existe exatamente para isso, e a allowlist histórica dela **não** foi
+ampliada.

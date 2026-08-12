@@ -161,29 +161,121 @@ function filesMatching(pattern: RegExp): string[] {
  */
 const KEYLESS_DIGEST_EXCEPTION = "supabase/functions/process-jobs/product-events.ts";
 
+/**
+ * Phase 2M slice 2M.4b — the one module that performs KEYED crypto outside the
+ * cores, and the reason the rule bends here rather than breaking.
+ *
+ * ## What changed
+ *
+ * Until this slice, the keyed-operation assertion admitted **no** exceptions at
+ * all, and that was the right shape while the only keyed crypto in the
+ * repository was BYOK's. Web Push is the first thing that genuinely needs its
+ * own: RFC 8291 is ECDH + HKDF + AES-128-GCM to a **per-subscription** key the
+ * browser generated, and RFC 8292 is an ES256 signature over a VAPID pair. None
+ * of those primitives, key types or key sources exist in the BYOK core.
+ *
+ * ## Why routing it through the core would be WORSE, not stricter
+ *
+ * `byok-envelope.ts` seals credentials under the master key. Teaching it ECDH
+ * and ECDSA would put the push sender's code inside the module that holds
+ * `BYOK_MASTER_KEY` — giving a notification path a call site inside the
+ * credential crypto core. The rule exists so that nothing outside the cores can
+ * touch a credential; satisfying it literally here would achieve the opposite of
+ * its purpose.
+ *
+ * ## What the exception is bounded by, so it stays as strong as the rule
+ *
+ * The property BYOK-GUARD-005 protects is *credential* locality, and the four
+ * assertions below keep it exactly: these files may never read a BYOK secret
+ * name, may never import a BYOK module, may never be imported BY one, and the
+ * list itself is closed. A push module that acquired any path to key material
+ * reds the build.
+ */
+const PUSH_CRYPTO_EXCEPTION = [
+  "supabase/functions/_shared/web-push.ts",
+  "supabase/functions/_shared/web-push.test.ts",
+];
+
+/** Every BYOK secret whose name must never appear in the push crypto module. */
+const BYOK_SECRET_NAMES = /BYOK_MASTER_KEY|BYOK_PREVIOUS_MASTER_KEY|BYOK_FINGERPRINT_PEPPER|BYOK_RATE_LIMIT_PEPPER/;
+
 describe("BYOK-GUARD-005: crypto locality", () => {
   it("no module outside the two crypto cores performs a KEYED crypto operation", () => {
     // The strict half. `fingerprint.ts` is the module this rule was most likely
     // to be bent for: it needs HMAC, and reaching for `crypto.subtle` there
     // would have been the obvious thing to write. It calls `hmacSha256` in the
     // core instead, and this assertion is why.
+    //
+    // The push crypto module is the ONE named exception, and the four
+    // assertions after this block are what keep it from being a hole.
     expect(
       filesMatching(/\bsubtle\.(?:importKey|deriveKey|deriveBits|encrypt|decrypt|sign|verify|wrapKey|unwrapKey)\b/),
-    ).toEqual(CRYPTO_MODULES);
+    ).toEqual([...CRYPTO_MODULES, ...PUSH_CRYPTO_EXCEPTION].sort());
   });
 
   it("no module outside the two crypto cores creates an AES-GCM or HMAC key", () => {
-    expect(filesMatching(/["']AES-GCM["']|["']HMAC["']/)).toEqual(CRYPTO_MODULES);
+    // Only the push crypto IMPLEMENTATION names these algorithms, not its test:
+    // the test drives the module through its exports and reaches for ECDH and
+    // ECDSA directly to build fixtures. Listing the test here anyway would be a
+    // permission granted to a file that is not using it.
+    expect(filesMatching(/["']AES-GCM["']|["']HMAC["']/)).toEqual(
+      [...CRYPTO_MODULES, "supabase/functions/_shared/web-push.ts"].sort(),
+    );
   });
 
-  it("touches the WebCrypto subtle surface at all only in the cores and one named keyless exception", () => {
+  it("touches the WebCrypto subtle surface at all only in the cores and the named exceptions", () => {
     // Both spellings. The Node core reaches it as `webcrypto.subtle` (the
     // `node:crypto` export), Deno and the Edge runtime as the global
     // `crypto.subtle`; a pattern matching only one of them would have declared
     // the Node core clean while it was doing all the encryption.
     expect(filesMatching(/\b(?:crypto|webcrypto)\.subtle\b/)).toEqual(
-      [...CRYPTO_MODULES, KEYLESS_DIGEST_EXCEPTION].sort(),
+      [
+        ...CRYPTO_MODULES,
+        KEYLESS_DIGEST_EXCEPTION,
+        ...PUSH_CRYPTO_EXCEPTION,
+        // The sender's orchestration computes the suppression event's
+        // idempotency digest, keyless, exactly as `product-events.ts` does.
+        "supabase/functions/send-push/deliver.ts",
+        "supabase/functions/send-push/deliver.test.ts",
+      ].sort(),
     );
+  });
+
+  it("keeps the push crypto exception to exactly the files that earned it", () => {
+    expect([...PUSH_CRYPTO_EXCEPTION].sort()).toEqual([
+      "supabase/functions/_shared/web-push.test.ts",
+      "supabase/functions/_shared/web-push.ts",
+    ]);
+  });
+
+  it("keeps the push crypto module unable to read ANY BYOK secret", () => {
+    /*
+     * The bound that makes the exception safe. BYOK-GUARD-005 protects
+     * *credential* locality, so what matters is not that this module performs
+     * keyed crypto — it must — but that no key material it can reach is a
+     * credential's. It reads a VAPID pair from its own environment and a
+     * per-subscription key from its caller, and nothing else.
+     */
+    for (const file of PUSH_CRYPTO_EXCEPTION) {
+      const body = read(file);
+      expect(body, `${file} names a BYOK secret`).not.toMatch(BYOK_SECRET_NAMES);
+    }
+    // Non-vacuity: the pattern really does fire on a file that names one, so
+    // the loop above is not passing against a regex that matches nothing.
+    expect(read("supabase/functions/_shared/byok-envelope.ts")).toMatch(BYOK_SECRET_NAMES);
+  });
+
+  it("keeps the push crypto module and the BYOK cores mutually unreachable", () => {
+    // Neither direction. An import either way would give one system a call site
+    // inside the other, which is the whole thing this requirement forbids —
+    // and it is the failure mode that "route it through the core instead" would
+    // have created deliberately.
+    for (const file of PUSH_CRYPTO_EXCEPTION) {
+      expect(read(file), `${file} imports BYOK`).not.toMatch(/from\s+["'][^"']*byok[^"']*["']/i);
+    }
+    for (const core of CRYPTO_MODULES) {
+      expect(read(core), `${core} imports the push crypto`).not.toMatch(/web-push/);
+    }
   });
 
   it("and that exception is still keyless — asserted, not assumed", () => {

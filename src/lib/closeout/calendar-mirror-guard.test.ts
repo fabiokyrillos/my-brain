@@ -99,6 +99,23 @@ const SURFACES: Record<string, Surface> = {
     copy: { module: "src/features/notifications/copy.ts", keys: ["unsupported"] },
     minimumClasses: 1,
   },
+  /*
+   * Slice 2M.4b. The controls the 2M.4a row deliberately had none of.
+   *
+   * A fifth row rather than an extension of the fourth, because the two are
+   * different claims: `notificationSettings` mirrors a surface that explains and
+   * announces, and this mirrors the surface that ACTS. Keeping them apart means
+   * the census below still refuses a lane nobody added a row for, and the
+   * browser lane cannot drift from the component that now has buttons in it.
+   */
+  pushControls: {
+    spec: "e2e/daily-surfaces.spec.ts",
+    components: ["src/features/notifications/push-controls.tsx"],
+    prefix: "push-",
+    attributes: [],
+    copy: { module: "src/features/notifications/copy.ts", keys: ["notAvailableYet"] },
+    minimumClasses: 2,
+  },
 };
 
 /** Every `className="…"` literal in a source, filtered to one surface's prefix. */
@@ -265,6 +282,12 @@ describe("2M-ACCESS-006: no surface in this phase is left without a mirror", () 
   });
 
   it("names four surfaces, which is how many this phase has shipped", () => {
-    expect(Object.keys(SURFACES)).toEqual(["calendar", "planner", "dayReview", "notificationSettings"]);
+    expect(Object.keys(SURFACES)).toEqual([
+      "calendar",
+      "planner",
+      "dayReview",
+      "notificationSettings",
+      "pushControls",
+    ]);
   });
 });

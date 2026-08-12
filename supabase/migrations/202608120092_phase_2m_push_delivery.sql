@@ -326,12 +326,40 @@ begin
     raise exception 'Subscription is incomplete' using errcode = '22023';
   end if;
 
-  -- Only an https endpoint, and never one pointing back at this application:
-  -- a subscription is a URL the server will later POST to, so an unvalidated
-  -- one is a request-forgery primitive with a user id attached.
+  -- A subscription is a URL THE SERVER WILL LATER POST TO, so an unvalidated one
+  -- is a request-forgery primitive with a user id attached. Two rules, and both
+  -- are here rather than only in the sender because the sender is not the only
+  -- thing that will ever read this column.
   if p_endpoint !~ '^https://' then
     raise exception 'Subscription endpoint must be https' using errcode = '22023';
   end if;
+
+  -- And never a host that resolves inside the deployment. This is a BLOCKLIST of
+  -- shapes rather than an allowlist of push services, deliberately: an allowlist
+  -- of vendors would need a migration every time a browser changed its push
+  -- host, and R-13 makes a fourth migration a stop condition. The sender applies
+  -- the positive allowlist, where it costs nothing to change; this refuses the
+  -- shapes that are never legitimate no matter which vendor appears next.
+  --
+  -- `split_part(..., '/', 3)` is the authority; `split_part(..., '@', -1)` then
+  -- discards any `user:pass@` prefix, because `https://push.test@127.0.0.1/x`
+  -- has an authority that STARTS with a legitimate-looking host and resolves to
+  -- loopback. The port is dropped last.
+  declare
+    host text := pg_catalog.split_part(
+      pg_catalog.split_part(pg_catalog.split_part(p_endpoint, '/', 3), '@', -1), ':', 1);
+  begin
+    -- Prefixes are matched as prefixes and `localhost`/`*.local` as wholes; a
+    -- single `$`-anchored alternation would have silently matched none of the
+    -- prefix arms. The final clause refuses any dotless authority, which is what
+    -- a bare hostname and a bracketed IPv6 literal both are.
+    if host ~* '^(127\.|0\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[)'
+       or host ~* '^localhost$'
+       or host ~* '\.local$'
+       or host !~ '\.' then
+      raise exception 'Subscription endpoint host is not routable' using errcode = '22023';
+    end if;
+  end;
 
   insert into public.push_subscriptions as subscription
     (user_id, endpoint, p256dh, auth, state, failure_count)
@@ -502,11 +530,23 @@ begin
   -- Quiet hours and the cap are the WHOLE PRODUCT'S, so they go where they have
   -- always lived and where the heartbeat already reads them. This is the reuse
   -- this migration was audited for: one promise, one pair of columns.
-  update public.agent_preferences
-     set quiet_start = p_quiet_start,
-         quiet_end = p_quiet_end,
-         max_followups_per_day = p_daily_cap
-   where user_id = actor;
+  --
+  -- An UPSERT rather than a bare UPDATE, and the difference is the whole point
+  -- of the reuse. `handle_new_user` creates this row, so its absence is
+  -- anomalous -- but a bare `update ... where user_id = actor` that matches
+  -- nothing SUCCEEDS SILENTLY, and this function would then return
+  -- `{"updated": true}` having discarded the quiet hours the user just set. That
+  -- is precisely the "sets quiet hours once and is still pushed at 03:00"
+  -- failure this migration refused a second column in order to avoid, arriving
+  -- through the back door. Every other column carries a default, so creating the
+  -- row is safe.
+  insert into public.agent_preferences as preferences
+    (user_id, quiet_start, quiet_end, max_followups_per_day)
+  values (actor, p_quiet_start, p_quiet_end, p_daily_cap)
+  on conflict (user_id) do update
+    set quiet_start = p_quiet_start,
+        quiet_end = p_quiet_end,
+        max_followups_per_day = p_daily_cap;
 
   return pg_catalog.jsonb_build_object('updated', true);
 end;
@@ -556,7 +596,7 @@ declare
   refusal text;
   subscriptions jsonb;
 begin
-  if pg_catalog.coalesce(auth.role(), '') <> 'service_role' then
+  if coalesce(auth.role(), '') <> 'service_role' then
     raise exception 'Service role required' using errcode = '42501';
   end if;
   if p_user_id is null or p_type not in ('reminder', 'follow_up', 'review', 'digest')
@@ -586,6 +626,20 @@ begin
   -- refusal wins, so an unconsented user never produces a `daily_cap` row --
   -- the ledger would be reporting a ceiling they cannot reach.
   if consent.user_id is null or consent.state <> 'granted' then
+    refusal := 'not_consented';
+  -- A `granted` consent with NO LIVE DEVICE is not a deliverable consent, and
+  -- saying so here rather than downstream is what keeps the retry bound honest:
+  -- without this the function would return `permitted` with an empty
+  -- subscription list, the sender would have nothing to POST to, and the
+  -- delivery would burn all three attempts failing at nothing before retiring.
+  --
+  -- Reported as `not_consented` because the deployed vocabulary has SIX reasons
+  -- and a seventh would be a migration -- R-13's stop condition. It is also the
+  -- truthful one of the six: there is no consenting device.
+  elsif not exists (
+    select 1 from public.push_subscriptions
+     where user_id = p_user_id and state = 'active'
+  ) then
     refusal := 'not_consented';
   elsif not (p_type = any (consent.enabled_types)) then
     refusal := 'type_muted';
@@ -617,7 +671,7 @@ begin
        where user_id = p_user_id and channel = 'push' and outcome = 'delivered'
          and (occurred_at at time zone user_zone)::date = local_now::date;
       -- `>=`, not `>`. A cap of three means the fourth is refused.
-      if delivered_today >= pg_catalog.coalesce(cap, 0) then
+      if delivered_today >= coalesce(cap, 0) then
         refusal := 'daily_cap';
       end if;
     end if;
@@ -642,7 +696,7 @@ begin
     return pg_catalog.jsonb_build_object('permitted', false, 'reason', 'duplicate');
   end if;
 
-  select pg_catalog.coalesce(pg_catalog.jsonb_agg(
+  select coalesce(pg_catalog.jsonb_agg(
            pg_catalog.jsonb_build_object(
              'id', id, 'endpoint', endpoint, 'p256dh', p256dh, 'auth', auth)), '[]'::jsonb)
     into subscriptions
@@ -663,7 +717,13 @@ grant execute on function public.begin_push_delivery(uuid, text, text) to servic
 create or replace function public.finish_push_delivery(
   p_delivery_id uuid,
   p_outcome text,
-  p_gone_subscription_ids uuid[] default '{}'::uuid[]
+  p_gone_subscription_ids uuid[] default '{}'::uuid[],
+  -- Subscriptions that FAILED without saying they were gone: a 500 from the push
+  -- service, a timeout, a network error. Separate from `gone` because they mean
+  -- different things -- gone is "the browser threw this away", failed is "this
+  -- did not work THIS TIME" -- and collapsing them would retire a device over one
+  -- bad afternoon at a vendor.
+  p_failed_subscription_ids uuid[] default '{}'::uuid[]
 )
 returns jsonb
 language plpgsql
@@ -674,7 +734,7 @@ declare
   target public.notification_deliveries%rowtype;
   final_outcome text;
 begin
-  if pg_catalog.coalesce(auth.role(), '') <> 'service_role' then
+  if coalesce(auth.role(), '') <> 'service_role' then
     raise exception 'Service role required' using errcode = '42501';
   end if;
   if p_outcome is null or p_outcome not in ('delivered', 'failed') then
@@ -708,14 +768,43 @@ begin
 
   update public.notification_deliveries
      set outcome = final_outcome,
-         attempts = pg_catalog.least(target.attempts + 1, 3),
+         attempts = least(target.attempts + 1, 3),
          occurred_at = case when p_outcome = 'delivered' then pg_catalog.now() else occurred_at end
    where id = p_delivery_id;
 
+  -- A success clears the strikes ONLY on the devices that actually received it.
+  --
+  -- A delivery to two devices can succeed on one and fail on the other, and
+  -- `p_outcome` is `delivered` when ANY of them took it. A blanket reset over
+  -- every active subscription would therefore forgive the device that just
+  -- failed, and a device that fails every single time would sit at zero strikes
+  -- forever as long as some other browser kept working -- which is the retry
+  -- ceiling defeated by a sibling. Excluding the two reported id lists is what
+  -- keeps `failure_count` a per-device fact.
   if p_outcome = 'delivered' then
     update public.push_subscriptions
        set last_delivered_at = pg_catalog.now(), failure_count = 0
-     where user_id = target.user_id and state = 'active';
+     where user_id = target.user_id and state = 'active'
+       and not (id = any (coalesce(p_failed_subscription_ids, '{}'::uuid[])))
+       and not (id = any (coalesce(p_gone_subscription_ids, '{}'::uuid[])));
+  end if;
+
+  -- A subscription that failed WITHOUT saying it was gone gets one strike, and
+  -- the third retires it.
+  --
+  -- This is what makes `failure_count` a column rather than an ornament: the
+  -- delivery row's own `attempts` bounds ONE delivery, so a device that fails
+  -- every time without ever returning 410 would be retried forever, one fresh
+  -- three-attempt delivery at a time. `2M-NOTIFY-010` says no failure is retried
+  -- indefinitely, and "indefinitely" is measured per device, not per message.
+  -- The CHECK ceiling of 3 on the column is what no code path can outrun.
+  if p_failed_subscription_ids is not null
+     and pg_catalog.array_length(p_failed_subscription_ids, 1) > 0 then
+    update public.push_subscriptions
+       set failure_count = least(failure_count + 1, 3),
+           state = case when failure_count + 1 >= 3 then 'expired' else state end
+     where user_id = target.user_id and id = any (p_failed_subscription_ids)
+       and state = 'active';
   end if;
 
   -- A 404/410 from the push service means the browser threw the subscription
@@ -726,7 +815,17 @@ begin
     update public.push_subscriptions
        set state = 'expired'
      where user_id = target.user_id and id = any (p_gone_subscription_ids);
+  end if;
 
+  -- The consent follows the LAST device out, whichever way it left -- retired
+  -- for being gone or retired for failing three times. Checked once, after both
+  -- updates, rather than inside the `gone` branch alone: a user whose only
+  -- device died of repeated failures is exactly as undeliverable as one whose
+  -- browser threw the subscription away, and `2M-NOTIFY-010` gives that state a
+  -- name the surface can render.
+  if (p_gone_subscription_ids is not null and pg_catalog.array_length(p_gone_subscription_ids, 1) > 0)
+     or (p_failed_subscription_ids is not null
+         and pg_catalog.array_length(p_failed_subscription_ids, 1) > 0) then
     if not exists (
       select 1 from public.push_subscriptions where user_id = target.user_id and state = 'active'
     ) then
@@ -740,11 +839,11 @@ begin
 end;
 $$;
 
-comment on function public.finish_push_delivery(uuid, text, uuid[]) is
-  '2M-NOTIFY-010/-011. Bounded retry (the third failure retires), expired subscriptions retired rather than retried, and a finished delivery never re-finished by a stale worker.';
+comment on function public.finish_push_delivery(uuid, text, uuid[], uuid[]) is
+  '2M-NOTIFY-010/-011. Retry bounded twice over -- per delivery by `attempts`, per device by `failure_count` -- expired subscriptions retired rather than retried, the consent following the last device out, and a finished delivery never re-finished by a stale worker.';
 
-revoke all on function public.finish_push_delivery(uuid, text, uuid[]) from public, anon, authenticated;
-grant execute on function public.finish_push_delivery(uuid, text, uuid[]) to service_role;
+revoke all on function public.finish_push_delivery(uuid, text, uuid[], uuid[]) from public, anon, authenticated;
+grant execute on function public.finish_push_delivery(uuid, text, uuid[], uuid[]) to service_role;
 
 -- ============================================================================
 -- 7. RETENTION -- defined here, ARMED BY NOBODY
@@ -770,7 +869,7 @@ begin
     select id from public.notification_deliveries
      where occurred_at < pg_catalog.now()
        - pg_catalog.make_interval(days => private.retention_window('notification_deliveries'))
-     limit pg_catalog.greatest(pg_catalog.coalesce(p_limit, 10000), 0)
+     limit greatest(coalesce(p_limit, 10000), 0)
   )
   delete from public.notification_deliveries target
    using expired where target.id = expired.id;

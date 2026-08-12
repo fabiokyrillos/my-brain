@@ -50,18 +50,6 @@ const FAILED: NotificationActionResult = Object.freeze({ ok: false, code: "faile
 const INVALID: NotificationActionResult = Object.freeze({ ok: false, code: "invalid" });
 const UNAUTHENTICATED: NotificationActionResult = Object.freeze({ ok: false, code: "unauthenticated" });
 
-/**
- * The telemetry surface for both notification events is `server`.
- *
- * There is no `notifications` surface in the deployed vocabulary, and declaring
- * one would be a **vocabulary change** — migration 1's territory, already spent,
- * and R-13 refuses this migration carrying another's contents. `server` is not
- * a workaround: both events really are recorded by the server, one from a
- * Server Action and one from the leased worker, and attributing them to a
- * browsing surface would be the less truthful choice.
- */
-const TELEMETRY_SURFACE = "server" as const;
-
 function isConsentState(value: unknown): value is NotificationConsentState {
   return typeof value === "string" && (notificationConsentStates as readonly string[]).includes(value);
 }
@@ -98,7 +86,25 @@ async function recordConsentChanged(
 ): Promise<void> {
   await recordProductEvent({
     name: "notification_consent_changed",
-    surface: TELEMETRY_SURFACE,
+    /*
+     * `server`, written as a LITERAL beside the event name and not behind a
+     * constant.
+     *
+     * `phase-2m-telemetry-guard.test.ts` reads this statically to prove the
+     * surface is one the deployed chain admits, and it cannot follow an
+     * identifier. That guard exists because Phase 2K closed with every event
+     * silently refused: the names were admitted and the SURFACE was not, inside
+     * a `.catch(() => {})` that swallowed the refusal. A named constant here
+     * would be tidier and would put this producer back outside what the guard
+     * can see.
+     *
+     * The value is also the truthful one. There is no `notifications` surface in
+     * the deployed vocabulary, and declaring one would be a vocabulary change —
+     * migration 1's territory, already spent, and R-13 refuses this migration
+     * carrying another's contents. Both notification events really are recorded
+     * by the server, one from this Server Action and one from the leased worker.
+     */
+    surface: "server",
     locale,
     viewportClass: "unknown",
     appVersion: "server",

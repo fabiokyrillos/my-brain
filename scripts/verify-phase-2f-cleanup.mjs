@@ -191,6 +191,12 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
     "2H.2 error sink. Owner-scoped only incidentally -- user_id is nullable and records who was affected, never who is at fault -- and unreadable by service_role, so this sweep cannot count it; cascades at 202608070080:59",
   rate_limit_events:
     "2H.3 rate limiter state. Expiring admission decisions written only by consume_rate_limit_slot, unreadable by service_role by design (a role that could read or delete it could mint slots), so this sweep cannot count it; cascades at 202608070081:186",
+  notification_consents:
+    "2M.4b push consent. Written only by the account itself through the four validated SECURITY DEFINER RPCs (authenticated has SELECT and no write policy at all); no Phase 2F proof writes it; cascades at 202608120092:83",
+  push_subscriptions:
+    "2M.4b browser subscription. Same posture and same writers as the consent above -- a row exists only because the owner pressed a control and their browser returned a subscription; no Phase 2F proof writes it; cascades at 202608120092:133",
+  notification_deliveries:
+    "2M.4b content-free delivery audit. Written only by the leased sender through begin_push_delivery/finish_push_delivery, and the ONE table here with its own retention window (90 days, private.retention_windows, swept by a function granted to no role); no Phase 2F proof writes it; cascades at 202608120092:184",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */

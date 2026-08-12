@@ -173,6 +173,21 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      */
     "src/features/day-review/day-review-view.tsx",
     "src/features/notifications/notification-settings.tsx",
+    /*
+     * Added by slice 2M.4b, and the discovery assertion below is what made
+     * adding it mandatory rather than remembered — the third occasion this
+     * guard has caught a surface that would otherwise have shipped unscanned.
+     *
+     * It is also the surface where the ban matters most in this slice. This is
+     * the only file in the repository permitted to raise a browser permission
+     * prompt, and a permission denial is STICKY: on most browsers the user
+     * cannot be asked again without digging through settings (T-07). A prompt
+     * reachable by a swipe, a long-press or any affordance a user can trigger
+     * without meaning to would be a one-gesture route to a permanently denied
+     * notification permission — the least recoverable outcome on this surface,
+     * and one no undo can reach.
+     */
+    "src/features/notifications/push-controls.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

@@ -99,7 +99,20 @@ const REPO = resolve(__dirname, "../../..");
 // reserved for push in 2M.4b — this move funds nothing else. Moved deliberately
 // and visibly in the same commit that adds the migration, which is the only way
 // this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608110091";
+//
+// Moved by PHASE 2M SLICE 2M.4b to `202608120092`, the push consent,
+// subscription and content-free delivery migration. This is the THIRD and LAST
+// of the three ADR-105 allocated and ADR-106 confirmed, all non-transferable:
+// the budget is now `3 allocated · 3 spent` and **a fourth is a stop
+// condition**, not a decision available inside a branch. It creates three
+// tables, six functions, forced RLS, a retention window and a sweep armed by no
+// role — and deliberately creates NO quiet-hours and NO daily-cap column,
+// because `agent_preferences.quiet_start`/`.quiet_end`/`.max_followups_per_day`
+// already hold that authority and a second copy is how a user sets quiet hours
+// once and is still pushed at 03:00. Moved deliberately and visibly in the same
+// commit that adds the migration, which is the only way this pin is allowed to
+// change.
+const AUTHORIZED_MIGRATION_HEAD = "202608120092";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
