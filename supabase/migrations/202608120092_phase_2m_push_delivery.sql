@@ -37,10 +37,18 @@
 --   * THE USER'S TIMEZONE is `profiles.timezone`, already the input to every
 --     local-day boundary in the product (`2M-TIME-003`).
 --
---   * THE DELIVERY JOB needs no schema at all: `public.jobs.type` carries NO
---     CHECK constraint (`202607160007:132`), so a `deliver_push` job is data in
---     an existing table with an existing lease, an existing bounded retry and
---     an existing reaper.
+--   * THE DELIVERY LEASE needs no schema either, and in the end needed no job
+--     row at all. The re-audit noted that `public.jobs.type` carries NO CHECK
+--     (`202607160007:132`), so a `deliver_push` row would have been free -- but
+--     CLAIMING it would not have been: every claim RPC is type-specific
+--     (`claim_attachment_job`, `claim_entry_interpretation_job`), there is no
+--     generic one, and adding it would be a FOURTH migration.
+--
+--     It is also unnecessary. The partial unique index below, on in-flight
+--     deliveries alone, IS the lease: two workers racing the same item cannot
+--     both hold it, `attempts` bounds the retry, and `finish_push_delivery`
+--     refuses a stale worker. A job row would have been a second lease over the
+--     first.
 --
 -- What genuinely has no existing home, and is therefore what this migration
 -- models:
@@ -264,8 +272,12 @@ grant select on table public.notification_deliveries to authenticated;
 -- `2M-NOTIFY-005` forbids inheriting the in-app controls "by assumption". It
 -- does NOT ask for a second, differently-behaving copy of them -- that would be
 -- the same defect wearing the opposite coat. So the wrap-around predicate the
--- heartbeat has used since `202607160007:238-240` is extracted here by value,
--- and `phase-2m-push-parity.test.ts` plus the pgTAP suite assert the two agree.
+-- heartbeat has used since `202607160007:238-240` is extracted here by value.
+--
+-- The parity is asserted by EVALUATING both expressions side by side at every
+-- quarter hour of a day, in `supabase/tests/phase_2m_push_delivery.sql` -- not by
+-- reading the two sources and agreeing that they look alike, which is the check
+-- that passes right up until one of them is edited.
 create or replace function private.push_within_quiet_hours(
   p_local_time time,
   p_quiet_start time,
@@ -931,8 +943,14 @@ begin
   if (select 1 from pg_proc
        where proname = 'validate_product_event_properties'
          and pronamespace = 'private'::regnamespace
-         and pg_catalog.position('notification_consent_changed' in pg_get_functiondef(oid)) > 0
-         and pg_catalog.position('notification_suppressed' in pg_get_functiondef(oid)) > 0
+         -- `strpos`, NOT `position`. `position(x in y)` is SQL GRAMMAR, not an
+         -- ordinary call, so `pg_catalog.position(...)` is a syntax error and
+         -- this migration would not have applied at all -- the same class of
+         -- defect as `pg_catalog.coalesce`, and the second one this file
+         -- carried. `strpos` is a real function, schema-qualifiable, identical
+         -- in meaning. The grammar guard now names both families.
+         and pg_catalog.strpos(pg_get_functiondef(oid), 'notification_consent_changed') > 0
+         and pg_catalog.strpos(pg_get_functiondef(oid), 'notification_suppressed') > 0
       ) is null then
     raise exception 'The notification telemetry vocabulary is not deployed; migration 1 must land first';
   end if;

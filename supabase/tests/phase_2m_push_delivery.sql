@@ -383,19 +383,29 @@ select results_eq(
   array['duplicate'],
   'deduplication refuses the same item while one is in flight');
 
+-- The delivery's id is PINNED by the superuser, for the reason section 8 states
+-- at length: `service_role` is not asserted anywhere to hold `SELECT` on these
+-- tables, and a sub-select here would smuggle one into a `service_role` block.
+-- This repository has already been caught by that assumption once, on
+-- `product_events`.
+reset role;
+update public.notification_deliveries set id = '2f4b0001-0000-4000-8000-0000000000d0'
+ where user_id = '2f4b0001-0000-4000-8000-000000000001' and dedupe_hash = repeat('d', 64);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+
 -- Bounded retry: a failure below the ceiling stays `pending`, holding its
 -- in-flight slot, so the retry reuses this row instead of inserting a second.
 select results_eq(
   $$ select (public.finish_push_delivery(
-       (select id from public.notification_deliveries where dedupe_hash = repeat('d', 64)),
-       'failed') ->> 'outcome') $$,
+       '2f4b0001-0000-4000-8000-0000000000d0', 'failed') ->> 'outcome') $$,
   array['pending'],
   'a failure below the retry ceiling stays in flight rather than becoming a second row');
 
 select results_eq(
   $$ select (public.finish_push_delivery(
-       (select id from public.notification_deliveries where dedupe_hash = repeat('d', 64)),
-       'delivered') ->> 'outcome') $$,
+       '2f4b0001-0000-4000-8000-0000000000d0', 'delivered') ->> 'outcome') $$,
   array['delivered'],
   'a delivered result is recorded as delivered');
 
