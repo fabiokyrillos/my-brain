@@ -46,6 +46,7 @@ function inboxItem(overrides: Partial<InboxItemView> = {}): InboxItemView {
 
 function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
+    timeZone: "America/Sao_Paulo",
     todayLabel: "QUINTA-FEIRA, 30 DE JULHO",
     status: { kind: "attention", count: 2, hasMore: false },
     priorities: [],

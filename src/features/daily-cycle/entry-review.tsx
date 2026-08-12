@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
+import { formatInstant } from "@/lib/time/instant-format";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
 import type { AttentionItemView, AttentionReason, CandidateOutcomeView, EntryOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import { getDailyCycleCopy, getEntryReviewSectionCopy, type DailyCycleLocale } from "./copy";
@@ -188,9 +189,12 @@ export function EntryOutcomes({
 export function CandidateOutcomeHistory({
   outcomes,
   locale,
+  timeZone,
 }: {
   outcomes: readonly CandidateOutcomeView[];
   locale: DailyCycleLocale;
+  /** The owner's zone (`LDC-DAILY-001`). Required, never defaulted. */
+  timeZone: string;
 }) {
   if (outcomes.length === 0) return null;
   const pt = locale === "pt-BR";
@@ -208,7 +212,7 @@ export function CandidateOutcomeHistory({
           <li key={outcome.key}>
             <strong>{outcome.title}</strong>
             <span>{outcome.outcomeLabel}</span>
-            <time dateTime={outcome.resolvedAt}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(outcome.resolvedAt))}</time>
+            <time dateTime={outcome.resolvedAt}>{formatInstant(outcome.resolvedAt, "dayAndTime", locale, timeZone)}</time>
           </li>
         ))}
       </ul>
@@ -255,6 +259,7 @@ export function EntryReview({
   agentName,
   occurredAtLabel,
   slots,
+  timeZone,
 }: {
   view: InterpretationReviewView;
   /** Omitted only by callers that have no database to read — the projection is required in the app. */
@@ -263,6 +268,12 @@ export function EntryReview({
   occurredAtLabel: string;
   agentName: string;
   slots: EntryReviewSlots;
+  /**
+   * The owner's zone (`LDC-DAILY-001`). Threaded rather than resolved here: the
+   * entry-detail page already has it on `EntryReviewProjection`, so the review
+   * and the page stamp the same instant from the same source.
+   */
+  timeZone: string;
 }) {
   return (
     <div className="entry-review">
@@ -274,7 +285,7 @@ export function EntryReview({
       </ReviewAttention>
       <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
       {outcomes === undefined ? null : <EntryOutcomes outcomes={outcomes} locale={locale} />}
-      <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} />
+      <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} timeZone={timeZone} />
       {slots.technicalDetails}
     </div>
   );

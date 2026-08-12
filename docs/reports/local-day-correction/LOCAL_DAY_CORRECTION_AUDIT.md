@@ -140,6 +140,21 @@ One consequence for Unit 2, recorded here so it is not rediscovered: `EntryRevie
 carries `timezone`, so the entry-detail page needs **no new query** to repair `entry-review.tsx` and
 `technical-details.tsx` — the zone is already loaded and already on the projection.
 
+**Unit 2 added a fifth read path and a finding.** The Records list page had no zone at all, and the
+obvious repair — `supabase.from("profiles")` on the page — was **refused by
+`architecture.test.ts`**, which holds that page to the Slice 2X.16 projection boundary. The guard was
+right. The zone now comes from `getOwnerTimeZone()` in `src/features/profile/owner-timezone.ts`, a
+`cache()`-wrapped `server-only` accessor modelled on `getAgentName`: one query per request however
+many surfaces ask, which is also the read path Units 3 and 4 use. The alternative — a `timezone`
+field on every projection — was rejected as right only where a projection already computes *in* the
+zone, and wrong where the inbox and attention projections never reason about days at all.
+
+A sixth, unnamed copy is also recorded here: `work-projection.ts:166` implements
+`resolveOwnerTimeZone`'s exact logic **inline** (`isSupportedTimeZone(...) ? ... :
+defaultAgentPreferences.timezone`). It is correct, so it is not a defect and
+`DUPLICATE_ZONE_RESOLVERS` does not name it — that list enumerates *declarations*. Unit 4 folds it
+into the resolver for reuse.
+
 ## 5. Stop conditions — none encountered
 
 No migration, column, schema, RLS, grant, policy or RPC change is required by any row above. Every

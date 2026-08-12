@@ -103,6 +103,7 @@ export function NeedsAttentionList({
   agentName,
   loadMore,
   retryAction,
+  timeZone,
 }: {
   initialItems: readonly NeedsAttentionItemView[];
   initialCursor: AttentionCursor | null;
@@ -112,6 +113,12 @@ export function NeedsAttentionList({
   loadMore: LoadMoreNeedsAttention;
   /** Omitted by callers that do not offer in-place retry (e.g. a preview). */
   retryAction?: RetryProcessingAction;
+  /**
+   * The owner's zone (`LDC-DAILY-001`). Threaded through the list rather than
+   * read per row: twenty rows resolving their own zone is twenty chances for one
+   * to resolve it differently, which is the shape the contract exists to stop.
+   */
+  timeZone: string;
 }) {
   const [items, setItems] = useState(initialItems);
   const [cursor, setCursor] = useState(initialCursor);
@@ -277,7 +284,7 @@ export function NeedsAttentionList({
         const canRetryHere = Boolean(retryAction) && item.kind === RESOLVABLE_IN_PLACE && !retried.has(item.key);
         return (
           <div className="attention-entry" key={item.key}>
-            <NeedsAttentionItemRow item={item} locale={locale} agentName={agentName} surface="needs_attention" />
+            <NeedsAttentionItemRow item={item} locale={locale} agentName={agentName} surface="needs_attention" timeZone={timeZone} />
             {canRetryHere ? (
               <button
                 type="button"

@@ -59,11 +59,14 @@ function item(
   };
 }
 
+/** The owner's zone, explicit in every render (`LDC-DAILY-001`). */
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
+
 const noLoadMore = vi.fn(async () => ({ ok: true as const, page: { items: [], hasNext: false, nextCursor: null } }));
 
 function renderList(items: NeedsAttentionItemView[], retryAction?: RetryProcessingAction) {
   return render(
-    <NeedsAttentionList
+    <NeedsAttentionList timeZone={OWNER_TIME_ZONE}
       initialItems={items}
       initialCursor={null}
       initialHasNext={false}

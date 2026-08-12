@@ -17,6 +17,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
 import { getAgentName } from "@/features/profile/agent-identity";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 
 function InboxViewTabs({ locale, active }: { locale: "pt-BR" | "en"; active: "all" | "needs-you" }) {
   const pt = locale === "pt-BR";
@@ -45,6 +46,11 @@ export default async function InboxPage({
 
   const agentName = await getAgentName();
 
+  // `LDC-DAILY-001`. Read through the shared accessor, not off a table: this
+  // page is held to the Slice 2X.16 projection boundary, and `cache()` makes
+  // the repair cost one query per request however many surfaces ask.
+  const timeZone = await getOwnerTimeZone();
+
   if (view === "needs-you") {
     const projection = await loadAttentionProjection(supabase, { locale });
 
@@ -67,6 +73,7 @@ export default async function InboxPage({
             locale={locale}
             loadMore={loadMoreNeedsAttention}
             retryAction={reprocessEntry}
+            timeZone={timeZone}
           />
         ) : (
           <>
@@ -93,7 +100,7 @@ export default async function InboxPage({
       <InboxViewTabs locale={locale} active="all" />
       {projection.items.length ? (
         <div className="list-stack">
-          {projection.items.map((item) => <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} />)}
+          {projection.items.map((item) => <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} timeZone={timeZone} />)}
         </div>
       ) : (
         <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Nenhum registro ainda" : "No entries yet"}</strong><p>{pt ? "Use a captura rápida para registrar algo sem interromper seu fluxo." : "Use quick capture to save something without breaking your flow."}</p></div>

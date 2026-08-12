@@ -157,6 +157,7 @@ export default async function EntryDetailPage({
 
       <EntryReview agentName={agentName}
         view={view}
+        timeZone={review.timezone}
         outcomes={outcomes}
         locale={locale}
         occurredAtLabel={occurredAtLabel}
@@ -173,6 +174,7 @@ export default async function EntryDetailPage({
               history={history}
               hasTechnicalDetails={view.hasTechnicalDetails}
               locale={locale}
+              timeZone={review.timezone}
               structured={editableCurrent ? {
                 concepts: editableCurrent.concepts,
                 extractedDates: editableCurrent.extractedDates,

@@ -5,6 +5,8 @@ import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-e
 import { NeedsAttentionList, type LoadMoreNeedsAttention } from "./needs-attention-list";
 import type { NeedsAttentionItemView } from "./contracts";
 
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
+
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   NeedsAttentionViewed: vi.fn(() => null),
   recordNeedsAttentionItemOpened: vi.fn(),
@@ -33,7 +35,7 @@ function item(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAttentionIt
 describe("NeedsAttentionList", () => {
   it("renders every initial item", () => {
     render(
-      <NeedsAttentionList
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE}
       agentName="Brain"
         initialItems={[item(), item({ key: "entry-2:review_interpretation", entryId: "entry-2", title: "Revisar orçamento" })]}
         initialCursor={null}
@@ -53,7 +55,7 @@ describe("NeedsAttentionList", () => {
 
   it("does not render a load-more control when there is no next page", () => {
     render(
-      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={null} initialHasNext={false} locale="pt-BR" loadMore={vi.fn()} />,
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE} agentName="Brain" initialItems={[item()]} initialCursor={null} initialHasNext={false} locale="pt-BR" loadMore={vi.fn()} />,
     );
 
     expect(screen.queryByRole("button", { name: "Carregar mais" })).not.toBeInTheDocument();
@@ -69,7 +71,7 @@ describe("NeedsAttentionList", () => {
     }));
 
     render(
-      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE} agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Carregar mais" }));
@@ -86,7 +88,7 @@ describe("NeedsAttentionList", () => {
     const loadMore: LoadMoreNeedsAttention = vi.fn(async (): Promise<Awaited<ReturnType<LoadMoreNeedsAttention>>> => ({ ok: false, code: "action_failed" }));
 
     render(
-      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE} agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Carregar mais" }));
@@ -106,7 +108,7 @@ describe("NeedsAttentionList", () => {
     );
 
     render(
-      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE} agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="pt-BR" loadMore={loadMore} />,
     );
 
     const button = screen.getByRole("button", { name: /Carregar mais/ });
@@ -125,7 +127,7 @@ describe("NeedsAttentionList", () => {
     const loadMore: LoadMoreNeedsAttention = vi.fn(async (): Promise<Awaited<ReturnType<LoadMoreNeedsAttention>>> => ({ ok: false, code: "session_expired" }));
 
     render(
-      <NeedsAttentionList agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="en" loadMore={loadMore} />,
+      <NeedsAttentionList timeZone={OWNER_TIME_ZONE} agentName="Brain" initialItems={[item()]} initialCursor={cursor} initialHasNext={true} locale="en" loadMore={loadMore} />,
     );
 
     expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();

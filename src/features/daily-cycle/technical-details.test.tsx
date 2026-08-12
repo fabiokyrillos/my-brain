@@ -6,6 +6,8 @@ import type { InterpretationTechnicalDetailsView } from "./contracts";
 import type { EntryReviewHistoryItem } from "./review-projection";
 import { TechnicalDetails } from "./technical-details";
 
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
+
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   TrackedTechnicalDetails: vi.fn(({ children }: { children: ReactNode }) => <details>{children}</details>),
 }));
@@ -48,14 +50,14 @@ function historyItem(overrides: Partial<EntryReviewHistoryItem> = {}): EntryRevi
 describe("TechnicalDetails", () => {
   it("renders nothing when the entry has no technical details to show", () => {
     const { container } = render(
-      <TechnicalDetails entryId="entry-1" technical={null} history={[]} hasTechnicalDetails={false} locale="pt-BR" />,
+      <TechnicalDetails timeZone={OWNER_TIME_ZONE} entryId="entry-1" technical={null} history={[]} hasTechnicalDetails={false} locale="pt-BR" />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders the extracted concepts, dates, entity links, and mentions when structured content is provided", () => {
     render(
-      <TechnicalDetails
+      <TechnicalDetails timeZone={OWNER_TIME_ZONE}
         entryId="entry-1"
         technical={null}
         history={[]}
@@ -76,7 +78,7 @@ describe("TechnicalDetails", () => {
   });
 
   it("stays collapsed by default behind a details/summary disclosure", () => {
-    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails timeZone={OWNER_TIME_ZONE} entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     const summary = screen.getByText("Ver detalhes técnicos");
     const details = summary.closest("details");
     expect(details).not.toHaveAttribute("open");
@@ -87,20 +89,20 @@ describe("TechnicalDetails", () => {
   });
 
   it("degrades gracefully when technical details failed to load but the entry has a current interpretation", () => {
-    render(<TechnicalDetails entryId="entry-1" technical={null} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails timeZone={OWNER_TIME_ZONE} entryId="entry-1" technical={null} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     expect(screen.getByText(/Não foi possível carregar os detalhes técnicos/)).toBeInTheDocument();
     expect(screen.getByText("v1 · Interpretação inicial")).toBeInTheDocument();
   });
 
   it("renders trust scores and policies for each interpreted element", () => {
-    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
+    render(<TechnicalDetails timeZone={OWNER_TIME_ZONE} entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="pt-BR" />);
     expect(screen.getByText("90%")).toBeInTheDocument();
     expect(screen.getByText("Aplicação automática")).toBeInTheDocument();
   });
 
   it("renders the immutable revision timeline", () => {
     render(
-      <TechnicalDetails
+      <TechnicalDetails timeZone={OWNER_TIME_ZONE}
         entryId="entry-1"
         technical={technicalView()}
         history={[historyItem(), historyItem({ interpretationId: "interp-2", version: 2, origin: "user_corrected", isCurrent: false })]}
@@ -113,7 +115,7 @@ describe("TechnicalDetails", () => {
   });
 
   it("localizes labels in English", () => {
-    render(<TechnicalDetails entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="en" />);
+    render(<TechnicalDetails timeZone={OWNER_TIME_ZONE} entryId="entry-1" technical={technicalView()} history={[historyItem()]} hasTechnicalDetails locale="en" />);
     expect(screen.getByText("View technical details")).toBeInTheDocument();
     expect(screen.getByText("Auto-apply")).toBeInTheDocument();
   });

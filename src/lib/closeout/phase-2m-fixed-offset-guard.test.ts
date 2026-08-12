@@ -66,36 +66,28 @@ const NAMED_SURFACES = [
 const CONTRACT = "src/lib/time/local-day.ts";
 
 /**
- * Four surfaces that **still render an instant in the host's zone**, found by
- * this guard on 2026-08-12 and recorded rather than repaired.
+ * **The carried-past-close list is empty, and this is what it looked like.**
  *
- * They are the same defect slice 2M.3 fixed on the notification list —
- * `new Intl.DateTimeFormat(locale, { dateStyle, timeStyle })` with no
- * `timeZone`, which on a server is UTC — and they are **not** repaired here
- * because the repair is a product change across two routes, `home-view.tsx`,
- * `needs-attention-list.tsx` and roughly twenty-seven component call sites, in a
- * slice whose authorization is closeout. Doing it quietly inside a closing
- * commit is how a phase's last change becomes its riskiest.
+ * Four surfaces — `entry-review.tsx`, `inbox-item.tsx`,
+ * `needs-attention-item.tsx` and `technical-details.tsx` — still rendered an
+ * instant in the host's zone when Phase 2M closed. They were the same defect
+ * slice 2M.3 fixed on the notification list, and they were recorded rather than
+ * repaired because the repair was a product change across two routes,
+ * `home-view.tsx`, `needs-attention-list.tsx` and roughly twenty-seven call
+ * sites, in a slice whose authorization was closeout. Doing that quietly inside
+ * a closing commit is how a phase's last change becomes its riskiest.
  *
- * **The exemption cannot outlive the defect.** The test below asserts that every
- * entry still contains it, so the day one is fixed this guard fails until the
- * name is removed — the opposite of an allowlist that silently keeps a repaired
- * file exempt.
+ * The Local Day Correction initiative (ADR-111) discharged all four in Unit 2,
+ * so the list and the assertion that kept it honest are **retired together**.
+ * The exemption never outlived the defect, which was the whole design: while it
+ * stood, every named file had to *still* contain the defect, so a repair failed
+ * the build until the name came out. That is what happened here.
  *
- * Destination: `docs/initiatives/push-hardware-validation/` §4, and `docs/TODO.md`.
+ * The corpus scan below now holds every file to the rule with no exceptions —
+ * and `local-day-correction-guard.test.ts` holds the **whole `src/` tree** to
+ * it, which is the reach this guard's eight named surfaces never had. Thirteen
+ * of the seventeen formatters that census found were outside this corpus.
  */
-const HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE = [
-  "src/features/daily-cycle/entry-review.tsx",
-  "src/features/daily-cycle/inbox-item.tsx",
-  "src/features/daily-cycle/needs-attention-item.tsx",
-  "src/features/daily-cycle/technical-details.tsx",
-] as const;
-
-function isCarriedPastClose(path: string): boolean {
-  return HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE.some(
-    (relative) => path.endsWith(join(...relative.split("/"))),
-  );
-}
 
 function walk(directory: string): string[] {
   const found: string[] = [];
@@ -166,28 +158,31 @@ describe("2M-TIME-007: the phase's dated surfaces use no fixed offset, day lengt
     for (const hazard of TIME_HAZARDS) {
       expect(hazard.pattern.test(source), `${path} uses ${hazard.name}`).toBe(false);
     }
-    if (isCarriedPastClose(path)) return;
     expect(formattersWithoutZone(source), `${path} formats an instant with no timeZone`).toBe(0);
   });
 
-  it("keeps the carried-past-close list exactly as long as the defect lasts", () => {
+  it("has no exemption left, and the four it carried are genuinely repaired", () => {
     /*
-     * The half that makes an exemption honest. Each named file must STILL format
-     * an instant without a zone; the moment one is repaired this fails and the
-     * name has to come out. An allowlist that keeps a fixed file exempt is how a
-     * guard's reach shrinks by accident.
+     * The retirement, asserted rather than announced. Deleting an exemption list
+     * proves nothing on its own — a list can be removed by deleting the rule
+     * with it. So the four files it named are checked directly: each must now
+     * format through the contract, and none may format without a zone.
      */
-    for (const relative of HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE) {
-      const source = withoutComments(readFileSync(join(process.cwd(), relative), "utf8"));
-      expect(
-        formattersWithoutZone(source),
-        `${relative} no longer formats without a zone — remove it from the carried-past-close list`,
-      ).toBeGreaterThan(0);
-      expect(corpus.some((path) => isCarriedPastClose(path)), "the list names no file in the corpus")
-        .toBe(true);
+    const carried = [
+      "src/features/daily-cycle/entry-review.tsx",
+      "src/features/daily-cycle/inbox-item.tsx",
+      "src/features/daily-cycle/needs-attention-item.tsx",
+      "src/features/daily-cycle/technical-details.tsx",
+    ];
+    for (const relative of carried) {
+      const raw = readFileSync(join(process.cwd(), relative), "utf8");
+      const source = withoutComments(raw);
+      expect(formattersWithoutZone(source), `${relative} still formats without a zone`).toBe(0);
+      expect(source, `${relative} does not use the instant contract`).toMatch(
+        /formatInstant|instantFormatter/,
+      );
+      expect(corpus, `${relative} left the corpus`).toContain(join(process.cwd(), ...relative.split("/")));
     }
-    // The count is asserted so a fifth surface cannot join quietly.
-    expect(HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE.length).toBe(4);
   });
 
   it("fires on each hazard, and not on the correct forms beside them", () => {

@@ -149,6 +149,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     }));
 
   const view: HomeViewModel = {
+    timeZone: workProjection.timezone,
     todayLabel: new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" })
       .format(new Date())
       .toUpperCase(),
