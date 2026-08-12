@@ -1,12 +1,14 @@
 # Phase 2M — deployment record
 
-**Authorization:** ADR-105. Migration budget **`2 allocated · NON-TRANSFERABLE`**.
-A third is a stop condition.
+**Authorization:** ADR-105, extended by **ADR-106** to **`3 allocated ·
+NON-TRANSFERABLE`**. A **fourth** is a stop condition.
 
 This file records each migration's application to the **hosted** project, the
 parity reading that followed, and the hosted proof. Everything below was
-**executed**; nothing is inferred. Migration 2 will be appended here when slice
-2M.4b spends it.
+**executed**; nothing is inferred.
+
+**All three are now spent and deployed.** The budget closes at **3 allocated · 3
+spent**, and hosted parity is **`202608120092`** across **92 migrations**.
 
 ---
 
@@ -197,3 +199,191 @@ push, no Edge Function deploy, no schedule, no cron job, no retention sweep, no
 secret, no signup change, no rollout execution, no provider call, no BYOK use.
 The migration asserts the unchanged posture rather than assuming it, and those
 assertions ran during the apply.
+
+---
+
+## Migrations 2 and 3 — `202608110091_phase_2m_clear_planned.sql` and `202608120092_phase_2m_push_delivery.sql`
+
+Applied together on **2026-08-12**, in chain order, after the merge and with CI
+green on the exact merge SHA.
+
+### 1. Provenance
+
+| | |
+|---|---|
+| PR | #183, merged 2026-08-12T12:51:14Z |
+| Merge SHA | `5a202048ee82643d7528117b2c92affa46614840` |
+| CI on the exact merge SHA | **green 3/3** — `application`, `database and journey`, `edge worker` — verified **before** anything was pushed |
+| Working tree at deployment | clean; both migration files **byte-identical** to the merge SHA |
+| `202608110091` sha256 | `bf295ee83a14baab7c64f543fc4dc2a706092dc5e707ef2386c51d63dadb6b69` |
+| `202608120092` sha256 | `554755641cc457831b13d7d4f890ee3d594d1cc3dcd3a5f5a72d96056f31ccf5` |
+
+Both hashes were taken from the working tree and compared against
+`git cat-file -p 5a20204:<path>`, not against a remembered value.
+
+### 2. The dry run — exactly two pending migrations, in this order
+
+```
+Would push these migrations:
+ - 202608110091_phase_2m_clear_planned.sql
+ - 202608120092_phase_2m_push_delivery.sql
+```
+
+**No third migration appeared.** A third would have been the stop condition, and
+the dry run is where it would have shown up.
+
+### 3. Application
+
+Both applied cleanly, `202608110091` first and `202608120092` second — the order
+the CLI takes from the chain and the order required.
+
+The push migration's self-checks ran **inside its own apply**: no
+content-bearing column on any of the three tables, forced RLS on all three, no
+write policy for `authenticated`, and the notification telemetry vocabulary
+already deployed by migration 1 — a producer that predates its vocabulary is
+`R-11`, and this migration refuses to install ahead of it.
+
+### 4. Parity — read live, read-only
+
+`npx supabase migration list --linked`, parsed row by row:
+
+```
+rows=92 mismatched=0
+head=202608120092
+LOCAL = REMOTE ON EVERY ROW
+```
+
+**Hosted parity moves from `202608110090` to `202608120092`; 92 migrations.**
+
+### 5. The Edge Function
+
+`npx supabase functions deploy send-push --use-api --no-verify-jwt`. `--use-api`
+because there is no local Docker; `--no-verify-jwt` explicitly as well as
+declared in `config.toml`, so the deployed state is unambiguous regardless of
+which the CLI honours.
+
+`npm run verify:edge-parity` afterwards:
+
+```
+send-push    2026-08-12T12:57   2026-08-12T11:30   ok
+every deployed function is at or ahead of its source
+```
+
+**No `config push` was run.** That command is all-or-nothing and would open
+signup as a side effect; the `[functions.send-push]` block is read locally by
+`functions deploy`.
+
+### 6. The secrets, confirmed by name and digest and never by value
+
+| environment | secret | state |
+|---|---|---|
+| Edge Functions | `VAPID_PRIVATE_KEY` | present, updated 2026-08-12T10:16Z |
+| Edge Functions | `VAPID_PUBLIC_KEY` | present, updated 2026-08-12T10:16Z |
+| Edge Functions | `WORKER_DISPATCH_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | present |
+| Vercel (Preview + Production) | `VAPID_PUBLIC_KEY` | present, `Sensitive` |
+| Vercel | `VAPID_PRIVATE_KEY` | **absent, and that is the requirement** |
+
+No value was read, printed, logged or written anywhere.
+
+### 7. The application
+
+Vercel deployed production from the merge commit automatically, four seconds
+after the merge (`Ready`, created 2026-08-12T12:51:18Z). The `VAPID_PUBLIC_KEY`
+variable was already configured for Production before that build, so the settings
+surface reads it rather than rendering the "not available" sentence.
+
+### 8. The deployed sender answers, and its refusals are its own
+
+| request | result |
+|---|---|
+| `POST` with no `x-dispatch-secret` | **401** `{"error":"Unauthorized"}` |
+| `POST` with a wrong secret | **401** `{"error":"Unauthorized"}` |
+| `GET` | **405** `{"error":"Method not allowed"}` |
+
+Two things are proved here that a green deploy alone would not show.
+
+**The gateway is forwarding.** These bodies are the function's own, not a
+platform JWT error — so `verify_jwt = false` took effect. Under the platform
+default the gateway would have answered 401 **before the function ran**, and the
+symptom would have been "nothing is ever sent" with nothing in the function's own
+logs.
+
+**Every environment variable is visible to the deployed function.** The POST path
+checks configuration *before* the secret and returns `503 vapid_not_configured`
+when either VAPID half is missing. It returned **401, not 503** — so both halves,
+the dispatch secret and the service credentials are all present in the running
+function. Established without reading any of them.
+
+### 9. The hosted proof — `npm run prove:2m:push`
+
+**47 of 47 claims passed** against the deployed project, through real PostgREST,
+under real roles, with RLS actually enforced rather than emulated by
+`set local role`:
+
+- consent granted from a real subscription, and **absence refusing** with no row
+  required to say so;
+- a refusal leaving **no partial write**;
+- non-https, loopback, private-range and `user:pass@`-smuggled endpoints refused;
+- a client unable to claim `granted`;
+- **T-01** — owner B sees zero of A's subscriptions *from B's own session*, and
+  registering the **same endpoint** succeeds rather than erroring, because an
+  error would be an existence oracle;
+- all six controls, each naming itself: `type_muted`, `quiet_hours`, `duplicate`,
+  `cooldown`, `daily_cap`, `not_consented`;
+- quiet hours and the cap read back from **`agent_preferences`**, proving the
+  reuse rather than a second copy;
+- **both retry ceilings** — the third delivery failure retires the delivery, the
+  third device strike retires the device, and the consent expires with the last
+  device;
+- a **gone** subscription retired at once with no strikes;
+- a finished delivery never re-finished by a stale worker;
+- **T-09** — revocation in one step, idempotent, nothing deliverable after;
+- the audit exposing **no content-bearing column**, every `dedupe_hash` a digest,
+  every suppression reason one of the declared six, and no delivered row carrying
+  one;
+- an authenticated caller unable to drive the sender (`42501`) or insert its own
+  consent (`42501`);
+- three non-vacuous negative controls: an undeclared type, a record identifier
+  where a digest belongs, and a cap beyond the column's bound.
+
+One claim is deliberately stated weaker than it looks: the retention sweep check
+proves only that `private.prune_notification_deliveries` is unreachable **through
+the data API**, because PostgREST does not expose the `private` schema at all.
+The privilege itself — no role, not even `service_role` — is proved in pgTAP.
+Recording the weaker claim as the stronger one is the probe-side defect this
+repository has paid for repeatedly.
+
+### 10. Cleanup and zero residue
+
+Both disposable owners deleted in a `finally`. Residue proved **owner-scoped**,
+per table and per owner — six reads, all zero — then confirmed globally:
+
+```
+push-proof fixture accounts remaining: 0
+total project accounts: 2
+notification_consents      total rows on project = 0
+push_subscriptions         total rows on project = 0
+notification_deliveries    total rows on project = 0
+```
+
+### 11. What this deployment does **not** prove
+
+**No push has been delivered to any device.** No push service was contacted, and
+the VAPID private key was never read by anything in this run. The sender's
+cryptography is proved correct against RFC 8291 section 5's published vector
+**byte for byte**, which is a strong claim about the bytes and says nothing about
+a phone. Real delivery on iOS and Android is the **owner's hardware checkpoint**
+(OD-2M-5), it blocks closeout, and nothing here discharges it.
+
+**No screen reader has read the surface.** `2M-ACCESS-007` is owner-run.
+
+**Nothing calls the sender automatically.** There is no producer, no schedule and
+no cron entry: wiring the heartbeat to enqueue a push would need a claim RPC and
+therefore a fourth migration, which is the stop condition. The sender is invoked
+explicitly, and that remainder is stated rather than implied.
+
+### 12. What this deployment did not touch
+
+No Auth or GoTrue setting, no `config.toml` push, no schedule, no cron job, no
+retention sweep armed, no signup change, no rollout execution, no provider call,
+no BYOK use, and no change to any pre-existing table's RLS, grants or policies.
