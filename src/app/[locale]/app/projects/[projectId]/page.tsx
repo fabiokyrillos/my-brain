@@ -14,6 +14,8 @@ import { loadOrganizationOptions } from "@/features/entities/organizations";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema";
 import { getVocabularyCopy, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
@@ -30,6 +32,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const copy = getEntityCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
+  // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
+  // other contextual surface stamp instants from the same source.
+  const timeZone = await getOwnerTimeZone();
   const [projectResult, taskLinkResult, personLinkResult, entryLinkResult, organizations, peopleOptionsResult] = await Promise.all([
     // `organization_id` joins the projection here for the first time: the column
     // has always existed and the page never read it (UX-08).
@@ -143,7 +148,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <div>
                   <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
                   <small>
-                    {new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at))}
+                    {formatInstant(entry.occurred_at, "dayAndTime", locale, timeZone)}
                     {entry.is_retroactive ? ` · ${pt ? "adicionado depois" : "added later"}` : ""}
                   </small>
                 </div>

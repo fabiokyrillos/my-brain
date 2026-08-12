@@ -163,13 +163,9 @@ export const OPEN_OCCURRENCES: readonly Exemption[] = [
   // in the owner's zone through `formatInstant`, and Phase 2M's
   // `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` list is empty and retired with them.
 
-  // Unit 3 — the contextual pages, none of which any guard was watching.
-  { file: "src/app/[locale]/app/chat/page.tsx", family: "formatter-without-zone", count: 1, unit: 3 },
-  { file: "src/app/[locale]/app/files/page.tsx", family: "formatter-without-zone", count: 1, unit: 3 },
-  { file: "src/app/[locale]/app/inbox/[entryId]/page.tsx", family: "formatter-without-zone", count: 1, unit: 3 },
-  { file: "src/app/[locale]/app/memories/[memoryId]/page.tsx", family: "formatter-without-zone", count: 1, unit: 3 },
-  { file: "src/app/[locale]/app/people/[personId]/page.tsx", family: "formatter-without-zone", count: 2, unit: 3 },
-  { file: "src/app/[locale]/app/projects/[projectId]/page.tsx", family: "formatter-without-zone", count: 1, unit: 3 },
+  // Unit 3 — DISCHARGED. The seven contextual call sites now stamp through the
+  // contract, six of them from `getOwnerTimeZone()` and the entry detail from
+  // the zone its own projection already carried.
 
   // Unit 4 — agent, search, shell, conversation sources, and the three families
   // the census surfaced beyond the seventeen formatters.
@@ -292,14 +288,14 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     // These totals are the initiative's baseline; they go to zero and the
     // assertions below go with them.
     const formatters = OPEN_OCCURRENCES.filter((e) => e.family === "formatter-without-zone");
-    // 17 across 16 files at the census; Unit 2 repaired four of them.
-    expect(formatters.reduce((sum, e) => sum + e.count, 0)).toBe(13);
-    expect(new Set(formatters.map((e) => e.file)).size).toBe(12);
+    // 17 across 16 files at the census; Units 2 and 3 repaired eleven.
+    expect(formatters.reduce((sum, e) => sum + e.count, 0)).toBe(6);
+    expect(new Set(formatters.map((e) => e.file)).size).toBe(6);
 
     const byUnit = (unit: number) =>
       OPEN_OCCURRENCES.filter((e) => e.unit === unit).reduce((sum, e) => sum + e.count, 0);
     expect(byUnit(2), "Unit 2 discharged the four daily-cycle formatters").toBe(0);
-    expect(byUnit(3), "the contextual pages").toBe(7);
+    expect(byUnit(3), "Unit 3 discharged the contextual pages").toBe(0);
     // Six formatters, plus the three families the census surfaced beyond them:
     // seven host-zone field operations in one review computation, four UTC day
     // slices, three zone round-trips.
@@ -310,8 +306,8 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     expect(byFamily("host-zone-field")).toBe(7);
     expect(byFamily("utc-day-slice")).toBe(4);
     expect(byFamily("zone-round-trip")).toBe(3);
-    // 31 at the census, less the four Unit 2 discharged. This reaches 0.
-    expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's remaining debt").toBe(27);
+    // 31 at the census, less the eleven Units 2 and 3 discharged. This reaches 0.
+    expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's remaining debt").toBe(20);
   });
 });
 
