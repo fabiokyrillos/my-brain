@@ -199,6 +199,98 @@ the event.
 | pgTAP `phase_2m_push_delivery.sql` | **90 assertions**, first executed in CI — red on the first run, green on the third |
 | CI `application` / `database` / `edge worker` | green 3/3 on the PR head, recorded in the deployment record |
 
+---
+
+## 6. OWNER CHECKPOINT — the hardware proof (OD-2M-5)
+
+**Nothing in this repository can discharge any line below.** Every test here uses
+a fake `fetch`; the Pixel 7 Playwright project is an emulated viewport, not a
+device; and no push service has ever been contacted by this code. What follows is
+the exact procedure, split by what it blocks.
+
+### 6.1 What blocks slice 2M.5, and what blocks only closeout
+
+| # | Check | Blocks |
+|---|---|---|
+| H-1 | Android Chrome, installed PWA: permission after an explicit tap | **2M.5** |
+| H-2 | Android: a real push arrives in **background** | **2M.5** |
+| H-3 | Android: tapping it lands on the authorized destination | **2M.5** |
+| H-4 | iOS Safari 16.4+, **installed to the home screen**: permission after an explicit tap | **2M.5** |
+| H-5 | iOS installed PWA: a real push arrives | **2M.5** |
+| H-6 | Revocation stops delivery on both platforms | **2M.5** |
+| H-7 | iOS Safari **not installed**: the surface says the home-screen step, and offers no button that cannot work | closeout |
+| H-8 | Foreground behaviour on both platforms | closeout |
+| H-9 | Lock-screen rendering carries **no content** | closeout |
+| H-10 | Quiet hours suppress a real send | closeout |
+| H-11 | Daily cap suppresses a real send | closeout |
+| H-12 | 24-hour cooldown suppresses a real re-send | closeout |
+| H-13 | Screen reader (VoiceOver / TalkBack) on the settings surface | closeout |
+| H-14 | Touch targets and reflow on real hardware | closeout |
+
+**Why the split.** 2M.5 cannot be planned without knowing that delivery *works at
+all* on both platforms and that consent can be withdrawn — those are the
+assumptions any further notification work would build on. H-7 through H-14 are
+quality and governance evidence: real, required for closeout, but they do not
+change what 2M.5 would be.
+
+### 6.2 The procedure
+
+**Before touching a device.** Confirm the sender answers: a `POST` to the
+deployed function with a wrong `x-dispatch-secret` must return **401**, and with
+no body must return **400**. If either returns 200, stop — the gateway is not
+enforcing what it should.
+
+**Android (H-1, H-2, H-3, H-6, H-8, H-9, H-11, H-12, H-14)**
+
+1. Chrome → the production URL → sign in → menu → **Install app**. Open the
+   installed icon, not the browser tab.
+2. Go to **Notifications**. Read the benefit and the content promise **before**
+   pressing anything — if a permission prompt appears without a tap, that is a
+   `2M-NOTIFY-003` failure and the run stops there.
+3. Tap **Ativar avisos neste aparelho**. Accept the OS prompt. The state line must
+   change to the `granted` sentence.
+4. Send one real push (owner-run, with the dispatch secret). Confirm it arrives
+   with the app **backgrounded**, then again with it **foregrounded**, then with
+   the screen **locked**.
+5. On the lock screen, read the notification text. It must say only that
+   something is waiting — **no task title, no name, no date, no count**. Anything
+   else is a `2M-NOTIFY-006` failure and is the one finding that would block
+   everything.
+6. Tap it. It must open the installed PWA on the destination for that type, and
+   must **not** open a second window if one is already open.
+7. Set quiet hours to a window containing *now*, send again, confirm nothing
+   arrives, and confirm the ledger recorded `quiet_hours`.
+8. Set the cap to the number already delivered today, send again, confirm nothing
+   arrives and the ledger says `daily_cap`.
+9. Send the **same item** twice within 24 hours; the second must not arrive and
+   the ledger must say `cooldown` — not `duplicate`.
+10. Tap **Desativar**. Send again. Nothing may arrive.
+
+**iOS (H-4, H-5, H-7, and the same governance checks)**
+
+1. **First, without installing:** Safari → the production URL → Notifications.
+   The surface must state the home-screen step and must offer **no** enable
+   button. This is H-7, and it is the case a user is most likely to hit.
+2. Share → **Add to Home Screen**. Open from the home screen icon.
+3. Repeat Android steps 2–10.
+
+### 6.3 How to report each line
+
+Use these five states, and do not collapse them:
+
+1. **executed and proved** — done on the device, with what was observed;
+2. **implemented but not executed in the required environment** — the code path
+   exists and is tested, but no device ran it;
+3. **partial** — with the remainder named and a destination;
+4. **blocked by the owner** — waiting on an owner action, named;
+5. **not started**.
+
+A line that cannot be run because delivery itself failed is **blocked**, not
+failed — record what broke and stop, rather than continuing down a list whose
+remaining items assume the first one worked.
+
+---
+
 ### The pgTAP suite's execution history, because "green" alone would hide it
 
 | run | outcome |
