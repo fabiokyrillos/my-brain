@@ -113,9 +113,11 @@ export const navigationCapabilities = [
    * decision this phase was not authorized to make, so it is left to the owner
    * and recorded as a residual rather than taken unilaterally.
    *
-   * `nested: true` because the daily planner and the day review are sub-routes
-   * (slices 2M.2 and 2M.3), so `/app/calendar/...` keeps this destination active
-   * rather than clearing the highlight mid-navigation.
+   * `nested: true` because the daily planner is a sub-route (slice 2M.2), so
+   * `/app/calendar/...` keeps this destination active rather than clearing the
+   * highlight mid-navigation. The day review is **not** one of them: slice 2M.3
+   * put it on `/app/reviews`, the surface reviews already had, so it keeps the
+   * `reviews` destination highlighted and needs nothing here.
    */
   { key: "calendar", route: "calendar", group: "organization", visibility: "more", nested: true, aliases: [] },
   { key: "reminders", route: "reminders", group: "organization", visibility: "more", nested: false, aliases: [] },

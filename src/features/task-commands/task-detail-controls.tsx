@@ -77,12 +77,29 @@ const MAX_LENGTH_BY_FIELD: Partial<Record<TaskCommandPatchField, number>> = {
  */
 export type TaskDetailControlsVariant = "section" | "inline";
 
+/**
+ * A value the *surface* proposes for a control, per action.
+ *
+ * `2M-REVIEW-003`. The day review's `carry_forward` is `set_planned` with the
+ * next day already filled in, and its `follow_up` is `set_status` with `waiting`
+ * already chosen — the user still presses the button, and can still change what
+ * is in the field before doing so.
+ *
+ * **It changes no control, no eligibility and no intent**, which is the same bar
+ * `variant` is held to. It fills an input's initial value, and every gate below
+ * runs unchanged: `buildDetailPatch` re-checks the bounds, `validateTaskCommand`
+ * re-checks the taxonomy, and `apply_task_command` re-checks the row. A preset a
+ * policy would refuse is refused exactly as a typed one would be.
+ */
+export type TaskDetailControlDefaults = Partial<Record<TaskCommandAction, string>>;
+
 export function TaskDetailControls({
   action,
   locale,
   taskId,
   title,
   controls,
+  defaultValues,
   relationOptions,
   dateBounds,
   variant = "section",
@@ -95,6 +112,8 @@ export function TaskDetailControls({
   /** The rendered title. A resolution query hint only, never a gate. */
   title: string;
   controls: readonly DetailControl[];
+  /** `2M-REVIEW-003`. Initial values a surface proposes; see the type's own note. */
+  defaultValues?: TaskDetailControlDefaults;
   relationOptions: TaskDetailRelationOptions;
   dateBounds: TaskDetailDateBounds;
   variant?: TaskDetailControlsVariant;
@@ -279,6 +298,7 @@ export function TaskDetailControls({
           const inputId = `task-control-${control.action}`;
           const intent = control.destructive ? "request_cancel" : "apply";
           const options = control.relation === null ? null : relationOptions[control.relation];
+          const proposed = defaultValues?.[control.action];
           // A relation control with nothing to point at is stated rather than
           // rendered as an empty `<select>` the user can only fail to use.
           const empty = options !== null && options.length === 0;
@@ -295,6 +315,7 @@ export function TaskDetailControls({
                 {control.kind === "text" && control.field !== null ? (
                   LONG_FIELDS.includes(control.field) ? (
                     <textarea
+                      defaultValue={proposed}
                       id={inputId}
                       maxLength={MAX_LENGTH_BY_FIELD[control.field]}
                       name="value"
@@ -303,6 +324,7 @@ export function TaskDetailControls({
                     />
                   ) : (
                     <input
+                      defaultValue={proposed}
                       id={inputId}
                       maxLength={MAX_LENGTH_BY_FIELD[control.field]}
                       name="value"
@@ -319,6 +341,7 @@ export function TaskDetailControls({
                   // instant. The bounds mirror the lexicon's ±730 days, so a
                   // date it would decline cannot be picked in the first place.
                   <input
+                    defaultValue={proposed}
                     id={inputId}
                     max={dateBounds.max}
                     min={dateBounds.min}
@@ -328,7 +351,11 @@ export function TaskDetailControls({
                 ) : null}
 
                 {control.kind === "choice" && control.choices !== null ? (
-                  <select defaultValue="" id={inputId} name="value">
+                  <select
+                    defaultValue={proposed !== undefined && control.choices.includes(proposed) ? proposed : ""}
+                    id={inputId}
+                    name="value"
+                  >
                     <option disabled value="">{copy.choosePlaceholder}</option>
                     {control.choices.map((choice) => (
                       <option key={choice} value={choice}>

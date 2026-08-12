@@ -268,3 +268,106 @@
 .calendar-reschedule input[type="date"] {
   max-width: 100%;
 }
+
+/*
+ * The planner and the day review, slices 2M.2 and 2M.3.
+ *
+ * In this stylesheet rather than in two new ones because both are this phase's
+ * surfaces and both reuse the calendar's controls; a `planner.css` and a
+ * `day-review.css` would be two more files the browser lane has to remember to
+ * load, and a stylesheet a lane forgets turns every computed-style assertion
+ * into a measurement of the browser default.
+ *
+ * What is set here is only what `2M-MOBILE-001` needs: lists that wrap instead
+ * of overflowing, and controls that stay inside the narrowest column a 320 CSS
+ * px viewport produces.
+ */
+.planner-page section,
+.day-review-page section {
+  margin-block: var(--space-4, 1rem);
+}
+
+.planner-list ul,
+.day-review-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  padding: 0;
+  list-style: none;
+}
+
+.planner-item,
+.day-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  min-width: 0;
+}
+
+.planner-item-head,
+.day-review-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  min-width: 0;
+}
+
+.planner-item-meta,
+.day-review-item-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #555);
+}
+
+.planner-day-nav,
+.day-review-scope-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+/*
+ * `2M-MOBILE-001`. The navigation links are the smallest interactive targets on
+ * either surface, so they carry the minimum themselves rather than inheriting a
+ * size from the text that happens to be inside them.
+ */
+.planner-day-nav a,
+.day-review-scope-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  padding-inline: var(--space-2, 0.5rem);
+}
+
+.day-review-scope-nav a[aria-current="page"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.day-review-verbs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.day-review-verb .task-control-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.day-review-verb .task-control form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.day-review-verb input[type="date"],
+.day-review-verb select {
+  max-width: 100%;
+}

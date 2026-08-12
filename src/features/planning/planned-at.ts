@@ -59,6 +59,7 @@ import {
   actionPolicy,
   type TaskCommandAction,
 } from "@/features/task-commands/taxonomy";
+import { formatInstant } from "@/lib/time/instant-format";
 import {
   compareLocalDates,
   formatLocalDate,
@@ -220,7 +221,12 @@ export function formatPlannedDay(
   locale: string,
   timeZone: string,
 ): string | null {
-  const parsed = typeof instant === "string" && instant !== "" ? new Date(instant) : null;
-  if (parsed === null || Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(parsed);
+  /*
+   * `2M-TIME-006`. Delegated to the one instant contract rather than building a
+   * second `Intl.DateTimeFormat` here: this function and the day review both
+   * render a planned day, and two formatters agreeing today is not the same as
+   * one formatter. The `day` presentation is the one that carries no clock
+   * component at all, which is consequence 1 of the declaration above.
+   */
+  return formatInstant(instant, "day", locale, timeZone);
 }

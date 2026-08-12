@@ -253,9 +253,18 @@ jobs:
         # components emit, because the routes themselves need a session this job
         # does not have. It runs at BOTH viewports deliberately -- the rendered
         # touch-target contract (2J-ACCESS-006) only executes on mobile.
+        # calendar.spec.ts (slice 2M.1) and daily-surfaces.spec.ts (slice 2M.3)
+        # are credential-free by the same construction and are added here by
+        # slice 2M.3, which is what `2M-ACCESS-006` actually asks for: "an entry
+        # in the CI accessibility lane, OR a mirror re-derived from component
+        # source". The mirror existed and ran in CI as a vitest guard; the lane
+        # it guards did not, so the browser assertions -- touch targets, focus,
+        # reflow at 320 CSS px, keyboard reach -- had never executed anywhere but
+        # a developer's machine. Both now run at BOTH viewports, because the
+        # touch-target contract only executes on mobile.
         # The remaining specs are credential-gated against the linked project
         # and skip themselves; remote smokes stay manual.
-        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts --project=desktop --project=mobile
+        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts --project=desktop --project=mobile
 
       # 2F-REVOKE-003 — the re-grant rollback rehearsal.
       #

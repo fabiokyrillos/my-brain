@@ -5,6 +5,8 @@ import type {
   AttentionResolutionAction,
   CalendarOrientation,
   CaptureModeAnalytics,
+  DayReviewActionKind,
+  DayReviewScope,
   ProductEventLocale,
   ProductEventName,
   ProductEventPropertiesByName,
@@ -535,5 +537,65 @@ export function recordDayPlanned(input: {
     surface: "calendar",
     locale: input.locale,
     properties: { operation: input.operation, itemCount: input.itemCount },
+  });
+}
+
+/**
+ * Q3's **denominator** — `day_review_opened`, one property and no second.
+ *
+ * `2M-REVIEW-001` and `-002` are two flows, so the scope travels and is asked
+ * about separately: a next-day review that never produces an action is a
+ * different fact from a daily one that does not. `recordOnce` keys on the scope,
+ * so switching between the two emits both and re-rendering either emits neither
+ * a second time.
+ *
+ * **The day is absent**, exactly as it is on the calendar and the planner. Which
+ * days somebody closes out is the same fingerprinting value, it answers no
+ * declared question, and the deployed validator admits the key `scope` and
+ * nothing else.
+ *
+ * The surface is `calendar` because that is the surface migration `202608110090`
+ * declared for this phase, naming the calendar, the planner **and the day
+ * review** as its residents. The mount point is `/app/reviews`, which is a
+ * different question from which product area the event belongs to —
+ * `task_command` has attributed to its own area from two unrelated routes since
+ * Phase 2E, and a `reviews` surface value the deployed CHECK does not admit would
+ * be a fourth migration in a phase whose three are allocated by name.
+ */
+export function DayReviewOpened({ scope, locale }: {
+  scope: DayReviewScope;
+  locale: ProductEventLocale;
+}) {
+  return <VisibilityEvent onVisible={() => recordOnce({
+    logicalKey: `day-review-opened:${scope}`,
+    name: "day_review_opened",
+    surface: "calendar",
+    locale,
+    properties: { scope },
+  })} />;
+}
+
+/**
+ * Q3's **numerator** — `day_review_action_applied`.
+ *
+ * Two properties: the scope, so the numerator can be divided by the denominator
+ * it belongs to, and the `actionKind`, which is one of the five verbs
+ * `2M-REVIEW-003` enumerates **by the requirement's own names**, so the funnel
+ * and the requirement cannot drift apart.
+ *
+ * No task id, no title, no day and no count. The key varies with the instant so
+ * two applications of the same verb are two events, because they are.
+ */
+export function recordDayReviewActionApplied(input: {
+  scope: DayReviewScope;
+  actionKind: DayReviewActionKind;
+  locale: ProductEventLocale;
+}) {
+  recordOnce({
+    logicalKey: `day-review-action:${input.scope}:${input.actionKind}:${Date.now()}`,
+    name: "day_review_action_applied",
+    surface: "calendar",
+    locale: input.locale,
+    properties: { scope: input.scope, actionKind: input.actionKind },
   });
 }
