@@ -469,6 +469,37 @@ begin
     values (p_user, 'ai', 'admitted');
   exception when others then failures := failures || ('rate_limit_events: ' || sqlerrm); end;
 
+  -- Phase 2M slice 2M.4b's three. Inserted directly rather than through
+  -- `register_push_subscription`, for the same reason `error_events` is: that
+  -- function derives the owner from `auth.uid()` and this populator runs without
+  -- a session, so the rows would land unowned and detector 2 would then report
+  -- three empty tables for an account that is supposed to be row-complete.
+  --
+  -- These three are exactly what detector 2 exists for: they were added by a
+  -- later slice, this populator did not know about them, and CI named all three
+  -- BY NAME on the first run of the migration that created them (T-32).
+  begin
+    insert into public.notification_consents (user_id, channel, state, enabled_types, frequency)
+    values (p_user, 'push', 'granted', array['reminder']::text[], 'immediate');
+  exception when others then failures := failures || ('notification_consents: ' || sqlerrm); end;
+
+  begin
+    -- Owner-scoped unique, so the bystander may hold the same endpoint. The keys
+    -- satisfy the column CHECKs (`p256dh` 16..256, `auth` 8..256); a shorter
+    -- fixture fails the insert and is reported by detector 1.
+    insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+    values (p_user, 'https://push.example.test/cascade-drill',
+            'p256dh-cascade-drill-0123', 'auth-cascade');
+  exception when others then failures := failures || ('push_subscriptions: ' || sqlerrm); end;
+
+  begin
+    -- `dedupe_hash` admits 64 lowercase hex characters and nothing else, which
+    -- is the whole point of the column: it cannot hold a title.
+    insert into public.notification_deliveries
+      (user_id, channel, notification_type, dedupe_hash, outcome)
+    values (p_user, 'push', 'reminder', repeat('7', 64), 'delivered');
+  exception when others then failures := failures || ('notification_deliveries: ' || sqlerrm); end;
+
   return array_to_string(failures, ' | ');
 end;
 $populate$;

@@ -243,6 +243,59 @@ describe("governance ships before delivery, and the directory proves it", () => 
     }
   });
 
+  it("2M-NOTIFY-011: NO product path uses service_role, and the delivery modules are where that matters", () => {
+    /*
+     * The pure modules above are asserted free of `service_role` because they
+     * may not reach for a client at all. That is the weaker half: they were
+     * never going to.
+     *
+     * The DELIVERY modules are the browser-reachable product path — the four
+     * Server Actions and the owner-scoped read behind the settings surface —
+     * and `2M-NOTIFY-011` forbids a `service_role` client on exactly those. The
+     * only `service_role` in this slice belongs to the leased sender, which
+     * lives under `supabase/functions/` and is not reachable from a page.
+     *
+     * Without this, the requirement would be proved only for the files least
+     * able to violate it.
+     */
+    for (const file of DELIVERY_MODULES) {
+      const text = withoutComments(read(file));
+      expect(text, `${file} names service_role on a product path`).not.toMatch(/service_role/);
+      // The service key by any of its spellings, in case a client were built
+      // here rather than imported.
+      expect(text, `${file} reaches for a service key`)
+        .not.toMatch(/SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|createServiceClient/);
+    }
+
+    // Non-vacuity: the corpus really was read, and the patterns really do fire
+    // on a file that uses the thing. Without this the loop would pass against
+    // five empty strings.
+    expect(DELIVERY_MODULES.length).toBeGreaterThan(3);
+    expect(withoutComments(read("supabase/functions/send-push/index.ts")))
+      .toMatch(/SERVICE_ROLE_KEY/);
+  });
+
+  it("2M-NOTIFY-011: every Server Action derives the owner from the session, never from an argument", () => {
+    /*
+     * The structural half of the same requirement. Each RPC takes the owner from
+     * `auth.uid()`, so there must be no argument through which a caller could
+     * name somebody else — and a `p_user_id` appearing in this file would be
+     * exactly that argument.
+     */
+    const actions = withoutComments(read("src/features/notifications/actions.ts"));
+    expect(actions).not.toMatch(/p_user_id|p_owner|userId:/);
+    // And it really does call the RPCs, so the absence above is about a file
+    // that has something to be absent from.
+    for (const rpc of [
+      "register_push_subscription",
+      "revoke_push_consent",
+      "record_push_consent_state",
+      "update_notification_preferences",
+    ]) {
+      expect(actions, `actions.ts no longer calls ${rpc}`).toContain(rpc);
+    }
+  });
+
   it("keeps the push allowlist to exactly the files 2M.4b earned", () => {
     /*
      * The ordering that makes a guard mean something: the guard watched the

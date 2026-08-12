@@ -270,7 +270,7 @@ select throws_ok(
 -- The positive control: the real path works.
 select lives_ok(
   $$ select public.register_push_subscription(
-       'https://push.test/endpoint-a', 'p256dh-a', 'auth-a') $$,
+       'https://push.test/endpoint-a', 'p256dh-owner-a-0123456789', 'auth-secret-a-01') $$,
   'a complete https registration succeeds');
 
 select results_eq(
@@ -323,7 +323,7 @@ select results_eq(
 -- would itself reveal A's row.
 select lives_ok(
   $$ select public.register_push_subscription(
-       'https://push.test/endpoint-a', 'p256dh-b', 'auth-b') $$,
+       'https://push.test/endpoint-a', 'p256dh-owner-b-0123456789', 'auth-secret-b-01') $$,
   'a second owner may register the same browser endpoint without an error that would reveal A');
 select results_eq(
   $$ select count(*)::int from public.push_subscriptions $$,
@@ -390,7 +390,7 @@ select results_eq(
 -- `product_events`.
 reset role;
 update public.notification_deliveries set id = '2f4b0001-0000-4000-8000-0000000000d0'
- where user_id = '2f4b0001-0000-4000-8000-000000000001' and dedupe_hash = repeat('d', 64);
+ where user_id = '2f4b0001-0000-4000-8000-000000000001' and dedupe_hash = repeat('d', 64) and outcome = 'pending';
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select set_config('request.jwt.claim.role', 'service_role', true);
 set local role service_role;
@@ -497,18 +497,18 @@ set local role authenticated;
 -- resolves inside the deployment is a request-forgery primitive with a user id
 -- attached, and `https` alone does not refuse one.
 select throws_ok(
-  $$ select public.register_push_subscription('https://127.0.0.1/push', 'p256dh-c', 'auth-c') $$,
+  $$ select public.register_push_subscription('https://127.0.0.1/push', 'p256dh-owner-c-0123456789', 'auth-secret-c-01') $$,
   '22023', null, 'a loopback endpoint is refused even though it is https');
 select throws_ok(
-  $$ select public.register_push_subscription('https://localhost/push', 'p256dh-c', 'auth-c') $$,
+  $$ select public.register_push_subscription('https://localhost/push', 'p256dh-owner-c-0123456789', 'auth-secret-c-01') $$,
   '22023', null, 'a dotless internal hostname is refused');
 select throws_ok(
-  $$ select public.register_push_subscription('https://10.0.0.5/push', 'p256dh-c', 'auth-c') $$,
+  $$ select public.register_push_subscription('https://10.0.0.5/push', 'p256dh-owner-c-0123456789', 'auth-secret-c-01') $$,
   '22023', null, 'a private-range endpoint is refused');
 -- The trap the naive check would miss: an authority that STARTS with a
 -- legitimate-looking host and still resolves to loopback.
 select throws_ok(
-  $$ select public.register_push_subscription('https://push.test@127.0.0.1/x', 'p256dh-c', 'auth-c') $$,
+  $$ select public.register_push_subscription('https://push.test@127.0.0.1/x', 'p256dh-owner-c-0123456789', 'auth-secret-c-01') $$,
   '22023', null, 'a userinfo prefix cannot smuggle a loopback host past the check');
 
 -- `2M-NOTIFY-002`: absence of a consent record refuses, with no row required to
@@ -565,7 +565,7 @@ select results_eq(
 -- A granted consent with NO LIVE DEVICE is not a deliverable consent.
 select lives_ok(
   $$ select public.register_push_subscription(
-       'https://push.test/endpoint-c', 'p256dh-c', 'auth-c') $$,
+       'https://push.test/endpoint-c', 'p256dh-owner-c-0123456789', 'auth-secret-c-01') $$,
   'owner C registers a real subscription');
 reset role;
 update public.push_subscriptions set state = 'revoked'
@@ -611,7 +611,7 @@ select results_eq(
 -- Pin the in-flight delivery's id too, for the same reason.
 reset role;
 update public.notification_deliveries set id = '2f4b0003-0000-4000-8000-0000000000d1'
- where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('3', 64);
+ where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('3', 64) and outcome = 'pending';
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select set_config('request.jwt.claim.role', 'service_role', true);
 set local role service_role;
@@ -707,7 +707,7 @@ set local role authenticated;
 -- user pressing the control again, the one action that should clear a lapse.
 select lives_ok(
   $$ select public.register_push_subscription(
-       'https://push.test/endpoint-c', 'p256dh-c2', 'auth-c2') $$,
+       'https://push.test/endpoint-c', 'p256dh-owner-c-9876543210', 'auth-secret-c-02') $$,
   're-registering revives an expired subscription');
 select results_eq(
   $$ select state || '|' || failure_count::text from public.push_subscriptions
@@ -727,7 +727,7 @@ select results_eq(
 
 reset role;
 update public.notification_deliveries set id = '2f4b0003-0000-4000-8000-0000000000d2'
- where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('5', 64);
+ where user_id = '2f4b0003-0000-4000-8000-000000000003' and dedupe_hash = repeat('5', 64) and outcome = 'pending';
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select set_config('request.jwt.claim.role', 'service_role', true);
 set local role service_role;
