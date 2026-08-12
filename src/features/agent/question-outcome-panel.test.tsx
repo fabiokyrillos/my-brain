@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuestionOutcomeCard } from "./question-outcome-panel";
 import type { QuestionOutcomeView } from "./question-outcome-projection";
 
+
+/** The owner's zone, explicit in every render (`LDC-AGENT-001`). */
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
 vi.mock("next/link", () => ({
   default: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) => (
     <a className={className} href={href}>{children}</a>
@@ -31,7 +34,7 @@ function outcome(overrides: Partial<QuestionOutcomeView> = {}): QuestionOutcomeV
 
 describe("QuestionOutcomeCard", () => {
   it("shows what the owner wrote, which the queue never did", () => {
-    render(<QuestionOutcomeCard agentName="Brain" locale="pt-BR" outcome={outcome()} />);
+    render(<QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="pt-BR" outcome={outcome()} />);
 
     expect(screen.getByText("Você respondeu")).toBeVisible();
     expect(screen.getByText("Ela é a responsável.")).toBeVisible();
@@ -42,24 +45,24 @@ describe("QuestionOutcomeCard", () => {
     // consequence only when the caller asks for one, so claiming a re-read on
     // every answer would describe work that never happened.
     const { unmount } = render(
-      <QuestionOutcomeCard agentName="Brain" locale="pt-BR" outcome={outcome({ reinterpreted: true })} />,
+      <QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="pt-BR" outcome={outcome({ reinterpreted: true })} />,
     );
     expect(screen.getByText(/reinterpretou o registro/)).toBeVisible();
     unmount();
 
-    render(<QuestionOutcomeCard agentName="Brain" locale="pt-BR" outcome={outcome({ reinterpreted: false })} />);
+    render(<QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="pt-BR" outcome={outcome({ reinterpreted: false })} />);
     expect(screen.getByText(/não reinterpretou nada/)).toBeVisible();
   });
 
   it("names the assistant by whatever the owner calls it", () => {
-    render(<QuestionOutcomeCard agentName="Ada" locale="pt-BR" outcome={outcome({ reinterpreted: true })} />);
+    render(<QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Ada" locale="pt-BR" outcome={outcome({ reinterpreted: true })} />);
 
     expect(screen.getByText(/O Ada reinterpretou o registro/)).toBeVisible();
     expect(screen.queryByText(/\{agent\}/)).toBeNull();
   });
 
   it("always links to where the decision is recorded", () => {
-    render(<QuestionOutcomeCard agentName="Brain" locale="pt-BR" outcome={outcome()} />);
+    render(<QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="pt-BR" outcome={outcome()} />);
 
     const link = screen.getByRole("link", { name: /Ver o registro/ });
     expect(link).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY_ID}`);
@@ -67,7 +70,7 @@ describe("QuestionOutcomeCard", () => {
 
   it("says nothing changed when the question was dismissed", () => {
     render(
-      <QuestionOutcomeCard
+      <QuestionOutcomeCard timeZone={OWNER_TIME_ZONE}
         agentName="Brain"
         locale="pt-BR"
         outcome={outcome({ disposition: "dismissed", answer: null, reinterpreted: false })}
@@ -81,7 +84,7 @@ describe("QuestionOutcomeCard", () => {
 
   it("tells a deferred question when it comes back", () => {
     render(
-      <QuestionOutcomeCard
+      <QuestionOutcomeCard timeZone={OWNER_TIME_ZONE}
         agentName="Brain"
         locale="pt-BR"
         outcome={outcome({
@@ -100,13 +103,13 @@ describe("QuestionOutcomeCard", () => {
 
   it("carries the disposition as data, so the surface can style it without re-deriving it", () => {
     const { container } = render(
-      <QuestionOutcomeCard agentName="Brain" locale="pt-BR" outcome={outcome({ disposition: "deferred" })} />,
+      <QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="pt-BR" outcome={outcome({ disposition: "deferred" })} />,
     );
     expect(container.querySelector(".question-outcome")).toHaveAttribute("data-disposition", "deferred");
   });
 
   it("localizes every visible string in English", () => {
-    render(<QuestionOutcomeCard agentName="Brain" locale="en" outcome={outcome({ reinterpreted: true })} />);
+    render(<QuestionOutcomeCard timeZone={OWNER_TIME_ZONE} agentName="Brain" locale="en" outcome={outcome({ reinterpreted: true })} />);
 
     expect(screen.getByText("Answered")).toBeVisible();
     expect(screen.getByText("You answered")).toBeVisible();

@@ -12,6 +12,7 @@ import { SourceList } from "@/features/conversation-sources/source-list";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { isLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
@@ -37,6 +38,7 @@ function ThreadMessage({
   model,
   role,
   sources,
+  timeZone,
 }: {
   agentName: string;
   citations: ParsedCitations;
@@ -48,6 +50,8 @@ function ThreadMessage({
   role: string;
   /** Already re-read against the current classification (`2K-PRIVACY-004`). */
   sources: readonly ResolvedSource[];
+  /** The owner's zone (`LDC-SEARCH-001`), so a citation and its page agree. */
+  timeZone: string;
 }) {
   const pt = locale === "pt-BR";
   /*
@@ -72,6 +76,7 @@ function ThreadMessage({
             locale={locale}
             messageId={messageId}
             sources={sources}
+            timeZone={timeZone}
           />
         </div>
       )}
@@ -93,6 +98,9 @@ export default async function ConversationPage({
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
   const agentName = await getAgentName();
+  // `LDC-SEARCH-001`. A cited source must not be dated differently from the page
+  // it cites.
+  const timeZone = await getOwnerTimeZone();
   const [conversationResult, messageResult] = await Promise.all([
     supabase.from("conversations").select("id,title").eq("id", conversationId).maybeSingle(),
     supabase
@@ -149,6 +157,7 @@ export default async function ConversationPage({
         {messages.map((message, index) => (
           <ThreadMessage
             agentName={agentName}
+            timeZone={timeZone}
             citations={parsed[index]!}
             content={message.content}
             conversationId={conversationId}

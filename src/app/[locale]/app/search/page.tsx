@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { SearchSurface } from "@/features/search/search-surface";
 import { searchEverything } from "@/features/search/actions";
 import type { Locale } from "@/lib/preferences";
@@ -18,10 +19,15 @@ export default async function SearchPage({
 }) {
   const { locale } = await params;
   await requireUser(locale);
+  // `LDC-SEARCH-001`. The surface is a client component, so the zone travels as
+  // a prop: the browser's zone is not the authority, and a result dated
+  // differently here than on the page it links to is the divergence this
+  // initiative removes.
+  const timeZone = await getOwnerTimeZone();
 
   return (
     <div className="page-shell">
-      <SearchSurface locale={locale} runSearch={searchEverything} />
+      <SearchSurface locale={locale} runSearch={searchEverything} timeZone={timeZone} />
     </div>
   );
 }

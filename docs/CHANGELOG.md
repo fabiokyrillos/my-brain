@@ -2,6 +2,22 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 4a: all seventeen formatters reach zero
+
+The job-retry notice, both question panels, conversation sources, search and Home's day header. **The `formatter-without-zone` family is now empty tree-wide**, and `OPEN_OCCURRENCES` holds only the three families the census surfaced beyond the seventeen.
+
+**Home's header was the one that was meaning rather than formatting.** `todayLabel` was `new Date()` with no zone while `dueFormatter` and `selectTodayPriorities` fifteen lines above both took `workProjection.timezone`. Between 21:00 and midnight in `America/Sao_Paulo` the header and the list beneath it named two different days, every day. The test does not merely assert the label carries *a* zone — that would pass on a label carrying a *different* zone from the list, which is the same bug with an extra step. It asserts Home names **exactly one** zone, and that the label uses it.
+
+**A second local `formatInstant` was found, and it was worse than the first.** `question-preview-panels.tsx` shadowed the contract's own name like `memories` did, but its primary path carried the zone correctly and only its `catch` branch rebuilt the formatter without one — so the single path that ran *when the zone was unusable* was the path that ignored it. Resolving through the total `resolveOwnerTimeZone` leaves the catch nothing to catch, so it is gone rather than repaired.
+
+**The two client surfaces take the zone as a prop.** `search-surface.tsx` and `source-list.tsx` are `"use client"`; the browser's zone is not the authority, and a search result dated differently from the page it links to is precisely the divergence being removed. Both are asserted to still be client components *and* to take the zone as a prop, so a later move to the server cannot silently reintroduce a host-zone read.
+
+**One trap worth recording: `getOwnerTimeZone()` cannot be imported everywhere.** Using it in `agent/actions.ts` broke `answer-pending-question.test.ts` with *"This module cannot be imported from a Client Component module"* — the accessor imports `server-only`, and that module is reached by tests running under the client condition. The fix was the **pure** `resolveOwnerTimeZone` with an inline profile read, on a path that already holds the client and the user. The accessor is for Server Components; the resolver is for everywhere.
+
+**A forced test update became a real proof.** Adding that query broke a retry test whose Supabase mock had no `profiles` branch. Rather than only unblocking the mock, the fixture now returns **`Pacific/Auckland`** — deliberately not the default, because the host running these tests *is* in `America/Sao_Paulo`, so a zone-less render and a correct one would agree all day and the assertion would prove nothing. The test now pins that the retry time reads `2100` and not `2099`.
+
+6536 tests pass. **Remaining debt: 14 occurrences** — 7 host-zone field operations, 4 UTC day slices, 3 zone round-trips, all Unit 4b. Zero migrations, 92, parity `202608120092`.
+
 ## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 3: the seven contextual call sites nobody was watching
 
 people (×2), projects, memories, the entry detail, files and chat now stamp instants through the contract. **Thirteen of the seventeen formatters the census found were outside any guard's corpus, and these are seven of the thirteen.**

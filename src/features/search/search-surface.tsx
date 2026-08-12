@@ -32,10 +32,18 @@ import {
   type SearchDomain,
   type SearchResponse,
 } from "./contracts";
+import { formatInstant } from "@/lib/time/instant-format";
 import { getSearchCopy } from "./copy";
 
 export type SearchSurfaceProps = {
   readonly locale: Locale;
+  /**
+   * The owner's zone (`LDC-SEARCH-001`). A prop rather than a read, because this
+   * is a client component: the browser's zone is not the authority, and a result
+   * dated differently here than on the contextual page it links to is the
+   * divergence this initiative exists to remove.
+   */
+  readonly timeZone: string;
   /** Injected so the component performs no I/O of its own. */
   readonly runSearch: (input: {
     query: string;
@@ -63,7 +71,7 @@ function bucket(count: number): string {
   return "26+";
 }
 
-export function SearchSurface({ locale, runSearch, onSearched }: SearchSurfaceProps) {
+export function SearchSurface({ locale, runSearch, onSearched, timeZone }: SearchSurfaceProps) {
   const text = getSearchCopy(locale);
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState<SearchDomain | "">("");
@@ -220,7 +228,7 @@ export function SearchSurface({ locale, runSearch, onSearched }: SearchSurfacePr
                       title={result.title}
                       snippet={result.snippet ?? undefined}
                       href={result.href}
-                      meta={result.occurredAt ? formatDate(result.occurredAt, locale) : undefined}
+                      meta={result.occurredAt ? formatDate(result.occurredAt, locale, timeZone) : undefined}
                     />
                   </li>
                 ))}
@@ -253,10 +261,6 @@ function sourceKindFor(domain: SearchDomain) {
   }
 }
 
-function formatDate(iso: string, locale: Locale): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso));
-  } catch {
-    return "";
-  }
+function formatDate(iso: string, locale: Locale, timeZone: string): string {
+  return formatInstant(iso, "day", locale, timeZone) ?? "";
 }

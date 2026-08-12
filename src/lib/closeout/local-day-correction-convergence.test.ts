@@ -124,6 +124,93 @@ describe("LDC-CONTEXT-001: every contextual surface stamps through the contract"
   });
 });
 
+describe("LDC-HOME-001: Home's today is computed in the owner's zone, not formatted in the host's", () => {
+  /*
+   * The clearest defect the census found, and the one that is **meaning rather
+   * than formatting**: `todayLabel` was `new Date()` with no zone, while
+   * `dueFormatter` and `selectTodayPriorities` fifteen lines above both took
+   * `workProjection.timezone`. Between 21:00 and midnight in `America/Sao_Paulo`
+   * the header and the list beneath it named two different days, every day.
+   *
+   * A test that only asserted "the label carries a zone" would have passed on a
+   * label carrying a *different* zone from the list, which is the same bug with
+   * an extra step. So what is asserted is that there is exactly **one** zone
+   * source in the file, and that the label uses it.
+   */
+  const HOME = "src/features/shell/home-dashboard.tsx";
+
+  it("builds the day label from workProjection.timezone", () => {
+    const code = read(HOME);
+    const label = /todayLabel:[\s\S]*?\.toUpperCase\(\)/.exec(code)?.[0] ?? "";
+    expect(label, "todayLabel was not found — the assertion below would be vacuous").not.toBe("");
+    expect(label, "the day label is built without a zone").toContain("timeZone");
+    expect(label, "the label uses a zone other than the projection's")
+      .toContain("timeZone: workProjection.timezone");
+  });
+
+  it("has one zone on the whole surface, so the header and the list cannot disagree", () => {
+    const code = read(HOME);
+    const sources = [...code.matchAll(/timeZone:\s*([A-Za-z0-9_.]+)/g)].map((match) => match[1]);
+    expect(sources.length, "no zone is named on Home at all").toBeGreaterThan(1);
+    expect(new Set(sources), "Home names more than one zone").toEqual(
+      new Set(["workProjection.timezone"]),
+    );
+  });
+
+  it("passes the same zone down to the rows it renders", () => {
+    // `home-view.tsx` carries it on the view model and hands it to the inbox and
+    // attention rows, which are the same components the Records page renders.
+    const view = read("src/features/shell/home-view.tsx");
+    expect(view).toMatch(/readonly timeZone: string;/);
+    expect((view.match(/timeZone=\{view\.timeZone\}/g) ?? []).length).toBe(2);
+    expect(read(HOME)).toContain("timeZone: workProjection.timezone,");
+  });
+});
+
+describe("LDC-AGENT-001/LDC-SEARCH-001: the agent, search and source surfaces", () => {
+  const SURFACES = [
+    "src/features/agent/actions.ts",
+    "src/features/agent/question-outcome-panel.tsx",
+    "src/features/agent/question-preview-panels.tsx",
+    "src/features/conversation-sources/source-list.tsx",
+    "src/features/search/search-surface.tsx",
+  ];
+
+  it.each(SURFACES)("%s stamps through the contract", (file) => {
+    expect(read(file), `${file} does not use the instant contract`).toMatch(
+      /formatInstant|instantFormatter/,
+    );
+  });
+
+  it("leaves no second local formatter shadowing the contract's name", () => {
+    /*
+     * `question-preview-panels.tsx` was the **second** file found declaring its
+     * own `formatInstant` — after `memories`. Worse than the first: its primary
+     * path carried the zone correctly and only its `catch` branch rebuilt the
+     * formatter without one, so the single path that ran when the zone was
+     * unusable was the path that ignored it.
+     */
+    for (const file of SURFACES) {
+      expect(read(file), `${file} declares a formatter named like the contract's`)
+        .not.toMatch(/function\s+formatInstant\s*\(/);
+    }
+    // And the replacement is a named wrapper over the contract, not a reimplementation.
+    const preview = read("src/features/agent/question-preview-panels.tsx");
+    expect(preview).toMatch(/function formatQuestionInstant/);
+    expect(preview, "the fallback that dropped the zone is back").not.toMatch(/catch\s*\{[\s\S]{0,120}DateTimeFormat/);
+  });
+
+  it("keeps the client surfaces on a passed zone rather than the browser's", () => {
+    // Both are `"use client"`. The browser's zone is not the authority, so the
+    // zone has to arrive as a prop from the server that resolved it.
+    for (const file of ["src/features/search/search-surface.tsx", "src/features/conversation-sources/source-list.tsx"]) {
+      const code = read(file);
+      expect(code, `${file} stopped being a client component`).toContain('"use client"');
+      expect(code, `${file} does not take the zone as a prop`).toMatch(/timeZone: string/);
+    }
+  });
+});
+
 describe("LDC-CONTEXT-002: one instant, one day, across surfaces and locales", () => {
   /*
    * 23:30Z on 2026-08-15 is:

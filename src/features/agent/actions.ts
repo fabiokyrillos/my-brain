@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { formatInstant } from "@/lib/time/instant-format";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
@@ -798,10 +800,29 @@ export async function retryAttachmentJob(
 
   const retryAt = new Date(job.next_attempt_at);
   if (retryAt.getTime() > Date.now()) {
-    const formatted = new Intl.DateTimeFormat(parsed.data.locale, {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(retryAt);
+    // `LDC-AGENT-001`. The sentence tells a user when to come back, so it has
+    // to be their clock. It was the host's, which on a server is UTC.
+    /*
+     * `LDC-AGENT-001`. The sentence tells a user when to come back, so it has to
+     * be their clock; it was the host's, which on a server is UTC.
+     *
+     * Read inline through the PURE resolver rather than through
+     * `getOwnerTimeZone()`: that accessor imports `server-only`, and this module
+     * is reached by tests running under the client condition, where that throws.
+     * The client and the user are already in hand, so the read costs one query
+     * on a path that has already made several.
+     */
+    const profile = await supabase
+      .from("profiles")
+      .select("timezone")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const formatted = formatInstant(
+      job.next_attempt_at,
+      "dayAndTime",
+      parsed.data.locale,
+      resolveOwnerTimeZone(profile.data?.timezone),
+    ) ?? "";
     return {
       status: "error",
       message: `${messages.retryAt} ${formatted}.`,

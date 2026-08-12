@@ -72,7 +72,7 @@ export default async function QuestionsPage({ params, searchParams }: { params: 
         {resolved.length ? (
           <div className="list-stack">
             {resolved.map((outcome) => (
-              <QuestionOutcomeCard agentName={agentName} key={outcome.questionId} locale={locale} outcome={outcome} />
+              <QuestionOutcomeCard agentName={agentName} key={outcome.questionId} locale={locale} outcome={outcome} timeZone={timezone} />
             ))}
           </div>
         ) : (

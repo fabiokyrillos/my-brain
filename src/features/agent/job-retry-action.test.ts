@@ -63,6 +63,19 @@ function createSupabaseMock(initialJob: object | null, finalJob?: object | null)
   };
   lifecycleQuery.select.mockReturnValue(lifecycleQuery);
   lifecycleQuery.eq.mockReturnValue(lifecycleQuery);
+  /*
+   * `LDC-AGENT-001`. The retry sentence tells a user when to come back, so it is
+   * stamped in THEIR zone. Auckland rather than the default on purpose: the host
+   * running these tests is in America/Sao_Paulo, so a zone-less render and a
+   * correct one would agree all day and the assertion would prove nothing.
+   */
+  const profileQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: { timezone: "Pacific/Auckland" }, error: null }),
+  };
+  profileQuery.select.mockReturnValue(profileQuery);
+  profileQuery.eq.mockReturnValue(profileQuery);
   const invoke = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
   return {
     client: {
@@ -73,7 +86,9 @@ function createSupabaseMock(initialJob: object | null, finalJob?: object | null)
           error: null,
         }),
       },
-      from: vi.fn((table: string) => (table === "account_lifecycle" ? lifecycleQuery : query)),
+      from: vi.fn((table: string) =>
+        table === "account_lifecycle" ? lifecycleQuery : table === "profiles" ? profileQuery : query,
+      ),
       functions: { invoke },
     },
     invoke,
@@ -186,5 +201,12 @@ describe("retryAttachmentJob", () => {
     expect(invoke).not.toHaveBeenCalled();
     expect(result.status).toBe("error");
     expect(result.message).toContain("Retry available");
+    /*
+     * 2100-01-01T00:00Z is 2100-01-01 13:00 in Auckland and 2099-12-31 21:00 in
+     * the host's own zone, so this distinguishes a correct render from the
+     * host-zone one that shipped until this initiative.
+     */
+    expect(result.message).toContain("2100");
+    expect(result.message, "the retry time is stamped in the host's zone").not.toContain("2099");
   });
 });

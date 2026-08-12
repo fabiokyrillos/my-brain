@@ -37,11 +37,12 @@ import { ConversationAnswerShown } from "@/features/product-analytics/interactio
 import type { Locale } from "@/lib/preferences";
 
 import type { ParsedCitations } from "./contracts";
+import { formatInstant } from "@/lib/time/instant-format";
 import { getConversationSourcesCopy } from "./copy";
 import { ExplanationPanel } from "./explanation-panel";
 import type { ResolvedSource } from "./resolve-sources";
 
-function Freshness({ locale, occurredAt }: { locale: Locale; occurredAt: string | null }) {
+function Freshness({ locale, occurredAt, timeZone }: { locale: Locale; occurredAt: string | null; timeZone: string }) {
   const copy = getConversationSourcesCopy(locale);
   if (occurredAt === null) {
     // Absent, never fabricated. A made-up date on a source is the preview's
@@ -52,7 +53,7 @@ function Freshness({ locale, occurredAt }: { locale: Locale; occurredAt: string 
     <span className="conversation-source-freshness">
       {copy.freshnessLabel}{" "}
       <time dateTime={occurredAt}>
-        {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(occurredAt))}
+        {formatInstant(occurredAt, "day", locale, timeZone)}
       </time>
     </span>
   );
@@ -90,6 +91,7 @@ export function SourceList({
   locale,
   messageId = null,
   sources,
+  timeZone,
 }: {
   citations: ParsedCitations;
   /** Present in a thread, absent wherever a source list has no position. */
@@ -98,6 +100,9 @@ export function SourceList({
   /** Keys the answer event, so one answer counts once rather than once per scroll. */
   messageId?: string | null;
   sources: readonly ResolvedSource[];
+  /** The owner's zone (`LDC-SEARCH-001`). A cited source must not be dated
+   *  differently from the page it cites. */
+  timeZone: string;
 }) {
   const copy = getConversationSourcesCopy(locale);
   const cardCopy = getConversationCardsCopy(locale);
@@ -137,7 +142,7 @@ export function SourceList({
                   {copy.supportKinds[source.support]}
                 </span>
                 <ConversationCardView card={source.card} locale={locale} />
-                <Freshness locale={locale} occurredAt={source.occurredAt} />
+                <Freshness locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
                 {openHref(source.card, continuity) === null ? null : (
                   <Link className="conversation-card-open" href={openHref(source.card, continuity)!}>
                     {cardCopy.open}

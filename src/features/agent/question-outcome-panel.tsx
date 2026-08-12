@@ -4,6 +4,7 @@ import Link from "next/link";
 import { withAgentName } from "@/lib/agent-name";
 import type { Locale } from "@/lib/preferences";
 
+import { formatInstant } from "@/lib/time/instant-format";
 import { getQuestionOutcomeCopy } from "./question-outcome-copy";
 import type { QuestionOutcomeView } from "./question-outcome-projection";
 
@@ -23,14 +24,16 @@ export function QuestionOutcomeCard({
   agentName,
   locale,
   outcome,
+  timeZone,
 }: {
   agentName: string;
   locale: Locale;
   outcome: QuestionOutcomeView;
+  /** The owner's zone (`LDC-AGENT-001`). Required, never defaulted. */
+  timeZone: string;
 }) {
   const copy = withAgentName(getQuestionOutcomeCopy(locale), agentName);
-  const date = (value: string) =>
-    new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  const date = (value: string) => formatInstant(value, "dayAndTime", locale, timeZone) ?? "";
 
   const effect = outcome.disposition === "dismissed"
     ? copy.effectDismissed
