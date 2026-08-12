@@ -439,3 +439,17 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.process-jobs]
 # Access tokens are validated inside the function with auth.getUser().
 verify_jwt = false
+
+[functions.send-push]
+# Phase 2M slice 2M.4b. The sender is SECRET-authenticated, not JWT-authenticated:
+# a background delivery has no end-user session, and the request carries
+# `x-dispatch-secret` instead of a bearer token. With the platform's default
+# `verify_jwt = true` the gateway would answer 401 before the function ran, and
+# the symptom would be "nothing is ever sent" with no trace in the function's own
+# logs -- indistinguishable from a dozen other causes.
+#
+# This is the same declaration and the same reason `process-jobs` carries for its
+# `mode=dispatch` path. It is NOT a relaxation: `index.ts` refuses every request
+# whose `x-dispatch-secret` header does not match, refuses when the secret is
+# unset rather than falling open, and refuses when the VAPID pair is missing.
+verify_jwt = false

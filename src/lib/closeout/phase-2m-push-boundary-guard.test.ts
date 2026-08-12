@@ -429,6 +429,35 @@ describe("2M-NOTIFY-006/-007: push exists now, and only where it was authorized"
       .toContain("src/lib/closeout/some-other-guard.test.ts");
   });
 
+  it("declares the sender with verify_jwt disabled, or it can never be reached", () => {
+    /*
+     * The deployment defect this exists to prevent, and it would have been
+     * invisible.
+     *
+     * The sender is SECRET-authenticated: a background delivery has no end-user
+     * session, so the request carries `x-dispatch-secret` rather than a bearer
+     * token. The platform's default is `verify_jwt = true`, under which the
+     * gateway answers 401 BEFORE the function runs — no log line in the
+     * function's own output, nothing in the delivery ledger, and a symptom
+     * ("nothing is ever sent") indistinguishable from a dozen other causes.
+     *
+     * `process-jobs` carries the same declaration for the same reason. Asserting
+     * it here means the sender cannot be deployed unreachable.
+     */
+    const config = readFileSync(join(REPO, "supabase/config.toml"), "utf8");
+    const block = /\[functions\.send-push\]([\s\S]*?)(?=\n\[|$)/.exec(config)?.[1] ?? "";
+    expect(block, "supabase/config.toml does not declare [functions.send-push]").not.toBe("");
+    expect(block).toMatch(/^\s*verify_jwt\s*=\s*false\s*$/m);
+
+    // And the declaration is not a relaxation: the function refuses every
+    // request whose secret does not match, and refuses when the secret is unset
+    // rather than falling open.
+    const entry = stripComments(readFileSync(join(REPO, "supabase/functions/send-push/index.ts"), "utf8"));
+    expect(entry).toMatch(/x-dispatch-secret/);
+    expect(entry).toMatch(/dispatch_secret_not_configured/);
+    expect(entry).toMatch(/vapid_not_configured/);
+  });
+
   it("keeps the payload copy incapable of carrying content", () => {
     // `notificationCopy(locale)` takes exactly one parameter, and it is the
     // locale. This is the structural half of `2M-NOTIFY-007`: the payload has
