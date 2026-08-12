@@ -3960,3 +3960,107 @@ open remainder.
 
 One hardware re-run with the diagnostics deployed. **2M.5 not started, Phase 2M
 not closed, Phase 2N not started, A13 not retargeted.**
+
+---
+
+## §57 — The 403 is narrowed by measurement, and the one question left is now askable without a device (2026-08-12)
+
+Hardware run 1 (§56) reported `unauthorized` with **HTTP 403**, twice — once with
+`subject: "reserved"` and once, after the owner configured `VAPID_SUBJECT` with a
+real operational address, with `subject: "operational"`. The subject is therefore
+**not** the cause, and 403 is where a rejected `sub`, a wrong `aud`, an
+unverifiable signature and an unexpected key all converge.
+
+### Three hypotheses eliminated by measurement, none by reading
+
+Comparisons made locally, reported as verdicts, **never as values**:
+
+| claim | verdict | how |
+|---|---|---|
+| `edge_public_vs_app_public` | **match** | sha256 of the deployed application's rendered key vs. the hosted secret's digest |
+| the application's key is a real uncompressed P-256 point | **yes** | 65 bytes, `0x04` prefix, decoded locally |
+| the key predates the subscription | **yes** | secret set 10:16 UTC; the owner re-subscribed after 14:47 UTC |
+| `VAPID_PRIVATE_KEY` present on Vercel | **no** | `vercel env ls` — the boundary holds |
+
+Two methodological notes worth keeping:
+
+1. **`supabase secrets list` reports `sha256(value)` in hex.** That is not
+   documented anywhere the CLI says so; it was established against **three
+   controls** whose values this machine already held. Never compare a secret by
+   asserting an algorithm you have not first proved on a known value.
+2. The application's copy is only observable **at runtime**, because
+   `VAPID_PUBLIC_KEY` is a server variable rendered into an authenticated page —
+   and Vercel marks it *Sensitive*, so no API returns it. It was read the way
+   `e2e/support/online-session.ts` reads anything hosted: mint a session over
+   HTTP, install the `@supabase/ssr` cookie, clear SH.4's consent interposition
+   **through the product's own surface**, and scan the page for base64url runs
+   that decode to a P-256 point. Zero residue; the scanner never printed a byte.
+
+### The hypothesis that could not be asked, and the runtime that is why
+
+Whether the two configured **halves are a pair**. This runtime cannot be asked,
+and that was measured rather than assumed: Deno's WebCrypto imports an EC private
+JWK **from `d` alone**, never consulting `x`/`y`. A `d` from one generation
+advertised with an `x`/`y` from another imports cleanly, signs, and yields a
+64-byte signature that verifies against **nothing**.
+
+That is a perfectly well-formed request no push service can authenticate, and
+**403 is the only answer it can give** — which is exactly what an iPhone said.
+
+### The remedy, merged as `7bc0698`, CI green 3/3 on that exact SHA, deployed
+
+- `vapidKeyPairAgrees` does what the push service does: signs a fixed public
+  probe with the configured private key, verifies it with the configured public
+  key. Disagreement is `false`; a half that is not a key **throws**, because
+  "two keys from different generations" and "this is not a key" are different
+  repairs.
+- `deliverPush` checks it **before `begin_push_delivery`** — which this module's
+  header had already promised for a missing VAPID key. The loop would otherwise
+  spend the dedupe slot, spend an attempt, and charge the **device** a strike for
+  a fault that is entirely ours. **Three strikes retire a subscription and the
+  owner has one.**
+- `inspectSenderConfiguration`, reachable as `mode: "selfcheck"`, reports
+  subject, public key, private key and pair as **categories** over a request that
+  touches no database, contacts no push service and can name no subscription.
+
+**The point of the self-check is the operational constraint, not the code.** The
+remaining bit of information cost a hardware run to obtain and left the next
+reading ambiguous. It now costs nothing.
+
+### The test lesson, again, and it is the same one
+
+Every existing RFC 8292 assertion was handed a pair generated in **one call**, so
+an incoherent pair could travel silently past all of them — §56's lesson with a
+different subject. The new controls supply the incoherent pair. The mismatch test
+is written to survive a runtime that starts validating: it asserts that **a
+mismatched pair never yields a token the advertised key can verify**, not that
+the import succeeds.
+
+### Deployment
+
+Byte-identity again needed the LF normalisation §56 recorded — `.gitattributes`
+still pins `*.sql` and not `*.ts`, and **that remainder is still open**. All five
+deployed files proved sha256-identical to the merge after normalising, the tree
+was restored, `verify:edge-parity` is green (`send-push` deployed
+2026-08-12T15:37 ≥ source 15:31), and the deployed function answers **405** to
+`GET`, **401** to a POST with no secret and **401** to one with a wrong secret —
+its own body, not a gateway error, so `verify_jwt = false` still holds and every
+variable is still visible to it.
+
+### Honest classification
+
+- **Executed and proved:** hypotheses 1, 3 and 11 eliminated; the runtime's
+  silent acceptance of a mismatched JWK; the merge, CI, deployment and parity.
+- **Implemented but not executed in the required environment:** the self-check
+  itself. It is secret-authenticated and **the agent does not hold
+  `WORKER_DISPATCH_SECRET`**, so its hosted reading is the owner's to take.
+- **Not eliminated:** hypothesis 2 (the pair). That is precisely what the
+  self-check now answers, at no cost.
+- **Blocked by owner action:** H-5 and every hardware line behind it.
+
+### THE LOOP STOPS HERE — OWNER ACTION REQUIRED
+
+**The self-check first, and it costs nothing.** Only if it reports
+`pair: "consistent"` is a device run the right next step. **2M.5 not started,
+Phase 2M not closed, Phase 2N not started, A13 not retargeted. No migration was
+created; the budget stays `3 allocated · 3 spent`.**

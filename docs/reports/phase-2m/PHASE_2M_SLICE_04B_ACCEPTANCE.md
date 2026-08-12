@@ -380,3 +380,73 @@ remaining items assume the first one worked.
 
 Recorded because a record that said only "pgTAP green" would imply the suite was
 right the first time, and the two red runs are where the real defects were.
+
+---
+
+## 7. Hardware run 1's 403, narrowed (2026-08-12)
+
+`H-5` failed twice with `unauthorized` / **HTTP 403** — once reporting
+`subject: "reserved"` and once, after the owner configured `VAPID_SUBJECT` with a
+real operational address, reporting `subject: "operational"`. **The subject is
+not the cause.** 403 is where a rejected `sub`, a wrong `aud`, an unverifiable
+signature and an unexpected key all converge.
+
+### 7.1 What was eliminated, and how
+
+Every comparison below was made locally and is reported as a **verdict**. No key,
+no fragment of one, and no digest that was not needed appears anywhere in this
+repository or in any command output that was kept.
+
+| claim | verdict | method |
+|---|---|---|
+| `edge_public_vs_app_public` | **match** | `sha256` of the deployed application's rendered key against the hosted secret's digest |
+| the application's key is an uncompressed P-256 point | **yes** | 65 bytes, `0x04` prefix |
+| the key predates the subscription | **yes** | secret set 10:16 UTC; the owner re-subscribed after 14:47 UTC |
+| `VAPID_PRIVATE_KEY` absent from the application environment | **yes** | `vercel env ls` |
+| all five sender secrets present on the Edge Function | **yes** | by name and digest only |
+
+Two methodological points that will recur:
+
+1. **`supabase secrets list` reports `sha256(value)` in hex.** That was
+   established against **three controls** whose values this machine already
+   held — not assumed. A comparison whose algorithm has not been proved on a
+   known value is not a comparison.
+2. `VAPID_PUBLIC_KEY` is a **server** variable on the application side, rendered
+   into an authenticated page, and Vercel marks it *Sensitive* so no API returns
+   it. It was read at runtime the way every hosted read here is done: mint a
+   session over HTTP, install the `@supabase/ssr` cookie, clear SH.4's consent
+   interposition **through the product's own surface**, and scan the page for
+   base64url runs that decode to a P-256 point. Residue: zero.
+
+### 7.2 The hypothesis that could not be asked
+
+Whether the two configured **halves are a pair**. This runtime cannot be asked,
+and that was measured: Deno's WebCrypto imports an EC private JWK **from `d`
+alone**, never consulting `x`/`y`. A `d` from one generation advertised with an
+`x`/`y` from another imports cleanly, signs, and produces a signature that
+verifies against nothing — a perfectly well-formed request that no push service
+can authenticate, whose only available answer is **403**.
+
+### 7.3 What now answers it, at no cost to a device
+
+`mode: "selfcheck"` on the deployed sender. It reaches no database, contacts no
+push service, can name no subscription, and is secret-authenticated all the same.
+It reports four **categories**:
+
+| field | values |
+|---|---|
+| `subject` | `operational` · `reserved` · `malformed` |
+| `publicKey` | `p256_point` · `not_canonical` · `malformed` |
+| `privateKey` | `p256_scalar` · `malformed` |
+| `pair` | `consistent` · `mismatched` · `unusable` |
+
+`deliverPush` also refuses a pair that cannot authenticate **before**
+`begin_push_delivery`, so a misconfiguration no longer spends the dedupe slot,
+spends an attempt, or charges the **device** a strike. Three strikes retire a
+subscription and the owner has one.
+
+**Read the self-check before running the device again.** A device run is the
+right next step only if it reports `pair: "consistent"`.
+
+Merged as `7bc0698` (PR #187), CI green 3/3 on that exact SHA, deployed
+byte-identical, `verify:edge-parity` green.
