@@ -8,7 +8,9 @@ allocated below are destinations, not permissions** — none may be created unti
 implementation is separately authorized. The execution loop in §9 must not be
 run.
 
-Companion PRD: `PHASE_2N_PRD.md` — **123 requirements across 16 families**.
+Companion PRD: `PHASE_2N_PRD.md` — **127 requirements across 16 families**.
+ADR-110 settled the one interpretation ADR-109 left flagged and fixed the
+posture of `people.notes`, adding four requirements and **no migration**.
 Evidence: `docs/reports/phase-2n/`.
 
 ---
@@ -76,15 +78,19 @@ updated product before it starts.
 - **Experience delivered.** Sensitive content stops being printed in full on the
   person, project, memory and file pages. Dates stop being wrong for anyone not
   living in UTC. Truncated lists start saying they are truncated.
-- **Requirements.** `2N-PRIVACY-001…007`, `2N-TIME-001…006`,
+- **Requirements.** `2N-PRIVACY-001…011`, `2N-TIME-001…006`,
   `2N-PERSON-003`, `2N-PROJECT-006`, `2N-KNOWS-007…008`, `2N-SEC-002`,
   `2N-SEC-003`, `2N-IDENTITY-001…004`, `2N-IDENTITY-008…009`.
 - **Dependencies.** None. Its decisions — `OD-2N-12` A, `OD-2N-13` B, `OD-2N-1`
-  A, `OD-2N-2` A — are **signed**.
+  A, `OD-2N-2` A — are **signed**, and ADR-110 settled the field taxonomy and
+  the `people.notes` posture that this slice implements.
 - **Files.** `src/features/sensitivity/contracts.ts` (surface list),
   a derivation for entry/memory/file subjects, the four contextual routes, a
   shared bounds vocabulary, an `entity_aliases` reader for entity resolution and
-  search, `src/lib/closeout/phase-2m-fixed-offset-guard.test.ts`
+  search, `src/features/search/contracts.ts` (**narrowing the `people` domain so
+  `notes` is neither matched nor snippeted**), `src/app/[locale]/app/people/page.tsx`
+  (the list currently prints `notes` as each row's subtitle),
+  `src/lib/closeout/phase-2m-fixed-offset-guard.test.ts`
   (corpus extension — **this phase's directories only**).
 - **Authority paths.** None new. Read-only, plus alias reading.
 - **Schema impact.** **None.** No migration. `entity_aliases` already exists
@@ -102,10 +108,23 @@ updated product before it starts.
 - **Telemetry.** None.
 - **Acceptance.** No contextual surface renders classified content unmasked; no
   zone-less formatter can be added to the phase's directories; every bounded
-  list says so; a known nickname resolves to the person it names.
-- **Stop conditions.** Any need for a migration; any change to ADR-093's search
-  behaviour; the four `daily-cycle` exemptions turning out to be load-bearing
-  for a 2N surface; alias reading turning out to need schema.
+  list says so; a known nickname resolves to the person it names. Plus
+  `2N-PRIVACY-011`'s journey: **name visible, notes masked**, reveal local and
+  keyboard/screen-reader reachable, notes **absent from search, retrieval,
+  previews, the graph and telemetry**, counts not usable as an oracle, and no
+  classification inferred as `normal` by absence.
+- **Stop conditions.** Any need for a migration; the four `daily-cycle`
+  exemptions turning out to be load-bearing for a 2N surface; alias reading
+  turning out to need schema; and — `2N-PRIVACY-011` — **removing `people.notes`
+  from retrieval or search turning out to need a migration, a column or a new
+  authority**, which may not consume or reallocate M1, M2 or M3.
+- **One narrowing of ADR-093, recorded rather than discovered.** Removing
+  `notes` from search's `people` domain changes behaviour ADR-093 signed. It is
+  a **deliberate, owner-signed narrowing** (ADR-110), not an accidental
+  reopening — the distinction `2N-PRIVACY-006` exists to force. ADR-093's
+  default exclusion of `highly_sensitive` is untouched and no other domain
+  changes. Verified: `phase-2i-search-guard.test.ts` does not pin `notes` into
+  the people domain, so the narrowing breaks no existing guard.
 
 ### Between 2N.0 and 2N.1 — the timezone initiative (separate authorization)
 

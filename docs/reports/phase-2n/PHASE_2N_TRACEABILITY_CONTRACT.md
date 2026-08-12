@@ -7,9 +7,10 @@ implementation is authorized — in a generated matrix that may not be typed by
 hand.
 
 The phase is authorized for **planning only** (ADR-108), with all seventeen
-decisions **signed** (ADR-109). Several refusals below therefore have two forms:
-what they refuse **now**, during planning, and what they will refuse **at
-closeout**. The planning half is live today.
+decisions **signed** (ADR-109) and the one flagged interpretation settled by
+**ADR-110**. **Thirty-one refusals: ten live during planning, twenty-one armed
+at implementation.** Several therefore have two forms: what they refuse **now**
+and what they will refuse **at closeout**. The planning half is live today.
 
 ---
 
@@ -43,6 +44,13 @@ All seventeen are signed. A document that reopens one, softens it, or describes
 it as open is refused. The **declined options must remain visible**: a decision
 whose alternatives have been deleted is a decision nobody can review, so the
 plan's §7 and ADR-109 both keep them.
+
+**R-4c — A decision that needed an interpretation may not be closed by
+inventing one.**
+Where a signed decision does not cleanly cover a case, the package **states the
+interpretation and asks**, rather than resolving it inside an implementation.
+`2N-PRIVACY-007` was the only such case, it was flagged rather than absorbed,
+and ADR-110 settled it. A future package that quietly picks a reading is refused.
 
 **R-5 — Implementation may not begin under a planning-only authorization.**
 No acceptance record, no traceability matrix, no closing report and no
@@ -104,6 +112,30 @@ degraded fallback.
 Any surface rendering entry content, task titles, memory content or file names
 is inside the sensitivity contract or it does not ship. A surface testing a
 classification literal on its own is refused by the existing boundary guard.
+
+**R-16b — A fail-open default for unclassifiable free text is refused.**
+`people.notes` carries no classification and no classifiable source. It is
+**masked by default**, revealed only by a local, explicit, accessible act, and
+**absence of classification never resolves to `normal`** (ADR-110). A surface
+that shows it because nothing told the surface not to is refused.
+
+**R-16c — An inferred classification is refused.**
+No sensitivity may be derived from the *text* of a note, or from any other
+content, by a model or a heuristic. Classification comes from a source record or
+from a user act, and from nothing else. A guess presented as a protection is
+worse than no protection, because the user stops checking.
+
+**R-16d — An indirect leak of masked free text is refused.**
+Content masked on the contextual surface may not appear in full in search
+results or snippets, suggestions, previews, related pages, the graph, telemetry,
+or as retrievable content. Masking a field on one surface and printing it on the
+next is not a policy; it is a bug with a policy attached.
+
+**R-16e — Masking a field may not hide the entity.**
+The person's name and aliases stay searchable, and their existence and
+structural counts stay true. A protection that makes the person unfindable has
+protected nothing and destroyed navigation, and it would also make the count an
+oracle in the opposite direction.
 
 **R-17 — An event without both a producer and a consumer is refused.**
 A producer with no reader is invisible, which this repository has already paid

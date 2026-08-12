@@ -53,7 +53,7 @@ Any new AI operation kind. The roadmap's next phase, in any form.
 
 ## 3. Baseline, obligation and by-rule
 
-This PRD declares **123 requirements across 16 families**, each family numbered
+This PRD declares **127 requirements across 16 families**, each family numbered
 from 001 with no gap. Requirements are marked so that the phase cannot claim
 credit for what already ships, and so that what the owner declined is visible
 rather than absent:
@@ -74,6 +74,28 @@ signatures created are **appended to the end of their existing families**.
 The options the owner declined are preserved in
 `PHASE_2N_IMPLEMENTATION_PLAN.md` §7 and in ADR-109, not deleted.
 
+**ADR-110 then added four more** — `2N-PRIVACY-008…011`, appended to the end of
+the privacy family — settling the one interpretation ADR-109 left flagged and
+fixing the posture of `people.notes`. It **adds no migration**, and it restated
+`2N-PERSON-002` because that requirement had described notes as rendering
+unchanged.
+
+## 3b. Owner-typed fields: the taxonomy this PRD uses
+
+The distinction that governs `2N-PRIVACY-007…011`, stated once so no surface has
+to re-derive it:
+
+| | Examples | Treatment |
+| --- | --- | --- |
+| **Structural identifier** — what the user needs to recognise the entity | `people.name`, `projects.name` | **Shown** on that entity's own contextual page. Existence and counts stay true |
+| **Free text** — owner-typed prose with no classification and no classifiable source | `people.notes` | **Masked by default**, revealed locally and explicitly; absent from indirect surfaces and from retrieval |
+| **Source-derived content** — classification derives from a source record | entry text, task titles, memory bodies, file names, extracted text | Governed by the sensitivity contract; fail-closed on an unreadable or missing source |
+
+**The line is structural-versus-free-text, not owner-authored-versus-derived.**
+Confirming that a name is shown does not make every field the owner typed
+`normal` — which is why the middle row exists and why ADR-110 stated it rather
+than leaving it to be inferred from which fields happen to be masked.
+
 ## 4. Universal states
 
 Every surface this phase ships or touches declares, in both locales: **loading**,
@@ -88,8 +110,12 @@ is not complete.
   authenticated client under forced RLS, and a foreign or nonexistent id is
   indistinguishable — both `notFound()`. Every read the phase adds preserves
   this, including counts and aggregates.
-- **2N-PERSON-002:** [BASELINE] Identity, notes, organization and the
-  employer-versus-relationship explainer render as they do today.
+- **2N-PERSON-002:** [BASELINE] Identity, organization and the
+  employer-versus-relationship explainer render as they do today. *(Restated by
+  ADR-110: `notes` no longer renders as it does today — it is **masked by
+  default** under `2N-PRIVACY-009`. Leaving the word "notes" in a `[BASELINE]`
+  requirement would have made this PRD assert two incompatible things about the
+  same field, which is exactly the drift a closeout discovers too late.)*
 - **2N-PERSON-003:** [OBLIGATION] Every list on the page states its bound when
   it is hit, in the vocabulary search already uses; silent truncation at 100 is
   removed.
@@ -398,25 +424,55 @@ is not complete.
 - **2N-PRIVACY-006:** [OBLIGATION] Any widening of search in this phase states
   its sensitivity posture explicitly and does not inherit `false` silently;
   ADR-093 is not reopened by accident.
-- **2N-PRIVACY-007:** [OBLIGATION] **An entity's own owner-typed fields —
-  `people.name`, `people.notes`, `projects.name`, `projects.description` — are
-  not source-derived content**, and the fail-closed rule of `2N-PRIVACY-005`
-  governs content whose classification *derives from a source record*, not
-  fields the owner typed directly onto the entity. They are shown.
+- **2N-PRIVACY-007:** [OBLIGATION] The fail-closed rule of `2N-PRIVACY-005`
+  governs **content whose classification derives from a source record** — entry
+  text, task titles, memory bodies, file names and extracted text. It does
+  **not** automatically mask a **structural field the owner typed directly onto
+  the entity**. Confirmed by **ADR-110**; the interpretation this requirement
+  previously flagged is settled.
 
-  > **Interpretation, flagged for owner confirmation.** `OD-2N-12` says
-  > classification is derived from the source and that an absent source resolves
-  > to the most protective case. Read literally across *every* field, that would
-  > mask a person's own **name** on their own page — because a name has no
-  > source entry — which makes the page unusable and is plainly not what the
-  > decision intends. The reading above draws the line at *derived content*
-  > (entry text, task titles, memory bodies, file names and extracted text)
-  > versus *the entity's own identity fields*. **This is an interpretation, not
-  > a signature**, it is the only place where a signed decision needed one, and
-  > it is recorded here rather than buried in an implementation. If the owner
-  > intends `people.notes` — free text about a human being, with no
-  > classification column and today fully searchable — to carry a posture of its
-  > own, that is a further decision and this requirement changes with it.
+  **The distinction is structural identifier versus free text, not
+  owner-authored versus derived** (`2N-PRIVACY-008`). Confirming this rule for
+  names **does not** make every owner-typed field `normal`, and
+  `2N-PRIVACY-009` is the proof that it does not.
+
+- **2N-PRIVACY-008:** [OBLIGATION] The phase distinguishes two kinds of
+  owner-typed field, and names which is which. A **structural identifier** —
+  `people.name`, `projects.name` — is what the user needs to recognise the
+  entity at all; it is shown on that entity's own contextual page, and the
+  entity's existence and structural counts stay true. **Free text** —
+  `people.notes`, and any field of that shape — is not a structural identifier
+  and does not inherit its treatment. The taxonomy is stated in the product's
+  own terms, not left to be inferred from which fields happen to be masked.
+- **2N-PRIVACY-009:** [OBLIGATION] **`people.notes` is masked by default on
+  every contextual surface** (ADR-110). It is free text about a human being with
+  **no classification of its own and no classifiable source**. Reveal is
+  **local, explicit and accessible**, announced rather than merely styled.
+  **Absence of classification never resolves to `normal`.** No `sensitivity`
+  column is added to `people`; **no sensitivity is inferred from the text of a
+  note**; and **no existing note is deleted or altered by this phase**. Editing
+  a note remains available — an owner opening the edit form is performing an
+  explicit act, not receiving an incidental display.
+- **2N-PRIVACY-010:** [OBLIGATION] **`people.notes` is not displayed in full on
+  any indirect surface**: not in search results or snippets, suggestions,
+  previews, related pages, the graph, or telemetry. **It is not content the
+  Brain retrieves** while it carries no reliable classification. **The person's
+  name and aliases stay searchable**, and masking a note never hides the person,
+  their existence or their counts. *Verified before this requirement was
+  written:* `match_internal_knowledge` unions `entry_embeddings` and
+  `memories` only and **never reads `people`**, so the retrieval half is
+  **already true today** and this requirement keeps it true rather than making
+  it true.
+- **2N-PRIVACY-011:** [OBLIGATION] An acceptance journey proves the posture
+  end to end, in both locales, on desktop and mobile: the person's **name is
+  visible** on their own page; **notes are masked**; the **reveal is local,
+  explicit and reachable by keyboard and screen reader**; notes are **absent
+  from search, retrieval, previews, the graph and telemetry**; **counts are not
+  used as an oracle** for what was masked; and **no classification is inferred
+  as `normal` by absence**. **Stop condition:** if removing `people.notes`
+  from retrieval or search turns out to need a migration, a new column or an
+  authority not already present, the work **stops and returns to the owner** —
+  it may not consume or reallocate **M1**, **M2** or **M3**.
 
 ### 13.3 Time — `2N-TIME`
 

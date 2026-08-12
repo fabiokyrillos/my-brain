@@ -2,6 +2,48 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2N: the field-classification reading confirmed, people.notes masked by default, 127 requirements
+
+**Still zero implementation. Still no migration - the budget is unchanged at 3 allocated / 0 spent /
+none created. No deployment. Signup closed, rollout untouched at 25/3/2. Timezone not repaired.
+Push not resumed.**
+
+ADR-110 settles the one interpretation ADR-109 deliberately left flagged, and goes further than the
+question asked.
+
+**The rule is structural identifier versus free text, not owner-authored versus derived.** A
+person's or project's name stays visible on its own contextual page, because a structural identifier
+is what the user needs to recognise the entity at all. Confirming that **does not** make every
+owner-typed field `normal` - which is why the taxonomy is stated in the PRD rather than left to be
+inferred from which fields happen to be masked.
+
+**`people.notes` is masked by default** on every contextual surface, revealed locally, explicitly
+and accessibly. Absence of classification never resolves to `normal`. It is absent from search
+results and snippets, suggestions, previews, related pages, the graph, telemetry and retrieval. The
+person's name and aliases stay searchable, and their existence and structural counts stay true. No
+`sensitivity` column, no migration, no sensitivity inferred from a note's text, and no existing note
+deleted or altered.
+
+**Why it costs no schema, verified rather than asserted.** Search's `people` domain reads its
+columns and snippet from `DOMAIN_SPECS`, a TypeScript constant; the sensitivity rules are data in a
+module; and `match_internal_knowledge` unions `entry_embeddings` and `memories` only and **never
+reads `people`** - so the retrieval half is already true today and the requirement keeps it true
+rather than making it true.
+
+**One consequence recorded rather than discovered: this narrows behaviour ADR-093 signed.** Removing
+`notes` from the `people` domain's matched columns and snippet is a deliberate, owner-signed
+narrowing, not an accidental reopening - the distinction `2N-PRIVACY-006` exists to force. ADR-093's
+default exclusion of `highly_sensitive` is untouched and no other domain moves.
+
+**Changed.** 123 -> **127 requirements**: four appended to the end of the `2N-PRIVACY` family, and
+`2N-PERSON-002` restated because it had described notes as rendering unchanged. The threat model
+gains **T-23**, so six threats are live today and five of the six need no schema. The traceability
+contract grows to **thirty-one refusals**, including refusals of a fail-open default, an inferred
+classification, an indirect leak, and a protection that hides the entity.
+
+**Neither ADR-108 nor ADR-109 was rewritten.** Each carries a pointer to what amended it, and the
+guard asserts both stayed intact.
+
 ## 2026-08-12 - PHASE 2N: ALL SEVENTEEN DECISIONS SIGNED, 123 requirements, three migrations allocated and none created
 
 **Still zero implementation. Still no migration. No deployment. Signup closed and the rollout gate

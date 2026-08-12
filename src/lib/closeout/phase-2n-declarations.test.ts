@@ -57,7 +57,7 @@ function declaredIds(source: string): string[] {
 }
 
 const ids = declaredIds(read(PRD));
-const TOTAL = 123;
+const TOTAL = 127;
 const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   PERSON: 8,
   PROJECT: 7,
@@ -68,7 +68,7 @@ const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   FILES: 12,
   RELATION: 11,
   PROV: 6,
-  PRIVACY: 7,
+  PRIVACY: 11,
   TIME: 6,
   MOBILE: 4,
   ACCESS: 6,
@@ -299,6 +299,67 @@ describe("Phase 2N: implementation has not begun", () => {
     for (const document of [AUDIT, GAPS, THREATS, CONTRACT]) {
       expect(declaredIds(read(document)), `${document} declares a requirement`).toEqual([]);
     }
+  });
+});
+
+describe("Phase 2N: the notes posture is unambiguous and costs no schema", () => {
+  it("records ADR-110 as an accepted amendment that adds no migration", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-110 — The owner confirms the field-classification reading/);
+    const block = decisions.slice(decisions.indexOf("## ADR-110"));
+    const body = block.slice(0, block.indexOf("\n## ") === -1 ? block.length : block.indexOf("\n## "));
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body).toMatch(/no migration/i);
+    expect(body).not.toMatch(/2O/i);
+  });
+
+  it("keeps ADR-109 intact and marks what amended it", () => {
+    // Same property as ADR-108 -> ADR-109: an accepted ADR is not edited into
+    // agreement with a later one. ADR-109 left the interpretation flagged, and
+    // that is the record of what was true when it was signed.
+    const decisions = read("docs/DECISIONS.md");
+    const block = decisions.slice(decisions.indexOf("## ADR-109"), decisions.indexOf("## ADR-110"));
+    expect(block).toMatch(/Amended by ADR-110/);
+    expect(block).toMatch(/is \*\*not rewritten\*\*/);
+  });
+
+  it("states the taxonomy as structural-versus-free-text, not owner-authored-versus-derived", () => {
+    // The distinction that stops "a name is shown" from generalising into "every
+    // field the owner typed is normal". Asserted because it is the exact
+    // over-reading this amendment exists to prevent.
+    const prd = read(PRD);
+    expect(prd).toMatch(/structural identifier versus free text/i);
+    expect(prd).toMatch(/does not make every owner-typed field `normal`|not make every field the owner typed/i);
+  });
+
+  it("carries the four notes requirements and their prohibitions", () => {
+    const prd = read(PRD);
+    for (const id of ["2N-PRIVACY-008", "2N-PRIVACY-009", "2N-PRIVACY-010", "2N-PRIVACY-011"]) {
+      expect(prd, `${id} is not declared`).toMatch(new RegExp(`- \\*\\*${id}:\\*\\*`));
+    }
+    expect(prd).toMatch(/masked by default/i);
+    expect(prd).toMatch(/never resolves to `normal`/);
+    expect(prd).toMatch(/no sensitivity is inferred from the text/i);
+    expect(prd).toMatch(/no existing note is deleted or altered/i);
+  });
+
+  it("keeps the notes posture free of schema, and says so", () => {
+    // The property that made the merge permissible: this decision reaches no
+    // database. Asserted against the directory as well as the prose.
+    const prd = read(PRD);
+    expect(prd).toMatch(/No `sensitivity`\s*\n?\s*column is added to `people`|No `sensitivity` column is added/);
+    expect(readdirSync(join(REPO, "supabase", "migrations"))).toHaveLength(92);
+    expect(read(PLAN)).toMatch(/may not consume or reallocate \*\*M1\*\*, \*\*M2\*\* or \*\*M3\*\*|may not consume or reallocate M1, M2 or M3/);
+  });
+
+  it("records the ADR-093 narrowing as deliberate rather than accidental", () => {
+    // 2N-PRIVACY-006 exists to force this distinction. Removing `notes` from the
+    // people domain changes behaviour ADR-093 signed; a package that did that
+    // without saying so would be the accidental reopening the requirement bans.
+    const plan = read(PLAN);
+    expect(plan).toMatch(/narrowing of ADR-093/i);
+    expect(plan).toMatch(/not an accidental\s*\n?\s*reopening/i);
+    expect(read(THREATS)).toMatch(/owner-signed narrowing/i);
   });
 });
 

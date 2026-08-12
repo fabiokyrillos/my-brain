@@ -208,6 +208,14 @@ Search excludes `highly_sensitive` by default (ADR-093) — but `people` and
 and snippeted with no classification, and **archived memories are returned as
 current results**.
 
+**Half of this is closed by ADR-110**: `notes` leaves the `people` domain's
+matched columns and its snippet entirely (T-23), while the person's name and
+aliases stay searchable. That is a **deliberate, owner-signed narrowing** of
+behaviour ADR-093 fixed — recorded as such, because `2N-PRIVACY-006` exists to
+stop exactly this kind of change happening by accident. ADR-093's default
+exclusion of `highly_sensitive` is untouched and no other domain moves. The
+other half — archived memories returned as current — is closed by **M1**.
+
 **Mitigations required.** Any widening of search in this phase — aliases,
 relations, files-by-entity — states its sensitivity posture explicitly and does
 not silently inherit `false`. ADR-093 is not reopened by accident; a change to
@@ -320,9 +328,39 @@ product may not be silent about which of the two it is.
 
 ---
 
+## T-23 — Unclassifiable free text defaulting to visible · *Live, closed by ADR-110*
+
+The field with the highest chance of holding something genuinely private about a
+named human being is the one with **no classification of its own and no source
+to derive one from**: `people.notes`. Every mechanism this phase builds derives
+protection from a source record, so a field with no source falls through all of
+them — and a fail-open default would leave it printed on the person page, in the
+people list's row subtitle, and in search snippets.
+
+**Why the obvious reading was the dangerous one.** `OD-2N-12`'s fail-closed rule
+is stated for *derived* content. Applied literally to every field it would mask a
+person's own name and make the page useless; applied to *no* owner-typed field it
+would leave free text fully exposed. Both readings are defensible from the text,
+which is precisely why the package refused to pick one silently.
+
+**Mitigations, signed by ADR-110.** `people.notes` is **masked by default**,
+revealed **locally, explicitly and accessibly**; **absence of classification
+never resolves to `normal`**; it is **absent from search snippets, suggestions,
+previews, related pages, the graph, telemetry and retrieval**; the person's
+**name and aliases stay searchable** and their existence and counts stay true.
+**No `sensitivity` column, no migration, no classification inferred from the
+text, and no existing note deleted or altered.**
+
+**And the boundary that keeps this from becoming a licence.** The rule is
+**structural identifier versus free text**, not owner-authored versus derived
+(`2N-PRIVACY-008`). Confirming that a name is shown does not make every field
+the owner typed `normal`.
+
+---
+
 ## Summary
 
-Statuses reflect the seventeen signatures in ADR-109.
+Statuses reflect the seventeen signatures in ADR-109 and the ADR-110 amendment.
 
 | Threat | Status | Needs schema? |
 | --- | --- | --- |
@@ -348,8 +386,9 @@ Statuses reflect the seventeen signatures in ADR-109.
 | T-20 account deletion | Mitigated | Only for new tables; M3 creates none |
 | T-21 push dependency | Latent, forbidden | No |
 | T-22 undo claiming too much | Latent, **created by `OD-2N-11` B** | No, beyond M3 |
+| T-23 unclassifiable free text | **Live**, closed by ADR-110 | **No** |
 
-**Five threats are live today**, and four of the five need no schema to close.
+**Six threats are live today**, and five of the six need no schema to close.
 **The signatures moved three threats into scope** — T-6, T-9 and T-11 — and
 **closed two by refusal rather than by mitigation**: T-1 by declining merge, T-3
 by declining persisted inference. Declining to build something remains the
