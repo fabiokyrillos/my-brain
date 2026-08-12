@@ -1,7 +1,10 @@
 import {
+  base64UrlDecode,
+  base64UrlEncode,
   createVapidAuthorization,
   encryptPushPayload,
   type PushSubscriptionKeys,
+  vapidKeyPairAgrees,
 } from "../_shared/web-push.ts";
 import {
   buildWirePayload,
@@ -241,6 +244,80 @@ export function categoriseVapidSubject(subject: string): "operational" | "reserv
 }
 
 /**
+ * What the deployment's VAPID configuration IS, as categories — never as values.
+ *
+ * Hardware run 1 answered `unauthorized` with HTTP 403, which narrows the fault
+ * to VAPID authentication and no further: a rejected `sub`, a wrong `aud`, a
+ * signature the service could not verify and a key it was not expecting all
+ * arrive as the same status. The `subject` half was already answerable from
+ * here. The rest was not, and asking it cost a real push — one of three strikes
+ * against the owner's only subscription, and an ambiguous NEXT reading.
+ *
+ * This is that question, asked offline.
+ */
+export type SenderConfigurationReport = Readonly<{
+  subject: "operational" | "reserved" | "malformed";
+  /**
+   * `not_canonical` is its own answer because `k=` carries the configured TEXT.
+   * A value that decodes to a real point but is padded, or re-encoded by some
+   * tool along the way, produces a header parameter no service will match
+   * against the subscription — while every length and shape check passes.
+   */
+  publicKey: "p256_point" | "not_canonical" | "malformed";
+  privateKey: "p256_scalar" | "malformed";
+  pair: "consistent" | "mismatched" | "unusable";
+}>;
+
+/**
+ * Reads the configuration and reports on it. Touches no database, contacts no
+ * push service, and cannot reach a subscription — so it may be run as often as
+ * an owner likes, at no cost to a device.
+ */
+export async function inspectSenderConfiguration(
+  config: SenderConfig,
+): Promise<SenderConfigurationReport> {
+  let publicKey: SenderConfigurationReport["publicKey"] = "malformed";
+  try {
+    const bytes = base64UrlDecode(config.vapidPublicKey);
+    if (bytes.length === 65) {
+      publicKey = base64UrlEncode(bytes) === config.vapidPublicKey ? "p256_point" : "not_canonical";
+    }
+  } catch {
+    // Stays `malformed`: text that is not base64 is not a key.
+  }
+
+  let privateKey: SenderConfigurationReport["privateKey"] = "malformed";
+  try {
+    if (base64UrlDecode(config.vapidPrivateKey).length === 32) privateKey = "p256_scalar";
+  } catch {
+    // Stays `malformed`.
+  }
+
+  let pair: SenderConfigurationReport["pair"] = "unusable";
+  if (publicKey !== "malformed" && privateKey !== "malformed") {
+    try {
+      pair = (await vapidKeyPairAgrees({
+        publicKey: config.vapidPublicKey,
+        privateKey: config.vapidPrivateKey,
+      }))
+        ? "consistent"
+        : "mismatched";
+    } catch {
+      // A right-sized value that is off the curve. Not a pair, and not a
+      // rotation either.
+      pair = "unusable";
+    }
+  }
+
+  return Object.freeze({
+    subject: categoriseVapidSubject(config.vapidSubject),
+    publicKey,
+    privateKey,
+    pair,
+  });
+}
+
+/**
  * A non-2xx status to a category. Status codes are the push service's, not the
  * user's, and carry nothing about who or what was being delivered.
  */
@@ -373,6 +450,33 @@ export async function deliverPush(
     console.warn("[send-push] VAPID subject is not an address a push service could use", {
       subject: subjectCategory,
     });
+  }
+
+  // The last configuration check, and it happens BEFORE anything is begun.
+  //
+  // This module's header promises that a missing VAPID key refuses before
+  // `begin_push_delivery`, "so a misconfigured deployment records nothing rather
+  // than recording a refusal it did not really evaluate". A pair whose halves do
+  // not belong together is a missing VAPID key in the only sense that matters —
+  // no push service can authenticate it — and it was the one shape that slipped
+  // through, because both halves are individually well-formed and this runtime
+  // signs with `d` without ever consulting `x`/`y`.
+  //
+  // Refusing here rather than inside the loop is the point: the loop would spend
+  // the dedupe slot, spend an attempt, and charge the DEVICE a strike for a
+  // fault that is entirely ours. Three strikes retire a subscription, and the
+  // owner has one.
+  try {
+    if (!await vapidKeyPairAgrees({
+      publicKey: config.vapidPublicKey,
+      privateKey: config.vapidPrivateKey,
+    })) {
+      console.error("[send-push] the configured VAPID pair does not authenticate");
+      return Object.freeze({ status: "refused", code: "vapid_pair_mismatch" });
+    }
+  } catch {
+    console.error("[send-push] the configured VAPID pair is not usable");
+    return Object.freeze({ status: "refused", code: "vapid_key_malformed" });
   }
 
   const begun = await client.rpc("begin_push_delivery", {

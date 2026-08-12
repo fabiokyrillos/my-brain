@@ -1,6 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { DEFAULT_VAPID_SUBJECT, deliverPush, parseDeliveryRequest } from "./deliver.ts";
+import {
+  DEFAULT_VAPID_SUBJECT,
+  deliverPush,
+  inspectSenderConfiguration,
+  parseDeliveryRequest,
+} from "./deliver.ts";
 
 /**
  * `2M-NOTIFY-011` — the push sender's entrypoint.
@@ -70,6 +75,24 @@ Deno.serve(async (request) => {
     return Response.json({ error: "Invalid request", code: "unparseable" }, { status: 400 });
   }
 
+  const vapidConfig = {
+    vapidPublicKey: Deno.env.get("VAPID_PUBLIC_KEY")!,
+    vapidPrivateKey: Deno.env.get("VAPID_PRIVATE_KEY")!,
+    vapidSubject: Deno.env.get("VAPID_SUBJECT") ?? DEFAULT_VAPID_SUBJECT,
+  };
+
+  // A reading of the configuration that SENDS NOTHING.
+  //
+  // Hardware run 1 could only ask "is this deployment's VAPID usable?" by
+  // pushing to a real device, and the answer cost one of three strikes against
+  // the owner's only subscription while leaving the next reading ambiguous. This
+  // mode reaches no database, contacts no push service and cannot name a
+  // subscription, so it may be run freely — and it is secret-authenticated all
+  // the same, because a configuration report is still ours.
+  if (typeof body === "object" && body !== null && (body as { mode?: unknown }).mode === "selfcheck") {
+    return Response.json({ ok: true, status: "selfcheck", ...await inspectSenderConfiguration(vapidConfig) });
+  }
+
   const parsed = parseDeliveryRequest(body);
   if (parsed === null) {
     return Response.json({ error: "Invalid request", code: "invalid_request" }, { status: 400 });
@@ -83,11 +106,7 @@ Deno.serve(async (request) => {
 
   const outcome = await deliverPush(parsed, {
     client: service,
-    config: {
-      vapidPublicKey: Deno.env.get("VAPID_PUBLIC_KEY")!,
-      vapidPrivateKey: Deno.env.get("VAPID_PRIVATE_KEY")!,
-      vapidSubject: Deno.env.get("VAPID_SUBJECT") ?? DEFAULT_VAPID_SUBJECT,
-    },
+    config: vapidConfig,
     fetch,
     nowSeconds: () => Math.floor(Date.now() / 1000),
   });
