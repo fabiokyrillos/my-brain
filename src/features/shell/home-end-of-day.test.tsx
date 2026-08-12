@@ -36,6 +36,7 @@ function attentionItem(overrides: Partial<NeedsAttentionItemView> = {}): NeedsAt
 
 function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
+    timeZone: "America/Sao_Paulo",
     todayLabel: "SÁBADO, 8 DE AGOSTO",
     status: { kind: "saved" },
     priorities: [],

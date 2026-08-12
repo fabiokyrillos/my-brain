@@ -12,6 +12,8 @@ import {
   ReviewUnderstanding,
 } from "./entry-review";
 
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
+
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   InterpretationReviewViewed: vi.fn(() => null),
 }));
@@ -238,7 +240,7 @@ describe("EntryOutcomes", () => {
 
 describe("CandidateOutcomeHistory", () => {
   it("renders localized entry-local outcomes and never exposes internal disposition values", () => {
-    render(<CandidateOutcomeHistory locale="pt-BR" outcomes={[
+    render(<CandidateOutcomeHistory timeZone={OWNER_TIME_ZONE} locale="pt-BR" outcomes={[
       { key: "1", title: "Ligar para Marina", outcomeLabel: "Tarefa criada", resolvedAt: "2026-07-22T12:00:00.000Z" },
       { key: "2", title: "Revisar rascunho", outcomeLabel: "Sugestão rejeitada", resolvedAt: "2026-07-22T12:01:00.000Z" },
       { key: "3", title: "Preferência de contato", outcomeLabel: "Mantida como registro", resolvedAt: "2026-07-22T12:02:00.000Z" },
@@ -254,7 +256,7 @@ describe("CandidateOutcomeHistory", () => {
   });
 
   it("renders nothing when the entry has no resolved candidate history", () => {
-    const { container } = render(<CandidateOutcomeHistory locale="en" outcomes={[]} />);
+    const { container } = render(<CandidateOutcomeHistory timeZone={OWNER_TIME_ZONE} locale="en" outcomes={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 });
@@ -279,7 +281,7 @@ describe("EntryReview", () => {
    */
   it("runs the blocks in the order the owner's questions are asked", () => {
     render(
-      <EntryReview
+      <EntryReview timeZone={OWNER_TIME_ZONE}
       agentName="Brain"
         view={baseView({ attentionItems: [attentionItem], productState: "needs_attention" })}
         outcomes={outcomes}
@@ -311,7 +313,7 @@ describe("EntryReview", () => {
 
   it("shows what was created, linked, without the owner having to confirm anything again", () => {
     render(
-      <EntryReview
+      <EntryReview timeZone={OWNER_TIME_ZONE}
       agentName="Brain"
         view={baseView()}
         outcomes={outcomes}
@@ -326,7 +328,7 @@ describe("EntryReview", () => {
 
   it("omits the technical details slot entirely when there is nothing to show", () => {
     render(
-      <EntryReview
+      <EntryReview timeZone={OWNER_TIME_ZONE}
       agentName="Brain"
         view={baseView()}
         outcomes={outcomes}

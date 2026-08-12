@@ -2,6 +2,22 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 2: the four Phase 2M carried past its own close
+
+`entry-review.tsx`, `inbox-item.tsx`, `needs-attention-item.tsx` and `technical-details.tsx` now render in the owner's zone through `formatInstant`. **Phase 2M's `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` list is empty and retired**, and the debt that phase recorded honestly rather than repaired is discharged.
+
+**The exemption never outlived the defect**, which was its whole design: while it stood, every named file had to *still* contain the defect, so repairing one failed the build until the name came out. That is exactly what happened. The retirement is **asserted, not announced** — deleting a list proves nothing, since a list can be removed by deleting the rule with it, so the four files are now checked directly: none may format without a zone, and each must use the contract.
+
+**Two divergences fixed, not one.** The four surfaces used *three different* option bags — `short/short` on the two rows, `medium/short` on the other two — so they disagreed with each other about how an instant reads, which is what `2M-TIME-006` forbids. Moving them onto the contract's closed presentation set fixes the zone **and** that. Inventing a bespoke fourth presentation to keep the output pixel-identical would have recreated precisely the "three surfaces inventing three near-identical option bags" the module exists to prevent. **Visible change:** the two inbox/attention rows now read `16 de jul. de 2026, 23:00` rather than `16/07/2026, 23:00`.
+
+**`getOwnerTimeZone()` — and the guard that rejected the first attempt.** The Records list page needed the zone, and the obvious repair was `supabase.from("profiles")` on the page. `architecture.test.ts` refused it: that page is held to the Slice 2X.16 **projection boundary**, and a page reading a table directly is exactly what the rule exists to stop. The guard was right and it caught this before review did. The zone now comes through a `cache()`-wrapped `server-only` accessor modelled on `getAgentName`, so a page that asks three times issues **one** query and the twelve remaining surfaces cost nothing extra. A `timezone` field on every projection was the other candidate and was rejected: correct where a projection already computes *in* the zone — `EntryReviewProjection` and the Work projection both do, and both keep it — but wrong where the inbox and attention projections never reason about days at all, since it would put presentation knowledge into a data contract.
+
+**The prop is required, never optional.** A defaulted `timeZone` is a value some surface eventually accepts without meaning to, and the defaulted value is the wrong answer. Making it required turned the compiler into the census: `tsc` enumerated all 19 call sites across 14 files, and none could be missed.
+
+**The fixtures could not have caught this.** Both row tests pinned an instant at **noon UTC**, which is the same calendar day in every zone the product supports — so they would have passed however wrong the rendering was. They now use `02:00Z`, which is the previous day in São Paulo and the same day in Auckland, and assert the day *changes with the zone* and *does not change with the locale*.
+
+6513 tests pass. Zero migrations, 92, parity `202608120092`.
+
 ## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 1: the contract, and a guard that can see the whole tree
 
 **ADR-111** authorizes the initiative through closeout with a **zero-migration budget**. Unit 1 repairs **nothing**, by design: the baseline is recorded mechanically before a single surface is touched.

@@ -1,6 +1,7 @@
 import { Brain, History, ShieldCheck } from "lucide-react";
 import { TrackedTechnicalDetails } from "@/features/product-analytics/interaction-events";
 import { conceptLabels } from "@/features/interpretations/copy";
+import { formatInstant } from "@/lib/time/instant-format";
 import type { InterpretationTechnicalDetailsView } from "./contracts";
 import type { DailyCycleLocale } from "./copy";
 import type { EntryReviewEditableCurrent, EntryReviewHistoryItem } from "./review-projection";
@@ -85,6 +86,7 @@ export function TechnicalDetails({
   hasTechnicalDetails,
   locale,
   structured,
+  timeZone,
 }: {
   entryId: string;
   technical: InterpretationTechnicalDetailsView | null;
@@ -92,6 +94,12 @@ export function TechnicalDetails({
   hasTechnicalDetails: boolean;
   locale: DailyCycleLocale;
   structured?: TechnicalDetailsStructuredContent | null;
+  /**
+   * The owner's zone (`LDC-DAILY-001`). The revision timeline is an audit trail,
+   * and an audit trail stamped in the host's zone is one whose order a reader
+   * cannot reconcile with anything else on the page.
+   */
+  timeZone: string;
 }) {
   if (!hasTechnicalDetails) return null;
   const pt = locale === "pt-BR";
@@ -169,7 +177,7 @@ export function TechnicalDetails({
                 <li key={revision.interpretationId} className={revision.isCurrent ? "revision-current" : undefined}>
                   <History size={17} aria-hidden="true" />
                   <div><strong>v{revision.version} · {originLabels[revision.origin]?.[locale] ?? revision.origin}</strong><p>{revision.summary}</p>{revision.correctionReason && <small>{revision.correctionReason}</small>}</div>
-                  <time>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(revision.createdAt))}</time>
+                  <time dateTime={revision.createdAt}>{formatInstant(revision.createdAt, "dayAndTime", locale, timeZone)}</time>
                 </li>
               ))}
             </ol>

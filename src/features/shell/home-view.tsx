@@ -64,6 +64,16 @@ export type HomeViewModel = {
   readonly waitingCount: number;
   readonly openQuestion: string | null;
   readonly recent: readonly InboxItemView[];
+  /**
+   * The owner's zone (`LDC-DAILY-001`), carried on the model rather than read by
+   * the rows.
+   *
+   * It comes from the **same `workProjection`** that computed `priorities` and
+   * `today`, which is the point: Home's header, its task list and its inbox rows
+   * are three answers to "when", and the defect this initiative removed was them
+   * being computed from two different sources.
+   */
+  readonly timeZone: string;
 };
 
 function statusLine(view: HomeViewModel, copy: ReturnType<typeof getHomeCopy>): string {
@@ -175,7 +185,7 @@ export function HomeView({
                     {copy.maskedLabel}
                   </p>
                 ) : (
-                  <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" />
+                  <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" timeZone={view.timeZone} />
                 ),
               )}
             </div>
@@ -354,7 +364,7 @@ export function HomeView({
           {view.recent.length ? (
             <div className="home-list">
               {view.recent.map((item) => (
-                <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} />
+                <InboxItemRow agentName={agentName} item={item} key={item.entryId} locale={locale} timeZone={view.timeZone} />
               ))}
             </div>
           ) : (
