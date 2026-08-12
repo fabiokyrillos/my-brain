@@ -2,6 +2,24 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2M SLICE 2M.4a: notification governance, and nothing that can deliver
+
+**Zero migrations.** Budget unchanged at `3 allocated - 2 spent`; migration 2 stays reserved **exclusively** for push in 2M.4b, `202608110091` is still undeployed, and hosted parity is unchanged at `202608110090`.
+
+**The rules exist before anything can obey them.** That is the ordering `2M-METRICS-001` applies to telemetry, pointed at consent: a consent model written alongside its first sender is a consent model shaped by what the sender found convenient. `consent-contract.ts` declares the shape, the five states and the absence rule; `governance.ts` decides a delivery from six named controls and returns **which one refused**; `payload.ts` carries three fields and has nowhere to put a fourth. There is no sender, no subscription, no service-worker handler and no persistence, and the push-absence guard's allowlist is asserted **empty**.
+
+**Absence is `unsupported`, never `denied` (`2M-NOTIFY-002`, `-010`).** The user has not refused anything, and `denied` is the one state a browser will not re-prompt from — collapsing the two produces the worst behaviour in the product: re-prompting forever with no way to explain why nothing happens. Every parser field fails closed toward *less* delivery: an unreadable state, frequency, type list or cap all resolve to the refusing value.
+
+**The surface offers no control, and says so in both locales (`2M-NOTIFY-003`, `-004`).** The consumer a control needs is migration 2's consent record, so a toggle now would change nothing — which is what `R-24` refuses and what slice 2M.0's audit of the five inert preferences was about. What ships is the benefit, the content promise, the honest state and the statement that nothing will be asked of the browser until the user asks. `2M-NOTIFY-004` is therefore **partial** with its remainder named and routed to 2M.4b.
+
+**`public/sw.js` has tests for the first time (`2M-NOTIFY-010`).** It is loaded in a fabricated worker scope and driven through install, activate and fetch — including that it refuses to serve an ordinary page from cache, which would show a signed-out user a signed-in page — and it is proved to register **no `push` and no `notificationclick` listener**. That is the behavioural half of the finding slice 2M.0 made structurally.
+
+**A guard collision, resolved in the guard's favour.** Three new files needed to name the APIs the push-absence guard forbids in order to assert their absence. That guard exempts exactly two files and asserts the count, because a broadened exemption is how a guard stops guarding — so the tokens are assembled at runtime instead. The first attempt failed again because the **variable names** were the literals.
+
+**Stricter than asked, in four places:** quiet hours wrap midnight (every realistic window does); an unreadable quiet window is deliberately **not** quiet, because silencing a user who never asked for silence is the worse failure; the cap boundary is `>=`; and the first refusal wins, so an unconsented user never records a `daily_cap` they could never reach.
+
+**Not proved.** Nothing about a notification arriving, because nothing can send one — and a real device, a real lock screen and a real permission prompt remain the owner's OD-2M-5 checkpoint.
+
 ## 2026-08-11 - PHASE 2M SLICE 2M.3: the day review, the five inert preferences, and one instant contract
 
 **Zero migrations.** The budget is unchanged at `3 allocated · 2 spent`, all three non-transferable; migration 2 stays reserved for push in 2M.4b, `202608110091` is still in the tree and **not deployed**, and hosted parity is unchanged at `202608110090`.

@@ -65,6 +65,8 @@ const COPY = {
     nothingScheduled: "Nada é executado por horário configurado; esta revisão só existe quando você a abre.",
     unreadableHeading: "O que não pôde ser lido",
     completed: "Concluído",
+    notifyHeading: "Notificações no aparelho",
+    notifyState: "Este navegador ou este aparelho não oferece avisos. No iPhone, é preciso instalar o app na tela de início primeiro.",
   },
   en: {
     plannerTitle: "Plan the day",
@@ -73,6 +75,8 @@ const COPY = {
     nothingScheduled: "Nothing runs from a configured schedule; this review exists only when you open it.",
     unreadableHeading: "What could not be read",
     completed: "Completed",
+    notifyHeading: "Notifications on this device",
+    notifyState: "This browser or device does not offer alerts. On iPhone, the app has to be installed to the home screen first.",
   },
 } as const;
 
@@ -222,6 +226,37 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
   </div>`);
 }
 
+/**
+ * The notification governance section, mirroring
+ * `src/features/notifications/notification-settings.tsx`.
+ *
+ * `2M-MOBILE-005` asks for the notification-settings journey at both viewports
+ * and in both locales. The section ships **no control** in slice 2M.4a — the
+ * consumer that would read one is migration 2's consent record — so what the
+ * lane proves is the honest half: the benefit is explained, the state is
+ * announced, and there is nothing to press.
+ */
+function notificationPage(locale: Locale): string {
+  const copy = COPY[locale];
+  return shell(locale, `<div class="content-page">
+    <section aria-label="${copy.notifyHeading}" class="notification-settings">
+      <h2>${copy.notifyHeading}</h2>
+      <p>Se você quiser, o Brain pode avisar no aparelho.</p>
+      <p class="quiet-state">O aviso nunca carrega o conteúdo.</p>
+      <h3>Situação atual</h3>
+      <p data-consent-state="unsupported" role="status">${copy.notifyState}</p>
+      <p class="quiet-state">Nada será perguntado ao navegador até que você peça, nesta página.</p>
+      <p class="quiet-state">Os controles ainda não estão disponíveis.</p>
+    </section>
+    <div class="list-stack">
+      <article class="list-row notification-row unread">
+        <div class="list-row-main"><strong>Um lembrete</strong><p>Corpo do lembrete.</p></div>
+        <div class="list-meta"><span>11 de ago. de 2026, 14:00</span></div>
+      </article>
+    </div>
+  </div>`);
+}
+
 async function open(target: Page, markup: string): Promise<void> {
   await target.setContent(markup, { waitUntil: "load" });
 }
@@ -252,6 +287,41 @@ for (const locale of ["pt-BR", "en"] as const) {
     });
   });
 }
+
+test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance section", () => {
+  for (const locale of ["pt-BR", "en"] as const) {
+    test(`explains the benefit and announces the state in ${locale}`, async ({ page }) => {
+      await open(page, notificationPage(locale));
+      await expect(page.getByRole("region", { name: COPY[locale].notifyHeading })).toBeVisible();
+      const status = page.locator('[data-consent-state]');
+      await expect(status).toHaveAttribute("role", "status");
+      await expect(status).toContainText(COPY[locale].notifyState);
+      await noHorizontalScroll(page);
+    });
+  }
+
+  test("offers nothing to press, because nothing would read it yet", async ({ page }) => {
+    await open(page, notificationPage("pt-BR"));
+    await expect(page.locator(".notification-settings button")).toHaveCount(0);
+    await expect(page.locator(".notification-settings input")).toHaveCount(0);
+    await expect(page.locator(".notification-settings select")).toHaveCount(0);
+  });
+
+  test("sits above the list whose content it makes a promise about", async ({ page }) => {
+    await open(page, notificationPage("pt-BR"));
+    const order = await page.evaluate(() => {
+      const nodes = [...document.querySelectorAll(".notification-settings, .list-stack")];
+      return nodes.map((node) => node.className.split(" ")[0]);
+    });
+    expect(order[0]).toBe("notification-settings");
+  });
+
+  test("reflows at 320 CSS px", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await open(page, notificationPage("pt-BR"));
+    await noHorizontalScroll(page);
+  });
+});
 
 test.describe("2M-ACCESS-004: every state change is announced", () => {
   test("both surfaces carry exactly one outcome region, outside every list", async ({ page }) => {

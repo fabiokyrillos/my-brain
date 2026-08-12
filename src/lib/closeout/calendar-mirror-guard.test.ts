@@ -85,6 +85,20 @@ const SURFACES: Record<string, Surface> = {
     copy: null,
     minimumClasses: 4,
   },
+  /*
+   * Slice 2M.4a. Added as a **row**, which is the whole reason this guard was
+   * made table-driven in 2M.3 rather than copied: a fourth surface costs five
+   * lines and inherits every assertion, including the census below that refuses
+   * a lane nobody added a row for.
+   */
+  notificationSettings: {
+    spec: "e2e/daily-surfaces.spec.ts",
+    components: ["src/features/notifications/notification-settings.tsx"],
+    prefix: "notification-",
+    attributes: ["data-consent-state"],
+    copy: { module: "src/features/notifications/copy.ts", keys: ["unsupported"] },
+    minimumClasses: 1,
+  },
 };
 
 /** Every `className="…"` literal in a source, filtered to one surface's prefix. */
@@ -250,7 +264,7 @@ describe("2M-ACCESS-006: no surface in this phase is left without a mirror", () 
     expect([...covered].sort()).toEqual(lanes);
   });
 
-  it("names three surfaces, which is how many this phase shipped", () => {
-    expect(Object.keys(SURFACES)).toEqual(["calendar", "planner", "dayReview"]);
+  it("names four surfaces, which is how many this phase has shipped", () => {
+    expect(Object.keys(SURFACES)).toEqual(["calendar", "planner", "dayReview", "notificationSettings"]);
   });
 });
