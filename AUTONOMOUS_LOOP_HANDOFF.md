@@ -3439,3 +3439,128 @@ the loop **stops** at `CHECKPOINT DO DONO — PROVA EM HARDWARE NECESSÁRIA`. Sl
 2M.5 and closeout come after the owner's evidence returns, never before.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+## §51 — Slice 2M.3 closes three partials, and the surface it mounted on was a decision (2026-08-11)
+
+**Baseline in: `50a1619`.** 91 migrations, **hosted parity `202608110090` — unchanged,
+because migration 3 is still NOT deployed.** Budget **`3 allocated · 2 spent`**,
+all three non-transferable. Signup closed, rollout gate untouched, Phase 2N not
+started. **Zero migrations were spent in this slice.**
+
+### The route was a decision, and it is recorded rather than absorbed
+
+The owner's brief said **reuse `/app/reviews`**. Three artifacts merged in slices
+2M.1 and 2M.2 — `product-analytics/contracts.ts`, the planner route and
+`capabilities.ts` — said the day review would be a **sub-route of
+`/app/calendar`**. That is a genuine divergence between an instruction and the
+repository's own record, and it was resolved rather than picked.
+
+**Neither reading costs a migration, and that is what decides it.** The
+constraint those comments were really about is the **surface value**: a `reviews`
+entry the deployed `product_events_surface_check` does not admit would be a
+fourth migration — a stop condition. The *route* was never the constraint.
+`surface` is the product area an event belongs to, not the route it was emitted
+from, and `task_command` has attributed to its own area from `/app/chat` and
+`/app/work` since Phase 2E. So the day review mounts where the owner asked, its
+two events carry `calendar` — the value migration `202608110090` deployed
+**naming the day review explicitly** — and all three comments were corrected in
+the same change instead of being left to disagree with the code.
+
+*A comment that states a governance fact is load-bearing. When the fact moves,
+the comment moves with it, in the same commit.*
+
+### Three defects, and two of them were older than the phase
+
+1. **The notification list rendered in the host's zone.** `new Intl.DateTimeFormat`
+   with **no `timeZone`** — UTC on a server — while the calendar, the planner,
+   the reminders page and the task detail had carried the owner's zone since
+   slice 2M.1. Changing the timezone in settings moved four surfaces and left
+   this one. `2M-TIME-005` and `2M-TIME-006` failing on one line.
+2. **Both Phase 2M browser lanes were absent from CI.** `2M-ACCESS-006` offers a
+   lane **or** a source-derived mirror; slice 2M.1 chose the mirror, the mirror
+   ran in CI as a vitest guard, and **the lane it guards ran nowhere**. Every
+   touch-target, focus, reflow and keyboard assertion `calendar.spec.ts` makes
+   had only ever executed on a developer's machine. *A guard over a lane is not
+   the lane.* Both are now in the CI Playwright step at both viewports.
+3. **`detailControlsFor` excludes `set_status`** — correctly, because the Work
+   list renders that verb elsewhere — so reusing it on a review row would have
+   shipped **four verbs where the requirement names five**, and the deployed
+   telemetry would have carried an `actionKind` no producer could emit.
+
+### What shipped
+
+`2M-REVIEW-001`…`-008`, `2M-TIME-005`, `2M-TIME-006`, `2M-ACCESS-006`, and the
+discharge of `2M-MOBILE-004` and `2M-ACCESS-004` where slice 2M.2's record said
+they would go.
+
+The five verbs are **data mapped onto the taxonomy**: `carry_forward` and `plan`
+are both `set_planned`, differing only in the day the surface proposes;
+`reschedule` is `reschedule_due`; `archive` is `cancel_task`; `follow_up` is
+`set_status` to `waiting`. Confirmation and reversibility are **read from
+`actionPolicy`**, never restated — a taxonomy that made archiving one-click
+fails a test rather than shipping quietly.
+
+`TaskDetailControls` gained exactly **one optional prop**, `defaultValues`,
+which fills an input's initial value and changes no control, no eligibility and
+no intent — the same bar `variant` is held to. Every gate below it runs
+unchanged, so a preset the policy would refuse is refused exactly as a typed one
+is.
+
+The mirror guard is now **table-driven over three surfaces** with a mutation
+control: a renamed class, an added class the lane does not name, and a drifted
+copy sentence each make it fail. The mutation runs on a **string**, never on a
+file — a harness that edits an artifact tests a different artifact.
+
+### The traceability generator, and the guard that was right
+
+`scripts/generate-phase-2m-traceability.mjs` extracts the declarations from the
+PRD and the classifications from the slice records, refuses on duplicates,
+unknown classes, vacuous remainders, rule-less absences, a foreign namespace and
+a fourth migration, and reports **94 declared, 63 classified, 60 built, 3
+partial, 31 not yet classified, 2/3 migrations** — every number extracted.
+
+**Its first run tripped `phase-2m-declarations.test.ts`**, which forbids the
+matrix from existing before the closeout gate: *a matrix written early is a
+classification of work that has not happened.* The guard was right. The fix was
+to make the artifact **impossible** before its gate — the mid-phase run prints
+and writes nothing, `--complete` writes the file — rather than to relax the
+guard. *When a guard fires on new work, the first question is whether the guard
+is right, and here it was.*
+
+It also found three things in the existing records: a requirement whose final
+classification was weaker than an earlier one, a guard-prose row read as its own
+violation, and two partials naming no destination in their row. The first two
+were generator defects and were fixed in the generator; the third resolves
+because slice 2M.3 discharges both.
+
+### What is NOT proved
+
+**The applied case in a browser.** The lane composes pages with `setContent`, so
+a successful carry-forward, the row leaving the list, the undo and a staleness
+refusal are not exercised. They need an authenticated app, exactly as the
+calendar's did. **Destination: an online journey, not this slice.**
+
+**A real screen reader and a real phone, still nowhere.** `2M-ACCESS-007` and the
+OD-2M-5 hardware checkpoint are the owner's.
+
+**The two review events have a producer and no observed arrival.** Nothing here
+watched one land in `product_events` on the hosted project.
+
+### One local execution constraint, recorded
+
+Playwright's `webServer` could not start within its 120 s timeout on this machine
+(Next reports a slow filesystem), so both lanes were executed through a temporary
+config **without** `webServer` — legitimate because neither spec navigates to the
+app. That config was deleted and is not in the tree. **36 passed** for
+`daily-surfaces.spec.ts` and **89 passed / 17 skipped** for the calendar and
+accessibility lanes, desktop and Pixel 7.
+
+### What is outstanding, exactly
+
+**Slice 2M.4a** (notification governance, no migration), **2M.4b** (**migration
+2**, push), then deploy — which must apply **`202608110091` and then migration 2,
+in that order** — hosted proof, and the loop **stops** at `CHECKPOINT DO DONO —
+PROVA EM HARDWARE NECESSÁRIA`. Slice 2M.5 and closeout come after the owner's
+evidence returns, never before.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**

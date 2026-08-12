@@ -22,6 +22,11 @@ import { localDateOf, parseLocalDate } from "@/lib/time/local-day";
  * value the deployed CHECK does not admit — a migration, in a phase whose three
  * are allocated by name.
  *
+ * **The day review took the other lawful option** in slice 2M.3: it mounts on
+ * `/app/reviews`, the surface reviews already had, and keeps attributing to
+ * `calendar`. Both routes are lawful because neither adds a surface value; what
+ * is unlawful is a *new* one, and that is what this comment is really about.
+ *
  * Every load is a fresh owner-scoped read at the current instant, for the same
  * reason the calendar's is: a cached planner would show a classification, a
  * conflict or a capacity that had since changed.

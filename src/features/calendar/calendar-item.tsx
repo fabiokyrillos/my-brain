@@ -30,6 +30,7 @@ import type {
   TaskDetailDateBounds,
 } from "@/features/task-commands/task-detail-controls";
 import type { Locale } from "@/lib/preferences";
+import { formatInstant } from "@/lib/time/instant-format";
 
 import type { CalendarItemView } from "./calendar-contracts";
 import { CalendarReschedule } from "./calendar-reschedule";
@@ -43,12 +44,11 @@ import { getCalendarCopy } from "./copy";
  * happens to be — and `2M-TIME-003` makes `profiles.timezone` the only answer.
  */
 function formatTime(instant: string, locale: Locale, timeZone: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone,
-  }).format(new Date(instant));
+  // `2M-TIME-006`, slice 2M.3: delegated to the one instant contract rather than
+  // kept as a second option bag. The `time` presentation is byte-for-byte what
+  // this function used to build, and it is now the same code the day review's
+  // capture times and every other clock on a dated surface run through.
+  return formatInstant(instant, "time", locale, timeZone) ?? "";
 }
 
 export function CalendarItem({

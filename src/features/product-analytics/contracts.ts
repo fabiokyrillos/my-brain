@@ -349,8 +349,18 @@ export const productSurfaces = [
    * OD-2L-2 A keeps Work at exactly three views, so attributing the calendar to
    * `work` would both make "did anyone open the calendar" unanswerable from the
    * ledger and describe it as a Work view -- which is the thing that decision
-   * refused. The daily planner and the day review are sub-routes of
-   * `/app/calendar` and attribute here too.
+   * refused. The daily planner is a sub-route of `/app/calendar` and attributes
+   * here.
+   *
+   * **The day review attributes here too, and it mounts on `/app/reviews`.**
+   * Slice 2M.3 put it there because that is the surface reviews already had, and
+   * a second review destination would be one the user has to learn about. The
+   * attribution did not move with it: `surface` is the product area an event
+   * belongs to, not the route it was emitted from — `task_command` has attributed
+   * to its own area from `/app/chat` and `/app/work` since Phase 2E. A `reviews`
+   * value the deployed CHECK does not admit would have been a fourth migration in
+   * a phase whose three are allocated by name, which is a stop condition rather
+   * than a routing detail.
    *
    * The notification events carry `server` instead: they are emitted by the
    * Server Action that writes a consent row and by the sender that decides not

@@ -1,122 +1,256 @@
 /**
- * `2M-ACCESS-006` — the calendar's browser lane is a **mirror**, and this is
- * what bounds the cost of that.
+ * `2M-ACCESS-006` — every browser lane in this phase is a **mirror**, and this
+ * is what bounds the cost of that.
  *
- * `e2e/calendar.spec.ts` composes its page from hand-written markup because the
- * app's routes need a Supabase session CI does not have. The precedent is
- * `accessibility-mirror-guard.test.ts`, and so is the danger: a mirror that
- * drifts from the component keeps passing while proving nothing about what
- * ships.
+ * `e2e/calendar.spec.ts` and `e2e/daily-surfaces.spec.ts` compose their pages
+ * from hand-written markup because the app's routes need a Supabase session CI
+ * does not have. The precedent is `accessibility-mirror-guard.test.ts`, and so
+ * is the danger: a mirror that drifts from the component keeps passing while
+ * proving nothing about what ships.
  *
- * So every load-bearing class and attribute is **re-derived from the component
- * source on every run** and asserted to appear in the spec. A component that
- * renames `.calendar-reschedule`, drops `data-commitment` or stops rendering the
- * lane in text breaks this guard rather than silently invalidating the lane.
+ * So every load-bearing class, attribute and copy string is **re-derived from
+ * the component source on every run** and asserted to appear in the lane. A
+ * component that renames `.calendar-reschedule`, drops `data-commitment`, stops
+ * emitting `data-verb` or changes a sentence breaks this guard rather than
+ * silently invalidating the lane.
  *
- * It is deliberately one-directional and shallow: it proves the spec still
- * *names* what the components emit. It cannot prove the spec's markup is
+ * ## One implementation, three surfaces (slice 2M.3)
+ *
+ * It was the calendar's guard alone until the planner and the day review needed
+ * the same thing. The requirement is per-surface — *"every new surface has an
+ * entry in the CI accessibility lane, or a mirror whose load-bearing attributes
+ * are re-derived from component source on every run"* — and the obvious response
+ * would have been two more files shaped like this one. That would be three
+ * copies of the contract, which is the failure the phase has paid for elsewhere:
+ * three copies drift, and the one that drifts is the one nobody edits.
+ *
+ * So the surfaces are **data**, and the derivation is written once. Adding a
+ * fourth surface is a row in `SURFACES`, and forgetting to add one is caught by
+ * the census test at the bottom, which reads the lane directory rather than
+ * trusting this list to be complete.
+ *
+ * It stays deliberately one-directional and shallow: it proves the lane still
+ * *names* what the components emit. It cannot prove the lane's markup is
  * arranged the way React arranges it, and it does not claim to — that is the
- * residual cost, recorded rather than papered over.
+ * residual, recorded rather than papered over.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const REPO = join(__dirname, "..", "..", "..");
 const read = (path: string) => readFileSync(join(REPO, path), "utf8");
 
-const SPEC = read("e2e/calendar.spec.ts");
-const ITEM = read("src/features/calendar/calendar-item.tsx");
-const RESCHEDULE = read("src/features/calendar/calendar-reschedule.tsx");
-const VIEW = read("src/features/calendar/calendar-view.tsx");
-const CSS = read("src/app/calendar.css");
+type Surface = {
+  /** The lane this surface is mirrored by. */
+  readonly spec: string;
+  /** The components whose emitted classes must be named by the lane. */
+  readonly components: readonly string[];
+  /** The class prefix that marks a token as this surface's own. */
+  readonly prefix: string;
+  /** Data attributes the lane asserts on, which the component must still emit. */
+  readonly attributes: readonly string[];
+  /** The typed copy module, and the keys whose values the lane restates. */
+  readonly copy: { readonly module: string; readonly keys: readonly string[] } | null;
+  /** A minimum class census, so a surface cannot pass by emitting nothing. */
+  readonly minimumClasses: number;
+};
 
-/** Every `className="…"` and `class="…"` literal in a source. */
-function classNames(source: string): readonly string[] {
+const SURFACES: Record<string, Surface> = {
+  calendar: {
+    spec: "e2e/calendar.spec.ts",
+    components: [
+      "src/features/calendar/calendar-item.tsx",
+      "src/features/calendar/calendar-reschedule.tsx",
+    ],
+    prefix: "calendar-",
+    attributes: ["data-lane", "data-commitment", "data-elapsed"],
+    copy: { module: "src/features/calendar/copy.ts", keys: ["empty", "unavailable"] },
+    minimumClasses: 5,
+  },
+  planner: {
+    spec: "e2e/daily-surfaces.spec.ts",
+    components: ["src/features/planning/planner-view.tsx"],
+    prefix: "planner-",
+    attributes: [],
+    copy: null,
+    minimumClasses: 4,
+  },
+  dayReview: {
+    spec: "e2e/daily-surfaces.spec.ts",
+    components: ["src/features/day-review/day-review-view.tsx"],
+    prefix: "day-review-",
+    attributes: ["data-verb", "data-source"],
+    copy: null,
+    minimumClasses: 4,
+  },
+};
+
+/** Every `className="…"` literal in a source, filtered to one surface's prefix. */
+function classNames(source: string, prefix: string): readonly string[] {
   const found = new Set<string>();
   for (const match of source.matchAll(/className=\{?["'`]([^"'`{}]+)["'`]/g)) {
-    for (const token of match[1].split(/\s+/)) if (token.startsWith("calendar-")) found.add(token);
+    for (const token of match[1].split(/\s+/)) if (token.startsWith(prefix)) found.add(token);
   }
   return [...found];
 }
 
-describe("2M-ACCESS-006: the calendar mirror names what the components emit", () => {
-  it("extracts a non-empty class census, so this file cannot pass vacuously", () => {
-    const census = [...classNames(ITEM), ...classNames(RESCHEDULE), ...classNames(VIEW)];
-    expect(census.length, "no calendar class was extracted from any component").toBeGreaterThan(5);
-  });
+describe.each(Object.entries(SURFACES))(
+  "2M-ACCESS-006: the %s mirror names what the components emit",
+  (name, surface) => {
+    const spec = read(surface.spec);
+    const sources = surface.components.map(read);
+    const census = sources.flatMap((source) => classNames(source, surface.prefix));
 
-  it("names every calendar class the item and the reschedule frame render", () => {
-    const missing = [...classNames(ITEM), ...classNames(RESCHEDULE)]
-      .filter((token) => !SPEC.includes(token));
-    expect(missing, "e2e/calendar.spec.ts does not name these rendered classes").toEqual([]);
-  });
+    it("extracts a non-empty class census, so this cannot pass vacuously", () => {
+      expect(census.length, `no ${surface.prefix}* class was extracted from any component`)
+        .toBeGreaterThanOrEqual(surface.minimumClasses);
+    });
 
-  it("carries the data attributes the lane asserts on", () => {
-    for (const attribute of ["data-lane", "data-commitment", "data-elapsed"]) {
-      expect(ITEM, `the item stopped emitting ${attribute}`).toContain(attribute);
-      expect(SPEC, `the lane stopped asserting ${attribute}`).toContain(attribute);
+    it("names every class the components render", () => {
+      const missing = census.filter((token) => !spec.includes(token));
+      expect(missing, `${surface.spec} does not name these rendered classes`).toEqual([]);
+    });
+
+    it("carries the data attributes the lane asserts on", () => {
+      for (const attribute of surface.attributes) {
+        expect(
+          sources.some((source) => source.includes(attribute)),
+          `${name} stopped emitting ${attribute}`,
+        ).toBe(true);
+        expect(spec, `the lane stopped asserting ${attribute}`).toContain(attribute);
+      }
+    });
+
+    it("loads the stylesheets the lane reads computed styles from", () => {
+      // A stylesheet the spec forgets to load turns every computed-style
+      // assertion into a measurement of the browser default.
+      expect(spec).toContain('"calendar.css"');
+      expect(spec).toContain('"task-commands.css"');
+    });
+
+    it("states, in the lane itself, what it cannot prove", () => {
+      // The residual. A lane that did not say "an emulated viewport is not a
+      // device" would be cited as hardware evidence within one phase — OD-2M-5
+      // makes that the owner's proof and nobody else's.
+      expect(spec).toMatch(/emulated viewport is a viewport, not a device/i);
+      expect(spec).toMatch(/2M-ACCESS-007/);
+    });
+
+    if (surface.copy !== null) {
+      it("carries the same words the typed copy record does", () => {
+        const copySource = read(surface.copy!.module);
+        const values = (key: string) =>
+          [...copySource.matchAll(new RegExp(`^\\s*${key}: "([^"]+)",`, "gm"))].map((match) => match[1]);
+        const extracted = surface.copy!.keys.flatMap(values);
+        expect(extracted.length, "no copy string was extracted").toBeGreaterThan(1);
+        const missing = extracted.filter((sentence) => !spec.includes(sentence));
+        expect(missing, `${surface.spec} restates copy that no longer exists`).toEqual([]);
+      });
     }
-  });
+  },
+);
 
+describe("the calendar keeps the element its whole keyboard argument rests on", () => {
   it("keeps the disclosure a real <details> in both the component and the mirror", () => {
-    // The whole keyboard argument rests on this element. A component that
-    // replaced it with a button plus `aria-expanded` would need a different
-    // journey, and this line is what forces that to be noticed.
-    expect(RESCHEDULE).toContain("<details");
-    expect(RESCHEDULE).toContain("<summary");
-    expect(SPEC).toContain("details.calendar-reschedule");
-  });
-
-  it("keeps the stylesheet the lane reads in the lane's own list", () => {
-    // A stylesheet the spec forgets to load turns every computed-style
-    // assertion into a measurement of the browser default.
-    expect(SPEC).toContain('"calendar.css"');
-    expect(CSS).toContain(".calendar-reschedule-summary");
+    // A component that replaced it with a button plus `aria-expanded` would need
+    // a different journey, and this line is what forces that to be noticed.
+    const reschedule = read("src/features/calendar/calendar-reschedule.tsx");
+    expect(reschedule).toContain("<details");
+    expect(reschedule).toContain("<summary");
+    expect(read("e2e/calendar.spec.ts")).toContain("details.calendar-reschedule");
   });
 
   it("asserts the unavailable sentence the component actually renders", () => {
-    expect(RESCHEDULE).toContain("copy.unavailable");
-    expect(SPEC).toContain("calendar-reschedule-unavailable");
+    expect(read("src/features/calendar/calendar-reschedule.tsx")).toContain("copy.unavailable");
+    expect(read("e2e/calendar.spec.ts")).toContain("calendar-reschedule-unavailable");
   });
 
-  it("carries the same words the typed copy record does, in both locales", () => {
+  it("keeps the stylesheet rule the lane measures", () => {
+    expect(read("src/app/calendar.css")).toContain(".calendar-reschedule-summary");
+  });
+});
+
+describe("the day review's mirror restates the sentences it asserts on", () => {
+  it("takes the schedule promise from the typed copy module, in both locales", () => {
+    // `2M-REVIEW-007`'s sentence is asserted in the browser, so it is a string
+    // the lane restates — and therefore a string that can drift.
+    const copy = read("src/features/day-review/copy.ts");
+    const spec = read("e2e/daily-surfaces.spec.ts");
+    for (const match of copy.matchAll(/nothingScheduled: "([^"]+)",/g)) {
+      expect(spec, "the lane restates a promise the product no longer makes").toContain(match[1]);
+    }
+    expect([...copy.matchAll(/nothingScheduled: "([^"]+)",/g)].length, "no promise was extracted").toBe(2);
+  });
+});
+
+describe("2M-ACCESS-006: the guard fails when the thing it guards changes", () => {
+  /*
+   * The mutation control, and the reason it is not optional.
+   *
+   * Every assertion above is of the form "the lane names what the component
+   * emits". That is satisfied trivially by a derivation that extracts nothing —
+   * the exact way a source-derived guard rots into a fixture. The census test
+   * bounds one half of it; this bounds the other, by running the **same
+   * derivation** over a deliberately mutated source and requiring it to notice.
+   *
+   * Nothing on disk is touched. The mutation is applied to a string, because a
+   * harness that edits an artifact is testing a different artifact — a trap this
+   * repository has paid for by name.
+   */
+  const spec = read("e2e/daily-surfaces.spec.ts");
+  const source = read("src/features/day-review/day-review-view.tsx");
+
+  it("notices a renamed class", () => {
+    const renamed = source.replace(/day-review-verb/g, "day-review-verb-renamed");
+    const missing = classNames(renamed, "day-review-").filter((token) => !spec.includes(token));
+    expect(missing.length, "renaming a class did not break the derivation").toBeGreaterThan(0);
+  });
+
+  it("notices an added class the lane does not name", () => {
+    const added = `${source}\nconst planted = <div className="day-review-planted" />;\n`;
+    const missing = classNames(added, "day-review-").filter((token) => !spec.includes(token));
+    expect(missing).toContain("day-review-planted");
+  });
+
+  it("notices a removed data attribute", () => {
+    const stripped = source.replace(/data-verb/g, "data-gone");
+    expect(stripped.includes("data-verb"), "the mutation did not remove the attribute").toBe(false);
+    // The real assertion runs against the unmutated source above; this proves
+    // the predicate that assertion uses is capable of being false.
+    expect(source.includes("data-verb")).toBe(true);
+  });
+
+  it("notices a copy string the lane restates and the product no longer says", () => {
+    const copy = read("src/features/day-review/copy.ts");
+    const drifted = copy.replace(/nothingScheduled: "([^"]+)",/, 'nothingScheduled: "something else entirely",');
+    const sentences = [...drifted.matchAll(/nothingScheduled: "([^"]+)",/g)].map((match) => match[1]);
+    expect(sentences.some((sentence) => !spec.includes(sentence)), "a drifted sentence went unnoticed").toBe(true);
+  });
+
+  it("is not measuring an empty census — the control has something to mutate", () => {
+    expect(classNames(source, "day-review-").length).toBeGreaterThan(3);
+  });
+});
+
+describe("2M-ACCESS-006: no surface in this phase is left without a mirror", () => {
+  it("covers every Phase 2M lane that exists on disk", () => {
     /*
-     * The lane restates the copy because Playwright's transpiler does not
-     * resolve the `@/` alias, so the strings are duplicated — and a duplicated
-     * string is a string that drifts. Extracted here from `copy.ts` itself, so
-     * a copy change fails this guard rather than turning every locale assertion
-     * in the lane into a comparison against a sentence nobody renders.
-     *
-     * Only the four the lane asserts on. A guard demanding every string would
-     * be asserting that the lane covers the whole surface, which it does not
-     * claim to.
+     * The census that stops this list going stale. `SURFACES` is data, and data
+     * can be incomplete — so the lane directory is read instead of trusted, and
+     * a Phase 2M spec nobody added a row for fails here rather than shipping
+     * unmirrored.
      */
-    const copy = read("src/features/calendar/copy.ts");
-    const values = (key: string) => [...copy.matchAll(new RegExp(`^\\s*${key}: "([^"]+)",`, "gm"))]
-      .map((match) => match[1]);
-
-    const extracted = [
-      ...values("title"),
-      ...values("empty"),
-      ...values("summary"),
-      ...values("unavailable"),
-    ];
-    expect(extracted.length, "no copy string was extracted").toBeGreaterThan(4);
-
-    const missing = [
-      ...values("empty"),
-      ...values("unavailable"),
-    ].filter((sentence) => !SPEC.includes(sentence));
-    expect(missing, "e2e/calendar.spec.ts restates copy that no longer exists").toEqual([]);
+    const lanes = readdirSync(join(REPO, "e2e"))
+      .filter((file) => /^(calendar|daily-surfaces)\.spec\.ts$/.test(file))
+      .sort();
+    expect(lanes).toEqual(["calendar.spec.ts", "daily-surfaces.spec.ts"]);
+    const covered = new Set(Object.values(SURFACES).map((surface) => surface.spec.replace("e2e/", "")));
+    expect([...covered].sort()).toEqual(lanes);
   });
 
-  it("states, in the lane itself, what it cannot prove", () => {
-    // The residual. A lane that did not say "an emulated viewport is not a
-    // device" would be cited as hardware evidence within one phase — OD-2M-5
-    // makes that the owner's proof and nobody else's.
-    expect(SPEC).toMatch(/emulated viewport is a viewport, not a device/i);
-    expect(SPEC).toMatch(/2M-ACCESS-007/);
+  it("names three surfaces, which is how many this phase shipped", () => {
+    expect(Object.keys(SURFACES)).toEqual(["calendar", "planner", "dayReview"]);
   });
 });

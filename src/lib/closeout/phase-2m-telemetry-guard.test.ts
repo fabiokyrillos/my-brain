@@ -534,15 +534,40 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
      *
      * `calendar_viewed`   — slice 2M.1 part 2, SHIPPED
      * `day_planned`       — slice 2M.2, SHIPPED
-     * `day_review_opened` / `day_review_action_applied` — slice 2M.3
+     * `day_review_opened` — slice 2M.3, SHIPPED
+     * `day_review_action_applied` — slice 2M.3, SHIPPED
      * `notification_consent_changed` — slice 2M.4a
      * `notification_suppressed`      — slice 2M.4b
      */
     const producers = producerSites();
-    expect([...producers.keys()].sort()).toEqual(["calendar_viewed", "day_planned"]);
-    for (const name of ["calendar_viewed", "day_planned"]) {
+    expect([...producers.keys()].sort()).toEqual([
+      "calendar_viewed",
+      "day_planned",
+      "day_review_action_applied",
+      "day_review_opened",
+    ]);
+    for (const name of ["calendar_viewed", "day_planned", "day_review_opened", "day_review_action_applied"]) {
       expect(producers.get(name), name)
         .toEqual(["src/features/product-analytics/interaction-events.tsx"]);
+    }
+  });
+
+  it("2M-METRICS-004: the review producers carry no date, no time and no identifier", () => {
+    // The same assertion the calendar's producer gets, applied to slice 2M.3's
+    // two. Which days somebody closes out is the same fingerprinting value as
+    // which days they look at, and a task id would be worse than either.
+    const source = readFileSync(join(REPO, "src/features/product-analytics/interaction-events.tsx"), "utf8");
+    const keysFor = (name: string) => {
+      const block = source.slice(source.indexOf(`name: "${name}"`));
+      const properties = /properties:\s*\{([^}]*)\}/.exec(block)?.[1] ?? "";
+      return properties.split(",").map((entry) => entry.split(":")[0].trim()).filter(Boolean);
+    };
+    expect(keysFor("day_review_opened")).toEqual(["scope"]);
+    expect(keysFor("day_review_action_applied")).toEqual(["scope", "actionKind"]);
+    for (const name of ["day_review_opened", "day_review_action_applied"]) {
+      for (const forbidden of ["date", "day", "at", "taskId", "title", "itemCount", "timezone"]) {
+        expect(keysFor(name), `${name} carries a '${forbidden}' key`).not.toContain(forbidden);
+      }
     }
   });
 
