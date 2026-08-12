@@ -1,11 +1,14 @@
 # Phase 2N — People, projects, memory, files and relations · PRD
 
-**Authorized for PLANNING ONLY by ADR-108 (2026-08-12). Implementation is not
+**Authorized for PLANNING ONLY by ADR-108 (2026-08-12). All seventeen owner
+decisions are SIGNED by ADR-109 (2026-08-12). Implementation is still not
 authorized.** No requirement below has been executed. Nothing here may be read
 as permission to write product code, create a page or component, create a
 migration, change schema, RLS, a grant, a policy or an RPC, touch an Edge
 Function, deploy, add a secret, integrate an external service, resume the push
-investigation, open signup, or alter the rollout.
+investigation, repair the timezone defects, open signup, or alter the rollout.
+**The three allocated migrations are destinations, not permissions**; none may
+be created until implementation is separately authorized.
 
 Companion plan: `PHASE_2N_IMPLEMENTATION_PLAN.md`. Evidence:
 `docs/reports/phase-2n/` — the current-experience audit, the UX gaps, the
@@ -48,17 +51,28 @@ Recurrence. Opening signup or advancing the rollout. Repairing the four
 `daily-cycle` timezone exemptions. `2E-COMMAND-012`. Any external integration.
 Any new AI operation kind. The roadmap's next phase, in any form.
 
-## 3. Baseline, obligation and proposal
+## 3. Baseline, obligation and by-rule
 
-This PRD declares **108 requirements across 16 families**, each family numbered
+This PRD declares **123 requirements across 16 families**, each family numbered
 from 001 with no gap. Requirements are marked so that the phase cannot claim
-credit for what already ships:
+credit for what already ships, and so that what the owner declined is visible
+rather than absent:
 
 - **[BASELINE]** — the behaviour exists today; the requirement is that it is
   *not broken* and is *proved* by this phase's tests.
 - **[OBLIGATION]** — the phase must deliver it.
-- **[PROPOSAL]** — it depends on an owner decision in §14 and closes
-  `not-built-by-rule` against that decision if it is not signed.
+- **[BY-RULE]** — a signed decision says it will **not** be built. It closes
+  `not-built-by-rule` against that signature, with a named destination, and
+  **never as a `partial`** — a partial with an invented remainder is exactly the
+  shape the traceability contract refuses.
+
+**There is no `[PROPOSAL]` marker any more.** ADR-109 signed all seventeen
+decisions, so every requirement now states what was decided. Requirements that
+previously read *"depends on OD-2N-n"* are **restated to their signature**;
+none was renumbered, reused or removed, and the fifteen obligations the
+signatures created are **appended to the end of their existing families**.
+The options the owner declined are preserved in
+`PHASE_2N_IMPLEMENTATION_PLAN.md` §7 and in ADR-109, not deleted.
 
 ## 4. Universal states
 
@@ -91,9 +105,9 @@ is not complete.
 - **2N-PERSON-007:** [OBLIGATION] Every mutation offered here reuses an
   existing authority path; the page introduces no direct client write to any
   domain table.
-- **2N-PERSON-008:** [PROPOSAL] Related files render on the page, sourced from
+- **2N-PERSON-008:** [OBLIGATION] Related files render on the page, sourced from
   `entity_attachments`, under the file classification contract
-  (`2N-FILES-004`). Depends on `OD-2N-9`.
+  (`2N-FILES-004`). Signed by `OD-2N-9` **option B**.
 
 ## 6. Project — `2N-PROJECT`
 
@@ -107,9 +121,13 @@ is not complete.
   is invented.
 - **2N-PROJECT-004:** [OBLIGATION] "Recent changes" is derived from existing
   audit and interpretation history, never from a new change-log table.
-- **2N-PROJECT-005:** [PROPOSAL] Decisions and risks are surfaced **only** if
-  they are representable from existing records; if they are not, the family
-  closes `not-built-by-rule` with the reason named. Depends on `OD-2N-2`.
+- **2N-PROJECT-005:** [OBLIGATION] Decisions and risks are surfaced **only** if
+  they are representable from existing records; if they are not, this
+  requirement closes `not-built-by-rule` with the reason named. *(Restated: it
+  previously cited `OD-2N-2`, which decides project identity and never governed
+  this. The mis-wiring is corrected here rather than left for a closeout to
+  discover, and the requirement is now decision-independent — representability
+  is a question of evidence, not of signature.)*
 - **2N-PROJECT-006:** [OBLIGATION] Bounds are stated exactly as
   `2N-PERSON-003`.
 - **2N-PROJECT-007:** [OBLIGATION] Every mutation reuses an existing authority
@@ -121,28 +139,39 @@ is not complete.
   words, what a person is and what a project is, and the statement matches the
   schema: today identity is a case-insensitively unique name per owner and
   nothing else.
-- **2N-IDENTITY-002:** [PROPOSAL] Canonical identity for a person is decided
-  and implemented as decided. Depends on `OD-2N-1`.
-- **2N-IDENTITY-003:** [PROPOSAL] Canonical identity for a project, likewise.
-  Depends on `OD-2N-2`.
-- **2N-IDENTITY-004:** [PROPOSAL] Aliases become readable and writable —
-  `entity_aliases` gains its first reader and first writer — so a known
-  nickname resolves to the person it names. Depends on `OD-2N-1`.
-- **2N-IDENTITY-005:** [PROPOSAL] Likely duplicates are **surfaced, never
-  merged automatically**, with the evidence for the suggestion shown. Depends on
-  `OD-2N-1`.
-- **2N-IDENTITY-006:** [PROPOSAL] Merge is a single validated authority path
-  with an explicit preview naming every object that will move, ownership of both
-  subjects proved in the same statement, and a full audit record. Depends on
-  `OD-2N-3`.
-- **2N-IDENTITY-007:** [PROPOSAL] Merge reversibility is whatever `OD-2N-4`
-  signs, and the product **says which** before the user confirms. If it is
-  reversible, undo is registered in the existing handler registry and proved by
-  a test that merges, undoes, and asserts the whole prior state including
-  relations.
+- **2N-IDENTITY-002:** [OBLIGATION] Identity for a person **stays
+  name-uniqueness** this phase (`OD-2N-1` **option A**). **No canonical-identity
+  pointer is added**, and the product's own words say so rather than implying a
+  stronger model.
+- **2N-IDENTITY-003:** [OBLIGATION] Projects follow the same identity principle
+  (`OD-2N-2` **option A**), so the product carries one identity model and not
+  two.
+- **2N-IDENTITY-004:** [OBLIGATION] **`entity_aliases` gains its first
+  reader.** A known nickname resolves to the person it names, in entity
+  resolution and in search. Signed by `OD-2N-1` **option A**; **no migration** —
+  the table, its policies and its grants already exist.
+- **2N-IDENTITY-005:** [BY-RULE] Automatic duplicate surfacing **is not built**.
+  Under `OD-2N-3` **option A** there is no merge, so a surfaced duplicate would
+  be an item with **no available action** — which `2N-CONFLICT-005` refuses by
+  rule. Closes `not-built-by-rule`; destination: a future identity phase, with
+  `OD-2N-1` option B and `OD-2N-3` option B as its gate.
+- **2N-IDENTITY-006:** [BY-RULE] **Merge is not built** (`OD-2N-3` **option
+  A**). No automatic suggestion, no merge RPC, no silent relinking of relations.
+  Closes `not-built-by-rule` — **never `partial`**, because nothing of it is
+  built. Destination: a future identity phase.
+- **2N-IDENTITY-007:** [BY-RULE] Merge reversibility is **decided in advance for
+  a future phase** (`OD-2N-4` **option A, conditional**): if merge is ever
+  authorized it must be reversible, with a complete preview, explicit
+  confirmation, a registered undo and a proof against a **populated** fixture.
+  Recorded so a later phase inherits the contract instead of re-deciding it
+  under pressure. Nothing is implemented here; closes `not-built-by-rule`.
 - **2N-IDENTITY-008:** [OBLIGATION] **No inference may create a persisted
-  identity.** Extraction may propose; only a user act may create. This holds
-  whether or not any other requirement in this family is signed.
+  identity.** Extraction may propose; only a user act may create.
+- **2N-IDENTITY-009:** [OBLIGATION] **An alias is owner-authored.** No
+  inference, extraction or import creates one; each is owner-scoped, carries its
+  validity window, and is correctable and removable through an existing
+  authority path. Reading an alias never widens what a query may return beyond
+  what the owner already owns.
 
 ## 8. What the Brain knows — `2N-KNOWS`
 
@@ -175,36 +204,66 @@ is not complete.
 - **2N-CORRECT-001:** [BASELINE] Correction of a memory and of an
   interpretation continues to run through the existing validated authority paths,
   audited.
-- **2N-CORRECT-002:** [PROPOSAL] The vocabulary is decided and implemented as
-  decided: what **suppress**, **archive** and **remove** each mean, and which
-  exist. Depends on `OD-2N-6`.
-- **2N-CORRECT-003:** [OBLIGATION] Whatever "no longer used" comes to mean, it
-  is enforced **where the retrieval bound is applied**, so a retired memory
-  neither reaches the process nor displaces a live one. Proved by a test that
-  asserts eviction from retrieval, not absence from a citation list.
-- **2N-CORRECT-004:** [PROPOSAL] Deletion, if authorized, propagates across an
-  **enumerated** set of referencing tables, transactionally, and the enumeration
-  is asserted by test rather than described in prose. Depends on `OD-2N-11`.
-- **2N-CORRECT-005:** [PROPOSAL] Deletion, if authorized, is irreversible and
-  therefore explicitly confirmed; if it is reversible it has a real, tested
-  undo. It cannot be both unstated and performed. Depends on `OD-2N-11`.
+- **2N-CORRECT-002:** [OBLIGATION] The memory vocabulary is exactly **`active`
+  and `archived`** (`OD-2N-6` **option A**). **No `suppressed` column.** Archive
+  is **not** a hard delete and is never described as one, and **correcting stays
+  distinct from archiving** — a correction changes what a memory says, archiving
+  changes whether it is in force.
+- **2N-CORRECT-003:** [OBLIGATION] An archived memory **genuinely stops
+  participating in retrieval**. Enforced **where the retrieval bound is
+  applied**, so it neither reaches the process nor displaces a live memory.
+  Hiding it at presentation is explicitly refused. Proved by a test that asserts
+  **eviction from retrieval**, not absence from a citation list. Migration
+  **M1**.
+- **2N-CORRECT-004:** [OBLIGATION] Deletion of a person, a project and a memory
+  propagates across an **enumerated** set of referencing tables,
+  transactionally, and the enumeration is **asserted by test** rather than
+  described in prose. Signed by `OD-2N-11` **option B**. Migration **M3**.
+- **2N-CORRECT-005:** [OBLIGATION] Deletion carries an **explicit confirmation**
+  and a **registered undo or compensation**. The product says which it is before
+  the user confirms; it may not be both unstated and performed.
 - **2N-CORRECT-006:** [OBLIGATION] Every correction, suppression, archival and
   removal is auditable: actor, source, reason, target, time and resulting
   state.
 - **2N-CORRECT-007:** [OBLIGATION] Undo targets recorded ids, never re-resolved
   names.
 - **2N-CORRECT-008:** [OBLIGATION] No correction path is a direct client write.
+- **2N-CORRECT-009:** [OBLIGATION] Deletion runs through **one validated,
+  owner-scoped authority path**. **No client-side multi-delete** — a sequence of
+  client statements is not a transaction, and it is exactly how partial deletion
+  happens.
+- **2N-CORRECT-010:** [OBLIGATION] Deletion is preceded by a **preview that
+  enumerates the consequences by type** — which relations, associations, linked
+  files, tasks and memories are affected and how. The preview is **never an
+  authorization**: the applying statement re-validates ownership and
+  preconditions atomically.
+- **2N-CORRECT-011:** [OBLIGATION] Deletion **removes the object from
+  retrieval** in the same transactional unit that removes it from its table. A
+  deleted object that is still retrievable is a failed deletion, not a delayed
+  one.
+- **2N-CORRECT-012:** [OBLIGATION] **No partial deletion and no soft delete
+  presented as removal.** A deletion that cannot complete fails whole and
+  changes nothing. If the product retains anything after a deletion, it says so
+  in the preview and calls it retention, not removal.
+- **2N-CORRECT-013:** [OBLIGATION] **A propagation that cannot be truthfully
+  undone is a stop condition.** The phase does not ship a smaller undo that
+  claims more than it restores; it stops and returns the case to the owner. The
+  per-type consequences are confirmed by the slice's re-audit **before**
+  implementation.
 
 ## 10. Conflicts — `2N-CONFLICT`
 
 - **2N-CONFLICT-001:** [OBLIGATION] The phase enumerates which conflicts are
   **deterministically detectable from the schema as it stands**, and declares
   the rest out of scope by name rather than leaving them implied.
-- **2N-CONFLICT-002:** [PROPOSAL] Detected conflicts are represented without
-  choosing a winner: both claims, both sources, no implicit precedence by
-  recency, confidence or similarity. Depends on `OD-2N-7`.
-- **2N-CONFLICT-003:** [PROPOSAL] Resolution is an explicit user act through an
-  authority path that already exists, and it is audited. Depends on `OD-2N-7`.
+- **2N-CONFLICT-002:** [OBLIGATION] Conflicts are **derived at read time from
+  existing data** (`OD-2N-7` **option A**) and represented without choosing a
+  winner: both claims, both sources, both validity windows, and **no implicit
+  precedence** by recency, confidence or similarity. **No conflict table and no
+  persisted conflict lifecycle. No migration.**
+- **2N-CONFLICT-003:** [OBLIGATION] Resolution is an explicit user act through
+  an authority path that already exists, and it is audited. Where an action
+  exists, the conflict routes into "Precisa de você".
 - **2N-CONFLICT-004:** [OBLIGATION] An unresolved conflict remains **visibly
   unresolved**; nothing disappears because it could not be decided.
 - **2N-CONFLICT-005:** [OBLIGATION] Nothing enters "Precisa de você" that the
@@ -233,8 +292,25 @@ is not complete.
   the classification would mask.
 - **2N-FILES-007:** [OBLIGATION] Recovery from a processing failure is reachable
   from wherever the failure is shown.
-- **2N-FILES-008:** [PROPOSAL] The library's scope beyond the above is whatever
-  `OD-2N-9` signs, and nothing more.
+- **2N-FILES-008:** [OBLIGATION] The library is **genuinely more useful**
+  (`OD-2N-9` **option B**): files linked to people and projects, provenance,
+  processing states, failure recovery, classification, filters and richer
+  discovery, with sensitivity handled throughout. **No new migration** —
+  `entity_attachments` already exists, is owner-scoped and is trigger-validated.
+- **2N-FILES-009:** [OBLIGATION] The link is navigable **in both directions**: a
+  file reached from a person or project, and the people and projects reached
+  from a file.
+- **2N-FILES-010:** [OBLIGATION] Files can be **classified and filtered** over
+  what the owner owns — by processing state, by kind, by linked entity, by
+  period — with every filtered list obeying `2N-PRIVACY-004`, so a count is
+  never an oracle for what a filter hid.
+- **2N-FILES-011:** [OBLIGATION] Discovery does **not duplicate global search**
+  and the library does **not become a second storage system**. Where the answer
+  is a search, the library links to search rather than reimplementing it.
+- **2N-FILES-012:** [OBLIGATION] The family ships with **no migration**. If the
+  slice's re-audit proves a material need incompatible with the budget, that is
+  a **stop condition and an owner decision**, never a quiet reallocation from
+  M1, M2 or M3.
 
 ## 12. Relations and the graph — `2N-RELATION`
 
@@ -244,23 +320,41 @@ is not complete.
 - **2N-RELATION-002:** [OBLIGATION] Every relation the product **renders**
   states its origin: authored by the user, or derived — and if derived, from
   what.
-- **2N-RELATION-003:** [PROPOSAL] Whether an inferred relation may be persisted
-  at all, and with what provenance, is decided and implemented as decided.
-  Depends on `OD-2N-8`.
+- **2N-RELATION-003:** [OBLIGATION] **Only owner-authored relations persist**
+  (`OD-2N-8` **option A**). Extraction may produce a **proposal**, and a
+  proposal is not a relation: nothing inferred is persisted automatically.
+  **No relation-provenance migration.**
 - **2N-RELATION-004:** [OBLIGATION] A relation can be corrected and ended
   through an existing authority path, and the change is audited.
 - **2N-RELATION-005:** [OBLIGATION] Confidence is never rendered as certainty,
   and a bare number is never shown as a fact.
-- **2N-RELATION-006:** [PROPOSAL] The graph, if built, is **secondary**: it
-  never replaces search, lists or contextual pages, every edge is traceable to a
-  source, and no layout, cluster or centrality is presented as meaning. Depends
-  on `OD-2N-10`.
-- **2N-RELATION-007:** [PROPOSAL] Every graph affordance has a **non-graph
-  equivalent** that is not a degraded fallback — reachable by keyboard, usable
-  by a screen reader, and complete. Depends on `OD-2N-10`.
-- **2N-RELATION-008:** [OBLIGATION] If `OD-2N-10` does not authorize a graph,
-  the family closes `not-built-by-rule` against that signature, with the
-  destination named, and never as a partial.
+- **2N-RELATION-006:** [OBLIGATION] The graph is **secondary** (`OD-2N-10`
+  **option B**): it never replaces search, lists or contextual pages, and it is
+  never primary navigation. It draws **only** authorized persisted relations —
+  so under `2N-RELATION-003` **no unconfirmed inferred relation can appear in
+  it**. **No additional migration.**
+- **2N-RELATION-007:** [OBLIGATION] Every graph affordance has a **complete
+  text/list equivalent** that is **not a degraded version** — reachable by
+  keyboard, usable by a screen reader, and carrying the same information.
+- **2N-RELATION-008:** [OBLIGATION] Existing relation rows are presented as
+  **owner-authored**, without inventing retroactive provenance. *(Restated: this
+  identifier previously carried the clause describing how the family would close
+  if a graph were not authorized. `OD-2N-10` **option B** authorized one, so the
+  identifier now carries the obligation that authorization created. Narrowing an
+  unsigned requirement to its signature is not a scope change; inventing a new
+  id for the same obligation would have been.)*
+- **2N-RELATION-009:** [OBLIGATION] **Every edge is explainable.** Opening one
+  says what it asserts and where it came from; where *"you told me"* is the only
+  truth available, that is what it says, and it is not dressed up as evidence.
+- **2N-RELATION-010:** [OBLIGATION] **No meaning is attributed to position,
+  distance, cluster or centrality**, and no numeric confidence is rendered as
+  certainty. The graph presents relations, never conclusions drawn from its own
+  layout.
+- **2N-RELATION-011:** [OBLIGATION] If the graph cannot satisfy
+  `2N-RELATION-006…010` within the budget, the work **stops and proposes a
+  reduction**. A decorative or misleading graph is refused outright — under
+  `OD-2N-10` the authorization is a contract, and a graph that fails it is not a
+  smaller success.
 
 ## 13. Cross-cutting families
 
@@ -282,9 +376,13 @@ is not complete.
 
 ### 13.2 Privacy — `2N-PRIVACY`
 
-- **2N-PRIVACY-001:** [OBLIGATION] The contextual surfaces join
-  `GOVERNED_SURFACES` in the same change that ships their first governed
-  consumer, and no surface tests a classification literal on its own.
+- **2N-PRIVACY-001:** [OBLIGATION] The contextual surfaces — **person, project,
+  memory, file, and relation/graph wherever it renders information derived from
+  those sources** — join `GOVERNED_SURFACES` in the same change that ships their
+  first governed consumer, and no surface tests a classification literal on its
+  own (`OD-2N-12` **option A**). **This requirement blocks any contextual page
+  that keeps rendering raw content outside `GOVERNED_SURFACES`.** No new
+  persistence; **no migration**.
 - **2N-PRIVACY-002:** [OBLIGATION] Entry content, task titles, memory content
   and file names rendered on a contextual page obey the contract, with the same
   masked-in-place posture and the same local, transient reveal.
@@ -292,14 +390,33 @@ is not complete.
   source record; no classification column is added to `people` or `projects`.
 - **2N-PRIVACY-004:** [OBLIGATION] Counts are computed over everything the user
   owns, masked or not; no affordance reveals how much was hidden.
-- **2N-PRIVACY-005:** [OBLIGATION] An unreadable or absent source resolves to
-  the most protective outcome.
+- **2N-PRIVACY-005:** [OBLIGATION] Classification is **never inferred as
+  `normal` by absence**: an unreadable, foreign or missing source resolves to
+  the **most protective** outcome. Sensitive rows are **masked in position and
+  not dropped** from a list to simplify it, and the reveal is local and
+  explicit.
 - **2N-PRIVACY-006:** [OBLIGATION] Any widening of search in this phase states
   its sensitivity posture explicitly and does not inherit `false` silently;
   ADR-093 is not reopened by accident.
-- **2N-PRIVACY-007:** [PROPOSAL] Whether `people.notes` and project
-  descriptions gain a classification posture is decided rather than assumed.
-  Depends on `OD-2N-12`.
+- **2N-PRIVACY-007:** [OBLIGATION] **An entity's own owner-typed fields —
+  `people.name`, `people.notes`, `projects.name`, `projects.description` — are
+  not source-derived content**, and the fail-closed rule of `2N-PRIVACY-005`
+  governs content whose classification *derives from a source record*, not
+  fields the owner typed directly onto the entity. They are shown.
+
+  > **Interpretation, flagged for owner confirmation.** `OD-2N-12` says
+  > classification is derived from the source and that an absent source resolves
+  > to the most protective case. Read literally across *every* field, that would
+  > mask a person's own **name** on their own page — because a name has no
+  > source entry — which makes the page unusable and is plainly not what the
+  > decision intends. The reading above draws the line at *derived content*
+  > (entry text, task titles, memory bodies, file names and extracted text)
+  > versus *the entity's own identity fields*. **This is an interpretation, not
+  > a signature**, it is the only place where a signed decision needed one, and
+  > it is recorded here rather than buried in an implementation. If the owner
+  > intends `people.notes` — free text about a human being, with no
+  > classification column and today fully searchable — to carry a posture of its
+  > own, that is a further decision and this requirement changes with it.
 
 ### 13.3 Time — `2N-TIME`
 
@@ -312,8 +429,17 @@ is not complete.
 - **2N-TIME-004:** [OBLIGATION] The four `daily-cycle` exemptions are **not
   repaired here**; they are re-stated as residuals with their destination
   unchanged, and the self-cleaning half of that exemption is preserved.
-- **2N-TIME-005:** [PROPOSAL] The disposition of the wider population of
-  zone-less call sites outside both corpora is whatever `OD-2N-13` signs.
+- **2N-TIME-005:** [OBLIGATION] The wider population is **enumerated and its
+  evidence preserved** — **13 zone-less formatter call sites across 12 files**
+  outside the `2M-TIME-007` corpus, or the count this phase's re-audit
+  re-derives, whichever is current. The enumeration is carried in the audit and
+  may not be reduced to a sentence.
+- **2N-TIME-006:** [OBLIGATION] The repair belongs to a **separate timezone
+  initiative** (`OD-2N-13` **option B**), which is a **mandatory dependency
+  completed before slice 2N.1 begins** and which may be planned or executed
+  **only under its own owner authorization**. **2N.0 guards only its own
+  surfaces**; the initiative's roughly 27 call sites are **not absorbed** into
+  it, and no timezone repair happens in the planning PR.
 
 ### 13.4 Mobile — `2N-MOBILE`
 
@@ -339,26 +465,43 @@ is not complete.
 - **2N-ACCESS-005:** [OBLIGATION] Copy exists in both locales for every state in
   §4, through a typed copy module rather than scattered locale ternaries.
 - **2N-ACCESS-006:** [OBLIGATION] **No claim of screen-reader conformance is
-  made without a real screen-reader run.** Absent one, the requirement closes
-  **partial** with a named destination; `2L-ACCESS-008` is re-stated as open.
+  made without a real screen-reader run**, and **no VoiceOver or TalkBack run
+  may be declared as executed** when it was not. Under `OD-2N-16` **option A**
+  no Phase 2N requirement depends on real hardware — mobile is proved in
+  viewports and browsers — so **the absence of a screen-reader run does not
+  block this phase's closeout**. The real run stays an **open residual with a
+  named destination**, alongside `2L-ACCESS-008`, and the phase **does not
+  inherit the push hardware checkpoint**.
 
 ### 13.6 Telemetry — `2N-METRICS`
 
-- **2N-METRICS-001:** [PROPOSAL] Whether this phase declares any product event
-  at all is decided; if it does not, the family closes `not-built-by-rule`
-  against the budget. Depends on `OD-2N-15`.
-- **2N-METRICS-002:** [PROPOSAL] If events are declared, one migration moves the
-  event-name CHECK, the property validator and the surface CHECK **in a single
-  change**, before any producer exists.
-- **2N-METRICS-003:** [OBLIGATION] Every declared event has a stated question,
-  a real producer, a real consumer, a test, and a non-vacuous negative control
-  proved through the real write path.
-- **2N-METRICS-004:** [OBLIGATION] Every event is **content-free**: no names,
-  titles, content, snippets, file names, aliases or free-form properties.
+- **2N-METRICS-001:** [OBLIGATION] The phase declares a **small content-free
+  event set** (`OD-2N-15` **option A**) — small because every event must earn
+  its place, and content-free because this is the phase most likely to put a
+  person's name in a property.
+- **2N-METRICS-002:** [OBLIGATION] Migration **M2** moves the event-name CHECK,
+  `private.validate_product_event_properties` and the surface CHECK **in a
+  single change**, **before any producer exists**, and **only if real producers
+  and consumers are specified and delivered**. If they are not, M2 closes
+  **unspent** and the dependent requirements close `not-built-by-rule` — an
+  unspent allocation is not a defect.
+- **2N-METRICS-003:** [OBLIGATION] **Before M2 exists**, every declared event
+  carries a **product question, a producer, a consumer, a surface, closed
+  properties, a justification, a forbidden-content test, a planned hosted proof,
+  and a cleanup and zero-residue proof**. An event missing any of these is not
+  declared.
+- **2N-METRICS-004:** [OBLIGATION] Every event is **content-free**. Explicitly
+  never recorded: a name, a title, memory content, a filename, a relation, a
+  person, a project, conflict text, a raw error, or **any identifier that
+  functions as content**. Enforced by the property validator, not by convention.
 - **2N-METRICS-005:** [OBLIGATION] No event is declared without a consumer; a
   producer with no reader is refused by the traceability contract.
 - **2N-METRICS-006:** [OBLIGATION] The three vocabulary copies move together or
   the change is rejected.
+- **2N-METRICS-007:** [OBLIGATION] The hosted proof leaves **zero residue**,
+  proved **owner-scoped** rather than by a global count — `product_events` is
+  unreadable to `service_role`, so a global count cannot prove it — and the
+  cleanup is part of the proof rather than a follow-up.
 
 ### 13.7 Security — `2N-SEC`
 
@@ -397,31 +540,36 @@ is not complete.
   started**; the re-audit declares no requirement, creates no governing
   artifact and does not retarget the phase-start guard.
 
-## 14. Open owner decisions
+## 14. Owner decisions — all seventeen SIGNED
 
-**None is signed. Each blocks what it says it blocks and nothing else.** Full
-options, impacts, migrations, risks and recommendations are in
-`PHASE_2N_IMPLEMENTATION_PLAN.md` §7; this is the signable index.
+**All seventeen were signed by ADR-109 on 2026-08-12. None is open.** The
+options the owner **declined** are preserved in
+`PHASE_2N_IMPLEMENTATION_PLAN.md` §7 and in ADR-109 — a decision whose
+alternatives have been deleted is a decision nobody can review.
 
-| | Decision | Blocks |
-| --- | --- | --- |
-| OD-2N-1 | Canonical identity for a person | final planning of the identity slice |
-| OD-2N-2 | Canonical identity for a project | the project slice |
-| OD-2N-3 | Merge authority | implementation of merge |
-| OD-2N-4 | Merge reversibility | implementation of merge |
-| OD-2N-5 | Memory-correction authority | the knows/correct slices |
-| OD-2N-6 | Suppress vs archive vs remove | the correct slice |
-| OD-2N-7 | Conflict representation | the conflict slice |
-| OD-2N-8 | Whether inferred relations may be persisted | the relation slice |
-| OD-2N-9 | File-library scope | the files slice |
-| OD-2N-10 | The graph's role, or none | the graph slice |
-| OD-2N-11 | Deletion propagation, or no deletion | the correct slice |
-| OD-2N-12 | Sensitivity posture for contextual pages and notes | the first contextual slice |
-| OD-2N-13 | Destination of the timezone defects | the foundation slice |
-| OD-2N-14 | Final migration budget | implementation, all slices |
-| OD-2N-15 | Telemetry: any events at all | the telemetry slice |
-| OD-2N-16 | Whether any requirement needs hardware proof | closeout only |
-| OD-2N-17 | Relationship to ADR-055 | closeout only |
+| | Decision | Signed | What it means here |
+| --- | --- | --- | --- |
+| OD-2N-1 | Person identity | **A** | name-uniqueness stays; `entity_aliases` gains its first reader; no canonical pointer; no migration |
+| OD-2N-2 | Project identity | **A** | projects mirror people; one identity model, not two |
+| OD-2N-3 | Merge | **A** | **not built**; `2N-IDENTITY-005…007` close `not-built-by-rule` |
+| OD-2N-4 | Merge reversibility | **A, conditional** | contract fixed for a future phase; nothing implemented now |
+| OD-2N-5 | Memory correction | **A** | reuse `updateMemory`, `setMemoryLifecycle`; no second path, no supersession RPC |
+| OD-2N-6 | Memory states | **A** | `active`/`archived` only; archiving must truly leave retrieval; no `suppressed` column |
+| OD-2N-7 | Conflicts | **A** | derived at read time; both claims; no table, no lifecycle, no migration |
+| OD-2N-8 | Inferred relations | **A** | only owner-authored relations persist; a proposal is not a relation |
+| OD-2N-9 | File library | **B** | the larger library — links both ways, classification, filters, discovery — **with no migration** |
+| OD-2N-10 | Graph | **B** | secondary graph under a contract that can refuse it; complete non-graph equivalent |
+| OD-2N-11 | Deletion | **B** | transactional deletion of person, project and memory; migration **M3** |
+| OD-2N-12 | Sensitivity | **A** | contextual surfaces join the contract; derived, fail-closed, masked in place; no migration |
+| OD-2N-13 | Timezone | **B** | separate initiative, **mandatory dependency before 2N.1**; not repaired here |
+| OD-2N-14 | Migration budget | **B** | **3 allocated · obligation ZERO · non-transferable**; a fourth is a stop condition |
+| OD-2N-15 | Telemetry | **A** | a small content-free set, fully specified before M2 |
+| OD-2N-16 | Hardware | **A** | nothing here depends on real hardware; absence does not block closeout |
+| OD-2N-17 | ADR-055 | **A** | untouched; expiry 2026-10-27 stands |
+
+**One interpretation was required and is flagged rather than absorbed**:
+`2N-PRIVACY-007` explains how `OD-2N-12`'s fail-closed rule applies to an
+entity's own owner-typed fields, and asks the owner to confirm it.
 
 ## 15. Dependencies and residuals
 
