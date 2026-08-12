@@ -6,9 +6,10 @@ is mechanically forbidden from claiming. Its enforcement lives in
 implementation is authorized — in a generated matrix that may not be typed by
 hand.
 
-The phase is authorized for **planning only** (ADR-108). Several refusals below
-therefore have two forms: what they refuse **now**, during planning, and what
-they will refuse **at closeout**. The planning half is live today.
+The phase is authorized for **planning only** (ADR-108), with all seventeen
+decisions **signed** (ADR-109). Several refusals below therefore have two forms:
+what they refuse **now**, during planning, and what they will refuse **at
+closeout**. The planning half is live today.
 
 ---
 
@@ -33,8 +34,15 @@ set passes trivially and is how a corpus scan dies unnoticed.
 
 **R-4 — No migration may exist.**
 No file in `supabase/migrations/` may be attributable to this phase during
-planning. The budget is `ceiling four · obligation zero · zero spent · none
-created`, and any document stating otherwise is refused.
+planning. The budget is `3 allocated · obligation zero · 0 spent · none
+created` (`OD-2N-14` B), and any document stating otherwise is refused. **An
+allocation is a destination, not a permission.**
+
+**R-4b — A signed decision may not be silently re-decided.**
+All seventeen are signed. A document that reopens one, softens it, or describes
+it as open is refused. The **declined options must remain visible**: a decision
+whose alternatives have been deleted is a decision nobody can review, so the
+plan's §7 and ADR-109 both keep them.
 
 **R-5 — Implementation may not begin under a planning-only authorization.**
 No acceptance record, no traceability matrix, no closing report and no
@@ -115,8 +123,34 @@ requirement closes **partial** with a named destination — never `pass`.
 Counts are computed over everything the user owns, masked or not.
 
 **R-21 — Deletion that does not propagate is refused.**
-If deletion ships, its propagation set is enumerated per table and asserted by
-test, transactionally, with retrieval eviction in the same unit.
+Deletion is signed (`OD-2N-11` B), so this is now a live obligation rather than
+a conditional. Its propagation set is enumerated **per table** and asserted by
+test, transactionally, with retrieval eviction in the same unit. A **client-side
+multi-delete is refused outright**, and so is a **soft delete presented as
+removal**.
+
+**R-21b — An undo that restores less than it claims is refused.**
+The proof of a deletion's undo is a test against a **populated** fixture — an
+object with linked tasks, memories, files, relations and associations — that
+asserts the **whole** prior state returns. A fixture with one bare row does not
+discharge it. Where a propagation cannot be truthfully undone, the phase
+**stops** (`2N-CORRECT-013`); it may not ship the smaller undo and describe the
+deletion as reversible.
+
+**R-21c — A graph that fails its contract is refused, not shipped smaller.**
+The graph is signed (`OD-2N-10` B) as a contract with a refusal clause. A graph
+without a complete, non-degraded, keyboard- and screen-reader-accessible
+alternative, or one that attributes meaning to position, distance, cluster or
+centrality, or one drawing an edge it cannot explain, fails the authorization
+that permitted it. `2N-RELATION-011` requires stopping and proposing a
+reduction; a decorative version is refused.
+
+**R-21d — A fourth migration is refused.**
+Three are allocated with exclusive destinations: **M1** retrieval,
+**M2** telemetry, **M3** deletion. None may carry another's responsibility, none
+is transferable, and a proven need for a fourth — including one arising from the
+enlarged library or the graph — is a **stop condition and an owner decision**,
+never a reallocation.
 
 **R-22 — ADR-055 may not be quietly discharged.**
 It is restated at close as neither satisfied nor superseded, with its expiry of
@@ -126,6 +160,10 @@ It is restated at close as neither satisfied nor superseded, with its expiry of
 
 It does not classify any requirement — nothing has been executed. It does not
 assert that the four `daily-cycle` timezone exemptions are this phase's to
-repair. It does not reopen ADR-093, ADR-057 or ADR-107. It does not gate signup
-or the rollout, whose gate is stronger and lives elsewhere. And it does not
-treat its own silence as approval of anything.
+repair; `OD-2N-13` **B** put them in a **separate initiative**, which this
+contract requires to be **complete before 2N.1 begins** and does not otherwise
+govern. It does not reopen ADR-093, ADR-057 or ADR-107. It does not gate signup
+or the rollout, whose gate is stronger and lives elsewhere. It does not treat a
+signed decision as an authorization to implement — **ADR-109 signed the
+decisions and authorized no implementation**. And it does not treat its own
+silence as approval of anything.

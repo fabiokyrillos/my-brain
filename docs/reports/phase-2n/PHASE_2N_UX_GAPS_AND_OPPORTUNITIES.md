@@ -214,3 +214,38 @@ all**, and together they cover five of the nine. The migration pressure in this
 phase comes from **G-2**, **G-3** and the persisted-provenance variant of
 **G-4** — which is why the budget proposal is small and destination-bound
 rather than round.
+
+---
+
+## 5. What the owner signed, gap by gap
+
+**Added 2026-08-12, after ADR-109.** The ranking above is unchanged; this is its
+disposition.
+
+| Gap | Signed outcome | Cost |
+| --- | --- | --- |
+| **G-1** privacy broken on a shipped page | **Closed in 2N.0** — `OD-2N-12` **A** | no migration |
+| **G-2** curation degrades answers | **Closed in 2N.3** — `OD-2N-6` **A**, archiving truly leaves retrieval | **M1** |
+| **G-3** nothing can be deleted | **Closed in 2N.3** — `OD-2N-11` **B**, transactional deletion | **M3** |
+| **G-4** unsourced claims shown as facts | **Closed by refusal** — `OD-2N-8` **A**, no persisted inference | no migration |
+| **G-5** one lever, three meanings | **Partly** — `OD-2N-6` **A** keeps two states and no `suppressed` column; "never true" is expressed by **deleting** (G-3) rather than by a third state | covered by M1/M3 |
+| **G-6** silent contradictions | **Closed in 2N.4** — `OD-2N-7` **A**, derived at read time | no migration |
+| **G-7** files unreachable from their subject | **Closed in 2N.5, and enlarged** — `OD-2N-9` **B** | no migration |
+| **G-8** nicknames find nothing | **Closed in 2N.0** — `OD-2N-1`/`OD-2N-2` **A**, first reader for `entity_aliases` | no migration |
+| **G-9** silent truncation | **Closed in 2N.0** | no migration |
+| **G-10** wrong dates | **Sent to a separate initiative** — `OD-2N-13` **B**, a mandatory dependency of 2N.1; **not repaired by Phase 2N** | no migration |
+
+**Every gap is addressed, and seven of the ten cost no schema.** The two
+migrations that close G-2 and G-3 are the two the audit proved could not be
+closed any other way; M2 serves telemetry, which no gap here required.
+
+**One combination is worth stating plainly**, because it is how the phase
+answers G-5 without a third state: the owner declined a `suppressed` column and
+signed deletion instead. "This was never true" is now expressed by **removing**
+the memory — which the product genuinely could not do before — rather than by
+adding a state that would have to be threaded through every read path.
+
+**And one consequence of declining merge is worth naming beside it**: G-8's
+aliases make a duplicate *findable*, and `OD-2N-3` A leaves it *unmergeable*.
+What makes that survivable is G-3: the duplicate cannot be merged, but it can
+now be deleted. The two signatures only cohere when read together.

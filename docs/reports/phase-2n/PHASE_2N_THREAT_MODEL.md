@@ -18,7 +18,7 @@ builds the thing that enables it.
 
 ---
 
-## T-1 — Incorrect identity merge destroys data irreversibly · *Latent*
+## T-1 — Incorrect identity merge destroys data irreversibly · *Out of scope, by signature*
 
 Merging two people relinks tasks, memories, files, relations, mentions and
 aliases. Done wrongly it silently rewrites history, and an unreversible merge is
@@ -30,11 +30,17 @@ will move. It records `before_state` and `after_state` in `undo_operations`
 through the existing handler registry, and its undo is **tested against a
 populated fixture**, not merely registered. Ownership of *both* subjects is
 proved in the same statement. If reversibility cannot be guaranteed, the
-operation is confirmed explicitly as irreversible — and `OD-2N-4` is where that
-is decided, not the implementation.
+operation is confirmed explicitly as irreversible.
 
-**Refused by construction.** No automatic merge. No merge proposed and applied
-in one action. No merge on inference.
+**Closed by signature, not by mitigation.** `OD-2N-3` **A** removed merge from
+Phase 2N entirely, so this threat is **not realisable by anything this phase
+builds**. The mitigations above are preserved deliberately: `OD-2N-4` **A**
+fixed them as the contract a *future* merge must satisfy — reversible, complete
+preview, explicit confirmation, registered undo, **populated-fixture proof** —
+so the next phase inherits them instead of re-deriving them under pressure.
+
+**Refused by construction, then and now.** No automatic merge. No merge proposed
+and applied in one action. No merge on inference.
 
 ## T-2 — Enumerating another owner's person or project · *Mitigated today*
 
@@ -54,11 +60,17 @@ exist" reopens the oracle the page closed.
 `confidence` and **no source**. Anything rendering them states a claim it
 cannot substantiate.
 
-**Mitigations required.** Either every persisted relation carries provenance
-and the surface renders origin and confidence, or inferred relations are not
-persisted at all and every stored relation is owner-authored by construction.
-`OD-2N-8`. What is refused is the third option in force today: persisting a
-confidence and rendering it as a fact.
+**Closed by `OD-2N-8` A.** Inferred relations are **not persisted at all**;
+extraction may produce a proposal, and a proposal is not a relation. Every
+stored relation is owner-authored by construction, and existing rows are
+presented as owner-authored **without inventing retroactive provenance** — the
+honest reading, since the product cannot now discover where they came from.
+The declined alternative — provenance columns — would have cost a migration and
+left every existing row unsourced forever. What stays refused is the third
+option, in force today: persisting a confidence and rendering it as a fact.
+
+**This signature is load-bearing for T-11**: because no inferred edge exists, a
+graph cannot draw one.
 
 ## T-4 — A memory without a source · *Partly live*
 
@@ -87,18 +99,31 @@ slot, and is dropped at presentation. Removal leaves *citation*, not
 nor displaces a live one. A test must prove eviction from retrieval, not merely
 absence from a rendered citation list.
 
-## T-6 — Partial deletion · *Latent*
+## T-6 — Partial deletion · *Latent, and now in scope*
 
-If deletion is built, a person deleted from `people` while
-`entry_entities`, `person_projects`, `entity_attachments`, `entity_tags`,
-`entity_aliases`, `task_people` and `memories.person_id` still reference them
-leaves the product internally inconsistent and the user misinformed.
+**`OD-2N-11` B signed deletion, so this is now the phase's most dangerous
+threat.** A person deleted from `people` while `entry_entities`,
+`person_projects`, `person_contexts`, `person_relationships`,
+`entity_attachments`, `entity_tags`, `entity_aliases`, `task_people` and
+`memories.person_id` still reference them leaves the product internally
+inconsistent and the user misinformed — and unlike every other threat here, the
+damage is not recoverable by reloading the page.
 
 **Mitigations required.** Propagation is enumerated **per table** before the
 first deletion ships, and the enumeration is asserted by test rather than
-described in prose. Deletion is transactional. Retrieval eviction is part of
-the same unit. A deletion that cannot complete fails whole rather than
-half-applying.
+described in prose (`2N-CORRECT-004`). Deletion is transactional through **one**
+validated owner-scoped path (`2N-CORRECT-009`) — never a client-side sequence,
+which the existing direct `delete` grant on every domain table would otherwise
+make trivially available. Retrieval eviction is part of the same unit
+(`2N-CORRECT-011`). A deletion that cannot complete **fails whole** and changes
+nothing (`2N-CORRECT-012`). The preview enumerates consequences by type and is
+**never an authorization** (`2N-CORRECT-010`).
+
+**And the stop condition, which is the part that matters most.** If a
+propagation cannot be **truthfully undone**, the slice stops and returns the
+case to the owner (`2N-CORRECT-013`). The failure this prevents is shipping a
+smaller undo that restores the row and not its relations, while the interface
+says the deletion was reversed.
 
 ## T-7 — Orphaned file · *Partly live*
 
@@ -119,16 +144,22 @@ extracted text with no classification applied.
 **Mitigation required.** Files enter the sensitivity contract in the same change
 that first renders them on a contextual page — never after.
 
-## T-9 — A conflict silently resolved · *Latent*
+## T-9 — A conflict silently resolved · *Latent, and now in scope*
 
 The failure mode of a conflict feature is choosing a winner. If the product
 picks the newer, the more confident or the more similar claim without saying
 so, it has decided something the user believes they decided.
 
-**Mitigations required.** Both claims are shown with their sources. No implicit
-precedence. Resolution is an explicit user act through an existing authority
-path, and it is audited. An unresolvable conflict remains visibly unresolved
-rather than disappearing.
+**Mitigations required.** Both claims are shown with their sources **and their
+validity windows**. No implicit precedence by recency, confidence or similarity.
+Resolution is an explicit user act through an existing authority path, and it is
+audited. An unresolvable conflict remains visibly unresolved rather than
+disappearing.
+
+**`OD-2N-7` A narrows the attack surface by refusing persistence.** Conflicts
+are derived at read time from existing columns — no conflict table, no
+lifecycle — so there is no stored "resolved" flag that could drift from the data
+it summarises, and no queue that can fill faster than it drains.
 
 ## T-10 — A correction written without authority · *Latent*
 
@@ -143,11 +174,19 @@ domains. Consider extending the existing direct-write allowlist mechanism —
 which already holds `tasks` empty and `reminders` at exactly one writer — to
 these tables, so the convention becomes a guard.
 
-## T-11 — The graph as an oracle · *Latent*
+## T-11 — The graph as an oracle · *Latent, and now in scope*
 
-A visual graph invites the reading that its edges are true and its clusters
-mean something. Edges without provenance (T-3) rendered as a diagram are the
-strongest possible presentation of the weakest possible claim.
+**`OD-2N-10` B authorized a graph, so this threat is now realisable by
+something this phase builds.** A visual graph invites the reading that its edges
+are true and its clusters mean something. Edges without provenance rendered as a
+diagram would be the strongest possible presentation of the weakest possible
+claim — which is precisely why the authorization is a **contract with a refusal
+clause** (`2N-RELATION-011`) rather than a permission.
+
+**What makes it acceptable is T-3's signature, not the graph's own design.**
+Under `OD-2N-8` A no inferred relation exists to be drawn, so every edge is one
+the owner authored. A graph authorized *without* that signature would have been
+this threat with no mitigation available.
 
 **Mitigations required.** The graph stays secondary and never replaces search,
 lists or contextual pages. Every edge is explainable and traceable to a source.
@@ -260,32 +299,61 @@ push delivery, and every surface that could notify must be fully usable
 in-app. The traceability contract refuses a close that treats push or Android
 as approved.
 
+## T-22 — An undo that claims more than it restores · *Latent, created by `OD-2N-11` B*
+
+The threat deletion adds that is **not** partial deletion. A deletion completes
+correctly and transactionally; its undo then restores the person row but not
+every association, link and relation the deletion removed — and the interface
+says the deletion was reversed. The user believes their data is back. It is not,
+and they have no reason to check.
+
+This is worse than a missing undo, because a missing undo is visible.
+
+**Mitigations required.** Undo targets **recorded ids**, never re-resolved names
+(`2N-CORRECT-007`). Its proof is a test that deletes an object **with linked
+tasks, memories, files, relations and associations**, undoes, and asserts the
+**whole** prior state — a fixture with one bare row proves nothing. And where a
+propagation cannot be truthfully undone, the phase **stops** rather than shipping
+the smaller undo (`2N-CORRECT-013`). Where undo is genuinely impossible, the
+operation is confirmed as irreversible in the preview and named as such — the
+product may not be silent about which of the two it is.
+
 ---
 
 ## Summary
 
-| Threat | Status today | Needs schema? |
+Statuses reflect the seventeen signatures in ADR-109.
+
+| Threat | Status | Needs schema? |
 | --- | --- | --- |
-| T-1 merge | Latent | Probably |
+| T-1 merge | **Out of scope** — `OD-2N-3` A | No; contract kept for a future phase |
 | T-2 enumeration | Mitigated | No |
-| T-3 unsourced relation | **Live** | Depends on `OD-2N-8` |
+| T-3 unsourced relation | **Live**, closed by `OD-2N-8` A | **No** — persistence refused instead |
 | T-4 sourceless memory | Partly live | No |
-| T-5 removed but retrieved | **Live** | **Yes** |
-| T-6 partial deletion | Latent | Depends on `OD-2N-11` |
+| T-5 removed but retrieved | **Live** | **Yes — M1** |
+| T-6 partial deletion | Latent, **in scope** — `OD-2N-11` B | **Yes — M3** |
 | T-7 orphaned file | Partly live | No |
 | T-8 sensitive file exposed | **Live** | No |
-| T-9 silent resolution | Latent | Probably |
+| T-9 silent resolution | Latent, **in scope** — `OD-2N-7` A | **No** — derived, not persisted |
 | T-10 unauthorized correction | Latent | No |
-| T-11 graph oracle | Latent | No |
+| T-11 graph oracle | Latent, **in scope** — `OD-2N-10` B | **No** — `OD-2N-8` A is the mitigation |
 | T-12 count oracle | Live in shape | No |
 | T-13 search leak | Partly live | No |
-| T-14 timezone | **Live** | No |
+| T-14 timezone | **Live** | No — separate initiative, `OD-2N-13` B |
 | T-15 stale read | Latent | No |
 | T-16 TOCTOU | Latent | No |
 | T-17 wrong undo | Latent | No |
-| T-18 telemetry content | Latent | Yes, if events are declared |
+| T-18 telemetry content | Latent | Yes — M2, if events are delivered |
 | T-19 retention | Live, inherited | No |
-| T-20 account deletion | Mitigated | Only for new tables |
+| T-20 account deletion | Mitigated | Only for new tables; M3 creates none |
 | T-21 push dependency | Latent, forbidden | No |
+| T-22 undo claiming too much | Latent, **created by `OD-2N-11` B** | No, beyond M3 |
 
-**Five threats are live today** and four of the five need no schema to close.
+**Five threats are live today**, and four of the five need no schema to close.
+**The signatures moved three threats into scope** — T-6, T-9 and T-11 — and
+**closed two by refusal rather than by mitigation**: T-1 by declining merge, T-3
+by declining persisted inference. Declining to build something remains the
+cheapest and most complete mitigation available, and this phase used it twice.
+
+**T-6 and T-22 are the phase's sharpest risks**, both created by the same
+signature, and both carry a stop condition rather than a promise.

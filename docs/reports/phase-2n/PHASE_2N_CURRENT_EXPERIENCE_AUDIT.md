@@ -451,6 +451,39 @@ Each was run rather than assumed:
 
 ---
 
+## 6b. What the owner decided about each finding
+
+**Added 2026-08-12, after ADR-109 signed all seventeen decisions.** The findings
+above are **unchanged** — this section records their disposition, so a reader
+can see which were acted on, which were declined, and which were sent elsewhere.
+
+| Finding | Signed disposition |
+| --- | --- |
+| The contextual pages already ship (§2.1, §2.2) | Accepted. The roadmap's construction slices become **hardening** slices |
+| Those pages are outside the sensitivity contract (§2.11) | **Fixed in 2N.0.** `OD-2N-12` **A** — person, project, memory, file and graph join `GOVERNED_SURFACES`; derived, fail-closed, masked in place; **no migration** |
+| Removal leaves citation, not retrieval (§2.3, §2.7) | **Fixed in 2N.3.** `OD-2N-6` **A** requires archiving to genuinely leave retrieval; migration **M1** |
+| No delete path exists at all (§2.10) | **Built in 2N.3.** `OD-2N-11` **B** — transactional deletion of person, project and memory; migration **M3**; enumerated propagation, preview, audit, undo, and a stop condition if a propagation cannot be truthfully undone |
+| `entity_aliases` has no reader (§2.7, §4) | **Switched on in 2N.0.** `OD-2N-1`/`OD-2N-2` **A** — first reader; **no migration** |
+| No merge, split or canonical identity (§2.1, §4) | **Declined.** `OD-2N-3` **A** — no merge this phase; `2N-IDENTITY-005…007` close `not-built-by-rule`. `OD-2N-4` **A** fixes the reversibility contract for a future phase |
+| Relations carry confidence and no source (§2.8, Finding A) | **Closed by refusal.** `OD-2N-8` **A** — inferred relations are never persisted; existing rows are presented as owner-authored **without inventing retroactive provenance**; **no migration** |
+| The timezone defect is larger than four (§3) | **Separate initiative.** `OD-2N-13` **B** — a **mandatory dependency of 2N.1**, separately authorized. **Not repaired by Phase 2N**, and its ~27 call sites are **not absorbed** into 2N.0 |
+| Files unreachable from their subject (§2.5) | **Built in 2N.5**, and larger: `OD-2N-9` **B** adds classification, filters and discovery, **with no migration** |
+| No conflict representation (§2.9) | **Built in 2N.4**, derived at read time: `OD-2N-7` **A** — no conflict table, no lifecycle, **no migration** |
+| No 2N telemetry surface (§2.14) | **Built in 2N.7** if real producers and consumers are delivered: `OD-2N-15` **A**, migration **M2**, else **unspent** |
+| Bounds are silent (§2.1) | **Fixed in 2N.0** |
+| No graph (§2.6) | **Built in 2N.6**, secondary, under a contract that can refuse it: `OD-2N-10` **B**; **no migration**, because `OD-2N-8` A leaves no inferred edge to draw |
+
+**Two findings were closed by declining to build something rather than by
+building a mitigation** — merge and persisted inference. That is the cheapest
+and most complete form of closure available, and this phase used it twice.
+
+**One point in the audit needed an interpretation and did not get a silent
+one.** `OD-2N-12`'s fail-closed rule, read literally over every field, would
+mask a person's own **name** on their own page, because a name has no source
+entry. `2N-PRIVACY-007` records the reading actually intended — the rule governs
+*source-derived content*, not an entity's own owner-typed fields — and **asks
+the owner to confirm it**.
+
 ## 7. Inherited truths, preserved without reclassification
 
 Push is implemented and hosted. Push **fails on the owner's real iPhone with

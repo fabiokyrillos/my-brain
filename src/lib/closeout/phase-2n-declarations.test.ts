@@ -57,22 +57,22 @@ function declaredIds(source: string): string[] {
 }
 
 const ids = declaredIds(read(PRD));
-const TOTAL = 108;
+const TOTAL = 123;
 const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   PERSON: 8,
   PROJECT: 7,
-  IDENTITY: 8,
+  IDENTITY: 9,
   KNOWS: 9,
-  CORRECT: 8,
+  CORRECT: 13,
   CONFLICT: 6,
-  FILES: 8,
-  RELATION: 8,
+  FILES: 12,
+  RELATION: 11,
   PROV: 6,
   PRIVACY: 7,
-  TIME: 5,
+  TIME: 6,
   MOBILE: 4,
   ACCESS: 6,
-  METRICS: 6,
+  METRICS: 7,
   SEC: 6,
   CLOSE: 6,
 };
@@ -164,7 +164,56 @@ describe("Phase 2N governance: the authorization is planning-only and says so", 
   });
 
   it("states in the PRD that implementation is not authorized", () => {
-    expect(read(PRD)).toMatch(/Implementation is not\s+authorized/);
+    // `still` was added when ADR-109 signed the decisions, and the assertion
+    // has to tolerate it without tolerating its absence: signing seventeen
+    // decisions is exactly the moment a package is most likely to start
+    // reading as an authorization to build.
+    expect(read(PRD)).toMatch(/Implementation is (?:still )?not\s+authorized/);
+  });
+
+  it("records ADR-109 as an accepted signing decision that authorizes no implementation", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-109 — The owner signs all seventeen Phase 2N decisions/);
+    const block = decisions.slice(decisions.indexOf("## ADR-109"));
+    const body = block.slice(0, block.indexOf("\n## ") === -1 ? block.length : block.indexOf("\n## "));
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body).toMatch(/authorizes \*\*no implementation\*\*/i);
+    // The property that matters most about this ADR: an allocation is not a
+    // permission. Three migrations are named and none may be created.
+    expect(body).toMatch(/destinations, not permissions/i);
+  });
+
+  it("keeps ADR-108 intact rather than rewritten, and marks what superseded it", () => {
+    // An accepted ADR is not edited into agreement with a later one. ADR-108's
+    // ceiling of four, its seventeen open questions and its recommendations are
+    // the record of what was decided before the owner answered.
+    const decisions = read("docs/DECISIONS.md");
+    const block = decisions.slice(decisions.indexOf("## ADR-108"), decisions.indexOf("## ADR-109"));
+    expect(block).toMatch(/ceiling FOUR/i);
+    expect(block).toMatch(/Superseded in part by ADR-109/);
+    expect(block).toMatch(/is \*\*not rewritten\*\*/);
+  });
+
+  it("carries all seventeen signed decisions in the PRD, each naming what it signed", () => {
+    const prd = read(PRD);
+    for (let n = 1; n <= 17; n += 1) {
+      expect(prd, `OD-2N-${n} is not carried by the PRD`).toMatch(
+        new RegExp(`OD-2N-${n}\\b`),
+      );
+    }
+    // Signed, not open. The word this package must never carry again for these.
+    expect(prd).not.toMatch(/## 14\. Open owner decisions/);
+    expect(prd).toMatch(/all seventeen SIGNED/i);
+  });
+
+  it("keeps the declined options visible rather than deleted", () => {
+    // R-4b. A decision whose alternatives have been deleted is a decision
+    // nobody can review, and the next phase to reopen one needs to see what
+    // was already weighed.
+    const plan = read(PLAN);
+    expect(plan).toMatch(/Declined B:/);
+    expect(plan).toMatch(/Refused C:/);
+    expect(plan).toMatch(/declined options are preserved/i);
   });
 
   it("keeps the successor unnamed by the authorizing heading", () => {
@@ -180,8 +229,8 @@ describe("Phase 2N governance: the authorization is planning-only and says so", 
 });
 
 describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
-  it("states a ceiling of four and an obligation of zero", () => {
-    expect(read(PLAN)).toMatch(/Ceiling FOUR · obligation ZERO · 0 spent · none/);
+  it("states three allocated, obligation zero, none created", () => {
+    expect(read(PLAN)).toMatch(/3 allocated · obligation ZERO · 0 spent · NONE CREATED/);
   });
 
   it("has created no migration attributable to this phase", () => {
@@ -198,13 +247,33 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     // enforce, and "one migration for adjustments" is the specific shape this
     // repository has already paid for twice.
     const plan = read(PLAN);
-    for (const candidate of ["M1", "M2", "M3", "M4"]) {
-      const heading = plan.split("\n").find((line) => line.startsWith(`### ${candidate} —`));
-      expect(heading, `${candidate} has no proposal heading`).toBeDefined();
+    for (const candidate of ["M1", "M2", "M3"]) {
+      const heading = plan.split("\n").find((line) => line.includes(`${candidate} — `) && line.startsWith("### "));
+      expect(heading, `${candidate} has no destination heading`).toBeDefined();
     }
-    expect(plan).toMatch(/exclusively/);
     expect(plan).toMatch(/non-transferable/i);
-    expect(plan).not.toMatch(/migration for adjustments/i);
+    expect(plan).toMatch(/No migration for adjustments/i);
+  });
+
+  it("proves each signed capability needs no further migration", () => {
+    // `OD-2N-14` requires that no fourth need be hidden. The proof is a section
+    // of the plan, and it is asserted to exist and to name each capability that
+    // could plausibly have demanded schema — because "no migration needed" is
+    // the claim most easily asserted and least easily checked.
+    const plan = read(PLAN);
+    const proof = plan.slice(plan.indexOf("### 6.5"));
+    expect(proof, "the no-migration proof section is missing").not.toBe("");
+    for (const capability of ["Aliases", "Sensitivity", "Derived conflicts", "Library option B", "Graph option B"]) {
+      expect(proof, `${capability} is not traced to existing schema`)
+        .toMatch(new RegExp(`${capability}[^\\n]*no migration`, "i"));
+    }
+    expect(proof).toMatch(/No fourth need is hidden/i);
+  });
+
+  it("makes a fourth migration a stop condition rather than a variance", () => {
+    const plan = read(PLAN);
+    expect(plan).toMatch(/fourth is a \*\*stop condition\*\*|fourth is a stop condition/i);
+    expect(read(CONTRACT)).toMatch(/A fourth migration is refused/i);
   });
 });
 
