@@ -3660,3 +3660,65 @@ order** — hosted proof, zero-residue proof, and the loop **stops** at
 after the owner's evidence returns, never before.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+## §53 — The loop stops between slices, with 2M.3 and 2M.4a closed (2026-08-12)
+
+**This is a boundary, not a checkpoint.** The owner's hardware checkpoint comes
+after 2M.4b; this is the *other* stopping rule the brief names — finish the unit,
+get CI green on the merge SHA, record a complete handoff, and stop **between**
+slices rather than part-way through one.
+
+### The two units this stretch closed
+
+| unit | PR | head SHA | merge SHA | CI on the exact merge SHA |
+|---|---|---|---|---|
+| slice **2M.3** | #180 | `015bfd7` | **`c48f703`** | **green, 3/3 jobs** |
+| slice **2M.4a** | #181 | `5c3e77d` | **`98898f4`** | **green, 3/3 jobs** |
+
+**Zero migrations were spent in either.** The budget is still
+**`3 allocated · 2 spent`**, all three non-transferable. **Hosted parity is
+`202608110090`.** `202608110091` is merged and has **not** been applied to the
+hosted project. Signup closed, rollout gate untouched, **Phase 2N not started**,
+A13 not retargeted.
+
+### Why the loop stops here rather than starting 2M.4b
+
+2M.4b is the largest remaining unit by a wide margin — **migration 2** (consent,
+subscription, delivery state, revocation, retention, deduplication, RLS, grants,
+fail-closed functions, content-free audit), a VAPID sender, two service-worker
+handlers, the settings controls the five 2M.4a partials are routed to, a pgTAP
+suite, **two migrations deployed in a fixed order**, hosted proof and a
+zero-residue proof.
+
+Starting it with the context left would have meant stopping part-way through a
+**migration**, which is the one artifact this phase cannot leave half-written:
+migrations are append-only, and a partial one in the tree is a stop condition
+somebody else has to resolve. So the loop stops at the boundary the brief names.
+
+### One thing the next session should confirm with the owner before deploying
+
+**Migration 2 needs a VAPID key pair, and the private half must live only in the
+server environment.** Generating the pair costs nothing and needs no provider
+account, but **setting `VAPID_PRIVATE_KEY` on the hosted environment is an owner
+action**, and `2M-NOTIFY-011` requires the private key never to reach any client.
+That is not a stop condition for *building* 2M.4b — the sender can be built and
+tested against a locally generated pair — but it **is** one for deploying it, and
+it should be raised before the deployment step rather than discovered inside it.
+
+### Two silences that have now each cost a round trip
+
+1. **Windows hides guard tests.** Three test *files* fail to parse locally on
+   this machine — the recorded shebang baseline — and they are green in CI.
+2. **`CI` gates a guard.** `phase-2f-traceability.test.ts`'s stale-deployment
+   sweep runs only when `CI` is set, so a local `npm test` runs it vacuously. It
+   caught a `STATE.md` line that read as claiming a *deployed* migration was
+   undeployed. **Run `CI=1 npm test` before pushing.**
+
+### The resumption prompt is in the report
+
+The next session begins with a preflight against `98898f4`, a re-audit of 2M.4b,
+and the migration-2 scope check the brief requires **before** the file is
+created. Nothing about 2M.5, the closeout or Phase 2N may begin before the
+owner's hardware evidence returns.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
