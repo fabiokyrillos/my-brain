@@ -4064,3 +4064,87 @@ variable is still visible to it.
 `pair: "consistent"` is a device run the right next step. **2M.5 not started,
 Phase 2M not closed, Phase 2N not started, A13 not retargeted. No migration was
 created; the budget stays `3 allocated · 3 spent`.**
+
+---
+
+## §58 — Phase 2M closes honestly, and its closeout slice found two surfaces that had never rendered (2026-08-12)
+
+**Phase 2M is COMPLETE.** 94 requirements: **89 built · 4 partial · 1
+not-built-by-rule · 0 undelivered**, generated from the slice records and never
+typed. Budget closes at **`3 allocated · 3 spent`**; zero migrations in the
+closeout. Hosted parity read live and read-only: **`202608120092` across 92
+migrations, local = remote on every row.** Signup closed; rollout gate untouched
+at **25 pass · 3 fail · 2 owner-signature**. Merged as PR #189 at **`71c258d`**
+with **CI green 3/3 on that exact SHA**.
+
+### The sentence the phase must be read with
+
+**Push is implemented and hosted, it fails on the owner's real iPhone with
+`HTTP 403` from Apple Web Push, and it has never been validated on Android.**
+
+The owner's self-check answered `pair: "consistent"`, and the single retest after
+it still answered `unauthorized 403` with no notification arriving. **A consistent
+pair eliminates a key mismatch and explains nothing.** No root cause is asserted
+anywhere in this repository, and the next person should treat every hypothesis in
+`docs/initiatives/push-hardware-validation/` §2 as unproven.
+
+**ADR-107 is an amendment to OD-2M-5's closeout gate and not a success claim.**
+`H-5` is FAILED, Android is NOT EXECUTED, and neither may be deleted,
+reclassified as passing, or discharged by an offline test.
+
+### The finding that mattered most, and it was not push
+
+The closeout slice's declared work was classification. The first thing it did was
+execute the authenticated journey slice 2M.3 said it owed — and that journey
+found that **`/app/reviews` and `/app/calendar/plan` had never rendered at all.**
+Both handed a plain arrow function to a `"use client"` component; React cannot
+serialize a function into the RSC payload, so both routes answered with their
+error boundary from the day they deployed. Measured in a real browser against the
+deployment, with `/app/calendar` beside them as the control that rendered.
+
+**Every component test was correct.** A test mounts the client component directly
+and hands it a function, which is valid there. Both browser lanes compose the
+surfaces with `setContent`, which never runs a server render.
+
+> **A boundary that only exists in production is only tested in production.**
+
+Two slices classified those surfaces `built` on evidence that could not see the
+boundary. Both are re-classified `built` in 2M.5 on evidence that can, and the
+earlier rows are left in place — the history is the contract working.
+
+### Three things worth carrying forward
+
+1. **A guard that fails on correct code is a guard somebody weakens.** The
+   boundary guard's first version scanned whole files and failed immediately on
+   `app/reminders/page.tsx`, which hands two local formatters to a **server**
+   component and works. It resolves the receiving element now.
+2. **An exemption must not outlive its defect.** `2M-TIME-007` found four
+   `daily-cycle` surfaces still formatting instants with no `timeZone`. They were
+   recorded rather than repaired — the repair crosses two routes and ~27 call
+   sites, and a product change inside a closing commit is how a phase's last
+   change becomes its riskiest. The guard names all four, asserts the length, and
+   **asserts each still carries the defect**, so the day one is fixed the guard
+   fails until the name comes out.
+3. **Invert a governance guard, never delete it.** `phase-2m-declarations.test.ts`
+   forbade the matrix and the closing report from existing — right mid-flight,
+   exactly wrong at closeout. It now *requires* both and requires the matrix to be
+   byte-identical to the generator's output, which is stronger than what it
+   replaced, and it changed inside ADR-107's own unit.
+
+### The deployment
+
+Vercel deploys `main` automatically. Both previously-broken routes were probed in
+a real browser after the merge and **render**. No Edge Function was redeployed —
+this slice touched none — and `verify:edge-parity` is green with `send-push`
+deployed 2026-08-12T15:37 ≥ source 15:31.
+
+### THE LOOP STOPS HERE — OWNER DECISIONS REQUIRED
+
+**Phase 2N is NOT started and NOT planned. A13 reports no start signal.** The
+re-audit is `docs/reports/phase-2m/PHASE_2M_SUCCESSOR_REAUDIT.md` and it asks
+four questions without preferring an answer: whether the successor starts at all,
+whether push's device validation is a precondition, whether the Android gap is
+accepted or funded, and whether the successor gets a migration budget.
+
+**No migration was created. No push was sent. No key was changed. Signup stays
+closed and the rollout gate stays untouched.**
