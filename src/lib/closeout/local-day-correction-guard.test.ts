@@ -192,6 +192,28 @@ export const OPEN_OCCURRENCES: readonly Exemption[] = [
   { file: "src/features/task-commands/detail-actions.ts", family: "zone-round-trip", count: 1, unit: 4 },
 ];
 
+/**
+ * Every module that decides for itself whether a zone is usable.
+ *
+ * The census set out to count formatters and found this instead: **four**
+ * private answers to "is this zone usable", outside the contract. Three are
+ * byte-identical `isValidTimeZone` predicates; the fourth,
+ * `resolveProfileTimezone`, is a *resolver* with its own hardcoded default
+ * string, and it is looser than all of them.
+ *
+ * They agree about `America/Sao_Paulo` and disagree about everything that
+ * matters, which is why nobody noticed. Unit 4 replaces all four with
+ * `resolveOwnerTimeZone`, and this list empties with them — recorded here rather
+ * than promised in prose, because a consolidation nothing asserts is a
+ * consolidation that half-happens.
+ */
+export const DUPLICATE_ZONE_RESOLVERS: readonly { readonly file: string; readonly symbol: string }[] = [
+  { file: "src/features/operations/actions.ts", symbol: "isValidTimeZone" },
+  { file: "src/features/task-commands/actions.ts", symbol: "isValidTimeZone" },
+  { file: "src/features/task-commands/detail-actions.ts", symbol: "isValidTimeZone" },
+  { file: "src/features/daily-cycle/review-projection.ts", symbol: "resolveProfileTimezone" },
+];
+
 function walk(directory: string, found: string[] = []): string[] {
   for (const entry of readdirSync(directory)) {
     const path = join(directory, entry);
@@ -290,6 +312,54 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     expect(byFamily("utc-day-slice")).toBe(4);
     expect(byFamily("zone-round-trip")).toBe(3);
     expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's whole debt").toBe(31);
+  });
+});
+
+describe("LDC-CONTRACT-001: the zone is decided in one place, and the copies are counted", () => {
+  it("finds no zone predicate this list does not already name", () => {
+    /*
+     * Tree-wide, so a fifth private answer cannot appear while the four known
+     * ones are being removed. The contract's own `isSupportedTimeZone` and the
+     * resolver built on it are the two allowed to exist.
+     */
+    const declaration = /(?:function|const)\s+(\w*(?:TimeZone|Timezone|TimeZones)\w*)\s*[(=]/g;
+    const found: string[] = [];
+    for (const file of corpus) {
+      for (const match of read(file).matchAll(declaration)) {
+        const symbol = match[1];
+        if (!/valid|supported|resolve/i.test(symbol)) continue;
+        found.push(`${file}::${symbol}`);
+      }
+    }
+    const expected = DUPLICATE_ZONE_RESOLVERS.map((entry) => `${entry.file}::${entry.symbol}`);
+    expect(
+      found.sort(),
+      "a zone predicate appeared or disappeared — update DUPLICATE_ZONE_RESOLVERS deliberately",
+    ).toEqual(expected.sort());
+  });
+
+  it("keeps each duplicate listed exactly as long as it exists", () => {
+    // The same two-directional honesty the occurrence list has: a copy that is
+    // gone fails here until its row is deleted.
+    for (const entry of DUPLICATE_ZONE_RESOLVERS) {
+      expect(
+        read(entry.file),
+        `${entry.symbol} is gone from ${entry.file} — remove the row from DUPLICATE_ZONE_RESOLVERS`,
+      ).toMatch(new RegExp(`function\\s+${entry.symbol}\\b`));
+    }
+    expect(DUPLICATE_ZONE_RESOLVERS.length, "four copies, until Unit 4 removes them").toBe(4);
+  });
+
+  it("has the fourth copy be the loosest, which is why counting them mattered", () => {
+    // `resolveProfileTimezone` is not an `isValidTimeZone` clone: it is a
+    // resolver with its own hardcoded default, and it accepts a bare
+    // abbreviation that carries no DST rule. Asserted so the difference is not
+    // rediscovered during the consolidation.
+    const source = read("src/features/daily-cycle/review-projection.ts");
+    expect(source).toMatch(/return "America\/Sao_Paulo";/);
+    expect(source, "it validates by construction alone, with no IANA-shape rule").not.toMatch(
+      /includes\("\/"\)/,
+    );
   });
 });
 

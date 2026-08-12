@@ -112,7 +112,35 @@ different operation and is not matched by the day-shaped pattern.
 
 ---
 
-## 4. Stop conditions — none encountered
+## 4. Four private answers to "is this zone usable"
+
+The census set out to count formatters and found this instead. Outside the contract there are
+**four** independent decisions about whether a stored zone can be used:
+
+| where | symbol | shape | rule |
+|---|---|---|---|
+| `features/operations/actions.ts:273` | `isValidTimeZone` | predicate | `Intl.DateTimeFormat` constructs ⇒ valid |
+| `features/task-commands/actions.ts:198` | `isValidTimeZone` | predicate | byte-identical |
+| `features/task-commands/detail-actions.ts:123` | `isValidTimeZone` | predicate | byte-identical |
+| `features/daily-cycle/review-projection.ts:374` | `resolveProfileTimezone` | **resolver** | same check, **plus `"America/Sao_Paulo"` as a literal** |
+| `lib/time/local-day.ts:146` | `isSupportedTimeZone` | the contract | **and** `"/"` or `"UTC"` |
+
+All four accept a value the contract refuses — a bare `EST` constructs happily and carries no DST
+rule, so a day computed in it is silently fixed-offset. They agree about `America/Sao_Paulo` and
+disagree only about the values that would hurt, which is why nothing noticed.
+
+The fourth is the one worth naming separately: `resolveProfileTimezone` is **not** an
+`isValidTimeZone` clone. It already does the job `resolveOwnerTimeZone` does, with a second
+declaration of the default written into it, and **a census of formatters would have walked straight
+past it**. It is recorded in `DUPLICATE_ZONE_RESOLVERS`, which is enumerated tree-wide so a fifth
+cannot appear while the four are being removed, and each row must still exist until Unit 4 deletes
+it.
+
+One consequence for Unit 2, recorded here so it is not rediscovered: `EntryReviewProjection` already
+carries `timezone`, so the entry-detail page needs **no new query** to repair `entry-review.tsx` and
+`technical-details.tsx` — the zone is already loaded and already on the projection.
+
+## 5. Stop conditions — none encountered
 
 No migration, column, schema, RLS, grant, policy or RPC change is required by any row above. Every
 fix is at the read, render or compute boundary. No stored value is rewritten, no data is

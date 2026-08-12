@@ -47,14 +47,15 @@ Fixed before any call site is touched, and reused rather than restated per surfa
 7. **23-, 24- and 25-hour days stay correct.**
 8. **A nonexistent or repeated midnight never moves an item to another day.**
 9. **pt-BR and en agree on the day** and differ only in presentation.
-10. **The contract is reused, never copied.** Three byte-identical `isValidTimeZone` copies existed;
-    they become one.
+10. **The contract is reused, never copied.** **Four** private answers to "is this zone usable"
+    existed outside the contract — three byte-identical `isValidTimeZone` predicates and
+    `resolveProfileTimezone`, a resolver carrying its own hardcoded default string. They become one.
 
 ## 4. Requirements
 
 | id | requirement | unit |
 |---|---|---|
-| `LDC-CONTRACT-001` | One resolver for the owner's zone; the three duplicate copies are removed | 1, 4 |
+| `LDC-CONTRACT-001` | One resolver for the owner's zone; the **four** duplicate copies are removed, and a tree-wide census refuses a fifth | 1, 4 |
 | `LDC-CONTRACT-002` | The locale changes the words, never the day; proved at a day boundary in both directions | 1 |
 | `LDC-GUARD-001` | A tree-wide guard over `src/`, four families, exact-count self-cleaning occurrences, mutation controls | 1 |
 | `LDC-GUARD-002` | The Phase 2M carry-past-close list reaches **empty** and its liveness assertion is retired with it | 2 |

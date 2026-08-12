@@ -9,19 +9,26 @@
  * day exactly when it matters. That refusal is correct, and it left every caller
  * to resolve the owner's zone itself.
  *
- * They did, and by the time this initiative ran the census there were **three
- * byte-identical copies** of the check —
+ * They did, and by the time this initiative ran the census there were **four
+ * private answers** to the question —
  *
- * | Where | Rule |
- * |---|---|
- * | `features/operations/actions.ts` | `Intl.DateTimeFormat` constructs ⇒ valid |
- * | `features/task-commands/actions.ts` | identical |
- * | `features/task-commands/detail-actions.ts` | identical |
- * | `lib/time/local-day.ts` (`isSupportedTimeZone`) | **and** `"/"` or `"UTC"` |
+ * | Where | Rule | Shape |
+ * |---|---|---|
+ * | `features/operations/actions.ts` | `Intl.DateTimeFormat` constructs ⇒ valid | predicate |
+ * | `features/task-commands/actions.ts` | identical | predicate |
+ * | `features/task-commands/detail-actions.ts` | identical | predicate |
+ * | `features/daily-cycle/review-projection.ts` | same, **plus its own hardcoded default string** | resolver |
+ * | `lib/time/local-day.ts` (`isSupportedTimeZone`) | **and** `"/"` or `"UTC"` | the contract |
  *
- * — three of which accepted a value the fourth refused. Nothing had noticed,
- * because all four agree about `America/Sao_Paulo` and disagree only about the
+ * — four of which accept a value the contract refuses. Nothing had noticed,
+ * because all five agree about `America/Sao_Paulo` and disagree only about the
  * values that would hurt.
+ *
+ * The fourth is the one worth naming. `resolveProfileTimezone` is not an
+ * `isValidTimeZone` clone: it is already a *resolver*, with `"America/Sao_Paulo"`
+ * written into it as a literal rather than read from `defaultAgentPreferences`.
+ * A second declaration of the default is a second thing to change, and it is
+ * exactly the kind of copy a census of *formatters* would have walked past.
  *
  * ## The narrowing, stated rather than slipped in
  *
