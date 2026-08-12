@@ -76,3 +76,62 @@ describe("2M-TIME-006: one presentation, one output", () => {
     }
   });
 });
+
+describe("LDC-CONTRACT-002: the locale changes the words, never the day", () => {
+  /*
+   * The property the initiative had to state before touching seventeen call
+   * sites, because almost every one of them passes `locale` and none of them
+   * passed a zone: **the locale is presentation and the zone is meaning**. A
+   * surface that switched languages and moved an item to another day would be
+   * answering a different question in Portuguese than in English.
+   *
+   * Asserted on the instants where it could actually break — inside the last
+   * hour of a local day, where the UTC date and the local date disagree.
+   */
+
+  /** 2026-08-15T02:30Z is still 2026-08-14 in São Paulo (UTC−3). */
+  const AFTER_UTC_MIDNIGHT = "2026-08-15T02:30:00.000Z";
+  /** 2026-08-15T23:30Z is already 2026-08-16 in Sydney (UTC+10). */
+  const BEFORE_UTC_MIDNIGHT = "2026-08-15T23:30:00.000Z";
+
+  /** The numerals a rendering contains, which is the day stripped of language. */
+  const digits = (rendered: string | null) => (rendered ?? "").match(/\d+/g)?.join("-") ?? "";
+
+  it("renders the same calendar day in pt-BR and en, on both sides of UTC midnight", () => {
+    for (const [instant, zone] of [
+      [AFTER_UTC_MIDNIGHT, "America/Sao_Paulo"],
+      [BEFORE_UTC_MIDNIGHT, "Australia/Sydney"],
+      [AFTER_UTC_MIDNIGHT, "Australia/Sydney"],
+      [BEFORE_UTC_MIDNIGHT, "America/Sao_Paulo"],
+    ] as const) {
+      const pt = formatInstant(instant, "day", "pt-BR", zone);
+      const en = formatInstant(instant, "day", "en", zone);
+      expect(digits(pt), `${instant} in ${zone}`).toBe(digits(en));
+      // And the words genuinely differ, or the assertion above would be vacuous
+      // — two identical strings agree about everything, including nothing.
+      expect(pt).not.toBe(en);
+    }
+  });
+
+  it("is the zone, not the locale, that moves an instant to another day", () => {
+    // One instant, one locale, two zones: different days. The same instant, one
+    // zone, two locales: the same day. That is the whole contract in two lines.
+    const saoPaulo = formatInstant(BEFORE_UTC_MIDNIGHT, "day", "pt-BR", "America/Sao_Paulo");
+    const sydney = formatInstant(BEFORE_UTC_MIDNIGHT, "day", "pt-BR", "Australia/Sydney");
+    expect(digits(saoPaulo)).not.toBe(digits(sydney));
+
+    const sydneyEnglish = formatInstant(BEFORE_UTC_MIDNIGHT, "day", "en", "Australia/Sydney");
+    expect(digits(sydney)).toBe(digits(sydneyEnglish));
+  });
+
+  it("keeps `dayAndTime` on the same day as `day` for the same instant", () => {
+    // The cross-presentation half of `2M-TIME-006`, at the boundary: a list
+    // showing "15 Aug 23:30" beside a detail showing "16 Aug" is the disagreement
+    // the notification list shipped once already.
+    for (const locale of ["pt-BR", "en"] as const) {
+      const day = digits(formatInstant(BEFORE_UTC_MIDNIGHT, "day", locale, "Australia/Sydney"));
+      const dayAndTime = digits(formatInstant(BEFORE_UTC_MIDNIGHT, "dayAndTime", locale, "Australia/Sydney"));
+      expect(dayAndTime.startsWith(day), `${locale}: ${dayAndTime} should begin with ${day}`).toBe(true);
+    }
+  });
+});

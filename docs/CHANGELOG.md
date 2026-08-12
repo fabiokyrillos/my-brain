@@ -2,6 +2,33 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 1: the contract, and a guard that can see the whole tree
+
+**ADR-111** authorizes the initiative through closeout with a **zero-migration budget**. Unit 1 repairs **nothing**, by design: the baseline is recorded mechanically before a single surface is touched.
+
+**The census, re-run against `main` at `9a1e8a2`** by the same brace-depth detector the guard uses, over `src/**/*.{ts,tsx}` minus tests and the contract modules:
+
+- **17 formatters with no `timeZone`, across 16 files** — exactly the re-audited baseline. **Four** were inside the Phase 2M corpus and recorded there as `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE`. **Thirteen were outside it** and were not deferred — they were invisible, because the guard that would have caught them names eight directories and none of the thirteen is in one.
+- **Three further families the phase corpus never looked for**: **seven** host-zone field operations computing `generateReview`'s `daily`/`weekly`/`monthly` period (`setHours(0,0,0,0)`, `getDay()`, `getDate()`, `getFullYear()`, `getMonth()`) which then stores `toISOString().slice(0, 10)` as the summary's dates — on a server that is **UTC throughout**, while `profiles.timezone` is read eleven lines later and used only for the prompt; **four** UTC day slices; **three** zone round-trips.
+- **31 occurrences total**, each classified individually in `LOCAL_DAY_CORRECTION_AUDIT.md`.
+
+**The clearest defect is meaning, not formatting.** Home's `todayLabel` formats `new Date()` with no zone while `dueFormatter` and `selectTodayPriorities` fifteen lines above both use `workProjection.timezone`. Between 21:00 and midnight in `America/Sao_Paulo`, one screen names two different days — every day.
+
+**Fifteen occurrences of a fixed 24 hours are durations, not day boundaries** — cooldowns, retention bounds, undo windows, duration clamps, rolling period filters, and civil day differences computed on UTC-anchored dates. They are correctly left alone; `phase-2m-local-day-guard.test.ts` already catches the one shape that was wrong twice, and this initiative neither adds to nor removes from it.
+
+**Shipped:**
+
+- `src/lib/time/owner-timezone.ts` — `resolveOwnerTimeZone`, the single resolver. It is deliberately **stricter** than the four private answers it will replace in Unit 4: a bare `EST` constructs an `Intl.DateTimeFormat` happily and carries **no DST rule**, so a day computed in it is silently fixed-offset. Nothing reachable narrows — `profileSchema.ianaTimezone` already requires `"/"` or `"UTC"` — and the test asserts the read and write rules **against each other** rather than describing the agreement. Total by construction, so every output is a zone `localDayBounds` accepts.
+- **The census set out to count formatters and found a fourth resolver.** Outside the contract there are **four** independent decisions about whether a stored zone can be used: three byte-identical `isValidTimeZone` predicates, **and `resolveProfileTimezone` in `daily-cycle/review-projection.ts`** — which is not a clone but a *resolver* carrying `"America/Sao_Paulo"` as a literal instead of reading `defaultAgentPreferences`, and is the loosest of the four. A census of formatters would have walked straight past it. `DUPLICATE_ZONE_RESOLVERS` now enumerates them **tree-wide**, refuses a fifth appearing while the four are removed, and requires each row to still exist until Unit 4 deletes it.
+- `src/lib/time/instant-format.test.ts` — `LDC-CONTRACT-002`: **the locale changes the words, never the day**. Proved on both sides of UTC midnight in two zones, with the words asserted to genuinely differ so the agreement is not vacuous.
+- `src/lib/closeout/local-day-correction-guard.test.ts` — **414 tests**, corpus `src/`, four families. Every occurrence carries an **exact count asserted in both directions**: a repaired file fails until its row is deleted, and an exempt file that grows a *new* occurrence fails too.
+
+**The guard is proved, not asserted.** Mutation controls plant each family in the shape this repository writes it, with the correct form beside it required to stay silent — `getUTC*`/`setUTC*`, `Date.UTC(...)`, a bare `new Date()`, `slice(0, 19)` canonicalising an instant, `slice(11, 16)` taking a clock, and the contract's own helpers. Beyond the synthetic controls: **a real planted defect in a non-exempt file failed the corpus scan by name and line**, and **a real repair of an exempt file failed the liveness assertion until its row was removed**. Comments are blanked in place, preserving newlines, so describing a defect is not committing one and a reported line is a line a reader can open.
+
+**One behaviour change is intended, and is stated here rather than discovered later:** after Unit 4, `generateReview` will compute its period in the owner's zone, so a review generated at 22:00 in São Paulo will cover a different period than it did before — **because the previous one was wrong**. No stored summary is rewritten, reprocessed or back-dated.
+
+**Unchanged:** 92 migrations, parity `202608120092`, `verify:edge-parity` green, zero Edge Function changes, `planned_at` semantics, push (not resumed; still HTTP 403 on a real iPhone, Android **NOT EXECUTED**), signup closed, rollout 25 · 3 · 2, Phase 2N planned and unimplemented, Phase 2O not started.
+
 ## 2026-08-12 - PHASE 2N: the field-classification reading confirmed, people.notes masked by default, 127 requirements
 
 **Still zero implementation. Still no migration - the budget is unchanged at 3 allocated / 0 spent /
