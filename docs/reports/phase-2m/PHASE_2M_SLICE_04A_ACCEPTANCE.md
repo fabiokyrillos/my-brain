@@ -80,6 +80,29 @@ the mistake, not a footnote.
 
 ---
 
+## 4b. The gate that only speaks in CI, and what it caught
+
+`phase-2f-traceability.test.ts`'s stale-deployment sweep is **skipped unless
+`CI` is set**, so a local `npm test` runs it vacuously. It failed on the first
+push, correctly: `STATE.md`'s opening line said *"still not deployed"* within
+ninety characters of `202608110090`, which **is** in the applied chain. The
+sentence was true — the "not deployed" was about `202608110091` — but proximity
+is what a reader and a scanner both use, and a line that can be read as claiming
+a deployed migration is undeployed is a line that will be.
+
+The fix is the sentence, not the guard: the parity statement now ends with a
+period before the undeployed one begins, so the two claims cannot be read
+together. **The lesson is procedural and is recorded in the handoff: run
+`CI=1 npm test` before pushing, because this repository has guards that are
+silent locally.**
+
+One transient is recorded rather than suppressed: a single `CI=1` run reported
+`project-key-guard.test.ts` failing, immediately after `STATE.md` was rewritten;
+it passed in isolation and in a subsequent untouched full run. That is this
+repository's recorded mid-write-read signature.
+
+---
+
 ## 5. Gates
 
 | Gate | Result |

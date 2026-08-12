@@ -3633,6 +3633,20 @@ cache would show a signed-out user a signed-in page. And it registers **no
 `push` and no `notificationclick` listener**, which is the behavioural half of
 the finding slice 2M.0 made structurally.
 
+### A guard that is silent locally, and the sentence it caught
+
+`phase-2f-traceability.test.ts`'s stale-deployment sweep **only runs when `CI`
+is set**. A local `npm test` runs it vacuously, so the first push to this branch
+failed CI on a line a local full-suite run had just passed.
+
+It was right. `STATE.md`'s opening line said *"still not deployed"* within ninety
+characters of `202608110090`, which **is** in the applied chain — the sentence
+was true, because the "not deployed" belonged to `202608110091`, but proximity is
+what a reader and a scanner both use. The fix was the sentence: a period now
+separates the parity claim from the undeployed one. **The rule from here: run
+`CI=1 npm test` before pushing.** This repository has guards that say nothing on
+Windows and nothing outside CI, and both silences have now cost a round trip.
+
 ### What is outstanding, exactly
 
 **Slice 2M.4b** — **migration 2**, the sender, the subscription, the service
