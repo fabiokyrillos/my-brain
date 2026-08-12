@@ -55,25 +55,37 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`phase-2j/`](./phase-2j/) | Phase 2J — Today, Capture and Attention (audit, threat model, traceability contract, gaps, eight slice acceptances, matrix, closing report, deployment record) | **COMPLETE** 2026-08-08 — 74 declared · 74 classified · 0 unclassified; `2 allocated · 2 spent` (unchanged); **DEPLOYED, hosted parity `202608080087`**. The deployment probe found the declared telemetry events refused by an un-widened third vocabulary copy; the post-2J correction `202608080087` removed that duplication the same day and telemetry is proved live producer → consumer |
 | [`phase-2k/`](./phase-2k/) | Phase 2K — Conversar as the primary interface (current-experience audit, gaps, threat model, traceability contract, slice acceptances) | **CONCLUDED** — planning authorized by ADR-097 (2026-08-08), **implementation authorized through closeout by ADR-101 (2026-08-09)**, which also signed the last two open decisions (OD-2K-1, OD-2K-4). **79** requirements across eleven families — **not the 68 this line and four other documents stated**; the undercount was `2K-A11Y`, whose family name contains digits. 79 declared · 79 classified · 0 unclassified — **66 built, 9 baseline, 4 partial** since 2026-08-11 (**it read 67/9/3 from the phase's close until then**). **CONCLUDED 2026-08-09, after an extraordinary post-phase correction** — slices 2K.0–2K.6 and 2K.8 executed and merged; 2K.7 is not implemented, by rule. `1 allocated · 1 spent`, **not retroactively reclassified**. **The phase reached closeout with its telemetry INERT on the deployed project**; the owner then authorized one exclusively corrective migration, **`202608090089`, outside this phase's budget and charged to no phase**, which deletes the hardcoded surface copy in `private.record_product_event`. Hosted telemetry proved operational producer → writer → RLS-scoped **aggregation**, **13/13**, with zero residue. Matrix and closing report written from executed evidence. **SECOND CORRECTION, 2026-08-11 (§7b of the report, §9 of the deployment record):** Phase 2M found that this phase's **declared consumer** could never have executed — it read `product_events.occurred_at`, a column that has never existed, and authenticated through a grant Turnstile has refused since SH.5 — so the 13/13 proof reached the aggregation through a query written for the occasion. `2K-METRICS-007` moved **`built` → `partial`**; the repair belongs to Phase 2M and **no historical execution is claimed** |
 | [`phase-2l/`](./phase-2l/) | Phase 2L — Work and execution (audit, gaps, threat model, traceability contract, six slice acceptance records, the traceability matrix, the closing report and the successor re-audit) | **COMPLETE** (2026-08-09) — planning by ADR-102, implementation through closeout by ADR-103, which signed all five owner decisions. **82 requirements declared, 82 classified: 73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered** — after a post-closeout correction (2026-08-09) that reclassified `2L-BULK-011` and `2L-CLOSE-004` from `partial` **from evidence**: a missing proof was executed and a live read-only `migration list --linked` was taken. The generator now refuses a `partial` whose remainder is vacuous. **Migration budget `1 allocated · 0 spent`** — the allocation lapsed under OD-2L-2 A, so no migration exists, **no deployment record was created** and there is no G8. Hosted parity unmoved at `202608090089`; signup closed; no new RPC, write path, grant, policy, telemetry event name or gesture. Three partials each name a remainder and a destination; `2L-MOBILE-008` and `2L-ACCESS-008` are reported **NOT EXECUTED** and need owner-run hardware, and `2L-METRICS-005` needs a migration the successor must spend before its producers exist. The successor is re-audited and **stopped for owner authorization**: no successor artifact, no successor requirement, and A13 is not retargeted here |
-| [`phase-2m/`](./phase-2m/) | Phase 2M — Calendar, daily planning and notifications (current-experience audit, UX gaps, threat model, traceability contract) | **IMPLEMENTATION AUTHORIZED THROUGH CLOSEOUT** (2026-08-11, ADR-105; planning by ADR-104), which signed all seven owner decisions — **OD-2M-1 A** (calendar renders tasks and reminders, both protected by derived sensitivity), **OD-2M-2** (one vocabulary migration before any producer, `calendar` as its own surface), **OD-2M-3 A** (`planned_at` is an intention), **OD-2M-4 B** (push, opt-in, **content-free** — the first egress of user-linked data in this product), **OD-2M-5** (owner-run hardware proof, **blocks closeout**), **OD-2M-6 A** (visible controls only), **OD-2M-7** (recurrence out, own initiative, closing `not-built-by-rule`). 94 requirements, thirteen families, six slices. Migration budget **2 allocated · 0 spent, NON-TRANSFERABLE**. Baseline `62753ce` — **the baseline moved during owner review (PR #166) and every audit negative was re-executed**. The audit's seven findings stand: `planned_at` is read by nothing; **a service worker exists and is registered in production**, so the predecessor's "no service worker" is wrong and the push-absence guard cannot see `public/sw.js`; five schedule preferences are inert; no event entity exists and the calendar does not need one; reminder sensitivity is derivable through `reminders.entry_id`; telemetry has five enforcement points; and two implementations of the user's local day exist. Slices 2M.0 and 2M.1 are complete; migration 1 is deployed and hosted parity is `202608110090`. Budget **2 allocated · 1 spent** |
+| [`phase-2m/`](./phase-2m/) | Phase 2M — Calendar, daily planning and notifications (audit, UX gaps, threat model, traceability contract, six slice acceptances, deployment, matrix, closing report, successor re-audit) | **COMPLETE** 2026-08-12 (planning ADR-104, implementation ADR-105, third migration ADR-106, closeout gate amended by ADR-107). 94 requirements — **89 built · 4 partial · 1 not-built-by-rule · 0 undelivered**; budget **3 allocated · 3 spent, NON-TRANSFERABLE**; hosted parity `202608120092`. **Push is implemented and hosted, FAILS on a real iPhone with HTTP 403 from Apple Web Push, cause unproven, and Android is NOT EXECUTED** — residual at `docs/initiatives/push-hardware-validation/`. Slice 2M.5 found that two shipped surfaces had never rendered, because a server-to-client boundary is only exercised when a real server renders a real page |
+| [`phase-2n/`](./phase-2n/) | Phase 2N — People, projects, memory, files and relations (current-experience audit, UX gaps, threat model, traceability contract) | **PLANNING ONLY** (2026-08-12, ADR-108). **Implementation is NOT authorized.** 108 requirements, sixteen families, eight slices. Migration budget **ceiling FOUR · obligation ZERO · 0 spent · none created**; the plan proposes **two**. **Seventeen owner decisions are open and none is signed.** The audit corrected the inherited picture in eight places: the person and project pages **already ship**; the sensitivity contract governs eight surfaces and **none is a person, project, memory or file page**; `match_internal_knowledge` filters neither validity nor sensitivity and applies its bound before reading `valid_until`, so **archiving a memory removes it from citation but not from retrieval**; there is **no `.delete()` anywhere in `src/`**; `entity_aliases` has **zero readers and zero writers**; relations carry confidence and **no source**; and the timezone defect is **thirteen call sites in twelve files outside the guard corpus**, not the four the exemption records |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**The active initiative is Phase 2M — Calendar, daily planning and
-notifications.** Planning was authorized by ADR-104 (2026-08-09) and
-**implementation through closeout by ADR-105** (2026-08-11), which signed all
-seven owner decisions. Its governing pair lives in
-`docs/initiatives/phase-2m/`; its evidence files here. **Two migrations are
-authorized and non-transferable**; **the first is spent and deployed** —
-`202608110090`, the daily-cycle telemetry vocabulary and the `calendar` surface,
-applied 2026-08-11, so **hosted parity is `202608110090`** — and the second is
-notification consent, subscription and delivery in slice 2M.4b. The phase carries
-a **mandatory owner hardware checkpoint** after its push slice.
+**The active initiative is Phase 2N — People, projects, memory, files and
+relations, and it is authorized for PLANNING ONLY** by ADR-108 (2026-08-12).
+Its governing pair lives in `docs/initiatives/phase-2n/`; its evidence files
+here. **Implementation is not authorized**: no product code, no page, no
+component, no migration, no schema, RLS, grant, policy or RPC change, no Edge
+Function, no deploy, no secret, no external integration. **108 requirements
+across sixteen families**, **migration budget ceiling FOUR · obligation ZERO ·
+0 spent · none created**, and **seventeen owner decisions open and unsigned**.
+The audit found that three of the roadmap's eight slices describe surfaces that
+already ship, so they are re-scoped from construction to hardening. **Push is a
+parallel track and never a precondition.**
 
-**Its predecessor, Phase 2L — Work and execution, is complete** (planning by
+**Its predecessor, Phase 2M — Calendar, daily planning and notifications, is
+complete** (planning by ADR-104, implementation through closeout by ADR-105,
+with ADR-106 funding a third migration and ADR-107 amending the closeout gate):
+94 requirements — 89 built, 4 partial, 1 not-built-by-rule, 0 undelivered —
+budget `3 allocated · 3 spent`, hosted parity `202608120092`. **Push is
+implemented and hosted, it fails on the owner's real iPhone with HTTP 403 from
+Apple Web Push, and it has never been validated on Android**; that residual
+lives at `docs/initiatives/push-hardware-validation/` and is not a Phase 2N
+dependency.
+
+**Before it, Phase 2L — Work and execution, is complete** (planning by
 ADR-102, implementation through closeout by ADR-103, both 2026-08-09), with its
 closeout corrected the same day from evidence. Before it, **Phase 2K — Conversar
 as the primary interface is concluded** (planning by ADR-097, 2026-08-08;
@@ -82,10 +94,10 @@ extraordinary post-phase correction the owner authorized separately**: the phase
 reached closeout with its telemetry inert on the deployed project, and migration
 `202608090089` closed that **outside Phase 2K's budget and charged to no phase**.
 
-**No successor to Phase 2M is authorized, planned, or given artifacts**, and A13
+**No successor to Phase 2N is authorized, planned, or given artifacts**, and A13
 now targets that successor, which is **not started**. Nothing here covers opening
 signup, executing rollout residuals, or running ADR-055's offline spike. Phases
-2H, 2I, 2J, 2K and 2L are closed.
+2H, 2I, 2J, 2K, 2L and 2M are closed.
 
 This line has now been stale twice, and both times the failure was the same:
 naming an initiative that had stopped being the active one. Until 2026-08-08 it
@@ -160,6 +172,29 @@ asymmetric by history, not by rule, and the generator accepts either an
 declares no requirement and plans no work — then the threat model, the four
 slice acceptance records, the online-journey blocker and harness acceptances,
 `PHASE_2G_TRACEABILITY_MATRIX.md` and `PHASE_2G_REPORT.md`. Closed 2026-08-06.
+
+### `phase-2n/` — Phase 2N (planning ADR-108, 2026-08-12 — **PLANNING ONLY**)
+
+`PHASE_2N_CURRENT_EXPERIENCE_AUDIT.md` (the falsifiable re-derivation of the
+person, project, memory, file and relation domains from source, whose central
+findings are that **the contextual pages already ship and are outside the
+sensitivity contract**, that **archiving a memory removes it from citation but
+not from retrieval** because `match_internal_knowledge` applies its bound before
+reading `valid_until`, that **no `.delete()` exists anywhere in `src/`**, that
+**`entity_aliases` has zero readers and zero writers**, and that the timezone
+defect is **thirteen call sites in twelve files outside the guard corpus**
+rather than the four the exemption records — and whose §0 records the census
+trap: seventeen core tables appear unprotected to a literal-text scan because
+their policies are built inside four `do` blocks through `execute format()`),
+`PHASE_2N_UX_GAPS_AND_OPPORTUNITIES.md` (ten ranked gaps, five of which need no
+schema at all, plus what is deliberately left alone),
+`PHASE_2N_THREAT_MODEL.md` (T-1…T-21, five of them **live today**) and
+`PHASE_2N_TRACEABILITY_CONTRACT.md` (twenty-two refusals: eight live during
+planning, fourteen armed at implementation). The governing pair lives in
+`docs/initiatives/phase-2n/`. **No acceptance record, matrix, closing report or
+deployment record may exist here** until implementation is authorized, and
+`src/lib/closeout/phase-2n-declarations.test.ts` asserts their absence rather
+than trusting it.
 
 ### `phase-2m/` — Phase 2M (planning ADR-104, 2026-08-09; implementation through closeout ADR-105, 2026-08-11)
 

@@ -2,6 +2,49 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2N AUTHORIZED FOR PLANNING ONLY: 108 requirements, and five findings that change the phase
+
+**Nothing was implemented. No migration was created. No deployment happened. Signup stays closed and
+the rollout gate is untouched at 25 pass / 3 fail / 2 owner-signature.**
+
+ADR-108 authorizes **Phase 2N - People, projects, memory, files and relations** for **planning
+only**, and retargets the A13 phase-start guard to the roadmap successor **in the same commit** -
+the ninth application of that rule, for the reason it has always been applied: an accepted ADR
+naming the authorized phase is itself a start signal, so the guard must move in the change that
+records the authorization and the invariant is never unenforced in between. The successor's name
+appears in no heading.
+
+**Added.** `docs/initiatives/phase-2n/PHASE_2N_PRD.md` (108 requirements, sixteen families, each
+numbered from 001 with no gap and each family name free of digits) and
+`..._IMPLEMENTATION_PLAN.md` (eight slices, a migration-budget proposal, seventeen owner decisions
+in full, and a re-estimate). Under `docs/reports/phase-2n/`: the current-experience audit, the UX
+gaps and opportunities, the threat model (T-1...T-21, five of them live today) and the traceability
+contract (twenty-two refusals). `src/lib/closeout/phase-2n-declarations.test.ts` enforces the
+planning-only half in CI.
+
+**The audit corrected the inherited picture in eight places.** The contextual person and project
+pages **already ship**, so two roadmap slices are re-scoped from construction to hardening. Those
+pages are **outside the sensitivity contract** - eight governed surfaces, none of them a person,
+project, memory or file page - and render raw entry content, task titles and memory bodies with no
+classification applied. `match_internal_knowledge` filters neither validity nor sensitivity and
+applies its bound of twenty **before** anything reads `valid_until`, so **archiving a memory removes
+it from citation but not from retrieval**, after it has already displaced a memory that is true.
+There is **no delete path anywhere in `src/`**. `entity_aliases` has **zero readers and zero
+writers**. There is **no merge, split or canonical identity** among the 89 RPCs. Relations carry
+confidence and **no source**. And the timezone defect is **thirteen call sites in twelve files
+outside the `2M-TIME-007` corpus**, six of them the pages this phase would extend - not the four the
+exemption records.
+
+**Changed.** `docs/TODO.md`'s active-milestone line and `docs/reports/README.md`'s active-initiative
+block move with the ADR, which is the drift Phase 2I demonstrated when the line named a finished
+phase for the whole of the next one while a guard pinned to the same stale value passed throughout.
+
+**Recorded, not fixed.** The four `daily-cycle` timezone exemptions keep their own destination and
+are **not repaired here**. Push is implemented and hosted, **fails on a real iPhone with HTTP 403**,
+its cause is unproven, and **Android is NOT EXECUTED**; it is a parallel track and never a
+precondition. `2L-MOBILE-008`, `2L-ACCESS-008` and `2E-COMMAND-012` stay residual. ADR-055 expires
+2026-10-27, neither satisfied nor superseded.
+
 ## 2026-08-12 - PHASE 2M COMPLETE: 94 requirements, and two surfaces that had never rendered
 
 **Push notifications are implemented and hosted, they fail on the owner's real iPhone with HTTP 403 from Apple Web Push, and they have never been validated on Android.** That sentence is the state of the feature, not a caveat after a success, and every other claim here is made next to it.
