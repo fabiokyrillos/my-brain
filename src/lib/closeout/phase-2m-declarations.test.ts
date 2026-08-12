@@ -271,32 +271,43 @@ describe("Phase 2M's authorization chain is recorded, not assumed", () => {
       .toMatch(/closes \*\*not-built-by-rule\*\* against OD-2M-7 rather than as a partial/);
   });
 
-  it("creates no closeout artifact before its gate", () => {
+  it("requires both closeout artifacts, and requires the matrix to be generated", async () => {
     /*
-     * Two artifacts have a gate at the **end** of the phase and nowhere else:
-     * the regenerated matrix and the closing report. Neither may exist while a
-     * slice is still outstanding, because a matrix written early is a
-     * classification of work that has not happened.
+     * This assertion used to be its own inverse.
      *
-     * Slice acceptance records are **not** on this list any more. They were,
-     * while ADR-104 authorized planning only and no slice could legitimately
-     * have one. ADR-105 authorized execution, so a slice that has run is
-     * *required* to have one — and a guard that still forbade them would be
-     * asserting the phase had not started, which stopped being true.
+     * While the phase was mid-flight it forbade
+     * `PHASE_2M_TRACEABILITY_MATRIX.md` and `PHASE_2M_REPORT.md` from existing
+     * at all, because *a matrix written early is a classification of work that
+     * has not happened*. That was right then and is exactly wrong at closeout,
+     * where the same two artifacts are the deliverable.
+     *
+     * **Inverted rather than deleted, in ADR-107's own unit**, and the
+     * replacement is the stronger contract: the matrix must be byte-identical
+     * to what `scripts/generate-phase-2m-traceability.mjs` produces from the
+     * slice records, so it cannot be typed, hand-edited, or left behind when a
+     * record changes. `2M-CLOSE-001` asks for exactly that — *"classified
+     * exactly once, from the slice records, by a generator — never typed into a
+     * report"* — and until now nothing enforced the "never typed" half.
+     *
+     * Slice acceptance records were removed from the forbidden list earlier, for
+     * the same reason in the other direction: ADR-105 authorized execution, so a
+     * slice that has run is *required* to have one.
      */
-    const forbidden = [
-      "docs/reports/phase-2m/PHASE_2M_TRACEABILITY_MATRIX.md",
-      "docs/reports/phase-2m/PHASE_2M_REPORT.md",
-    ];
-    for (const relative of forbidden) {
-      let exists = true;
-      try {
-        read(relative);
-      } catch {
-        exists = false;
-      }
-      expect(exists, `${relative} exists before its gate`).toBe(false);
+    const matrixPath = "docs/reports/phase-2m/PHASE_2M_TRACEABILITY_MATRIX.md";
+    const reportPath = "docs/reports/phase-2m/PHASE_2M_REPORT.md";
+    for (const relative of [matrixPath, reportPath]) {
+      expect(() => read(relative), `${relative} is missing at closeout`).not.toThrow();
     }
+
+    const { buildPhase2mTraceability, renderMatrix } = await import(
+      "../../../scripts/generate-phase-2m-traceability.mjs"
+    );
+    const result = buildPhase2mTraceability({ complete: true });
+    expect(result.failures, "the generator refuses the slice records it was given").toEqual([]);
+    expect(
+      read(matrixPath).replace(/\r\n/g, "\n"),
+      "the committed matrix is not what the generator produces — it was edited, or a record moved under it",
+    ).toBe(renderMatrix(result).replace(/\r\n/g, "\n"));
   });
 
   it("requires an acceptance record for every slice that has run", () => {

@@ -55,7 +55,6 @@ import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
 import { recordDayReviewActionApplied } from "@/features/product-analytics/interaction-events";
-import type { DayReviewScope } from "@/features/product-analytics/contracts";
 import type { TaskDetailCommandState } from "@/features/task-commands/detail-action-state";
 import type { TaskDetailDateBounds, TaskDetailRelationOptions } from "@/features/task-commands/task-detail-controls";
 import { TaskDetailControls, type TaskDetailCommandHandler } from "@/features/task-commands/task-detail-controls";
@@ -79,7 +78,6 @@ export function DayReviewView({
   locale,
   projection,
   reviewsHref,
-  scopeHref,
   undoAction,
 }: {
   action: TaskDetailCommandHandler;
@@ -88,7 +86,6 @@ export function DayReviewView({
   projection: DayReviewProjection;
   /** Where the generated-review list lives. Navigation only. */
   reviewsHref: string;
-  scopeHref: (scope: DayReviewScope) => string;
   undoAction?: TaskUndoHandler;
 }) {
   const copy = getDayReviewCopy(locale);
@@ -217,7 +214,7 @@ export function DayReviewView({
           {(["day", "next_day"] as const).map((scope) => (
             <a
               aria-current={projection.scope === scope ? "page" : undefined}
-              href={scopeHref(scope)}
+              href={`${reviewsHref}?scope=${scope}`}
               key={scope}
             >
               {copy.scopes[scope]}
