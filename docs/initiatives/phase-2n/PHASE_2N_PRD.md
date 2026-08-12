@@ -50,8 +50,9 @@ Any new AI operation kind. The roadmap's next phase, in any form.
 
 ## 3. Baseline, obligation and proposal
 
-Requirements are marked so that the phase cannot claim credit for what already
-ships:
+This PRD declares **108 requirements across 16 families**, each family numbered
+from 001 with no gap. Requirements are marked so that the phase cannot claim
+credit for what already ships:
 
 - **[BASELINE]** — the behaviour exists today; the requirement is that it is
   *not broken* and is *proved* by this phase's tests.
