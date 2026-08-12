@@ -2,6 +2,141 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2N: the field-classification reading confirmed, people.notes masked by default, 127 requirements
+
+**Still zero implementation. Still no migration - the budget is unchanged at 3 allocated / 0 spent /
+none created. No deployment. Signup closed, rollout untouched at 25/3/2. Timezone not repaired.
+Push not resumed.**
+
+ADR-110 settles the one interpretation ADR-109 deliberately left flagged, and goes further than the
+question asked.
+
+**The rule is structural identifier versus free text, not owner-authored versus derived.** A
+person's or project's name stays visible on its own contextual page, because a structural identifier
+is what the user needs to recognise the entity at all. Confirming that **does not** make every
+owner-typed field `normal` - which is why the taxonomy is stated in the PRD rather than left to be
+inferred from which fields happen to be masked.
+
+**`people.notes` is masked by default** on every contextual surface, revealed locally, explicitly
+and accessibly. Absence of classification never resolves to `normal`. It is absent from search
+results and snippets, suggestions, previews, related pages, the graph, telemetry and retrieval. The
+person's name and aliases stay searchable, and their existence and structural counts stay true. No
+`sensitivity` column, no migration, no sensitivity inferred from a note's text, and no existing note
+deleted or altered.
+
+**Why it costs no schema, verified rather than asserted.** Search's `people` domain reads its
+columns and snippet from `DOMAIN_SPECS`, a TypeScript constant; the sensitivity rules are data in a
+module; and `match_internal_knowledge` unions `entry_embeddings` and `memories` only and **never
+reads `people`** - so the retrieval half is already true today and the requirement keeps it true
+rather than making it true.
+
+**One consequence recorded rather than discovered: this narrows behaviour ADR-093 signed.** Removing
+`notes` from the `people` domain's matched columns and snippet is a deliberate, owner-signed
+narrowing, not an accidental reopening - the distinction `2N-PRIVACY-006` exists to force. ADR-093's
+default exclusion of `highly_sensitive` is untouched and no other domain moves.
+
+**Changed.** 123 -> **127 requirements**: four appended to the end of the `2N-PRIVACY` family, and
+`2N-PERSON-002` restated because it had described notes as rendering unchanged. The threat model
+gains **T-23**, so six threats are live today and five of the six need no schema. The traceability
+contract grows to **thirty-one refusals**, including refusals of a fail-open default, an inferred
+classification, an indirect leak, and a protection that hides the entity.
+
+**Neither ADR-108 nor ADR-109 was rewritten.** Each carries a pointer to what amended it, and the
+guard asserts both stayed intact.
+
+## 2026-08-12 - PHASE 2N: ALL SEVENTEEN DECISIONS SIGNED, 123 requirements, three migrations allocated and none created
+
+**Still zero implementation. Still no migration. No deployment. Signup closed and the rollout gate
+untouched at 25 pass / 3 fail / 2 owner-signature. Timezone not repaired. Push not resumed.**
+
+ADR-109 signs all seventeen Phase 2N decisions and fixes the budget at **3 allocated - obligation
+zero - non-transferable**, and **authorizes no implementation**. The three migrations are
+**destinations, not permissions**: **M1** validity-aware retrieval (slice 2N.3), **M2** content-free
+telemetry vocabulary (slice 2N.7, only if real producers and consumers are delivered), **M3**
+transactional deletion and propagation (slice 2N.3). A fourth is a stop condition.
+
+**ADR-108 is not rewritten.** Its ceiling of four, its seventeen open questions, the options
+considered and the recommendations it carried are the record of what was decided before the owner
+answered. ADR-109 layers on top and says so.
+
+**What the owner changed against the plan's recommendations.** The plan recommended two migrations
+and the owner signed three, funding deletion - which the gaps report ranked as the largest single
+improvement in user control available in this phase. The plan recommended declining the graph and
+the owner authorized it **under a contract that can refuse it**. The plan recommended the smaller
+library and the owner signed the larger one **with no migration**, which is coherent only because
+`entity_attachments` already exists - and the plan now proves that capability by capability rather
+than asserting it.
+
+**Changed.** The PRD moves from **108 to 123 requirements**: fifteen identifiers appended to the end
+of their existing families, twelve restated to what was signed, **none renumbered, reused or
+removed**. `[PROPOSAL]` is retired as a marker and `[BY-RULE]` replaces it for the three merge
+requirements, which close `not-built-by-rule` and never `partial`. The plan's slices, budget,
+estimates and critical path are rebuilt; **slice 2N.3 is now the critical path**, carrying two
+migrations and the phase's only irreversible operation. The threat model gains **T-22** - an undo
+that restores less than it claims - moves T-6, T-9 and T-11 into scope, and closes **T-1 and T-3 by
+refusal rather than by mitigation**. The traceability contract grows from 22 refusals to **26**.
+
+**A separate timezone initiative is now a mandatory dependency of slice 2N.1** (OD-2N-13 B). Phase
+2N enumerates the defects and guards its own surfaces; it does **not** repair them, and the roughly
+27 call sites are **not absorbed** into slice 2N.0.
+
+**One interpretation is flagged rather than absorbed.** Read literally over every field, OD-2N-12's
+fail-closed rule would mask a person's own name on their own page, because a name has no source
+entry. `2N-PRIVACY-007` records the intended reading - the rule governs source-derived content, not
+an entity's own owner-typed fields - and asks the owner to confirm it.
+
+**Estimate revised to 17-26 weeks** (18-28 including the timezone initiative), up from 12-17 and
+above the roadmap's 13-18, entirely attributable to deletion, the enlarged library and the graph
+with its alternative.
+
+**Preserved without reclassification.** Push is implemented and hosted, fails on a real iPhone with
+HTTP 403, cause unproven, Android NOT EXECUTED. No real screen reader has run. The four
+`daily-cycle` timezone exemptions keep their own destination. ADR-055 expires 2026-10-27.
+
+## 2026-08-12 - PHASE 2N AUTHORIZED FOR PLANNING ONLY: 108 requirements, and five findings that change the phase
+
+**Nothing was implemented. No migration was created. No deployment happened. Signup stays closed and
+the rollout gate is untouched at 25 pass / 3 fail / 2 owner-signature.**
+
+ADR-108 authorizes **Phase 2N - People, projects, memory, files and relations** for **planning
+only**, and retargets the A13 phase-start guard to the roadmap successor **in the same commit** -
+the ninth application of that rule, for the reason it has always been applied: an accepted ADR
+naming the authorized phase is itself a start signal, so the guard must move in the change that
+records the authorization and the invariant is never unenforced in between. The successor's name
+appears in no heading.
+
+**Added.** `docs/initiatives/phase-2n/PHASE_2N_PRD.md` (108 requirements, sixteen families, each
+numbered from 001 with no gap and each family name free of digits) and
+`..._IMPLEMENTATION_PLAN.md` (eight slices, a migration-budget proposal, seventeen owner decisions
+in full, and a re-estimate). Under `docs/reports/phase-2n/`: the current-experience audit, the UX
+gaps and opportunities, the threat model (T-1...T-21, five of them live today) and the traceability
+contract (twenty-two refusals, since grown to twenty-six).
+`src/lib/closeout/phase-2n-declarations.test.ts` enforces the
+planning-only half in CI.
+
+**The audit corrected the inherited picture in eight places.** The contextual person and project
+pages **already ship**, so two roadmap slices are re-scoped from construction to hardening. Those
+pages are **outside the sensitivity contract** - eight governed surfaces, none of them a person,
+project, memory or file page - and render raw entry content, task titles and memory bodies with no
+classification applied. `match_internal_knowledge` filters neither validity nor sensitivity and
+applies its bound of twenty **before** anything reads `valid_until`, so **archiving a memory removes
+it from citation but not from retrieval**, after it has already displaced a memory that is true.
+There is **no delete path anywhere in `src/`**. `entity_aliases` has **zero readers and zero
+writers**. There is **no merge, split or canonical identity** among the 89 RPCs. Relations carry
+confidence and **no source**. And the timezone defect is **thirteen call sites in twelve files
+outside the `2M-TIME-007` corpus**, six of them the pages this phase would extend - not the four the
+exemption records.
+
+**Changed.** `docs/TODO.md`'s active-milestone line and `docs/reports/README.md`'s active-initiative
+block move with the ADR, which is the drift Phase 2I demonstrated when the line named a finished
+phase for the whole of the next one while a guard pinned to the same stale value passed throughout.
+
+**Recorded, not fixed.** The four `daily-cycle` timezone exemptions keep their own destination and
+are **not repaired here**. Push is implemented and hosted, **fails on a real iPhone with HTTP 403**,
+its cause is unproven, and **Android is NOT EXECUTED**; it is a parallel track and never a
+precondition. `2L-MOBILE-008`, `2L-ACCESS-008` and `2E-COMMAND-012` stay residual. ADR-055 expires
+2026-10-27, neither satisfied nor superseded.
+
 ## 2026-08-12 - PHASE 2M COMPLETE: 94 requirements, and two surfaces that had never rendered
 
 **Push notifications are implemented and hosted, they fail on the owner's real iPhone with HTTP 403 from Apple Web Push, and they have never been validated on Android.** That sentence is the state of the feature, not a caveat after a success, and every other claim here is made next to it.
