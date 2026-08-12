@@ -36,12 +36,17 @@ applies `202608110091` and then `202608120092`.
 
 ---
 
-## 2. Five defects this slice found in its own migration, before it could deploy
+## 2. Six defects in the migration, and four more in its own test suite
 
 The migration was complete at the previous stop and was **reviewed rather than
-trusted**. All five were fixed in place, which is correct precisely because the
-file was neither merged nor hosted — and a fourth migration to repair a third one
+trusted**. All were fixed in place, which is correct precisely because the file
+was neither merged nor hosted — and a fourth migration to repair a third one
 would have been the stop condition.
+
+**Five were found by reading. The sixth was found by CI, and it was the worst
+one** — see §2b. That ordering is worth recording: careful review caught the
+defects that would have failed *later*, and only execution caught the one that
+would have failed *immediately*.
 
 1. **`pg_catalog.coalesce` / `.least` / `.greatest` cannot resolve.** They are SQL
    grammar with no `pg_proc` entry, and under `set search_path = ''` there is no
@@ -71,6 +76,55 @@ would have been the stop condition.
    hiding a loopback behind a legitimate-looking host — with the positive
    push-service allowlist in the sender, where it costs a redeploy rather than a
    migration.
+
+### 2b. The sixth, which only execution could find
+
+6. **`pg_catalog.position('x' in y)` is a parse-time syntax error, so the
+   migration would not have applied at all.** `position(x IN y)` is a **parsed
+   form** — the keyword inside the parentheses is grammar, and it is grammar only
+   for the unqualified spelling. CI's `supabase db reset` failed with `42601
+   syntax error at or near "pg_get_functiondef"`.
+
+   This is the same family as defect 1 and strictly louder: `pg_catalog.coalesce`
+   deploys clean and fails on the first send, while this never deploys.
+   `sql-grammar-guard.test.ts` named only the first family and was blind to the
+   second. It now names both — `position`, `overlay`, `substring`, `trim`,
+   `extract` — with a control proving each is detected **and** a control proving
+   the ordinary replacements (`strpos`, `substr`, `btrim`, `date_part`) are not,
+   so the fix does not push authors back toward the unqualified spellings. The
+   historical allowlist did not grow, and the whole 92-migration chain passes.
+
+### 2c. Four defects in the suite, found by its first real execution
+
+Once the migration applied, the pgTAP suite ran for the first time and **47 of 90
+assertions failed**. Every one traced to real problems, and three of them were
+other guards refusing to be silent about the new tables.
+
+1. **My own fixtures violated the CHECKs I wrote.** `push_subscriptions.p256dh`
+   is checked 16..256 and `.auth` 8..256; `'p256dh-a'` is 8 characters and
+   `'auth-a'` is 6. The first registration died, `lives_ok` swallowed it, owner A
+   ended with no consent, and every downstream delivery answered `not_consented`.
+   One root, 47 symptoms.
+
+   Its second-order effect is the interesting half: with consent absent, each
+   call wrote a **suppressed** row, and suppressed rows are not covered by the
+   in-flight unique index — so two rows shared a `dedupe_hash` and the superuser
+   id-pin tried to give both the same primary key. The pins are now scoped
+   `and outcome = 'pending'`, which the index guarantees is at most one row.
+
+2. **`signup_hardening_cascade_drill.sql`** enumerates every user-owned table
+   from the catalog at run time and requires a row for the doomed account. It
+   named all three new tables **by name**, on the first run of the migration that
+   created them, without anybody having remembered to add them. That is T-32
+   working exactly as designed.
+
+3. **`signup_hardening_grant_census.sql`** pins the `authenticated` DML matrix as
+   a norm plus named exceptions. All three deviate as `SELECT`-only, and that is
+   the posture — a line here gaining INSERT would mean it had been given away.
+
+4. **`signup_hardening_retention.sql`** pins the retention registry to exactly
+   the declared windows, so a class the database will one day delete rows for
+   cannot be added silently.
 
 ---
 
@@ -142,4 +196,16 @@ the event.
 | `deno test` over `supabase/functions/` | **104 passed, 0 failed** |
 | `deno check` on all four entrypoints | clean; `send-push/index.ts` added to CI |
 | Playwright `daily-surfaces.spec.ts` | **56 passed** (desktop + Pixel 7) |
-| pgTAP `phase_2m_push_delivery.sql` | **90 assertions**, first executed in CI |
+| pgTAP `phase_2m_push_delivery.sql` | **90 assertions**, first executed in CI — red on the first run, green on the third |
+| CI `application` / `database` / `edge worker` | green 3/3 on the PR head, recorded in the deployment record |
+
+### The pgTAP suite's execution history, because "green" alone would hide it
+
+| run | outcome |
+|---|---|
+| 1 | **never reached the suite** — `supabase db reset` failed applying the migration (`42601`) |
+| 2 | **47 of 90 failed** — undersized fixture keys, plus three sibling suites correctly naming the new tables |
+| 3 | **90 of 90 passed** |
+
+Recorded because a record that said only "pgTAP green" would imply the suite was
+right the first time, and the two red runs are where the real defects were.
