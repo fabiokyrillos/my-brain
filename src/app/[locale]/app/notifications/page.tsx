@@ -2,7 +2,7 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { markNotification } from "@/features/agent/actions";
-import { NO_CONSENT } from "@/features/notifications/consent-contract";
+import { readPushConsent, readVapidPublicKey } from "@/features/notifications/consent-reader";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -43,11 +43,24 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const result = await supabase.from("notifications").select("id,type,title,body,action_url,priority,status,created_at").neq("status", "dismissed").order("created_at", { ascending: false }).range(from, to);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load notifications") ?? []);
 
+  const consent = await readPushConsent(supabase, user.id);
+
   return <div className="content-page">{/*
-    `2M-NOTIFY-003`/`-008`, slice 2M.4a. The governance section sits above the
-    list it makes a promise about, so the promise and the thing it is a promise
-    about are read together. The state is `NO_CONSENT.state` — `unsupported` —
-    because migration 2 has not created the record yet and the honest answer to
-    "what is my consent state" is that there is no record, never a default-on.
-  */}<NotificationSettings locale={locale} state={NO_CONSENT.state} /><header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div></header>{items.length ? <div className="list-stack">{items.map((item) => <article className={`list-row notification-row ${item.status}`} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta"><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link className="row-action" href={item.action_url}>{pt ? "Abrir" : "Open"}</Link>}<form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form></div></article>)}</div> : <div className="empty-list"><Bell size={30} /><strong>{pt ? "Tudo tranquilo" : "All quiet"}</strong><p>{pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`}</p></div>}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></div>;
+    `2M-NOTIFY-003`/`-008`. The governance section sits above the list it makes
+    a promise about, so the promise and the thing it is a promise about are read
+    together.
+
+    Slice 2M.4b replaces slice 2M.4a's hardcoded `NO_CONSENT.state` with the
+    real owner-scoped read. The resolution is still fail-closed: a missing or
+    unreadable record resolves to `unsupported`, never to a default-on.
+  */}<NotificationSettings
+    locale={locale}
+    state={consent.state}
+    pushPublicKey={readVapidPublicKey()}
+    enabledTypes={consent.enabledTypes}
+    frequency={consent.frequency}
+    quietStart={consent.quietStart ?? "22:30"}
+    quietEnd={consent.quietEnd ?? "07:00"}
+    dailyCap={consent.dailyCap}
+  /><header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div></header>{items.length ? <div className="list-stack">{items.map((item) => <article className={`list-row notification-row ${item.status}`} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta"><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link className="row-action" href={item.action_url}>{pt ? "Abrir" : "Open"}</Link>}<form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form></div></article>)}</div> : <div className="empty-list"><Bell size={30} /><strong>{pt ? "Tudo tranquilo" : "All quiet"}</strong><p>{pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`}</p></div>}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></div>;
 }

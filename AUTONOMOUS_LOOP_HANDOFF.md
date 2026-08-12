@@ -3722,3 +3722,96 @@ created. Nothing about 2M.5, the closeout or Phase 2N may begin before the
 owner's hardware evidence returns.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched.**
+
+## §54 — Slice 2M.4b is built to the migration boundary and stops there, unmerged (2026-08-12)
+
+**This is a mid-slice stop, and it is recorded as one.** Slice 2M.4b is **NOT
+complete**, **NOT merged**, **NOT deployed**. Branch `codex/phase-2m-slice-4b`,
+no PR opened. `main` is untouched at `b91bad4`.
+
+### Why the loop stopped here rather than at a slice boundary
+
+§53 predicted 2M.4b was the largest remaining unit, and it was: a migration, a
+pgTAP suite, two service-worker handlers, four Server Actions, a client control
+surface, two guard retargets, an Edge sender, browser lanes and a deployment in
+a fixed order. Context ran out partway. The brief's rule for that case is to
+finish the atomic unit in progress, stop at a safe boundary, and **never leave a
+migration append-only partially built**.
+
+**The migration is complete and self-consistent.** That was the artifact that
+could not be left half-written, and it is not.
+
+### The budget is UNCHANGED on `main`
+
+`3 allocated · 2 spent`. The third and last allocated migration exists **only on
+the unmerged branch** as `202608120092_phase_2m_push_delivery.sql`. Hosted
+parity is still `202608110090`; `202608110091` is still merged and unapplied.
+**No fourth migration was created.** Signup closed, rollout gate untouched,
+Phase 2N not started, A13 not retargeted.
+
+### What the branch contains, and what is proved about it
+
+| artifact | state |
+|---|---|
+| `202608120092_phase_2m_push_delivery.sql` | **complete**; three tables, six functions, RLS forced, retention registered and armed by nobody, eight self-checks |
+| `supabase/tests/phase_2m_push_delivery.sql` | **complete**, 61 assertions, positive controls beside every refusal — **never executed** (no local Docker; CI's `database` job is the first real run) |
+| `public/sw.js` | `push` + `notificationclick` handlers; payload treated as untrusted, destination from a closed set |
+| `actions.ts`, `schema.ts`, `consent-reader.ts`, `push-controls.tsx`, `push-encoding.ts` | built; typecheck and lint clean |
+| push + notification boundary guards | **retargeted, not weakened**; allowlist names three files and each is proved to earn its entry |
+| `service-worker.test.ts` | retargeted from "no push surface" to driving the real handlers — **12 passed** |
+| Edge Function sender | **NOT STARTED** |
+
+### Three defects this work found in itself, recorded because they are the shape
+
+1. **`cooldown` was unreachable.** The first draft let a delivered row count as
+   a `duplicate`, so the duplicate branch always fired first and the 24-hour
+   cooldown could never be the answer. Writing the pgTAP suite found it. The
+   state model now separates *in flight* from *delivered recently*, and both
+   controls are exercised.
+2. **The allowlist blinded the guard's own mutation controls.** Adding
+   `public/sw.js` to `ALLOWED` made three scratch-root controls return `[]`
+   while still passing. `pushArtifacts` now takes the allowlist as a parameter
+   so the controls pass `[]`.
+3. **`now() at time zone <zone>` is a `timestamp`, not a `timestamptz`.**
+   Declaring it `timestamptz` would have re-interpreted the user's wall clock in
+   the server's zone and silently skewed every quiet-hours and local-day
+   comparison.
+
+### Local gate state at the stop
+
+`typecheck` clean · `lint` clean · `npx vitest run` **5824 passed, 20 failed,
+12 files failed (366)**. The 20 are enumerated and none is a mystery:
+
+- `notification-settings.test.tsx` (10) — 2M.4a component tests that render the
+  surface without the props 2M.4b added. **Need retargeting.**
+- `phase-2f-traceability`, `phase-2f-documentation`, `phase-2f-cleanup`,
+  `egc-invariants` — chain-head and documentation guards that require the new
+  migration recorded in `DATABASE.md`, `STATE.md` and the regenerated matrix.
+- `phase-2l-no-gesture-guard` — must name the new notification components.
+- 3 unparsed **files** — the recorded Windows shebang baseline, green in CI.
+
+### What the next session owes, in order
+
+1. Retarget `notification-settings.test.tsx`; add tests for `push-encoding.ts`,
+   `schema.ts`, `consent-reader.ts` and `actions.ts`.
+2. Build the Edge sender (a `deliver_push` job through `process-jobs` —
+   `public.jobs.type` carries **no CHECK**, so this needs no schema change) and
+   the `notification_suppressed` producer.
+3. Extend `phase-2l-no-gesture-guard`; update `DATABASE.md`, `STATE.md`,
+   `CHANGELOG.md`, `TODO.md`; regenerate the 2F matrix and the 2M traceability.
+4. Playwright desktop + mobile; `CI=1 npm test`; `git diff --check`.
+5. Draft PR → CI green on the head → review → merge → CI green on the **exact**
+   merge SHA.
+6. **Then the VAPID checkpoint, which is already known to be open** — see below.
+
+### The VAPID checkpoint is confirmed OPEN, and it was checked rather than assumed
+
+`npx supabase secrets list` was read against the linked project. **There is no
+`VAPID_PRIVATE_KEY` and no `VAPID_PUBLIC_KEY`.** Deployment of `202608120092`
+is therefore blocked on an owner action regardless of when the code is finished.
+The surface already handles the absence honestly: `consent-reader.ts` returns
+`null` and `push-controls.tsx` renders the "not available" sentence instead of a
+button that would produce a subscription nothing can deliver to.
+
+**Phase 2N remains unstarted. Signup closed. Rollout gate untouched. `main`
+unchanged.**

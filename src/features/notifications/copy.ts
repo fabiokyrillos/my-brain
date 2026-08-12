@@ -23,9 +23,36 @@ export type NotificationSettingsCopy = {
   readonly states: Readonly<Record<NotificationConsentState, string>>;
   /** Where content still lives, which is the in-app list on this same page. */
   readonly inAppNote: string;
-  /** The honest statement that the controls do not exist yet. */
+  /**
+   * The honest statement for the case where the controls genuinely cannot work.
+   *
+   * Slice 2M.4a used this for "no persistence yet". Slice 2M.4b keeps it for
+   * the two cases that remain real: a browser with no Push API, and a
+   * deployment whose VAPID public key is not configured. `R-24` is why it still
+   * exists — a control that cannot do anything is not rendered, and the reason
+   * is said out loud instead.
+   */
   readonly notAvailableYet: string;
   readonly noPromptYet: string;
+
+  /* Slice 2M.4b — the controls `2M-NOTIFY-004` asks for, each with a consumer. */
+  readonly enableAction: string;
+  readonly enablePending: string;
+  readonly disableAction: string;
+  readonly typesHeading: string;
+  readonly types: Readonly<Record<"reminder" | "follow_up" | "review" | "digest", string>>;
+  readonly frequencyHeading: string;
+  readonly frequencies: Readonly<Record<"immediate" | "daily_digest" | "off", string>>;
+  readonly quietHeading: string;
+  readonly quietStartLabel: string;
+  readonly quietEndLabel: string;
+  readonly quietNote: string;
+  readonly dailyCapLabel: string;
+  readonly dailyCapNote: string;
+  readonly savePreferences: string;
+  readonly saved: string;
+  readonly saveFailed: string;
+  readonly permissionRefused: string;
 };
 
 const PT_BR: NotificationSettingsCopy = {
@@ -41,8 +68,34 @@ const PT_BR: NotificationSettingsCopy = {
     expired: "A inscrição deste aparelho expirou. Não foi você que desligou — dá para renovar.",
   },
   inAppNote: "As notificações com conteúdo continuam nesta página, atrás do seu login.",
-  notAvailableYet: "Os controles de tipo, frequência e período silencioso ainda não estão disponíveis. Eles chegam junto com o envio, e nada aqui promete um controle que ainda não existe.",
+  notAvailableYet: "Este navegador não oferece avisos, ou o envio ainda não está configurado neste ambiente. Por isso os controles não aparecem — em vez de aparecerem sem fazer nada.",
   noPromptYet: "Nada será perguntado ao navegador até que você peça, nesta página.",
+  enableAction: "Ativar avisos neste aparelho",
+  enablePending: "Ativando…",
+  disableAction: "Desativar avisos neste aparelho",
+  typesHeading: "O que pode avisar",
+  types: {
+    reminder: "Lembretes",
+    follow_up: "Coisas para acompanhar",
+    review: "Revisões prontas",
+    digest: "Resumos",
+  },
+  frequencyHeading: "Com que frequência",
+  frequencies: {
+    immediate: "Assim que acontecer",
+    daily_digest: "Uma vez por dia",
+    off: "Não avisar",
+  },
+  quietHeading: "Período silencioso",
+  quietStartLabel: "Começa às",
+  quietEndLabel: "Termina às",
+  quietNote: "Durante esse período nada é enviado. O mesmo período vale para os avisos dentro do app.",
+  dailyCapLabel: "Máximo de avisos por dia",
+  dailyCapNote: "Vale para o aparelho e para o app, contados separadamente em cada um.",
+  savePreferences: "Salvar preferências",
+  saved: "Preferências salvas.",
+  saveFailed: "Não foi possível salvar. Nada foi alterado.",
+  permissionRefused: "O navegador não autorizou. Nada foi ativado.",
 };
 
 const EN: NotificationSettingsCopy = {
@@ -58,8 +111,34 @@ const EN: NotificationSettingsCopy = {
     expired: "This device's subscription expired. You did not turn it off — it can be renewed.",
   },
   inAppNote: "Notifications with content stay on this page, behind your login.",
-  notAvailableYet: "The type, frequency and quiet-period controls are not available yet. They arrive together with delivery, and nothing here promises a control that does not exist.",
+  notAvailableYet: "This browser does not offer alerts, or delivery is not configured in this environment. That is why the controls are absent — rather than present and doing nothing.",
   noPromptYet: "Nothing will be asked of the browser until you ask for it, on this page.",
+  enableAction: "Turn on alerts on this device",
+  enablePending: "Turning on…",
+  disableAction: "Turn off alerts on this device",
+  typesHeading: "What may alert you",
+  types: {
+    reminder: "Reminders",
+    follow_up: "Things to follow up",
+    review: "Reviews that are ready",
+    digest: "Summaries",
+  },
+  frequencyHeading: "How often",
+  frequencies: {
+    immediate: "As soon as it happens",
+    daily_digest: "Once a day",
+    off: "Do not alert",
+  },
+  quietHeading: "Quiet period",
+  quietStartLabel: "Starts at",
+  quietEndLabel: "Ends at",
+  quietNote: "Nothing is sent during this period. The same period applies to in-app alerts.",
+  dailyCapLabel: "Most alerts per day",
+  dailyCapNote: "Applies to this device and to the app, counted separately on each.",
+  savePreferences: "Save preferences",
+  saved: "Preferences saved.",
+  saveFailed: "Could not save. Nothing was changed.",
+  permissionRefused: "The browser did not allow it. Nothing was turned on.",
 };
 
 export function getNotificationSettingsCopy(locale: string): NotificationSettingsCopy {
