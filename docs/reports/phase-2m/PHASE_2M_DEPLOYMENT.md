@@ -387,3 +387,98 @@ explicitly, and that remainder is stated rather than implied.
 No Auth or GoTrue setting, no `config.toml` push, no schedule, no cron job, no
 retention sweep armed, no signup change, no rollout execution, no provider call,
 no BYOK use, and no change to any pre-existing table's RLS, grants or policies.
+
+---
+
+## Sender redeploy — content-free failure diagnostics (2026-08-12)
+
+Triggered by a **hardware failure**, not by a schema change. No migration, no
+parity movement: hosted parity stays `202608120092` at 92 migrations.
+
+### 1. Why
+
+An iPhone with the PWA installed and permission granted reported
+`ok=true status=sent delivered=0 retired=0 failed=1`, and nothing arrived. The
+function's logs held **only boot and shutdown**: both of the sender's failure
+paths appended to `failed` and said nothing, so an Apple rejection, a bad VAPID
+signature, a transport error and a malformed subscription were one
+indistinguishable observation.
+
+That was an observability defect in the sender. It is recorded as such rather
+than as a platform problem.
+
+### 2. Provenance
+
+| | |
+|---|---|
+| PR | #185, merged as `609ee5b72ba81dd6e1d6f5ba3fbcad00a600ea64` |
+| CI on the exact merge SHA | **green 3/3** |
+| Deployed | 2026-08-12T14:11, `--use-api --no-verify-jwt` |
+| `verify:edge-parity` | `send-push … ok`, every function at or ahead of its source |
+
+### 3. Byte-identity, stated precisely rather than loosely
+
+The five uploaded files were compared against the merge SHA's blobs and are
+**byte-identical**. Getting there required a step worth recording: on a Windows
+checkout the working tree holds **CRLF** while the blob holds **LF**, because
+`.gitattributes` pins `*.sql text eol=lf` and says nothing about `*.ts`. A naive
+comparison therefore reported four mismatches whose content was identical.
+
+The files were normalised to LF before the upload, proved byte-identical, and the
+working tree restored afterwards. **The earlier migration deployment's
+byte-identity claim is unaffected and remains exact**, because `*.sql` is pinned.
+
+**Remainder, not closed here:** `.gitattributes` does not pin `*.ts`, so this
+normalisation is manual on every Windows deploy of an Edge Function. Pinning it
+would renormalise a large number of files and belongs in its own change.
+
+### 4. What the sender now reports
+
+A **closed twelve-value category** per failed attempt, plus the **HTTP status**
+when the push service actually answered — `gone`, `unauthorized`, `bad_request`,
+`payload_too_large`, `rate_limited`, `server_error`, `unexpected_status`,
+`host_not_allowed`, `subscription_malformed`, `vapid_key_malformed`,
+`network_error`, `unknown_error`.
+
+**Nothing else travels**: no endpoint, no subscription id, no owner, no key, no
+payload, and no text from the push service's response. A thrown value is matched
+by exact equality against the closed set this repository's own crypto module
+throws; everything else collapses to `network_error` or a deliberately opaque
+`unknown_error`. A test plants markers in all seven of those and asserts none
+reaches the outcome or the console.
+
+**Retirement is unchanged: still exactly 404/410**, asserted across
+`404, 410, 403, 500, 429, 400`. A `401` now has a name so it can be seen, and
+still must not retire a device — a rejected signature is our configuration being
+wrong, not the browser having discarded anything.
+
+### 5. The hypothesis under test, and what is already known about it
+
+The cryptography is **not** the suspect and was not touched: it is structurally
+equivalent to a known-working deployment and is additionally proved against
+**RFC 8291 section 5's published vector, byte for byte**.
+
+The difference is the VAPID `sub`. RFC 8292 defines it as an address the push
+service operator can be contacted at, and Apple is documented as strict. This
+deployment's default is `mailto:ops@my-brain.invalid`; `.invalid` is RFC 2606
+reserved and can never resolve.
+
+**Read on the deployed project: `VAPID_SUBJECT` is NOT configured**, so the
+running function is using that default, and the sender will therefore report
+`subject: "reserved"`. The half of the diagnostic that needed no hardware is
+already answered; **the push service's status code is the part only a device can
+supply.**
+
+### 6. Live confirmation of the redeploy
+
+`POST` without the dispatch secret still answers **401 and not 503**, which is
+again the proof that every environment variable is visible to the running
+function — and the body is the function's own, so `verify_jwt = false` still
+holds after the redeploy.
+
+### 7. What is NOT changed, deliberately
+
+`Urgency: normal` and the TTL value differ from the reference deployment and were
+**left alone**. Changing them in the same redeploy would make the next hardware
+run ambiguous about which change mattered. They are candidate follow-ups, each to
+be proved on its own.
