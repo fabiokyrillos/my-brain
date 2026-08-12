@@ -63,7 +63,7 @@ function renderPlanner(overrides: Record<string, unknown> = {}) {
     action={vi.fn()}
     bulkAction={vi.fn()}
     dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
-    dayHref={(day: string) => `/en/app/calendar/plan?date=${day}`}
+    dayHrefBase="/en/app/calendar/plan"
     locale="en"
     projection={projection()}
     {...overrides}

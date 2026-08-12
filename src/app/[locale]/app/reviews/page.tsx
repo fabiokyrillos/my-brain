@@ -104,7 +104,6 @@ export default async function ReviewsPage({
       locale={locale}
       projection={projection}
       reviewsHref={`/${locale}/app/reviews`}
-      scopeHref={(value) => `/${locale}/app/reviews?scope=${value}`}
       undoAction={undoWorkOperation}
     />
 

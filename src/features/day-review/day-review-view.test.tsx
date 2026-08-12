@@ -74,7 +74,6 @@ function mount(overrides: Partial<DayReviewProjection> = {}, props: Record<strin
     locale="en"
     projection={projection(overrides)}
     reviewsHref="/en/app/reviews"
-    scopeHref={(scope: string) => `/en/app/reviews?scope=${scope}`}
     {...props}
   />);
 }

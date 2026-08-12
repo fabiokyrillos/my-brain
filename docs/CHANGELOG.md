@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2M COMPLETE: 94 requirements, and two surfaces that had never rendered
+
+**Push notifications are implemented and hosted, they fail on the owner's real iPhone with HTTP 403 from Apple Web Push, and they have never been validated on Android.** That sentence is the state of the feature, not a caveat after a success, and every other claim here is made next to it.
+
+**94 requirements: 89 built · 4 partial · 1 not-built-by-rule · 0 undelivered**, classified by a generator from the slice records and never typed. Budget closes at `3 allocated · 3 spent`, all non-transferable; a fourth was a stop condition throughout and none was created. Hosted parity read live and read-only: `202608120092` across 92 migrations, local = remote on every row. Signup closed; rollout gate untouched at 25 pass · 3 fail · 2 owner-signature.
+
+**ADR-107 amends OD-2M-5's closeout gate and asserts nothing about push working.** The owner deferred real-device validation out of the phase so that everything else it proved could be recorded. `H-5` stays **FAILED**, Android stays **NOT EXECUTED**, and both travel to `docs/initiatives/push-hardware-validation/` where they may not be deleted, reclassified as passing, or discharged by an offline test. The deployed sender's self-check answers `pair: "consistent"` and the application's public key is byte-identical to the Edge Function's — **a consistent pair eliminates a key mismatch and explains nothing**. No root cause is asserted.
+
+**The closeout slice's first act was to discover that two shipped surfaces had never worked.** `/app/reviews` and `/app/calendar/plan` each passed a plain arrow function to a `"use client"` component; React cannot serialize a function into the RSC payload, so both routes answered with their error boundary from the day they deployed — measured in a real browser, with `/app/calendar` beside them as the control. **Every component test was correct**: a test mounts the client component directly and hands it a function, which is valid there, and both browser lanes compose the surfaces with `setContent`, which never runs a server render. *A boundary that only exists in production is only tested in production.*
+
+The repair is data rather than a workaround. The new guard resolves the **receiving element** for 57 client elements; its first version scanned whole files and immediately failed on `app/reminders/page.tsx`, which hands two local formatters to a **server** component and works — **a guard that fails on correct code is a guard somebody weakens**.
+
+**The journey slice 2M.3 said it owed now exists and passes.** `e2e/online-day-review.spec.ts`: the carry-forward reaches `apply_task_command`, the intention moves read back in the account's own zone, the row leaves the day, the audit row exists, the undo is offered outside the row that disappears and works, and the outcome region takes focus when the round settles — which closes `2M-ACCESS-003`'s remainder. **20 passed** across the day-review and calendar journeys, desktop and Pixel 7, both locales, zero residue.
+
+**`2M-TIME-007` ships as a guard that names eight surfaces, and it found four more defects.** Four `daily-cycle` surfaces still format an instant with no `timeZone` — UTC on the server, the same defect 2M.3 fixed on the notification list. They are **recorded rather than repaired**, because the repair crosses two routes and roughly twenty-seven call sites and a product change inside a closing commit is how a phase's last change becomes its riskiest. The exemption is enumerated, its length asserted, and each entry asserted to **still carry the defect**, so it cannot outlive the repair.
+
+**The closeout guard was inverted rather than deleted.** It forbade the matrix and the closing report from existing; it now requires both, and requires the matrix to be byte-identical to what the generator produces — a stronger contract, changed in ADR-107's own unit rather than silently.
+
+The roadmap successor is **re-audited and not started**: no artifact, no requirement, no ADR, and the phase-start guard is not retargeted.
+
 ## 2026-08-12 - The sender proves its own VAPID pair, offline, before it sends
 
 **Hardware run 1's 403 is narrowed to one unanswered question, and that question no longer costs a device run.** The iPhone answered `unauthorized` / HTTP 403 twice — once with `subject: "reserved"` and once, after the owner configured a real operational address, with `subject: "operational"`. The subject is therefore not the cause, and 403 is where a rejected `sub`, a wrong `aud`, an unverifiable signature and an unexpected key all converge.

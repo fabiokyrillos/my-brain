@@ -97,7 +97,7 @@ export function PlannerView({
   action,
   bulkAction,
   dateBounds,
-  dayHref,
+  dayHrefBase,
   locale,
   projection,
   undoAction,
@@ -106,7 +106,7 @@ export function PlannerView({
   bulkAction: BulkCommandHandler;
   dateBounds: TaskDetailDateBounds;
   /** Where a day link goes. Navigation only — this component builds no URL policy. */
-  dayHref: (day: string) => string;
+  dayHrefBase: string;
   locale: Locale;
   projection: PlannerProjection;
   undoAction?: TaskUndoHandler;
@@ -219,9 +219,9 @@ export function PlannerView({
           <p className="quiet-state">{copy.createsNothing}</p>
         </div>
         <nav aria-label={copy.dayLabel} className="planner-day-nav">
-          <a href={dayHref(shiftDay(projection.day, -1))}>{copy.previousDay}</a>
+          <a href={`${dayHrefBase}?date=${shiftDay(projection.day, -1)}`}>{copy.previousDay}</a>
           <strong>{projection.day}{projection.isToday ? ` · ${copy.today}` : ""}</strong>
-          <a href={dayHref(shiftDay(projection.day, 1))}>{copy.nextDay}</a>
+          <a href={`${dayHrefBase}?date=${shiftDay(projection.day, 1)}`}>{copy.nextDay}</a>
         </nav>
       </header>
 

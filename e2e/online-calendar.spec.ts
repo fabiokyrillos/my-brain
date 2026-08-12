@@ -366,4 +366,36 @@ test.describe("the calendar reschedules through the existing command path", () =
     // is left", and this is that rule observed rather than argued.
     await expect(page.locator(".calendar-item", { hasText: title })).toHaveCount(0);
   });
+
+  test("the planner renders at all, and its day navigation carries the date", async ({ page }) => {
+    /*
+     * Slice 2M.2 shipped `/app/calendar/plan`, merged it with CI green and
+     * deployed it, and **it had never rendered.** `page.tsx` handed the client
+     * component a `dayHref` arrow function; React cannot serialize a function
+     * into the RSC payload, so the render threw and the route answered with its
+     * error boundary — measured against the deployment on 2026-08-12, with
+     * `/app/calendar` beside it as the control that rendered fine.
+     *
+     * The planner's own lane composes the view with `setContent`, which never
+     * runs a server render, so nothing could have caught it there. This case is
+     * deliberately shallow: it asserts the page **exists**, which is the claim
+     * that turned out to be false.
+     *
+     * `client-boundary-serializability-guard.test.ts` is the structural half and
+     * runs in CI; this is the behavioural half and needs a real server.
+     */
+    await signInOnline(page, {
+      email: owner.email,
+      locale: "pt-BR",
+      next: "/pt-BR/app/calendar/plan",
+    });
+
+    await expect(page.getByRole("alert").getByRole("heading", { name: /Não foi possível carregar/ }))
+      .toHaveCount(0);
+    const dayNav = page.locator("nav.planner-day-nav");
+    await expect(dayNav).toBeVisible();
+    // The two links the broken prop was supposed to build. A planner that
+    // rendered without them would be the same defect with a quieter symptom.
+    await expect(dayNav.locator("a[href*='/app/calendar/plan?date=']")).toHaveCount(2);
+  });
 });
