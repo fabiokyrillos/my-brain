@@ -3905,3 +3905,58 @@ gesture, delivery on both platforms, the tap destination, revocation) and the
 **2M.5 is NOT started. Phase 2M is NOT closed. Phase 2N is NOT started and NOT
 planned. A13 is NOT retargeted.** Signup closed, rollout gate untouched, the
 retention sweep armed by nobody.
+
+## §56 — Hardware run 1 failed H-5, and the failure was undiagnosable by my own doing (2026-08-12)
+
+**H-4 passed. H-5 FAILED. The checkpoint is still blocked**, and every remaining
+hardware line is **not started** rather than passed, because each assumes
+delivery works.
+
+### The second defect, which was mine
+
+The iPhone reported `ok=true status=sent delivered=0 retired=0 failed=1` and the
+function's logs held **only boot and shutdown**. Both failure paths appended to
+`failed` and said nothing, so an Apple rejection, a bad VAPID signature, a
+transport error and a malformed subscription were **one observation**.
+
+**Only hardware could have found this.** Every offline test asserts what the code
+*does* with a known failure; none could notice that it never says *which* failure
+happened. That is a general lesson about test design, not about push: a suite
+that always supplies the failure it is testing cannot detect that the system
+under test never reports which failure occurred.
+
+### The remedy, merged as `609ee5b` and deployed
+
+Twelve closed categories plus the HTTP status when the service answered. No
+endpoint, no subscription id, no owner, no key, no payload, and **no response
+body text** — a thrown value is matched by exact equality against our own crypto
+module's closed set and everything else collapses to an opaque `unknown_error`.
+Retirement stays **exactly 404/410**, asserted across six statuses.
+
+### The hypothesis, and the half already answered
+
+Cryptography is **not** the suspect: structurally equivalent to a known-working
+deployment and proved against RFC 8291 section 5's vector byte for byte. The
+difference is the VAPID `sub`. Ours defaults to `mailto:ops@my-brain.invalid`,
+and `.invalid` is RFC 2606 reserved and can never resolve, while RFC 8292 defines
+`sub` as an address the operator can be contacted at.
+
+**`VAPID_SUBJECT` is confirmed NOT configured on the deployed project**, so the
+sender is using that default and will report `subject: "reserved"`. The remaining
+unknown is the push service's status code, and only a device can supply it.
+
+`Urgency: normal` and the TTL difference are **deliberately unchanged** — moving
+them now would make the next run ambiguous.
+
+### A deployment detail that will recur
+
+On Windows the working tree holds CRLF while the blob holds LF, because
+`.gitattributes` pins `*.sql` and not `*.ts`. Byte-identity for an Edge Function
+deploy therefore needs an LF normalisation first. **The migration deployments'
+byte-identity claims are unaffected** — `*.sql` is pinned. Pinning `*.ts` is an
+open remainder.
+
+### THE LOOP STOPS HERE — OWNER ACTION REQUIRED
+
+One hardware re-run with the diagnostics deployed. **2M.5 not started, Phase 2M
+not closed, Phase 2N not started, A13 not retargeted.**
