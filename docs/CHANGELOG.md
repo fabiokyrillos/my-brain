@@ -2,6 +2,55 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2N: ALL SEVENTEEN DECISIONS SIGNED, 123 requirements, three migrations allocated and none created
+
+**Still zero implementation. Still no migration. No deployment. Signup closed and the rollout gate
+untouched at 25 pass / 3 fail / 2 owner-signature. Timezone not repaired. Push not resumed.**
+
+ADR-109 signs all seventeen Phase 2N decisions and fixes the budget at **3 allocated - obligation
+zero - non-transferable**, and **authorizes no implementation**. The three migrations are
+**destinations, not permissions**: **M1** validity-aware retrieval (slice 2N.3), **M2** content-free
+telemetry vocabulary (slice 2N.7, only if real producers and consumers are delivered), **M3**
+transactional deletion and propagation (slice 2N.3). A fourth is a stop condition.
+
+**ADR-108 is not rewritten.** Its ceiling of four, its seventeen open questions, the options
+considered and the recommendations it carried are the record of what was decided before the owner
+answered. ADR-109 layers on top and says so.
+
+**What the owner changed against the plan's recommendations.** The plan recommended two migrations
+and the owner signed three, funding deletion - which the gaps report ranked as the largest single
+improvement in user control available in this phase. The plan recommended declining the graph and
+the owner authorized it **under a contract that can refuse it**. The plan recommended the smaller
+library and the owner signed the larger one **with no migration**, which is coherent only because
+`entity_attachments` already exists - and the plan now proves that capability by capability rather
+than asserting it.
+
+**Changed.** The PRD moves from **108 to 123 requirements**: fifteen identifiers appended to the end
+of their existing families, twelve restated to what was signed, **none renumbered, reused or
+removed**. `[PROPOSAL]` is retired as a marker and `[BY-RULE]` replaces it for the three merge
+requirements, which close `not-built-by-rule` and never `partial`. The plan's slices, budget,
+estimates and critical path are rebuilt; **slice 2N.3 is now the critical path**, carrying two
+migrations and the phase's only irreversible operation. The threat model gains **T-22** - an undo
+that restores less than it claims - moves T-6, T-9 and T-11 into scope, and closes **T-1 and T-3 by
+refusal rather than by mitigation**. The traceability contract grows from 22 refusals to **26**.
+
+**A separate timezone initiative is now a mandatory dependency of slice 2N.1** (OD-2N-13 B). Phase
+2N enumerates the defects and guards its own surfaces; it does **not** repair them, and the roughly
+27 call sites are **not absorbed** into slice 2N.0.
+
+**One interpretation is flagged rather than absorbed.** Read literally over every field, OD-2N-12's
+fail-closed rule would mask a person's own name on their own page, because a name has no source
+entry. `2N-PRIVACY-007` records the intended reading - the rule governs source-derived content, not
+an entity's own owner-typed fields - and asks the owner to confirm it.
+
+**Estimate revised to 17-26 weeks** (18-28 including the timezone initiative), up from 12-17 and
+above the roadmap's 13-18, entirely attributable to deletion, the enlarged library and the graph
+with its alternative.
+
+**Preserved without reclassification.** Push is implemented and hosted, fails on a real iPhone with
+HTTP 403, cause unproven, Android NOT EXECUTED. No real screen reader has run. The four
+`daily-cycle` timezone exemptions keep their own destination. ADR-055 expires 2026-10-27.
+
 ## 2026-08-12 - PHASE 2N AUTHORIZED FOR PLANNING ONLY: 108 requirements, and five findings that change the phase
 
 **Nothing was implemented. No migration was created. No deployment happened. Signup stays closed and
@@ -19,7 +68,8 @@ numbered from 001 with no gap and each family name free of digits) and
 `..._IMPLEMENTATION_PLAN.md` (eight slices, a migration-budget proposal, seventeen owner decisions
 in full, and a re-estimate). Under `docs/reports/phase-2n/`: the current-experience audit, the UX
 gaps and opportunities, the threat model (T-1...T-21, five of them live today) and the traceability
-contract (twenty-two refusals). `src/lib/closeout/phase-2n-declarations.test.ts` enforces the
+contract (twenty-two refusals, since grown to twenty-six).
+`src/lib/closeout/phase-2n-declarations.test.ts` enforces the
 planning-only half in CI.
 
 **The audit corrected the inherited picture in eight places.** The contextual person and project
