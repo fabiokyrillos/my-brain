@@ -8,6 +8,8 @@ import { JobRetryForm, UploadForm } from "@/features/agent/forms";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { ATTACHMENT_LIMITS } from "@/lib/quotas";
 import { isLocale } from "@/lib/preferences";
@@ -96,6 +98,9 @@ export default async function FilesPage({
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase } = await requireUser(locale);
+  // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
+  // other contextual surface stamp instants from the same source.
+  const timeZone = await getOwnerTimeZone();
 
   const [fileResult, failedJobResult] = await Promise.all([
     supabase
@@ -233,11 +238,7 @@ export default async function FilesPage({
               const terminal =
                 job.status === "exhausted" ||
                 Number(job.attempts) >= Number(job.max_attempts);
-              const retryAt = new Date(job.next_attempt_at);
-              const retryAtLabel = new Intl.DateTimeFormat(locale, {
-                dateStyle: "short",
-                timeStyle: "short",
-              }).format(retryAt);
+              const retryAtLabel = formatInstant(job.next_attempt_at, "dayAndTime", locale, timeZone);
 
               return (
                 <article className="failed-job" key={job.id}>

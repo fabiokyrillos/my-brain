@@ -23,6 +23,8 @@ import {
 } from "@/features/entities/relationships";
 import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
@@ -34,6 +36,9 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const copy = getEntityCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
+  // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
+  // other contextual surface stamp instants from the same source.
+  const timeZone = await getOwnerTimeZone();
   const [
     personResult,
     taskLinkResult,
@@ -99,7 +104,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   // "shared projects" said they were shared, not what this person does on them.
   const roleByProjectId = new Map(projectLinks.map((link) => [link.project_id, link.role]));
   const organizationName = organizations.find((item) => item.id === person.organization_id)?.name ?? null;
-  const formatDate = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(value));
+  const formatDate = (value: string) => formatInstant(value, "day", locale, timeZone) ?? "";
 
   return (
     <div className="content-page entity-detail">
@@ -223,7 +228,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                 <div>
                   <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
                   <small>
-                    {new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(entry.occurred_at))}
+                    {formatInstant(entry.occurred_at, "dayAndTime", locale, timeZone)}
                     {entry.is_retroactive ? ` · ${pt ? "adicionado depois" : "added later"}` : ""}
                   </small>
                 </div>

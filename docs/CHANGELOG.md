@@ -2,6 +2,25 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 3: the seven contextual call sites nobody was watching
+
+people (×2), projects, memories, the entry detail, files and chat now stamp instants through the contract. **Thirteen of the seventeen formatters the census found were outside any guard's corpus, and these are seven of the thirteen.**
+
+Six take the zone from `getOwnerTimeZone()`. The seventh — the entry detail — takes it from **`review.timezone`**, the zone its own projection already carried and the same value its two child components stamp from, so the page cannot disagree with itself. That is a deliberate exception, and it is asserted rather than left to be inferred.
+
+**`memories` had a local function named `formatInstant`.** Same name as the contract's, four lines from doing the opposite of what the contract does. A reader grepping for `formatInstant` to check whether that page was already correct would have found it and concluded yes. It is deleted, its three call sites now reach the real one, and the convergence test forbids any contextual surface declaring `formatInstant`/`formatDate`/`formatDay` of its own.
+
+**Wall dates were checked before anything was converted.** Every column feeding these seven — `occurred_at`, `updated_at`, `next_attempt_at`, `valid_from`, `valid_until`, `created_at` — is `timestamptz` in its migration, so all seven format a genuine instant and none is a wall date being wrongly resolved. Contract item 4 holds by verification, not by assumption.
+
+**A new test asserts convergence, which the guard cannot.** The guard proves an *absence* — no formatter without a zone — and that is necessary and insufficient: seven call sites could each carry a different zone or a different presentation and every one would pass while the product still told a user two different things about one instant. `local-day-correction-convergence.test.ts` pins both axes: **presentation** (every surface renders with the same token, so a list and a detail cannot disagree) and **source** (a page stamping more than one instant takes its zone from one place).
+
+Two things that test caught about itself, worth recording because both were the test being wrong rather than the code:
+
+- **It initially required `formatInstant` of every surface.** `inbox/page.tsx` renders rows and stamps nothing — it *threads* the zone. The honest fix was to say which kind each surface is, not to loosen the assertion until everything passed; each entry now declares `formats` or `threads`, and a non-vacuity check keeps both arms reachable.
+- **It imported a helper from `local-day-correction-guard.test.ts`.** Importing a symbol out of a `*.test.ts` file executes that file's `describe` blocks inside the importing suite, so the guard's four hundred assertions ran a second time and reported their failures under this test's name. Four duplicated lines are cheaper than that.
+
+6526 tests pass. **Remaining debt: 20 occurrences** — 6 formatters, 7 host-zone field operations, 4 UTC day slices, 3 zone round-trips, all Unit 4. Zero migrations, 92, parity `202608120092`.
+
 ## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 2: the four Phase 2M carried past its own close
 
 `entry-review.tsx`, `inbox-item.tsx`, `needs-attention-item.tsx` and `technical-details.tsx` now render in the owner's zone through `formatInstant`. **Phase 2M's `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` list is empty and retired**, and the debt that phase recorded honestly rather than repaired is discharged.

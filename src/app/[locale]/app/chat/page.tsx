@@ -11,6 +11,8 @@ import { createProposedMemory, undoProposedMemory } from "@/features/memories/ac
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -25,6 +27,9 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
+  // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
+  // other contextual surface stamp instants from the same source.
+  const timeZone = await getOwnerTimeZone();
   /*
    * `2K-SUGG-001/002`. Two small reads under RLS, alongside the one this page
    * already made, and **no model call** — T-2K-10 is that "contextual
@@ -84,7 +89,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
             <Link href={`/${locale}/app/chat/${conversation.id}`} className="list-row" key={conversation.id}>
               <div className="list-row-main">
                 <strong>{conversation.title}</strong>
-                <p>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(conversation.updated_at))}</p>
+                <p>{formatInstant(conversation.updated_at, "dayAndTime", locale, timeZone)}</p>
               </div>
             </Link>
           ))}

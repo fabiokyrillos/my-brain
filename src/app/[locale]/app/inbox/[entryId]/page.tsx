@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
 import { requireUser } from "@/lib/auth/require-user";
+import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import type { InterpretationTechnicalDetailsView } from "@/features/daily-cycle/contracts";
 import { EntryReview } from "@/features/daily-cycle/entry-review";
@@ -93,7 +94,10 @@ export default async function EntryDetailPage({
     undoId: taskUndoId,
   } : undefined;
 
-  const occurredAtLabel = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(view.original.occurredAt));
+  // `LDC-CONTEXT-001`. `review.timezone` rather than the accessor: this page
+  // already loaded the owner's zone on the projection, and the two components
+  // below stamp from the same value, so the page cannot disagree with itself.
+  const occurredAtLabel = formatInstant(view.original.occurredAt, "dayAndTime", locale, review.timezone) ?? "";
 
   const nextActions = editableCurrent ? (
     <>

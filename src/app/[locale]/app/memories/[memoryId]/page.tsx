@@ -9,7 +9,9 @@ import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { MemoryEditForm } from "@/features/memories/memory-edit-form";
 import { asMemoryKind, asMemorySensitivity } from "@/features/memories/read";
 import { requireUser } from "@/lib/auth/require-user";
-import { isLocale, type Locale } from "@/lib/preferences";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
+import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
 /**
@@ -40,6 +42,9 @@ export default async function MemoryDetailPage({
   const locale = candidate;
   const copy = getMemoryCopy(locale);
   const { supabase } = await requireUser(locale);
+  // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
+  // other contextual surface stamp instants from the same source.
+  const timeZone = await getOwnerTimeZone();
 
   const memoryResult = await supabase
     .from("memories")
@@ -165,11 +170,11 @@ export default async function MemoryDetailPage({
         </div>
         <div>
           <dt>{copy.validFrom}</dt>
-          <dd>{formatInstant(memory.valid_from ?? memory.created_at, locale)}</dd>
+          <dd>{formatInstant(memory.valid_from ?? memory.created_at, "dayAndTime", locale, timeZone)}</dd>
         </div>
         <div>
           <dt>{copy.validUntil}</dt>
-          <dd>{memory.valid_until ? formatInstant(memory.valid_until, locale) : copy.validAlways}</dd>
+          <dd>{memory.valid_until ? formatInstant(memory.valid_until, "dayAndTime", locale, timeZone) : copy.validAlways}</dd>
         </div>
       </dl>
 
@@ -183,7 +188,7 @@ export default async function MemoryDetailPage({
                 <Link href={`/${locale}/app/inbox/${sourceEntry.id}`}>
                   <strong>{sourceEntry.original_content}</strong>
                 </Link>
-                <small>{formatInstant(sourceEntry.occurred_at, locale)}</small>
+                <small>{formatInstant(sourceEntry.occurred_at, "dayAndTime", locale, timeZone)}</small>
               </div>
             </article>
           </div>
@@ -208,11 +213,5 @@ export default async function MemoryDetailPage({
         state={state}
       />
     </div>
-  );
-}
-
-function formatInstant(value: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(
-    new Date(value),
   );
 }
