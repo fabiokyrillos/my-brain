@@ -3815,3 +3815,93 @@ button that would produce a subscription nothing can deliver to.
 
 **Phase 2N remains unstarted. Signup closed. Rollout gate untouched. `main`
 unchanged.**
+
+## §55 — Slice 2M.4b is complete, merged and DEPLOYED; the loop stops at the owner's hardware checkpoint (2026-08-12)
+
+**Slice 2M.4b is COMPLETE, MERGED and DEPLOYED.** PR #183, merge SHA
+`5a202048ee82643d7528117b2c92affa46614840`, CI green **3/3 on that exact SHA**
+before anything was pushed to the hosted project.
+
+### The budget is CLOSED
+
+`3 allocated · 3 spent`, all non-transferable. **Hosted parity is
+`202608120092` across 92 migrations, local = remote on every row.** A **fourth
+migration is a stop condition** and none was created — the dry run showed exactly
+two pending, in chain order, and nothing else.
+
+### Ten defects, and where each was caught
+
+Six in the migration, four in its own suite. The distribution is the durable
+lesson and it is why this section exists.
+
+| # | defect | caught by |
+|---|---|---|
+| 1 | `pg_catalog.coalesce/.least/.greatest` cannot resolve — applies clean, fails on the first real send | the grammar guard, locally |
+| 2 | quiet hours silently discardable by a no-op `UPDATE` | reading |
+| 3 | `failure_count`: a CHECK with no writer, so retry was bounded per delivery only | reading |
+| 4 | a granted consent with no live device returned `permitted` | reading |
+| 5 | the SSRF comment described a control that did not exist | reading |
+| 6 | **`pg_catalog.position('x' in y)` is a PARSE-TIME error — the migration would not have applied at all** | **CI, on the first attempt to apply it** |
+| 7 | fixture keys violated the CHECKs the migration declares | **the suite's first execution** |
+| 8 | the cascade drill named all three new tables, by name | **CI** |
+| 9 | the grant census required the `SELECT`-only posture declared | **CI** |
+| 10 | the retention registry required the new window named | **CI** |
+
+**Careful review caught everything that would fail LATER. Only execution caught
+the one that would fail IMMEDIATELY.** Five readings of a migration did not
+notice that it could not parse, because reading tests the model in your head and
+`supabase db reset` tests Postgres. Both are needed and neither substitutes.
+
+`sql-grammar-guard.test.ts` now names **both** families — the ones that fail at
+first execution and the ones that fail at parse — with a control proving each is
+detected and a control proving the ordinary replacements are not flagged.
+
+### Two deployment traps found before they could bite
+
+1. **`verify_jwt`.** The sender is secret-authenticated, and under the platform
+   default the GATEWAY answers 401 before the function runs — no log line, no
+   ledger row, and a symptom ("nothing is ever sent") indistinguishable from a
+   dozen others, discovered at the owner's checkpoint. `[functions.send-push]
+   verify_jwt = false` is declared in `config.toml` and passed explicitly at
+   deploy. **`supabase config push` was NOT run and must not be** — it is
+   all-or-nothing and would open signup.
+2. **No local Docker**, so `functions deploy` needs `--use-api`.
+
+### The 401-not-503 proof, worth reusing
+
+The deployed sender's POST path checks configuration **before** the secret. A
+`POST` with a wrong secret returning **401 rather than 503** therefore proves
+that both VAPID halves, the dispatch secret and the service credentials are all
+visible to the running function — established without reading any value. And the
+401 body being the function's own rather than a gateway JWT error proves
+`verify_jwt = false` took effect. Two facts from one curl.
+
+### What is proved, and what is emphatically not
+
+**47 of 47 hosted claims passed** through real PostgREST under real roles with
+RLS actually enforced: T-01, T-09, the six controls each naming itself, both
+retry ceilings, immediate retirement of a gone subscription, quiet hours and the
+cap read back from `agent_preferences`, an audit with no content-bearing column,
+and three non-vacuous negative controls. Zero residue proved owner-scoped and
+then confirmed globally.
+
+The push cryptography is proved against **RFC 8291 section 5's published vector,
+byte for byte** — a round trip would have agreed with itself while both halves
+used the same wrong info string.
+
+**NO PUSH HAS REACHED ANY DEVICE.** Every test uses a fake `fetch`. An emulated
+Pixel 7 is a viewport, not a device. No screen reader has read the surface.
+**Nothing calls the sender automatically** — there is no producer, no schedule
+and no cron entry, because wiring the heartbeat would need a claim RPC and
+therefore a fourth migration.
+
+### THE LOOP STOPS HERE — OWNER CHECKPOINT, HARDWARE PROOF REQUIRED
+
+The checklist is in `docs/reports/phase-2m/PHASE_2M_SLICE_04B_ACCEPTANCE.md` §6,
+split into the **six lines that block slice 2M.5** (permission after a real
+gesture, delivery on both platforms, the tap destination, revocation) and the
+**eight that block only closeout**.
+
+**2M.5 is NOT started. Phase 2M is NOT closed. Phase 2N is NOT started and NOT
+planned. A13 is NOT retargeted.** Signup closed, rollout gate untouched, the
+retention sweep armed by nobody.
