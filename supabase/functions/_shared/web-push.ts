@@ -251,21 +251,51 @@ export async function encryptPushPayload(input: {
  * push endpoint is the subscription identifier, and signing it into a token
  * would put a per-user secret into a header that transits intermediaries.
  */
-export async function createVapidAuthorization(input: {
-  readonly endpoint: string;
-  readonly publicKey: string;
-  readonly privateKey: string;
-  readonly subject: string;
-  /** Seconds since the epoch. Passed in so the token is deterministic under test. */
-  readonly expiresAtSeconds: number;
-}): Promise<string> {
-  const audience = new URL(input.endpoint).origin;
-  const publicKeyBytes = base64UrlDecode(input.publicKey);
-  if (publicKeyBytes.length !== P256_PUBLIC_KEY_BYTES) throw new Error("vapid_public_key_invalid");
-  const privateKeyBytes = base64UrlDecode(input.privateKey);
-  if (privateKeyBytes.length !== 32) throw new Error("vapid_private_key_invalid");
+/** The scalar half of a P-256 pair. */
+const P256_PRIVATE_KEY_BYTES = 32;
 
-  const signingKey = await crypto.subtle.importKey(
+/**
+ * The two configured halves, decoded, with the two faults named APART.
+ *
+ * `base64UrlDecode` throws a `DOMException` for text that is not base64 at all,
+ * and a `DOMException` reaching `categoriseThrown` collapses to `unknown_error`
+ * — the opaque category, for the one fault whose repair is the most specific.
+ * So both routes to "this is not a key" arrive as the same named error here.
+ */
+function decodeVapidPair(publicKey: string, privateKey: string): {
+  publicKeyBytes: Uint8Array;
+  privateKeyBytes: Uint8Array;
+} {
+  let publicKeyBytes: Uint8Array;
+  try {
+    publicKeyBytes = base64UrlDecode(publicKey);
+  } catch {
+    throw new Error("vapid_public_key_invalid");
+  }
+  if (publicKeyBytes.length !== P256_PUBLIC_KEY_BYTES) throw new Error("vapid_public_key_invalid");
+  let privateKeyBytes: Uint8Array;
+  try {
+    privateKeyBytes = base64UrlDecode(privateKey);
+  } catch {
+    throw new Error("vapid_private_key_invalid");
+  }
+  if (privateKeyBytes.length !== P256_PRIVATE_KEY_BYTES) throw new Error("vapid_private_key_invalid");
+  return { publicKeyBytes, privateKeyBytes };
+}
+
+/**
+ * The signing key, built from `d` with `x`/`y` alongside it.
+ *
+ * **This runtime does not check that they belong together.** It imports the
+ * scalar and signs with it, so a `d` from one generation and an `x`/`y` from
+ * another produce a valid signature over a key nobody was given.
+ * `vapidKeyPairAgrees` is what makes that visible; nothing here can.
+ */
+function importVapidSigningKey(
+  publicKeyBytes: Uint8Array,
+  privateKeyBytes: Uint8Array,
+): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
     "jwk",
     {
       kty: "EC",
@@ -279,6 +309,82 @@ export async function createVapidAuthorization(input: {
     false,
     ["sign"],
   );
+}
+
+/** Fixed, public, and carries nothing: it exists only to be signed and checked. */
+const VAPID_PAIR_PROBE = encoder.encode("vapid-key-pair-agreement-probe");
+
+/**
+ * Does `VAPID_PRIVATE_KEY` actually sign for `VAPID_PUBLIC_KEY`?
+ *
+ * RFC 8292 sends the public key to the push service in `k=` and asks it to
+ * verify a signature made by the private one. If the two are not a pair the
+ * request is perfectly well-formed and **unauthenticable**, and every push
+ * service's only available answer is 401/403 — indistinguishable from a rejected
+ * `sub`, a wrong `aud`, or a signature format it disliked. That ambiguity cost a
+ * hardware run, and the only way to resolve it was another one.
+ *
+ * So it is asked here instead, by doing what the push service does: sign a fixed
+ * probe with the configured private key and verify it with the configured public
+ * key. A `false` is a real disagreement; a malformed half THROWS rather than
+ * answering `false`, because "your keys are from different generations" and
+ * "your key is not a key" are different repairs.
+ */
+export async function vapidKeyPairAgrees(input: {
+  readonly publicKey: string;
+  readonly privateKey: string;
+}): Promise<boolean> {
+  const { publicKeyBytes, privateKeyBytes } = decodeVapidPair(input.publicKey, input.privateKey);
+
+  // 65 bytes is a length, not a point. A value that is the right size and off
+  // the curve is refused here rather than at a push service.
+  let verifier: CryptoKey;
+  try {
+    verifier = await crypto.subtle.importKey(
+      "raw",
+      publicKeyBytes as BufferSource,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"],
+    );
+  } catch {
+    throw new Error("vapid_public_key_invalid");
+  }
+
+  let signingKey: CryptoKey;
+  try {
+    signingKey = await importVapidSigningKey(publicKeyBytes, privateKeyBytes);
+  } catch {
+    // A runtime that DOES validate the JWK refuses the incoherent pair right
+    // here. That is a disagreement, reported as one, so this function's answer
+    // does not depend on which runtime it is running on.
+    return false;
+  }
+
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    signingKey,
+    VAPID_PAIR_PROBE as BufferSource,
+  );
+  return await crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    verifier,
+    signature,
+    VAPID_PAIR_PROBE as BufferSource,
+  );
+}
+
+export async function createVapidAuthorization(input: {
+  readonly endpoint: string;
+  readonly publicKey: string;
+  readonly privateKey: string;
+  readonly subject: string;
+  /** Seconds since the epoch. Passed in so the token is deterministic under test. */
+  readonly expiresAtSeconds: number;
+}): Promise<string> {
+  const audience = new URL(input.endpoint).origin;
+  const { publicKeyBytes, privateKeyBytes } = decodeVapidPair(input.publicKey, input.privateKey);
+  const signingKey = await importVapidSigningKey(publicKeyBytes, privateKeyBytes);
 
   const header = base64UrlEncode(encoder.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
   const claims = base64UrlEncode(

@@ -6,6 +6,7 @@ import {
   createVapidAuthorization,
   encryptPushPayload,
   importSenderKeyPair,
+  vapidKeyPairAgrees,
 } from "./web-push.ts";
 
 /**
@@ -188,4 +189,93 @@ Deno.test("a malformed VAPID key is refused rather than signing with a truncated
     Error,
     "vapid_public_key_invalid",
   );
+});
+
+/**
+ * The gap an iPhone found, stated as a test rather than as a hypothesis.
+ *
+ * Every assertion above this line is handed a pair generated in one call, so
+ * `d` has always belonged to `x`/`y`. That is the same shape of blind spot §56
+ * recorded: a suite that always supplies a coherent input cannot notice that
+ * an incoherent one travels silently. And it does travel — this runtime imports
+ * an EC private JWK from `d` alone, so a `VAPID_PRIVATE_KEY` and a
+ * `VAPID_PUBLIC_KEY` set from two different generations produce a perfectly
+ * well-formed `Authorization` header carrying a signature that verifies against
+ * NOTHING the push service was given. The service's only available answer is
+ * 401/403, which is exactly what a rejected `sub`, a wrong `aud` and a bad
+ * signature all look like from here.
+ */
+Deno.test("RFC 8292: a private key that does not belong to the advertised public key is DETECTED", async () => {
+  const a = await testVapidPair();
+  const b = await testVapidPair();
+
+  // The positive control first: a real pair must agree, or the negative below
+  // would pass against a function that always answers `false`.
+  assertEquals(await vapidKeyPairAgrees({ publicKey: a.publicKey, privateKey: a.privateKey }), true);
+  assertEquals(await vapidKeyPairAgrees({ publicKey: b.publicKey, privateKey: b.privateKey }), true);
+
+  // Both halves are individually valid — a length check cannot see this.
+  assertEquals(await vapidKeyPairAgrees({ publicKey: b.publicKey, privateKey: a.privateKey }), false);
+  assertEquals(await vapidKeyPairAgrees({ publicKey: a.publicKey, privateKey: b.privateKey }), false);
+});
+
+Deno.test("the pair check refuses a malformed half rather than answering `false` for it", async () => {
+  const { publicKey, privateKey } = await testVapidPair();
+  // `false` would read as "the keys disagree", pointing at a rotation that never
+  // happened. A key that is not a key is a different repair.
+  await assertRejects(
+    () => vapidKeyPairAgrees({ publicKey: base64UrlEncode(new Uint8Array(31)), privateKey }),
+    Error,
+    "vapid_public_key_invalid",
+  );
+  await assertRejects(
+    () => vapidKeyPairAgrees({ publicKey, privateKey: base64UrlEncode(new Uint8Array(31)) }),
+    Error,
+    "vapid_private_key_invalid",
+  );
+});
+
+/**
+ * Why the check above cannot be replaced by trusting the runtime.
+ *
+ * Written to survive a runtime that starts validating: the invariant asserted is
+ * not "the import succeeds" but "a mismatched pair never yields a token a push
+ * service would accept". If a future Deno refuses the import outright, this
+ * still passes and `vapidKeyPairAgrees` becomes belt and braces; if it keeps
+ * accepting it, this is the proof that the belt is load-bearing.
+ */
+Deno.test("a mismatched pair never yields a token the advertised key can verify", async () => {
+  const a = await testVapidPair();
+  const b = await testVapidPair();
+
+  let header: string | null = null;
+  try {
+    header = await createVapidAuthorization({
+      endpoint: "https://push.example.test/subscription/abc123",
+      publicKey: b.publicKey,
+      privateKey: a.privateKey,
+      subject: "mailto:ops@example.test",
+      expiresAtSeconds: 1_800_000_000,
+    });
+  } catch {
+    // The runtime refused the incoherent key outright. Nothing was sent.
+    return;
+  }
+
+  const [, token, advertisedKey] = /^vapid t=([^,]+), k=(.+)$/.exec(header)!;
+  const [encodedHeader, encodedClaims, encodedSignature] = token.split(".");
+  const verifier = await crypto.subtle.importKey(
+    "raw",
+    base64UrlDecode(advertisedKey) as BufferSource,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["verify"],
+  );
+  const valid = await crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    verifier,
+    base64UrlDecode(encodedSignature) as BufferSource,
+    new TextEncoder().encode(`${encodedHeader}.${encodedClaims}`) as BufferSource,
+  );
+  assertEquals(valid, false);
 });

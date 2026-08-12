@@ -7,6 +7,7 @@ import {
   DEFAULT_VAPID_SUBJECT,
   deliverPush,
   deliveryFailureCategories,
+  inspectSenderConfiguration,
   isAllowedPushHost,
   parseDeliveryRequest,
   recordSuppression,
@@ -103,6 +104,155 @@ Deno.test("a title offered alongside a valid request is discarded, not forwarded
   assertEquals(parsed !== null, true);
   assertEquals(Object.keys(parsed!).sort(), ["dedupeHash", "locale", "type", "userId"]);
   assertEquals(JSON.stringify(parsed).includes("remédio"), false);
+});
+
+/**
+ * `2M-NOTIFY-011`'s fail-closed rule, applied to the one misconfiguration that
+ * could not be seen.
+ *
+ * This module's header already promised it: "a missing VAPID key ... refuses
+ * BEFORE `begin_push_delivery` is called, so a misconfigured deployment records
+ * nothing rather than recording a refusal it did not really evaluate." A pair
+ * whose two halves come from different generations is a missing VAPID key in
+ * every respect that matters — no push service can authenticate it — and it was
+ * the one shape that slipped past, because both halves are individually
+ * well-formed and the runtime signs with `d` without ever consulting `x`/`y`.
+ *
+ * Refusing BEFORE the delivery is begun is the whole point: the previous
+ * behaviour consumed the dedupe slot, spent an attempt and charged the device a
+ * strike for a fault that was entirely ours. Three of those retire the owner's
+ * only subscription.
+ */
+Deno.test("a VAPID pair that cannot authenticate refuses BEFORE the delivery is begun", async () => {
+  const mine = await vapidPair();
+  const other = await vapidPair();
+  const { client, calls } = recordingClient({
+    begin_push_delivery: {
+      data: { permitted: true, delivery_id: "2f4b0001-0000-4000-8000-0000000000d1", subscriptions: [] },
+    },
+  });
+  let fetched = 0;
+
+  const outcome = await deliverPush(REQUEST, {
+    client,
+    config: { ...mine, vapidPublicKey: other.vapidPublicKey },
+    fetch: (() => {
+      fetched += 1;
+      return Promise.resolve(new Response(null, { status: 201 }));
+    }) as unknown as typeof fetch,
+    nowSeconds: () => 1_800_000_000,
+    allowedHosts: ALLOWED_TEST_HOSTS,
+  });
+
+  assertEquals(outcome, { status: "refused", code: "vapid_pair_mismatch" });
+  // Nothing was begun, nothing was finished, nothing was sent, and no device was
+  // charged for it.
+  assertEquals(calls.length, 0);
+  assertEquals(fetched, 0);
+});
+
+Deno.test("a malformed VAPID half refuses before the delivery too, and says which fault it is", async () => {
+  const { vapidPrivateKey, vapidSubject } = await vapidPair();
+  const { client, calls } = recordingClient({});
+  const outcome = await deliverPush(REQUEST, {
+    client,
+    config: { vapidPublicKey: base64UrlEncode(new Uint8Array(31)), vapidPrivateKey, vapidSubject },
+    fetch: (() => Promise.reject(new Error("must not be reached"))) as unknown as typeof fetch,
+    nowSeconds: () => 1_800_000_000,
+    allowedHosts: ALLOWED_TEST_HOSTS,
+  });
+
+  // A DIFFERENT code from the mismatch above: one is a key that is not a key,
+  // the other is two keys that are not a pair, and they are different repairs.
+  assertEquals(outcome, { status: "refused", code: "vapid_key_malformed" });
+  assertEquals(calls.length, 0);
+});
+
+Deno.test("the pre-flight is not vacuous: a coherent pair still reaches the database", async () => {
+  /*
+   * Without this, both refusals above would pass against a `deliverPush` that
+   * refused unconditionally — the cheapest possible way to make a fail-closed
+   * test suite green and the product dead.
+   */
+  const { client, calls } = recordingClient({
+    begin_push_delivery: { data: { permitted: false, reason: "not_consented" } },
+  });
+  const outcome = await deliverPush(REQUEST, {
+    client,
+    config: await vapidPair(),
+    fetch: (() => Promise.reject(new Error("must not be reached"))) as unknown as typeof fetch,
+    nowSeconds: () => 1_800_000_000,
+    allowedHosts: ALLOWED_TEST_HOSTS,
+  });
+  assertEquals(outcome, { status: "suppressed", reason: "not_consented" });
+  assertEquals(calls.some((call) => call.name === "begin_push_delivery"), true);
+});
+
+/**
+ * The reading the owner can take at ZERO cost to a device.
+ *
+ * Hardware run 1 answered `unauthorized 403`, and the remaining question — is
+ * the configured pair even self-consistent? — could until now only be asked by
+ * sending a real push, which spends one of three strikes against the owner's
+ * only subscription and makes the NEXT reading ambiguous. This report answers it
+ * without a database call, without a push and without a device.
+ *
+ * Every field is a CATEGORY chosen by this file. There is no branch on which a
+ * key, a fragment of one, or its length reaches the output.
+ */
+Deno.test("the configuration self-check names every fault as a category and never a value", async () => {
+  const mine = await vapidPair();
+  const other = await vapidPair();
+
+  assertEquals(await inspectSenderConfiguration(mine), {
+    subject: "operational",
+    publicKey: "p256_point",
+    privateKey: "p256_scalar",
+    pair: "consistent",
+  });
+
+  assertEquals(await inspectSenderConfiguration({ ...mine, vapidPublicKey: other.vapidPublicKey }), {
+    subject: "operational",
+    publicKey: "p256_point",
+    privateKey: "p256_scalar",
+    pair: "mismatched",
+  });
+
+  assertEquals(
+    await inspectSenderConfiguration({ ...mine, vapidPublicKey: base64UrlEncode(new Uint8Array(31)) }),
+    { subject: "operational", publicKey: "malformed", privateKey: "p256_scalar", pair: "unusable" },
+  );
+
+  assertEquals(
+    await inspectSenderConfiguration({ ...mine, vapidPrivateKey: base64UrlEncode(new Uint8Array(31)) }),
+    { subject: "operational", publicKey: "p256_point", privateKey: "malformed", pair: "unusable" },
+  );
+
+  // The default subject is still visible here, which is what made hardware run
+  // 1's `subject: "reserved"` readable at all.
+  assertEquals(
+    (await inspectSenderConfiguration({ ...mine, vapidSubject: DEFAULT_VAPID_SUBJECT })).subject,
+    "reserved",
+  );
+
+  // A public key that decodes to a point but is not the CANONICAL text for it:
+  // the `k=` parameter carries the configured TEXT, so a padded or whitespace-
+  // bearing value travels verbatim into a header no service will accept.
+  assertEquals(
+    (await inspectSenderConfiguration({ ...mine, vapidPublicKey: `${mine.vapidPublicKey}=` })).publicKey,
+    "not_canonical",
+  );
+});
+
+Deno.test("the self-check output can hold no key material at all", async () => {
+  const config = await vapidPair();
+  const report = JSON.stringify(await inspectSenderConfiguration(config));
+  for (const secret of [config.vapidPublicKey, config.vapidPrivateKey, config.vapidSubject]) {
+    assertEquals(report.includes(secret), false);
+    // And no fragment of one either: eight characters is well below any
+    // accidental collision with a category name.
+    assertEquals(report.includes(secret.slice(0, 8)), false);
+  }
 });
 
 Deno.test("a suppressed decision sends nothing and records the control that refused", async () => {
