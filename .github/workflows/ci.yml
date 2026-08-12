@@ -68,6 +68,8 @@ jobs:
             supabase/functions/heartbeat/index.ts
           deno check --config supabase/functions/delete-account/deno.json --node-modules-dir=none --no-lock \
             supabase/functions/delete-account/index.ts
+          deno check --config supabase/functions/send-push/deno.json --node-modules-dir=none --no-lock \
+            supabase/functions/send-push/index.ts
 
       - name: Run the worker test suite
         # No --allow-* flags on purpose: the suite must stay network-free and

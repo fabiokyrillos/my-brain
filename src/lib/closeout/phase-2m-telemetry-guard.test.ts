@@ -536,8 +536,11 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
      * `day_planned`       — slice 2M.2, SHIPPED
      * `day_review_opened` — slice 2M.3, SHIPPED
      * `day_review_action_applied` — slice 2M.3, SHIPPED
-     * `notification_consent_changed` — slice 2M.4a
-     * `notification_suppressed`      — slice 2M.4b
+     * `notification_consent_changed` — slice 2M.4b, SHIPPED
+     * `notification_suppressed`      — slice 2M.4b, SHIPPED **in the worker**
+     *
+     * All six now have one. `2M-METRICS-003` closes on that, and the assertion
+     * below is what made each arrival visible in a diff rather than at closeout.
      */
     const producers = producerSites();
     expect([...producers.keys()].sort()).toEqual([
@@ -545,11 +548,40 @@ describe("Phase 2M migration 1: the daily-cycle vocabulary", () => {
       "day_planned",
       "day_review_action_applied",
       "day_review_opened",
+      "notification_consent_changed",
     ]);
     for (const name of ["calendar_viewed", "day_planned", "day_review_opened", "day_review_action_applied"]) {
       expect(producers.get(name), name)
         .toEqual(["src/features/product-analytics/interaction-events.tsx"]);
     }
+    expect(producers.get("notification_consent_changed"))
+      .toEqual(["src/features/notifications/actions.ts"]);
+  });
+
+  it("2M-METRICS-003: the sixth producer exists too, in the runtime this scan cannot walk", () => {
+    /*
+     * `notification_suppressed` is emitted by the Edge sender, under
+     * `supabase/functions/`, which `producerSites()` deliberately does not scan
+     * — its roots are `src/features`, `src/app` and `src/lib`.
+     *
+     * That gap is exactly how a producer goes invisible, and this repository has
+     * paid for it: SH.6's quota refusals recorded nothing for weeks because the
+     * only thing that would have noticed was a validator that never looked at
+     * the writer. So the sixth is asserted HERE, by name, against the file that
+     * emits it, rather than being left to the tally above where its absence
+     * would read as "not shipped yet".
+     */
+    const sender = readFileSync(join(REPO, "supabase/functions/send-push/deliver.ts"), "utf8");
+    expect(sender).toContain('p_event_name: "notification_suppressed"');
+    // The surface, literal, for the same reason the application producers'
+    // surfaces are: a constant is a value this guard cannot follow.
+    expect(sender).toContain('p_surface: "server"');
+    // And its properties are exactly the two the deployed validator admits.
+    // A third key is refused by `hasExactKeys`, silently, inside a catch.
+    expect(sender).toMatch(/p_properties:\s*\{\s*channel:\s*"push",\s*reason:\s*input\.reason\s*\}/);
+    // Content-free: the sender must never put the item's digest into the event.
+    const block = sender.slice(sender.indexOf('p_event_name: "notification_suppressed"'));
+    expect(block.slice(0, 600)).not.toMatch(/dedupeHash|dedupe_hash/);
   });
 
   it("2M-METRICS-004: the review producers carry no date, no time and no identifier", () => {

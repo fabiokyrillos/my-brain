@@ -47,19 +47,64 @@ function walk(directory: string): readonly string[] {
   });
 }
 
-const GOVERNANCE = walk(path.join(REPO, "src/features/notifications"))
+const FEATURE = walk(path.join(REPO, "src/features/notifications"))
   .filter((file) => !/\.test\.tsx?$/.test(file))
   .map((file) => ({
     file: path.relative(REPO, file).replace(/\\/g, "/"),
     text: withoutComments(readFileSync(file, "utf8")),
   }));
 
+/**
+ * Slice 2M.4b splits this directory in two, and the split IS the retarget.
+ *
+ * Until 2M.4b, no file here could reach for a client, a writer or a permission
+ * prompt — the ordering that made the rules a constraint on the sender rather
+ * than a description of it. That ordering has now been honoured: 2M.4a merged
+ * with CI green on its merge SHA before any of this was written.
+ *
+ * So the constraint is not dropped, it is **narrowed to the modules it was
+ * always about**. The four decision modules stay exactly as pure as they were
+ * — no client, no fetch, no writer, no prompt, no scheduler — and the delivery
+ * modules are named, one by one, the same way the push guard names its
+ * allowlist. A guard that had simply been deleted at this point would have been
+ * a guard that only ever described the past.
+ */
+const PURE_MODULES = [
+  "src/features/notifications/consent-contract.ts",
+  "src/features/notifications/governance.ts",
+  "src/features/notifications/payload.ts",
+  "src/features/notifications/copy.ts",
+  "src/features/notifications/push-encoding.ts",
+];
+
+/** The modules slice 2M.4b earned, by name. */
+const DELIVERY_MODULES = [
+  "src/features/notifications/actions.ts",
+  "src/features/notifications/consent-reader.ts",
+  "src/features/notifications/notification-settings.tsx",
+  "src/features/notifications/push-controls.tsx",
+  "src/features/notifications/schema.ts",
+];
+
+const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));
+
 const PAYLOAD = withoutComments(read("src/features/notifications/payload.ts"));
 
 describe("2M-NOTIFY-007: the payload has nowhere to put content", () => {
   it("scans a corpus that exists", () => {
-    expect(GOVERNANCE.length).toBeGreaterThanOrEqual(4);
+    expect(GOVERNANCE.length).toBe(PURE_MODULES.length);
     expect(GOVERNANCE.map(({ file }) => file)).toContain("src/features/notifications/payload.ts");
+  });
+
+  it("accounts for every file in the feature as pure or delivery", () => {
+    /*
+     * The discovery sweep that makes the split honest. Without it, a new file
+     * added to this directory would belong to NEITHER list and would therefore
+     * be scanned by nothing — which is precisely how a boundary guard is
+     * defeated without anybody editing it.
+     */
+    const classified = [...PURE_MODULES, ...DELIVERY_MODULES].sort();
+    expect(FEATURE.map(({ file }) => file).sort()).toEqual(classified);
   });
 
   it("declares exactly three fields on the payload type", () => {
@@ -120,14 +165,42 @@ describe("2M-NOTIFY-003: nothing asks the browser for permission yet", () => {
     }
   });
 
-  it("renders no control the user could press to ask", () => {
-    const surface = withoutComments(read("src/features/notifications/notification-settings.tsx"));
-    // `R-24`: a control with no consumer. In 2M.4a there is no persisted consent
-    // for a control to write to, so the surface offers none and says so.
-    expect(surface, "the surface renders a button before there is anything to press it for")
-      .not.toMatch(/<button|onClick=/);
-    expect(surface, "the surface must state that the controls do not exist yet")
-      .toContain("notAvailableYet");
+  it("raises the prompt from exactly one file, inside a handler", () => {
+    /*
+     * `R-24` inverted. In 2M.4a the honest state was "no control at all,
+     * because nothing reads one". Now the consent record exists and the
+     * controls have a consumer, so the question changes from *whether* a
+     * control may be rendered to *where the prompt may be raised from*.
+     *
+     * Exactly one file, and inside a function rather than at module scope: a
+     * top-level `requestPermission()` would fire on import, which is
+     * `2M-NOTIFY-003`'s "on first load" by another route.
+     */
+    const requestPermission = `request${"Permission"}(`;
+    const asking = FEATURE.filter(({ text }) => text.includes(requestPermission));
+    expect(asking.map(({ file }) => file)).toEqual(["src/features/notifications/push-controls.tsx"]);
+
+    const controls = withoutComments(read("src/features/notifications/push-controls.tsx"));
+    const line = controls.split("\n").find((candidate) => candidate.includes(requestPermission)) ?? "";
+    expect(line, "the prompt is raised at module scope, which fires on import").toMatch(/^\s+/);
+    expect(controls, "the prompt is not awaited inside an effect").not.toMatch(
+      new RegExp(`useEffect\\([\\s\\S]{0,400}${requestPermission.replace("(", "\\(")}`),
+    );
+  });
+
+  it("keeps every control's consumer real", () => {
+    // `R-24` proper: each rendered control must reach a write path that reads
+    // it. The four preference fields go to one action, and that action names
+    // the RPC that persists them.
+    const controls = withoutComments(read("src/features/notifications/push-controls.tsx"));
+    for (const field of ["notificationType", "notificationFrequency", "quietStart", "quietEnd", "dailyCap"]) {
+      expect(controls, `the surface offers no ${field} control`).toContain(field);
+    }
+    expect(controls).toContain("updateNotificationPreferences");
+
+    const actions = withoutComments(read("src/features/notifications/actions.ts"));
+    expect(actions, "the preferences action does not reach the validated RPC")
+      .toContain("update_notification_preferences");
   });
 
   it("explains the benefit on the same surface, which is what a prompt would follow", () => {
@@ -170,12 +243,96 @@ describe("governance ships before delivery, and the directory proves it", () => 
     }
   });
 
-  it("keeps the push-absence allowlist empty until 2M.4b puts a name in it", () => {
-    // The ordering that makes a guard mean something: the guard watches the file
-    // before anything is added to it. A non-empty allowlist here would mean a
-    // push artifact had already been permitted somewhere.
+  it("2M-NOTIFY-011: NO product path uses service_role, and the delivery modules are where that matters", () => {
+    /*
+     * The pure modules above are asserted free of `service_role` because they
+     * may not reach for a client at all. That is the weaker half: they were
+     * never going to.
+     *
+     * The DELIVERY modules are the browser-reachable product path — the four
+     * Server Actions and the owner-scoped read behind the settings surface —
+     * and `2M-NOTIFY-011` forbids a `service_role` client on exactly those. The
+     * only `service_role` in this slice belongs to the leased sender, which
+     * lives under `supabase/functions/` and is not reachable from a page.
+     *
+     * Without this, the requirement would be proved only for the files least
+     * able to violate it.
+     */
+    for (const file of DELIVERY_MODULES) {
+      const text = withoutComments(read(file));
+      expect(text, `${file} names service_role on a product path`).not.toMatch(/service_role/);
+      // The service key by any of its spellings, in case a client were built
+      // here rather than imported.
+      expect(text, `${file} reaches for a service key`)
+        .not.toMatch(/SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|createServiceClient/);
+    }
+
+    // Non-vacuity: the corpus really was read, and the patterns really do fire
+    // on a file that uses the thing. Without this the loop would pass against
+    // five empty strings.
+    expect(DELIVERY_MODULES.length).toBeGreaterThan(3);
+    expect(withoutComments(read("supabase/functions/send-push/index.ts")))
+      .toMatch(/SERVICE_ROLE_KEY/);
+  });
+
+  it("2M-NOTIFY-011: every Server Action derives the owner from the session, never from an argument", () => {
+    /*
+     * The structural half of the same requirement. Each RPC takes the owner from
+     * `auth.uid()`, so there must be no argument through which a caller could
+     * name somebody else — and a `p_user_id` appearing in this file would be
+     * exactly that argument.
+     */
+    const actions = withoutComments(read("src/features/notifications/actions.ts"));
+    expect(actions).not.toMatch(/p_user_id|p_owner|userId:/);
+    // And it really does call the RPCs, so the absence above is about a file
+    // that has something to be absent from.
+    for (const rpc of [
+      "register_push_subscription",
+      "revoke_push_consent",
+      "record_push_consent_state",
+      "update_notification_preferences",
+    ]) {
+      expect(actions, `actions.ts no longer calls ${rpc}`).toContain(rpc);
+    }
+  });
+
+  it("keeps the push allowlist to exactly the files 2M.4b earned", () => {
+    /*
+     * The ordering that makes a guard mean something: the guard watched the
+     * file before anything was added to it, and now that something has been
+     * added, the permission is enumerated rather than implied.
+     *
+     * This assertion lives HERE, in the governance guard, as well as in the
+     * push guard itself — two guards over one property, each of which could be
+     * relaxed without the other noticing.
+     */
     const guard = read("src/lib/closeout/phase-2m-push-boundary-guard.test.ts");
     const allowed = /const ALLOWED: readonly string\[\] = \[([\s\S]*?)\];/.exec(guard)?.[1] ?? "MISSING";
-    expect(allowed.trim(), "a push artifact has been allowed before slice 2M.4b").toBe("");
+    const names = [...allowed.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+    expect(names, "the push allowlist gained or lost an entry").toEqual([
+      "public/sw.js",
+      "src/features/notifications/consent-reader.ts",
+      "src/features/notifications/push-controls.tsx",
+      "supabase/functions/_shared/web-push.test.ts",
+      "supabase/functions/_shared/web-push.ts",
+      "supabase/functions/send-push/deliver.test.ts",
+      "supabase/functions/send-push/deliver.ts",
+      "supabase/functions/send-push/index.ts",
+    ]);
+
+    /*
+     * And the half that matters most, asserted separately.
+     *
+     * The sender may grow files — it is a runtime the browser cannot load. The
+     * APPLICATION may not: every entry on that side is a file that ships to a
+     * page. Splitting the assertion means a future sender refactor cannot
+     * quietly buy room for a fourth push artifact in `src/` or `public/`, which
+     * a single growing list would have allowed without anyone noticing.
+     */
+    expect(names.filter((name) => !name.startsWith("supabase/"))).toEqual([
+      "public/sw.js",
+      "src/features/notifications/consent-reader.ts",
+      "src/features/notifications/push-controls.tsx",
+    ]);
   });
 });

@@ -1455,6 +1455,81 @@ export type Database = {
           },
         ]
       }
+      notification_consents: {
+        Row: {
+          channel: string
+          created_at: string
+          enabled_types: string[]
+          frequency: string
+          recorded_at: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          enabled_types?: string[]
+          frequency?: string
+          recorded_at?: string
+          state: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          enabled_types?: string[]
+          frequency?: string
+          recorded_at?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_deliveries: {
+        Row: {
+          attempts: number
+          channel: string
+          consent_recorded_at: string | null
+          created_at: string
+          dedupe_hash: string
+          id: string
+          notification_type: string
+          occurred_at: string
+          outcome: string
+          suppression_reason: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          consent_recorded_at?: string | null
+          created_at?: string
+          dedupe_hash: string
+          id?: string
+          notification_type: string
+          occurred_at?: string
+          outcome: string
+          suppression_reason?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          consent_recorded_at?: string | null
+          created_at?: string
+          dedupe_hash?: string
+          id?: string
+          notification_type?: string
+          occurred_at?: string
+          outcome?: string
+          suppression_reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
@@ -2023,6 +2098,45 @@ export type Database = {
           consumed_at?: string
           id?: string
           outcome?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          failure_count: number
+          id: string
+          last_delivered_at: string | null
+          p256dh: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          failure_count?: number
+          id?: string
+          last_delivered_at?: string | null
+          p256dh: string
+          state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          failure_count?: number
+          id?: string
+          last_delivered_at?: string | null
+          p256dh?: string
+          state?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -3381,6 +3495,40 @@ export type Database = {
           event_id: string
           recorded: boolean
         }[]
+      }
+      begin_push_delivery: {
+        Args: { p_dedupe_hash: string; p_type: string; p_user_id: string }
+        Returns: Json
+      }
+      finish_push_delivery: {
+        Args: {
+          p_delivery_id: string
+          p_gone_subscription_ids?: string[]
+          p_outcome: string
+        }
+        Returns: Json
+      }
+      record_push_consent_state: {
+        Args: { p_state: string }
+        Returns: Json
+      }
+      register_push_subscription: {
+        Args: { p_auth: string; p_endpoint: string; p_p256dh: string }
+        Returns: Json
+      }
+      revoke_push_consent: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      update_notification_preferences: {
+        Args: {
+          p_daily_cap: number
+          p_enabled_types: string[]
+          p_frequency: string
+          p_quiet_end: string
+          p_quiet_start: string
+        }
+        Returns: Json
       }
       record_product_event_for_user: {
         Args: {

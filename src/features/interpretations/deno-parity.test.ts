@@ -146,6 +146,29 @@ describe("Deno worker copies stay identical to their Node source", () => {
       // comparing two things that are not copies of each other.
       "lifecycle-gate.ts",
       "lifecycle-gate.test.ts",
+      // Phase 2M slice 2M.4b's two, and they are opposite kinds of "not a copy".
+      //
+      //   * `notification-payload.ts` IS a second implementation of a Node
+      //     contract — `src/features/notifications/payload.ts` — and it cannot
+      //     be a `pair`: the Node module is the app's payload TYPE plus a
+      //     serialiser, while this one is the worker's builder and additionally
+      //     owns the type-to-destination mapping the app never needed. A
+      //     body-for-body comparison would fail on the half that only exists on
+      //     one side. Its parity is held BEHAVIOURALLY, the way
+      //     `extraction-validation.ts`'s is: `push-payload-parity.test.ts` calls
+      //     both implementations over the whole locale-by-type matrix and fails
+      //     the build on any disagreement, so a copy that was reformatted still
+      //     passes and a copy whose WORDS changed does not.
+      //   * `web-push.ts` is Deno-owned outright. There is no Node counterpart
+      //     and there must not be one: it holds the only code that touches the
+      //     VAPID private key, and `2M-NOTIFY-011` requires that key to be
+      //     unreachable from the application. A Node twin would be a second
+      //     place it could be read from. Its correctness is held by RFC 8291's
+      //     and RFC 8292's own published vectors in `web-push.test.ts`, not by
+      //     agreement with a sibling.
+      "notification-payload.ts",
+      "web-push.ts",
+      "web-push.test.ts",
     ];
     const expected = [...denoOnly, ...pairs.map((pair) => pair.file)].sort();
 

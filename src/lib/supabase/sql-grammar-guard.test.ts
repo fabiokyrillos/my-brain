@@ -137,9 +137,31 @@ function lineOf(text: string, index: number): number {
   return line;
 }
 
-/** Trap 1: schema-qualified lookups of grammar constructs that have no pg_proc entry. */
+/**
+ * Trap 1: schema-qualified lookups of grammar constructs that have no `pg_proc`
+ * entry — **two families, and the second was added the hard way.**
+ *
+ * The first family (`coalesce`, `nullif`, `greatest`, `least`) fails at plpgsql's
+ * first *execution*, so a migration deploys clean and breaks later.
+ *
+ * The second family is worse and this guard did not name it until Phase 2M slice
+ * 2M.4b. `position(x IN y)`, `substring(x FROM y)`, `overlay(x PLACING y FROM z)`,
+ * `trim(BOTH x FROM y)` and `extract(field FROM x)` are **parsed forms**: the
+ * keyword inside the parentheses is grammar, and it is only grammar for the
+ * unqualified spelling. `pg_catalog.position('a' in b)` is therefore a **syntax
+ * error at parse time** — `42601` — and the migration does not apply at all.
+ *
+ * It cost a red CI run to learn, on a migration whose first application was that
+ * run. The fix in every case is an ordinary function that means the same thing
+ * and *can* be qualified: `pg_catalog.strpos`, `pg_catalog.substr`,
+ * `pg_catalog.btrim`, `pg_catalog.date_part`.
+ *
+ * Both families are reported through one allowlist, because both are "a
+ * schema-qualified name that is not a function".
+ */
 export function findUnresolvableCatalogCalls(cleanedSql: string): { index: number; match: string }[] {
-  const pattern = /pg_catalog\s*\.\s*(coalesce|nullif|greatest|least)\s*\(/gi;
+  const pattern =
+    /pg_catalog\s*\.\s*(coalesce|nullif|greatest|least|position|overlay|substring|trim|extract)\s*\(/gi;
   const hits: { index: number; match: string }[] = [];
   for (const m of cleanedSql.matchAll(pattern)) {
     hits.push({ index: m.index ?? 0, match: `pg_catalog.${m[1].toLowerCase()}(` });
@@ -251,6 +273,43 @@ describe("2F-GUARD-001: the detector itself is falsifiable", () => {
 
   it("detects the pattern through whitespace and case variance", () => {
     expect(findUnresolvableCatalogCalls("PG_CATALOG . Greatest (a, b)")).toHaveLength(1);
+  });
+
+  it("detects the PARSED forms too — the family that fails at 42601, not at first call", () => {
+    /*
+     * Added by Phase 2M slice 2M.4b, and added the hard way: the migration
+     * carried `pg_catalog.position('x' in pg_get_functiondef(oid))`, this guard
+     * did not name `position`, and the whole `supabase db reset` reddened with
+     * `syntax error at or near "pg_get_functiondef"`. The migration would not
+     * have applied AT ALL — a strictly louder failure than the `coalesce`
+     * family's, and one this guard existed to make impossible.
+     *
+     * The keyword inside the parentheses is grammar, and it is grammar only for
+     * the unqualified spelling.
+     */
+    const cases = [
+      "select pg_catalog.position('a' in b);",
+      "select pg_catalog.substring(a from 2 for 3);",
+      "select pg_catalog.overlay(a placing 'x' from 2);",
+      "select pg_catalog.trim(both ' ' from a);",
+      "select pg_catalog.extract(epoch from a);",
+    ];
+    for (const source of cases) {
+      expect(findUnresolvableCatalogCalls(source), source).toHaveLength(1);
+    }
+  });
+
+  it("leaves the ordinary functions that replace them alone", () => {
+    // The fix for each is a real function that means the same thing and CAN be
+    // schema-qualified. A guard that also flagged these would push authors back
+    // toward the unqualified spellings, which is the opposite of the house rule.
+    const source = [
+      "select pg_catalog.strpos(a, 'x');",
+      "select pg_catalog.substr(a, 2, 3);",
+      "select pg_catalog.btrim(a, ' ');",
+      "select pg_catalog.date_part('epoch', a);",
+    ].join("\n");
+    expect(findUnresolvableCatalogCalls(source)).toEqual([]);
   });
 
   it("ignores the pattern inside comments and string literals, where the chain legitimately names it", () => {

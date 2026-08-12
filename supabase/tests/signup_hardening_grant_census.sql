@@ -347,7 +347,7 @@ select is(
         and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
-  -- Thirty-one of the fifty public base tables deviate from the norm, and
+  -- Thirty-four of the fifty-three public base tables deviate from the norm, and
   -- every one of them deviates because a named migration said so. The five
   -- shapes, so a reader can check a line against an intent rather than against
   -- a memory:
@@ -362,8 +362,9 @@ select is(
   --                          attachment_interpretations, entity_attachments,
   --                          entry_entities, entry_interpretations,
   --                          entry_task_candidate_resolutions, heartbeat_runs,
-  --                          product_events, task_command_confirmations, tasks,
-  --                          undo_operations
+  --                          notification_consents, notification_deliveries,
+  --                          product_events, push_subscriptions,
+  --                          task_command_confirmations, tasks, undo_operations
   --   INSERT,SELECT          append-only to the client -- attachments,
   --                          audit_logs (ADR-081's retained grant),
   --                          conversation_messages,
@@ -399,10 +400,18 @@ select is(
   || E'error_events -> (none)\n'
   || E'heartbeat_runs -> SELECT\n'
   || E'jobs -> INSERT,SELECT\n'
+  -- Phase 2M slice 2M.4b's three. All `SELECT`-only, and deliberately: every
+  -- write goes through a validated SECURITY DEFINER RPC, so the consent state
+  -- machine cannot be driven sideways by a client that inserts `granted` with no
+  -- subscription behind it. A line here changing to include INSERT would mean
+  -- that posture had been given away.
+  || E'notification_consents -> SELECT\n'
+  || E'notification_deliveries -> SELECT\n'
   || E'notifications -> SELECT,UPDATE\n'
   || E'pending_questions -> SELECT,UPDATE\n'
   || E'policy_acceptances -> INSERT,SELECT\n'
   || E'product_events -> SELECT\n'
+  || E'push_subscriptions -> SELECT\n'
   || E'rate_limit_events -> (none)\n'
   || E'reminders -> INSERT,SELECT\n'
   || E'scheduled_job_health -> (none)\n'

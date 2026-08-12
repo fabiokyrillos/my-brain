@@ -64,10 +64,49 @@ const PUSH_APIS: ReadonlyArray<readonly [string, RegExp]> = [
 /**
  * Files permitted to carry a push artifact, **by name**.
  *
- * Empty until slice 2M.4b. Adding to it is a deliberate act that shows up in a
- * diff as what it is: a decision to put a push artifact somewhere.
+ * Empty until slice 2M.4b, which is the slice that earns the entries. Adding to
+ * it is a deliberate act that shows up in a diff as what it is: a decision to
+ * put a push artifact somewhere. The list is deliberately shorter than the set
+ * of files that *touch* push, and it splits cleanly in two.
+ *
+ * **In the application, three files and no more:**
+ *
+ * - `public/sw.js` — the `push` and `notificationclick` handlers, added to the
+ *   worker that was already registered on every production client.
+ * - `push-controls.tsx` — the ONLY place permitted to raise a browser
+ *   permission prompt, and the only caller of `pushManager`.
+ * - `consent-reader.ts` — reads `VAPID_PUBLIC_KEY` from the server
+ *   environment. The **public** half only; the private half appears nowhere
+ *   under `src/`, which `2M-NOTIFY-011` requires and a test below asserts.
+ *
+ * **In the Edge sender, which is a different runtime and a different trust
+ * boundary:**
+ *
+ * - `_shared/web-push.ts` and its test — RFC 8291 encryption and RFC 8292
+ *   VAPID signing, the only code that ever touches the private key.
+ * - `send-push/index.ts` and `send-push/deliver.ts` and its test — the
+ *   entrypoint and the delivery orchestration.
+ *
+ * That these six live under `supabase/functions/` rather than `src/` is the
+ * point rather than an accident: the private key is reachable ONLY from a
+ * runtime the browser cannot load, and the `src`-and-`public` sweep below
+ * asserts it never crossed over.
+ *
+ * `notification-settings.tsx` and the notifications page are NOT here, on
+ * purpose: the key travels through them as a `pushPublicKey` prop, so they
+ * carry no push artifact and the allowlist stays as narrow as the truth allows.
+ * Widening it to whatever happened to fail is how a guard stops guarding.
  */
-const ALLOWED: readonly string[] = [];
+const ALLOWED: readonly string[] = [
+  "public/sw.js",
+  "src/features/notifications/push-controls.tsx",
+  "src/features/notifications/consent-reader.ts",
+  "supabase/functions/_shared/web-push.ts",
+  "supabase/functions/_shared/web-push.test.ts",
+  "supabase/functions/send-push/index.ts",
+  "supabase/functions/send-push/deliver.ts",
+  "supabase/functions/send-push/deliver.test.ts",
+];
 
 /**
  * The guards that *declare* these APIs as patterns, and are therefore exempt.
@@ -81,6 +120,40 @@ const ALLOWED: readonly string[] = [];
 const PATTERN_DECLARING_GUARDS: readonly string[] = [
   "src/lib/closeout/phase-2m-push-boundary-guard.test.ts",
   "src/lib/closeout/sensitivity-convergence.test.ts",
+];
+
+/**
+ * Tests that ASSERT ABOUT push without DOING push.
+ *
+ * This is a genuinely different category from `ALLOWED` and is kept separate so
+ * the allowlist above cannot be diluted by it. `ALLOWED` names files that
+ * perform a push operation and ship; these name files that *talk about* one and
+ * do not ship at all — they are excluded from the production bundle, from
+ * `public/`, and from what `supabase functions deploy` uploads.
+ *
+ * A test asserting that the VAPID key decodes, or that the payload copies agree,
+ * has to write the word `vapid` in order to test the thing. Refusing it would
+ * mean the only way to satisfy this guard was to stop testing the boundary it
+ * guards, which is the opposite of the point.
+ *
+ * The category is bounded three ways, each asserted below: every entry must be
+ * a test file, the list is closed, and **no entry may contain an actual push
+ * call** — no `subscribe(`, no `showNotification(`, no permission request. A
+ * test that started genuinely performing push would fail that assertion and
+ * belong in `ALLOWED` or nowhere.
+ */
+const PUSH_ASSERTING_TESTS: readonly string[] = [
+  "src/features/interpretations/deno-parity.test.ts",
+  "src/features/notifications/consent-reader.test.ts",
+  "src/features/notifications/notification-settings.test.tsx",
+  "src/features/notifications/push-encoding.test.ts",
+  "src/lib/byok/guards.test.ts",
+  // The governance guard mirrors this file's allowlist so the two watch each
+  // other, which means it must spell the sender's filenames out. It previously
+  // avoided the token by splitting strings (`web-${"push"}`); that discipline
+  // does not survive having to name real paths, and a path list written in
+  // fragments is a path list that silently stops matching.
+  "src/lib/closeout/phase-2m-notification-boundary-guard.test.ts",
 ];
 
 function stripComments(source: string): string {
@@ -104,11 +177,25 @@ function scannedFiles(root: string, dir: string, found: string[] = []): string[]
   return found;
 }
 
-export function pushArtifacts(root: string): Array<{ api: string; where: string }> {
+/**
+ * The allowlist is a PARAMETER, not a closed-over constant.
+ *
+ * Once `ALLOWED` gained `public/sw.js`, every scratch-root mutation control
+ * that plants a push handler in that path started returning `[]` — the guard
+ * had been made blind to its own test fixtures, and three controls silently
+ * stopped proving anything while still passing. Threading the allowlist lets
+ * the repository scan use it and lets the mutation controls pass `[]`, which is
+ * the only way "would this guard still fire?" is a real question.
+ */
+export function pushArtifacts(
+  root: string,
+  allowed: readonly string[] = ALLOWED,
+): Array<{ api: string; where: string }> {
   const found: Array<{ api: string; where: string }> = [];
   for (const tree of SCANNED_TREES) {
     for (const file of scannedFiles(root, tree)) {
-      if (PATTERN_DECLARING_GUARDS.includes(file) || ALLOWED.includes(file)) continue;
+      if (PATTERN_DECLARING_GUARDS.includes(file) || PUSH_ASSERTING_TESTS.includes(file)) continue;
+      if (allowed.includes(file)) continue;
       const code = stripComments(readFileSync(join(root, file), "utf8"));
       for (const [api, pattern] of PUSH_APIS) {
         if (pattern.test(code)) found.push({ api, where: file });
@@ -154,7 +241,7 @@ describe("2M-AUDIT-006: the service worker exists, and the guard can now see it"
       join(root, "public/sw.js"),
       'self.addEventListener("push", (event) => { self.registration.showNotification("x"); });\n',
     );
-    const found = pushArtifacts(root);
+    const found = pushArtifacts(root, []);
     expect(found.map((f) => f.where)).toContain("public/sw.js");
     expect(found.map((f) => f.api)).toContain("a service-worker push listener");
     expect(found.map((f) => f.api)).toContain("a notification rendered by a service worker");
@@ -166,31 +253,163 @@ describe("2M-AUDIT-006: the service worker exists, and the guard can now see it"
     writeFileSync(join(root, "supabase/functions/send.ts"), "import webpush from 'web-push';\n");
     writeFileSync(join(root, "src/features/pwa/keys.ts"), "const VAPID_PUBLIC = '';\n");
     writeFileSync(join(root, "src/features/pwa/ask.tsx"), "Notification.requestPermission();\n");
-    const apis = new Set(pushArtifacts(root).map((f) => f.api));
+    const apis = new Set(pushArtifacts(root, []).map((f) => f.api));
     expect(apis).toContain("a push subscription manager");
     expect(apis).toContain("a web-push sender");
     expect(apis).toContain("a VAPID key");
     expect(apis).toContain("a browser permission request");
   });
 
-  it("does not fire on the existing cache-only worker", () => {
-    // The control. The worker that ships today must pass, or the guard is
-    // measuring the wrong thing and would be silenced on its first run.
+  it("fires on the real worker when it is NOT allowlisted", () => {
+    /*
+     * The mutation control, and it is the one that matters most now.
+     *
+     * Until slice 2M.4b this test asserted the shipped worker produced NO
+     * artifacts, which was true because the worker had no push handlers. Now it
+     * has them, so the honest control is the other way round: copy the REAL
+     * worker into a scratch tree where nothing is allowlisted and prove the
+     * guard still sees it. If this ever returns `[]`, the scanner has stopped
+     * detecting the handlers and the allowlist below would be protecting
+     * nothing.
+     */
     const root = scratchRoot();
     writeFileSync(join(root, "public/sw.js"), readFileSync(join(REPO, "public/sw.js"), "utf8"));
-    expect(pushArtifacts(root)).toEqual([]);
+    const apis = new Set(pushArtifacts(root, []).map((f) => f.api));
+    expect(apis).toContain("a service-worker push listener");
+    expect(apis).toContain("a notification-click listener");
+    expect(apis).toContain("a notification rendered by a service worker");
+  });
+
+  it("still passes the cache-only half of the worker", () => {
+    // The other half of the same control: the caching logic that predates this
+    // slice must not be what trips the scanner, or the guard would be reporting
+    // the wrong thing about the right file.
+    const root = scratchRoot();
+    const worker = readFileSync(join(REPO, "public/sw.js"), "utf8");
+    const cacheOnly = worker.slice(0, worker.indexOf("const NOTIFICATION_TYPES"));
+    expect(cacheOnly.length).toBeGreaterThan(200);
+    writeFileSync(join(root, "public/sw.js"), cacheOnly);
+    expect(pushArtifacts(root, [])).toEqual([]);
   });
 });
 
-describe("2M-NOTIFY-006/-007: nothing has left the application yet", () => {
-  it("finds no push artifact anywhere in this repository", () => {
-    // The state slice 2M.0 closes in. Slice 2M.4b changes it, and when it does
-    // the change is a named entry in ALLOWED rather than a widened pattern.
+describe("2M-NOTIFY-006/-007: push exists now, and only where it was authorized", () => {
+  it("finds no push artifact outside the three allowlisted files", () => {
+    // The state slice 2M.4b closes in. Every artifact is in a file somebody
+    // deliberately named, and a new one anywhere else fails the build.
     expect(pushArtifacts(REPO)).toEqual([]);
   });
 
-  it("keeps the allowlist empty until the slice that earns an entry", () => {
-    expect(ALLOWED).toEqual([]);
+  it("keeps the allowlist to exactly the files the slice earned", () => {
+    expect([...ALLOWED].sort()).toEqual([
+      "public/sw.js",
+      "src/features/notifications/consent-reader.ts",
+      "src/features/notifications/push-controls.tsx",
+      "supabase/functions/_shared/web-push.test.ts",
+      "supabase/functions/_shared/web-push.ts",
+      "supabase/functions/send-push/deliver.test.ts",
+      "supabase/functions/send-push/deliver.ts",
+      "supabase/functions/send-push/index.ts",
+    ]);
+  });
+
+  it("keeps the application half of the allowlist to exactly three files", () => {
+    /*
+     * The split matters more than the total. The sender may grow files; the
+     * APPLICATION may not, because every file added on that side is a file the
+     * browser can load. Asserting the two halves separately means a future
+     * sender refactor cannot quietly buy room for a fourth push artifact in
+     * `src/` or `public/`.
+     */
+    expect(ALLOWED.filter((file) => !file.startsWith("supabase/")).sort()).toEqual([
+      "public/sw.js",
+      "src/features/notifications/consent-reader.ts",
+      "src/features/notifications/push-controls.tsx",
+    ]);
+  });
+
+  it("proves each allowlisted file really does carry an artifact", () => {
+    /*
+     * An allowlist entry for a file with no artifact is dead permission: it
+     * grants something nobody is using, and the next person to add a push call
+     * to that file gets it for free. Each entry must be EARNED, so each is
+     * re-scanned with the allowlist ignored.
+     */
+    for (const file of ALLOWED) {
+      const root = scratchRoot();
+      const target = join(root, file);
+      mkdirSync(join(target, ".."), { recursive: true });
+      writeFileSync(target, readFileSync(join(REPO, file), "utf8"));
+      expect(pushArtifacts(root, []).map((f) => f.where), `${file} is allowlisted but carries no push artifact`)
+        .toContain(file);
+    }
+  });
+
+  it("keeps the VAPID PRIVATE key out of the application entirely", () => {
+    /*
+     * `2M-NOTIFY-011`: the private key is "held only in the server environment
+     * and never exposed to any client". The strongest available check is that
+     * the string does not appear in the application tree at all -- not in a
+     * component, not in a Server Action, not in an env parser. The sender reads
+     * it from its own environment, outside `src/`.
+     */
+    let scanned = 0;
+    for (const tree of ["src", "public"]) {
+      for (const file of scannedFiles(REPO, tree)) {
+        // This guard has to NAME the thing it forbids, so it is exempt from its
+        // own sweep -- the same narrow exemption, and for the same reason, as
+        // the pattern list above.
+        if (file === "src/lib/closeout/phase-2m-push-boundary-guard.test.ts") continue;
+        scanned += 1;
+        const code = readFileSync(join(REPO, file), "utf8");
+        expect(code, `${file} references the VAPID private key`)
+          .not.toMatch(/VAPID_PRIVATE_KEY|vapidPrivateKey/);
+      }
+    }
+    // Non-vacuity: the sweep really walked the tree rather than finding nothing
+    // to walk, which is how this assertion would pass while proving nothing.
+    expect(scanned).toBeGreaterThan(500);
+  });
+
+  it("keeps the push-asserting tests to a closed list that ships nothing", () => {
+    expect([...PUSH_ASSERTING_TESTS].sort()).toEqual([
+      "src/features/interpretations/deno-parity.test.ts",
+      "src/features/notifications/consent-reader.test.ts",
+      "src/features/notifications/notification-settings.test.tsx",
+      "src/features/notifications/push-encoding.test.ts",
+      "src/lib/byok/guards.test.ts",
+      "src/lib/closeout/phase-2m-notification-boundary-guard.test.ts",
+    ]);
+    // Every entry really is a test, so none of them is in a shipped bundle.
+    for (const file of PUSH_ASSERTING_TESTS) {
+      expect(file, `${file} is exempted as a test but is not one`).toMatch(/\.test\.tsx?$/);
+    }
+  });
+
+  it("proves no push-asserting test actually performs a push operation", () => {
+    /*
+     * The bound that makes the category safe. These files may NAME the APIs —
+     * that is what makes them tests of this boundary — but none may call one.
+     * A test that started subscribing, prompting or rendering a notification
+     * would be doing the thing rather than asserting about it, and would belong
+     * in `ALLOWED` or nowhere.
+     */
+    const OPERATIONS: ReadonlyArray<readonly [string, RegExp]> = [
+      ["subscribes", /pushManager\s*\.\s*subscribe\s*\(/],
+      ["renders a notification", /registration\s*\.\s*showNotification\s*\(/],
+      ["requests permission", /Notification\s*\.\s*requestPermission\s*\(/],
+      ["registers a push listener", /addEventListener\(\s*["']push["']/],
+    ];
+    for (const file of PUSH_ASSERTING_TESTS) {
+      const source = stripComments(readFileSync(join(REPO, file), "utf8"));
+      for (const [operation, pattern] of OPERATIONS) {
+        expect(pattern.test(source), `${file} ${operation}`).toBe(false);
+      }
+    }
+    // Non-vacuity: the patterns really do fire on a file that performs these
+    // operations, so the loop above is not passing against dead regexes.
+    const worker = stripComments(readFileSync(join(REPO, "public/sw.js"), "utf8"));
+    expect(OPERATIONS.filter(([, pattern]) => pattern.test(worker)).length).toBeGreaterThan(0);
   });
 
   it("exempts exactly the two guards that declare these patterns, and nothing else", () => {
@@ -206,8 +425,37 @@ describe("2M-NOTIFY-006/-007: nothing has left the application yet", () => {
       join(root, "src/lib/closeout/some-other-guard.test.ts"),
       "registration.pushManager.subscribe();\n",
     );
-    expect(pushArtifacts(root).map((f) => f.where))
+    expect(pushArtifacts(root, []).map((f) => f.where))
       .toContain("src/lib/closeout/some-other-guard.test.ts");
+  });
+
+  it("declares the sender with verify_jwt disabled, or it can never be reached", () => {
+    /*
+     * The deployment defect this exists to prevent, and it would have been
+     * invisible.
+     *
+     * The sender is SECRET-authenticated: a background delivery has no end-user
+     * session, so the request carries `x-dispatch-secret` rather than a bearer
+     * token. The platform's default is `verify_jwt = true`, under which the
+     * gateway answers 401 BEFORE the function runs — no log line in the
+     * function's own output, nothing in the delivery ledger, and a symptom
+     * ("nothing is ever sent") indistinguishable from a dozen other causes.
+     *
+     * `process-jobs` carries the same declaration for the same reason. Asserting
+     * it here means the sender cannot be deployed unreachable.
+     */
+    const config = readFileSync(join(REPO, "supabase/config.toml"), "utf8");
+    const block = /\[functions\.send-push\]([\s\S]*?)(?=\n\[|$)/.exec(config)?.[1] ?? "";
+    expect(block, "supabase/config.toml does not declare [functions.send-push]").not.toBe("");
+    expect(block).toMatch(/^\s*verify_jwt\s*=\s*false\s*$/m);
+
+    // And the declaration is not a relaxation: the function refuses every
+    // request whose secret does not match, and refuses when the secret is unset
+    // rather than falling open.
+    const entry = stripComments(readFileSync(join(REPO, "supabase/functions/send-push/index.ts"), "utf8"));
+    expect(entry).toMatch(/x-dispatch-secret/);
+    expect(entry).toMatch(/dispatch_secret_not_configured/);
+    expect(entry).toMatch(/vapid_not_configured/);
   });
 
   it("keeps the payload copy incapable of carrying content", () => {

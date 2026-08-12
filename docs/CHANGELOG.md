@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - PHASE 2M SLICE 2M.4b: push can deliver, and the last allocated migration is spent
+
+**One migration, and the budget closes.** `202608120092` is the third and last ADR-105 allocated and ADR-106 confirmed. `3 allocated - 3 spent`, all non-transferable, and **a fourth is a stop condition**. Three tables, six functions, forced RLS on all three, and **no write policy for `authenticated` at all**: every write goes through a validated `SECURITY DEFINER` RPC, so the consent state machine cannot be driven sideways by a client asserting `granted` with no subscription behind it.
+
+**It creates no quiet-hours and no daily-cap column, and that absence is the design.** `agent_preferences.quiet_start`/`.quiet_end`/`.max_followups_per_day` already hold that authority and the heartbeat has read them since `202607160007`. A second copy is exactly how somebody sets quiet hours once and is still pushed at 03:00. Push reads the same columns; `update_notification_preferences` writes them by **upsert**, because a bare `update` matching no row succeeds silently and would have discarded the very setting it was called to save.
+
+**The content prohibition is structural, not customary.** The only caller-chosen value in the whole migration is `notification_deliveries.dedupe_hash`, restricted by CHECK to 64 lowercase hex characters. A column that can hold nothing but a SHA-256 digest cannot hold a title, and the migration asserts that against the catalogue rather than promising it.
+
+**The sender is real, and its cryptography is proved against the RFCs' own vectors rather than against itself.** `supabase/functions/send-push/` implements RFC 8291 message encryption and RFC 8292 VAPID on WebCrypto with **no dependency**, and `web-push.test.ts` reproduces RFC 8291 section 5's published worked example **byte for byte**. A round-trip test would have agreed with itself while both halves used the same wrong info string — and the symptom would have been "nothing arrives on the phone", found at the owner's hardware checkpoint. `npm:web-push` was refused deliberately: it is built on Node's `crypto`, this runs on Deno's Edge Runtime, and that is the class of dependency that passes locally and fails deployed.
+
+**Retry is bounded twice, per delivery and per device.** `attempts` and `failure_count` both carry a CHECK ceiling of 3. The second exists because "indefinitely" is measured per device: a subscription that fails every time without ever returning 410 would otherwise be retried forever, one fresh three-attempt delivery at a time. A **gone** subscription (404/410) is retired at once with no strikes, and the consent follows the last device out.
+
+**Five defects found in the migration by reviewing it before it could deploy**, all fixed in place because the file was neither merged nor hosted. The most serious was found by a guard rather than by reading: **`pg_catalog.coalesce`/`.least`/`.greatest` cannot resolve** — they are SQL grammar with no `pg_proc` entry — so the migration would have applied cleanly and failed at first execution, on the first real send. The other four: quiet hours silently discardable, a `failure_count` column with a CHECK and no writer, a granted consent with no live device returning `permitted`, and an SSRF comment describing a control that did not exist.
+
+**BYOK-GUARD-005 admits its first exception, with four assertions holding it shut.** The keyed-crypto rule previously admitted none, which was right while the only keyed crypto was BYOK's. Web Push genuinely needs its own primitives, and routing them through the BYOK core would have put a notification path inside the module holding `BYOK_MASTER_KEY` — satisfying the rule literally while defeating its purpose. The exception is a closed list that may read no BYOK secret name, may not import BYOK, and that BYOK may not import.
+
+**Six of six telemetry events now have a producer**, closing `2M-METRICS-003`. `notification_suppressed` is emitted from the worker, outside the roots the telemetry guard walks, so it is asserted **by name against the file that emits it** rather than left to a tally where its absence would read as "not shipped yet" — the shape SH.6's invisible quota refusals cost this repository once already.
+
+**Nothing is deployed by this commit.** Hosted parity remains `202608110090`; `202608110091` and `202608120092` are applied at the deployment step, in that order. Signup closed, rollout gate untouched, 2M.5 not started, Phase 2N not started, A13 not retargeted.
+
 ## 2026-08-12 - PHASE 2M SLICE 2M.4a: notification governance, and nothing that can deliver
 
 **Zero migrations.** Budget unchanged at `3 allocated - 2 spent`; migration 2 stays reserved **exclusively** for push in 2M.4b, `202608110091` is still undeployed, and hosted parity is unchanged at `202608110090`.

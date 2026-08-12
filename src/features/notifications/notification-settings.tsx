@@ -39,12 +39,23 @@
  * together.
  */
 
-import type { NotificationConsentState } from "./consent-contract";
+import type {
+  NotificationConsentState,
+  NotificationFrequency,
+  NotificationType,
+} from "./consent-contract";
 import { getNotificationSettingsCopy } from "./copy";
+import { PushControls } from "./push-controls";
 
 export function NotificationSettings({
   locale,
   state,
+  pushPublicKey,
+  enabledTypes,
+  frequency,
+  quietStart,
+  quietEnd,
+  dailyCap,
 }: {
   locale: string;
   /**
@@ -56,6 +67,13 @@ export function NotificationSettings({
    * a write path by accident.
    */
   state: NotificationConsentState;
+  /** The PUBLIC half of the VAPID pair, or null when unset in this environment. */
+  pushPublicKey: string | null;
+  enabledTypes: readonly NotificationType[];
+  frequency: NotificationFrequency;
+  quietStart: string;
+  quietEnd: string;
+  dailyCap: number;
 }) {
   const copy = getNotificationSettingsCopy(locale);
 
@@ -74,7 +92,29 @@ export function NotificationSettings({
       <p data-consent-state={state} role="status">{copy.states[state]}</p>
 
       <p className="quiet-state">{copy.noPromptYet}</p>
-      <p className="quiet-state">{copy.notAvailableYet}</p>
+
+      {/*
+        Slice 2M.4b. The controls the 2M.4a record routed here, each with a
+        consumer: the enable button's consumer is the consent record, and the
+        type, frequency, quiet-period and cap controls' consumer is
+        `begin_push_delivery`, which reads every one of them before sending.
+
+        `PushControls` is the client boundary and the ONLY place in this
+        repository that may raise a browser permission prompt -- and it does so
+        from a click handler, below the benefit and the content promise
+        rendered above, which is the ordering `2M-NOTIFY-003` requires.
+      */}
+      <PushControls
+        locale={locale}
+        state={state}
+        pushPublicKey={pushPublicKey}
+        enabledTypes={enabledTypes}
+        frequency={frequency}
+        quietStart={quietStart}
+        quietEnd={quietEnd}
+        dailyCap={dailyCap}
+      />
+
       <p className="quiet-state">{copy.inAppNote}</p>
     </section>
   );

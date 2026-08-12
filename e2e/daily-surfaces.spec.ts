@@ -67,6 +67,16 @@ const COPY = {
     completed: "Concluído",
     notifyHeading: "Notificações no aparelho",
     notifyState: "Este navegador ou este aparelho não oferece avisos. No iPhone, é preciso instalar o app na tela de início primeiro.",
+    notAvailableYet: "Este navegador não oferece avisos, ou o envio ainda não está configurado neste ambiente. Por isso os controles não aparecem — em vez de aparecerem sem fazer nada.",
+    enableAction: "Ativar avisos neste aparelho",
+    disableAction: "Desativar avisos neste aparelho",
+    typesHeading: "O que pode avisar",
+    frequencyHeading: "Com que frequência",
+    quietHeading: "Período silencioso",
+    quietStartLabel: "Começa às",
+    quietEndLabel: "Termina às",
+    dailyCapLabel: "Máximo de avisos por dia",
+    savePreferences: "Salvar preferências",
   },
   en: {
     plannerTitle: "Plan the day",
@@ -77,6 +87,16 @@ const COPY = {
     completed: "Completed",
     notifyHeading: "Notifications on this device",
     notifyState: "This browser or device does not offer alerts. On iPhone, the app has to be installed to the home screen first.",
+    notAvailableYet: "This browser does not offer alerts, or delivery is not configured in this environment. That is why the controls are absent — rather than present and doing nothing.",
+    enableAction: "Turn on alerts on this device",
+    disableAction: "Turn off alerts on this device",
+    typesHeading: "What may alert you",
+    frequencyHeading: "How often",
+    quietHeading: "Quiet period",
+    quietStartLabel: "Starts at",
+    quietEndLabel: "Ends at",
+    dailyCapLabel: "Most alerts per day",
+    savePreferences: "Save preferences",
   },
 } as const;
 
@@ -231,12 +251,61 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
  * `src/features/notifications/notification-settings.tsx`.
  *
  * `2M-MOBILE-005` asks for the notification-settings journey at both viewports
- * and in both locales. The section ships **no control** in slice 2M.4a — the
- * consumer that would read one is migration 2's consent record — so what the
- * lane proves is the honest half: the benefit is explained, the state is
- * announced, and there is nothing to press.
+ * and in both locales.
+ *
+ * **Slice 2M.4b changed what this lane proves, and the change is the point.**
+ * In 2M.4a the section shipped **no control** — the consumer that would read one
+ * was migration 2's consent record — so the lane proved the honest half: the
+ * benefit is explained, the state is announced, and there is nothing to press.
+ * `begin_push_delivery` is now that consumer, so the controls have earned their
+ * existence and the lane proves the other half: that they render, that they are
+ * reachable, and that they still disappear in the two states where nothing would
+ * read them.
+ *
+ * `state` selects which of those the fixture renders, mirroring
+ * `push-controls.tsx`'s own branches:
+ *   - `no-key`  — the deployment has no VAPID public key. One sentence, no
+ *                 control at all, because a button here would raise a prompt
+ *                 whose grant produces a subscription nothing can deliver to.
+ *   - `ungranted` — the enable button alone. No preference control, because the
+ *                 delivery decision refuses before it consults a type or a cap.
+ *   - `granted` — the full set.
  */
-function notificationPage(locale: Locale): string {
+type PushState = "no-key" | "ungranted" | "granted";
+
+function pushControls(locale: Locale, state: PushState): string {
+  const copy = COPY[locale];
+  if (state === "no-key") return `<p class="quiet-state">${copy.notAvailableYet}</p>`;
+  if (state === "ungranted") {
+    return `<div class="push-controls">
+      <button type="button">${copy.enableAction}</button>
+    </div>`;
+  }
+  return `<div class="push-controls">
+    <button type="button">${copy.disableAction}</button>
+    <div class="push-preferences">
+      <fieldset>
+        <legend>${copy.typesHeading}</legend>
+        ${["reminder", "follow_up", "review", "digest"].map((type) => `
+        <label><input type="checkbox" name="notificationType" value="${type}" checked />${type}</label>`).join("")}
+      </fieldset>
+      <fieldset>
+        <legend>${copy.frequencyHeading}</legend>
+        ${["immediate", "daily_digest", "off"].map((option) => `
+        <label><input type="radio" name="notificationFrequency" value="${option}" />${option}</label>`).join("")}
+      </fieldset>
+      <fieldset>
+        <legend>${copy.quietHeading}</legend>
+        <label>${copy.quietStartLabel}<input type="time" name="quietStart" value="22:30" /></label>
+        <label>${copy.quietEndLabel}<input type="time" name="quietEnd" value="07:00" /></label>
+      </fieldset>
+      <label>${copy.dailyCapLabel}<input type="number" name="dailyCap" min="0" max="20" value="3" /></label>
+      <button type="button">${copy.savePreferences}</button>
+    </div>
+  </div>`;
+}
+
+function notificationPage(locale: Locale, state: PushState = "granted"): string {
   const copy = COPY[locale];
   return shell(locale, `<div class="content-page">
     <section aria-label="${copy.notifyHeading}" class="notification-settings">
@@ -244,9 +313,9 @@ function notificationPage(locale: Locale): string {
       <p>Se você quiser, o Brain pode avisar no aparelho.</p>
       <p class="quiet-state">O aviso nunca carrega o conteúdo.</p>
       <h3>Situação atual</h3>
-      <p data-consent-state="unsupported" role="status">${copy.notifyState}</p>
+      <p data-consent-state="${state === "granted" ? "granted" : "unsupported"}" role="status">${copy.notifyState}</p>
       <p class="quiet-state">Nada será perguntado ao navegador até que você peça, nesta página.</p>
-      <p class="quiet-state">Os controles ainda não estão disponíveis.</p>
+      ${pushControls(locale, state)}
     </section>
     <div class="list-stack">
       <article class="list-row notification-row unread">
@@ -300,11 +369,109 @@ test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance sectio
     });
   }
 
-  test("offers nothing to press, because nothing would read it yet", async ({ page }) => {
-    await open(page, notificationPage("pt-BR"));
+  test("offers nothing to press when the deployment has no VAPID key", async ({ page }) => {
+    /*
+     * `R-24`, and the state the owner's environment was actually in until the
+     * key was set. A button here would raise a browser prompt whose grant
+     * produces a subscription nothing can ever deliver to — consent the product
+     * cannot honour — and a permission denial is sticky and often unrecoverable
+     * without the user digging through browser settings (T-07).
+     */
+    await open(page, notificationPage("pt-BR", "no-key"));
     await expect(page.locator(".notification-settings button")).toHaveCount(0);
     await expect(page.locator(".notification-settings input")).toHaveCount(0);
-    await expect(page.locator(".notification-settings select")).toHaveCount(0);
+    await expect(page.getByText(COPY["pt-BR"].notAvailableYet)).toBeVisible();
+  });
+
+  test("offers the enable control alone until consent is granted", async ({ page }) => {
+    // The preference controls' consumer is `begin_push_delivery`, which refuses
+    // on consent BEFORE it consults a type, a frequency or a cap — so under any
+    // ungranted state they would be controls whose value nothing reaches.
+    await open(page, notificationPage("pt-BR", "ungranted"));
+    await expect(page.locator(".push-controls button")).toHaveCount(1);
+    await expect(page.locator(".push-preferences")).toHaveCount(0);
+    await expect(page.locator(".notification-settings input")).toHaveCount(0);
+  });
+
+  test("renders every preference control under a granted consent", async ({ page }) => {
+    // The positive control for the two absences above: without it, both would
+    // pass against a surface that renders nothing under any condition.
+    await open(page, notificationPage("pt-BR", "granted"));
+    await expect(page.locator('input[name="notificationType"]')).toHaveCount(4);
+    await expect(page.locator('input[name="notificationFrequency"]')).toHaveCount(3);
+    await expect(page.locator('input[name="quietStart"]')).toHaveCount(1);
+    await expect(page.locator('input[name="dailyCap"]')).toHaveCount(1);
+  });
+
+  test("bounds the daily cap control to the column's own range", async ({ page }) => {
+    // `agent_preferences.max_followups_per_day` is a smallint checked 0..20, and
+    // a control offering 99 would be a control the database refuses.
+    await open(page, notificationPage("pt-BR", "granted"));
+    const cap = page.locator('input[name="dailyCap"]');
+    await expect(cap).toHaveAttribute("min", "0");
+    await expect(cap).toHaveAttribute("max", "20");
+  });
+
+  test("gives every preference group a legend a screen reader can announce", async ({ page }) => {
+    // `2M-ACCESS-004`. A fieldset without a legend is a group a screen-reader
+    // user reaches with no idea what it groups.
+    await open(page, notificationPage("pt-BR", "granted"));
+    const legends = await page.locator(".push-preferences fieldset legend").allTextContents();
+    expect(legends).toEqual([
+      COPY["pt-BR"].typesHeading,
+      COPY["pt-BR"].frequencyHeading,
+      COPY["pt-BR"].quietHeading,
+    ]);
+  });
+
+  test("reaches every control by keyboard alone, with no gesture to replace", async ({ page }) => {
+    /*
+     * `2M-MOBILE-004`/`2M-ACCESS-006`. This is the surface where the no-gesture
+     * ban matters most in the phase: it is the only place permitted to raise a
+     * permission prompt, and that prompt must be reachable deliberately and
+     * only deliberately.
+     */
+    await open(page, notificationPage("pt-BR", "granted"));
+
+    /*
+     * Tab STOPS, not elements, and the distinction is the whole assertion.
+     *
+     * A radio group is one tab stop by design — the browser moves between its
+     * members with the arrow keys — so counting `input` elements and demanding
+     * that many stops would fail against correct, accessible markup. The first
+     * draft of this test did exactly that and reported a defect that was not
+     * there. What must be true is that every INDEPENDENT control is reachable,
+     * so each is named and looked for individually.
+     */
+    const reached = new Set<string>();
+    for (let step = 0; step < 20; step += 1) {
+      await page.keyboard.press("Tab");
+      const marker = await page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || !active.closest(".push-controls")) return null;
+        const name = active.getAttribute("name");
+        if (name === null) return `button:${active.textContent?.trim() ?? ""}`;
+        return `${name}:${active.getAttribute("value") ?? ""}`;
+      });
+      if (marker !== null) reached.add(marker);
+    }
+
+    for (const expected of [
+      `button:${COPY["pt-BR"].disableAction}`,
+      `button:${COPY["pt-BR"].savePreferences}`,
+      "notificationType:reminder",
+      "notificationType:follow_up",
+      "notificationType:review",
+      "notificationType:digest",
+      "quietStart:22:30",
+      "quietEnd:07:00",
+      "dailyCap:3",
+    ]) {
+      expect([...reached], `${expected} is unreachable by keyboard`).toContain(expected);
+    }
+    // The frequency group is one stop, and reaching any member proves the group
+    // is on the tab order at all.
+    expect([...reached].some((marker) => marker.startsWith("notificationFrequency:"))).toBe(true);
   });
 
   test("sits above the list whose content it makes a promise about", async ({ page }) => {

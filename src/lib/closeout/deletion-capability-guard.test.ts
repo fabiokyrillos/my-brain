@@ -93,6 +93,11 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
     reason:
       "2M-METRICS-002/003: teardown for the two disposable owners the hosted funnel proof creates on the DEPLOYED project. The deletion is the proof of zero residue rather than an incidental cleanup: product_events grants service_role neither SELECT nor DELETE, so the rows cannot be counted or removed directly, and the only honest evidence that none survives is that no owner of them does. Nothing in the funnel path -- neither the reader nor the aggregation module -- holds this capability or any service-role client at all, which phase-2m-telemetry-guard.test.ts asserts separately",
   },
+  "scripts/phase-2m-push-delivery-proof.mjs": {
+    class: "operator-script",
+    reason:
+      "2M-NOTIFY-005/-009/-010/-011: teardown for the two disposable owners the hosted push proof creates on the DEPLOYED project. Signup is closed and must stay closed, so the owners are minted through the admin API and must be removed the same way; the deletion runs in a `finally` so a failed assertion cannot leave a live account behind. Unlike the funnel proof, the three push tables ARE readable here, so the run additionally reads each one owner-scoped after the delete and reports a table it could not read as residue NOT PROVED rather than as silence. Nothing on the push PRODUCT path holds this capability or a service-role client at all -- phase-2m-notification-boundary-guard.test.ts asserts that over the five delivery modules separately",
+  },
 };
 
 /** Scanned roots. `docs/` is excluded: prose may name what code may not do. */
@@ -225,7 +230,21 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
     );
     expect(funnelProof).toHaveLength(1);
 
-    expect(operatorScripts).toHaveLength(14 + recoveryProof.length + funnelProof.length);
+    // Plus Phase 2M slice 2M.4b's hosted push proof, counted on its own line for
+    // the same reason. Its deletion is teardown AND evidence, but in the
+    // opposite direction from the funnel proof's: the three push tables are
+    // readable, so the run reads each one owner-scoped AFTER the delete and
+    // reports zero rows. A table it could not read is recorded as residue NOT
+    // PROVED rather than passed over — silence is not evidence, and a harness
+    // that treated an unreadable table as a clean one would be reporting the
+    // absence of a measurement as the absence of rows.
+    const pushProof = operatorScripts.filter(
+      (file) => file === "scripts/phase-2m-push-delivery-proof.mjs",
+    );
+    expect(pushProof).toHaveLength(1);
+
+    expect(operatorScripts)
+      .toHaveLength(14 + recoveryProof.length + funnelProof.length + pushProof.length);
     expect(operatorScripts).not.toContain("supabase/functions/delete-account/reap.ts");
   });
 

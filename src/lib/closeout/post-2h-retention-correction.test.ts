@@ -133,6 +133,20 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // deliberately account for" -- and an authorized migration is exactly the
       // case where naming it is the whole point.
       "202608110091_phase_2m_clear_planned.sql",
+      // Phase 2M slice 2M.4b: MIGRATION 3 of 3, the last one ADR-105 allocated
+      // and ADR-106 confirmed. Push consent, subscription and a content-free
+      // delivery audit.
+      //
+      // Named here with particular care, because this is the retention guard and
+      // this migration REGISTERS A RETENTION WINDOW. It reuses the signed 90-day
+      // value from `private.retention_windows` (PRD sec. 14.1, ADR-082) rather
+      // than minting a new number, and its sweep
+      // `private.prune_notification_deliveries` is granted to **no role** and
+      // scheduled by nobody — because this repository has recorded that
+      // SCHEDULING IS AUTHORIZATION, and arming a destructive sweep is an
+      // operator action rather than a migration's. The pgTAP suite asserts both
+      // halves: that the window is 90 and that no role can execute the sweep.
+      "202608120092_phase_2m_push_delivery.sql",
     ]);
   });
 });

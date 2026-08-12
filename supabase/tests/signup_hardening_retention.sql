@@ -93,6 +93,13 @@ select is(
     'error_events',
     'heartbeat_runs',
     'jobs_terminal',
+    -- Phase 2M slice 2M.4b: the content-free push delivery audit. It REUSES the
+    -- signed 90-day window rather than minting a new value, and its sweep
+    -- `private.prune_notification_deliveries` is executable by no role and
+    -- scheduled by nobody -- scheduling is authorization (ADR-082). Declared
+    -- here because this list is what makes "the database will one day delete
+    -- rows for this" a visible decision.
+    'notification_deliveries',
     'notifications',
     'product_events',
     'rate_limit_events',
