@@ -201,7 +201,86 @@ the event.
 
 ---
 
-## 6. OWNER CHECKPOINT — the hardware proof (OD-2M-5)
+## 6a. Hardware run 1 — 2026-08-12: H-4 passed, **H-5 FAILED**
+
+The owner ran the checklist on an iPhone. Recorded as executed, with the result
+it actually produced.
+
+| line | result |
+|---|---|
+| **H-4** — iOS installed PWA, permission after an explicit gesture | **executed and proved** |
+| **H-5** — a real push arrives | **FAILED.** `ok=true status=sent delivered=0 retired=0 failed=1`, nothing arrived |
+| H-1 … H-3, H-6 … H-14 | **not reached** — every one assumes delivery works |
+
+### The failure exposed a second defect, in this work rather than in the platform
+
+The function's logs held **only boot and shutdown**. Both of the sender's failure
+paths — a non-2xx answer and a thrown exception — appended to `failed` and said
+nothing at all, so an Apple rejection, a bad VAPID signature, a transport error
+and a malformed subscription were **one indistinguishable observation**.
+
+That is an observability defect in the sender, it was mine, and it could only
+have been found on hardware: every offline test asserts what the code *does* with
+a known failure, and none of them could notice that the code never *says* which
+failure happened. The remedy is §6b.
+
+**The checkpoint stays blocked.** Nothing about H-5 is discharged, and the
+remaining lines are **not started** rather than passed.
+
+## 6b. The diagnostic remedy, and the hypothesis it makes checkable
+
+The sender now records, for every attempt that does not land, a **closed
+category** and — when the push service actually answered — its **HTTP status**.
+Twelve categories, each a constant chosen by this repository: `gone`,
+`unauthorized`, `bad_request`, `payload_too_large`, `rate_limited`,
+`server_error`, `unexpected_status`, `host_not_allowed`,
+`subscription_malformed`, `vapid_key_malformed`, `network_error`,
+`unknown_error`.
+
+**Nothing else travels.** No endpoint, no subscription id, no owner, no key, no
+payload, and — deliberately — **no text from the push service's response**, which
+is third-party data and is exactly how an endpoint or a token ends up in a log it
+was promised not to be in. A test feeds a recognisable marker into every one of
+those and asserts that neither the returned outcome nor anything written to the
+console contains it, with a non-vacuity check that something *was* logged.
+
+**Retirement is unchanged and still exactly 404/410.** The diagnostic vocabulary
+is deliberately wider than the retirement rule: a `401` now has its own name so
+it can be *seen*, and it still must not retire a device, because a rejected
+signature is our configuration being wrong rather than the user's browser having
+discarded anything. A test asserts the retirement set across `404, 410, 403, 500,
+429, 400`.
+
+### The leading hypothesis, made answerable in one run
+
+Comparing against a known-working deployment, the cryptography is structurally
+equivalent — P-256, ECDH, HKDF with `WebPush: info`, `aes128gcm`, the `0x02`
+delimiter, the RFC 8188 header and VAPID ES256 — and ours is additionally proved
+against **RFC 8291 section 5's published vector, byte for byte**. So the
+cryptography is not the suspect and has not been touched.
+
+The visible difference is the VAPID `sub`. The working deployment uses a real
+domain; this one's **default** is `mailto:ops@my-brain.invalid`, and `.invalid`
+is RFC 2606 reserved and guaranteed never to resolve. RFC 8292 defines `sub` as
+an address the push service operator can be contacted at, and Apple is documented
+as strict about it.
+
+**This is not asserted as the cause.** It is made *observable*: the sender now
+reports the subject's **category** — `operational`, `reserved` or `malformed`,
+never the address — in the same response as the HTTP status. One hardware run
+therefore answers both "what did Apple say" and "was our subject even usable",
+instead of needing two. A test asserts the shipped default categorises as
+`reserved`, importing the constant rather than restating it.
+
+The fix, if the hypothesis holds, is **configuration**: `VAPID_SUBJECT` is
+already read from the environment, so an operational address is a secret the
+owner sets and never a personal address compiled into this repository.
+
+`Urgency: normal` and the TTL difference are noted and **deliberately not
+changed here** — bundling them would make the next run's result ambiguous about
+which change mattered.
+
+## 6c. OWNER CHECKPOINT — the hardware proof (OD-2M-5)
 
 **Nothing in this repository can discharge any line below.** Every test here uses
 a fake `fetch`; the Pixel 7 Playwright project is an emulated viewport, not a

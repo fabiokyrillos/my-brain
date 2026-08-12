@@ -47,6 +47,21 @@ import {
  * item from ever being delivered again.
  */
 
+/**
+ * The `sub` claim used when `VAPID_SUBJECT` is not configured.
+ *
+ * It lives here rather than in the entrypoint so a test can assert its category
+ * **by importing it**. The alternative — reading `index.ts` from disk — would
+ * need `--allow-read`, and the worker suite deliberately runs with no `--allow-*`
+ * flags at all so it can never reach a network.
+ *
+ * `.invalid` is RFC 2606 reserved and guaranteed never to resolve, which makes
+ * this default an address no push service can act on. That is deliberate as a
+ * *placeholder* and wrong as a *deployed value*; `categoriseVapidSubject` is
+ * what makes the difference visible instead of silent.
+ */
+export const DEFAULT_VAPID_SUBJECT = "mailto:ops@my-brain.invalid";
+
 /** Twelve hours, the ceiling RFC 8292 puts on a VAPID token's lifetime is 24. */
 const VAPID_TTL_SECONDS = 12 * 60 * 60;
 /** How long the push service may hold the message for a device that is offline. */
@@ -77,8 +92,60 @@ export type DeliveryRequest = Readonly<{
   dedupeHash: string;
 }>;
 
+/**
+ * Why a single attempt did not land, as a CLOSED vocabulary.
+ *
+ * Added after a real iPhone reported `delivered=0, failed=1` and the function's
+ * logs held nothing but boot and shutdown. Both failure paths — a non-2xx answer
+ * and a thrown exception — appended to `failed` and said nothing, so a rejection
+ * by Apple, a bad VAPID signature, a transport error and a malformed
+ * subscription were all the same observation. That is the defect this vocabulary
+ * exists to remove, and it was found on hardware because nothing here could have
+ * found it.
+ *
+ * Every member is a constant chosen by this file. None is derived from the push
+ * service's response body, from an exception message, or from anything belonging
+ * to the user — so a category can be logged, returned and stored without any of
+ * `2M-NOTIFY-006`'s prohibitions coming with it.
+ */
+export const deliveryFailureCategories = [
+  // The push service answered, and the class of answer:
+  "gone",              // 404/410 — the browser discarded the subscription
+  "unauthorized",      // 401/403 — VAPID rejected: bad signature, `aud`, or `sub`
+  "bad_request",       // 400 — the request itself was malformed
+  "payload_too_large", // 413
+  "rate_limited",      // 429
+  "server_error",      // 5xx — the vendor is having a bad afternoon
+  "unexpected_status", // any other non-2xx
+  // The request never produced an answer:
+  "host_not_allowed",       // refused before egress by the allowlist
+  "subscription_malformed", // the stored keys are not usable
+  "vapid_key_malformed",    // the configured key pair is not usable
+  "network_error",          // DNS, TLS, timeout — fetch itself threw
+  "unknown_error",          // anything else, and deliberately opaque
+] as const;
+export type DeliveryFailureCategory = (typeof deliveryFailureCategories)[number];
+
+/**
+ * One content-free diagnostic line. `status` is present only when the push
+ * service actually answered, which is itself the distinction that was missing.
+ */
+export type DeliveryDiagnostic = Readonly<{
+  category: DeliveryFailureCategory;
+  status?: number;
+}>;
+
 export type DeliveryOutcome =
-  | Readonly<{ status: "sent"; delivered: number; retired: number; failed: number }>
+  | Readonly<{
+    status: "sent";
+    delivered: number;
+    retired: number;
+    failed: number;
+    /** Content-free, one entry per attempt that did not land. */
+    diagnostics: readonly DeliveryDiagnostic[];
+    /** The VAPID `sub`'s category — never the address. */
+    subject: "operational" | "reserved" | "malformed";
+  }>
   | Readonly<{ status: "suppressed"; reason: string }>
   | Readonly<{ status: "refused"; code: string }>;
 
@@ -138,6 +205,76 @@ export function isAllowedPushHost(endpoint: string, allowed: readonly RegExp[] =
     return false;
   }
   return allowed.some((pattern) => pattern.test(host));
+}
+
+/**
+ * Whether the configured VAPID `sub` is an address a push service could
+ * actually use — as a CATEGORY, never as the address.
+ *
+ * RFC 8292 says `sub` is a `mailto:` or `https:` URI the push service operator
+ * can contact you at, and Apple is documented as strict about it. This
+ * deployment's DEFAULT is `mailto:ops@my-brain.invalid`, and `.invalid` is
+ * RFC 2606 reserved and guaranteed never to resolve — so it is exactly the kind
+ * of value a strict service is entitled to reject with 401/403, which is
+ * indistinguishable from every other rejection until something says so.
+ *
+ * This is OBSERVATION, not a fix and not a guess about the cause. It returns a
+ * three-value category so one hardware run can answer both "what did the push
+ * service say" and "was our subject even usable", instead of needing two.
+ */
+export function categoriseVapidSubject(subject: string): "operational" | "reserved" | "malformed" {
+  const mailto = /^mailto:[^@\s]+@([A-Za-z0-9.-]+)$/.exec(subject);
+  let host: string | null = mailto ? mailto[1] : null;
+  if (host === null && /^https:\/\//.test(subject)) {
+    try {
+      host = new URL(subject).hostname;
+    } catch {
+      host = null;
+    }
+  }
+  if (host === null) return "malformed";
+  // RFC 2606 / RFC 6761 reserved names, which no push service can reach.
+  if (/\.(invalid|test|example|localhost|local)$/i.test(host)) return "reserved";
+  if (/^example\.(com|net|org)$/i.test(host)) return "reserved";
+  if (!host.includes(".")) return "malformed";
+  return "operational";
+}
+
+/**
+ * A non-2xx status to a category. Status codes are the push service's, not the
+ * user's, and carry nothing about who or what was being delivered.
+ */
+export function categoriseStatus(status: number): DeliveryFailureCategory {
+  if (status === 404 || status === 410) return "gone";
+  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 400) return "bad_request";
+  if (status === 413) return "payload_too_large";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "server_error";
+  return "unexpected_status";
+}
+
+/**
+ * A thrown value to a category, **without ever reading its message into the
+ * output**.
+ *
+ * The only messages consulted are the closed set this repository's own crypto
+ * module throws, compared by exact equality. Everything else collapses to
+ * `network_error` (fetch rejects with a `TypeError` for DNS, TLS and timeout) or
+ * to `unknown_error`, which is deliberately opaque: a push service's exception
+ * text is third-party data, and interpolating it into a log is exactly how an
+ * endpoint or a token ends up somewhere it was promised not to be.
+ */
+export function categoriseThrown(error: unknown): DeliveryFailureCategory {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "subscription_key_invalid" || message === "subscription_auth_invalid") {
+    return "subscription_malformed";
+  }
+  if (message === "vapid_public_key_invalid" || message === "vapid_private_key_invalid") {
+    return "vapid_key_malformed";
+  }
+  if (error instanceof TypeError) return "network_error";
+  return "unknown_error";
 }
 
 function readSubscriptions(value: unknown): SubscriptionRow[] {
@@ -228,6 +365,16 @@ export async function deliverPush(
   const payload = buildWirePayload(request.type, request.locale);
   if (payload === null) return Object.freeze({ status: "refused", code: "payload_unavailable" });
 
+  // The subject's CATEGORY, once per delivery, never its value. A `reserved`
+  // reading beside a `401`/`403` in the same run is the whole answer; a
+  // `operational` reading beside one rules the subject out and points elsewhere.
+  const subjectCategory = categoriseVapidSubject(config.vapidSubject);
+  if (subjectCategory !== "operational") {
+    console.warn("[send-push] VAPID subject is not an address a push service could use", {
+      subject: subjectCategory,
+    });
+  }
+
   const begun = await client.rpc("begin_push_delivery", {
     p_user_id: request.userId,
     p_type: request.type,
@@ -264,7 +411,21 @@ export async function deliverPush(
   const authorizationCache = new Map<string, string>();
   const gone: string[] = [];
   const failed: string[] = [];
+  const diagnostics: DeliveryDiagnostic[] = [];
   let delivered = 0;
+
+  /**
+   * The single place a failure is recorded, so no path can add to `failed`
+   * without also saying why. The previous version had two that did exactly
+   * that, and an iPhone found it.
+   */
+  const note = (category: DeliveryFailureCategory, status?: number): void => {
+    diagnostics.push(status === undefined ? { category } : { category, status });
+    // The log line carries the category and the status and NOTHING else — no
+    // endpoint, no subscription id, no owner, no key, no payload, no response
+    // body. `2M-NOTIFY-006` applies to a log exactly as it applies to a push.
+    console.error("[send-push] attempt failed", status === undefined ? { category } : { category, status });
+  };
 
   for (const subscription of subscriptions) {
     // The last line before egress. The database already refused the shapes that
@@ -273,7 +434,7 @@ export async function deliverPush(
     // a host we stopped recognising is our list being out of date, not the
     // user's browser having discarded anything.
     if (!isAllowedPushHost(subscription.endpoint, allowedHosts)) {
-      console.warn("[send-push] endpoint host is not an allowed push service");
+      note("host_not_allowed");
       failed.push(subscription.id);
       continue;
     }
@@ -309,19 +470,28 @@ export async function deliverPush(
         body: body as BodyInit,
       });
 
-      if (response.status === 404 || response.status === 410) {
+      if (response.ok) {
+        delivered += 1;
+      } else if (response.status === 404 || response.status === 410) {
         // The browser threw this subscription away. Retiring it is the required
         // outcome and retrying it can never succeed.
+        //
+        // RETIREMENT IS STILL EXACTLY 404/410 AND NOTHING ELSE. The diagnostic
+        // vocabulary is wider than the retirement rule on purpose: a 401 now has
+        // its own name so it can be SEEN, and it must still not retire a device,
+        // because a rejected signature is our configuration being wrong rather
+        // than the user's browser having discarded anything.
+        note("gone", response.status);
         gone.push(subscription.id);
-      } else if (response.ok) {
-        delivered += 1;
       } else {
+        note(categoriseStatus(response.status), response.status);
         failed.push(subscription.id);
       }
-    } catch {
+    } catch (error) {
       // A malformed subscription key, a DNS failure or a transport error. One
       // device's failure never aborts the loop: a second device that would have
       // received this must not be punished for the first one's state.
+      note(categoriseThrown(error));
       failed.push(subscription.id);
     }
   }
@@ -339,5 +509,16 @@ export async function deliverPush(
     console.error("[send-push] finish failed", { code: finished.error.code ?? "unknown" });
   }
 
-  return Object.freeze({ status: "sent", delivered, retired: gone.length, failed: failed.length });
+  // The diagnostics travel back in the RESPONSE as well as to the log, because
+  // the manual trigger is how the owner runs the hardware proof: a run that
+  // answered `delivered=0, failed=1` and nothing else is what made an iPhone
+  // failure undiagnosable in the first place.
+  return Object.freeze({
+    status: "sent",
+    delivered,
+    retired: gone.length,
+    failed: failed.length,
+    diagnostics: Object.freeze(diagnostics.map((entry) => Object.freeze(entry))),
+    subject: subjectCategory,
+  });
 }
