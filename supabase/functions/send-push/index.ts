@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { deliverPush, parseDeliveryRequest } from "./deliver.ts";
+import { DEFAULT_VAPID_SUBJECT, deliverPush, parseDeliveryRequest } from "./deliver.ts";
 
 /**
  * `2M-NOTIFY-011` — the push sender's entrypoint.
@@ -32,13 +32,6 @@ import { deliverPush, parseDeliveryRequest } from "./deliver.ts";
  * fall back to sending unsigned. Both refuse with a named code, because the
  * failure this function must never have is "sent anyway".
  */
-
-/**
- * The `sub` claim RFC 8292 requires. A `mailto:` the push service can use to
- * reach the operator when a subscription misbehaves; it identifies the
- * DEPLOYMENT, never a user, and carries nothing about who is being notified.
- */
-const DEFAULT_VAPID_SUBJECT = "mailto:ops@my-brain.invalid";
 
 const configurationError: string | null = (() => {
   if (!Deno.env.get("VAPID_PUBLIC_KEY") || !Deno.env.get("VAPID_PRIVATE_KEY")) {
