@@ -12,9 +12,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NeedsAttentionItemView, TrackedAttentionReason } from "./contracts";
-
-/** The owner's zone, explicit in every render (`LDC-DAILY-001`). */
-const OWNER_TIME_ZONE = "America/Sao_Paulo";
 import {
   NeedsAttentionList,
   type AttentionActionState,
@@ -61,6 +58,9 @@ function item(
     ...overrides,
   };
 }
+
+/** The owner's zone, explicit in every render (`LDC-DAILY-001`). */
+const OWNER_TIME_ZONE = "America/Sao_Paulo";
 
 const noLoadMore = vi.fn(async () => ({ ok: true as const, page: { items: [], hasNext: false, nextCursor: null } }));
 
