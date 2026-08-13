@@ -2,6 +2,53 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N slice 2N.2: the project page says what changed, what a reading called a decision, and what it cannot know
+
+Seven requirements: **4 built, 3 baseline**, with the risk half of `2N-PROJECT-005` closing **`not-built-by-rule`**. **Zero migrations**; 92 total, parity `202608120092`.
+
+### The re-audit moved three requirements to baseline before anything was written
+
+`2N-PROJECT-001` (identity, status, links) and `2N-PROJECT-006` (for the three lists 2N.0 and PR #205 had already bounded) were known to be satisfied. `2N-PROJECT-002` was the one worth re-deriving: **people already rendered with their roles**, because `AssociationPanel` has received `role` from `person_projects` and printed it since UX-08. All three are re-verified by journey and **not claimed as this slice's work**.
+
+### Risks close by rule, and the rule is asserted rather than narrated
+
+Decisions are representable: `entry_interpretations.concepts` is a stored `text[]` whose vocabulary contains `decision`, written by the worker under the same validated contract the app declares.
+
+**Risks are not.** There is no risk concept, no risk column and no risk table anywhere - not in the schema, not in `src/lib/ai/extraction-schema.ts`, not in the worker's own vocabulary. The nearest members are `blocker`, `dependency` and `waiting_for_third_party`, and none of them means a risk: **a blocker is something that is stopping work; a risk is something that might.** Mapping one to the other would mint a vocabulary the product does not have and present an inference as a record.
+
+So the classification is checked rather than promised. `phase-2n-project-guard` scans all three vocabularies for a risk concept and the migrations for a risk-named object, **with a non-vacuity control proving the same scan finds the `decision` concept that did ship**. A later phase that makes risks representable fails this guard in the same change, which reopens the requirement instead of leaving it closed by an old sentence.
+
+### Decisions are read from the current interpretation, not from any of them
+
+The rows come from `entries.current_interpretation_id`. A query on `entry_interpretations.entry_id` would have matched every superseded version, so a reading the owner had already corrected would have resurfaced as a decision the product still claimed. The section heading says these are a **reading**, not decisions the product holds, and every row opens to the record so the reader can check it.
+
+### A count from a bounded list says "at least N"
+
+The state line reports the project's stored status, how many linked tasks are still open, and when the most recent linked entry happened - three records that already exist, in vocabularies that already exist. But the task list is bounded at 100, and the rows the limit dropped may hold further open tasks. So a bounded count renders as **"pelo menos N em aberto"**, and the confident and uncertain phrasings are **separate copy strings** rather than one with a conditional prefix, which is what stops a caller printing the first over the second's number.
+
+### One change is narrated one way, wherever it is read
+
+"What changed recently" is `audit_logs` described by **the same `describeHistoryEvent` and rendered by the same `HistoryList`** the History surface uses. No change-log table, and the guard forbids the project surface from naming an action type at all - a second label is how a product ends up describing one audit row two ways on two screens. The audit `reason` is **not even selected** into the projection, matching UX-28.
+
+The section's explainer names the two things the trail carries for a project, so a change it never records - linking a task, for instance - reads as **outside this list rather than as an absence of history**.
+
+### `memories.project_id` gains its first reader
+
+The column has existed since `202607160006`. A memory the owner recorded about a project was reachable only through a person it also mentioned, or not at all. It now renders with the same per-row provenance the person page uses, and `confidence` is deliberately absent from the projection.
+
+### Two defects the diff review caught and no test did
+
+- **A third hop carried no bound.** `associationIds` feeds the association-change lookup under `CONTEXTUAL_LIMIT`; a project with more than a hundred association rows in its history would have left some unqueried and their changes missing from a list that looked complete.
+- **A section that vanished when empty.** The memories block copied the person page's `length > 0 &&` guard, which left its empty-state copy unreachable and the reader unable to tell an empty answer from a surface that never had the question.
+
+### Proofs
+
+`project-context.test.ts` **18**, `phase-2n-project-guard.test.ts` **26**, hosted journeys **28/28** across both locales and two viewports. **Five mutation controls executed and reverted**, each failing its guard by name - including one that type-checks perfectly: feeding the change list from the untrimmed array.
+
+The journey edits a project **through the product's own form** and then asserts the sentence appears, because a fixture row written behind the surface would have proved the reader and left the writer untested. A separate fixture carries 101 linked entries: exactly 100 render and the notice appears.
+
+Suite 6760 -> 6807, measured against `7e27b53` in a throwaway worktree rather than attributed by assumption.
+
 ## 2026-08-13 - PHASE 2N slice 2N.1: the person page says where each claim came from, and refuses to invent one
 
 Twenty-five requirements: **17 built, 7 baseline, 1 N/A** (`2N-ACCESS-004` — this slice ships no graph). **Zero migrations**; 92 total, parity `202608120092`.

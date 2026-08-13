@@ -227,11 +227,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
    * limit, so the newest `RECENT_CHANGE_LIMIT` of the union is exactly what the
    * merge holds — but either source may have truncated while the merged list is
    * short of its own limit, which is the `upstreamBounded` case.
+   *
+   * `associationIds` is a **third** hop and carries the bound too. It is read
+   * under `CONTEXTUAL_LIMIT`, so a project with more than a hundred association
+   * rows in its whole history would leave some of them unqueried — and their
+   * changes would be missing from a list that otherwise looked complete. That is
+   * the same silent truncation one hop further out.
    */
   const boundedChanges = boundedList(
     changeEvents,
     RECENT_CHANGE_LIMIT,
-    projectChanges.length > RECENT_CHANGE_LIMIT || associationChanges.length > RECENT_CHANGE_LIMIT,
+    projectChanges.length > RECENT_CHANGE_LIMIT
+      || associationChanges.length > RECENT_CHANGE_LIMIT
+      || associationIds.length > CONTEXTUAL_LIMIT,
   );
 
   /*
@@ -468,11 +476,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <BoundedNotice list={boundedDecisions} locale={locale} />
       </section>
 
-      {boundedMemories.items.length > 0 && (
-        <section className="entity-memory" id="memories">
-          <h2>{copy.projectMemories}</h2>
-          <SectionOriginNote locale={locale} origin="derived" />
-          {boundedMemories.items.map((memory, index) => {
+      {/*
+        Rendered even when empty, unlike the person page's memory block.
+        "Nenhuma memória vinculada a este projeto" is an answer to *what
+        supports this context*; a section that vanishes leaves the reader unable
+        to tell an empty answer from a surface that does not have the question —
+        which is the distinction every other section on this page states.
+      */}
+      <section className="entity-memory" id="memories">
+        <h2>{copy.projectMemories}</h2>
+        <SectionOriginNote locale={locale} origin="derived" />
+        {boundedMemories.items.length ? (
+          boundedMemories.items.map((memory, index) => {
             const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
             return (
               <article id={`memory-${memory.id}`} key={memory.id}>
@@ -500,10 +515,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 />
               </article>
             );
-          })}
-          <BoundedNotice list={boundedMemories} locale={locale} />
-        </section>
-      )}
+          })
+        ) : <p className="quiet-state">{copy.projectMemoriesEmpty}</p>}
+        <BoundedNotice list={boundedMemories} locale={locale} />
+      </section>
 
       {/*
         `2N-PROJECT-004`. Derived from `audit_logs` and described by the same
