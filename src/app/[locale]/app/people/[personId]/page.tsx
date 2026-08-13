@@ -163,9 +163,15 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   // only by an explicit, local act.
   const notesSensitivity = deriveFreeTextSensitivity();
 
-  const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT);
+  /*
+   * Both hops carry the bound. Tasks and the timeline are read through
+   * `task_people` and `entry_entities` first, and a link whose row does not
+   * resolve would otherwise make a truncated list look complete — see
+   * `boundedList`'s `upstreamBounded`.
+   */
+  const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT, taskLinks.length > CONTEXTUAL_LIMIT);
   const boundedMemories = boundedList(memories, CONTEXTUAL_LIMIT);
-  const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT);
+  const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT, entryLinks.length > CONTEXTUAL_LIMIT);
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.

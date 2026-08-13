@@ -102,8 +102,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const entryLevels = new Map(timelineLevels);
   for (const [id, level] of readableLevelsOf(sourceResult.data)) entryLevels.set(id, level);
 
-  const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT);
-  const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT);
+  // Both hops carry the bound, as on the person page: a link whose row does not
+  // resolve would otherwise make a truncated list look complete.
+  const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT, taskLinks.length > CONTEXTUAL_LIMIT);
+  const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT, entryLinks.length > CONTEXTUAL_LIMIT);
 
   return (
     <div className="content-page entity-detail">

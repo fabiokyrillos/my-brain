@@ -58,6 +58,32 @@ describe("2N-PERSON-003: a bounded list knows that it is bounded", () => {
     }
   });
 
+  it("reports a bound the FIRST hop hit, even when the second returned fewer rows", () => {
+    /*
+     * The two-hop case the contextual pages actually read in: 101 links come
+     * back, only 95 resolve to rows. Without the upstream signal this reports
+     * `bounded: false` and the page looks complete while a hundred-and-first
+     * link exists — the same silent truncation, one hop earlier.
+     */
+    const list = boundedList(rows(95), 100, true);
+    expect(list.bounded).toBe(true);
+    expect(list.items).toHaveLength(95);
+  });
+
+  it("still reports the bound when only the second hop hit it", () => {
+    expect(boundedList(rows(101), 100, false).bounded).toBe(true);
+  });
+
+  it("reports no bound when neither hop hit it", () => {
+    // The disjunction must not become "always bounded".
+    expect(boundedList(rows(95), 100, false).bounded).toBe(false);
+  });
+
+  it("defaults the upstream signal to absent, so an unaware caller is unchanged", () => {
+    expect(boundedList(rows(95), 100).bounded).toBe(false);
+    expect(boundedList(rows(101), 100).bounded).toBe(true);
+  });
+
   it("reports the bound that was applied, so a notice cannot restate a different number", () => {
     expect(boundedList(rows(11), 10).limit).toBe(10);
     expect(shownCount(boundedList(rows(11), 10))).toBe(10);

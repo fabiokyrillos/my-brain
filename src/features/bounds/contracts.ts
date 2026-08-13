@@ -87,11 +87,36 @@ export type Bounded<T> = {
  *
  * Trims the probe row off before returning, so a caller cannot accidentally
  * render it — the probe exists to be counted, never to be shown.
+ *
+ * ## Why there is an `upstreamBounded` argument
+ *
+ * The contextual pages read in two hops: a relationship table gives the ids,
+ * then the ids are resolved to rows. **Both hops are bounded**, and only the
+ * second one is visible here.
+ *
+ * That leaves a case this would otherwise get wrong. If 101 links come back but
+ * only 95 resolve — six removed, foreign or simply not returned — then `rows`
+ * holds 95, this would report `bounded: false`, and the page would look
+ * complete while a hundred-and-first link exists. The rarity is not the point:
+ * it is the same silent truncation this module exists to end, one hop earlier.
+ *
+ * So the caller passes what it knows about the first hop, and the answer is the
+ * disjunction. Reporting the bound when *either* hop hit it is the honest
+ * direction: "more exist" stays true whether the shortfall came from the limit
+ * or from the read.
  */
-export function boundedList<T>(rows: readonly T[] | null | undefined, limit: number): Bounded<T> {
+export function boundedList<T>(
+  rows: readonly T[] | null | undefined,
+  limit: number,
+  upstreamBounded = false,
+): Bounded<T> {
   const all = rows ?? [];
-  const bounded = all.length > limit;
-  return { items: bounded ? all.slice(0, limit) : all, bounded, limit };
+  const overflowed = all.length > limit;
+  return {
+    items: overflowed ? all.slice(0, limit) : all,
+    bounded: overflowed || upstreamBounded,
+    limit,
+  };
 }
 
 /**
