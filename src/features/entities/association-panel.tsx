@@ -30,6 +30,8 @@ import { useActionState, useId, useState } from "react";
 
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
+import { ownerAuthored } from "@/features/provenance/contracts";
+import { ProvenanceNote, SectionOriginNote } from "@/features/provenance/provenance-note";
 
 import type { Locale } from "@/lib/preferences";
 
@@ -150,6 +152,19 @@ export function AssociationPanel({
   return (
     <section className="relation-panel">
       <h2>{heading}</h2>
+      {/*
+        Persisted, and owner-authored by construction: neither `person_contexts`
+        nor `person_projects` carries a `source_entry_id` or an
+        `interpretation_id`, so there is nothing else the origin could be. Stated
+        once for the section rather than on every row — see
+        `relationship-panel.tsx` for why.
+      */}
+      <SectionOriginNote locale={locale} origin="persisted" />
+      <ProvenanceNote
+        locale={locale}
+        provenance={ownerAuthored(target.kind === "person-context" ? "person_contexts" : "person_projects")}
+        subject=""
+      />
 
       {rows.length ? (
         <ul className="relation-list">
