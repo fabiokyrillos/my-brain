@@ -23,6 +23,8 @@
 import { LoaderCircle, Pencil, Plus, X } from "lucide-react";
 import { useActionState, useId, useState } from "react";
 
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import type { Bounded } from "@/features/bounds/contracts";
 import type { Locale } from "@/lib/preferences";
 
 import { getEntityCopy } from "./copy";
@@ -42,6 +44,7 @@ export type RelationshipRow = {
 };
 
 export function RelationshipPanel({
+  bound,
   createAction,
   endAction,
   locale,
@@ -49,10 +52,19 @@ export function RelationshipPanel({
   relationships,
   updateAction,
 }: {
+  /**
+   * The bound for `relationships`, **required** for the reason
+   * `association-panel.tsx` records at length: the person page fetched this list
+   * with `withProbe(RELATION_LIMIT)` and handed it straight here, so at 51
+   * relationships it rendered the probe row and reported nothing. An optional
+   * prop would leave the next caller free to forget, and forgetting is silent.
+   */
+  readonly bound: Bounded<unknown>;
   createAction: EntityEditAction;
   endAction: EntityEditAction;
   locale: Locale;
   personId: string;
+  /** Always `bound.items`, mapped - never the untrimmed query result. */
   relationships: readonly RelationshipRow[];
   updateAction: EntityEditAction;
 }) {
@@ -84,6 +96,8 @@ export function RelationshipPanel({
       ) : (
         <p className="quiet-state">{copy.relationshipsEmpty}</p>
       )}
+
+      <BoundedNotice list={bound} locale={locale} />
 
       <RelationshipCreate action={createAction} locale={locale} personId={personId} />
     </section>

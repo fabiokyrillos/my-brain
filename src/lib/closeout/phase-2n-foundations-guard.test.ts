@@ -120,6 +120,37 @@ describe("2N-PERSON-003 / -PROJECT-006 / -KNOWS-008: no silent bound survives", 
     }
   });
 
+  it("feeds every panel list from a bounded list, never from the raw query", () => {
+    /*
+     * The defect the two checks above could not see, and the reason this one is
+     * phrased about the DATA rather than about the notice.
+     *
+     * Three lists on the person page (`relationships`, `contexts`, linked
+     * `projects`) and one on the project page (linked `people`) were queried with
+     * `withProbe(limit)` and then handed straight to their panel. Both checks
+     * above passed the whole time: the routes *did* call `withProbe`, they *did*
+     * call `boundedList`, and they *did* render `<BoundedNotice>` — just for
+     * their other lists. So the probe row was rendered rather than reported, and
+     * at 51 relationships or 101 linked projects the page showed one row past its
+     * own limit and claimed to be complete.
+     *
+     * A required `bound` prop stops the notice being forgotten, which `tsc`
+     * enforces. It cannot stop the rows themselves being the untrimmed array —
+     * `bound={boundedX}` beside `rows={raw.map(...)}` type-checks perfectly and
+     * renders one row too many. That is what this asserts.
+     */
+    for (const route of CONTEXTUAL_ROUTES) {
+      const source = code(route);
+      const fed = [...source.matchAll(/(?:rows|relationships)=\{([A-Za-z0-9_.]+)\.map\(/g)];
+      for (const [, expression] of fed) {
+        expect(
+          expression,
+          `${route} feeds a panel from \`${expression}\`, which is the untrimmed query result`,
+        ).toMatch(/\.items$/);
+      }
+    }
+  });
+
   it("has exactly one bounds vocabulary, and it is search's word", () => {
     /*
      * `2N-PERSON-003` says the bound is stated "in the vocabulary search already

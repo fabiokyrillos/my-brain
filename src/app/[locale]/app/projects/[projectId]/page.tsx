@@ -106,6 +106,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // resolve would otherwise make a truncated list look complete.
   const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT, taskLinks.length > CONTEXTUAL_LIMIT);
   const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT, entryLinks.length > CONTEXTUAL_LIMIT);
+  /*
+   * The linked-people list had the same defect the person page had in three
+   * places: fetched with `withProbe`, then handed to the panel untrimmed, so at
+   * 101 linked people it rendered the probe row and claimed to be complete.
+   * Fixed here rather than deferred to 2N.2 - the panel now requires its bound,
+   * so this is what the surface needs to keep compiling, and leaving a known
+   * silent truncation in place to preserve a slice boundary would be the wrong
+   * trade.
+   */
+  const boundedPeople = boundedList(people, CONTEXTUAL_LIMIT, personLinks.length > CONTEXTUAL_LIMIT);
 
   return (
     <div className="content-page entity-detail">
@@ -182,12 +192,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         */}
         <AssociationPanel
           addAction={associatePersonProject}
+          bound={boundedPeople}
           endAction={endPersonProject}
           heading={copy.linkedPeople}
           locale={locale}
           options={peopleOptions.map((option) => ({ id: option.id, label: option.name }))}
           roleAction={updatePersonProjectRole}
-          rows={people.map((person) => ({
+          rows={boundedPeople.items.map((person) => ({
             id: person.id,
             label: person.name,
             href: `/${locale}/app/people/${person.id}`,

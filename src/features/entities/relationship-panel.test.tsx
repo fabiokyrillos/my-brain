@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { boundedList, RELATION_LIMIT } from "@/features/bounds/contracts";
+
 import type { EntityEditState } from "./edit-state";
 import type { EntityEditAction } from "./entity-edit-form";
 import { RelationshipPanel, type RelationshipRow } from "./relationship-panel";
@@ -26,9 +28,15 @@ const spouse: RelationshipRow = {
   since: "15 de março de 2019",
 };
 
+/**
+ * The default is an UNBOUNDED list, so every existing case still asserts what it
+ * asserted: `BoundedNotice` renders nothing when `bounded` is false. A case that
+ * wants the notice passes its own bound.
+ */
 function panel(overrides: Partial<Parameters<typeof RelationshipPanel>[0]> = {}) {
   return (
     <RelationshipPanel
+      bound={boundedList([], RELATION_LIMIT)}
       createAction={resolvesTo(idle)}
       endAction={resolvesTo(idle)}
       locale="pt-BR"
@@ -171,5 +179,53 @@ describe("RelationshipPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Registrar relação" }));
 
     expect(screen.getByLabelText("Tipo de relação")).toBeVisible();
+  });
+
+  describe("2N-PERSON-003: the list says when it is bounded", () => {
+    /*
+     * The defect this closes, stated as the case that used to pass silently.
+     *
+     * The person page fetched relationships with `withProbe(RELATION_LIMIT)` and
+     * handed the result straight here, so a 51st relationship was RENDERED and
+     * the panel still said nothing. The bound now arrives with the rows, and it
+     * is required rather than optional because the failure is invisible: a list
+     * that forgets to report simply looks complete.
+     */
+    const rows = (count: number): RelationshipRow[] =>
+      Array.from({ length: count }, (_, index) => ({
+        ...spouse,
+        id: `33333333-3333-4333-8333-${String(index).padStart(12, "0")}`,
+        description: `relação ${index}`,
+      }));
+
+    it("reports the bound, and reports the count it actually shows", () => {
+      const items = rows(RELATION_LIMIT);
+      render(
+        panel({
+          bound: { items, bounded: true, limit: RELATION_LIMIT },
+          relationships: items,
+        }),
+      );
+
+      const notice = screen.getByRole("note");
+      expect(notice).toHaveAttribute("data-bounded", "true");
+      // The number shown, not an invented total — `shownCount`'s contract.
+      expect(notice).toHaveTextContent(String(RELATION_LIMIT));
+    });
+
+    it("stays silent when the list is complete, so the notice keeps meaning something", () => {
+      // The control. Without it the assertion above would pass on a panel that
+      // renders the notice unconditionally, which is the one outcome that would
+      // make the notice worthless.
+      const items = rows(2);
+      render(
+        panel({
+          bound: { items, bounded: false, limit: RELATION_LIMIT },
+          relationships: items,
+        }),
+      );
+
+      expect(screen.queryByRole("note")).toBeNull();
+    });
   });
 });
