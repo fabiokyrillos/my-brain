@@ -2,6 +2,40 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N slice 2N.1: the person page says where each claim came from, and refuses to invent one
+
+Twenty-five requirements: **17 built, 7 baseline, 1 N/A** (`2N-ACCESS-004` — this slice ships no graph). **Zero migrations**; 92 total, parity `202608120092`.
+
+### The `on delete set null` trap that shaped the whole slice
+
+`memories.source_entry_id` and `tasks.source_entry_id` are both declared **`on delete set null`**. So a NULL source means **either** "nothing recorded one" **or** "the source entry was deleted and the foreign key nulled the column" - and nothing afterwards tells them apart. There is a real writer that inserts a memory with no source at all, so both readings occur.
+
+The tempting arm is to call a null source owner-authored and print "informado por você". **For a memory whose entry the owner deleted, that is false**, and false in the direction that turns an absence into a positive claim about where knowledge came from. So **null resolves to `unsourced`**, the same arm as a source that will not resolve.
+
+"Informed by you" is reserved for `person_relationships`, `person_projects` and `person_contexts`, where it is true **by construction** - they carry no source column at all. `ownerAuthored` takes a closed union of exactly those tables, so `ownerAuthored("memories")` is a **type error**, and a guard checks that union against the migrations so a later phase adding a source column fails in the same change.
+
+Removed, foreign, unreadable and never-set are **one arm**, by having no branch that could tell them apart - so the rendered page cannot be used to test whether an entry id exists.
+
+### What the page now says
+
+Origin is stated **once per section** for the relation panels (every row has the same answer, and repeating it twelve times says nothing actionable) and **per row** for memories and tasks (where it genuinely differs). The timeline gets none: those rows *are* the records.
+
+An unsourced claim renders as ordinary italic text, **not** a warning. Colouring it would present a missing stored source as a fault to fix, and would invite the reader to guess *why* it is missing - the distinction the single arm exists to destroy.
+
+Each section states in **words** whether the owner maintains it or the page derived it (`2N-PERSON-004`) - words rather than layout, because a two-column convention conveys nothing to a screen reader and nothing at a narrow viewport where both columns stack.
+
+### Opening a source no longer costs the reader their place
+
+`?back=` carries the row's anchor, and the entry page renders the link that spends it. The value is untrusted, so it is matched against a strict allow-list built from this app's own locales and **anything else renders nothing** - without that it is an open redirect, and the pattern is anchored on the locale segment precisely because `startsWith("/")` would let `//host` through.
+
+### The guard that was wrong first
+
+The confidence guard initially banned the string anywhere under `src/features/entities` and failed on correct code: **all three relation tables carry a `confidence` column whose writers set the constant 1**. Writing that constant is not rendering certainty; rendering it would print "100%" beside something the owner merely typed. Narrowed to what renders, and extended so `confidence` may not even enter a person-page projection.
+
+### Recorded, not decided silently
+
+**Sensitivity reveals are not restored across a source round trip.** The provenance disclosure is restored by the anchor; a revealed mask is not. ADR-110 makes the reveal local and explicit, and persisting one across a navigation would weaken 2N.0's posture for a convenience. Flagged for the owner.
+
 ## 2026-08-13 - PHASE 2N: four lists fetched a probe row and rendered it
 
 Found re-deriving 2N.0's coverage from source at the start of slice 2N.1 rather than inheriting the handoff's numbers - which were raw `grep` **line** counts, not consumers: the person page has **4** `ProtectedContent` and **3** `BoundedNotice`, not the 9 and 4 that were recorded.

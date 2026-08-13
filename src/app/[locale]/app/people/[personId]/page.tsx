@@ -25,6 +25,9 @@ import { loadAliasesForEntity } from "@/features/entities/aliases";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
 import { ProtectedContent } from "@/features/operations/protected-content";
+import { deriveClaimProvenance, isOpenable, resolvableEntryIdsOf } from "@/features/provenance/contracts";
+import { getProvenanceCopy } from "@/features/provenance/copy";
+import { ProvenanceNote, SectionOriginNote } from "@/features/provenance/provenance-note";
 import {
   deriveFreeTextSensitivity,
   deriveSubjectSensitivity,
@@ -44,6 +47,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const locale = candidate;
   const pt = locale === "pt-BR";
   const copy = getEntityCopy(locale);
+  const provenanceCopy = getProvenanceCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
   const { supabase } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
@@ -75,7 +79,11 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     // classification to travel with the content rather than be fetched again at
     // render time — and because `2N-KNOWS-007` requires it read from the current
     // row, which is what selecting it beside the content means.
-    supabase.from("memories").select("id,content,kind,important,sensitivity").eq("person_id", personId).order("important", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)),
+    // `source_entry_id` joins this projection for `2N-PROV-001`: it is the only
+    // column on `memories` that can point at a record. Note it is declared
+    // `on delete set null`, so a NULL here is ambiguous and never renders as
+    // owner-authored — see `features/provenance/contracts.ts`.
+    supabase.from("memories").select("id,content,kind,important,sensitivity,source_entry_id").eq("person_id", personId).order("important", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)),
     // Two relations the schema has modelled since `202607160009` and the page
     // has never shown (UX-09). Both are validity-scoped: a relationship that
     // ended is history, not the current answer to "who is this to me".
@@ -141,15 +149,24 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
    * second — the kind of "remembering" this contract exists to remove.
    */
   const timelineLevels = readableLevelsOf(entries);
-  const missingSourceIds = Array.from(
+  /*
+   * `2N-PROV-001`: memories join tasks here.
+   *
+   * Both tables carry `source_entry_id`, and a memory's source is no more likely
+   * than a task's to be one of the timeline entries — the timeline is what
+   * mentions this person, and a memory can come from an entry that never did. So
+   * both sets of ids are resolved in the same owner-scoped, bounded read, and
+   * the rows that come back feed BOTH the classification map and the set of
+   * sources this page may offer to open.
+   */
+  const declaredSourceIds = Array.from(
     new Set(
-      tasks
-        .map((task) => task.source_entry_id)
+      [...tasks.map((task) => task.source_entry_id), ...memories.map((memory) => memory.source_entry_id)]
         .filter((id): id is string => Boolean(id) && !timelineLevels.has(id as string)),
     ),
   );
-  const sourceResult = missingSourceIds.length
-    ? await supabase.from("entries").select("id,sensitivity").in("id", missingSourceIds)
+  const sourceResult = declaredSourceIds.length
+    ? await supabase.from("entries").select("id,sensitivity").in("id", declaredSourceIds)
     : { data: [], error: null };
   // A failed read is NOT treated as an empty result that could be mistaken for
   // "these entries carry no classification": rows that do not arrive stay absent
@@ -157,6 +174,21 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const entryLevels = new Map(timelineLevels);
   for (const [id, level] of readableLevelsOf(sourceResult.data)) entryLevels.set(id, level);
   const memoryLevels = readableLevelsOf(memories);
+
+  /*
+   * The entries this page may offer to OPEN — built from rows that actually came
+   * back, never from the ids that were asked for.
+   *
+   * That distinction is the whole guarantee: an id the query requested and did
+   * not return is removed, foreign or unreadable, and offering a link for it
+   * would both 404 and confirm the id exists. `resolvableEntryIdsOf` therefore
+   * reads the returned rows, and every one of those three cases lands in the
+   * same `unsourced` arm.
+   */
+  const resolvableEntryIds = new Set([
+    ...resolvableEntryIdsOf(entries),
+    ...resolvableEntryIdsOf(sourceResult.data),
+  ]);
 
   // `2N-PRIVACY-009`, ADR-110 Decision 4. The note carries no classification and
   // none may be inferred from its text, so it is masked by default and revealed
@@ -192,6 +224,23 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const roleByProjectId = new Map(projectLinks.map((link) => [link.project_id, link.role]));
   const organizationName = organizations.find((item) => item.id === person.organization_id)?.name ?? null;
   const formatDate = (value: string) => formatInstant(value, "day", locale, timeZone) ?? "";
+
+  /*
+   * `2N-PERSON-006`, `2N-PROV-003` — opening a source must not cost the reader
+   * their place.
+   *
+   * Every row that can open one carries a stable anchor, and the link hands that
+   * anchor to the entry page as `back`. Returning is then a normal navigation to
+   * a fragment on this page rather than a scroll position the browser may or may
+   * not have kept, which matters because these rows are server-rendered and a
+   * back navigation can re-fetch them.
+   *
+   * The anchor is built from ids that are already in the URL or already public
+   * on the page — never from content, which would put a masked string into the
+   * address bar and the browser's history.
+   */
+  const sourceHref = (entryId: string, anchor: string) =>
+    `/${locale}/app/inbox/${entryId}?back=${encodeURIComponent(`/${locale}/app/people/${person.id}#${anchor}`)}`;
 
   return (
     <div className="content-page entity-detail">
@@ -248,6 +297,13 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             <strong>{organizationName ?? copy.companyNone}</strong>
             <small>{copy.companyExplainer}</small>
           </p>
+          {/*
+            `2N-PERSON-004`, `2N-PROV-001`. Everything in this header — the name,
+            the note, the company, the nicknames — is a field the owner typed
+            into the form directly below. `people` carries no `source_entry_id`,
+            so there is no record to trace it to and none is invented.
+          */}
+          <SectionOriginNote locale={locale} origin="persisted" />
         </div>
       </header>
 
@@ -308,10 +364,29 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
       <div className="entity-columns">
         <section>
           <h2>{pt ? "Pendências e tarefas" : "Open work and tasks"}</h2>
+          {/*
+            `2N-PERSON-004`. Derived: this list is assembled at render from
+            `task_people` and `tasks`, and the task itself is edited on Work, not
+            here. Saying so is what stops the reader looking for an edit control
+            that was never meant to be on this page.
+          */}
+          <SectionOriginNote locale={locale} origin="derived" />
           {boundedTasks.items.length ? (
             <div className="mini-list">
-              {boundedTasks.items.map((task) => (
-                <article key={task.id}>
+              {boundedTasks.items.map((task, index) => {
+                /*
+                 * Derived ONCE and asked about, rather than the resolvability
+                 * test being re-implemented in the `href`.
+                 *
+                 * Writing `resolvableEntryIds.has(...) ? sourceHref(...)` beside
+                 * `deriveClaimProvenance(...)` would be two answers to one
+                 * question, and they would drift the moment the contract gained
+                 * a condition — leaving a page that offers a link to something
+                 * it simultaneously labels unsourced.
+                 */
+                const provenance = deriveClaimProvenance(task.source_entry_id, resolvableEntryIds);
+                return (
+                <article id={`task-${task.id}`} key={task.id}>
                   {/*
                     The same component the Work list and the task detail mount, so
                     a task masked on `/app/work` is masked here too — the
@@ -329,8 +404,21 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                     <strong>{task.title}</strong>
                   </ProtectedContent>
                   <span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span>
+                  {/*
+                    `subject` is positional, never the title. The title is what
+                    `ProtectedContent` above may be withholding, and an
+                    `aria-label` carrying it would hand the masked string to
+                    assistive technology and to the DOM.
+                  */}
+                  <ProvenanceNote
+                    href={isOpenable(provenance) ? sourceHref(provenance.entryId, `task-${task.id}`) : undefined}
+                    locale={locale}
+                    provenance={provenance}
+                    subject={provenanceCopy.taskSubject(index + 1)}
+                  />
                 </article>
-              ))}
+                );
+              })}
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
           <BoundedNotice list={boundedTasks} locale={locale} />
@@ -356,8 +444,11 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
       {boundedMemories.items.length > 0 && (
         <section className="entity-memory">
           <h2>{pt ? "Memórias" : "Memories"}</h2>
-          {boundedMemories.items.map((memory) => (
-            <article key={memory.id}>
+          <SectionOriginNote locale={locale} origin="derived" />
+          {boundedMemories.items.map((memory, index) => {
+            const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
+            return (
+            <article id={`memory-${memory.id}`} key={memory.id}>
               <ProtectedContent
                 locale={locale}
                 revealKey={`person-memory-${memory.id}`}
@@ -367,18 +458,40 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                 <strong>{memory.content}</strong>
               </ProtectedContent>
               <span>{memoryKindLabel(locale, memory.kind) ?? vocabulary.unknownState}</span>
+              {/*
+                A memory with a NULL `source_entry_id` renders `unsourced`, NOT
+                "informed by you". The column is `on delete set null`, so null
+                means either "nothing recorded a source" or "the source entry was
+                deleted" — and calling the second one owner-authored would invent
+                an origin for knowledge the owner may never have typed.
+              */}
+              <ProvenanceNote
+                href={isOpenable(provenance) ? sourceHref(provenance.entryId, `memory-${memory.id}`) : undefined}
+                locale={locale}
+                provenance={provenance}
+                subject={provenanceCopy.memorySubject(index + 1)}
+              />
             </article>
-          ))}
+            );
+          })}
           <BoundedNotice list={boundedMemories} locale={locale} />
         </section>
       )}
 
       <section className="entity-timeline">
         <h2>{pt ? "Linha do tempo" : "Timeline"}</h2>
+        {/*
+          Derived, and the one section that needs no per-row provenance: these
+          rows ARE the records. A "de um registro seu" line under an entry would
+          be the page explaining that a record came from itself, which is the
+          repetition `2N-PROV-002` guards against by asking that source and
+          derived statement be visibly DIFFERENT things.
+        */}
+        <SectionOriginNote locale={locale} origin="derived" />
         {boundedEntries.items.length ? (
           <div className="timeline-list">
             {boundedEntries.items.map((entry) => (
-              <article key={entry.id}>
+              <article id={`entry-${entry.id}`} key={entry.id}>
                 <span className="timeline-dot" />
                 <div>
                   {/*
@@ -389,13 +502,13 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                     functional loss the privacy decision never asked for.
                   */}
                   <ProtectedContent
-                    href={`/${locale}/app/inbox/${entry.id}`}
+                    href={sourceHref(entry.id, `entry-${entry.id}`)}
                     locale={locale}
                     revealKey={`person-entry-${entry.id}`}
                     sensitivity={deriveSubjectSensitivity(entry.id, entryLevels)}
                     surface="person"
                   >
-                    <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
+                    <Link href={sourceHref(entry.id, `entry-${entry.id}`)}><strong>{entry.original_content}</strong></Link>
                   </ProtectedContent>
                   <small>
                     {formatInstant(entry.occurred_at, "dayAndTime", locale, timeZone)}

@@ -25,6 +25,8 @@ import { useActionState, useId, useState } from "react";
 
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
+import { ownerAuthored } from "@/features/provenance/contracts";
+import { ProvenanceNote, SectionOriginNote } from "@/features/provenance/provenance-note";
 import type { Locale } from "@/lib/preferences";
 
 import { getEntityCopy } from "./copy";
@@ -79,6 +81,17 @@ export function RelationshipPanel({
         there are two places that look like they describe the same person.
       */}
       <p className="relation-explainer">{copy.relationshipExplainer}</p>
+      {/*
+        `2N-PERSON-004`: persisted — the owner adds, corrects and ends these here.
+        `2N-RELATION-002`/`-008`: the origin is stated ONCE for the section rather
+        than repeated on every row. `person_relationships` carries no
+        `source_entry_id` and no `interpretation_id`, so every row has the same
+        answer, and printing "informado por você" under each of twelve rows would
+        be noise that says nothing a reader could act on. It is the section's
+        property, so it is the section that says it.
+      */}
+      <SectionOriginNote locale={locale} origin="persisted" />
+      <ProvenanceNote locale={locale} provenance={ownerAuthored("person_relationships")} subject="" />
 
       {relationships.length ? (
         <ul className="relation-list">

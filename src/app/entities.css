@@ -320,3 +320,81 @@
   font-weight: 600;
   color: var(--ink-soft);
 }
+
+/*
+ * `2N-PROV-001`…`-004`, `2N-PERSON-004`, `2N-MOBILE-001`, `2N-ACCESS-002`.
+ *
+ * Provenance is deliberately quiet: it is context for a claim, not the claim,
+ * and a line that competes with the content it describes would push the actual
+ * information down the page on the viewport where there is least of it.
+ *
+ * `data-provenance` carries the state rather than a colour, so the distinction
+ * survives a stylesheet that fails to load and is available to a test without
+ * asserting on presentation. `2N-ACCESS-002`: nothing here is the ONLY carrier
+ * of meaning — every state also has words.
+ */
+.provenance-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  /* Long unbroken content must wrap rather than widen the page (2N-MOBILE-001). */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.provenance-label {
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+.provenance-label::after { content: ":"; }
+
+.provenance-note a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  /*
+   * `2N-MOBILE-002`: a visible, labelled control with a real touch target. The
+   * inline padding keeps it comfortably tappable without turning the line into
+   * a block that separates the note from the claim above it.
+   */
+  padding: 4px 0;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/*
+ * An unsourced claim reads as ordinary text, NOT as a warning.
+ *
+ * Colouring it red or amber would present the absence of a stored source as a
+ * fault the reader should fix — which it is not, and which would also invite
+ * them to guess WHY it is absent. Removed, foreign, unreadable and never-set are
+ * one arm in `provenance/contracts.ts` precisely so nothing downstream can
+ * distinguish them, and a colour would be the first thing to try.
+ */
+.provenance-note[data-provenance="unsourced"] { font-style: italic; }
+
+.section-origin {
+  margin: -2px 0 6px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+}
+
+.return-to-source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
