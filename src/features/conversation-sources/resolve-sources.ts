@@ -28,10 +28,18 @@ import "server-only";
  *
  * ## Lifecycle is part of readability
  *
- * An archived memory renders **unavailable**, not in the clear. `chat/actions.ts`
- * already refuses to *retrieve* one, sharing `isMemoryInForce` with the badge
- * the owner reads; this shares the same helper, so the page and the retrieval
- * provably cannot disagree about what "in force" means.
+ * An archived memory renders **unavailable**, not in the clear. Since Phase 2N
+ * slice 2N.3 (`202608130093`, migration M1) `match_internal_knowledge` refuses
+ * to *retrieve* one at all, applying the validity window ahead of its own
+ * bound; this module shares `isMemoryInForce` with that SQL predicate and with
+ * the badge the owner reads, so none of the three can disagree about what "in
+ * force" means.
+ *
+ * This check is **not** redundant with that one, and it is the reason the two
+ * are separate concerns rather than one. Retrieval decides what may be used to
+ * answer a NEW question. This decides what a message ALREADY ANSWERED may still
+ * show — and a memory archived after that answer was written was legitimately
+ * retrieved at the time. Only a render-time read can catch it.
  */
 
 import { isMemoryInForce } from "@/features/memories/lifecycle";

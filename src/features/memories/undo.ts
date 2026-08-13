@@ -26,12 +26,19 @@
  *
  * ## Why the archive really does withdraw the memory from use
  *
- * `chat/actions.ts` filters retrieved memories through `isMemoryInForce`, which
- * reads the same `valid_from`/`valid_until` window the Memories badge reads.
- * So an archived memory stops being retrievable as a source rather than merely
+ * An archived memory stops being retrievable as a source rather than merely
  * leaving a list — which is the property that makes "undo" true rather than
- * decorative, and it is asserted in `undo.test.ts` and in
- * `supabase/tests/phase_2k_memory_undo.sql`.
+ * decorative.
+ *
+ * That property got stronger in Phase 2N slice 2N.3. It used to rest entirely
+ * on `chat/actions.ts` filtering retrieved rows through `isMemoryInForce`, which
+ * removed the archived memory from the citations but left it consuming one of
+ * the eight slots the retrieval bound allows — so archiving a memory could
+ * silently cost the owner a live one. Migration M1 (`202608130093`,
+ * `2N-CORRECT-003`) moved the same window into `match_internal_knowledge`,
+ * ahead of its bound. Asserted in `undo.test.ts`,
+ * `supabase/tests/phase_2k_memory_undo.sql` and
+ * `supabase/tests/phase_2n_validity_aware_retrieval.sql`.
  */
 
 import type { ConversationCardReversal, ConversationCardState } from "@/features/conversation-cards/contracts";

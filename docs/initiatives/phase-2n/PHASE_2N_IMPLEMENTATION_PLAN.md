@@ -344,9 +344,16 @@ inference without confirmation. A `sensitivity` column on `people` or
 
 ## 6. Migration budget — SIGNED
 
-**`3 allocated · obligation ZERO · 0 spent · NONE CREATED`, all three
+**`3 allocated · obligation ZERO · 1 spent · M1 CREATED`, all three
 non-transferable** (`OD-2N-14` **option B**). A fourth is a **stop condition**,
 not a decision the implementer makes.
+
+**M1 was spent by slice 2N.3 on 2026-08-13** as
+`202608130093_phase_2n_slice_3_validity_aware_retrieval.sql`: it re-declares
+`match_internal_knowledge` so the memory validity window is applied inside the
+union, ahead of the bound (`2N-CORRECT-003`). It creates no table, no column, no
+policy, no grant change and no schedule. **M3 remains allocated to slice 2N.3
+and M2 to slice 2N.7, both unspent.**
 
 | | Destination | Slice | Carries |
 | --- | --- | --- | --- |

@@ -15,12 +15,21 @@
 --
 -- WHAT IT DELIBERATELY DOES NOT CLAIM
 --
--- It does not assert that an archived memory stops being retrieved. That filter
--- lives in `chat/actions.ts` — `match_internal_knowledge` has never read
--- `valid_from`/`valid_until`, and teaching it to would cost a migration this
--- phase's budget does not have (OD-2K-C). What this suite pins is the **window
--- itself**, which is the value `isMemoryInForce` reads, so the page, the
--- retrieval and this test provably agree on one fact.
+-- It does not assert that an archived memory stops being retrieved, and the
+-- reason changed. When this suite was written that filter lived in
+-- `chat/actions.ts`, because `match_internal_knowledge` had never read
+-- `valid_from`/`valid_until` and teaching it to would cost a migration Phase 2K
+-- did not have (OD-2K-C). **Phase 2N slice 2N.3 spent one** (`202608130093`,
+-- migration M1, `2N-CORRECT-003`), and the eviction it produces is asserted in
+-- `phase_2n_validity_aware_retrieval.sql`.
+--
+-- What this suite pins is still the **window itself**, which is the value
+-- `isMemoryInForce` reads, so the page, the retrieval and this test provably
+-- agree on one fact. Note that the predicate used below is only the
+-- `valid_until` half — sufficient for an archive transition, which is all this
+-- suite exercises, and NOT the definition of in force. That definition needs
+-- the `valid_from` half too, or a scheduled memory reads as active; it is
+-- asserted in full by the 2N.3 suite named above.
 --
 -- WHY THE POSITIVE CONTROL IS MANDATORY
 --

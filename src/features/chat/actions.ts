@@ -189,13 +189,23 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     // A memory the owner archived must stop being used, or "Archive" on the
     // Memories page is a label with nothing behind it (UX-10).
     //
-    // `match_internal_knowledge` selects memories on `embedding is not null`
-    // alone (`202607160006:116-117`) — it has never read `valid_from` or
-    // `valid_until`, and teaching it to would mean a migration this slice is not
-    // authorized to make. Filtering here is the read-only equivalent: the RPC
-    // returns at most 20 rows, so this is one indexed lookup over a handful of
-    // ids, and it shares `isMemoryInForce` with the badge the owner reads, so
-    // the page and the retrieval provably cannot disagree.
+    // **The enforcement moved into the database in Phase 2N slice 2N.3
+    // (`202608130093`, migration M1, `2N-CORRECT-003`).**
+    // `match_internal_knowledge` now applies the validity window INSIDE the
+    // union, ahead of `order by` and the bound, so an out-of-force memory is
+    // never returned and — the part this filter could never fix — never
+    // displaces a live one. The RPC is asked for 8 rows; before M1 an archived
+    // memory ranking in the top 8 consumed a slot, and no code here could
+    // recover a row the database did not send.
+    //
+    // This filter is deliberately KEPT, and it is no longer the enforcement.
+    // It is the same predicate applied a second time, one layer out, for one
+    // reason: M1's documented rollback is "re-declare the prior definition",
+    // and a rollback that also silently re-admitted archived memories into
+    // citations would cost more than the displacement fix it was meant to undo.
+    // It costs one indexed lookup over at most 20 ids, and it shares
+    // `isMemoryInForce` with both the badge the owner reads and the SQL
+    // predicate, which `phase-2n-knowledge-guard.test.ts` holds together.
     const relevant = ((matches ?? []) as KnowledgeRow[]).filter((match) => match.similarity >= 0.2);
     const inForce = await memoriesInForce(supabase, relevant);
     const sources: ChatSource[] = relevant
