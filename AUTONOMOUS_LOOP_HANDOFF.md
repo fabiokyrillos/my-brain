@@ -4525,3 +4525,133 @@ parity `202608120092`, budget non-transferable with a **fourth a STOP
 CONDITION**, signup closed, rollout 25 · 3 · 2, push **not** resumed (HTTP 403 on
 a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and A13 still
 guarding the roadmap successor.
+
+## §62 — Phase 2N slice 2N.0 ships: the contextual surfaces become governed, bounded and identifiable (2026-08-13)
+
+**PR #202**, merged at `effc8da`, **CI green 3/3 on that exact SHA**. Head at
+review was `ef953dc`, also green 3/3. Base was `main` at `4b66119`.
+`docs/reports/phase-2n/PHASE_2N_SLICE_0_ACCEPTANCE.md`.
+
+**Migrations: 0 created. 92 total, parity `202608120092`.** M1/M2/M3 remain
+allocated to 2N.3 and 2N.7, unspent and non-transferable — asserted by a guard,
+not by prose.
+
+**29 requirements: 23 built, 5 baseline, 1 partial.** The partial is
+`2N-PRIVACY-011`: its journey is written, covers both locales on desktop and
+mobile, asserts every clause — and **has not been executed**, because it needs
+hosted credentials and skips without them. A written test is not an executed
+test. `2N-IDENTITY-008` also closes `baseline`: the slice ships no writer at all,
+so "no inference creates a persisted identity" is preserved rather than built.
+
+### The thing worth carrying forward: a column is not an answer
+
+Work needed a derivation because `tasks` has no classification. `entries`,
+`memories` and `attachments` **do**, so the obvious implementation here was
+"read the column and render it" — and that is the bug. **A column exists on the
+row the query returned and says nothing about the row it could not return.**
+
+These pages join through relationship tables, and a join that comes back short
+does so silently: the id is on the page, the classified row is not, and the
+fail-open reading prints whatever it has. So `subject-derivation.ts` keeps the
+three-arm answer even where the level is closer to hand, and removed, foreign
+and unreadable stay indistinguishable **by having no branch that could tell them
+apart** — all three are *absent from the map*, so they are literally the same
+input.
+
+### `undetermined` and "masked by default" are both absences, and picking wrong publishes
+
+`people.notes` has no classification anywhere to read. `undetermined` renders
+**in the clear**, so routing the note through it would have published the single
+most likely place in this product for something genuinely private about a named
+human being. `deriveFreeTextSensitivity` returns `derived` at the most protective
+level, and **takes no arguments at all** — ADR-110 D7 forbids inferring a level
+from the note's text, and a signature that cannot accept the text is stronger
+than callers remembering not to pass it.
+
+### Exactly `limit` rows cannot tell you whether more exist
+
+The audited defect was silent truncation. The plausible fix —
+`bounded = rows.length === limit` — is **worse**: it claims a truncation every
+time the total is exactly the limit, trading silence for a confident falsehood
+the user cannot detect. The bound is measured with a probe row (`limit + 1`),
+which the repo's own `paginateRows` already did and nobody had generalised.
+
+**And a two-hop read has two bounds.** Found reviewing the diff, not by a test:
+the contextual pages resolve ids through a relationship table first, so 101 links
+resolving to 95 rows reported the list **complete**. `upstreamBounded` makes the
+answer the disjunction.
+
+### `loading.tsx` takes no props, and the real fix was one level up
+
+It announced Portuguese to every reader. It cannot look the locale up —
+`node_modules/next/dist/docs/.../loading.md` says "Loading UI components do not
+accept any parameters" — and the workarounds each cost something: `await
+headers()` makes an instant fallback dynamic, `"use client"` ships JS to render
+a skeleton.
+
+So it renders **every** announcement and the document's `lang` selects one. That
+required fixing why it could not: **`src/app/layout.tsx` sits above `[locale]`
+and hardcodes `lang="pt-BR"` for every locale**, so `app-shell.tsx` — the first
+element below it that knows the locale — now declares it. Worth having on its
+own: it is what a screen reader uses to pick a voice for the whole app.
+
+The stylesheet **hides what does not match** rather than showing what does, so a
+missing stylesheet or a missing `lang` degrades to announcing *both* rather than
+*nothing*. The gate is untouched: `loading.tsx` awaits nothing and holds no
+client, and `requireUser` still runs above the Suspense boundary.
+
+### Guards found one defect; the diff review found the other; two guards were wrong first
+
+The bounds guard caught **`.limit(20)` silently bounding the files page's failed
+jobs** — the one list whose entire purpose is "these need your attention". Fixed,
+not exempted.
+
+Two guards were written wrong and **corrected rather than loosened**: one flagged
+pagination's `hasMore` as a competing bounds vocabulary (it is not — "there is a
+next page" comes with a way to reach it), and one matched `await` inside the
+comment in `loading.tsx` **forbidding** `await`. A guard that fails on correct
+code gets weakened by the next person to touch it, so both were narrowed to the
+property actually being asserted.
+
+### Two judgement calls a reviewer should be able to disagree with
+
+- **`graph` was NOT admitted to `GOVERNED_SURFACES`.** `2N-PRIVACY-001` admits a
+  surface in the change that ships its first consumer, and 2N.0 ships no graph.
+  It joins in 2N.6, with its consumer, or not at all.
+- **`projects.description` stays visible.** ADR-110 D4 masks free text *about a
+  human being*, and search deliberately keeps matching that column. Masking it
+  would leave the product saying two things about one column; widening is an
+  owner decision, not one a slice takes. Recorded in place so it does not read
+  as an oversight.
+
+Also corrected: **`asMemorySensitivity` fails OPEN to `normal`** where the
+contract's predicate fails closed. The memory detail page both *states* the
+classification and *acts* on it, so two predicates failing in opposite directions
+could print "Normal" beside content the mask was withholding. That page now uses
+the contract; the write-path helper is left alone.
+
+### Slice 2N.1 re-audited against `effc8da`, NOT started
+
+- **Dependencies satisfied.** 2N.0's three modules are on `main`; the timezone
+  initiative concluded at `d581e43`.
+- **ADR-108 audit finding #7 still holds:** `person_relationships`,
+  `person_projects` and `person_contexts` carry **no `source_entry_id` and no
+  `interpretation_id`** — 0 occurrences in the migrations. So a relation cannot
+  answer "where did this come from", and `OD-2N-8` A's *"informed by you"* is the
+  only truth available. **Backfilling provenance the product cannot know is the
+  slice's named stop condition.**
+- **`relationship-panel.tsx` renders no origin, source or confidence at all** — 0
+  occurrences. The `2N-PROV` work is real, not already-shipped.
+- **The person page is now governed and bounded** (9 `ProtectedContent`, 4
+  `BoundedNotice`), so 2N.1 inherits those rather than building them, and must
+  not re-claim them.
+- **No reordering justified.** No migration implied — `OD-2N-8` A removed the
+  provenance migration.
+
+### State at the end of this entry
+
+`main` at `effc8da`, clean, synchronized. No open PR. **92 migrations, parity
+`202608120092`.** Budget **3 allocated · 0 spent**, non-transferable, a fourth a
+**STOP CONDITION**. Signup closed, rollout **25 · 3 · 2**, push **not** resumed
+(HTTP 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**,
+and A13 still guarding the roadmap successor. Slices 2N.1–2N.7 remain.
