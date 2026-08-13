@@ -50,10 +50,35 @@ describe("2N-ACCESS-005: every locale the product has is selectable", () => {
     for (const shown of locales) {
       for (const hidden of locales) {
         if (shown === hidden) continue;
-        const rule = `[lang="${shown}"] .route-loading [data-route-loading-locale="${hidden}"]`;
+        const rule = `.route-loading [data-route-loading-locale="${hidden}"]:lang(${shown})`;
         expect(css, `missing rule to hide ${hidden} when the document is ${shown}`).toContain(rule);
       }
     }
+  });
+
+  it("selects on the NEAREST `lang`, not on any ancestor carrying one", () => {
+    /*
+     * The defect this guard could not previously see, and the reason it is
+     * phrased as a ban rather than as a preference.
+     *
+     * The rules used to read `[lang="pt-BR"] .route-loading [data-…="en"]`. A
+     * descendant combinator matches an ancestor at ANY depth, and there are
+     * always two `lang` declarations above these spans: `src/app/layout.tsx`
+     * hardcodes `lang="pt-BR"` on `<html>` because it sits above `[locale]`, and
+     * `.app-frame` carries the real one. On `en` they disagree, so BOTH rules
+     * matched and BOTH announcements were hidden — a silent loading state, which
+     * is precisely what the "hide what does not match" direction exists to
+     * prevent. It reached production because every unit test passes: jsdom
+     * applies no external stylesheet, so nothing below a real browser evaluates
+     * this cascade.
+     *
+     * `:lang()` resolves against the nearest declaration, so the outer `<html>`
+     * cannot participate. Anyone reintroducing the ancestor form fails here.
+     */
+    expect(
+      css.match(/\[lang="[^"]*"\]\s+\.route-loading/g),
+      "an ancestor [lang=…] selector is back; two disagreeing `lang` ancestors hide every announcement",
+    ).toBeNull();
   });
 
   it("hides what does not match rather than showing what does", () => {
@@ -67,10 +92,10 @@ describe("2N-ACCESS-005: every locale the product has is selectable", () => {
      * does not run a real browser.
      */
     for (const locale of locales) {
-      const selfRule = `[lang="${locale}"] .route-loading [data-route-loading-locale="${locale}"]`;
+      const selfRule = `.route-loading [data-route-loading-locale="${locale}"]:lang(${locale})`;
       expect(css, `${locale} must not depend on a rule to become visible`).not.toContain(selfRule);
     }
-    const rules = css.match(/\[lang="[^"]+"\] \.route-loading \[data-route-loading-locale="[^"]+"\]\{[^}]*\}/g) ?? [];
+    const rules = css.match(/\.route-loading \[data-route-loading-locale="[^"]+"\]:lang\([^)]+\)\{[^}]*\}/g) ?? [];
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) expect(rule).toContain("display:none");
   });

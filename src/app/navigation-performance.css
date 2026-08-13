@@ -11,9 +11,19 @@
    `.app-frame` by `app-shell.tsx` — selects one. `display:none` removes the others
    from the accessibility tree, so exactly one is announced. Written as "hide what
    does not match" rather than "show what does", so a missing stylesheet or a missing
-   `lang` degrades to announcing both instead of announcing nothing. */
-[lang="pt-BR"] .route-loading [data-route-loading-locale="en"]{display:none}
-[lang="en"] .route-loading [data-route-loading-locale="pt-BR"]{display:none}
+   `lang` degrades to announcing both instead of announcing nothing.
+
+   Keyed on `:lang()`, NOT on an ancestor `[lang="…"]`. There are always TWO `lang`
+   declarations above these spans and on `en` they disagree: `src/app/layout.tsx`
+   sits above `[locale]` and hardcodes `lang="pt-BR"`, while `.app-frame` carries the
+   real one. A descendant selector matches an ancestor ANYWHERE up the tree, so both
+   rules fired at once and BOTH announcements were hidden — an English screen reader
+   heard nothing, which is the exact failure the direction above was chosen to avoid.
+   `:lang()` resolves against the NEAREST declaration, so `.app-frame` wins.
+   Caught by `e2e/online-phase-2n-foundations.spec.ts` against a real browser; jsdom
+   applies no external stylesheet and could not have seen it. */
+.route-loading [data-route-loading-locale="en"]:lang(pt-BR){display:none}
+.route-loading [data-route-loading-locale="pt-BR"]:lang(en){display:none}
 .navigation-pending{font-size:10px;font-weight:750;color:var(--blue);white-space:nowrap}
 .mobile-primary-link .navigation-pending,.capture-fab .navigation-pending{position:absolute;width:1px;height:1px;overflow:hidden}
 .row-action.optimistic{background:var(--blue-wash);color:var(--blue);border-color:rgba(49,92,255,.28)}
