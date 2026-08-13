@@ -406,10 +406,19 @@ test.describe("2N.2 — the project page states its situation without inventing 
       await page.getByRole("button", { name: /Editar|Edit/ }).first().click();
       await page.getByLabel(/Situação|Status/).first().selectOption("paused");
       await page.getByRole("button", { name: /Salvar|Save/ }).first().click();
-      // Wait for the write to be confirmed by the product before asking what it
-      // recorded. Asserting straight after the click tests the revalidation
-      // race, not the change list.
-      await expect(page.locator(".entity-edit-feedback.success")).toBeVisible({ timeout: 15_000 });
+      /*
+       * Wait for the write to be confirmed by the product before asking what it
+       * recorded. Asserting straight after the click tests the revalidation
+       * race, not the change list.
+       *
+       * The allowance is generous because this is the one journey that WRITES:
+       * a pre-read, an update, an audit insert and two revalidations, against
+       * the hosted database, from a local server, with four workers competing.
+       * A run caught it still showing "Saving…" at 15s with every control
+       * disabled and no error — slow, not broken, and shortening the wait would
+       * only convert a slow path into a red test.
+       */
+      await expect(page.locator(".entity-edit-feedback.success")).toBeVisible({ timeout: 45_000 });
 
       // Re-entered rather than refreshed in place: this is what a reader gets,
       // and it does not depend on how the router happened to revalidate.
