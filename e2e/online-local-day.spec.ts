@@ -55,6 +55,22 @@ import { onlineEnvironment, signInWithoutTheLoginForm, type OnlineLocale } from 
 const { supabaseUrl, serviceRoleKey } = onlineEnvironment;
 const onlineConfigured = onlineEnvironment.configured;
 
+/**
+ * The deployed application, when one is named.
+ *
+ * Without it this file runs the merged bytes locally against the **hosted**
+ * project, which is what every `online-*.spec.ts` means by "online" and is
+ * already a real proof: the data, the RLS, the profile zone and the session all
+ * come from production. What it is *not* is the deployment — a Vercel server
+ * whose host zone is UTC rather than this machine's `America/Cayenne`, which is
+ * the environment the defect was actually reported against.
+ *
+ * `DEPLOYED_ORIGIN=https://… npm run test:e2e:online -- e2e/online-local-day.spec.ts`
+ * points every navigation and the session cookie at it. Opt-in, so the ordinary
+ * lane is unaffected and CI never reaches for a deployment.
+ */
+const deployedOrigin = process.env.DEPLOYED_ORIGIN?.replace(/\/$/, "");
+
 /** The contract's own presentations, mirrored so expectations are exact. */
 const OPTIONS = {
   day: { dateStyle: "medium" },
@@ -526,8 +542,8 @@ for (const owner of OWNERS) {
           publishableKey: onlineEnvironment.publishableKey!,
           email: fixture.email,
           locale: owner.locale,
-          appOrigin: test.info().project.use.baseURL!,
-          next: `/${owner.locale}/app`,
+          appOrigin: deployedOrigin ?? test.info().project.use.baseURL!,
+          next: `${deployedOrigin ?? ""}/${owner.locale}/app`,
         });
         sessionCookies = await context.cookies();
       } finally {
@@ -538,7 +554,7 @@ for (const owner of OWNERS) {
     /** The signed-in browser for one case, without a fresh GoTrue exchange. */
     async function visit(page: Page, path: string): Promise<void> {
       await page.context().addCookies(sessionCookies);
-      await page.goto(`/${owner.locale}${path}`);
+      await page.goto(`${deployedOrigin ?? ""}/${owner.locale}${path}`);
     }
 
     test.afterAll(async () => {
