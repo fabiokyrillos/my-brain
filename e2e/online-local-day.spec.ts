@@ -71,9 +71,14 @@ const onlineConfigured = onlineEnvironment.configured;
  */
 const deployedOrigin = process.env.DEPLOYED_ORIGIN?.replace(/\/$/, "");
 
-/** The contract's own presentations, mirrored so expectations are exact. */
+/**
+ * The contract's `dayAndTime`, mirrored so the DST expectations are exact.
+ *
+ * Only this one: a *day* is checked as a set of spellings (see `DAY_SPELLINGS`)
+ * because surfaces legitimately choose different presentations, but the DST
+ * cases assert a **clock time**, and there the exact rendering is the claim.
+ */
 const OPTIONS = {
-  day: { dateStyle: "medium" },
   dayAndTime: { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" },
 } as const satisfies Record<string, Intl.DateTimeFormatOptions>;
 
