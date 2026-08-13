@@ -248,7 +248,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
    * its own — its own overflow is impossible, since it is a subset of a list
    * that was already trimmed.
    */
-  const decisionIds = decisionEntryIds(interpretationResult.data);
+  /*
+   * A failed read must NOT become "no entry was read as a decision".
+   *
+   * `sourceResult` above deliberately reads `.data` directly, because a row that
+   * does not arrive stays absent from the levels map and lands in the
+   * most-protective arm — failing closed. This read has the opposite shape: an
+   * empty result renders an empty-state sentence that *asserts* something about
+   * the readings, so swallowing an error here would turn "we could not look"
+   * into "there are none". `requireSupabaseData` is the posture every other list
+   * on this page already takes.
+   */
+  const decisionIds = decisionEntryIds(
+    requireSupabaseData(interpretationResult, "load project interpretations"),
+  );
   const boundedDecisions = boundedList(
     boundedEntries.items.filter((entry) => decisionIds.has(entry.id)),
     CONTEXTUAL_LIMIT,
