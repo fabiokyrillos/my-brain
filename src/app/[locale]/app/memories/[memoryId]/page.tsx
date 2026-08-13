@@ -2,8 +2,15 @@ import { ArrowLeft, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PICKER_LIMIT } from "@/features/bounds/contracts";
+import { boundedList, PICKER_LIMIT, withProbe } from "@/features/bounds/contracts";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
+import {
+  deriveClaimProvenance,
+  isOpenable,
+  resolvableEntryIdsOf,
+} from "@/features/provenance/contracts";
+import { ProvenanceNote } from "@/features/provenance/provenance-note";
+import { getProvenanceCopy } from "@/features/provenance/copy";
 import { setMemoryLifecycle, updateMemory } from "@/features/memories/actions";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
@@ -76,15 +83,25 @@ export default async function MemoryDetailPage({
           .eq("id", memory.source_entry_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    supabase.from("people").select("id,name").order("name").limit(PICKER_LIMIT),
-    supabase.from("projects").select("id,name").order("name").limit(PICKER_LIMIT),
+    // `2N-KNOWS-008`. These two are the only genuinely BOUNDED lists on this
+    // page — the memory's own facts are one row and the list page next door is
+    // paginated, so nothing there is silently dropped. A picker that truncates
+    // in silence is worse than a truncated read: the owner cannot link the
+    // memory to a person that exists, and the form gives no sign that the name
+    // they are looking for was left out. `withProbe` measures the bound instead
+    // of guessing it from a full page.
+    supabase.from("people").select("id,name").order("name").limit(withProbe(PICKER_LIMIT)),
+    supabase.from("projects").select("id,name").order("name").limit(withProbe(PICKER_LIMIT)),
   ]);
 
   const person = requireSupabaseData(personResult, "load memory person");
   const project = requireSupabaseData(projectResult, "load memory project");
   const sourceEntry = requireSupabaseData(entryResult, "load memory source entry");
-  const people = requireSupabaseData(peopleResult, "load people options") ?? [];
-  const projects = requireSupabaseData(projectsResult, "load project options") ?? [];
+  const people = boundedList(requireSupabaseData(peopleResult, "load people options"), PICKER_LIMIT);
+  const projects = boundedList(
+    requireSupabaseData(projectsResult, "load project options"),
+    PICKER_LIMIT,
+  );
 
   const state = memoryLifecycleState(memory, new Date());
   const kind = asMemoryKind(memory.kind);
@@ -120,21 +137,40 @@ export default async function MemoryDetailPage({
         : copy.retrievalScheduled;
 
   /**
-   * Provenance, told apart from *absent* provenance.
+   * `2N-KNOWS-003` — where this memory came from, said only where it can be.
    *
-   * `source_entry_id` is `on delete set null`, so a memory that came from an
-   * entry the owner later deleted is indistinguishable from one they typed
-   * themselves — both hold `null`. The three cases are still worth
-   * distinguishing where they *can* be: a live id with a row is a link, a live
-   * id whose row did not load is a dangling reference worth admitting, and
-   * `null` means the owner created it.
+   * ## What this replaced, and why it was wrong in both arms
+   *
+   * The page used to answer in three arms of its own: `null` printed *"Criada
+   * por você" / "Created by you"*, an unresolvable id printed *"O registro de
+   * origem não existe mais"*, and only the resolved case linked.
+   *
+   * **Neither non-link arm was true.** `memories.source_entry_id` is declared
+   * `on delete set null` (`202607160006:6`), so `null` means *either* "nothing
+   * recorded a source" *or* "the source entry was deleted and the key nulled
+   * the column" — and nothing afterwards tells them apart. Calling that
+   * owner-authored manufactures a positive claim about the origin of knowledge
+   * out of an absence, which is the exact case
+   * `src/features/provenance/contracts.ts` was written around: it makes
+   * `ownerAuthored("memories")` a **type error** rather than a judgement call.
+   *
+   * The second arm was worse, because it asserted a fact the page cannot have.
+   * The column is a plain FK to `entries(id)` with **no composite
+   * `(user_id, id)`**, so a foreign id is storable, and under RLS a foreign
+   * row simply does not come back — at which point *"no longer exists"* is
+   * false about a record that does exist, and the sentence becomes a probe for
+   * whether an entry id is real.
+   *
+   * So removed, foreign, unreadable and never-set are **one arm**, guaranteed
+   * by having no branch that could separate them: the resolvable set is built
+   * from the row this page actually got back, and everything else is
+   * `unsourced`.
    */
-  const provenance =
-    memory.source_entry_id === null
-      ? { label: copy.provenanceManual, href: null }
-      : sourceEntry
-        ? { label: copy.provenanceFromEntry, href: `/${locale}/app/inbox/${sourceEntry.id}` }
-        : { label: copy.provenanceUnknown, href: null };
+  const resolvableEntryIds = resolvableEntryIdsOf(sourceEntry ? [sourceEntry] : []);
+  const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
+  const sourceHref = isOpenable(provenance)
+    ? `/${locale}/app/inbox/${provenance.entryId}`
+    : undefined;
 
   return (
     <div className="content-page entity-detail memory-detail">
@@ -171,20 +207,27 @@ export default async function MemoryDetailPage({
             <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
             {retrieval}
           </p>
+          {/*
+            Rendered by the shared component rather than as a row in the facts
+            list below, which is also why that row is gone: the list's own label
+            is "Origem", `ProvenanceNote` renders "Origem", and a page that
+            printed both would be labelling one fact twice.
+
+            `subject` is a NEUTRAL POSITIONAL label, never the memory's text —
+            that text is exactly what `ProtectedContent` may be withholding two
+            lines above, and an `aria-label` carrying it would hand the masked
+            string to assistive technology.
+          */}
+          <ProvenanceNote
+            href={sourceHref}
+            locale={locale}
+            provenance={provenance}
+            subject={getProvenanceCopy(locale).memorySubject(1)}
+          />
         </div>
       </header>
 
       <dl className="memory-facts">
-        <div>
-          <dt>{copy.provenance}</dt>
-          <dd>
-            {provenance.href ? (
-              <Link href={provenance.href}>{provenance.label}</Link>
-            ) : (
-              provenance.label
-            )}
-          </dd>
-        </div>
         <div>
           <dt>{copy.relatedPerson}</dt>
           <dd>
@@ -209,9 +252,29 @@ export default async function MemoryDetailPage({
           <dt>{copy.sensitivityLabel}</dt>
           <dd>{copy.sensitivities[sensitivity]}</dd>
         </div>
+        {/*
+          `2N-KNOWS-004` asks for THREE facts — when it was recorded, from when
+          it is in force, and until when — and the page used to show two labels.
+          `valid_from` fell back to `created_at` under the label "Vale desde",
+          so a memory with no start date read as though it began the day it was
+          typed, and the recording time was never shown as itself.
+
+          They are different facts and the difference is the interesting one: a
+          memory recorded in March can be in force from January. Each is now
+          labelled as what it is, and an absent boundary says it is absent
+          rather than borrowing another column's value.
+        */}
+        <div>
+          <dt>{copy.recordedAt}</dt>
+          <dd>{formatInstant(memory.created_at, "dayAndTime", locale, timeZone)}</dd>
+        </div>
         <div>
           <dt>{copy.validFrom}</dt>
-          <dd>{formatInstant(memory.valid_from ?? memory.created_at, "dayAndTime", locale, timeZone)}</dd>
+          <dd>
+            {memory.valid_from
+              ? formatInstant(memory.valid_from, "dayAndTime", locale, timeZone)
+              : copy.validFromAlways}
+          </dd>
         </div>
         <div>
           <dt>{copy.validUntil}</dt>
@@ -219,7 +282,14 @@ export default async function MemoryDetailPage({
         </div>
       </dl>
 
-      {sourceEntry ? (
+      {/*
+        Gated on `isOpenable` rather than on `sourceEntry` again. The two agree
+        today and would drift the moment the contract gained a condition,
+        leaving a page that shows a source section under a line that calls the
+        claim unsourced — the same "one question asked two ways" the person
+        page's diff review caught in slice 2N.1.
+      */}
+      {isOpenable(provenance) && sourceEntry ? (
         <section className="entity-timeline">
           <h2>{copy.provenance}</h2>
           <div className="timeline-list">

@@ -8,6 +8,13 @@ import { asMemoryKind } from "@/features/memories/read";
 import { createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { ProtectedContent } from "@/features/operations/protected-content";
+import {
+  deriveClaimProvenance,
+  isOpenable,
+  resolvableEntryIdsOf,
+} from "@/features/provenance/contracts";
+import { getProvenanceCopy } from "@/features/provenance/copy";
+import { ProvenanceNote } from "@/features/provenance/provenance-note";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
@@ -65,6 +72,33 @@ export default async function MemoriesPage({
   const now = new Date();
   const memoryLevels = readableLevelsOf(items);
 
+  /*
+   * `2N-KNOWS-003` — "every memory shows its source" was failing on the surface
+   * most memories are actually seen from. This page already SELECTED
+   * `source_entry_id` and rendered nothing with it.
+   *
+   * One owner-scoped read, bounded to the ids on this page, and the resolvable
+   * set is built from what came BACK rather than from what was asked for. That
+   * distinction is the contract: an entry that was deleted, belongs to someone
+   * else, or simply did not return is absent from the set by the same route, so
+   * no branch here can tell them apart and the rendered list cannot be used to
+   * test whether a given entry id exists.
+   */
+  const sourceIds = [...new Set(items.map((memory) => memory.source_entry_id).filter((id): id is string => id !== null))];
+  const sourceResult = sourceIds.length
+    ? await supabase.from("entries").select("id").in("id", sourceIds)
+    : { data: [], error: null };
+  /*
+   * `.data` is read directly, deliberately, and this is the one place on this
+   * page where that is correct. A row that does not arrive stays out of the
+   * resolvable set and its memory renders `unsourced` — the most protective
+   * arm. Routing it through `requireSupabaseData` would turn a failed
+   * provenance lookup into a failed page, and this list's job is to show
+   * memories.
+   */
+  const resolvableEntryIds = resolvableEntryIdsOf(sourceResult.data);
+  const provenanceCopy = getProvenanceCopy(locale);
+
   return (
     <div className="content-page">
       <header className="list-header">
@@ -89,10 +123,11 @@ export default async function MemoriesPage({
 
       {items.length ? (
         <div className="list-stack">
-          {items.map((memory) => {
+          {items.map((memory, index) => {
             const state = memoryLifecycleState(memory, now);
             const related = memory.person_id !== null || memory.project_id !== null;
             const href = `/${locale}/app/memories/${memory.id}`;
+            const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
             return (
               /*
                 A `div` rather than a `Link` wrapping the whole row, because the
@@ -122,6 +157,21 @@ export default async function MemoriesPage({
                       </span>
                     ) : null}
                   </p>
+                  {/*
+                    Per row, because unlike the relation panels on the person
+                    page every row here genuinely has a different answer.
+
+                    `subject` is the row's POSITION, never its content: the
+                    title beside it is exactly what `ProtectedContent` may be
+                    masking, and an accessible name carrying it would hand the
+                    masked string to assistive technology.
+                  */}
+                  <ProvenanceNote
+                    href={isOpenable(provenance) ? `/${locale}/app/inbox/${provenance.entryId}` : undefined}
+                    locale={locale}
+                    provenance={provenance}
+                    subject={provenanceCopy.memorySubject(index + 1)}
+                  />
                 </div>
                 <div className="list-meta">
                   {/* The state is the row's headline fact: it is the difference

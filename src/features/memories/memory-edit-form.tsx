@@ -22,6 +22,8 @@
 import { Archive, LoaderCircle, Pencil, RotateCcw } from "lucide-react";
 import { useActionState, useId, useState } from "react";
 
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import type { Bounded } from "@/features/bounds/contracts";
 import type { Locale } from "@/lib/preferences";
 
 import { getMemoryCopy } from "./copy";
@@ -59,9 +61,16 @@ export function MemoryEditForm({
   lifecycleAction: MemoryEditAction;
   fields: MemoryEditFields;
   locale: Locale;
-  /** The owner's existing people and projects. Never created here. */
-  people: readonly MemoryRelationOption[];
-  projects: readonly MemoryRelationOption[];
+  /**
+   * The owner's existing people and projects. Never created here.
+   *
+   * `2N-KNOWS-008`: bounded rather than bare arrays, so the pickers can say
+   * when a name was left out. Silent truncation here is not a cosmetic
+   * omission — the owner simply cannot link the memory to a person that
+   * exists, and a `<select>` gives no hint that its list is partial.
+   */
+  people: Bounded<MemoryRelationOption>;
+  projects: Bounded<MemoryRelationOption>;
   /** Which transition to offer — derived from the row's validity, never guessed here. */
   state: MemoryLifecycleState;
 }) {
@@ -224,10 +233,13 @@ export function MemoryEditForm({
             name="personId"
           >
             <option value="">{copy.relatedNone}</option>
-            {people.map((person) => (
+            {people.items.map((person) => (
               <option key={person.id} value={person.id}>{person.name}</option>
             ))}
           </select>
+          {/* Outside the `<select>` and after it: an `<option>` carrying the
+              notice would be selectable and would submit as a person id. */}
+          <BoundedNotice list={people} locale={locale} />
         </label>
 
         <label htmlFor={`${fieldId}-project`}>
@@ -240,10 +252,11 @@ export function MemoryEditForm({
             name="projectId"
           >
             <option value="">{copy.relatedNone}</option>
-            {projects.map((project) => (
+            {projects.items.map((project) => (
               <option key={project.id} value={project.id}>{project.name}</option>
             ))}
           </select>
+          <BoundedNotice list={projects} locale={locale} />
         </label>
 
         {/*

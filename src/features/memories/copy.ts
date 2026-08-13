@@ -44,15 +44,42 @@ type MemoryCopy = {
   readonly restoring: string;
   readonly restored: string;
   readonly archiveExplainer: string;
+  /**
+   * `2N-KNOWS-004` — three distinct freshness facts, not two.
+   *
+   * `recordedAt` is `created_at` and it is its own fact. The page previously
+   * printed `valid_from ?? created_at` under `validFrom`, which made a memory
+   * with no start date read as though it began the day it was typed. A memory
+   * recorded in March can be in force from January; those are different
+   * questions and each label now answers only its own.
+   */
+  readonly recordedAt: string;
   readonly validFrom: string;
+  /** An absent start boundary, said as absent rather than filled in. */
+  readonly validFromAlways: string;
   readonly validUntil: string;
   readonly validAlways: string;
 
   /** Provenance and relations. */
   readonly provenance: string;
-  readonly provenanceFromEntry: string;
-  readonly provenanceManual: string;
-  readonly provenanceUnknown: string;
+  /*
+   * `provenanceFromEntry`, `provenanceManual` and `provenanceUnknown` were
+   * RETIRED by slice 2N.3 rather than left unused.
+   *
+   * Two of the three were false. "Criada por você" / "Created by you" was
+   * printed whenever `source_entry_id` was null — but the column is
+   * `on delete set null`, so that also covers a memory whose source entry the
+   * owner deleted, and the string turned an absence into a positive claim
+   * about where knowledge came from. "O registro de origem não existe mais"
+   * was printed whenever the row did not come back, which under RLS also
+   * covers a foreign or unreadable entry, and asserted the non-existence of a
+   * record the page cannot see.
+   *
+   * The wording now comes from `src/features/provenance/copy.ts`, which the
+   * person and project pages already share, and where `unsourced` is one arm
+   * that says nothing about why. Deleted rather than deprecated: a copy string
+   * that still exists is one a later surface can still render.
+   */
   readonly relatedPerson: string;
   readonly relatedProject: string;
   readonly relatedNone: string;
@@ -138,7 +165,9 @@ const copy = {
     restored: "Memória reativada.",
     archiveExplainer:
       "Arquivar encerra a validade e tira a memória das respostas. Nada é apagado: o texto e a origem continuam aqui.",
+    recordedAt: "Registrada em",
     validFrom: "Vale desde",
+    validFromAlways: "Sem data de início",
     // Neutral tense on purpose. The same row is rendered for a memory that is
     // still in force, and "Valeu até" would state in the past tense something
     // that is currently true.
@@ -146,9 +175,6 @@ const copy = {
     validAlways: "Sem prazo",
 
     provenance: "Origem",
-    provenanceFromEntry: "Veio de um registro seu",
-    provenanceManual: "Criada por você",
-    provenanceUnknown: "O registro de origem não existe mais",
     relatedPerson: "Pessoa",
     relatedProject: "Projeto",
     relatedNone: "Nenhum",
@@ -229,16 +255,15 @@ const copy = {
     restored: "Memory reactivated.",
     archiveExplainer:
       "Archiving ends the validity and takes the memory out of answers. Nothing is deleted: the text and its origin stay here.",
+    recordedAt: "Recorded on",
     validFrom: "Valid from",
+    validFromAlways: "No start date",
     // Neutral tense: this row also renders for a memory still in force, where
     // "Was valid until" would put a currently-true fact in the past.
     validUntil: "Valid until",
     validAlways: "No end date",
 
     provenance: "Origin",
-    provenanceFromEntry: "Came from one of your records",
-    provenanceManual: "Created by you",
-    provenanceUnknown: "The originating record no longer exists",
     relatedPerson: "Person",
     relatedProject: "Project",
     relatedNone: "None",
