@@ -4401,3 +4401,127 @@ green, zero Edge Function changes, `planned_at` untouched, push **not** resumed
 rollout 25 · 3 · 2, **Phase 2N planned and unimplemented**, **Phase 2O not
 started**, M1/M2/M3 still allocated and non-transferable, and A13 still guarding
 the roadmap successor.
+
+## §61 — Phase 2N implementation is authorized, the stale time requirements are corrected, and 2N.0 is re-audited but NOT started (2026-08-13)
+
+**ADR-112**, merged at `05d4c8f` with CI green on that exact SHA. `docs/reports/phase-2n/PHASE_2N_SLICE_0_REAUDIT.md`.
+
+### What moved
+
+Phase 2N goes from **planned** to **in implementation**. Planning had been
+authorized by ADR-108, all seventeen decisions signed by ADR-109, the flagged
+interpretation settled by ADR-110 — and every one of those withheld permission
+to build. **This change built no product.**
+
+### The seventeen signatures, re-audited and unchanged
+
+Every one stands. `OD-2N-13` **B** is the only one whose *object* changed, and it
+changed by being **satisfied**: the initiative it required was authorized,
+executed and merged. **A decision that has been carried out is not a decision
+that has been altered** — which is why four requirements were corrected and no
+signature was amended.
+
+### The four corrections, and why each was a defect rather than a tidy-up
+
+| id | was | now |
+|---|---|---|
+| `2N-TIME-002` | extend `2M-TIME-007`'s **named** corpus | `[BASELINE]` — the tree-wide guard's four families stay at zero; **2N.0 builds no timezone guard** |
+| `2N-TIME-004` | preserve the self-cleaning half of the exemption list | `[BASELINE]` — the list is retired; **no exemption list is re-created** |
+| `2N-TIME-005` | 13 across 12 files (≈27) | `[BASELINE]` — **31**, under the requirement's own "whichever is current" clause |
+| `2N-TIME-006` | future-tense dependency, "2N.0 guards its own surfaces" | `[BASELINE]` — dependency **discharged**; the repair is **not this phase's delivery** |
+
+**`2N-TIME-002` was the one that mattered.** As written it instructed a slice to
+build a **second census of one defect**, beside a tree-wide guard already holding
+it at zero — and the narrower census always reads as authoritative to the next
+author. That is the failure `2M-TIME-007` taught, being re-created by a
+requirement written before the fix existed.
+
+**`2N-TIME-004` was the subtler one.** It obliged the phase to *preserve* a list
+that no longer exists, and **the most direct way to satisfy it literally would
+have been to re-create one.** A requirement can outlive its object and still read
+as perfectly sensible.
+
+**All four close `baseline`, never `built`.** The repair came from ADR-111's
+initiative under its own budget and its own closeout. `baseline` is the marker
+this repository already has for *"true before the phase; the phase must not break
+it"*, and using `built` would have inflated this phase's delivery by 31 call
+sites it did not touch.
+
+### How the correction stayed traceable
+
+**No id renumbered, reused or deleted.** Each restated **in place** with an
+explicit `*(Restated by ADR-112: …)*` marker — the mechanism ADR-109 used for
+twelve requirements and ADR-110 for one. Count stays **127 across sixteen
+families**, re-derived from the PRD rather than typed. Deleting the ids would
+have destroyed the record that the obligation existed *and* broken the family's
+gapless numbering, which the guard asserts.
+
+### Two guards inverted rather than deleted, as the file itself predicted
+
+`phase-2n-declarations.test.ts` was written to be inverted — its header says so,
+citing Phase 2M's equivalent. Both inversions happened at their gate:
+
+- *"implementation is still not authorized"* → *"implementation is authorized,
+  **and by which decision**"*, still requiring the PRD to name what is refused in
+  the same breath.
+- *"implementation has not begun"* → narrowed to *"the **closing** artifacts
+  arrive at their gates"*. Slice acceptance records are now expected; the matrix,
+  closing report and deployment record are not, until 2N.7.
+
+**The flat count of 92 migrations became the rule it was standing in for:** at
+most three attributable to this phase, and the total is 92 **plus exactly those**.
+A fourth now fails at the guard rather than at closeout, **and an unattributed
+migration fails too** — which a flat count could only ever catch by accident.
+
+**A13's milestone line moved in the same commit, for the sixth time**, by the
+unchanged rule: *the line cites every authorization the phase has received and
+overstates none of them.* ADR-105 dropped "planning"; ADR-108 required it back;
+ADR-112 drops it again, because requiring it now would force the backlog to
+**understate**.
+
+### The correction's premise is asserted, not trusted
+
+A new cross-guard check fails if `OPEN_OCCURRENCES` is ever re-populated or the
+tree-wide corpus narrowed — **proved by planting a row and watching it fail by
+name**. Removing one census while the other quietly weakened is the single way
+this correction could have done harm, so it is the one thing mechanically
+prevented.
+
+### Both Unit 5 findings dispositioned, neither absorbed
+
+- **In scope, no new id invented.** `app/loading.tsx` announces
+  `"Carregando página"` in **both** locales on a live region. PRD §4 obliges
+  every surface this phase ships **or touches** to declare its **loading** state
+  in both locales, and it is the streaming fallback for all four contextual
+  routes → `2N-ACCESS-005` and `2N-ACCESS-003`, delivered in **2N.0**.
+  **Trap for whoever builds it:** an App Router `loading.tsx` receives **no
+  props**, so no `params` and no locale. Read `node_modules/next/dist/docs/`
+  before choosing how to derive it.
+- **Out of scope, remainder with a destination.** `loadQuestionPreviews` turns a
+  rejected row shape into an empty `Map`. **No instance of that pattern exists on
+  any Phase 2N surface** — asserted over the four contextual routes and
+  `src/features/entities`, not assumed.
+
+### 2N.0 re-audited against `05d4c8f` — and NOT started
+
+All five of ADR-108's premises **still hold**, re-derived from source: no
+contextual route imports the sensitivity contract; `entity_aliases` still has
+**zero readers**; search's `people` domain still matches **and snippets**
+`notes`; the person and project pages still truncate silently at
+`.limit(100/200/50)`; and neither table carries a `sensitivity` column. **The
+slice needs no re-planning**, has no blocked requirement and no open decision,
+and its schema impact is **none**.
+
+### THE LOOP STOPS HERE — 2N.0 IS RE-AUDITED, NOT IMPLEMENTED
+
+Stopped **between slices**, which is where ADR-112's loop says to stop. 2N.0 is
+29 requirements across five routes plus a new derivation module, a bounds
+vocabulary, an alias reader, a search narrowing, the loading fix, unit tests and
+desktop/mobile journeys in both locales. **Beginning it without finishing it
+would leave exactly the partial slice the loop forbids.**
+
+**Unchanged:** 92 migrations, **zero of Phase 2N's three spent, none created**,
+parity `202608120092`, budget non-transferable with a **fourth a STOP
+CONDITION**, signup closed, rollout 25 · 3 · 2, push **not** resumed (HTTP 403 on
+a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and A13 still
+guarding the roadmap successor.
