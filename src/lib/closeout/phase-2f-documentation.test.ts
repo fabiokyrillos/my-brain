@@ -198,6 +198,8 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line).toBeDefined();
     expect(line).toMatch(/Phase 2N/);
     expect(line, "the start must cite its authorization").toMatch(/ADR-108/);
+    expect(line, "implementation has its own authorization and the line must cite it")
+      .toMatch(/ADR-112/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
     /*
      * The "planning" half came back at ADR-102, went again at ADR-103, came back
@@ -211,16 +213,20 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * ADR-105 then authorized implementation through closeout, so requiring
      * "planning" alone would have forced the line to *understate* — the
      * mirror-image error, and the one that made this assertion drop the word at
-     * Phase 2K's close under ADR-101. ADR-108 authorizes **planning only** for
-     * Phase 2N, so the word is required again, and it is required rather than
-     * merely permitted: a backlog that says a phase is active without saying it
-     * is unimplemented is the overstatement this whole guard exists to catch.
+     * Phase 2K's close under ADR-101. ADR-108 authorized **planning only** for
+     * Phase 2N, so the word was required again — and **ADR-112 has now
+     * authorized implementation through closeout**, so requiring "planning"
+     * alone would force the line to understate, which is the identical error one
+     * direction over. The word goes for the sixth time, in the commit that
+     * records the authorization.
      *
      * What does not move: the line names the phase, cites every ADR it has, and
      * does not announce a successor.
      */
-    expect(line, "ADR-108 authorizes planning only, and the line must not overstate it")
-      .toMatch(/planning/i);
+    expect(line, "ADR-112 authorizes implementation, and the line must not understate it")
+      .toMatch(/IMPLEMENTATION/);
+    expect(line, "the line must not still call the phase planning-only")
+      .not.toMatch(/PLANNING ONLY/i);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2O/);
   });

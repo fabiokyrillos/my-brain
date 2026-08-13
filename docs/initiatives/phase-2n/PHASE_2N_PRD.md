@@ -1,14 +1,24 @@
 # Phase 2N — People, projects, memory, files and relations · PRD
 
-**Authorized for PLANNING ONLY by ADR-108 (2026-08-12). All seventeen owner
-decisions are SIGNED by ADR-109 (2026-08-12). Implementation is still not
-authorized.** No requirement below has been executed. Nothing here may be read
-as permission to write product code, create a page or component, create a
-migration, change schema, RLS, a grant, a policy or an RPC, touch an Edge
-Function, deploy, add a secret, integrate an external service, resume the push
-investigation, repair the timezone defects, open signup, or alter the rollout.
-**The three allocated migrations are destinations, not permissions**; none may
-be created until implementation is separately authorized.
+**Planning authorized by ADR-108 (2026-08-12). All seventeen owner decisions
+SIGNED by ADR-109 (2026-08-12). IMPLEMENTATION THROUGH CLOSEOUT AUTHORIZED by
+ADR-112 (2026-08-13).** A requirement is executed only when a merged slice says
+so and CI is green on its exact merge SHA; **no requirement below is executed by
+being written here**.
+
+**What is still not authorized:** a **fourth migration** (a STOP CONDITION),
+opening signup, altering the rollout gate, resuming the push investigation, any
+entity merge, any persisted graph inference, any paid provider call, and any
+planning, starting or retargeting toward the successor phase. **The three
+allocated migrations remain non-transferable destinations**, spent only at the
+slice each is allocated to, and each must pass the full chain — chain, pgTAP,
+CI, dry run, byte parity, deploy and hosted proof — before it counts as
+delivered.
+
+**The timezone dependency is discharged.** ADR-111's Local Day Correction
+concluded at `d581e43`; `2N-TIME-002`, `-004`, `-005` and `-006` are restated by
+ADR-112 and close **`baseline`** — this phase inherits that repair and may not
+claim it.
 
 Companion plan: `PHASE_2N_IMPLEMENTATION_PLAN.md`. Evidence:
 `docs/reports/phase-2n/` — the current-experience audit, the UX gaps, the
@@ -478,24 +488,45 @@ is not complete.
 
 - **2N-TIME-001:** [OBLIGATION] Every dated value this phase renders routes
   through `src/lib/time/local-day.ts` and carries the owner's zone.
-- **2N-TIME-002:** [OBLIGATION] The `2M-TIME-007` guard corpus extends to this
-  phase's directories, so a new zone-less formatter cannot be added to them.
+- **2N-TIME-002:** [BASELINE] The tree-wide guard's four families stay at
+  **zero** after this phase's routes are added, **asserted rather than
+  assumed**. `src/lib/closeout/local-day-correction-guard.test.ts` takes `src/`
+  itself as its corpus with a per-file budget of zero, so this phase's
+  directories are already inside it and **2N.0 builds no timezone guard of its
+  own**. No allowlist may be created to accommodate a new occurrence: a route
+  that would need one has a defect, not an exemption. *(Restated by ADR-112:
+  this previously obliged the phase to extend `2M-TIME-007`'s **named** corpus.
+  A narrower list beside a tree-wide rule is two censuses of one defect, and the
+  narrower one reads as authoritative — the exact failure `2M-TIME-007` taught.)*
 - **2N-TIME-003:** [OBLIGATION] No fixed offset, no fixed day length and no
   host-zone reader appears in this phase's code.
-- **2N-TIME-004:** [OBLIGATION] The four `daily-cycle` exemptions are **not
-  repaired here**; they are re-stated as residuals with their destination
-  unchanged, and the self-cleaning half of that exemption is preserved.
-- **2N-TIME-005:** [OBLIGATION] The wider population is **enumerated and its
-  evidence preserved** — **13 zone-less formatter call sites across 12 files**
-  outside the `2M-TIME-007` corpus, or the count this phase's re-audit
-  re-derives, whichever is current. The enumeration is carried in the audit and
-  may not be reduced to a sentence.
-- **2N-TIME-006:** [OBLIGATION] The repair belongs to a **separate timezone
-  initiative** (`OD-2N-13` **option B**), which is a **mandatory dependency
-  completed before slice 2N.1 begins** and which may be planned or executed
-  **only under its own owner authorization**. **2N.0 guards only its own
-  surfaces**; the initiative's roughly 27 call sites are **not absorbed** into
-  it, and no timezone repair happens in the planning PR.
+- **2N-TIME-004:** [BASELINE] The retirement of
+  `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` holds and **no exemption list is
+  re-created**. The four `daily-cycle` call sites are **not repaired here** —
+  they were repaired by ADR-111's initiative in its Unit 2 (`1734d34`), which is
+  why this closes **`baseline` and never `built`**: Phase 2N may not claim
+  another initiative's delivery. *(Restated by ADR-112: this previously obliged
+  the phase to preserve the self-cleaning half of an exemption list that no
+  longer exists, and the most direct way to satisfy it literally would have been
+  to re-create one.)*
+- **2N-TIME-005:** [BASELINE] The wider population is **enumerated and its
+  evidence preserved** — **31 occurrences: 17 zone-less formatters across 16
+  files, plus 7 host-zone field reads, 4 UTC day slices and 3 zone round-trips**.
+  The enumeration is carried in the initiative's audit and in the guard, and may
+  not be reduced to a sentence. *(Restated by ADR-112 under this requirement's
+  own "whichever is current" clause: the signed estimate of 13 across 12 files —
+  roughly 27 call sites — was re-derived mechanically as 31. An audit counting
+  formatters could not see the other three families, and the worst of them
+  changed what a review contained rather than how a date was printed.)*
+- **2N-TIME-006:** [BASELINE] The repair belonged to a **separate timezone
+  initiative** (`OD-2N-13` **option B**), a **mandatory dependency of slice
+  2N.1** which was authorized by ADR-111 and **CONCLUDED at `d581e43`** —
+  planned and executed under its own owner authorization, with **zero migrations
+  created and zero spent**. Its 31 call sites were **not absorbed** into 2N.0
+  and **Phase 2N may not claim them as its own delivery**. *(Restated by ADR-112
+  for coherence with `2N-TIME-002`: the clause "2N.0 guards only its own
+  surfaces" described a guard this phase no longer builds, and the future tense
+  described a dependency now discharged.)*
 
 ### 13.4 Mobile — `2N-MOBILE`
 
@@ -635,9 +666,33 @@ contract (2L), the local-day and calendar contracts (2M), the search contract
 vocabulary.
 
 **Residuals re-stated as open, not absorbed:** `2L-MOBILE-008`,
-`2L-ACCESS-008`, `2E-COMMAND-012`, the four `daily-cycle` timezone exemptions,
-`2M-DEVICE-004`, `2M-DEVICE-005`, `2M-ACCESS-007`, `RG-QUO-3`, `RG-DEP-1`,
-`RG-DEP-3`, `RG-DEP-4`, and ADR-055's expiry of 2026-10-27.
+`2L-ACCESS-008`, `2E-COMMAND-012`, `2M-DEVICE-004`, `2M-DEVICE-005`,
+`2M-ACCESS-007`, `RG-QUO-3`, `RG-DEP-1`, `RG-DEP-3`, `RG-DEP-4`, and ADR-055's
+expiry of 2026-10-27.
+
+**Discharged since this package was signed:** the four `daily-cycle` timezone
+exemptions were repaired by ADR-111's initiative (Unit 2, `1734d34`) and
+`HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` is retired. They leave this list
+because they were **fixed**, not because they were absorbed — see `2N-TIME-004`,
+which closes `baseline` for exactly that reason.
+
+**Inherited from the Local Day Correction's Unit 5, dispositioned by ADR-112
+Decision 7:**
+
+- **In scope, no new requirement needed.**
+  `src/app/[locale]/app/loading.tsx` announces `"Carregando página"` in **both**
+  locales on a `role="status"` `aria-live="polite"` region, so a screen reader in
+  `en` announces Portuguese. §4 obliges every surface this phase ships **or
+  touches** to declare its **loading** state in both locales, and this is the
+  streaming fallback for all four contextual routes. Carried by
+  **`2N-ACCESS-005`** and **`2N-ACCESS-003`**, delivered in **2N.0**.
+- **Out of scope, remainder with a destination.** `loadQuestionPreviews`
+  (`src/features/agent/question-preview-projection.ts`) turns a rejected row
+  shape into an empty `Map` via `.catch(() => new Map())`, so the surface renders
+  nothing while appearing to have rendered. **No instance of that pattern exists
+  on any Phase 2N surface** — asserted over the four contextual routes and
+  `src/features/entities`, not assumed. **Destination:** the questions surface,
+  under whichever phase next opens `src/features/agent`. Not implemented here.
 
 **Never a dependency:** push delivery, Android, any external service, any
 provider call for explanation.

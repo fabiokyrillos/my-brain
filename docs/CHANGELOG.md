@@ -2,6 +2,31 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N: implementation authorized, and the four time requirements the completed dependency made stale are corrected
+
+**ADR-112 authorizes Phase 2N implementation through closeout.** Planning only, until now: ADR-108 authorized planning, ADR-109 signed all seventeen decisions and ADR-110 settled the one it left flagged, and every one of them explicitly withheld permission to build. **This PR implements no product.**
+
+**All seventeen signatures were re-audited against `main` and every one stands.** None is reopened, narrowed or reinterpreted. `OD-2N-13` **B** is the only one whose object changed, and it changed by being **satisfied** — the initiative it required was authorized, executed and merged. **A decision that has been carried out is not a decision that has been altered**, which is why this corrects four requirements and amends no signature.
+
+**Four `2N-TIME` requirements are restated in place — no id renumbered, reused or deleted, each carrying an explicit `*(Restated by ADR-112: …)*` marker**, the mechanism ADR-109 used for twelve requirements and ADR-110 for one. **The count stays at 127 across sixteen families**, re-derived from the PRD rather than typed, because a restatement is not an addition.
+
+- **`2N-TIME-002` was obsolete as written.** It obliged this phase to extend `2M-TIME-007`'s **named** corpus. A tree-wide guard now takes `src/` itself — 400+ files, four families, `OPEN_OCCURRENCES` empty, per-file budget **zero** — and Phase 2N's directories are already inside it. **Two censuses of one defect is the failure `2M-TIME-007` taught**, and the narrower one always reads as authoritative. Restated `[BASELINE]`: the four families **stay at zero after this phase's routes are added, asserted rather than assumed**, and **2N.0 builds no timezone guard of its own**.
+- **`2N-TIME-004` had lost its object.** It obliged the phase to preserve the self-cleaning half of an exemption list that no longer exists — the four `daily-cycle` sites were repaired in Unit 2 (`1734d34`) and the list is retired. **The most direct way to satisfy it literally would have been to re-create one.** Restated `[BASELINE]`: the retirement holds and no exemption list is re-created.
+- **`2N-TIME-005`'s population is corrected from 13/≈27 to 31**, under the requirement's own *"whichever is current"* clause. The mechanical census found **17 formatters across 16 files**, plus **7** host-zone field reads, **4** UTC day slices and **3** zone round-trips. An audit counting *formatters* could not see the other three families, and the worst of them changed **what a review contained**.
+- **`2N-TIME-006` is restated for coherence**: its "2N.0 guards only its own surfaces" described a guard this phase no longer builds, and its future tense described a discharged dependency.
+
+**All four close `baseline`, never `built`.** The repair was delivered by ADR-111's initiative under its own budget and its own closeout, and **Phase 2N may not claim it**.
+
+**Both findings from the initiative's Unit 5 are dispositioned rather than absorbed.** `app/loading.tsx` announcing `"Carregando página"` in **both** locales on a live region is **inside** signed scope — PRD §4 obliges every surface this phase ships *or touches* to declare its **loading** state in both locales, and it is the streaming fallback for all four contextual routes — so it is carried by **`2N-ACCESS-005`** and **`2N-ACCESS-003`** and delivered in **2N.0**, with no new requirement invented. `loadQuestionPreviews` swallowing a rejected row shape is **out of scope**: **no instance of that pattern exists on any Phase 2N surface**, asserted over the four contextual routes and `src/features/entities` rather than assumed, so it is recorded as a **remainder with a destination**.
+
+**Two guards were inverted rather than deleted, exactly as `phase-2n-declarations.test.ts` predicted in its own header.** *"Implementation is still not authorized"* becomes *"implementation is authorized, and by which decision"* — still requiring the citation, and still requiring the PRD to say what is refused in the same breath. *"Implementation has not begun"* narrows to *"the **closing** artifacts arrive at their gates"*: per-slice acceptance records are now expected; the matrix, closing report and deployment record are not, until 2N.7. **The flat count of 92 migrations becomes the rule it was standing in for** — at most three attributable to this phase, and the total is 92 plus exactly those, so a fourth fails here rather than at closeout and an unattributed migration fails too, which a flat count could only catch by accident.
+
+**The A13 milestone-line assertion moved in this same commit**, for the sixth time and by the same rule: *the line cites every authorization the phase has received and overstates none of them.* ADR-105 dropped "planning" when it authorized implementation; ADR-108 required it back; ADR-112 drops it again, because requiring it now would force the backlog to **understate**.
+
+**The correction's premise is asserted, not trusted:** a new cross-guard check fails if `OPEN_OCCURRENCES` is ever re-populated or the tree-wide corpus narrowed — proved by planting a row and watching it fail by name. Removing one census while the other quietly weakened would be the one way this correction could do harm.
+
+**Zero product code. Migrations stay at 92, parity `202608120092`, budget `3 allocated · 0 spent · NON-TRANSFERABLE`, a fourth a STOP CONDITION.** ADR-108, ADR-109, ADR-110 and ADR-111 are **not rewritten**. Signup closed, rollout 25 · 3 · 2, push not resumed, **Phase 2O not started** and not named by the authorizing heading.
+
 ## 2026-08-13 - LOCAL DAY CORRECTION, UNIT 5: the correction is proved to render, and the initiative CONCLUDES
 
 **The initiative is CONCLUDED.** Thirty-one occurrences repaired across four families, all at zero tree-wide, and — new here — the correction is proved to *render*, in a real browser, against the deployed application.

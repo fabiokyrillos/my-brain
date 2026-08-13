@@ -1,12 +1,16 @@
 # Phase 2N — implementation plan
 
-**Authorized for PLANNING ONLY by ADR-108 (2026-08-12). All seventeen owner
-decisions SIGNED by ADR-109 (2026-08-12). Implementation is still not
-authorized.** This plan describes work that **has not been authorized to
-execute**. Nothing here may be started. **No migration exists, and the three
-allocated below are destinations, not permissions** — none may be created until
-implementation is separately authorized. The execution loop in §9 must not be
-run.
+**Planning authorized by ADR-108 (2026-08-12). All seventeen owner decisions
+SIGNED by ADR-109 (2026-08-12). IMPLEMENTATION THROUGH CLOSEOUT AUTHORIZED by
+ADR-112 (2026-08-13).** The execution loop in §9 is live, slice by slice, in the
+order below. **No migration exists yet**: the three allocated below are
+**non-transferable**, each is spent only at its own slice, **M2 only once real
+producers and consumers exist**, an allocation may close **unspent**, and a
+**fourth is a STOP CONDITION** returning the work to the owner.
+
+**The timezone dependency between 2N.0 and 2N.1 is discharged** — ADR-111's
+Local Day Correction concluded at `d581e43` with zero migrations spent — so 2N.1
+is unblocked and this phase **inherits** that repair rather than delivering it.
 
 Companion PRD: `PHASE_2N_PRD.md` — **127 requirements across 16 families**.
 ADR-110 settled the one interpretation ADR-109 left flagged and fixed the
@@ -76,8 +80,13 @@ updated product before it starts.
 - **Objective.** Make the contextual surfaces governable before anything is
   added to them.
 - **Experience delivered.** Sensitive content stops being printed in full on the
-  person, project, memory and file pages. Dates stop being wrong for anyone not
-  living in UTC. Truncated lists start saying they are truncated.
+  person, project, memory and file pages. Truncated lists start saying they are
+  truncated. The route loading state stops announcing Portuguese to an English
+  screen reader. *(Amended by ADR-112: "dates stop being wrong for anyone not
+  living in UTC" was **already delivered** by ADR-111's initiative, which
+  concluded at `d581e43` and proved it rendering on the deployed application.
+  This slice inherits correct dates rather than producing them, and may not
+  claim them — see `2N-TIME-002`, `-004`, `-005` and `-006`, all `baseline`.)*
 - **Requirements.** `2N-PRIVACY-001…011`, `2N-TIME-001…006`,
   `2N-PERSON-003`, `2N-PROJECT-006`, `2N-KNOWS-007…008`, `2N-SEC-002`,
   `2N-SEC-003`, `2N-IDENTITY-001…004`, `2N-IDENTITY-008…009`.
@@ -89,35 +98,49 @@ updated product before it starts.
   shared bounds vocabulary, an `entity_aliases` reader for entity resolution and
   search, `src/features/search/contracts.ts` (**narrowing the `people` domain so
   `notes` is neither matched nor snippeted**), `src/app/[locale]/app/people/page.tsx`
-  (the list currently prints `notes` as each row's subtitle),
-  `src/lib/closeout/phase-2m-fixed-offset-guard.test.ts`
-  (corpus extension — **this phase's directories only**).
+  (the list currently prints `notes` as each row's subtitle), and
+  `src/app/[locale]/app/loading.tsx` (its `role="status"` fallback announces
+  `"Carregando página"` in both locales — ADR-112 Decision 7a, carried by
+  `2N-ACCESS-005` and `2N-ACCESS-003`).
+  *(Amended by ADR-112: `phase-2m-fixed-offset-guard.test.ts` **leaves this
+  list**. Its corpus extension is what `2N-TIME-002` used to require, and a
+  tree-wide guard at zero already covers these directories — building a second,
+  narrower census is the failure that requirement now exists to prevent.)*
 - **Authority paths.** None new. Read-only, plus alias reading.
 - **Schema impact.** **None.** No migration. `entity_aliases` already exists
   with its own policies and grants; this slice gives it its first reader.
-- **What it must not do.** It must **not** repair the roughly 27 timezone call
-  sites belonging to the separate initiative (`2N-TIME-006`). Its guard
-  extension covers **its own surfaces only**.
-- **Tests.** Contract unit tests per surface; the convergence guard extended;
-  the fixed-offset guard's corpus extended with its self-cleaning half intact;
-  a negative control proving a masked surface is actually masked.
+- **What it must not do.** It must **not** claim the timezone repair as its own
+  delivery: the 31 call sites were fixed by ADR-111's initiative, and
+  `2N-TIME-002`, `-004`, `-005` and `-006` all close **`baseline`**. It must
+  **not** build a second timezone guard, and it must **not** add a row to
+  `OPEN_OCCURRENCES` to accommodate a new route. *(Amended by ADR-112, which
+  replaced "its guard extension covers its own surfaces only" — this slice now
+  extends no timezone guard at all.)*
+- **Tests.** Contract unit tests per surface; the convergence guard extended; a
+  negative control proving a masked surface is actually masked; and an assertion
+  that the tree-wide local-day guard's four families are **still at zero** with
+  `OPEN_OCCURRENCES` **still empty** once this slice's routes are in place.
 - **Journeys.** Desktop + mobile, both locales: a `highly_sensitive` entry
   masked on the person page and revealable locally.
 - **Accessibility.** Mask and reveal announced, not merely styled.
 - **Security.** T-8, T-12, T-14, T-15.
 - **Telemetry.** None.
-- **Acceptance.** No contextual surface renders classified content unmasked; no
-  zone-less formatter can be added to the phase's directories; every bounded
-  list says so; a known nickname resolves to the person it names. Plus
+- **Acceptance.** No contextual surface renders classified content unmasked; the
+  tree-wide guard's four families are still at zero with `OPEN_OCCURRENCES`
+  still empty; the route loading state announces in the reader's own locale;
+  every bounded list says so; a known nickname resolves to the person it names.
+  Plus
   `2N-PRIVACY-011`'s journey: **name visible, notes masked**, reveal local and
   keyboard/screen-reader reachable, notes **absent from search, retrieval,
   previews, the graph and telemetry**, counts not usable as an oracle, and no
   classification inferred as `normal` by absence.
-- **Stop conditions.** Any need for a migration; the four `daily-cycle`
-  exemptions turning out to be load-bearing for a 2N surface; alias reading
+- **Stop conditions.** Any need for a migration; alias reading
   turning out to need schema; and — `2N-PRIVACY-011` — **removing `people.notes`
   from retrieval or search turning out to need a migration, a column or a new
   authority**, which may not consume or reallocate M1, M2 or M3.
+  *(Amended by ADR-112: the `daily-cycle` exemptions can no longer be
+  load-bearing for anything — they were repaired and the list retired — so that
+  stop condition is removed as unreachable rather than left as decoration.)*
 - **One narrowing of ADR-093, recorded rather than discovered.** Removing
   `notes` from search's `people` domain changes behaviour ADR-093 signed. It is
   a **deliberate, owner-signed narrowing** (ADR-110), not an accidental
@@ -126,28 +149,36 @@ updated product before it starts.
   changes. Verified: `phase-2i-search-guard.test.ts` does not pin `notes` into
   the people domain, so the narrowing breaks no existing guard.
 
-### Between 2N.0 and 2N.1 — the timezone initiative (separate authorization)
+### Between 2N.0 and 2N.1 — the timezone initiative — **DONE, and not this phase's**
 
-**Not a Phase 2N slice, and not authorized by ADR-108 or ADR-109.** It is
-recorded here because `OD-2N-13` **B** makes it a **mandatory dependency of
-2N.1**, and a dependency nobody wrote down is a dependency that gets skipped.
+**Not a Phase 2N slice.** Authorized by **ADR-111**, executed as the **Local Day
+Correction** initiative, and **CONCLUDED on 2026-08-13 at `d581e43`** with
+**zero migrations created and zero spent**. Recorded here because `OD-2N-13`
+**B** made it a **mandatory dependency of 2N.1** — and a discharged dependency
+that nobody wrote down is one a later reader re-opens.
 
 - **Objective.** Repair the zone-less rendering that Phase 2N would otherwise
-  inherit and extend.
-- **Population.** The **13 zone-less formatter call sites across 12 files**
-  outside the `2M-TIME-007` corpus that this phase's audit enumerated
-  (`2N-TIME-005`), plus the **four** `daily-cycle` files carried past Phase 2M's
-  close, whose self-cleaning exemption must be removed as each is repaired —
-  roughly 27 call sites in total once the component call sites behind them are
-  counted.
-- **Why it is not folded into 2N.0.** It touches `daily-cycle`, `shell`,
+  inherit and extend. **Achieved.**
+- **Population, as re-derived rather than as estimated.** The plan said **13
+  zone-less formatters across 12 files** plus the four `daily-cycle` files —
+  roughly 27 call sites. The mechanical census found **17 formatters across 16
+  files**, plus **7** host-zone field reads, **4** UTC day slices and **3** zone
+  round-trips: **31**, all repaired. *(Amended by ADR-112 under `2N-TIME-005`'s
+  own "whichever is current" clause.)*
+- **Why it was not folded into 2N.0.** It touched `daily-cycle`, `shell`,
   `search`, `chat` and `agent` — surfaces Phase 2N otherwise does not open. A
   foundation slice that acquires five unrelated surfaces stops being a
-  foundation.
-- **Schema impact.** None expected. The owner's zone is already available and
-  already threaded through five surfaces since 2M.1.
-- **Gate.** **2N.1 does not begin until this initiative is authorized, executed
-  and merged.** 2N.3 is explicitly *not* gated on it.
+  foundation. That reasoning held: the census found nearly twice the estimate.
+- **Schema impact.** **None, confirmed rather than expected.** Migrations stayed
+  at 92 and parity at `202608120092`.
+- **What it leaves behind for this phase.** A tree-wide guard —
+  `local-day-correction-guard.test.ts`, corpus `src/`, four families, per-file
+  budget **zero**, `OPEN_OCCURRENCES` **empty** — which already covers Phase 2N's
+  directories. **2N.0 therefore builds no timezone guard**, and every 2N-TIME
+  requirement except `-001` and `-003` closes **`baseline`**: this phase must not
+  claim another initiative's delivery.
+- **Gate.** **Satisfied.** 2N.1 is unblocked. 2N.3 was explicitly never gated on
+  it.
 
 ### 2N.1 — Person page hardening
 

@@ -58,6 +58,16 @@ function declaredIds(source: string): string[] {
 
 const ids = declaredIds(read(PRD));
 const TOTAL = 127;
+
+/**
+ * The migration count on the day Phase 2N implementation was authorized.
+ *
+ * Phase 2N may add **at most three** on top of this, one per allocation. The
+ * baseline is a constant rather than a re-read of the directory precisely so
+ * that a spend has to be *attributable*: total minus this must equal the number
+ * of files naming the phase, or something arrived that nobody allocated.
+ */
+const MIGRATIONS_BEFORE_PHASE_2N = 92;
 const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   PERSON: 8,
   PROJECT: 7,
@@ -163,12 +173,24 @@ describe("Phase 2N governance: the authorization is planning-only and says so", 
     }
   });
 
-  it("states in the PRD that implementation is not authorized", () => {
-    // `still` was added when ADR-109 signed the decisions, and the assertion
-    // has to tolerate it without tolerating its absence: signing seventeen
-    // decisions is exactly the moment a package is most likely to start
-    // reading as an authorization to build.
-    expect(read(PRD)).toMatch(/Implementation is (?:still )?not\s+authorized/);
+  it("states in the PRD that implementation is authorized, and by which decision", () => {
+    /*
+     * **Inverted by ADR-112, not deleted.** This asserted the opposite for the
+     * whole of planning: *"Implementation is still not authorized"*. ADR-112
+     * authorized implementation through closeout, so the assertion turns over —
+     * and it keeps naming the decision, because "implementation is authorized"
+     * with no citation is exactly the sentence a package acquires by drift.
+     *
+     * The pairing matters as much as the claim. The PRD must say what is *still*
+     * refused, or an authorization to build eight slices reads as an
+     * authorization to do anything.
+     */
+    const prd = read(PRD);
+    expect(prd).toMatch(/IMPLEMENTATION THROUGH CLOSEOUT AUTHORIZED by\s*\n?ADR-112/);
+    expect(prd, "a fourth migration must still be refused in the same breath")
+      .toMatch(/fourth migration\*{0,2} \(a STOP CONDITION\)|fourth\*{0,2} migration/i);
+    expect(prd, "the phase must not read as permission to start the successor")
+      .toMatch(/successor phase/i);
   });
 
   it("records ADR-109 as an accepted signing decision that authorizes no implementation", () => {
@@ -233,13 +255,27 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     expect(read(PLAN)).toMatch(/3 allocated · obligation ZERO · 0 spent · NONE CREATED/);
   });
 
-  it("has created no migration attributable to this phase", () => {
-    // R-4. The planning authorization forbids a migration outright, so the
-    // absence is asserted rather than assumed — and it is asserted against the
-    // directory rather than against a document that could simply be wrong.
+  it("spends at most the three allocated, and nothing unattributed appears beside them", () => {
+    /*
+     * **Inverted by ADR-112.** Under planning this asserted *zero* Phase 2N
+     * migrations and exactly 92 files. Implementation may now spend up to three,
+     * so a flat count would have to be edited on every spend — and a budget
+     * guard that gets edited to go green is not a budget guard.
+     *
+     * What replaces it is the rule itself, which does not move: **at most three
+     * are attributable to this phase, and the total is 92 plus exactly those.**
+     * A fourth fails here rather than at closeout, and an unattributed migration
+     * — one that belongs to no phase and slipped in beside them — fails too,
+     * which the old flat count could only catch by accident.
+     */
     const migrations = readdirSync(join(REPO, "supabase", "migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2n/i.test(name))).toEqual([]);
-    expect(migrations).toHaveLength(92);
+    const mine = migrations.filter((name) => /phase[_-]?2n/i.test(name));
+    expect(mine.length, `a fourth Phase 2N migration is a STOP CONDITION: ${mine.join(", ")}`)
+      .toBeLessThanOrEqual(3);
+    expect(
+      migrations,
+      "a migration appeared that belongs to neither the pre-phase baseline nor this phase",
+    ).toHaveLength(MIGRATIONS_BEFORE_PHASE_2N + mine.length);
   });
 
   it("gives every proposed migration an exclusive destination", () => {
@@ -277,19 +313,30 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
   });
 });
 
-describe("Phase 2N: implementation has not begun", () => {
-  it("has created no acceptance record, matrix, report or deployment record", () => {
-    // R-5. These are the artifacts that only exist after work has run. Phase 2M's
-    // equivalent had to be *inverted* at closeout rather than deleted, and this
-    // one is written to be inverted the same way rather than quietly dropped.
+describe("Phase 2N: implementation is under way, and its artifacts arrive at their gates", () => {
+  it("keeps the closing artifacts absent until the phase actually closes", () => {
+    /*
+     * **Inverted by ADR-112, exactly as this file's header predicted it would
+     * be.** Under planning, an acceptance record, a matrix, a report or a
+     * deployment record was proof that work had started under an authorization
+     * that forbade it. Implementation is now authorized, so per-slice acceptance
+     * records are *expected* — but the **closing** artifacts still are not, and
+     * a phase that grows a closing report while six slices are outstanding has
+     * declared victory rather than reached it.
+     *
+     * So the rule narrows rather than disappears: slice acceptance records may
+     * exist; the traceability **matrix**, the **closing report** and the
+     * **deployment record** may not, until `2N.7` produces them.
+     */
     const reports = readdirSync(join(REPO, "docs", "reports", "phase-2n"));
-    const forbidden = reports.filter((name) =>
-      /ACCEPTANCE|TRACEABILITY_MATRIX|_REPORT\.md|DEPLOYMENT/.test(name),
+    const closing = reports.filter((name) =>
+      /TRACEABILITY_MATRIX|CLOSING_REPORT|DEPLOYMENT/.test(name),
     );
-    expect(forbidden, `implementation artifacts exist under a planning-only authorization`)
-      .toEqual([]);
-    // Non-vacuous: the directory is not empty, so the filter above is really
-    // filtering something.
+    expect(
+      closing,
+      "a closing artifact exists while the phase is still running — see 2N.7",
+    ).toEqual([]);
+    // Non-vacuous: the directory is not empty, so the filter is really filtering.
     expect(reports.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -348,7 +395,15 @@ describe("Phase 2N: the notes posture is unambiguous and costs no schema", () =>
     // database. Asserted against the directory as well as the prose.
     const prd = read(PRD);
     expect(prd).toMatch(/No `sensitivity`\s*\n?\s*column is added to `people`|No `sensitivity` column is added/);
-    expect(readdirSync(join(REPO, "supabase", "migrations"))).toHaveLength(92);
+    // The notes posture must reach no database. Asserted as "no migration names
+    // privacy or notes" rather than as a flat file count, which ADR-112 made
+    // movable — the claim was never about the total, it was about this decision
+    // costing nothing.
+    expect(
+      readdirSync(join(REPO, "supabase", "migrations")).filter((name) =>
+        /privacy|notes|sensitiv/i.test(name),
+      ),
+    ).toEqual([]);
     expect(read(PLAN)).toMatch(/may not consume or reallocate \*\*M1\*\*, \*\*M2\*\* or \*\*M3\*\*|may not consume or reallocate M1, M2 or M3/);
   });
 
@@ -360,6 +415,108 @@ describe("Phase 2N: the notes posture is unambiguous and costs no schema", () =>
     expect(plan).toMatch(/narrowing of ADR-093/i);
     expect(plan).toMatch(/not an accidental\s*\n?\s*reopening/i);
     expect(read(THREATS)).toMatch(/owner-signed narrowing/i);
+  });
+});
+
+describe("ADR-112: implementation is authorized and the stale time requirements are corrected", () => {
+  const adr = () => {
+    const decisions = read("docs/DECISIONS.md");
+    const start = decisions.indexOf("## ADR-112");
+    expect(start, "ADR-112 is not recorded").toBeGreaterThan(0);
+    const next = decisions.indexOf("\n## ADR-", start + 1);
+    return decisions.slice(start, next === -1 ? undefined : next);
+  };
+
+  it("records ADR-112 as an accepted implementation authorization that still refuses a fourth migration", () => {
+    const body = adr();
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body).toMatch(/authorizes \*\*implementation through closeout\*\*/i);
+    expect(body).toMatch(/fourth is a STOP CONDITION/i);
+    // The property every authorizing ADR in this series is held to.
+    expect(body, "an authorizing ADR must not name the successor").not.toMatch(/2O/i);
+  });
+
+  it("keeps ADR-108, ADR-109, ADR-110 and ADR-111 unrewritten", () => {
+    // The same rule applied for the fourth time in this series: an accepted ADR
+    // is not edited into agreement with a later one. ADR-108's ceiling of four
+    // and ADR-109's "destinations, not permissions" are the record of what was
+    // true when each was signed.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions.slice(decisions.indexOf("## ADR-108"), decisions.indexOf("## ADR-109")))
+      .toMatch(/ceiling FOUR/i);
+    expect(decisions.slice(decisions.indexOf("## ADR-109"), decisions.indexOf("## ADR-110")))
+      .toMatch(/destinations, not permissions/i);
+    expect(adr()).toMatch(/ADR-108, ADR-109, ADR-110 and ADR-111 are \*\*not rewritten\*\*/);
+  });
+
+  it("restates four time requirements in place, with markers, and renumbers nothing", () => {
+    /*
+     * The traceability half. A correction that renumbered, reused or deleted an
+     * id would make every prior reference silently wrong — so the ids are
+     * asserted to still exist, to still be six, and to carry an explicit
+     * restatement marker naming the decision that moved them.
+     */
+    const prd = read(PRD);
+    for (const id of ["2N-TIME-002", "2N-TIME-004", "2N-TIME-005", "2N-TIME-006"]) {
+      expect(prd, `${id} is no longer declared`).toMatch(new RegExp(`- \\*\\*${id}:\\*\\*`));
+      const block = prd.slice(prd.indexOf(`- **${id}:**`));
+      const body = block.slice(0, block.indexOf("\n- **2N-"));
+      expect(body, `${id} is restated without saying so`).toMatch(/\(Restated by ADR-112/);
+      expect(body, `${id} must close baseline, not built`).toMatch(/\[BASELINE\]/);
+    }
+    // Untouched by the correction, and still obligations on unwritten code.
+    for (const id of ["2N-TIME-001", "2N-TIME-003"]) {
+      const block = prd.slice(prd.indexOf(`- **${id}:**`));
+      expect(block.slice(0, block.indexOf("\n- **2N-"))).toMatch(/\[OBLIGATION\]/);
+    }
+    expect(ids.filter((id) => id.startsWith("2N-TIME-"))).toHaveLength(6);
+  });
+
+  it("stops requiring a second timezone census, in the PRD and in the plan", () => {
+    // The substance of the correction: 2N.0 must not build a narrower guard
+    // beside the tree-wide one. Asserted in both documents because the plan is
+    // what an implementer reads.
+    const prd = read(PRD);
+    // Wrapped prose: the phrase spans a line break in the PRD, and an assertion
+    // that only matched it unwrapped would fail on correct text.
+    expect(prd).toMatch(/2N\.0 builds no timezone guard of its\s+own/i);
+    const plan = read(PLAN);
+    expect(plan, "the plan still lists the fixed-offset guard for corpus extension")
+      .not.toMatch(/phase-2m-fixed-offset-guard\.test\.ts\s*\n?\s*\(corpus extension/);
+    expect(plan).toMatch(/this slice now\s*\n?\s*extends no timezone guard at all|extends no timezone guard/i);
+  });
+
+  it("records the corrected population as 31 rather than the signed estimate", () => {
+    const prd = read(PRD);
+    const block = prd.slice(prd.indexOf("- **2N-TIME-005:**"));
+    const body = block.slice(0, block.indexOf("\n- **2N-"));
+    expect(body).toMatch(/\*\*31 occurrences/);
+    expect(body, "the correction must cite the clause that permits it")
+      .toMatch(/whichever is current/);
+  });
+
+  it("leaves the tree-wide guard at zero with no allowlist, which is what makes the correction safe", () => {
+    /*
+     * The correction's whole premise is that a tree-wide guard already covers
+     * this phase's directories. If that guard were weakened — its list
+     * re-populated, its corpus narrowed — the restatement would have removed one
+     * census and left nothing. Asserted here, in the phase's own guard, rather
+     * than trusted to the other file.
+     */
+    const guard = read("src/lib/closeout/local-day-correction-guard.test.ts");
+    expect(guard).toMatch(/export const OPEN_OCCURRENCES: readonly Exemption\[\] = \[\s*(?:\/\/[^\n]*\n\s*)*\];/);
+    expect(guard, "the tree-wide corpus stopped being the tree").toMatch(/walk\(join\(REPO, "src"\)\)/);
+  });
+
+  it("disposes both Unit 5 findings, one in scope and one out, neither silently", () => {
+    const prd = read(PRD);
+    expect(prd, "the loading-state locale defect is not carried by any requirement")
+      .toMatch(/loading\.tsx[\s\S]{0,400}2N-ACCESS-005/);
+    expect(prd, "the swallowed rejection is not recorded as a remainder")
+      .toMatch(/loadQuestionPreviews[\s\S]{0,400}Destination/);
+    // Out of scope is a claim about this phase's surfaces, so it is asserted
+    // against them rather than asserted about them.
+    expect(adr()).toMatch(/no instance of that pattern on any Phase 2N surface/i);
   });
 });
 
