@@ -98,6 +98,12 @@ test.describe("2N.0 — the contextual surfaces become governed, bounded and ide
     // One classified and one ordinary, on the same person and the same page.
     // The ordinary one is the control: if it were masked too, the assertions on
     // the classified one would pass for the wrong reason.
+    //
+    // `source_entry_id: null` is spelled out rather than omitted. PostgREST
+    // refuses a bulk insert whose rows carry different key sets — `PGRST102,
+    // "All object keys must match"` — because it builds one statement with one
+    // column list for the whole array. The explicit null is also the honest
+    // value: this memory genuinely has no source entry.
     const memories = await insert<{ id: string }>("memories", [
       {
         user_id: userId,
@@ -106,14 +112,30 @@ test.describe("2N.0 — the contextual surfaces become governed, bounded and ide
         person_id: person.id,
         source_entry_id: entry.id,
       },
-      { user_id: userId, content: ORDINARY_MEMORY, sensitivity: "normal", person_id: person.id },
+      {
+        user_id: userId,
+        content: ORDINARY_MEMORY,
+        sensitivity: "normal",
+        person_id: person.id,
+        source_entry_id: null,
+      },
     ]);
     secretMemoryId = memories[0].id;
 
     // `2N-IDENTITY-009`: one alias in force, one whose window has closed. The
     // expired one is what proves the window is applied rather than declared.
+    //
+    // `valid_to: null` for the same PostgREST reason as above, and it is what
+    // "in force" means here: an open-ended window, which `aliasIsInForce` reads
+    // as vacuously true.
     await insert("entity_aliases", [
-      { user_id: userId, entity_type: "person", entity_id: person.id, alias: ALIAS_IN_FORCE },
+      {
+        user_id: userId,
+        entity_type: "person",
+        entity_id: person.id,
+        alias: ALIAS_IN_FORCE,
+        valid_to: null,
+      },
       {
         user_id: userId,
         entity_type: "person",
