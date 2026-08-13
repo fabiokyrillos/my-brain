@@ -33,7 +33,26 @@ export function AppShell({
   );
 
   return (
-    <div className="app-frame">
+    /*
+     * `lang` is declared here, and it is load-bearing rather than decorative
+     * (`2N-ACCESS-003`, `2N-ACCESS-005`, ADR-112 Decision 7a).
+     *
+     * The root layout hardcodes `<html lang="pt-BR">` for every locale, because
+     * `src/app/layout.tsx` sits **above** `[locale]` and so never receives the
+     * segment. This is the first element below that point which knows the
+     * locale, so it is the first place the document can tell the truth about
+     * what language it is in — which a screen reader uses to pick a voice.
+     *
+     * It is also what makes `loading.tsx` localisable at all. An App Router
+     * `loading.tsx` **receives no props** — `node_modules/next/dist/docs/01-app/
+     * 03-api-reference/03-file-conventions/loading.md` states it outright:
+     * "Loading UI components do not accept any parameters." It has no `params`,
+     * so no locale. But it renders as this element's descendant, so the
+     * `[lang]` selectors in `navigation-performance.css` can resolve which of
+     * its two announcements applies, with no client JavaScript, no `headers()`
+     * read, and nothing awaited that would delay an instant fallback.
+     */
+    <div className="app-frame" lang={locale}>
       <aside className="side-rail">
         <Link href={`/${locale}/app`} className="brand" aria-label="My Brain">
           <span className="brand-mark">B</span>

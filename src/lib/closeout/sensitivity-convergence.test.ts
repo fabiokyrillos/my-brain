@@ -105,6 +105,91 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
     expect(callers).toEqual(["src/features/sensitivity/task-derivation.ts"]);
   });
 
+  it("the four contextual surfaces read the contract, through the same component (2N-PRIVACY-001)", () => {
+    /*
+     * `person`, `project`, `memory` and `file` joined `GOVERNED_SURFACES` in
+     * Phase 2N slice 2N.0, in the same change that shipped their first consumers
+     * — which `2N-PRIVACY-001` requires by name.
+     *
+     * These are the surfaces ADR-108's audit found rendering
+     * `entries.original_content`, task titles and memory bodies with **no
+     * classification applied at all**. The positive half matters more here than
+     * anywhere it has been asserted before, because each of these pages renders
+     * several *different kinds* of subject: the negative guard would pass for a
+     * page that masked its memories and kept printing its timeline.
+     *
+     * So every surface is named with the content it withholds, and the listing
+     * is asserted alongside the detail wherever both exist — the convergence
+     * `2N-PRIVACY-001` asks for, and the divergence slice 2L.1 found on Hoje.
+     */
+    for (const [file, description] of [
+      ["src/app/[locale]/app/people/[personId]/page.tsx", "person detail"],
+      ["src/app/[locale]/app/projects/[projectId]/page.tsx", "project detail"],
+      ["src/app/[locale]/app/memories/[memoryId]/page.tsx", "memory detail"],
+      ["src/app/[locale]/app/memories/page.tsx", "memory listing"],
+      ["src/app/[locale]/app/files/page.tsx", "file listing"],
+    ] as const) {
+      expect(code(file), `${description} does not mount ProtectedContent`).toMatch(/<ProtectedContent/);
+    }
+
+    // Each surface must ask as ITSELF. A page that passed `surface="work"` would
+    // mount the component, satisfy the assertion above, and be governed by
+    // another surface's rule.
+    expect(code("src/app/[locale]/app/people/[personId]/page.tsx")).toMatch(/surface="person"/);
+    expect(code("src/app/[locale]/app/projects/[projectId]/page.tsx")).toMatch(/surface="project"/);
+    expect(code("src/app/[locale]/app/memories/[memoryId]/page.tsx")).toMatch(/surface="memory"/);
+    expect(code("src/app/[locale]/app/memories/page.tsx")).toMatch(/surface="memory"/);
+    expect(code("src/app/[locale]/app/files/page.tsx")).toMatch(/surface="file"/);
+  });
+
+  it("keeps the four contextual rules in one place too, so no surface answers for itself", () => {
+    // The negative half for the surfaces added in 2N.0, in the shape `work` and
+    // `calendar` already have. Their literals live in `subject-derivation.ts`
+    // rather than `task-derivation.ts` because they answer a different question
+    // — a subject's own row, not a task's source — but the property is the same:
+    // exactly one module names each surface.
+    const walk = (dir: string, found: string[] = []): string[] => {
+      const absolute = join(REPO, dir);
+      for (const entry of readdirSync(absolute)) {
+        const full = join(absolute, entry);
+        if (statSync(full).isDirectory()) walk(join(dir, entry), found);
+        else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(join(dir, entry));
+      }
+      return found;
+    };
+    for (const surface of ["person", "project", "memory", "file"]) {
+      const callers = walk("src")
+        .filter((file) => new RegExp(`resolveContent\\(\\s*\\n?\\s*["']${surface}["']`).test(code(file)))
+        .map((file) => file.replace(/\\/g, "/"));
+      expect(callers, `${surface} is decided outside the derivation module`).toEqual([
+        "src/features/sensitivity/subject-derivation.ts",
+      ]);
+    }
+  });
+
+  it("carries the classification into the queries those surfaces read (2N-KNOWS-007)", () => {
+    /*
+     * The failure this catches is the quiet one: a page can mount
+     * `ProtectedContent` correctly and still render everything, if the column it
+     * derives from was never selected. The derivation would see an absent map,
+     * return the most protective level, and the page would mask EVERYTHING —
+     * which is safe but useless, and the opposite mistake (deriving from a
+     * source the query does not read) is what a fail-open version looks like.
+     */
+    expect(code("src/app/[locale]/app/people/[personId]/page.tsx")).toMatch(/is_retroactive,sensitivity/);
+    expect(code("src/app/[locale]/app/projects/[projectId]/page.tsx")).toMatch(/is_retroactive,sensitivity/);
+    expect(code("src/app/[locale]/app/memories/page.tsx")).toMatch(/source_entry_id,sensitivity/);
+    expect(code("src/app/[locale]/app/files/page.tsx")).toMatch(/processing_error,sensitivity/);
+    // And a task's level still comes from its source entry, which means the id
+    // has to travel with it.
+    for (const file of [
+      "src/app/[locale]/app/people/[personId]/page.tsx",
+      "src/app/[locale]/app/projects/[projectId]/page.tsx",
+    ]) {
+      expect(code(file)).toMatch(/due_at,source_entry_id/);
+    }
+  });
+
   it("Hoje withholds a protected task too, because Hoje renders task titles", () => {
     /*
      * Not in `2L-PRIVACY-007`'s enumeration, and it belongs there anyway.

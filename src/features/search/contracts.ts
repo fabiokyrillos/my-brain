@@ -85,6 +85,16 @@ export type DomainSpec = {
   readonly dateColumn: string;
   /** The `capabilities.ts` route this result opens. */
   readonly route: string;
+  /**
+   * The `entity_aliases.entity_type` this domain resolves nicknames through, or
+   * `null` where the table has no alias kind for it (`2N-IDENTITY-004`).
+   *
+   * Declared here rather than branched on in the query builder for the reason
+   * the whole map exists: a domain's search behaviour is data, so adding or
+   * removing alias resolution is a visible change to a constant rather than a
+   * condition somebody has to find.
+   */
+  readonly aliasEntityType: "context" | "organization" | "project" | "person" | null;
 };
 
 export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
@@ -97,6 +107,7 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: false,
     dateColumn: "created_at",
     route: "tasks",
+    aliasEntityType: null,
   },
   entries: {
     domain: "entries",
@@ -107,6 +118,7 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: true,
     dateColumn: "occurred_at",
     route: "inbox",
+    aliasEntityType: null,
   },
   memories: {
     domain: "memories",
@@ -117,16 +129,42 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: true,
     dateColumn: "created_at",
     route: "memories",
+    aliasEntityType: null,
   },
   people: {
     domain: "people",
     table: "people",
-    columns: ["name", "notes"],
+    /*
+     * `notes` LEAVES this domain — ADR-110 Decision 5, a deliberate, owner-signed
+     * narrowing of behaviour ADR-093 signed, not an accidental reopening
+     * (`2N-PRIVACY-006` exists to force exactly that distinction).
+     *
+     * `people.notes` is free text about a human being carrying **no
+     * classification of its own and no classifiable source**, on a table
+     * `2N-PRIVACY-003` forbids adding a `sensitivity` column to. Every other
+     * domain here either has no such field or has a `sensitivity` column that
+     * OD-1's predicate can act on; this one had neither, so a note was matched
+     * and snippeted at full length with nothing able to withhold it. That is the
+     * single most likely place in this product for something genuinely private
+     * about a named person, and `2N-PRIVACY-010` puts it out of search entirely.
+     *
+     * `snippetColumn` becomes `null` rather than moving to another column: the
+     * requirement forbids displaying the note on any indirect surface, and
+     * substituting a different free-text field would satisfy the letter of that
+     * while recreating the exposure one column over. A person result is a name.
+     *
+     * **The person stays findable.** ADR-110 Decision 5 keeps the name and the
+     * aliases searchable, and `aliasEntityType` below is what makes the second
+     * half true — masking a note never hides the person, their existence or
+     * their counts.
+     */
+    columns: ["name"],
     titleColumn: "name",
-    snippetColumn: "notes",
+    snippetColumn: null,
     hasSensitivity: false,
     dateColumn: "created_at",
     route: "people",
+    aliasEntityType: "person",
   },
   projects: {
     domain: "projects",
@@ -137,6 +175,9 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: false,
     dateColumn: "created_at",
     route: "projects",
+    // OD-2N-2 A: projects follow the same identity principle as people, so they
+    // resolve through the same alias mechanism rather than a second one.
+    aliasEntityType: "project",
   },
   organizations: {
     domain: "organizations",
@@ -147,6 +188,7 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: false,
     dateColumn: "created_at",
     route: "organizations",
+    aliasEntityType: null,
   },
   files: {
     domain: "files",
@@ -159,6 +201,7 @@ export const DOMAIN_SPECS: Readonly<Record<SearchDomain, DomainSpec>> = {
     hasSensitivity: true,
     dateColumn: "created_at",
     route: "files",
+    aliasEntityType: null,
   },
 };
 

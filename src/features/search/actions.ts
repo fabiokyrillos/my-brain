@@ -36,6 +36,7 @@
  * difference that would reveal what was excluded.
  */
 
+import { resolveAliasMatches } from "@/features/entities/aliases";
 import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/lib/preferences";
 
@@ -169,12 +170,35 @@ async function queryDomain(
     };
   };
 
+  /*
+   * `2N-IDENTITY-004` — a known nickname resolves to the person it names.
+   *
+   * Resolved before the domain query and folded into the same `or`, so an alias
+   * hit and a name hit produce **one** result set: a person matched both ways
+   * appears once, ordered and bounded with everybody else. A second query unioned
+   * afterwards would have needed its own bound and its own dedupe, and would have
+   * made `bounded` mean two different things in one outcome.
+   *
+   * This widens **which of the owner's rows match**, never which rows are
+   * visible: the ids come from an owner-scoped read under the same forced RLS as
+   * the query they feed, and they are matched against `id`, which the domain
+   * query already restricts to the caller's rows. A failed alias read yields no
+   * ids and therefore narrows nothing — search keeps working, minus nicknames.
+   */
+  const aliasIds = spec.aliasEntityType
+    ? await resolveAliasMatches(supabase, spec.aliasEntityType, query, new Date())
+    : [];
+  const columnFilter = buildOrFilter(spec, query);
+  const orFilter = aliasIds.length
+    ? `${columnFilter},id.in.(${aliasIds.join(",")})`
+    : columnFilter;
+
   // One extra row, so "there are more" is knowable without a second count
   // query — and without ever telling the user how many more.
   let builder = loose
     .from(spec.table)
     .select(`id, ${spec.columns.join(", ")}, ${spec.dateColumn}`)
-    .or(buildOrFilter(spec, query))
+    .or(orFilter)
     .order(spec.dateColumn, { ascending: false })
     .limit(PER_DOMAIN_LIMIT + 1);
 

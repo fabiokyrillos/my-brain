@@ -5,6 +5,10 @@ import {
   uploadAttachment,
 } from "@/features/agent/actions";
 import { JobRetryForm, UploadForm } from "@/features/agent/forms";
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import { boundedList, FAILED_JOB_LIMIT, withProbe } from "@/features/bounds/contracts";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
@@ -106,7 +110,10 @@ export default async function FilesPage({
     supabase
       .from("attachments")
       .select(
-        "id,storage_path,original_name,mime_type,size_bytes,status,description,processing_error,created_at",
+        // `sensitivity` joins this projection because `2N-PRIVACY-002` names file
+        // names as content the contract governs, and `attachments` has carried
+        // the column all along — the page simply never read it.
+        "id,storage_path,original_name,mime_type,size_bytes,status,description,processing_error,sensitivity,created_at",
       )
       .order("created_at", { ascending: false })
       .range(from, to),
@@ -118,16 +125,20 @@ export default async function FilesPage({
       .eq("type", "process_attachment")
       .in("status", ["failed", "exhausted"])
       .order("updated_at", { ascending: false })
-      .limit(20),
+      // This list was bounded at a bare 20 and said nothing. An owner with 30
+      // failed uploads saw 20 and was told the rest did not exist — on the one
+      // section of this page whose entire purpose is "these need your attention".
+      .limit(withProbe(FAILED_JOB_LIMIT)),
   ]);
 
   const paginated = paginateRows(
     requireSupabaseData(fileResult, "load files") ?? [],
   );
-  const failedJobs = (requireSupabaseData(
-    failedJobResult,
-    "load failed jobs",
-  ) ?? []) as FailedJob[];
+  const boundedFailedJobs = boundedList(
+    (requireSupabaseData(failedJobResult, "load failed jobs") ?? []) as FailedJob[],
+    FAILED_JOB_LIMIT,
+  );
+  const failedJobs = boundedFailedJobs.items;
   const ids = paginated.items.map((file) => file.id);
   const attachmentIdsByJob = new Map(
     failedJobs.map((job) => {
@@ -171,7 +182,7 @@ export default async function FilesPage({
       failedAttachmentIds.length
         ? supabase
             .from("attachments")
-            .select("id,original_name")
+            .select("id,original_name,sensitivity")
             .in("id", failedAttachmentIds)
         : { data: [], error: null },
     ]);
@@ -202,6 +213,12 @@ export default async function FilesPage({
       attachment.original_name,
     ]),
   );
+  // `2N-PRIVACY-001`/`-002`. Two maps rather than one, because they are read from
+  // two different queries with two different bounds — a failed job's attachment
+  // is often not on the current page, and merging them would make "absent" mean
+  // "not on this page" instead of "unreadable".
+  const fileLevels = readableLevelsOf(paginated.items);
+  const failedFileLevels = readableLevelsOf(failedAttachments);
   const rows = paginated.items.map((file) => ({
     ...file,
     url: urls.get(file.storage_path),
@@ -243,7 +260,21 @@ export default async function FilesPage({
               return (
                 <article className="failed-job" key={job.id}>
                   <div className="failed-job-copy">
-                    <strong>{originalName ?? copy.missingName}</strong>
+                    {/*
+                      A failed job names the file it failed on, so this row
+                      carries a file name too and obeys the same contract. When
+                      the attachment could not be read at all the copy already
+                      falls back to a generic label, which is `undetermined`'s
+                      rendering by another route — there is no name to withhold.
+                    */}
+                    <ProtectedContent
+                      locale={locale}
+                      revealKey={`failed-job-${job.id}`}
+                      sensitivity={deriveSubjectSensitivity(attachmentId ?? null, failedFileLevels)}
+                      surface="file"
+                    >
+                      <strong>{originalName ?? copy.missingName}</strong>
+                    </ProtectedContent>
                     <span className={terminal ? "terminal" : "recoverable"}>
                       {terminal ? copy.exhausted : copy.recoverable}
                     </span>
@@ -268,6 +299,7 @@ export default async function FilesPage({
               );
             })}
           </div>
+          <BoundedNotice list={boundedFailedJobs} locale={locale} />
         </section>
       )}
 
@@ -277,16 +309,31 @@ export default async function FilesPage({
             <article className="file-card" key={file.id}>
               <header>
                 <div>
-                  <strong>{file.original_name}</strong>
-                  <p>
-                    {file.analysis?.description ??
-                      file.description ??
-                      `${file.mime_type} · ${(
-                        Number(file.size_bytes) /
-                        1024 /
-                        1024
-                      ).toFixed(2)} MB`}
-                  </p>
+                  {/*
+                    The name and the description are withheld together, under one
+                    control. They are the same fact about the same file — the
+                    name the owner uploaded and the model's summary of what is
+                    inside it — so two separate reveals would ask the user to
+                    make one decision twice. The size and MIME fallback is not
+                    file content and is not withheld.
+                  */}
+                  <ProtectedContent
+                    locale={locale}
+                    revealKey={`file-${file.id}`}
+                    sensitivity={deriveSubjectSensitivity(file.id, fileLevels)}
+                    surface="file"
+                  >
+                    <strong>{file.original_name}</strong>
+                    <p>
+                      {file.analysis?.description ??
+                        file.description ??
+                        `${file.mime_type} · ${(
+                          Number(file.size_bytes) /
+                          1024 /
+                          1024
+                        ).toFixed(2)} MB`}
+                    </p>
+                  </ProtectedContent>
                 </div>
                 <div className="list-meta">
                   <span className={`status-badge ${file.status}`}>
@@ -314,7 +361,21 @@ export default async function FilesPage({
                   {file.analysis.extracted_text && (
                     <div>
                       <h3>{copy.extractedText}</h3>
-                      <p>{file.analysis.extracted_text}</p>
+                      {/*
+                        Text lifted out of the document itself — the most
+                        content-bearing thing on this page. Withheld under its
+                        own control rather than the header's, because opening the
+                        disclosure and revealing the text are two separate acts
+                        and the second is the one that exposes the document.
+                      */}
+                      <ProtectedContent
+                        locale={locale}
+                        revealKey={`file-text-${file.id}`}
+                        sensitivity={deriveSubjectSensitivity(file.id, fileLevels)}
+                        surface="file"
+                      >
+                        <p>{file.analysis.extracted_text}</p>
+                      </ProtectedContent>
                     </div>
                   )}
                   {[

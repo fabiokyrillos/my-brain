@@ -94,6 +94,40 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
  * unconfirmed extracted date is a date — so neither needs a rule here, and
  * inventing one would suggest a protection that is not being performed.
  */
+/**
+ * `person`, `project`, `memory` and `file` arrive in Phase 2N slice 2N.0
+ * (`2N-PRIVACY-001`, OD-2N-12 **option A**), and they are the surfaces this
+ * contract was written to reach.
+ *
+ * ADR-108's audit found the divergence intact one domain over: the contextual
+ * pages render `entries.original_content`, task titles and memory bodies with
+ * **no classification applied at all**, and `src/features/entities/**` appeared
+ * in no sensitivity reader. That is the same "two surfaces of one product meant
+ * two answers" the module header describes, surviving in the four places a user
+ * goes to read about a *person*.
+ *
+ * Two properties are specific to these four and worth stating where the rule
+ * lives.
+ *
+ * **The subject's classification is its own, not a task's.** `entries`,
+ * `memories` and `attachments` each carry a `sensitivity` column, so
+ * `subject-derivation.ts` reads the row rather than chasing a source — but it
+ * keeps the same three-arm answer, because a row the query could not return is
+ * still a row this must not print. Tasks rendered on these pages keep deriving
+ * through `task-derivation.ts`; nothing is classified twice.
+ *
+ * **One field on these surfaces has no classification available at all.**
+ * `people.notes` is free text about a human being, with no `sensitivity` column
+ * and no classifiable source. ADR-110 Decision 4 masks it by default, and
+ * `deriveFreeTextSensitivity` resolves it to the most protective level rather
+ * than to `undetermined` — the arm that renders in the clear.
+ *
+ * `graph` is deliberately **absent**. `2N-PRIVACY-001` admits a surface "in the
+ * same change that ships their first governed consumer", and 2N.0 ships no
+ * graph. Adding it here would create a governed surface no one reads — a
+ * producer with no consumer, which this repository has already paid for twice.
+ * It joins in 2N.6, with its consumer, or not at all.
+ */
 export const GOVERNED_SURFACES = [
   "hoje",
   "attention",
@@ -103,6 +137,10 @@ export const GOVERNED_SURFACES = [
   "chat",
   "work",
   "calendar",
+  "person",
+  "project",
+  "memory",
+  "file",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -156,6 +194,17 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   // outcome than a masked title and is also a lie about their own data. The row
   // keeps its lane, its instant and its position; the words do not.
   calendar: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  // The four contextual surfaces take the identical posture, and their sameness
+  // is the point rather than a copy-paste. `2N-PRIVACY-004` requires counts
+  // computed over everything the user owns, and `2N-PRIVACY-005` requires
+  // sensitive rows masked **in position** and not dropped — so a person page
+  // that hid three memories would report a count that matches nothing the user
+  // can see, and the gap between the number and the rows is itself the oracle
+  // OD-2J-1 refuses. A masked row keeps the count honest and says nothing.
+  person: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  project: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  memory: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  file: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

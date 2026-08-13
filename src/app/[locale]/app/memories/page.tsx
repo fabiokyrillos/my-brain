@@ -7,6 +7,8 @@ import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { asMemoryKind } from "@/features/memories/read";
 import { createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
@@ -48,7 +50,11 @@ export default async function MemoriesPage({
 
   const result = await supabase
     .from("memories")
-    .select("id,content,kind,important,person_id,project_id,source_entry_id,valid_from,valid_until,updated_at")
+    // `sensitivity` joins this projection so the list can obey the same contract
+    // the detail page does. Without it, a memory the owner classified would be
+    // masked on its own page and printed in full in the list that links to it —
+    // the divergence `2N-PRIVACY-001` exists to end.
+    .select("id,content,kind,important,person_id,project_id,source_entry_id,sensitivity,valid_from,valid_until,updated_at")
     .order("important", { ascending: false })
     .order("updated_at", { ascending: false })
     .range(from, to);
@@ -57,6 +63,7 @@ export default async function MemoriesPage({
   // One clock for the whole render, so two rows cannot disagree about whether
   // the same instant has passed.
   const now = new Date();
+  const memoryLevels = readableLevelsOf(items);
 
   return (
     <div className="content-page">
@@ -85,10 +92,27 @@ export default async function MemoriesPage({
           {items.map((memory) => {
             const state = memoryLifecycleState(memory, now);
             const related = memory.person_id !== null || memory.project_id !== null;
+            const href = `/${locale}/app/memories/${memory.id}`;
             return (
-              <Link className="list-row memory-row" href={`/${locale}/app/memories/${memory.id}`} key={memory.id}>
+              /*
+                A `div` rather than a `Link` wrapping the whole row, because the
+                reveal control is a `<button>` and a button inside an anchor is
+                invalid markup that gives the row two conflicting activations.
+                The Work list hit this exact problem first and answered it the
+                same way: `ProtectedContent` carries the `href`, so the title —
+                masked or not — is what opens the memory.
+              */
+              <div className="list-row memory-row" key={memory.id}>
                 <div className="list-row-main">
-                  <strong>{memory.content}</strong>
+                  <ProtectedContent
+                    href={href}
+                    locale={locale}
+                    revealKey={`memory-row-${memory.id}`}
+                    sensitivity={deriveSubjectSensitivity(memory.id, memoryLevels)}
+                    surface="memory"
+                  >
+                    <Link href={href}><strong>{memory.content}</strong></Link>
+                  </ProtectedContent>
                   <p>
                     {copy.kinds[asMemoryKind(memory.kind)]}
                     {related ? (
@@ -104,9 +128,11 @@ export default async function MemoriesPage({
                       between a memory the assistant is using and one it is not. */}
                   <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
                   {memory.important ? <span className="status-badge">{copy.importantBadge}</span> : null}
-                  <ChevronRight aria-hidden="true" className="memory-row-chevron" size={16} />
+                  <Link aria-label={copy.title} className="memory-row-chevron-link" href={href}>
+                    <ChevronRight aria-hidden="true" className="memory-row-chevron" size={16} />
+                  </Link>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -310,3 +310,13 @@
   font: inherit;
   font-weight: 400;
 }
+
+/* 2N-PERSON-003, 2N-PROJECT-006, 2N-KNOWS-008 — the bounded-list notice.
+   Rendered only when a list is actually bounded, so it stays meaningful; a banner
+   that is always present is one users stop reading. */
+.bounded-notice {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}

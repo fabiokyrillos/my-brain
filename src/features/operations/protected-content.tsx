@@ -36,6 +36,12 @@ import { useState, type ReactNode } from "react";
 
 import { NO_REVEALS } from "@/features/sensitivity/contracts";
 import {
+  resolveFileContent,
+  resolveMemoryContent,
+  resolvePersonContent,
+  resolveProjectContent,
+} from "@/features/sensitivity/subject-derivation";
+import {
   resolveCalendarContent,
   resolveTaskContent,
   type TaskSensitivity,
@@ -54,12 +60,29 @@ import { getWorkCopy } from "./copy";
  * `task-derivation.ts` and nowhere else — while the mask, the reveal and the
  * accessible name stay identical, which is what makes "a masked title looks the
  * same everywhere" true rather than a coincidence.
+ *
+ * `2N-PRIVACY-001`/`-002` add the four contextual surfaces, through this same
+ * component and for a sharper version of the same reason. Those surfaces render
+ * **more than one kind of subject each** — a person page shows entries, memories
+ * and task titles together — so "each surface remembers the rule" would have
+ * meant each surface remembering it several times. Here it is asked once per
+ * item, and `sensitivity-convergence.test.ts` fails if a contextual page renders
+ * classified content without going through this.
+ *
+ * The two derivations feeding it stay separate, because they answer different
+ * questions: a task's level comes from its source entry (`task-derivation.ts`),
+ * a subject's from its own row (`subject-derivation.ts`). Both produce the same
+ * three-arm value, which is why one component can consume either.
  */
-export type ProtectedSurface = "work" | "calendar";
+export type ProtectedSurface = "work" | "calendar" | "person" | "project" | "memory" | "file";
 
 const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
   work: resolveTaskContent,
   calendar: resolveCalendarContent,
+  person: resolvePersonContent,
+  project: resolveProjectContent,
+  memory: resolveMemoryContent,
+  file: resolveFileContent,
 };
 
 export function ProtectedContent({
