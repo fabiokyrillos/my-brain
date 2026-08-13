@@ -327,6 +327,14 @@ test.describe("2N.3 M1 — the Brain says where a memory came from, and stops us
         const wide = await retrieve(20);
         expect(wide.map((row) => row.content)).not.toContain(candidateText);
         expect(wide.map((row) => row.content), "the live memory vanished too").toContain(liveText);
+
+        // Reentry: the state is a property of the row, not of the form's
+        // in-memory result. A fresh request must reach the same conclusion, or
+        // the badge was optimistic rather than read.
+        await page.reload();
+        await expect(page.locator("body")).toContainText(candidateText);
+        await expect(page.locator("body")).toContainText(copy.archivedState);
+        await expect(page.locator("body")).toContainText(copy.retrievalArchived);
       } finally {
         /*
          * Removed by EXPLICIT ID, and in a `finally` so a failed run cleans up
