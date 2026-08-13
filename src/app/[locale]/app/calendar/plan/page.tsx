@@ -84,7 +84,7 @@ export default async function PlannerPage({
        */
       action={applyTaskDetailCommand}
       bulkAction={applyBulkWorkCommand}
-      dateBounds={dateBounds(now)}
+      dateBounds={dateBounds(now, timezone)}
       dayHrefBase={`/${locale}/app/calendar/plan`}
       locale={locale}
       projection={projection}

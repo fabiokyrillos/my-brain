@@ -92,7 +92,7 @@ export default async function CalendarPage({
          * `src/features/calendar/` writes to `tasks`, and the direct-write guard's
          * empty `tasks` allowlist is what keeps that true rather than customary.
          */
-        dateBounds={dateBounds(now)}
+        dateBounds={dateBounds(now, timezone)}
         locale={locale}
         projection={projection}
         query={query}

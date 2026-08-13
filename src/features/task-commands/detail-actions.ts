@@ -31,6 +31,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -39,7 +40,7 @@ import {
   recordProductEvent,
 } from "@/features/product-analytics/server";
 import { requireUser } from "@/lib/auth/require-user";
-import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
+import { locales, resolveLocale, type Locale } from "@/lib/preferences";
 
 import { buildTaskCommandAppliedProperties } from "./analytics";
 import { TaskCommandApplyError } from "./apply";
@@ -118,16 +119,6 @@ function settled(
       partial.announcement
       ?? [partial.heading, partial.detail, partial.reason].filter(Boolean).join(". "),
   };
-}
-
-function isValidTimeZone(value: unknown): value is string {
-  if (typeof value !== "string" || value === "") return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** One rendered sentence per refusal kind, from the two copy modules that own them. */
@@ -270,15 +261,24 @@ export async function applyTaskDetailCommand(
   // what `2026-08-15` means, so a zone this process guessed would silently move
   // the user's due date.
   const profile = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-  const timeZone = isValidTimeZone(profile.data?.timezone)
-    ? profile.data.timezone
-    : defaultAgentPreferences.timezone;
+  const timeZone = resolveOwnerTimeZone(profile.data?.timezone);
 
   const nowMs = Date.now();
-  // The submitted value becomes a patch against the caller's *own* today, so a
-  // picker bounded in one timezone is judged in the same one.
-  const today = new Date(new Date(nowMs).toLocaleString("en-US", { timeZone }));
-  const patch = buildDetailPatch(control, request.value, today);
+  /*
+   * The submitted value becomes a patch against the caller's *own* today, so a
+   * picker bounded in one timezone is judged in the same one.
+   *
+   * `LDC-MISC-001`. This used to be
+   * `new Date(new Date(nowMs).toLocaleString("en-US", { timeZone }))` — the
+   * round-trip that formats an instant in the target zone and re-parses the
+   * string with the **host's** parser, manufacturing a `Date` whose host-zone
+   * fields mimic the target zone's wall clock. It carries a zone and is still
+   * wrong in kind: the resulting value is a different instant, and it depends on
+   * `toLocaleString`'s output being parseable, which is true in V8 and is not
+   * guaranteed. The instant and the zone now travel separately, which is what
+   * they are.
+   */
+  const patch = buildDetailPatch(control, request.value, new Date(nowMs), timeZone);
   if (patch.status === "refused") {
     return settled({
       status: "refused",

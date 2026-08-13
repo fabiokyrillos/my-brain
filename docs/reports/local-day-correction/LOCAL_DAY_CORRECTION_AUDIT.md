@@ -152,8 +152,19 @@ zone, and wrong where the inbox and attention projections never reason about day
 A sixth, unnamed copy is also recorded here: `work-projection.ts:166` implements
 `resolveOwnerTimeZone`'s exact logic **inline** (`isSupportedTimeZone(...) ? ... :
 defaultAgentPreferences.timezone`). It is correct, so it is not a defect and
-`DUPLICATE_ZONE_RESOLVERS` does not name it — that list enumerates *declarations*. Unit 4 folds it
-into the resolver for reuse.
+`DUPLICATE_ZONE_RESOLVERS` does not name it — that list enumerates *declarations*.
+
+**Unit 4b consolidated all four**, and found a seventh reader that is deliberately **not**
+consolidated. `requireProfileTimeZone` in `calendar-projection.ts:189` **throws** on an unsupported
+zone instead of falling back. That is not a fifth copy; it is the correct posture for a surface that
+*computes* days rather than rendering them, and it is precisely the argument `local-day.ts` makes for
+its own refusal to default a zone: a day nobody could compute must be **reported rather than
+answered**, because the alternative is a plausible wrong answer at 23:00.
+
+`resolveOwnerTimeZone` is total for the opposite reason — it serves rendering, where falling back to
+the declared default beats taking down a page whose content is elsewhere. **Two postures, each
+stated, rather than one rule applied inconsistently.** The guard asserts the strict reader stays
+strict.
 
 ## 5. Stop conditions — none encountered
 

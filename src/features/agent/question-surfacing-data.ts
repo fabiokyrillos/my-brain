@@ -1,6 +1,6 @@
 import "server-only";
 import { localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-date";
-import { resolveProfileTimezone } from "@/features/daily-cycle/review-projection";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import type { createClient } from "@/lib/supabase/server";
 import { actionablePendingQuestionFilter } from "./question-visibility";
 import { decideQuestionSurfacing, type QuestionSurfacingDecision } from "./question-surfacing";
@@ -76,7 +76,7 @@ export async function loadQuestionSurfacingDecision(
     if (openQuestionCount <= 0) return suppressedDecision();
 
     const preferences = preferencesResult.data;
-    const timezone = resolveProfileTimezone(
+    const timezone = resolveOwnerTimeZone(
       (profileResult.data as { timezone?: unknown } | null)?.timezone,
     );
 

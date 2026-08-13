@@ -9,7 +9,7 @@ import { loadResolvedQuestions } from "@/features/agent/question-outcome-project
 import { QuestionPreviewPanels } from "@/features/agent/question-preview-panels";
 import { loadQuestionPreviews, type QuestionPreview } from "@/features/agent/question-preview-projection";
 import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
-import { resolveProfileTimezone } from "@/features/daily-cycle/review-projection";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { withAgentName } from "@/lib/agent-name";
@@ -95,7 +95,7 @@ export default async function QuestionsPage({ params, searchParams }: { params: 
     supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle(),
   ]);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load pending questions") ?? []);
-  const timezone = resolveProfileTimezone(
+  const timezone = resolveOwnerTimeZone(
     (requireSupabaseData(profileResult, "load questions profile timezone") as { timezone?: unknown } | null)?.timezone,
   );
   // Slice 2D.3 — one owner-scoped, strictly read-only batch that yields the

@@ -52,6 +52,7 @@
  */
 
 import { useState } from "react";
+import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-day";
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
 import { BulkBar, type BulkCommandHandler } from "@/features/operations/bulk-bar";
@@ -326,7 +327,18 @@ export function PlannerView({
  * is is the defect slice 2M.0 removed from two other places.
  */
 function shiftDay(day: string, delta: number): string {
-  const [year, month, date] = day.split("-").map(Number);
-  const shifted = new Date(Date.UTC(year, month - 1, date + delta));
-  return shifted.toISOString().slice(0, 10);
+  /*
+   * `LDC-MISC-001`. This was already **correct** — `Date.UTC(y, m, d + delta)`
+   * is civil-date arithmetic and DST-safe, and `2M-TIME-007` recorded it as such
+   * and deliberately left it alone.
+   *
+   * It moves onto the contract anyway, for one reason: it was the last
+   * `toISOString().slice(0, 10)` in the tree, and with it gone that family
+   * reaches zero **with no exemption**. A family at zero needs no allowlist, and
+   * an allowlist is the thing a later author widens. A correct second
+   * implementation of calendar arithmetic is also still a second one.
+   */
+  const parsed = parseLocalDate(day);
+  if (parsed === null) return day;
+  return formatLocalDate(addLocalDays(parsed, delta));
 }

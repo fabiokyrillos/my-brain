@@ -13,6 +13,7 @@
  */
 
 import type { TaskCommandPatch } from "./schema";
+import { addLocalDays, formatLocalDate, localDateOf } from "@/lib/time/local-day";
 import {
   TASK_COMMAND_ACTIONS,
   actionPolicy,
@@ -138,12 +139,24 @@ export function detailControlsFor(status: string): readonly DetailControl[] {
  */
 export const MAX_RELATIVE_DAYS = 730;
 
-export function dateBounds(today: Date): { readonly min: string; readonly max: string } {
-  const day = 24 * 60 * 60 * 1000;
-  const iso = (value: Date) => value.toISOString().slice(0, 10);
+/**
+ * The picker's `min`/`max`, as the owner's calendar dates.
+ *
+ * `LDC-MISC-001`. This used to add `MAX_RELATIVE_DAYS * 24h` to an instant and
+ * slice the **UTC** date off the result, which is wrong twice over: a day is not
+ * always 24 hours, and the UTC calendar date is the owner's only by coincidence.
+ * Both errors are at most a day at a ±730-day bound, so no user ever saw a wrong
+ * date from it — it is corrected because it was a second implementation of
+ * calendar arithmetic, not because it was visibly misbehaving.
+ *
+ * `addLocalDays` shifts the **date**, never the instant, so a transition inside
+ * the two-year window cannot move the bound.
+ */
+export function dateBounds(now: Date, timeZone: string): { readonly min: string; readonly max: string } {
+  const today = localDateOf(now, timeZone);
   return {
-    min: iso(new Date(today.getTime() - MAX_RELATIVE_DAYS * day)),
-    max: iso(new Date(today.getTime() + MAX_RELATIVE_DAYS * day)),
+    min: formatLocalDate(addLocalDays(today, -MAX_RELATIVE_DAYS)),
+    max: formatLocalDate(addLocalDays(today, MAX_RELATIVE_DAYS)),
   };
 }
 
@@ -164,10 +177,10 @@ function isRealCalendarDay(match: RegExpExecArray): boolean {
   return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-export function isSubmittableDate(value: string, today: Date): boolean {
+export function isSubmittableDate(value: string, now: Date, timeZone: string): boolean {
   const match = CALENDAR_DATE.exec(value);
   if (match === null || !isRealCalendarDay(match)) return false;
-  const bounds = dateBounds(today);
+  const bounds = dateBounds(now, timeZone);
   return value >= bounds.min && value <= bounds.max;
 }
 
@@ -206,7 +219,8 @@ export type DetailPatchResult =
 export function buildDetailPatch(
   control: DetailControl,
   value: string | undefined,
-  today: Date,
+  now: Date,
+  timeZone: string,
 ): DetailPatchResult {
   // An `immediate` control fills nothing, so a value arriving with one is
   // discarded rather than refused: `clear_due` means the same thing whatever
@@ -221,7 +235,7 @@ export function buildDetailPatch(
     if (match === null || !isRealCalendarDay(match)) {
       return { status: "refused", reason: "date_invalid" };
     }
-    if (!isSubmittableDate(trimmed, today)) {
+    if (!isSubmittableDate(trimmed, now, timeZone)) {
       return { status: "refused", reason: "date_out_of_range" };
     }
   }

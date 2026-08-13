@@ -159,27 +159,17 @@ export type Exemption = {
 };
 
 export const OPEN_OCCURRENCES: readonly Exemption[] = [
-  // Unit 2 — DISCHARGED. The four Phase 2M carried past its own close now render
-  // in the owner's zone through `formatInstant`, and Phase 2M's
-  // `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` list is empty and retired with them.
-
-  // Unit 3 — DISCHARGED. The seven contextual call sites now stamp through the
-  // contract, six of them from `getOwnerTimeZone()` and the entry detail from
-  // the zone its own projection already carried.
-
-  // Unit 4 — agent, search, shell, conversation sources, and the three families
-  // the census surfaced beyond the seventeen formatters.
-  // Unit 4a — DISCHARGED. All SEVENTEEN formatters are now at zero tree-wide.
-
-  { file: "src/features/agent/actions.ts", family: "host-zone-field", count: 7, unit: 4 },
-  { file: "src/features/agent/actions.ts", family: "utc-day-slice", count: 2, unit: 4 },
-  { file: "src/features/planning/planner-view.tsx", family: "utc-day-slice", count: 1, unit: 4 },
-  { file: "src/features/task-commands/detail-controls.ts", family: "utc-day-slice", count: 1, unit: 4 },
-
-  { file: "src/features/byok/credential-panel.tsx", family: "zone-round-trip", count: 1, unit: 4 },
-  { file: "src/features/operations/actions.ts", family: "zone-round-trip", count: 1, unit: 4 },
-  { file: "src/features/task-commands/detail-actions.ts", family: "zone-round-trip", count: 1, unit: 4 },
+  // EMPTY. All thirty-one occurrences the census found are repaired: seventeen
+  // formatters (Units 2, 3 and 4a), seven host-zone field operations, four UTC
+  // day slices and three zone round-trips (Unit 4b).
+  //
+  // The list stays because the rule that empties it is the rule that keeps it
+  // empty: every entry had to STILL hold its exact count, so a repair failed the
+  // build until its row came out. A new occurrence anywhere in `src/` now fails
+  // the corpus scan with a budget of zero, and adding a row here to make that
+  // pass is the one move this file exists to make visible.
 ];
+
 
 /**
  * Every module that decides for itself whether a zone is usable.
@@ -197,11 +187,11 @@ export const OPEN_OCCURRENCES: readonly Exemption[] = [
  * consolidation that half-happens.
  */
 export const DUPLICATE_ZONE_RESOLVERS: readonly { readonly file: string; readonly symbol: string }[] = [
-  { file: "src/features/operations/actions.ts", symbol: "isValidTimeZone" },
-  { file: "src/features/task-commands/actions.ts", symbol: "isValidTimeZone" },
-  { file: "src/features/task-commands/detail-actions.ts", symbol: "isValidTimeZone" },
-  { file: "src/features/daily-cycle/review-projection.ts", symbol: "resolveProfileTimezone" },
+  // EMPTY. The three byte-identical `isValidTimeZone` predicates and
+  // `resolveProfileTimezone` are gone; every caller resolves through
+  // `resolveOwnerTimeZone`.
 ];
+
 
 function walk(directory: string, found: string[] = []): string[] {
   for (const entry of readdirSync(directory)) {
@@ -278,32 +268,29 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     }
   });
 
-  it("records what the census found, so the list cannot shrink by editing", () => {
-    // The seventeen formatters in sixteen files, and the three further families.
-    // These totals are the initiative's baseline; they go to zero and the
-    // assertions below go with them.
-    const formatters = OPEN_OCCURRENCES.filter((e) => e.family === "formatter-without-zone");
-    // 17 across 16 files at the census. Units 2, 3 and 4a repaired all of them.
-    expect(formatters.reduce((sum, e) => sum + e.count, 0), "all seventeen are repaired").toBe(0);
-    expect(new Set(formatters.map((e) => e.file)).size).toBe(0);
+  it("is empty, and every family is at zero tree-wide", () => {
+    /*
+     * The closing state. The census found **thirty-one** occurrences across four
+     * families; all thirty-one are repaired, so this list is empty and every
+     * per-file budget above is zero.
+     *
+     * The assertion is not "the list is empty" alone — an empty list is also
+     * what deleting the rule produces. It is empty **and** the corpus scan above
+     * ran over four hundred files with a budget of zero for every family, which
+     * is what makes the emptiness mean something.
+     */
+    expect(OPEN_OCCURRENCES, "an occurrence is open again").toEqual([]);
+    expect(corpus.length, "the corpus collapsed, so zero would be trivially true")
+      .toBeGreaterThan(400);
 
-    const byUnit = (unit: number) =>
-      OPEN_OCCURRENCES.filter((e) => e.unit === unit).reduce((sum, e) => sum + e.count, 0);
-    expect(byUnit(2), "Unit 2 discharged the four daily-cycle formatters").toBe(0);
-    expect(byUnit(3), "Unit 3 discharged the contextual pages").toBe(0);
-    // Six formatters, plus the three families the census surfaced beyond them:
-    // seven host-zone field operations in one review computation, four UTC day
-    // slices, three zone round-trips.
-    expect(byUnit(4), "Unit 4a discharged the formatters; 4b owns the three further families").toBe(14);
-
-    const byFamily = (family: HazardFamily) =>
-      OPEN_OCCURRENCES.filter((e) => e.family === family).reduce((sum, e) => sum + e.count, 0);
-    expect(byFamily("host-zone-field")).toBe(7);
-    expect(byFamily("utc-day-slice")).toBe(4);
-    expect(byFamily("zone-round-trip")).toBe(3);
-    // 31 at the census, less the seventeen formatters. This reaches 0 in Unit 4b.
-    expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's remaining debt").toBe(14);
+    // Non-vacuity: the detector still finds each family when one is present.
+    // Without this, emptiness could equally mean the patterns stopped matching.
+    expect(occurrences('new Intl.DateTimeFormat(locale, { dateStyle: "short" })', "formatter-without-zone")).toHaveLength(1);
+    expect(occurrences("at.getDate()", "host-zone-field")).toHaveLength(1);
+    expect(occurrences("at.toISOString().slice(0, 10)", "utc-day-slice")).toHaveLength(1);
+    expect(occurrences("at.toLocaleDateString(locale)", "zone-round-trip")).toHaveLength(1);
   });
+
 });
 
 describe("LDC-CONTRACT-001: the zone is decided in one place, and the copies are counted", () => {
@@ -329,29 +316,46 @@ describe("LDC-CONTRACT-001: the zone is decided in one place, and the copies are
     ).toEqual(expected.sort());
   });
 
-  it("keeps each duplicate listed exactly as long as it exists", () => {
-    // The same two-directional honesty the occurrence list has: a copy that is
-    // gone fails here until its row is deleted.
-    for (const entry of DUPLICATE_ZONE_RESOLVERS) {
-      expect(
-        read(entry.file),
-        `${entry.symbol} is gone from ${entry.file} — remove the row from DUPLICATE_ZONE_RESOLVERS`,
-      ).toMatch(new RegExp(`function\\s+${entry.symbol}\\b`));
+  it("has the four copies actually gone from the files that held them", () => {
+    /*
+     * Emptying the list proves nothing on its own, so the four files are checked
+     * directly: the symbol must be absent, and the file must reach the resolver
+     * instead. A consolidation that deleted the list and left the copies would
+     * fail here.
+     */
+    const consolidated = [
+      { file: "src/features/operations/actions.ts", symbol: "isValidTimeZone" },
+      { file: "src/features/task-commands/actions.ts", symbol: "isValidTimeZone" },
+      { file: "src/features/task-commands/detail-actions.ts", symbol: "isValidTimeZone" },
+      { file: "src/features/daily-cycle/review-projection.ts", symbol: "resolveProfileTimezone" },
+    ];
+    for (const { file, symbol } of consolidated) {
+      const code = read(file);
+      expect(code, `${symbol} still declared in ${file}`).not.toMatch(new RegExp(`function\s+${symbol}\b`));
+      expect(code, `${file} does not use the resolver`).toContain("resolveOwnerTimeZone");
     }
-    expect(DUPLICATE_ZONE_RESOLVERS.length, "four copies, until Unit 4 removes them").toBe(4);
+    expect(DUPLICATE_ZONE_RESOLVERS).toEqual([]);
   });
 
-  it("has the fourth copy be the loosest, which is why counting them mattered", () => {
-    // `resolveProfileTimezone` is not an `isValidTimeZone` clone: it is a
-    // resolver with its own hardcoded default, and it accepts a bare
-    // abbreviation that carries no DST rule. Asserted so the difference is not
-    // rediscovered during the consolidation.
-    const source = read("src/features/daily-cycle/review-projection.ts");
-    expect(source).toMatch(/return "America\/Sao_Paulo";/);
-    expect(source, "it validates by construction alone, with no IANA-shape rule").not.toMatch(
-      /includes\("\/"\)/,
-    );
+  it("keeps the calendar's strict reader, which is a posture rather than a copy", () => {
+    /*
+     * `requireProfileTimeZone` in `calendar-projection.ts` is NOT a fifth copy and
+     * is deliberately left alone. It **throws** on an unsupported zone instead of
+     * falling back, and that is the right posture for a surface that *computes*
+     * days: `local-day.ts`'s own comment argues a day nobody could compute must
+     * be reported rather than answered, because the alternative is a plausible
+     * wrong answer at 23:00.
+     *
+     * `resolveOwnerTimeZone` is total because it serves *rendering*, where a
+     * fallback beats a crashed page. Two postures, stated — not one rule applied
+     * inconsistently.
+     */
+    const calendar = read("src/features/calendar/calendar-projection.ts");
+    expect(calendar).toMatch(/function requireProfileTimeZone/);
+    expect(calendar, "the strict reader stopped being strict").toContain("throw new Error(`unsupported time zone");
+    expect(calendar).toContain("isSupportedTimeZone");
   });
+
 });
 
 describe("LDC-GUARD-001: the detector fires on each family, and stays silent beside it", () => {

@@ -49,7 +49,7 @@ function renderPanel(
   const interpretPendingAction = vi.fn(async () => ({ status: "idle" }) as ByokActionState);
 
   render(
-    <CredentialPanel
+    <CredentialPanel timeZone="America/Sao_Paulo"
       credential={credential}
       interpretPendingAction={interpretPendingAction}
       locale="en"

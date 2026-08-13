@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import type { EntryExtraction } from "@/lib/ai/extraction-schema";
 import type { CandidateResolutionHistoryItem, InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
@@ -356,7 +357,7 @@ export async function loadEntryReviewProjection(
     candidateResolutionHistory: data.candidateResolutionHistory,
     unavailableCandidateIndexes: data.unavailableCandidateIndexes,
     locale,
-    timezone: resolveProfileTimezone(profile?.timezone),
+    timezone: resolveOwnerTimeZone(profile?.timezone),
     relationOptions,
     lifecycle: {
       entryLifecycle: data.entry.status,
@@ -369,17 +370,4 @@ export async function loadEntryReviewProjection(
       now: new Date().toISOString(),
     },
   });
-}
-
-export function resolveProfileTimezone(value: unknown): string {
-  if (typeof value === "string") {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: value }).format(0);
-      return value;
-    } catch {
-      // Fall through to the same default used by profile settings.
-    }
-  }
-
-  return "America/Sao_Paulo";
 }
