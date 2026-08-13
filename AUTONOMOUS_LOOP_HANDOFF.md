@@ -4919,8 +4919,8 @@ A13 still guarding the roadmap successor. Slices 2N.2–2N.7 remain.
 
 ## §66 — Slice 2N.2 ships: the project page says what changed, what a reading called a decision, and what it cannot know (2026-08-13)
 
-**PR #209**, merged at `<MERGE_SHA>`, **CI green on that exact SHA**. Head at
-review was `<HEAD_SHA>`, also green. Base was `main` at `7e27b53`.
+**PR #209**, merged at `163f09b`, **CI green on that exact SHA**. Head at
+review was `4949e37`, also green. Base was `main` at `7e27b53`.
 `docs/reports/phase-2n/PHASE_2N_SLICE_2_ACCEPTANCE.md`.
 
 **Migrations: 0 created. 92 total, parity `202608120092`.** M1/M3 remain
@@ -5032,6 +5032,14 @@ would mean editing a component `/app/history` depends on.
 concepts were classified `fact`, `interpretation`, `inference` or `suggestion` —
 **available, deliberately not surfaced**, because no requirement asks and it
 would mint user-facing copy for a four-value vocabulary that has none.
+
+### One sequencing mistake, recorded because it repeats
+
+§66 was written **inside the slice PR**, so its own merge SHA could not be known
+and went in as a placeholder that reached `main`. §65 avoided this by shipping
+the handoff as a **separate follow-up PR** (#208) after #207 had merged — which
+is the shape to keep: a section that cites its merge commit cannot be in the
+commit it cites.
 
 ### THE LOOP STOPS HERE — 2N.3 IS NOT STARTED
 
