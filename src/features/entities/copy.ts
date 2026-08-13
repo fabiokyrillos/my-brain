@@ -122,6 +122,42 @@ type EntityCopy = {
    */
   readonly companyExplainer: string;
   readonly relationshipExplainer: string;
+  /**
+   * The project surface (`2N-PROJECT-003`…`-005`, `2N-ACCESS-005`).
+   *
+   * Every string below is chosen against a rule rather than for tone, because
+   * on this page the wording is what keeps a derivation from reading as a fact:
+   *
+   * - **A count under a bound says "at least".** `openCommitments` is only used
+   *   for a complete list; a truncated one uses `openCommitmentsAtLeast`, and
+   *   the two are separate strings so a caller cannot print the confident form
+   *   over the uncertain number.
+   * - **"Changed" is scoped to what is recorded.** `recentChangesExplainer`
+   *   names the two things the audit trail carries for a project, so a change
+   *   the trail never recorded reads as out of scope rather than as absent.
+   * - **A decision is a reading.** The heading says so, and the explainer says
+   *   where to go to check it. "Decisões do projeto" would state that the
+   *   product holds decisions; it holds entries that a reading marked.
+   */
+  readonly stateLabel: string;
+  readonly openCommitments: (count: number) => string;
+  readonly openCommitmentsAtLeast: (count: number) => string;
+  readonly noOpenCommitments: string;
+  readonly lastEntry: (when: string) => string;
+  readonly noEntriesYet: string;
+  readonly allProjects: string;
+  readonly projectContextFallback: string;
+  readonly projectMemories: string;
+  readonly projectMemoriesEmpty: string;
+  readonly recentChanges: string;
+  readonly recentChangesExplainer: string;
+  readonly recentChangesEmpty: string;
+  readonly decisions: string;
+  readonly decisionsExplainer: string;
+  readonly decisionsEmpty: string;
+  readonly timeline: string;
+  readonly timelineEmpty: string;
+  readonly addedLater: string;
 };
 
 const copy = {
@@ -234,6 +270,30 @@ const copy = {
     editRole: "Editar papel",
     companyExplainer: "Onde a pessoa trabalha.",
     relationshipExplainer: "Quem essa pessoa é para você.",
+    stateLabel: "Estado",
+    // "Em aberto" is the word `work-filters-copy.ts` already prints for the same
+    // set of statuses. Taking it rather than minting one keeps the product from
+    // describing the same tasks two ways on two screens.
+    openCommitments: (count) => `${count} em aberto`,
+    openCommitmentsAtLeast: (count) => `pelo menos ${count} em aberto`,
+    noOpenCommitments: "Nada em aberto",
+    lastEntry: (when) => `último registro ${when}`,
+    noEntriesYet: "sem registros ainda",
+    allProjects: "Projetos",
+    projectContextFallback: "Contexto construído a partir dos seus registros.",
+    projectMemories: "Memórias deste projeto",
+    projectMemoriesEmpty: "Nenhuma memória vinculada a este projeto.",
+    recentChanges: "O que mudou recentemente",
+    recentChangesExplainer:
+      "Vem do registro de alterações: edições do projeto e vínculos com pessoas.",
+    recentChangesEmpty: "Nenhuma alteração registrada neste projeto ainda.",
+    decisions: "Decisões lidas nos seus registros",
+    decisionsExplainer:
+      "Uma leitura dos seus registros, não um campo que você preencheu. Abra o registro para ver o texto original.",
+    decisionsEmpty: "Nenhum registro deste projeto foi lido como uma decisão.",
+    timeline: "Linha do tempo",
+    timelineEmpty: "A linha do tempo começa na próxima menção.",
+    addedLater: "adicionado depois",
   },
   en: {
     edit: "Edit",
@@ -338,6 +398,27 @@ const copy = {
     editRole: "Edit role",
     companyExplainer: "Where this person works.",
     relationshipExplainer: "Who this person is to you.",
+    stateLabel: "State",
+    openCommitments: (count) => `${count} open`,
+    openCommitmentsAtLeast: (count) => `at least ${count} open`,
+    noOpenCommitments: "Nothing open",
+    lastEntry: (when) => `last entry ${when}`,
+    noEntriesYet: "no entries yet",
+    allProjects: "Projects",
+    projectContextFallback: "Context built from your entries.",
+    projectMemories: "Memories about this project",
+    projectMemoriesEmpty: "No memory is linked to this project.",
+    recentChanges: "What changed recently",
+    recentChangesExplainer:
+      "From the recorded changes: edits to the project and links to people.",
+    recentChangesEmpty: "No change has been recorded on this project yet.",
+    decisions: "Decisions read in your entries",
+    decisionsExplainer:
+      "A reading of your entries, not a field you filled in. Open the entry to see the original text.",
+    decisionsEmpty: "No entry on this project was read as a decision.",
+    timeline: "Timeline",
+    timelineEmpty: "The timeline starts with the next mention.",
+    addedLater: "added later",
   },
 } satisfies Record<Locale, EntityCopy>;
 
