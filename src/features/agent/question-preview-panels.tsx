@@ -1,6 +1,8 @@
 "use client";
 
 import { TrackedQuestionPreview } from "@/features/product-analytics/interaction-events";
+import { formatInstant } from "@/lib/time/instant-format";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import type { QuestionEffectPreview, QuestionSourceView } from "./question-preview-projection";
 
 // Phase 2D Slice 2D.3 — read-only source and predicted-effect disclosures.
@@ -47,18 +49,15 @@ const copy = {
   },
 } as const;
 
-function formatInstant(value: string, locale: "pt-BR" | "en", timezone: string): string {
-  const instant = new Date(value);
-  if (Number.isNaN(instant.getTime())) return "";
-  try {
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: "short",
-      timeStyle: "short",
-      timeZone: timezone,
-    }).format(instant);
-  } catch {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(instant);
-  }
+/*
+ * `LDC-AGENT-001`. This was a second local `formatInstant`, shadowing the
+ * contract's own name -- and its `catch` branch rebuilt the formatter WITHOUT
+ * the zone, so the one path that ran when the zone was unusable was the one that
+ * ignored it. Resolving through the total `resolveOwnerTimeZone` leaves the
+ * catch nothing to catch, so it is gone rather than repaired.
+ */
+function formatQuestionInstant(value: string, locale: "pt-BR" | "en", timezone: string): string {
+  return formatInstant(value, "dayAndTime", locale, resolveOwnerTimeZone(timezone)) ?? "";
 }
 
 export function QuestionPreviewPanels({ locale, timezone, source, effect }: {
@@ -93,18 +92,18 @@ export function QuestionPreviewPanels({ locale, timezone, source, effect }: {
             </div>
             <div>
               <dt>{labels.entryRecordedLabel}</dt>
-              <dd>{formatInstant(source.entryCreatedAt, locale, timezone)}</dd>
+              <dd>{formatQuestionInstant(source.entryCreatedAt, locale, timezone)}</dd>
             </div>
             <div>
               <dt>{labels.entryOccurredLabel}</dt>
-              <dd>{formatInstant(source.entryOccurredAt, locale, timezone)}</dd>
+              <dd>{formatQuestionInstant(source.entryOccurredAt, locale, timezone)}</dd>
             </div>
             <div>
               <dt>{labels.interpretationLabel}</dt>
               <dd>
                 {labels.interpretationValue(
                   source.interpretationVersion,
-                  formatInstant(source.interpretationCreatedAt, locale, timezone),
+                  formatQuestionInstant(source.interpretationCreatedAt, locale, timezone),
                 )}
                 <small>{source.interpretationSummary}</small>
               </dd>

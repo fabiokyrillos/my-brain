@@ -150,7 +150,19 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
 
   const view: HomeViewModel = {
     timeZone: workProjection.timezone,
-    todayLabel: new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" })
+    /*
+      `LDC-HOME-001`. The header's day is MEANING, not formatting, and it comes
+      from the same `workProjection.timezone` as `dueFormatter` and
+      `selectTodayPriorities` fifteen lines above. Until this initiative it was
+      `new Date()` with no zone: between 21:00 and midnight in America/Sao_Paulo
+      the header and the list beneath it named two different days, every day.
+    */
+    todayLabel: new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: workProjection.timezone,
+    })
       .format(new Date())
       .toUpperCase(),
     status:

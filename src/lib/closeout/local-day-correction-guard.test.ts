@@ -169,12 +169,7 @@ export const OPEN_OCCURRENCES: readonly Exemption[] = [
 
   // Unit 4 — agent, search, shell, conversation sources, and the three families
   // the census surfaced beyond the seventeen formatters.
-  { file: "src/features/agent/actions.ts", family: "formatter-without-zone", count: 1, unit: 4 },
-  { file: "src/features/agent/question-outcome-panel.tsx", family: "formatter-without-zone", count: 1, unit: 4 },
-  { file: "src/features/agent/question-preview-panels.tsx", family: "formatter-without-zone", count: 1, unit: 4 },
-  { file: "src/features/conversation-sources/source-list.tsx", family: "formatter-without-zone", count: 1, unit: 4 },
-  { file: "src/features/search/search-surface.tsx", family: "formatter-without-zone", count: 1, unit: 4 },
-  { file: "src/features/shell/home-dashboard.tsx", family: "formatter-without-zone", count: 1, unit: 4 },
+  // Unit 4a — DISCHARGED. All SEVENTEEN formatters are now at zero tree-wide.
 
   { file: "src/features/agent/actions.ts", family: "host-zone-field", count: 7, unit: 4 },
   { file: "src/features/agent/actions.ts", family: "utc-day-slice", count: 2, unit: 4 },
@@ -288,9 +283,9 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     // These totals are the initiative's baseline; they go to zero and the
     // assertions below go with them.
     const formatters = OPEN_OCCURRENCES.filter((e) => e.family === "formatter-without-zone");
-    // 17 across 16 files at the census; Units 2 and 3 repaired eleven.
-    expect(formatters.reduce((sum, e) => sum + e.count, 0)).toBe(6);
-    expect(new Set(formatters.map((e) => e.file)).size).toBe(6);
+    // 17 across 16 files at the census. Units 2, 3 and 4a repaired all of them.
+    expect(formatters.reduce((sum, e) => sum + e.count, 0), "all seventeen are repaired").toBe(0);
+    expect(new Set(formatters.map((e) => e.file)).size).toBe(0);
 
     const byUnit = (unit: number) =>
       OPEN_OCCURRENCES.filter((e) => e.unit === unit).reduce((sum, e) => sum + e.count, 0);
@@ -299,15 +294,15 @@ describe("LDC-GUARD-001: no surface reaches for the host's zone", () => {
     // Six formatters, plus the three families the census surfaced beyond them:
     // seven host-zone field operations in one review computation, four UTC day
     // slices, three zone round-trips.
-    expect(byUnit(4), "agent, search, shell, sources, plus the three further families").toBe(20);
+    expect(byUnit(4), "Unit 4a discharged the formatters; 4b owns the three further families").toBe(14);
 
     const byFamily = (family: HazardFamily) =>
       OPEN_OCCURRENCES.filter((e) => e.family === family).reduce((sum, e) => sum + e.count, 0);
     expect(byFamily("host-zone-field")).toBe(7);
     expect(byFamily("utc-day-slice")).toBe(4);
     expect(byFamily("zone-round-trip")).toBe(3);
-    // 31 at the census, less the eleven Units 2 and 3 discharged. This reaches 0.
-    expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's remaining debt").toBe(20);
+    // 31 at the census, less the seventeen formatters. This reaches 0 in Unit 4b.
+    expect(OPEN_OCCURRENCES.reduce((sum, e) => sum + e.count, 0), "the initiative's remaining debt").toBe(14);
   });
 });
 
