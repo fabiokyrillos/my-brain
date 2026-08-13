@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
+import { ReturnToSource } from "@/features/provenance/return-to-source";
 import { requireUser } from "@/lib/auth/require-user";
 import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
@@ -24,11 +25,14 @@ export default async function EntryDetailPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; entryId: string }>;
-  searchParams: Promise<{ from?: string | string[] }>;
+  searchParams: Promise<{ from?: string | string[]; back?: string | string[] }>;
 }) {
   const { locale: rawLocale, entryId } = await params;
   // `2K-CONT-002`: present only when the user arrived from a conversation.
-  const from = (await searchParams).from;
+  // `2N-PERSON-006`: present only when the user arrived from a contextual page
+  // that recorded where on itself they were. Both are untrusted URL input and
+  // both are parsed by the component that spends them.
+  const { from, back } = await searchParams;
   if (!isLocale(rawLocale)) notFound();
   const locale = rawLocale;
   const pt = locale === "pt-BR";
@@ -158,6 +162,7 @@ export default async function EntryDetailPage({
     <div className="content-page entry-detail-page">
       <Link href={`/${locale}/app/inbox`} className="back-link"><ArrowLeft size={16} />{pt ? "Registros" : "Records"}</Link>
       <ReturnToConversation from={from} locale={locale} />
+      <ReturnToSource back={back} locale={locale} />
 
       <EntryReview agentName={agentName}
         view={view}
