@@ -4148,3 +4148,126 @@ accepted or funded, and whether the successor gets a migration budget.
 
 **No migration was created. No push was sent. No key was changed. Signup stays
 closed and the rollout gate stays untouched.**
+
+## §59 — The Local Day Correction initiative repairs all thirty-one occurrences; the loop stops before its browser and hosted proof (2026-08-12)
+
+**Authorized by ADR-111** as a compact initiative — planning through closeout,
+**zero migrations, allocated and spent**. Not a phase: it opens no roadmap
+position and implements nothing from Phase 2N.
+
+`docs/initiatives/local-day-correction/`, `docs/reports/local-day-correction/`.
+
+### What the census actually found
+
+The merged Phase 2M successor re-audit said seventeen call sites in sixteen
+files. Re-run against `main` at `9a1e8a2` by the same brace-depth detector the
+guard uses, that number was **exact** — and it was not the whole number.
+
+| family | found | where |
+|---|---|---|
+| `formatter-without-zone` | **17** in 16 files | 4 inside the Phase 2M corpus, **13 outside any guard's reach** |
+| `host-zone-field` | 7 | one function: `generateReview`'s period |
+| `utc-day-slice` | 4 | `generateReview` ×2, `dateBounds`, `shiftDay` |
+| `zone-round-trip` | 3 | BYOK panel, and two `toLocaleString` fakes |
+
+**Thirty-one, all repaired.** `OPEN_OCCURRENCES` is empty; every family is at
+zero tree-wide.
+
+### The thing worth carrying forward
+
+**Thirteen of the seventeen were invisible, not deferred.** `2M-TIME-007` named
+eight directories, honestly recorded the four inside them, and could not see the
+person page, the project page, the memory detail, the entry detail, the file
+list, the conversation list, the question panels, search, conversation sources or
+the Home header. A guard whose corpus is a list is a guard that is exactly as
+wide as somebody remembered to make it.
+
+The replacement takes **`src/`** as its corpus and reaches zero in all four
+families, which is what makes a tree-wide rule affordable: **no family needs a
+standing allowlist, so none can be widened to make a failure go away.**
+
+### Five things this initiative learned the hard way
+
+1. **An exemption list must be asserted in both directions.** Every row carried
+   an exact count that had to *still* hold; repairing a file failed the build
+   until its row came out. That is how Phase 2M's carry-past-close list was
+   discharged rather than forgotten — and the retirement is **asserted**, not
+   announced, because deleting a list is also what deleting the rule looks like.
+2. **A fixture that cannot fail proves nothing.** Both `daily-cycle` row tests
+   pinned **noon UTC** — the same calendar day in every zone this product
+   supports — so they would have passed however wrong the rendering was. Every
+   fixture now sits at a boundary instant where two zones disagree, and the host
+   running the tests is `America/Sao_Paulo`, so a fixture in the default zone is
+   a fixture that cannot fail either.
+3. **Two local functions were named `formatInstant`.** `memories` and
+   `question-preview-panels` both shadowed the contract's own name while doing
+   the opposite of what it does; anyone grepping to check whether those pages
+   were correct would have found the name and concluded yes. The second was
+   worse: its primary path carried the zone and only its **`catch` branch**
+   dropped it, so the one path that ran when the zone was unusable ignored it.
+4. **Guards caught my repairs, and were right both times.**
+   `architecture.test.ts` refused a raw `.from("profiles")` on a page held to the
+   Slice 2X.16 projection boundary — which produced `getOwnerTimeZone()`, a
+   `cache()`-wrapped accessor that costs one query per request however many
+   surfaces ask. And `git diff --check` refused a commit whose scripted edits had
+   written CRLF into LF files, reporting every line as changed.
+5. **`getOwnerTimeZone()` cannot be imported everywhere.** It pulls in
+   `server-only`, and `agent/actions.ts` is reached by tests running under the
+   client condition. The accessor is for Server Components; the pure
+   `resolveOwnerTimeZone` is for everywhere else.
+
+### One intended behaviour change, signed before it was made
+
+`generateReview` computed its `daily`/`weekly`/`monthly` window from the host's
+calendar — UTC on a server — and stored UTC date labels, **while fetching the
+owner's zone eleven lines below in the same batch and using it only for the
+prompt**. It now computes in the owner's zone.
+
+A daily review generated at 22:00 in São Paulo covers that day instead of
+tomorrow. **ADR-111 Decision 6 signed this in advance**, and **no stored summary
+is rewritten, reprocessed or back-dated.**
+
+### Two corrections that were not user-visible, recorded as such
+
+`dateBounds` sliced a UTC date off an instant plus `730 * 24h` — wrong twice
+over, and at most a day at a ±730-day picker bound, so **no user ever saw a wrong
+date from it**. `shiftDay` was **correct** and moved onto the contract anyway,
+because it was the last `toISOString().slice(0, 10)` in the tree and a family at
+zero needs no allowlist. Neither is dressed up as a user-facing fix.
+
+### One reader deliberately left alone
+
+`requireProfileTimeZone` **throws** on an unsupported zone instead of falling
+back. That is not a fifth copy of the resolver — it is the correct posture for a
+surface that *computes* days, and it is `local-day.ts`'s own argument: a day
+nobody could compute must be **reported rather than answered**. Two postures,
+each stated.
+
+### Merge SHAs, each with CI green on the exact SHA
+
+| unit | merge SHA | debt after |
+|---|---|---|
+| 1 — contract and guard | `911c58a` | 31 |
+| 2 — daily-cycle | `1734d34` | 27 |
+| 3 — contextual pages | `ea9fd39` | 20 |
+| 4a — remaining formatters | `45fb7fb` | 14 |
+| 4b — three families, resolvers | `7bd89aa` | **0** |
+
+### THE LOOP STOPS HERE — UNIT 5 IS NOT DONE
+
+**The code work is complete and the initiative is NOT closed.** What remains is
+Unit 5: browser journeys, authenticated production verification in two zones that
+are on different calendar days at the same instant, a DST case per hemisphere,
+zero-residue cleanup, the closing report, and a re-audit of slice 2N.0 against
+the new `main` **without implementing it**.
+
+**Not proven anywhere yet:** that any of this renders correctly in a real
+browser, or against production. The proof to date is unit-level and structural —
+6536 tests, a tree-wide guard, and a convergence test — plus CI green on five
+merge SHAs.
+
+**Unchanged throughout:** 92 migrations, hosted parity `202608120092`,
+`verify:edge-parity` green, zero Edge Function changes, `planned_at` untouched,
+push not resumed (still HTTP 403 on a real iPhone, Android **NOT EXECUTED**),
+signup closed, rollout 25 · 3 · 2, **Phase 2N planned and unimplemented**, Phase
+2O not started, and A13 still guarding the roadmap successor.
