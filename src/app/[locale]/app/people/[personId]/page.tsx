@@ -25,7 +25,7 @@ import { loadAliasesForEntity } from "@/features/entities/aliases";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
 import { ProtectedContent } from "@/features/operations/protected-content";
-import { deriveClaimProvenance, resolvableEntryIdsOf } from "@/features/provenance/contracts";
+import { deriveClaimProvenance, isOpenable, resolvableEntryIdsOf } from "@/features/provenance/contracts";
 import { getProvenanceCopy } from "@/features/provenance/copy";
 import { ProvenanceNote, SectionOriginNote } from "@/features/provenance/provenance-note";
 import {
@@ -373,7 +373,19 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           <SectionOriginNote locale={locale} origin="derived" />
           {boundedTasks.items.length ? (
             <div className="mini-list">
-              {boundedTasks.items.map((task, index) => (
+              {boundedTasks.items.map((task, index) => {
+                /*
+                 * Derived ONCE and asked about, rather than the resolvability
+                 * test being re-implemented in the `href`.
+                 *
+                 * Writing `resolvableEntryIds.has(...) ? sourceHref(...)` beside
+                 * `deriveClaimProvenance(...)` would be two answers to one
+                 * question, and they would drift the moment the contract gained
+                 * a condition — leaving a page that offers a link to something
+                 * it simultaneously labels unsourced.
+                 */
+                const provenance = deriveClaimProvenance(task.source_entry_id, resolvableEntryIds);
+                return (
                 <article id={`task-${task.id}`} key={task.id}>
                   {/*
                     The same component the Work list and the task detail mount, so
@@ -399,17 +411,14 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                     assistive technology and to the DOM.
                   */}
                   <ProvenanceNote
-                    href={
-                      resolvableEntryIds.has(task.source_entry_id ?? "")
-                        ? sourceHref(task.source_entry_id!, `task-${task.id}`)
-                        : undefined
-                    }
+                    href={isOpenable(provenance) ? sourceHref(provenance.entryId, `task-${task.id}`) : undefined}
                     locale={locale}
-                    provenance={deriveClaimProvenance(task.source_entry_id, resolvableEntryIds)}
+                    provenance={provenance}
                     subject={provenanceCopy.taskSubject(index + 1)}
                   />
                 </article>
-              ))}
+                );
+              })}
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
           <BoundedNotice list={boundedTasks} locale={locale} />
@@ -436,7 +445,9 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         <section className="entity-memory">
           <h2>{pt ? "Memórias" : "Memories"}</h2>
           <SectionOriginNote locale={locale} origin="derived" />
-          {boundedMemories.items.map((memory, index) => (
+          {boundedMemories.items.map((memory, index) => {
+            const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
+            return (
             <article id={`memory-${memory.id}`} key={memory.id}>
               <ProtectedContent
                 locale={locale}
@@ -455,17 +466,14 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                 an origin for knowledge the owner may never have typed.
               */}
               <ProvenanceNote
-                href={
-                  resolvableEntryIds.has(memory.source_entry_id ?? "")
-                    ? sourceHref(memory.source_entry_id!, `memory-${memory.id}`)
-                    : undefined
-                }
+                href={isOpenable(provenance) ? sourceHref(provenance.entryId, `memory-${memory.id}`) : undefined}
                 locale={locale}
-                provenance={deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds)}
+                provenance={provenance}
                 subject={provenanceCopy.memorySubject(index + 1)}
               />
             </article>
-          ))}
+            );
+          })}
           <BoundedNotice list={boundedMemories} locale={locale} />
         </section>
       )}

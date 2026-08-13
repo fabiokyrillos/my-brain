@@ -106,6 +106,25 @@ describe("2N-PROV-004: no surface invents an origin", () => {
     expect(sql).toMatch(/source_entry_id uuid references public\.entries\(id\) on delete set null/);
   });
 
+  it("asks the contract whether a source is openable, rather than re-testing it", () => {
+    /*
+     * Found reviewing the diff, not by a test.
+     *
+     * The first draft wrote `resolvableEntryIds.has(id) ? sourceHref(id) : undefined`
+     * beside `provenance={deriveClaimProvenance(id, resolvableEntryIds)}` — two
+     * answers to one question, computed from the same inputs by two different
+     * expressions. They agree today and would drift the moment the contract
+     * gained a condition, leaving a page that offers a link to a claim it
+     * simultaneously labels unsourced.
+     *
+     * `isOpenable` is the single answer, and it also removes the non-null
+     * assertion the duplicated form needed.
+     */
+    expect(code(PERSON_PAGE), "the page re-implements the contract's resolvability test")
+      .not.toMatch(/resolvableEntryIds\.has\(/);
+    expect(code(PERSON_PAGE)).toMatch(/isOpenable\(/);
+  });
+
   it("infers no source from text, date or proximity", () => {
     /*
      * `2N-PROV-005`. The provenance module performs no I/O and reads no content,
