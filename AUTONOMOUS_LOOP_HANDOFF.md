@@ -4805,3 +4805,114 @@ parity `202608120092`, budget non-transferable with a **fourth a STOP
 CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
 A13 still guarding the roadmap successor. Slices 2N.1–2N.7 remain.
+
+## §65 — Slice 2N.1 ships: the person page says where each claim came from, and refuses to invent one (2026-08-13)
+
+**PR #207**, merged at `da7f8c9`, **CI green 3/3 on that exact SHA**. Head at
+review was `3cfefb9`, also green. Base was `main` at `12591495`.
+`docs/reports/phase-2n/PHASE_2N_SLICE_1_ACCEPTANCE.md`.
+
+**Migrations: 0 created. 92 total, parity `202608120092`.** M1/M2/M3 remain
+allocated to 2N.3 and 2N.7, unspent and non-transferable.
+
+**25 requirements: 17 built, 7 baseline, 1 N/A** (`2N-ACCESS-004` — this slice
+ships no graph; it belongs to 2N.6).
+
+### The thing worth carrying forward: a nullable FK is not an absence of intent
+
+`memories.source_entry_id` and `tasks.source_entry_id` are both declared
+**`on delete set null`**. So a `NULL` means **either** "nothing recorded a
+source" **or** "the source entry was deleted and the foreign key nulled the
+column" — and nothing afterwards distinguishes them. There is a real writer that
+inserts a memory with no source at all, so both readings genuinely occur.
+
+The obvious implementation is to call a null source *owner-authored* and print
+*"informado por você"*. **That is the bug.** For a memory whose entry the owner
+deleted, it is false — and false in the direction that matters, turning an
+absence into a positive claim about where knowledge came from. So `null`
+resolves to **`unsourced`**, the same arm as a source that will not resolve.
+
+*"Informed by you"* is reserved for the three relation tables, where it is true
+**by construction**: they carry no source column at all. `ownerAuthored` takes a
+closed union of exactly those tables, so **`ownerAuthored("memories")` is a type
+error rather than a judgement call** — and a guard checks that union against the
+migrations, so a later phase adding a source column to one of them fails in the
+same change that adds it.
+
+Removed, foreign, unreadable and never-set are **one arm**, by having no branch
+that could tell them apart, so the rendered page cannot be used to test whether
+an entry id exists.
+
+### Where the origin is stated, and where it deliberately is not
+
+Once **per section** for the relation panels — every row has the same answer,
+and repeating it under twelve rows is noise that says nothing actionable. **Per
+row** for memories and tasks, where it genuinely differs. **None** on the
+timeline: those rows *are* the records, and a "from an entry of yours" line
+under an entry is the page explaining that a record came from itself.
+
+An unsourced claim renders as ordinary italic text, **not** a warning. Colouring
+it would present a missing stored source as a fault to fix and would invite the
+reader to guess *why* — the distinction the single arm exists to destroy.
+
+### Two guards were wrong before the product was
+
+- **The confidence guard banned the string outright and failed on correct code.**
+  All three relation tables carry a `confidence` column whose writers set the
+  constant `1` for every owner-authored row. *Writing* that is not rendering
+  certainty; *rendering* it would print "100%" beside something the owner merely
+  typed. Narrowed to what renders, and extended so `confidence` may not even
+  enter a person-page projection — a value absent from the query cannot be
+  rendered by a later edit and is not in the RSC payload either.
+- **The diff review caught the page asking one question two ways.**
+  `resolvableEntryIds.has(id) ? sourceHref(id) : undefined` sat beside
+  `deriveClaimProvenance(id, resolvableEntryIds)` — two expressions computing one
+  answer from the same inputs. They agreed then and would drift the moment the
+  contract gained a condition, leaving a page that offers a link to a claim it
+  simultaneously labels unsourced. Derived once, asked via `isOpenable`, guarded.
+
+### `?back=` is refused rather than sanitised
+
+The return handle arrives in a URL, so it is matched against a strict allow-list
+built from this app's own locales and **anything else renders nothing**. Without
+it this is an open redirect, and the pattern is anchored on the locale segment
+precisely because an allow-list built on `startsWith("/")` lets `//host`
+through. Refusing costs nothing — the browser's own Back still works — while a
+sanitised link is a guess about intent.
+
+### Proofs
+
+`e2e/online-phase-2n-person.spec.ts` — **14/14**, both locales × desktop and
+mobile (Pixel 7). The fixture builds the `on delete set null` case on purpose: a
+memory whose source entry is **deleted after the memory is created**, and the
+journey asserts its line does not borrow the owner-authored wording — which is
+what makes the pair evidence rather than coincidence. `online-phase-2n-foundations`
+re-run **12/12**, no regression. Suite **6701 → 6760**.
+
+Same lane as 2N.0: hosted database/auth/RLS, **local production build**, **not**
+the Vercel deployment. Mobile is a **viewport simulation on Pixel 7 metrics**,
+not a physical device, and **no screen-reader run is claimed**. Zero residue,
+owner-scoped: `codex-2n1-` accounts **0**, five synthetic markers **0** each.
+
+### Recorded for the owner, not decided by a slice
+
+**Sensitivity reveals are NOT restored across a source round trip.**
+`2N-PERSON-006` asks for "any expanded disclosure"; the anchor restores the
+provenance disclosure, but a revealed mask is not restored. ADR-110 makes the
+reveal local and explicit, and persisting one across a navigation would weaken
+the posture 2N.0 shipped in order to satisfy a convenience. **An owner decision.**
+
+### THE LOOP STOPS HERE — 2N.2 IS NOT STARTED
+
+Stopped **between slices**. 2N.2 is the project page and its missing sections
+(`2N-PROJECT-001…007` plus the mobile and accessibility families), and it
+inherits this slice's shared panels — both `AssociationPanel` and the provenance
+module already render on `/app/projects/[projectId]`, so 2N.2 must **re-derive
+what is already true there rather than re-claim it**. Its stop condition is
+unchanged: any temptation to add a change-log or decision table.
+
+**Unchanged:** 92 migrations, **zero of Phase 2N's three spent, none created**,
+parity `202608120092`, budget non-transferable with a **fourth a STOP
+CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
+A13 still guarding the roadmap successor. Slices 2N.2–2N.7 remain.
