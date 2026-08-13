@@ -2,13 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { formatInstant } from "@/lib/time/instant-format";
-import {
-  formatLocalDate,
-  localDateOf,
-  localDayBounds,
-  localDayBoundsForDate,
-  startOfLocalWeek,
-} from "@/lib/time/local-day";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
@@ -29,6 +22,7 @@ import { requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordAIUsage } from "@/lib/ai/usage";
 import type { Json } from "@/lib/supabase/database.types";
 import { loadQuestionSuggestions } from "./question-preview-projection";
+import { reviewWindow } from "./review-period";
 import { findPresentedSuggestion } from "./question-suggestions";
 import {
   normalizeQuestionResolutionCommand,
@@ -952,23 +946,19 @@ export async function generateReview(
       .maybeSingle(),
   ]);
   const timeZone = resolveOwnerTimeZone(profileResult.data?.timezone);
-  const today = localDateOf(now, timeZone);
   /*
-   * Monday-based, matching the `(getDay() + 6) % 7` this replaces and
-   * `startOfLocalWeek`'s own rule — one convention, stated in the contract, so
-   * the two locales cannot disagree about where a week starts.
+   * Monday-based weeks and day 1 of the owner's local month, both through the
+   * contract — so a period beginning on a day whose local midnight does not
+   * exist starts at the first instant that does.
    *
-   * The month case takes day 1 of the owner's current local month. Every branch
-   * resolves through `localDayBoundsForDate`, so a period beginning on a day
-   * whose local midnight does not exist starts at the first instant that does.
+   * The computation lives in `review-period.ts` rather than here because
+   * `"use server"` makes every export in this file an async Server Action: the
+   * window could not be exported, so it could not be called with a fixed `now`,
+   * so the one behaviour change ADR-111 signed had no test able to contradict
+   * it. `review-period.test.ts` is that test, and it fails on both halves of a
+   * regression to the host's calendar.
    */
-  const start = new Date(
-    parsed.data.period === "daily"
-      ? localDayBounds(now, timeZone).start
-      : parsed.data.period.startsWith("weekly")
-        ? localDayBoundsForDate(startOfLocalWeek(today), timeZone).start
-        : localDayBoundsForDate({ ...today, day: 1 }, timeZone).start,
-  );
+  const { start, startDate, endDate } = reviewWindow(now, timeZone, parsed.data.period);
 
   const [entriesResult, tasksResult] = await Promise.all([
     supabase
@@ -1075,13 +1065,12 @@ export async function generateReview(
       sourceType: "summary",
     });
     /*
-     * `LDC-AGENT-002`. These are the summary's own dates, and they were the
-     * **UTC** calendar days of the two instants — so a review covering the
-     * owner's Tuesday could be stored as Wednesday's. `formatLocalDate` of the
-     * owner's local date is the same day the window was built from.
+     * `LDC-AGENT-002`. The summary's own dates were the **UTC** calendar days of
+     * the two instants — so a review covering the owner's Tuesday could be
+     * stored as Wednesday's. They now come from `reviewWindow` above, which is
+     * the same computation the window itself came from: the labels and the
+     * period they describe cannot drift apart.
      */
-    const startDate = formatLocalDate(localDateOf(start, timeZone));
-    const endDate = formatLocalDate(today);
     const titleMap = parsed.data.locale === "pt-BR"
       ? { daily: "Resumo diário", weekly_review: "Revisão semanal", weekly_plan: "Planejamento semanal", monthly: "Revisão mensal" }
       : { daily: "Daily summary", weekly_review: "Weekly review", weekly_plan: "Weekly plan", monthly: "Monthly review" };
