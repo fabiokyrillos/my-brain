@@ -39,7 +39,15 @@ const SHELL = "src/features/shell/app-shell.tsx";
 const LAYOUT = "src/app/[locale]/app/layout.tsx";
 
 describe("2N-ACCESS-005: every locale the product has is selectable", () => {
-  const css = read(STYLESHEET);
+  /*
+   * The stylesheet with its comments removed, for the same reason `code()`
+   * exists above: the comment beside these rules *quotes the selector form it
+   * bans*, so a guard reading the raw file would fail on a correct stylesheet
+   * and get weakened by the next person to touch it. Rules are matched against
+   * the stripped text; only the `:lang()` containment checks, which cannot
+   * collide with prose, read either.
+   */
+  const css = read(STYLESHEET).replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("has a rule hiding every OTHER locale, for each locale", () => {
     /*
