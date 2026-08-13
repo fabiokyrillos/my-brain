@@ -172,6 +172,20 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT, taskLinks.length > CONTEXTUAL_LIMIT);
   const boundedMemories = boundedList(memories, CONTEXTUAL_LIMIT);
   const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT, entryLinks.length > CONTEXTUAL_LIMIT);
+  /*
+   * The three lists that asked for a probe row and then rendered it.
+   *
+   * Every query above already used `withProbe`, so the rows were *fetched* to
+   * measure the bound - but relationships, contexts and linked projects went
+   * straight into their panels without passing through `boundedList`. At 51
+   * relationships, 51 contexts or 101 linked projects the page showed one row
+   * more than its own limit and stated nothing, which is the silent truncation
+   * `2N-PERSON-003` exists to end. Contexts and projects resolve through a link
+   * table first, so both carry the upstream hop the same way tasks do.
+   */
+  const boundedRelationships = boundedList(relationships, RELATION_LIMIT);
+  const boundedContexts = boundedList(contexts, RELATION_LIMIT, contextLinks.length > RELATION_LIMIT);
+  const boundedProjects = boundedList(projects, CONTEXTUAL_LIMIT, projectLinks.length > CONTEXTUAL_LIMIT);
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.
@@ -259,11 +273,12 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
       */}
       <div className="entity-columns">
         <RelationshipPanel
+          bound={boundedRelationships}
           createAction={createOwnerRelationship}
           endAction={endOwnerRelationship}
           locale={locale}
           personId={person.id}
-          relationships={relationships.map((relationship) => ({
+          relationships={boundedRelationships.items.map((relationship) => ({
             id: relationship.id,
             storedType: relationship.relationship_type,
             // `null` for a value outside the vocabulary, so the panel renders the
@@ -276,11 +291,12 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         />
         <AssociationPanel
           addAction={associatePersonContext}
+          bound={boundedContexts}
           endAction={endPersonContext}
           heading={copy.contexts}
           locale={locale}
           options={contextOptions.map((option) => ({ id: option.id, label: option.name }))}
-          rows={contexts.map((context) => ({
+          rows={boundedContexts.items.map((context) => ({
             id: context.id,
             label: context.name,
             href: `/${locale}/app/contexts/${context.id}`,
@@ -321,12 +337,13 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         </section>
         <AssociationPanel
           addAction={associatePersonProject}
+          bound={boundedProjects}
           endAction={endPersonProject}
           heading={copy.linkedProjects}
           locale={locale}
           options={projectOptions.map((option) => ({ id: option.id, label: option.name }))}
           roleAction={updatePersonProjectRole}
-          rows={projects.map((project) => ({
+          rows={boundedProjects.items.map((project) => ({
             id: project.id,
             label: project.name,
             href: `/${locale}/app/projects/${project.id}`,

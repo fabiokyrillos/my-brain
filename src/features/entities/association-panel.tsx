@@ -28,6 +28,9 @@ import { LoaderCircle, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useId, useState } from "react";
 
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import type { Bounded } from "@/features/bounds/contracts";
+
 import type { Locale } from "@/lib/preferences";
 
 import { getEntityCopy } from "./copy";
@@ -70,6 +73,7 @@ function hiddenFields(target: AssociationTarget, selectedId: string) {
 
 export function AssociationPanel({
   addAction,
+  bound,
   endAction,
   heading,
   locale,
@@ -79,6 +83,23 @@ export function AssociationPanel({
   target,
 }: {
   addAction: EntityEditAction;
+  /**
+   * The bound for `rows`, and **required on purpose** (`2N-PERSON-003`,
+   * `2N-PROJECT-006`).
+   *
+   * The person and project pages already fetched these lists with
+   * `withProbe(limit)` and then handed the result straight to this panel, so the
+   * probe row was *rendered* and the bound was never reported: at 51 contexts or
+   * 101 linked projects the page silently showed one row too many and claimed to
+   * be complete. Three lists on the person page and one on the project page were
+   * in that state.
+   *
+   * Optional would have re-created the failure `bounded-notice.tsx` describes -
+   * a convergence held together by each caller remembering - and the symptom is
+   * silent, because a list that forgets simply looks complete. Required makes
+   * the type system the thing that remembers.
+   */
+  readonly bound: Bounded<unknown>;
   endAction: EntityEditAction;
   heading: string;
   locale: Locale;
@@ -86,6 +107,7 @@ export function AssociationPanel({
   options: readonly AssociationOption[];
   /** Present only where the association carries a role. */
   roleAction?: EntityEditAction;
+  /** Always `bound.items`, mapped - never the untrimmed query result. */
   rows: readonly AssociationRow[];
   target: AssociationTarget;
 }) {
@@ -157,6 +179,13 @@ export function AssociationPanel({
               : copy.linkedPeopleEmpty}
         </p>
       )}
+
+      {/*
+        Above the create control rather than below it: the notice belongs to the
+        list it describes, and a bound printed under "Add a project" reads as a
+        statement about the selector instead.
+      */}
+      <BoundedNotice list={bound} locale={locale} />
 
       <AssociationCreate
         action={addAction}

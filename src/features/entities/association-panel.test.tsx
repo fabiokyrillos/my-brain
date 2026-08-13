@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { boundedList, CONTEXTUAL_LIMIT } from "@/features/bounds/contracts";
+
 import { AssociationPanel, type AssociationTarget } from "./association-panel";
 import type { EntityEditState } from "./edit-state";
 import type { EntityEditAction } from "./entity-edit-form";
@@ -25,6 +27,9 @@ function panel(
   return (
     <AssociationPanel
       addAction={resolvesTo(idle)}
+      // Unbounded by default: `BoundedNotice` renders nothing, so every existing
+      // case keeps asserting exactly what it asserted before.
+      bound={boundedList([], CONTEXTUAL_LIMIT)}
       endAction={resolvesTo(idle)}
       heading="Seção"
       locale="pt-BR"
@@ -232,5 +237,47 @@ describe("AssociationPanel", () => {
 
     expect(screen.getByText("sponsor")).toBeVisible();
     expect(screen.getByText("Sem papel definido")).toBeVisible();
+  });
+
+  describe("2N-PERSON-003 / 2N-PROJECT-006: the list says when it is bounded", () => {
+    /*
+     * Three of these panels shipped bound-less: contexts and linked projects on
+     * the person page, linked people on the project page. All three were queried
+     * with `withProbe(limit)`, so the extra row was fetched to measure the bound
+     * and then rendered instead of reported.
+     */
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,
+        label: `Vínculo ${index}`,
+        href: `/pt-BR/app/projects/${index}`,
+        role: null,
+      }));
+
+    it("reports the bound on the count it actually shows", () => {
+      const items = rows(CONTEXTUAL_LIMIT);
+      render(
+        panel(
+          { kind: "person-project", personId: PERSON_ID },
+          { bound: { items, bounded: true, limit: CONTEXTUAL_LIMIT }, rows: items },
+        ),
+      );
+
+      const notice = screen.getByRole("note");
+      expect(notice).toHaveAttribute("data-bounded", "true");
+      expect(notice).toHaveTextContent(String(CONTEXTUAL_LIMIT));
+    });
+
+    it("stays silent on a complete list", () => {
+      const items = rows(3);
+      render(
+        panel(
+          { kind: "person-project", personId: PERSON_ID },
+          { bound: { items, bounded: false, limit: CONTEXTUAL_LIMIT }, rows: items },
+        ),
+      );
+
+      expect(screen.queryByRole("note")).toBeNull();
+    });
   });
 });

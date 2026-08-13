@@ -2,6 +2,20 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N: four lists fetched a probe row and rendered it
+
+Found re-deriving 2N.0's coverage from source at the start of slice 2N.1 rather than inheriting the handoff's numbers - which were raw `grep` **line** counts, not consumers: the person page has **4** `ProtectedContent` and **3** `BoundedNotice`, not the 9 and 4 that were recorded.
+
+`2N-PERSON-003` and `2N-PROJECT-006` closed **built** in 2N.0 on "bounds vocabulary applied to every list". Four lists were never in it: **relationships, contexts and linked projects** on the person page, **linked people** on the project page. Each was queried with `withProbe(limit)` - the extra row *was* fetched to measure the bound - and then handed straight to its panel without `boundedList`. At 51 relationships or 101 linked projects the page rendered **one row past its own limit and reported nothing**.
+
+**Three guards passed over it, and none was wrong.** The routes did call `withProbe`, did call `boundedList`, and did render `<BoundedNotice>` - for their *other* lists. The notice lived inside a panel that the route-level checks never opened.
+
+The bound is now a **required** prop on both panels, so `tsc` is what remembers instead of each caller; optional would have re-created the failure `bounded-notice.tsx` exists to prevent, and the symptom is silent. Because a required prop still permits `bound={boundedX}` beside `rows={raw.map(...)}`, the new guard asserts the **data**: every panel list on a contextual route is fed from `.items`. Proved by feeding it the raw array and watching it fail by name.
+
+The project page is fixed here rather than deferred to 2N.2 - it carries the same live defect, and preserving a slice boundary is not worth leaving a known silent truncation in place. **2N.2 still owns the project page's requirements.**
+
+Zero migrations. 92 total, parity `202608120092`.
+
 ## 2026-08-13 - PHASE 2N slice 2N.0: the hosted journey is executed, and it finds the loading state silent in English
 
 `2N-PRIVACY-011` closes **partial -> built**. 2N.0 shipped its acceptance journey written but **never run**, because it needs hosted credentials and skips without them. Executed now: **12/12**, both locales x desktop and mobile, against the hosted Supabase project (`202608120092`) with the **production build** serving the app. **Zero migrations.** 92 total, parity unchanged.
