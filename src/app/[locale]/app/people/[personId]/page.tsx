@@ -21,6 +21,16 @@ import {
   endOwnerRelationship,
   updateOwnerRelationship,
 } from "@/features/entities/relationships";
+import { loadAliasesForEntity } from "@/features/entities/aliases";
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import {
+  deriveFreeTextSensitivity,
+  deriveSubjectSensitivity,
+  readableLevelsOf,
+} from "@/features/sensitivity/subject-derivation";
+import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
@@ -50,18 +60,27 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     organizations,
     contextOptions,
     projectOptionsResult,
+    aliases,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
     supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at").eq("id", personId).maybeSingle(),
-    supabase.from("task_people").select("task_id,role").eq("person_id", personId).limit(100),
-    supabase.from("person_projects").select("project_id,role,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).limit(100),
-    supabase.from("entry_entities").select("entry_id").eq("entity_type", "person").eq("entity_id", personId).limit(100),
-    supabase.from("memories").select("id,content,kind,important").eq("person_id", personId).order("important", { ascending: false }).limit(100),
+    // `2N-PERSON-003`: every list below asks for one row more than it will show,
+    // so "there are more" is knowable rather than guessed. See
+    // `features/bounds/contracts.ts` — receiving exactly `limit` rows cannot
+    // distinguish a complete list from a truncated one.
+    supabase.from("task_people").select("task_id,role").eq("person_id", personId).limit(withProbe(CONTEXTUAL_LIMIT)),
+    supabase.from("person_projects").select("project_id,role,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).limit(withProbe(CONTEXTUAL_LIMIT)),
+    supabase.from("entry_entities").select("entry_id").eq("entity_type", "person").eq("entity_id", personId).limit(withProbe(CONTEXTUAL_LIMIT)),
+    // `sensitivity` joins this projection because `2J-PRIVACY-005` requires the
+    // classification to travel with the content rather than be fetched again at
+    // render time — and because `2N-KNOWS-007` requires it read from the current
+    // row, which is what selecting it beside the content means.
+    supabase.from("memories").select("id,content,kind,important,sensitivity").eq("person_id", personId).order("important", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)),
     // Two relations the schema has modelled since `202607160009` and the page
     // has never shown (UX-09). Both are validity-scoped: a relationship that
     // ended is history, not the current answer to "who is this to me".
-    supabase.from("person_relationships").select("id,relationship_type,description,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).order("valid_from", { ascending: false }).limit(50),
-    supabase.from("person_contexts").select("context_id,valid_until").eq("person_id", personId).is("valid_until", null).limit(50),
+    supabase.from("person_relationships").select("id,relationship_type,description,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).order("valid_from", { ascending: false }).limit(withProbe(RELATION_LIMIT)),
+    supabase.from("person_contexts").select("context_id,valid_until").eq("person_id", personId).is("valid_until", null).limit(withProbe(RELATION_LIMIT)),
     loadOrganizationOptions(supabase),
     // EGC.2. The two selectors the association panels offer, bounded at 200 by
     // the loaders themselves (EGC-ASSOC-008). Loaded here rather than inside the
@@ -73,7 +92,12 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     // projects was told to create one, which is the `EG-04` shape again. It is
     // also a true thing to record that somebody worked on a project that has
     // since been archived.
-    supabase.from("projects").select("id,name").order("name").limit(200),
+    supabase.from("projects").select("id,name").order("name").limit(PICKER_LIMIT),
+    // `2N-IDENTITY-004` — `entity_aliases` gains its first reader, and this is
+    // the surface it means something on: a person page that never showed the
+    // nicknames the owner recorded could not explain why searching one found
+    // this person. Owner-scoped under forced RLS, validity-windowed at now.
+    loadAliasesForEntity(supabase, "person", personId, new Date()),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];
@@ -89,16 +113,59 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const entryIds = entryLinks.map((item) => item.entry_id);
   const contextIds = contextLinks.map((item) => item.context_id);
   const [taskResult, projectResult, entryResult, contextResult] = await Promise.all([
-    taskIds.length ? supabase.from("tasks").select("id,title,status,due_at").in("id", taskIds).order("updated_at", { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-    projectIds.length ? supabase.from("projects").select("id,name,status").in("id", projectIds).limit(100) : Promise.resolve({ data: [], error: null }),
-    entryIds.length ? supabase.from("entries").select("id,original_content,occurred_at,is_retroactive").in("id", entryIds).order("occurred_at", { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-    contextIds.length ? supabase.from("contexts").select("id,name,kind").in("id", contextIds).limit(50) : Promise.resolve({ data: [], error: null }),
+    // `source_entry_id` joins this projection so a task's classification can be
+    // derived at all: `tasks` carries no `sensitivity` column and OD-2L-1 B
+    // forbids adding one, so the level comes from the entry the task came from.
+    taskIds.length ? supabase.from("tasks").select("id,title,status,due_at,source_entry_id").in("id", taskIds).order("updated_at", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
+    projectIds.length ? supabase.from("projects").select("id,name,status").in("id", projectIds).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
+    entryIds.length ? supabase.from("entries").select("id,original_content,occurred_at,is_retroactive,sensitivity").in("id", entryIds).order("occurred_at", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
+    contextIds.length ? supabase.from("contexts").select("id,name,kind").in("id", contextIds).limit(withProbe(RELATION_LIMIT)) : Promise.resolve({ data: [], error: null }),
   ]);
   const tasks = requireSupabaseData(taskResult, "load related tasks") ?? [];
   const projects = requireSupabaseData(projectResult, "load related projects") ?? [];
   const entries = requireSupabaseData(entryResult, "load person timeline") ?? [];
   const contexts = requireSupabaseData(contextResult, "load person context names") ?? [];
   const projectOptions = requireSupabaseData(projectOptionsResult, "load project options") ?? [];
+
+  /*
+   * `2N-PRIVACY-001`/`-002`/`-005` — the classifications this page renders with.
+   *
+   * A task's source entry is usually NOT one of the timeline entries above:
+   * the timeline is the entries that mention this person, and a task can come
+   * from an entry that never did. So the levels for those sources are read here,
+   * owner-scoped and bounded to the ids actually on the page.
+   *
+   * The two reads are merged into ONE map, because the derivation's contract is
+   * that absence means unreadable. Two maps would have meant two ways to be
+   * absent, and a lookup that missed the first would have to remember to try the
+   * second — the kind of "remembering" this contract exists to remove.
+   */
+  const timelineLevels = readableLevelsOf(entries);
+  const missingSourceIds = Array.from(
+    new Set(
+      tasks
+        .map((task) => task.source_entry_id)
+        .filter((id): id is string => Boolean(id) && !timelineLevels.has(id as string)),
+    ),
+  );
+  const sourceResult = missingSourceIds.length
+    ? await supabase.from("entries").select("id,sensitivity").in("id", missingSourceIds)
+    : { data: [], error: null };
+  // A failed read is NOT treated as an empty result that could be mistaken for
+  // "these entries carry no classification": rows that do not arrive stay absent
+  // from the map, which is exactly the most-protective arm.
+  const entryLevels = new Map(timelineLevels);
+  for (const [id, level] of readableLevelsOf(sourceResult.data)) entryLevels.set(id, level);
+  const memoryLevels = readableLevelsOf(memories);
+
+  // `2N-PRIVACY-009`, ADR-110 Decision 4. The note carries no classification and
+  // none may be inferred from its text, so it is masked by default and revealed
+  // only by an explicit, local act.
+  const notesSensitivity = deriveFreeTextSensitivity();
+
+  const boundedTasks = boundedList(tasks, CONTEXTUAL_LIMIT);
+  const boundedMemories = boundedList(memories, CONTEXTUAL_LIMIT);
+  const boundedEntries = boundedList(entries, CONTEXTUAL_LIMIT);
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.
@@ -114,8 +181,41 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         <UserRound size={28} />
         <div>
           <p className="eyebrow">{pt ? "PESSOA" : "PERSON"}</p>
+          {/*
+            ADR-110 Decision 2: the name STAYS VISIBLE. A structural identifier
+            the owner needs to recognise the entity is not unsourced derived
+            content, and masking it would make the page unusable while protecting
+            nothing — the name is how the user got here.
+          */}
           <h1>{person.name}</h1>
-          <p>{person.notes ?? (pt ? "Contexto construído a partir das interações registradas." : "Context built from recorded interactions.")}</p>
+          {/*
+            ADR-110 Decision 4: the note does not. It is free text about a human
+            being with no classification of its own and no classifiable source,
+            and `2N-PRIVACY-005` says absence never resolves to `normal`. The
+            fallback sentence is not a note and is shown as it always was.
+          */}
+          {person.notes ? (
+            <ProtectedContent
+              describedAs={person.name}
+              locale={locale}
+              revealKey={`person-notes-${person.id}`}
+              sensitivity={notesSensitivity}
+              surface="person"
+            >
+              <span>{person.notes}</span>
+            </ProtectedContent>
+          ) : (
+            <p>{pt ? "Contexto construído a partir das interações registradas." : "Context built from recorded interactions."}</p>
+          )}
+          {aliases.length > 0 && (
+            <p className="entity-aliases">
+              {/* Gender-neutral in pt-BR on purpose: this line describes every
+                  person, and "conhecida"/"conhecido" would force the product to
+                  assert something about them that it does not know. */}
+              <span>{pt ? "Outros nomes" : "Also known as"}</span>
+              <strong>{aliases.map((entry) => entry.alias).join(" · ")}</strong>
+            </p>
+          )}
           {/*
             EGC-REL-009. Company and relationship-to-owner are visibly distinct
             concerns: this line says where they work, and the relationship panel
@@ -186,11 +286,32 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
       <div className="entity-columns">
         <section>
           <h2>{pt ? "Pendências e tarefas" : "Open work and tasks"}</h2>
-          {tasks.length ? (
+          {boundedTasks.items.length ? (
             <div className="mini-list">
-              {tasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span></article>)}
+              {boundedTasks.items.map((task) => (
+                <article key={task.id}>
+                  {/*
+                    The same component the Work list and the task detail mount, so
+                    a task masked on `/app/work` is masked here too — the
+                    divergence `2L-PRIVACY-007` found on Hoje, prevented one
+                    domain earlier this time. No `describedAs`: the title IS the
+                    protected content, and passing it would defeat the mask
+                    through the accessible name.
+                  */}
+                  <ProtectedContent
+                    locale={locale}
+                    revealKey={`person-task-${task.id}`}
+                    sensitivity={deriveTaskSensitivity(task.source_entry_id, entryLevels)}
+                    surface="person"
+                  >
+                    <strong>{task.title}</strong>
+                  </ProtectedContent>
+                  <span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span>
+                </article>
+              ))}
             </div>
           ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
+          <BoundedNotice list={boundedTasks} locale={locale} />
         </section>
         <AssociationPanel
           addAction={associatePersonProject}
@@ -209,24 +330,50 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         />
       </div>
 
-      {memories.length > 0 && (
+      {boundedMemories.items.length > 0 && (
         <section className="entity-memory">
           <h2>{pt ? "Memórias" : "Memories"}</h2>
-          {memories.map((memory) => (
-            <article key={memory.id}><strong>{memory.content}</strong><span>{memoryKindLabel(locale, memory.kind) ?? vocabulary.unknownState}</span></article>
+          {boundedMemories.items.map((memory) => (
+            <article key={memory.id}>
+              <ProtectedContent
+                locale={locale}
+                revealKey={`person-memory-${memory.id}`}
+                sensitivity={deriveSubjectSensitivity(memory.id, memoryLevels)}
+                surface="person"
+              >
+                <strong>{memory.content}</strong>
+              </ProtectedContent>
+              <span>{memoryKindLabel(locale, memory.kind) ?? vocabulary.unknownState}</span>
+            </article>
           ))}
+          <BoundedNotice list={boundedMemories} locale={locale} />
         </section>
       )}
 
       <section className="entity-timeline">
         <h2>{pt ? "Linha do tempo" : "Timeline"}</h2>
-        {entries.length ? (
+        {boundedEntries.items.length ? (
           <div className="timeline-list">
-            {entries.map((entry) => (
+            {boundedEntries.items.map((entry) => (
               <article key={entry.id}>
                 <span className="timeline-dot" />
                 <div>
-                  <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
+                  {/*
+                    The raw entry text ADR-108's audit found printed in full with
+                    no classification applied at all. `href` keeps the row
+                    openable while masked: being able to reach an entry is not
+                    content, and a masked row nobody can open would be a
+                    functional loss the privacy decision never asked for.
+                  */}
+                  <ProtectedContent
+                    href={`/${locale}/app/inbox/${entry.id}`}
+                    locale={locale}
+                    revealKey={`person-entry-${entry.id}`}
+                    sensitivity={deriveSubjectSensitivity(entry.id, entryLevels)}
+                    surface="person"
+                  >
+                    <Link href={`/${locale}/app/inbox/${entry.id}`}><strong>{entry.original_content}</strong></Link>
+                  </ProtectedContent>
                   <small>
                     {formatInstant(entry.occurred_at, "dayAndTime", locale, timeZone)}
                     {entry.is_retroactive ? ` · ${pt ? "adicionado depois" : "added later"}` : ""}
@@ -236,6 +383,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             ))}
           </div>
         ) : <p className="quiet-state">{pt ? "A linha do tempo começa na próxima menção." : "The timeline starts with the next mention."}</p>}
+        <BoundedNotice list={boundedEntries} locale={locale} />
       </section>
     </div>
   );

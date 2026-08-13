@@ -2,12 +2,16 @@ import { ArrowLeft, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PICKER_LIMIT } from "@/features/bounds/contracts";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
 import { setMemoryLifecycle, updateMemory } from "@/features/memories/actions";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { MemoryEditForm } from "@/features/memories/memory-edit-form";
-import { asMemoryKind, asMemorySensitivity } from "@/features/memories/read";
+import { asMemoryKind } from "@/features/memories/read";
+import { ProtectedContent } from "@/features/operations/protected-content";
+import { toSensitivityLevel } from "@/features/sensitivity/contracts";
+import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { formatInstant } from "@/lib/time/instant-format";
@@ -68,12 +72,12 @@ export default async function MemoryDetailPage({
     memory.source_entry_id
       ? supabase
           .from("entries")
-          .select("id,original_content,occurred_at")
+          .select("id,original_content,occurred_at,sensitivity")
           .eq("id", memory.source_entry_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    supabase.from("people").select("id,name").order("name").limit(200),
-    supabase.from("projects").select("id,name").order("name").limit(200),
+    supabase.from("people").select("id,name").order("name").limit(PICKER_LIMIT),
+    supabase.from("projects").select("id,name").order("name").limit(PICKER_LIMIT),
   ]);
 
   const person = requireSupabaseData(personResult, "load memory person");
@@ -84,7 +88,29 @@ export default async function MemoryDetailPage({
 
   const state = memoryLifecycleState(memory, new Date());
   const kind = asMemoryKind(memory.kind);
-  const sensitivity = asMemorySensitivity(memory.sensitivity);
+  /*
+   * `2N-KNOWS-007` — read from the current row, and narrowed through the
+   * **contract's** predicate rather than `asMemorySensitivity`.
+   *
+   * The two disagree on exactly one input and it is the one that matters: for a
+   * value outside the vocabulary, `asMemorySensitivity` returns `normal` and
+   * `toSensitivityLevel` returns `highly_sensitive`. This page both *states* the
+   * classification and *acts* on it, so taking them from two predicates that
+   * fail in opposite directions would let it print "Normal" beside content the
+   * mask is withholding. One read, one answer, failing closed.
+   *
+   * `asMemorySensitivity` is left alone: it is a narrowing used by a write path's
+   * schema, and re-pointing that is not this slice's business.
+   */
+  const sensitivity = toSensitivityLevel(memory.sensitivity);
+  // The memory is its own subject, so the map it is looked up in is the row that
+  // was just read. Absence would still mean unreadable — `maybeSingle` returning
+  // nothing already sent this page to `notFound()` above.
+  const memorySensitivity = deriveSubjectSensitivity(memory.id, readableLevelsOf([memory]));
+  const sourceSensitivity = deriveSubjectSensitivity(
+    memory.source_entry_id,
+    readableLevelsOf(sourceEntry ? [sourceEntry] : []),
+  );
 
   const retrieval =
     state === "active"
@@ -124,8 +150,23 @@ export default async function MemoryDetailPage({
           <p className="eyebrow">{copy.kinds[kind].toUpperCase()}</p>
           {/* The memory itself is the heading. It is owner prose and can be up
               to 4000 characters, so it wraps rather than truncating — a memory
-              the owner cannot read in full is one they cannot decide about. */}
-          <h1 className="memory-content-heading">{memory.content}</h1>
+              the owner cannot read in full is one they cannot decide about.
+
+              `2N-PRIVACY-002` governs it all the same, and the memories LIST is
+              why: a memory masked there and printed here would be the exact
+              divergence slice 2L.1 found on Hoje, one entity over. The mask is
+              not a refusal — the owner set this level themselves and the reveal
+              is one explicit, local act away. */}
+          <h1 className="memory-content-heading">
+            <ProtectedContent
+              locale={locale}
+              revealKey={`memory-content-${memory.id}`}
+              sensitivity={memorySensitivity}
+              surface="memory"
+            >
+              {memory.content}
+            </ProtectedContent>
+          </h1>
           <p className="memory-retrieval-line">
             <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
             {retrieval}
@@ -185,9 +226,17 @@ export default async function MemoryDetailPage({
             <article>
               <span className="timeline-dot" />
               <div>
-                <Link href={`/${locale}/app/inbox/${sourceEntry.id}`}>
-                  <strong>{sourceEntry.original_content}</strong>
-                </Link>
+                <ProtectedContent
+                  href={`/${locale}/app/inbox/${sourceEntry.id}`}
+                  locale={locale}
+                  revealKey={`memory-source-${sourceEntry.id}`}
+                  sensitivity={sourceSensitivity}
+                  surface="memory"
+                >
+                  <Link href={`/${locale}/app/inbox/${sourceEntry.id}`}>
+                    <strong>{sourceEntry.original_content}</strong>
+                  </Link>
+                </ProtectedContent>
                 <small>{formatInstant(sourceEntry.occurred_at, "dayAndTime", locale, timeZone)}</small>
               </div>
             </article>
