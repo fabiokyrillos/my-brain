@@ -36,7 +36,18 @@ const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
 const onlineConfigured = Boolean(supabaseUrl && publishableKey && serviceRoleKey);
 
 const STATE_PROJECT = "Projeto Estado 2N2 d41a9c";
-const CHANGE_PROJECT = "Projeto Mudanca 2N2 b73f10";
+/**
+ * One change project **per locale**, and the reason is a real defect this
+ * fixture had first.
+ *
+ * Both locale runs share a worker, so a single project meant the second run
+ * found the status already `paused`. Its edit was then a no-op, the audit row
+ * recorded `paused -> paused`, and `extractChanges` correctly produced no
+ * from-to clause — so the assertion failed against a page that was behaving
+ * exactly as specified. A shared mutable fixture makes a test depend on the
+ * order its cases happen to run in.
+ */
+const CHANGE_PROJECT = { "pt-BR": "Projeto Mudanca PT 2N2 b73f10", en: "Projeto Mudanca EN 2N2 a92d44" } as const;
 const BOUND_PROJECT = "Projeto Limite 2N2 e58c22";
 const ROLED_PERSON = "Marina Teste 2N2";
 const UNROLED_PERSON = "Otavio Teste 2N2";
@@ -96,7 +107,7 @@ test.describe("2N.2 — the project page states its situation without inventing 
   const email = `codex-2n2-${crypto.randomUUID()}@example.com`;
   let userId: string | undefined;
   let stateProjectId: string | undefined;
-  let changeProjectId: string | undefined;
+  const changeProjectIds = new Map<"pt-BR" | "en", string>();
   let boundProjectId: string | undefined;
   let sourceEntryId: string | undefined;
 
@@ -171,12 +182,15 @@ test.describe("2N.2 — the project page states its situation without inventing 
 
     const projects = await insert<{ id: string; name: string }>("projects", [
       { user_id: userId, name: STATE_PROJECT, description: null, status: "active", organization_id: null },
-      { user_id: userId, name: CHANGE_PROJECT, description: null, status: "active", organization_id: null },
+      { user_id: userId, name: CHANGE_PROJECT["pt-BR"], description: null, status: "active", organization_id: null },
+      { user_id: userId, name: CHANGE_PROJECT.en, description: null, status: "active", organization_id: null },
       { user_id: userId, name: BOUND_PROJECT, description: null, status: "active", organization_id: null },
     ]);
-    stateProjectId = projects.find((row) => row.name === STATE_PROJECT)!.id;
-    changeProjectId = projects.find((row) => row.name === CHANGE_PROJECT)!.id;
-    boundProjectId = projects.find((row) => row.name === BOUND_PROJECT)!.id;
+    const byName = (name: string) => projects.find((row) => row.name === name)!.id;
+    stateProjectId = byName(STATE_PROJECT);
+    changeProjectIds.set("pt-BR", byName(CHANGE_PROJECT["pt-BR"]));
+    changeProjectIds.set("en", byName(CHANGE_PROJECT.en));
+    boundProjectId = byName(BOUND_PROJECT);
 
     /*
      * `2N-PROJECT-002`. Two people, one with a stored role and one without —
@@ -384,13 +398,22 @@ test.describe("2N.2 — the project page states its situation without inventing 
       await expect(page.locator("#changes")).toContainText(copy.changes);
       await expect(page.locator("#changes")).toContainText(copy.noChanges);
 
-      await page.goto(`/${locale}/app/projects/${changeProjectId}`);
-      await expect(page.getByRole("heading", { level: 1, name: CHANGE_PROJECT })).toBeVisible();
+      const changeProject = CHANGE_PROJECT[locale];
+      const changeUrl = `/${locale}/app/projects/${changeProjectIds.get(locale)}`;
+      await page.goto(changeUrl);
+      await expect(page.getByRole("heading", { level: 1, name: changeProject })).toBeVisible();
 
       await page.getByRole("button", { name: /Editar|Edit/ }).first().click();
       await page.getByLabel(/Situação|Status/).first().selectOption("paused");
       await page.getByRole("button", { name: /Salvar|Save/ }).first().click();
+      // Wait for the write to be confirmed by the product before asking what it
+      // recorded. Asserting straight after the click tests the revalidation
+      // race, not the change list.
+      await expect(page.locator(".entity-edit-feedback.success")).toBeVisible({ timeout: 15_000 });
 
+      // Re-entered rather than refreshed in place: this is what a reader gets,
+      // and it does not depend on how the router happened to revalidate.
+      await page.goto(changeUrl);
       const changes = page.locator("#changes");
       await expect(changes).toContainText(copy.changed, { timeout: 15_000 });
       // The audit `reason` is never selected, so no writer's internal sentence
