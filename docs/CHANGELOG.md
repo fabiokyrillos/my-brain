@@ -2,6 +2,51 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N slice 2N.0: the contextual surfaces become governed, bounded and identifiable
+
+**The first slice of Phase 2N to build anything.** ADR-112 authorized implementation; this is 2N.0, re-audited against `main` at `4b66119` before a line was written. Twenty-nine requirements, **zero migrations**, 92 total and parity `202608120092` unchanged.
+
+### Sensitivity reaches the contextual surfaces
+
+`person`, `project`, `memory` and `file` join `GOVERNED_SURFACES` (`2N-PRIVACY-001`, OD-2N-12 A). ADR-108's audit had found the divergence `2J-PRIVACY-001` was created to end still intact one domain over: these pages rendered `entries.original_content`, task titles and memory bodies with **no classification applied at all**.
+
+`graph` is deliberately **absent**. `2N-PRIVACY-001` admits a surface in the change that ships its first consumer, and 2N.0 ships no graph; adding it early would create a governed surface nobody reads.
+
+**`subject-derivation.ts` keeps the three-arm answer even though `entries`, `memories` and `attachments` all carry their own `sensitivity` column.** The obvious implementation - read the column and render it - is the bug: a column exists on the row the query *returned* and says nothing about the row it could not. Removed, foreign and unreadable are all *absent from the map*, so no branch exists that could distinguish them (`2N-PRIVACY-005`).
+
+**`people.notes` is masked by default** (ADR-110 D4). `deriveFreeTextSensitivity` **takes no arguments**, so no caller can hand it the note's text - the rule ADR-110 D7 states, enforced by a signature rather than by callers remembering - and it returns `derived` at the most protective level rather than `undetermined`, which is the arm that renders in the clear.
+
+### One bounds vocabulary, measured rather than guessed
+
+The audit found `.limit(100)` six times on the person page and four on the project page, none stating its bound. The subtle half: **receiving exactly `limit` rows cannot distinguish a complete list from a truncated one**, so a surface reporting truncation whenever it received `limit` rows would lie every time the total is exactly `limit`. The bound is probed with `limit + 1`. The word is `bounded`, taken from `search/contracts.ts` rather than minted beside it (`2N-PERSON-003`).
+
+### `entity_aliases` gains its first reader
+
+The table, its policies, its grants and its index have existed since `202607170020` with **neither a reader nor a writer**. Owner-scoped under RLS, validity-windowed inclusively to match `resolve_owned_entity_exact` exactly, **read-only**, and **no migration**.
+
+It deliberately does **not** call `resolve_owned_entity_exact` - `security definer` taking `p_user_id` as a parameter, so a request path would hand it a caller-supplied owner id - and does **not** normalize: `normalize_entity_alias` is revoked from `authenticated`, and `normalizer-divergence.test.ts` already proves a TypeScript port disagrees with it on combining marks.
+
+### `notes` leaves the searchable people domain, aliases enter it
+
+ADR-110 D5/D10, a **deliberate owner-signed narrowing** of ADR-093 rather than an accidental reopening. `snippetColumn` becomes `null` rather than moving to another column, and the people list stops **selecting** `notes` at all - stronger than fetching and hiding it, since nothing is left in the RSC payload for a later edit to render. The person stays findable by name and by nickname.
+
+### The route loading state announces in the reader's own language
+
+ADR-112 D7a. It announced `"Carregando pagina"` in both locales. It cannot look the locale up: **`loading.tsx` takes no props**, which the local Next.js docs state outright. So it renders every announcement and the document's `lang` selects one - which required `app-shell.tsx` to declare `lang`, because `src/app/layout.tsx` sits above `[locale]` and hardcodes `pt-BR` for every locale. The stylesheet **hides what does not match** rather than showing what does, so a missing stylesheet degrades to announcing both rather than nothing.
+
+### Two defects found by the work itself
+
+- **`.limit(20)` silently bounding the files page's failed-jobs section** - the one list whose entire purpose is "these need your attention". Caught by the new guard; fixed, not exempted.
+- **`boundedList` could only see the second of two read hops.** The contextual pages resolve ids through a relationship table first, so 101 links resolving to 95 rows reported the list complete. Caught reviewing the diff; `upstreamBounded` makes the answer the disjunction.
+
+Two guards were written wrong first and corrected rather than loosened: one flagged pagination's `hasMore` as a competing bounds vocabulary (it is not - "there is a next page" comes with a way to reach it), and one matched `await` inside the comment in `loading.tsx` forbidding `await`.
+
+### Also corrected
+
+The memory detail page narrowed its level through `asMemorySensitivity`, which **fails open to `normal`** where the contract's predicate fails closed. That page both states the classification and acts on it, so two predicates failing in opposite directions could print "Normal" beside content the mask was withholding. The write-path helper is left alone.
+
+`projects.description` **stays visible**, recorded in place rather than left as an apparent oversight: ADR-110 D4 masks free text *about a human being*, and search deliberately keeps matching that column. Widening the mask to it is an owner decision, not one this slice takes.
+
 ## 2026-08-13 - PHASE 2N: implementation authorized, and the four time requirements the completed dependency made stale are corrected
 
 **ADR-112 authorizes Phase 2N implementation through closeout.** Planning only, until now: ADR-108 authorized planning, ADR-109 signed all seventeen decisions and ADR-110 settled the one it left flagged, and every one of them explicitly withheld permission to build. **This PR implements no product.**
