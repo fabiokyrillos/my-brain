@@ -55,6 +55,18 @@ export const CONTEXTUAL_LIMIT = 100;
 export const RELATION_LIMIT = 50;
 export const PICKER_LIMIT = 200;
 export const FAILED_JOB_LIMIT = 20;
+/**
+ * `2N-PROJECT-004` — the recent-changes list, the one bound the audit did not
+ * find because the list did not exist.
+ *
+ * It is stated **here** rather than as a literal in the route, for the reason
+ * this module opens with: a page that carries its own number can disagree with
+ * the notice it renders. The value follows `FAILED_JOB_LIMIT` rather than
+ * `CONTEXTUAL_LIMIT` because the question this list answers is *what changed
+ * recently* — a hundred rows would answer a different question, and the notice
+ * says so honestly when there are more.
+ */
+export const RECENT_CHANGE_LIMIT = 20;
 
 /**
  * How many rows to ask for when you intend to render `limit` of them.
