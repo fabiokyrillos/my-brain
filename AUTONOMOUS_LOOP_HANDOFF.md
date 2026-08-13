@@ -4655,3 +4655,153 @@ the contract; the write-path helper is left alone.
 **STOP CONDITION**. Signup closed, rollout **25 · 3 · 2**, push **not** resumed
 (HTTP 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**,
 and A13 still guarding the roadmap successor. Slices 2N.1–2N.7 remain.
+
+## §63 — 2N.0's hosted proof is executed, and it finds the loading state silent in English (2026-08-13)
+
+**PR #204**, merged at `77172d4`, **CI green on that exact SHA**. Head at review
+was `fe57467`, also green. `docs/reports/phase-2n/PHASE_2N_SLICE_0_ACCEPTANCE.md`
+§8. **0 migrations. 92 total, parity `202608120092`.**
+
+`2N-PRIVACY-011` closes **partial → built**. Slice 2N.0 is now **24 built · 5
+baseline · 0 partial**.
+
+### What "hosted" actually means here, stated so it cannot be overclaimed
+
+**12/12 passed**, both locales × desktop and mobile (Pixel 7).
+
+| half | what it was |
+|---|---|
+| database, auth, RLS | the **hosted Supabase project**, real GoTrue session, real policies |
+| application | the **production build** (`npm run build` → `npm run start`) on `localhost:3000` |
+
+**The application half is NOT the Vercel deployment.** That is what this
+repository's online lane is — `playwright.config.ts` pins `baseURL` to
+localhost and `scripts/online-playwright.mjs` supplies only hosted Supabase
+credentials. `npm run start` over `npm run dev` is a deliberate narrowing (§57's
+two never-rendered surfaces), and `npm run dev` cannot be used anyway: it exceeds
+the 120s `webServer` timeout on this machine.
+
+No owner credential. **No paid provider** — search is lexical, and no trigger
+enqueues a job from a direct REST insert, so nothing reached OpenAI.
+
+### Two defects, and only one of them was the product
+
+**1. The journey could never have run.** Both array inserts gave their rows
+different key sets, which PostgREST refuses with `PGRST102 — "All object keys
+must match"`. **A written test is not an executed test — and an unexecuted one is
+not even known to be *runnable*.** 2N.0 classified it partial for the right
+reason and still understated it.
+
+**2. `2N-ACCESS-003`/`-005`: the loading state is silent in English.** 2N.0
+replaced a fallback that announced Portuguese to every reader with one that, on
+`en`, announces **nothing at all** — both spans hidden, a screen reader given
+silence, which is *worse* than the bug it fixed and is exactly what the
+"hide what does not match" direction was chosen to prevent.
+
+The direction was right; the **selector form** defeated it. A descendant
+`[lang="…"]` combinator matches an ancestor at **any** depth, and there are
+always **two** `lang` declarations above those spans — `src/app/layout.tsx` sits
+above `[locale]` and hardcodes `pt-BR`, `.app-frame` carries the real one — so on
+`en` both rules fired. **`:lang()` resolves against the nearest declaration**, so
+the outer `<html>` cannot participate. Degradation preserved: no stylesheet or no
+`lang` and both are announced.
+
+**No unit test in this repository could have caught it** — jsdom applies no
+external stylesheet — and the guard asserted the rules *existed*, so it would
+have passed on a stylesheet that hides everything. It now bans the ancestor form
+by name, **proved by reintroducing the old selector**, and separately proved not
+to fire on the comment that quotes it.
+
+### Zero residue, owner-scoped
+
+Never a global count — the project holds the owner's real data, so a global
+number would be evidence of nothing. Disposable accounts by prefix: **0**. Six
+distinctive synthetic markers across `people`/`memories`/`entries`/
+`entity_aliases`: **0** each. The probe run **before** the first successful
+execution also returned zero, which is what establishes the harness cleans up
+after a **failed** `beforeAll` rather than only after a passing run.
+
+## §64 — Slice 2N.1 is re-audited, one inherited number is wrong, and the defect it hid is fixed — 2N.1 itself is NOT started (2026-08-13)
+
+**PR #205**, merged at `6309e0d`, **CI green 3/3 on head `e3cc9dc`**.
+**0 migrations. 92 total, parity `202608120092`.**
+
+### The inherited number was wrong, and that is the transferable part
+
+§62 recorded "9 `ProtectedContent`, 4 `BoundedNotice`" on the person page, and
+the next prompt restated it as **"nove consumidores"**. Both are raw `grep`
+**line** counts — import lines and closing tags included. The real figures are
+**4 `ProtectedContent`** and **3 `BoundedNotice`**.
+
+**An inherited coverage number is what the next slice uses to decide what it may
+skip as already shipped.** Inflated 2×, it silently narrows scope, and nobody
+re-derives it because it reads as already audited. Re-derive counts of *usages*
+from the opening tag, never from the bare name.
+
+### The defect that re-deriving it exposed
+
+`2N-PERSON-003` and `2N-PROJECT-006` closed **built** in 2N.0 on "bounds
+vocabulary applied to every list". **Four lists were never in it**:
+`relationships`, `contexts` and linked `projects` on the person page, and linked
+`people` on the project page.
+
+Each was queried with `withProbe(limit)` — the extra row **was** fetched to
+measure the bound — and then handed straight to its panel without
+`boundedList`. So at 51 relationships or 101 linked projects the page **rendered
+one row past its own limit AND reported nothing**: the probe row became content
+instead of evidence.
+
+**Three guards passed over it, and none of them was wrong.** The routes did call
+`withProbe`, did call `boundedList`, and did render `<BoundedNotice>` — for their
+*other* lists. The notice lived inside a panel the route-level checks never
+opened.
+
+- The bound is now a **required** prop on both panels, so `tsc` remembers rather
+  than each caller. Optional would have re-created the exact failure
+  `bounded-notice.tsx` was written to prevent, and the symptom is silent.
+- A required prop is **not sufficient**: `bound={boundedX}` beside
+  `rows={raw.map(...)}` type-checks and still renders one row too many. So the
+  new guard asserts the **data** — every panel list on a contextual route is fed
+  from `.items` — proved by feeding it the raw array and watching it fail by name.
+- The project page is fixed here rather than deferred. It carries the same live
+  defect, and preserving a slice boundary is not worth leaving a known silent
+  truncation in place. **2N.2 still owns the project page's requirements.**
+
+### THE LOOP STOPS HERE — 2N.1 IS RE-AUDITED AND NOT STARTED
+
+`2N-PERSON-003` is now genuinely satisfied on the person page (all six lists
+bounded). Everything else in 2N.1 is **unbuilt**, verified against source rather
+than assumed:
+
+| requirement | state |
+|---|---|
+| `2N-PERSON-001`/`-002` | `[BASELINE]`, preserved — re-verify, do not re-claim |
+| `2N-PERSON-003` | **satisfied** by PR #205 |
+| `2N-PERSON-004` derived vs persisted, visibly | **NOT BUILT** — the only two matches in the page are *comments* |
+| `2N-PERSON-005` Work authority + derived classification | partly present (`deriveTaskSensitivity` + shared `ProtectedContent`); the authority half is unasserted |
+| `2N-PERSON-006` return to exact position incl. expanded disclosure | **NOT BUILT** |
+| `2N-PERSON-007` no direct client write | likely already true; **unasserted** |
+| `2N-PROV-001…006` | **NOT BUILT** — `src/features/provenance` does not exist |
+| `2N-RELATION-002`/`-008` origin per relation | **NOT BUILT** — 0 origin/source/confidence in `relationship-panel.tsx` |
+| `2N-RELATION-004` correct/end, audited | paths exist (`updateOwnerRelationship`, `endOwnerRelationship`); audit half unasserted |
+| `2N-RELATION-005` confidence never certainty | **0 confidence rendered anywhere** in `src/features/entities` → likely `baseline` |
+| `2N-MOBILE-001…003`, `2N-ACCESS-001…005` | **NOT VALIDATED** (`-004` N/A: no graph in 2N.1) |
+
+**The provenance facts are unchanged and were re-confirmed against this tree:**
+`person_relationships`, `person_projects` and `person_contexts` carry **no
+`source_entry_id` and no `interpretation_id`** (0 occurrences in the migrations),
+so *"informed by you"* is the only truth available for a relation. **`memories`
+and `tasks` DO carry `source_entry_id`**, so those two — and only those two —
+can show a real, openable source. Do not generalise that path to relations.
+
+**Stopped between slices**, which is where the loop says to stop. 2N.1 is 25
+requirements including a provenance vocabulary, a derived/persisted distinction,
+position restoration, and mobile/accessibility validation with journeys in both
+locales on two viewports. **Beginning it without finishing it would leave exactly
+the partial slice the loop forbids.**
+
+**Unchanged:** 92 migrations, **zero of Phase 2N's three spent, none created**,
+parity `202608120092`, budget non-transferable with a **fourth a STOP
+CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
+A13 still guarding the roadmap successor. Slices 2N.1–2N.7 remain.
