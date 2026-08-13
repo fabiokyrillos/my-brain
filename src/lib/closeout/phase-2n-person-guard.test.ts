@@ -72,8 +72,21 @@ describe("2N-RELATION-003 / OD-2N-8 A: the provenance premise is asserted, not t
     // impact is none. The phase budget is asserted elsewhere; this asserts the
     // narrower thing — 2N.1 created nothing.
     const migrations = readdirSync(join(REPO, MIGRATIONS)).filter((file) => file.endsWith(".sql"));
-    expect(migrations).toHaveLength(92);
-    expect(migrations.at(-1)).toBe("202608120092_phase_2m_push_delivery.sql");
+    /*
+     * **Re-framed when slice 2N.3 spent M1.** This pinned the directory at 92
+     * files with `202608120092` last, which held only while the phase had spent
+     * nothing. Bumping the number on each spend would make this a guard that
+     * gets edited to go green; asserting attribution instead is stronger, and
+     * it survives M3 and M2 without an edit.
+     */
+    const phase2n = migrations.filter((file) => /phase_2n/i.test(file));
+    for (const file of phase2n) {
+      expect(file, `${file} does not name the slice that spent it`).toMatch(/_slice_\d+_/);
+    }
+    expect(
+      phase2n.filter((file) => /_slice_1_/.test(file)),
+      "2N.1's schema impact is none; M1 and M3 belong to 2N.3 and M2 to 2N.7",
+    ).toEqual([]);
   });
 });
 

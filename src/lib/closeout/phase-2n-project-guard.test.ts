@@ -49,11 +49,33 @@ function migrationSources(): string {
 
 describe("2N.2 schema impact: none", () => {
   it("adds no migration of its own", () => {
-    // The phase budget is asserted elsewhere; this asserts the narrower thing —
-    // 2N.2 created nothing, and M1/M3/M2 stay allocated to 2N.3 and 2N.7.
+    /*
+     * The phase budget is asserted elsewhere; this asserts the narrower thing —
+     * 2N.2 created nothing.
+     *
+     * **Re-framed when slice 2N.3 spent M1.** This read
+     * `expect(migrations).toHaveLength(92)` plus a pin on the last filename,
+     * which was true only while the phase had spent nothing at all. Restoring
+     * it by bumping 92 to 93 would make a guard that has to be edited on every
+     * future spend to go green, and the declarations suite has already recorded
+     * why that is not a guard.
+     *
+     * What replaces it is the claim this file actually wants to make, and it is
+     * **stronger**: every Phase 2N migration must name the slice that spent it,
+     * and **none of them names this one**. It survives M3 and M2 landing
+     * without an edit, and it fails if a migration ever appears without an
+     * attributable owner — which the flat count could not detect at all.
+     */
     const migrations = readdirSync(join(REPO, MIGRATIONS)).filter((file) => file.endsWith(".sql"));
-    expect(migrations).toHaveLength(92);
-    expect(migrations.at(-1)).toBe("202608120092_phase_2m_push_delivery.sql");
+    const phase2n = migrations.filter((file) => /phase_2n/i.test(file));
+
+    for (const file of phase2n) {
+      expect(file, `${file} does not name the slice that spent it`).toMatch(/_slice_\d+_/);
+    }
+    expect(
+      phase2n.filter((file) => /_slice_2_/.test(file)),
+      "2N.2's schema impact is none; M1 and M3 belong to 2N.3 and M2 to 2N.7",
+    ).toEqual([]);
   });
 });
 

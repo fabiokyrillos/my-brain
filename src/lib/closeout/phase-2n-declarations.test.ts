@@ -251,8 +251,46 @@ describe("Phase 2N governance: the authorization is planning-only and says so", 
 });
 
 describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
-  it("states three allocated, obligation zero, none created", () => {
-    expect(read(PLAN)).toMatch(/3 allocated · obligation ZERO · 0 spent · NONE CREATED/);
+  it("states three allocated, obligation zero, and a spend count that matches the tree", () => {
+    /*
+     * **Inverted by slice 2N.3's M1.** This asserted the literal string
+     * `0 spent · NONE CREATED`, which was the truth until a slice spent an
+     * allocation and then became a lie the guard was enforcing.
+     *
+     * The rule that does not move is that the plan's stated spend must equal
+     * what is actually on disk. So the number is READ from the plan and
+     * CHECKED against the migrations, rather than pinned — a plan claiming
+     * fewer spends than exist fails here, which is the direction that matters.
+     */
+    const plan = read(PLAN);
+    const stated = plan.match(/3 allocated · obligation ZERO · (\d+) spent/);
+    expect(stated, "the plan no longer states its budget in the signed form").not.toBeNull();
+
+    const spent = readdirSync(join(REPO, "supabase", "migrations")).filter((name) =>
+      /phase[_-]?2n/i.test(name),
+    );
+    expect(Number(stated?.[1]), `the plan says ${stated?.[1]} spent, the tree has ${spent.length}`)
+      .toBe(spent.length);
+  });
+
+  it("names the allocation and the slice for every migration it has spent", () => {
+    /*
+     * `OD-2N-14` makes the three allocations **non-transferable**, which is only
+     * enforceable if each spend says which allocation it consumed. A migration
+     * that names no allocation is one whose budget line nobody can check, and
+     * two migrations naming the same one is a transfer with extra steps.
+     */
+    const dir = join(REPO, "supabase", "migrations");
+    const spent = readdirSync(dir).filter((name) => /phase[_-]?2n/i.test(name));
+    const claimed = spent.map((name) => {
+      expect(name, `${name} does not name the slice that spent it`).toMatch(/_slice_\d+_/);
+      const header = readFileSync(join(dir, name), "utf8").slice(0, 4000);
+      const allocation = header.match(/MIGRATION (M[123])\b/);
+      expect(allocation, `${name} does not name the allocation it consumes`).not.toBeNull();
+      return allocation?.[1];
+    });
+    expect(new Set(claimed).size, `two migrations claim one allocation: ${claimed.join(", ")}`)
+      .toBe(claimed.length);
   });
 
   it("spends at most the three allocated, and nothing unattributed appears beside them", () => {

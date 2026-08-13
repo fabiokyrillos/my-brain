@@ -147,6 +147,17 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // operator action rather than a migration's. The pgTAP suite asserts both
       // halves: that the window is 90 and that no role can execute the sweep.
       "202608120092_phase_2m_push_delivery.sql",
+      // Phase 2N slice 2N.3: MIGRATION M1 of the three ADR-109 allocated,
+      // NON-TRANSFERABLE. It re-declares `match_internal_knowledge` so the
+      // memory validity window is applied INSIDE the union, ahead of the bound
+      // — `2N-CORRECT-003`. Named here rather than tolerated, because the
+      // property this assertion protects is "nothing follows that somebody did
+      // not deliberately account for".
+      //
+      // Relevant to THIS guard specifically: it registers NO retention window,
+      // schedules NOTHING, and creates no sweep. It touches one function and
+      // no data, so the retention posture `202608070084` corrected is untouched.
+      "202608130093_phase_2n_slice_3_validity_aware_retrieval.sql",
     ]);
   });
 });

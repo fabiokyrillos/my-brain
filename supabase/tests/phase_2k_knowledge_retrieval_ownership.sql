@@ -36,10 +36,21 @@
 --
 -- WHAT THIS SUITE DOES NOT CLAIM
 --
--- It does not test relevance, ranking quality, the 0.2 similarity floor applied
--- in TypeScript, or the memory-lifecycle filter — that filter lives in
--- `chat/actions.ts` precisely because teaching the RPC `valid_from`/
--- `valid_until` would need a migration, and slice 2K.0 spends none.
+-- It does not test relevance, ranking quality, or the 0.2 similarity floor
+-- applied in TypeScript.
+--
+-- It also does not test the memory-lifecycle filter, and the reason changed.
+-- When this suite was written that filter lived in `chat/actions.ts`, because
+-- teaching the RPC `valid_from`/`valid_until` would need a migration and slice
+-- 2K.0 spent none. **Phase 2N slice 2N.3 spent one** (`202608130093`, migration
+-- M1, `2N-CORRECT-003`): the window is now applied inside the union, ahead of
+-- the bound. That behaviour is proved by `phase_2n_validity_aware_retrieval.sql`
+-- and is deliberately not duplicated here — this suite's fixtures give every
+-- row the same vector so that OWNERSHIP is the only discriminator, which is the
+-- opposite of what a displacement test needs.
+--
+-- The fixtures below leave `valid_from` and `valid_until` NULL, which is
+-- `active`, so every assertion here means exactly what it did before M1.
 -- ---------------------------------------------------------------------------
 
 begin;

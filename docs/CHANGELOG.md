@@ -2,6 +2,38 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N slice 2N.3 unit M1: an archived memory stops being retrieved, at the bound
+
+**The phase's first migration.** `202608130093_phase_2n_slice_3_validity_aware_retrieval.sql` is **M1** of the three ADR-109 allocated, all non-transferable. Budget moves to **`3 allocated · 1 spent`**; **M3** stays with slice 2N.3 and **M2** with 2N.7, and **a fourth is a stop condition**. 93 migrations local.
+
+**This unit contains no deletion.** M3 is authorized only by the intermediate deletion re-audit, which runs against the tree and database this unit produces.
+
+### The bound was applied before validity, and no later code could undo that
+
+`match_internal_knowledge` applied `limit least(...)` **before anything read `valid_from` or `valid_until`** — neither column appeared in the function at all. Validity was enforced afterwards in TypeScript, which removes an archived memory from the *citation list* but cannot undo what the bound already did: chat asks for **8** rows, so an archived memory ranking in the top eight **consumed one of the eight slots** and the live memory ranked ninth was never sent. **No downstream code can recover a row the database did not return** — which is why the alternative without a migration fails `2N-CORRECT-003` in principle, not merely in practice.
+
+The predicate now sits **inside the union arm**, and it is the exact negation of `isMemoryInForce` — **both halves**, because a `valid_until`-only predicate still retrieves a **scheduled** memory, which is the same lie in the other direction. Entries are deliberately unfiltered: they carry no validity window. `security invoker`, empty `search_path` and every grant are unchanged, so RLS remains the boundary that actually holds.
+
+**The TypeScript filter is kept and is no longer the enforcement.** M1's documented rollback is "re-declare the prior definition", and a rollback that also re-admitted archived memories into citations would cost more than the displacement fix it undoes.
+
+### The re-audit found a live defect the plan did not carry
+
+`2N-KNOWS-003`. The memory detail page printed **"Criada por você" / "Created by you"** for every null `source_entry_id` — and that column is **`on delete set null`**, so a memory whose source entry the owner deleted claimed an origin it cannot have. Its other arm printed **"the originating record no longer exists"** whenever the row did not come back, which under RLS also covers a **foreign** entry: false about a record that exists, and a probe for whether an entry id is real. Slice 2N.1 built the contract that refuses both and made `ownerAuthored("memories")` a **type error**; the memory page predates it. Both surfaces now derive through `deriveClaimProvenance`, the three copy strings are **deleted** rather than deprecated, and the list — which showed no source at all — shows one per row.
+
+Also `2N-KNOWS-004`, where the page showed two freshness facts for a requirement asking three (`created_at` was silently substituted into the in-force-from slot, so a memory with no start date read as though it began the day it was typed), and `2N-KNOWS-008`, where the person and project pickers truncated in silence so an owner past the bound cannot link a person that exists.
+
+### Two classifications close by rule, and the rules are executable
+
+`2N-KNOWS-005` — **fact / interpretation / inference is not representable for a memory.** `memories` carries no classification column and no interpretation pointer; `element_classifications` is a jsonb on `entry_interpretations`, and `memories.kind` contains a value spelled `fact` beside `preference` and `habit`, which is a **category of subject matter**, not an epistemic level. Rendering it as one would mint the vocabulary slice 2N.2 refused to mint for `risk`. `2N-IDENTITY-005…007` — **merge and duplicate surfacing stay unbuilt** under `OD-2N-3` A. Both are asserted against schema, types and app, each with a **non-vacuity control**.
+
+### Proofs
+
+`phase_2n_validity_aware_retrieval.sql`, **15 assertions**, proves **eviction at the bound** rather than absence from a citation list: the archived memory *outranks* the live one — asserted directly against the table, so the control is not vacuous — and at a bound of **one** the live memory is what comes back. Both inclusive boundaries are exact, because `now()` is transaction time. Six **mutation controls**, each failing exactly its own assertion. The journey archives **through the product's own form** and then calls the RPC **as that user**, with a **synthetic** query vector, so it observes eviction directly and **costs no provider spend**.
+
+### Three guards pinned 92, and were re-framed rather than bumped
+
+Bumping to 93 would make a guard that must be edited on every spend to go green, which the declarations suite already records as not a guard. They now assert **slice attribution** — every Phase 2N migration names the slice that spent it, and none names 2N.0/2N.1/2N.2 — which survives M3 and M2 and catches an unattributed migration the flat count could not see at all. The declarations suite gained a matching assertion that every spend names its **allocation** and that two migrations never claim one.
+
 ## 2026-08-13 - PHASE 2N slice 2N.2: the project page says what changed, what a reading called a decision, and what it cannot know
 
 Seven requirements: **4 built, 3 baseline**, with the risk half of `2N-PROJECT-005` closing **`not-built-by-rule`**. **Zero migrations**; 92 total, parity `202608120092`.

@@ -235,8 +235,23 @@ describe("2N.0 adds no schema and no new authority", () => {
     const migrations = readdirSync(join(REPO, "supabase", "migrations")).filter((file) =>
       file.endsWith(".sql"),
     );
-    expect(migrations).toHaveLength(92);
-    expect(migrations.filter((file) => /2n|phase_2n/i.test(file))).toEqual([]);
+    /*
+     * **Re-framed when slice 2N.3 spent M1.** This asserted 92 files and that
+     * NO Phase 2N migration existed anywhere — true when 2N.0 shipped, and a
+     * claim about the whole phase rather than about this slice. The phase is
+     * now authorized to spend three.
+     *
+     * The narrower claim is the one this file wants and it is stronger: every
+     * Phase 2N migration names the slice that spent it, and none names 2N.0.
+     */
+    const phase2n = migrations.filter((file) => /phase_2n/i.test(file));
+    for (const file of phase2n) {
+      expect(file, `${file} does not name the slice that spent it`).toMatch(/_slice_\d+_/);
+    }
+    expect(
+      phase2n.filter((file) => /_slice_0_/.test(file)),
+      "2N.0's schema impact is none; M1 and M3 belong to 2N.3 and M2 to 2N.7",
+    ).toEqual([]);
   });
 
   it("adds no sensitivity column to people or projects", () => {

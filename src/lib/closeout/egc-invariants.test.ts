@@ -112,7 +112,18 @@ const REPO = resolve(__dirname, "../../..");
 // once and is still pushed at 03:00. Moved deliberately and visibly in the same
 // commit that adds the migration, which is the only way this pin is allowed to
 // change.
-const AUTHORIZED_MIGRATION_HEAD = "202608120092";
+// Moved by PHASE 2N SLICE 2N.3 to `202608130093`, validity-aware retrieval.
+// This is MIGRATION M1 of the three ADR-109 allocated, all NON-TRANSFERABLE:
+// M3 stays with slice 2N.3 for transactional deletion and M2 with slice 2N.7
+// for the telemetry vocabulary, and the budget is now `3 allocated · 1 spent`
+// with **a fourth a stop condition**. It re-declares ONE function so that
+// `valid_from`/`valid_until` are applied inside the union rather than after the
+// bound — creating no table, no column, no policy, no grant change and no
+// schedule — because filtering after the bound removes an archived memory from
+// the citations while it has already displaced a live one, which no downstream
+// code can undo. Moved deliberately and visibly in the same commit that adds
+// the migration, which is the only way this pin is allowed to change.
+const AUTHORIZED_MIGRATION_HEAD = "202608130093";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
