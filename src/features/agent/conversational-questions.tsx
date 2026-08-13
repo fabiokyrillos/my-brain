@@ -1,7 +1,7 @@
 import "server-only";
 import { CircleHelp, MoonStar } from "lucide-react";
 import Link from "next/link";
-import { resolveProfileTimezone } from "@/features/daily-cycle/review-projection";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { ConversationalQuestionsViewed } from "@/features/product-analytics/interaction-events";
 import type { createClient } from "@/lib/supabase/server";
 import { QuestionAnswerForm } from "./forms";
@@ -116,7 +116,7 @@ export async function ConversationalQuestions({
 
   // A timezone read error is non-fatal: fall back to the default zone so the
   // defer picker and preview dates still render.
-  const timezone = resolveProfileTimezone(
+  const timezone = resolveOwnerTimeZone(
     (profileResult.data as { timezone?: unknown } | null)?.timezone,
   );
 

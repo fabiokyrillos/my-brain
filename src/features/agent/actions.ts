@@ -2,6 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { formatInstant } from "@/lib/time/instant-format";
+import {
+  formatLocalDate,
+  localDateOf,
+  localDayBounds,
+  localDayBoundsForDate,
+  startOfLocalWeek,
+} from "@/lib/time/local-day";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
@@ -15,7 +22,7 @@ import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { ATTACHMENT_LIMITS, QUOTAS } from "@/lib/quotas";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
-import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
+import { resolveLocale, type Locale } from "@/lib/preferences";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { requireSupabaseSuccess } from "@/lib/supabase/result";
@@ -917,41 +924,67 @@ export async function generateReview(
   if (!user) return { status: "error", message: messages.session };
   await assertActiveAccount(supabase, user.id, parsed.data.locale);
   const now = new Date();
-  let start = new Date(now);
-  if (parsed.data.period === "daily") start.setHours(0, 0, 0, 0);
-  else if (parsed.data.period.startsWith("weekly")) {
-    const day = (now.getDay() + 6) % 7;
-    start.setDate(now.getDate() - day);
-    start.setHours(0, 0, 0, 0);
-  } else {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-  const [entriesResult, tasksResult, profileResult, preferencesResult] =
-    await Promise.all([
-      supabase
-        .from("entries")
-        .select("id,original_content,occurred_at")
-        .gte("occurred_at", start.toISOString())
-        .lte("occurred_at", now.toISOString())
-        .order("occurred_at")
-        .limit(100),
-      supabase
-        .from("tasks")
-        .select("id,title,status,due_at,updated_at")
-        .gte("updated_at", start.toISOString())
-        .order("updated_at")
-        .limit(100),
-      supabase
-        .from("profiles")
-        .select("timezone")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("agent_preferences")
-        .select("review_model,personality,tone,response_detail")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+
+  /*
+   * `LDC-AGENT-002` — the period is **the owner's**, not the host's.
+   *
+   * This used to compute `start` with `setHours(0, 0, 0, 0)`, `getDay()`,
+   * `getDate()`, `getFullYear()` and `getMonth()`: seven reads of the *host's*
+   * calendar, which on a server is UTC. The owner's zone was fetched eleven
+   * lines below, in the same batch, and used only to build the prompt — so the
+   * review was told which zone the user lived in while being given the wrong
+   * days to summarise.
+   *
+   * The profile is therefore read **first** now, and the window comes from the
+   * contract rather than from arithmetic. Two round trips instead of one, which
+   * is the honest cost of needing the zone before the query it parameterises.
+   *
+   * **This changes what a review contains**, and ADR-111 Decision 6 signed that
+   * in advance: a daily review generated at 22:00 in São Paulo now covers that
+   * day instead of tomorrow. No stored summary is rewritten or reprocessed.
+   */
+  const [profileResult, preferencesResult] = await Promise.all([
+    supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("agent_preferences")
+      .select("review_model,personality,tone,response_detail")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+  const timeZone = resolveOwnerTimeZone(profileResult.data?.timezone);
+  const today = localDateOf(now, timeZone);
+  /*
+   * Monday-based, matching the `(getDay() + 6) % 7` this replaces and
+   * `startOfLocalWeek`'s own rule — one convention, stated in the contract, so
+   * the two locales cannot disagree about where a week starts.
+   *
+   * The month case takes day 1 of the owner's current local month. Every branch
+   * resolves through `localDayBoundsForDate`, so a period beginning on a day
+   * whose local midnight does not exist starts at the first instant that does.
+   */
+  const start = new Date(
+    parsed.data.period === "daily"
+      ? localDayBounds(now, timeZone).start
+      : parsed.data.period.startsWith("weekly")
+        ? localDayBoundsForDate(startOfLocalWeek(today), timeZone).start
+        : localDayBoundsForDate({ ...today, day: 1 }, timeZone).start,
+  );
+
+  const [entriesResult, tasksResult] = await Promise.all([
+    supabase
+      .from("entries")
+      .select("id,original_content,occurred_at")
+      .gte("occurred_at", start.toISOString())
+      .lte("occurred_at", now.toISOString())
+      .order("occurred_at")
+      .limit(100),
+    supabase
+      .from("tasks")
+      .select("id,title,status,due_at,updated_at")
+      .gte("updated_at", start.toISOString())
+      .order("updated_at")
+      .limit(100),
+  ]);
   if (
     entriesResult.error ||
     tasksResult.error ||
@@ -1027,8 +1060,9 @@ export async function generateReview(
     }).answerFromKnowledge({
       question: prompts[parsed.data.period],
       locale: parsed.data.locale,
-      timezone:
-        profileResult.data?.timezone ?? defaultAgentPreferences.timezone,
+      // The same resolved zone the window was built from, so the prompt cannot
+      // describe a zone the period was not computed in.
+      timezone: timeZone,
       sources,
       responseDetail: preferences?.response_detail ?? "short",
       agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
@@ -1040,8 +1074,14 @@ export async function generateReview(
       usage: answer,
       sourceType: "summary",
     });
-    const startDate = start.toISOString().slice(0, 10);
-    const endDate = now.toISOString().slice(0, 10);
+    /*
+     * `LDC-AGENT-002`. These are the summary's own dates, and they were the
+     * **UTC** calendar days of the two instants — so a review covering the
+     * owner's Tuesday could be stored as Wednesday's. `formatLocalDate` of the
+     * owner's local date is the same day the window was built from.
+     */
+    const startDate = formatLocalDate(localDateOf(start, timeZone));
+    const endDate = formatLocalDate(today);
     const titleMap = parsed.data.locale === "pt-BR"
       ? { daily: "Resumo diário", weekly_review: "Revisão semanal", weekly_plan: "Planejamento semanal", monthly: "Revisão mensal" }
       : { daily: "Daily summary", weekly_review: "Weekly review", weekly_plan: "Weekly plan", monthly: "Monthly review" };

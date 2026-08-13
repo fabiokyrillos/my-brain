@@ -113,7 +113,7 @@ export async function TaskDetailSurface({
             // Computed on the server against the request's own instant, so the
             // picker's bounds are one value rather than two that could disagree
             // across hydration.
-            dateBounds={dateBounds(new Date())}
+            dateBounds={dateBounds(new Date(), detail.timezone)}
             locale={locale}
             relationOptions={{
               project: relations.projects,

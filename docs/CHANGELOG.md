@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 4b: the three families reach zero, and the resolvers become one
+
+**All thirty-one occurrences the census found are repaired. `OPEN_OCCURRENCES` is empty and every family is at zero tree-wide.**
+
+**`generateReview` computed its period in the host's zone.** `setHours(0, 0, 0, 0)` for daily, `getDay()`/`setDate()` for weekly, `new Date(getFullYear(), getMonth(), 1)` for monthly — seven reads of the *host's* calendar, which on a server is UTC — and then `toISOString().slice(0, 10)` stored as the summary's dates. The owner's zone was fetched eleven lines below, **in the same batch**, and used only to build the prompt: the review was told which zone the user lived in while being given the wrong days to summarise.
+
+The profile is now read **first**, and the window comes from the contract — `localDayBounds` for daily, `startOfLocalWeek` for weekly, day 1 of the owner's local month for monthly. Two round trips instead of one, which is the honest cost of needing the zone before the query it parameterises. **This changes what a review contains**, and ADR-111 Decision 6 signed that in advance: a daily review generated at 22:00 in São Paulo now covers that day instead of tomorrow. No stored summary is rewritten, reprocessed or back-dated.
+
+**The `toLocaleString` round-trip is gone from both call sites.** `new Date(new Date(ms).toLocaleString("en-US", { timeZone }))` formats an instant in the target zone and re-parses the string with the **host's** parser, manufacturing a `Date` whose host-zone fields mimic the target zone's wall clock. It carries a zone and is still wrong in kind — the result is a different instant, and it depends on `toLocaleString`'s output being parseable, which is true in V8 and is not guaranteed. `buildDetailPatch` now takes the instant and the zone separately, which is what they are.
+
+**`dateBounds` was wrong twice over and visible never.** It added `730 * 24h` to an instant and sliced the **UTC** date off the result: a day is not always 24 hours, and the UTC calendar date is the owner's only by coincidence. Both errors are at most a day at a ±730-day picker bound, so no user ever saw a wrong date from it. It is corrected because it was a second implementation of calendar arithmetic — stated plainly rather than dressed up as a user-facing fix.
+
+**`shiftDay` was correct and moved anyway.** `2M-TIME-007` had recorded it as correct — `Date.UTC(y, m, d + delta)` is DST-safe civil arithmetic — and deliberately left it alone. It moves onto the contract because it was the last `toISOString().slice(0, 10)` in the tree, and with it gone that family reaches zero **with no exemption**. A family at zero needs no allowlist, and an allowlist is the thing a later author widens.
+
+**Four private zone resolvers become one.** The three byte-identical `isValidTimeZone` predicates and `resolveProfileTimezone` all now call `resolveOwnerTimeZone`. Emptying `DUPLICATE_ZONE_RESOLVERS` proves nothing by itself, so the four files are checked directly: the symbol must be absent *and* the file must reach the resolver.
+
+**One reader is deliberately left alone, and the reason is recorded.** `requireProfileTimeZone` in `calendar-projection.ts` **throws** on an unsupported zone rather than falling back. That is not a fifth copy — it is the right posture for a surface that *computes* days, and it is exactly the argument `local-day.ts` makes for itself: a day nobody could compute must be reported rather than answered, because the alternative is a plausible wrong answer at 23:00. `resolveOwnerTimeZone` is total because it serves *rendering*, where a fallback beats a crashed page. Two postures, stated — not one rule applied inconsistently.
+
+**What the census still reports, and why it is right to.** Fifteen `24 * 60 * 60 * 1000` / `86_400_000` occurrences remain and every one is a **duration**: cooldowns, retention bounds, undo windows, duration clamps, a bounded-integer validator, rolling period filters, and civil day differences computed on UTC-anchored dates. Two documented fail-open fallbacks remain (`slice(11, 16)` taking a clock; a rolling window when the zone is unusable), and `forms.tsx` still slices `0, 19` to canonicalise an **instant** — a different operation from taking a day.
+
+6536 tests pass. Zero migrations, 92, parity `202608120092`.
+
 ## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 4a: all seventeen formatters reach zero
 
 The job-retry notice, both question panels, conversation sources, search and Home's day header. **The `formatter-without-zone` family is now empty tree-wide**, and `OPEN_OCCURRENCES` holds only the three families the census surfaced beyond the seventeen.

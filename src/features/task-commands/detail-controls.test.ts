@@ -97,11 +97,19 @@ describe("detailControlsFor", () => {
 });
 
 describe("date bounds", () => {
-  const today = new Date("2026-07-30T12:00:00.000Z");
+  /*
+   * `LDC-MISC-001`. An instant plus a zone, not a faked local Date.
+   *
+   * Noon UTC on the 30th is still the 30th in Sao Paulo (UTC-3), so the window
+   * below is unchanged by the correction -- which is the point: this is a
+   * contract change, not a behaviour change.
+   */
+  const NOW = new Date("2026-07-30T12:00:00.000Z");
+  const ZONE = "America/Sao_Paulo";
 
   it("mirrors the temporal lexicon's ±730-day window", () => {
     expect(MAX_RELATIVE_DAYS).toBe(730);
-    const bounds = dateBounds(today);
+    const bounds = dateBounds(NOW, ZONE);
     // 730 days back crosses no leap day (Feb 2025 and Feb 2026 are common
     // years); 730 forward crosses Feb 2028, which is why the window is not
     // symmetric on the calendar even though it is symmetric in days.
@@ -110,31 +118,31 @@ describe("date bounds", () => {
   });
 
   it("accepts the calendar-date shape the lexicon resolves", () => {
-    expect(isSubmittableDate("2026-08-15", today)).toBe(true);
+    expect(isSubmittableDate("2026-08-15", NOW, ZONE)).toBe(true);
   });
 
   it("refuses a complete ISO instant, which the lexicon deliberately will not resolve", () => {
     // `resolveTemporalPhrase` refuses a full instant on purpose: the instant is
     // never client-supplied, or a browser offset could pin the user to another
     // timezone. The control must therefore never submit one.
-    expect(isSubmittableDate("2026-08-15T17:00:00.000Z", today)).toBe(false);
+    expect(isSubmittableDate("2026-08-15T17:00:00.000Z", NOW, ZONE)).toBe(false);
   });
 
   it("refuses a date outside the window instead of silently clamping it", () => {
-    expect(isSubmittableDate("2030-01-01", today)).toBe(false);
-    expect(isSubmittableDate("2020-01-01", today)).toBe(false);
+    expect(isSubmittableDate("2030-01-01", NOW, ZONE)).toBe(false);
+    expect(isSubmittableDate("2020-01-01", NOW, ZONE)).toBe(false);
   });
 
   it("refuses a day that does not exist, which the lexicon would silently roll over", () => {
     // `explicit_date` builds a WallTime straight from the capture groups and
     // never asks, so 2026-02-31 resolves — as March 3rd. Rescheduling a task to
     // a day the user did not name is worse than refusing.
-    expect(isSubmittableDate("2026-02-31", today)).toBe(false);
-    expect(isSubmittableDate("2026-13-01", today)).toBe(false);
-    expect(isSubmittableDate("2026-00-10", today)).toBe(false);
+    expect(isSubmittableDate("2026-02-31", NOW, ZONE)).toBe(false);
+    expect(isSubmittableDate("2026-13-01", NOW, ZONE)).toBe(false);
+    expect(isSubmittableDate("2026-00-10", NOW, ZONE)).toBe(false);
     // The leap day itself must still be accepted in a leap year.
-    expect(isSubmittableDate("2028-02-29", today)).toBe(true);
-    expect(isSubmittableDate("2027-02-29", today)).toBe(false);
+    expect(isSubmittableDate("2028-02-29", NOW, ZONE)).toBe(true);
+    expect(isSubmittableDate("2027-02-29", NOW, ZONE)).toBe(false);
   });
 });
 
@@ -164,7 +172,15 @@ describe("detailControlFor", () => {
 });
 
 describe("buildDetailPatch", () => {
-  const today = new Date("2026-07-30T12:00:00.000Z");
+  /*
+   * `LDC-MISC-001`. An instant plus a zone, not a faked local Date.
+   *
+   * Noon UTC on the 30th is still the 30th in Sao Paulo (UTC-3), so the window
+   * below is unchanged by the correction -- which is the point: this is a
+   * contract change, not a behaviour change.
+   */
+  const NOW = new Date("2026-07-30T12:00:00.000Z");
+  const ZONE = "America/Sao_Paulo";
 
   function control(action: TaskCommandAction): DetailControl {
     const value = detailControlFor(action);
@@ -173,63 +189,63 @@ describe("buildDetailPatch", () => {
   }
 
   it("fills the single field its control declares", () => {
-    expect(buildDetailPatch(control("rename_task"), "Novo título", today))
+    expect(buildDetailPatch(control("rename_task"), "Novo título", NOW, ZONE))
       .toEqual({ status: "ok", patch: { title: "Novo título" } });
-    expect(buildDetailPatch(control("set_priority"), "high", today))
+    expect(buildDetailPatch(control("set_priority"), "high", NOW, ZONE))
       .toEqual({ status: "ok", patch: { priority: "high" } });
-    expect(buildDetailPatch(control("assign_project"), "Aurora", today))
+    expect(buildDetailPatch(control("assign_project"), "Aurora", NOW, ZONE))
       .toEqual({ status: "ok", patch: { projectRef: "Aurora" } });
   });
 
   it("sends an empty patch for a control that fills nothing, whatever the form carried", () => {
     // `clear_due` means the same thing with or without a stray value, so a value
     // arriving with it is discarded rather than refused.
-    expect(buildDetailPatch(control("clear_due"), undefined, today))
+    expect(buildDetailPatch(control("clear_due"), undefined, NOW, ZONE))
       .toEqual({ status: "ok", patch: {} });
-    expect(buildDetailPatch(control("clear_due"), "ignorado", today))
+    expect(buildDetailPatch(control("clear_due"), "ignorado", NOW, ZONE))
       .toEqual({ status: "ok", patch: {} });
-    expect(buildDetailPatch(control("cancel_task"), undefined, today))
+    expect(buildDetailPatch(control("cancel_task"), undefined, NOW, ZONE))
       .toEqual({ status: "ok", patch: {} });
   });
 
   it("refuses an empty required field with its own reason, not a schema error", () => {
     for (const value of [undefined, "", "   "]) {
-      expect(buildDetailPatch(control("rename_task"), value, today))
+      expect(buildDetailPatch(control("rename_task"), value, NOW, ZONE))
         .toEqual({ status: "refused", reason: "missing_value" });
     }
   });
 
   it("trims the submitted value, since the schema trims and would then disagree", () => {
-    expect(buildDetailPatch(control("rename_task"), "  Novo título  ", today))
+    expect(buildDetailPatch(control("rename_task"), "  Novo título  ", NOW, ZONE))
       .toEqual({ status: "ok", patch: { title: "Novo título" } });
   });
 
   it("separates a malformed date from a real one outside the window", () => {
     // Two different corrections: one is "write it as a date", the other is
     // "pick a nearer day". A single reason would tell the user neither.
-    expect(buildDetailPatch(control("reschedule_due"), "15/08/2026", today))
+    expect(buildDetailPatch(control("reschedule_due"), "15/08/2026", NOW, ZONE))
       .toEqual({ status: "refused", reason: "date_invalid" });
-    expect(buildDetailPatch(control("reschedule_due"), "2026-02-31", today))
+    expect(buildDetailPatch(control("reschedule_due"), "2026-02-31", NOW, ZONE))
       .toEqual({ status: "refused", reason: "date_invalid" });
-    expect(buildDetailPatch(control("reschedule_due"), "2026-08-15T17:00:00.000Z", today))
+    expect(buildDetailPatch(control("reschedule_due"), "2026-08-15T17:00:00.000Z", NOW, ZONE))
       .toEqual({ status: "refused", reason: "date_invalid" });
-    expect(buildDetailPatch(control("set_planned"), "2035-01-01", today))
+    expect(buildDetailPatch(control("set_planned"), "2035-01-01", NOW, ZONE))
       .toEqual({ status: "refused", reason: "date_out_of_range" });
   });
 
   it("accepts a date inside the window on both date verbs", () => {
-    expect(buildDetailPatch(control("reschedule_due"), "2026-08-15", today))
+    expect(buildDetailPatch(control("reschedule_due"), "2026-08-15", NOW, ZONE))
       .toEqual({ status: "ok", patch: { dueAt: "2026-08-15" } });
-    expect(buildDetailPatch(control("set_planned"), "2026-08-15", today))
+    expect(buildDetailPatch(control("set_planned"), "2026-08-15", NOW, ZONE))
       .toEqual({ status: "ok", patch: { plannedAt: "2026-08-15" } });
   });
 
   it("refuses a choice outside the policy's own closed set", () => {
-    expect(buildDetailPatch(control("set_priority"), "catastrófica", today))
+    expect(buildDetailPatch(control("set_priority"), "catastrófica", NOW, ZONE))
       .toEqual({ status: "refused", reason: "value_not_allowed" });
     // The route this closes matters: `set_status` reaching `cancelled` would be
     // an unconfirmed path to the transition `cancel_task` exists to guard.
-    expect(buildDetailPatch(control("set_status"), "cancelled", today))
+    expect(buildDetailPatch(control("set_status"), "cancelled", NOW, ZONE))
       .toEqual({ status: "refused", reason: "value_not_allowed" });
   });
 
@@ -238,7 +254,7 @@ describe("buildDetailPatch", () => {
       const value = detailControlFor(action);
       if (value === null || value.choices === null) continue;
       for (const choice of value.choices) {
-        expect(buildDetailPatch(value, choice, today)).toMatchObject({ status: "ok" });
+        expect(buildDetailPatch(value, choice, NOW, ZONE)).toMatchObject({ status: "ok" });
       }
     }
   });

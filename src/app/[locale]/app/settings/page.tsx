@@ -5,6 +5,7 @@ import { loadPendingEntryCount } from "@/features/byok/pending-entries";
 import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
 import { loadSettingsFormValues } from "@/features/profile/settings-view";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 
@@ -36,6 +37,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         saveAction={saveAiCredential}
         removeAction={removeAiCredential}
         interpretPendingAction={interpretPendingEntries}
+        timeZone={await getOwnerTimeZone()}
       />
       <SettingsForm action={updateProfile} locale={locale} values={values} />
     </div>

@@ -100,7 +100,7 @@ export default async function ReviewsPage({
        * the direct-write guard is what keeps that true rather than customary.
        */
       action={applyTaskDetailCommand}
-      dateBounds={dateBounds(now)}
+      dateBounds={dateBounds(now, timezone)}
       locale={locale}
       projection={projection}
       reviewsHref={`/${locale}/app/reviews`}

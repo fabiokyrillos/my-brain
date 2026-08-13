@@ -1,6 +1,7 @@
 "use client";
 
 import { Inbox, KeyRound, LoaderCircle, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
+import { formatInstant } from "@/lib/time/instant-format";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/preferences";
@@ -46,6 +47,7 @@ export function CredentialPanel({
   saveAction,
   removeAction,
   interpretPendingAction,
+  timeZone,
 }: {
   locale: Locale;
   credential: CredentialMetadata;
@@ -53,6 +55,12 @@ export function CredentialPanel({
   saveAction: Action;
   removeAction: Action;
   interpretPendingAction: Action;
+  /**
+   * The owner's zone (`LDC-MISC-001`). This is a client component, so the
+   * validated-at date rendered in the **browser's** zone — the one authority the
+   * contract names explicitly as not being one.
+   */
+  timeZone: string;
 }) {
   const copy = getByokCopy(locale);
   const [saveState, save, savePending] = useActionState(saveAction, idle);
@@ -129,7 +137,7 @@ export function CredentialPanel({
           <span>
             {copy.settings.validatedAt}{" "}
             <time dateTime={credential.validatedAt}>
-              {new Date(credential.validatedAt).toLocaleDateString(locale)}
+              {formatInstant(credential.validatedAt, "day", locale, timeZone)}
             </time>
           </span>
         ) : null}

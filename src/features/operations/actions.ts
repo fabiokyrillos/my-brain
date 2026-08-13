@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
@@ -19,7 +20,7 @@ import { WORK_SURFACE_ACTIONS } from "@/features/task-commands/taxonomy";
 import { WorkCommandInputError, applyWorkCommand } from "@/features/task-commands/work-command";
 import { requireUser } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
-import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
+import { locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 import { applyDetailCommand } from "@/features/task-commands/detail-command";
 import { buildDetailPatch, detailControlFor } from "@/features/task-commands/detail-controls";
@@ -270,16 +271,6 @@ function settled(
   };
 }
 
-function isValidTimeZone(value: unknown): value is string {
-  if (typeof value !== "string" || value === "") return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Applies one Work-surface click through `public.apply_task_command`.
  *
@@ -316,9 +307,7 @@ export async function applyWorkItemAction(
   // Work verb carries a temporal phrase, but a zone this process guessed would
   // still be a guess recorded in a validated command.
   const profile = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-  const timeZone = isValidTimeZone(profile.data?.timezone)
-    ? profile.data.timezone
-    : defaultAgentPreferences.timezone;
+  const timeZone = resolveOwnerTimeZone(profile.data?.timezone);
 
   let outcome: Awaited<ReturnType<typeof applyWorkCommand>>;
   try {
@@ -473,13 +462,13 @@ export async function applyBulkWorkCommand(
 
   const { supabase, user } = await requireUser(locale);
   const profile = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-  const timeZone = isValidTimeZone(profile.data?.timezone)
-    ? profile.data.timezone
-    : defaultAgentPreferences.timezone;
+  const timeZone = resolveOwnerTimeZone(profile.data?.timezone);
 
   const nowMs = Date.now();
-  const today = new Date(new Date(nowMs).toLocaleString("en-US", { timeZone }));
-  const patch = buildDetailPatch(control, parsed.data.value, today);
+  // `LDC-MISC-001`. The instant and the zone travel separately; see
+  // `detail-actions.ts` for why the `toLocaleString` round-trip this replaces
+  // was wrong in kind rather than merely fragile.
+  const patch = buildDetailPatch(control, parsed.data.value, new Date(nowMs), timeZone);
   // The value is refused **once**, before any item is touched. Fifty identical
   // refusals for one bad date would be fifty rows of noise about one mistake.
   if (patch.status === "refused") {

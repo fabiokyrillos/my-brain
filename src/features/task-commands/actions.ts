@@ -37,6 +37,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -52,7 +53,7 @@ import {
 } from "@/lib/ai/task-command-schema";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireUser } from "@/lib/auth/require-user";
-import { defaultAgentPreferences, locales, type Locale } from "@/lib/preferences";
+import { locales, type Locale } from "@/lib/preferences";
 import {
   createProductEventIdempotencyKey,
   recordProductEvent,
@@ -195,16 +196,6 @@ function parseOrigin(formData: FormData): TaskCommandOrigin {
   return parsed.success ? parsed.data : "chat";
 }
 
-function isValidTimeZone(value: unknown): value is string {
-  if (typeof value !== "string" || value === "") return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 type CommandContext = {
   readonly supabase: Awaited<ReturnType<typeof requireUser>>["supabase"];
   readonly userId: string;
@@ -235,7 +226,7 @@ async function loadCommandContext(formData: FormData): Promise<CommandContext> {
     supabase,
     userId: user.id,
     locale,
-    timeZone: isValidTimeZone(candidate) ? candidate : defaultAgentPreferences.timezone,
+    timeZone: resolveOwnerTimeZone(candidate),
     origin: parseOrigin(formData),
     copy: copyFor(locale),
   };
