@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - PHASE 2N slice 2N.0: the hosted journey is executed, and it finds the loading state silent in English
+
+`2N-PRIVACY-011` closes **partial -> built**. 2N.0 shipped its acceptance journey written but **never run**, because it needs hosted credentials and skips without them. Executed now: **12/12**, both locales x desktop and mobile, against the hosted Supabase project (`202608120092`) with the **production build** serving the app. **Zero migrations.** 92 total, parity unchanged.
+
+### The product defect the execution found
+
+**2N.0 replaced a fallback that announced Portuguese to every reader with one that, on `en`, announces nothing at all.** Both spans hidden, a screen reader given silence - worse than the bug it fixed, and exactly what the rules' "hide what does not match" direction was chosen to prevent.
+
+The direction was right; the **selector form** defeated it. `[lang="pt-BR"] .route-loading [data-...="en"]` uses a descendant combinator, which matches an ancestor at **any** depth - and there are always **two** `lang` declarations above those spans: `src/app/layout.tsx` sits above `[locale]` and hardcodes `lang="pt-BR"`, while `.app-frame` carries the real one. On `en` they disagree, both rules match, both announcements go. Keyed on **`:lang()`**, which resolves against the *nearest* declaration, the outer `<html>` cannot participate. Degradation is preserved: no stylesheet or no `lang` and neither pseudo-class matches, so both are announced.
+
+**This corrects the claim made in the 2N.0 entry below** that the stylesheet "degrades to announcing both rather than nothing". The intent was that; the implementation did the opposite on one of the two locales.
+
+**No unit test in this repository could have caught it** - jsdom applies no external stylesheet - and the guard asserted only that the rules *existed*, so it would have passed on a stylesheet that hides everything. It now bans the ancestor form by name, proved by reintroducing the old selector and watching it fail.
+
+### The journey could never have run
+
+Its two array inserts gave their rows different key sets, which PostgREST refuses with `PGRST102 - "All object keys must match"`. **A written test is not an executed test, and an unexecuted one is not even known to be runnable.**
+
+### Residue
+
+Disposable accounts, admin-created and admin-deleted, **no owner credential** and **no paid provider** (search is lexical; no trigger enqueues a job from a direct insert). Zero residue proved **owner-scoped** by account and by six distinctive synthetic markers - never by a global count, which on a project holding the owner's real data would be evidence of nothing.
+
 ## 2026-08-13 - PHASE 2N slice 2N.0: the contextual surfaces become governed, bounded and identifiable
 
 **The first slice of Phase 2N to build anything.** ADR-112 authorized implementation; this is 2N.0, re-audited against `main` at `4b66119` before a line was written. Twenty-nine requirements, **zero migrations**, 92 total and parity `202608120092` unchanged.
