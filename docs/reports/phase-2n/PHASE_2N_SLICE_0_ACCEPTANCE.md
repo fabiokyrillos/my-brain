@@ -30,7 +30,13 @@ No drift, no re-planning, no reordering. **2N.0's plan was accurate as written.*
 
 ## 2. Requirements — 29 declared, 29 classified
 
-### Built (23)
+**Amended 2026-08-13, after the hosted journey was executed.** `2N-PRIVACY-011`
+moves **partial → built**, and the execution found a **product defect** in
+`2N-ACCESS-003`/`-005`. Both are recorded in §8 rather than by editing the
+history above: the slice really did close with a partial, and the record of that
+is worth more than a tidy table. **24 built · 5 baseline · 0 partial.**
+
+### Built (23 at merge; 24 after §8)
 
 | id | delivered as |
 |---|---|
@@ -73,9 +79,12 @@ identity. This slice adds no writer of any kind, so the property is preserved
 rather than built — asserted as the absence of every write verb in the alias
 reader.
 
-### Partial (1)
+### Partial (1 at merge; 0 after §8)
 
-`2N-PRIVACY-011` — **partial, and the remainder is named.** The journey is
+`2N-PRIVACY-011` — **partial, and the remainder is named.** *(Closed **built** by
+§8 on 2026-08-13: executed 12/12 against the hosted project, zero residue. The
+execution also found the journey un-runnable and the product silent in English —
+both fixed there.)* The journey is
 written (`e2e/online-phase-2n-foundations.spec.ts`), covers both locales on
 desktop and mobile, and asserts every clause: name visible, notes masked, reveal
 local and reachable, notes absent from search, counts not usable as an oracle,
@@ -165,3 +174,114 @@ usage ledger is untouched. No change to signup (**closed**), to the rollout gate
 
 **Code complete; hosted acceptance outstanding** (`2N-PRIVACY-011`, §2). CI and
 merge SHA are recorded in the handoff entry for this slice.
+
+*(Superseded by §8: the hosted acceptance has since been executed.)*
+
+---
+
+## 8. The hosted execution — 2026-08-13, after merge
+
+Run against `main` at `e9121233`. **`2N-PRIVACY-011` moves partial → built.**
+
+### What was executed, stated precisely
+
+`npm run test:e2e:online -- e2e/online-phase-2n-foundations.spec.ts` —
+**12/12 passed**, both locales × desktop and mobile (Pixel 7), 33.4s.
+
+| half | what it actually was |
+|---|---|
+| database, auth, RLS | the **hosted Supabase project**, `202608120092`, real GoTrue session, real policies |
+| application | the **production build** (`npm run build` → `npm run start`) on `localhost:3000` |
+
+**The application half is a local production build, not the Vercel deployment.**
+That is what this repository's online lane is — `playwright.config.ts` pins
+`baseURL` to `localhost:3000` and `scripts/online-playwright.mjs` supplies only
+the hosted Supabase credentials. `npm run start` rather than `npm run dev` is a
+deliberate narrowing of the gap: handoff §57 recorded two Phase 2M surfaces that
+shipped green and had never been rendered, and the dev compiler is not the
+artifact that ships. **Not claimed:** the Vercel edge, its headers, or its build.
+
+### Provider, credentials, residue
+
+- **No paid provider consumed.** `search/contracts.ts` is lexical only ("No
+  embeddings"); `entries` carries no trigger that enqueues an `interpret_entry`
+  job, so a direct REST insert starts no worker. `ai_usage_events` untouched.
+- **No owner credential used.** A disposable account per worker,
+  `codex-2n0-<uuid>@example.com`, admin-created and admin-deleted.
+- **Zero residue, proved two ways and owner-scoped both times.** No global count
+  was taken — the project holds the owner's real data, and a global number would
+  be evidence of nothing.
+
+| probe | result |
+|---|---|
+| accounts matching `codex-2n0-` | **0** |
+| `people.notes` ilike `%e3f77b%` | **0** |
+| `memories.content` ilike `%4f2a9c%` / `%7b1e%` | **0** / **0** |
+| `entries.original_content` ilike `%9d4c1a%` | **0** |
+| `entity_aliases.alias` in (`Mari2N`,`Antigo2N`) | **0** |
+| `people.name` ilike `%Marina Teste 2N%` | **0** |
+
+The same probe run **before** the first successful execution also returned zero,
+which is what establishes the harness cleans up after a **failed** `beforeAll` —
+not merely after a passing run.
+
+### Two defects, and only one of them was the product
+
+**1. The journey could not run at all (fixture).** Both array inserts gave their
+rows different key sets; PostgREST answers `PGRST102 — "All object keys must
+match"`, because one statement carries one column list. **A written test is not
+an executed test, and an unexecuted one is not even known to be runnable** —
+this one was not. Fixed with explicit `source_entry_id: null` / `valid_to: null`,
+which are the honest values anyway.
+
+**2. The loading state is silent in English (product, `2N-ACCESS-003`/`-005`).**
+2N.0 replaced a fallback that announced Portuguese to everyone. On `en` the
+replacement announced **nothing at all** — both spans hidden, a screen reader
+given silence, which is *worse* than the bug it fixed and is precisely what §5's
+"hide what does not match" direction was chosen to prevent.
+
+The direction was right; the **selector form** defeated it. The rules read
+`[lang="pt-BR"] .route-loading [data-…="en"]`, and a descendant combinator
+matches an ancestor at **any** depth. There are always **two** `lang`
+declarations above those spans — `src/app/layout.tsx` sits above `[locale]` and
+hardcodes `lang="pt-BR"`, while `.app-frame` carries the real one — so on `en`
+they disagree, **both** rules match and **both** announcements are removed.
+Keyed on `:lang()`, which resolves against the *nearest* declaration, the outer
+`<html>` cannot participate. Degradation is preserved: with no stylesheet or no
+`lang`, neither pseudo-class matches and both are announced.
+
+**Why every gate passed over it.** jsdom applies no external stylesheet, so no
+unit test in this repository can evaluate this cascade. The guard asserted the
+rules *existed* and reasoned about their direction — it never asserted the
+cascade yields exactly one announcement, so it would have passed on a stylesheet
+that hides everything. It now bans the ancestor form by name, **proved by
+reintroducing the old selector and watching it fail**, because a control that
+cannot fail is not a control.
+
+**This is the third time on this phase's ledger that a proof was the thing at
+fault** (§4 records two guards written wrong). Here the split is cleaner and
+worth keeping: the *fixture* was broken, the *guard* was too weak, and the
+*product* was genuinely wrong — the same execution surfaced all three, and only
+running it could have.
+
+### Gates on the amendment
+
+| gate | result |
+|---|---|
+| `npm run lint` | clean |
+| `npm run typecheck` | clean |
+| `npx vitest run` | **6696 passed**; same 3 failed *files* / **0 failed tests** Windows baseline |
+| `npm run build` | passes |
+| `git diff --check` | clean |
+| hosted journey | **12/12** |
+
+**Test count: 6695 → 6696 (+1)**, the new ancestor-selector ban. Both figures
+measured; `main` at `e9121233` was re-run on a clean tree to establish the 6695.
+*(§3's 6691 was the figure recorded during the 2N.0 PR and is left as written.)*
+
+### Unchanged
+
+**0 migrations.** 92 total, parity `202608120092`. M1/M2/M3 unspent and
+non-transferable. No schema, RLS, grant, policy, RPC or Edge Function change. No
+writer. Signup **closed**, rollout **25 · 3 · 2**, push **not resumed**. **Phase
+2O not started.**
