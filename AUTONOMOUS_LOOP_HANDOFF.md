@@ -4271,3 +4271,133 @@ merge SHAs.
 push not resumed (still HTTP 403 on a real iPhone, Android **NOT EXECUTED**),
 signup closed, rollout 25 · 3 · 2, **Phase 2N planned and unimplemented**, Phase
 2O not started, and A13 still guarding the roadmap successor.
+
+## §60 — The Local Day Correction concludes: the proof stops being structural and starts rendering (2026-08-13)
+
+Unit 5 of ADR-111, merged at `005c42e` with CI green on that exact SHA. The
+initiative is **CONCLUDED**. `docs/reports/local-day-correction/LOCAL_DAY_CORRECTION_CLOSEOUT.md`
+and `PHASE_2N_SLICE_0_REAUDIT.md`.
+
+### What §59 could not say, and this one can
+
+§59 recorded thirty-one repairs and then said plainly what was missing: *"not
+proven anywhere yet: that any of this renders correctly in a real browser, or
+against production."* Everything to that point — a tree-wide guard at zero in
+four families, a convergence test, 6563 unit tests, CI green on five merge SHAs —
+is a statement about **source**. None of it renders a page.
+
+### The shape of the proof, and why it is two owners rather than one
+
+A single account cannot distinguish "renders the owner's day" from "renders some
+day". So one instant runs past **two owners whose zones are on different calendar
+dates at that instant, in opposite directions**:
+
+| owner | zone | locale | sees | UTC — and the deployment's host — sees |
+|---|---|---|---|---|
+| ahead | `Pacific/Auckland` | pt-BR | **15 May** | 14 May |
+| behind | `America/Los_Angeles` | en | **13 May** | 14 May |
+
+A surface pinned to UTC fails for **both**; a surface that merely picked some
+other zone fails for **at least one**. Before this initiative every cell in the
+fourth column read 14 May. May, not August, because a fixture dated today would
+let a page's own "today" satisfy an assertion about a **stored** instant.
+
+Eleven surfaces each, plus the Home header and a DST pair per hemisphere.
+**Executed four ways — 29/29 desktop and mobile against the hosted project, then
+both again against the deployed application.** 116 assertions, zero residue.
+
+**The deployment is the point.** Its host zone is UTC; this machine's is
+`America/Cayenne`. A host-zone defect renders differently in the two, and the
+deployment is the environment the defect was reported against.
+
+### Four ways a test reports success while proving nothing — all found by running
+
+None of these was reasoned about in advance. Each was found because the suite ran
+against something real.
+
+1. **An absence assertion passes on a page that never rendered.** Eleven surface
+   cases "passed" while one of them was reading a body containing nothing but the
+   navigation shell and "Carregando página". The route's Suspense fallback is now
+   waited out, and **every surface names a marker from its own fixture**, so "the
+   wrong day appears nowhere" can no longer be satisfied by a blank page.
+2. **A test that pins a format tests the format.** The calendar was *correct* and
+   failed anyway: `calendar-view.tsx` labels a column `Wed, May 13` and the
+   assertion wanted `May 13, 2026`. A day is now a **set** of spellings.
+3. **`innerText` does not report collapsed content.** The question panels are
+   `<details>`; their dates were in the DOM and invisible. Opened by clicking —
+   scoped to `main`, because the nav shell's own `<details>` is hidden at desktop
+   widths and never becomes clickable.
+4. **Thirty sign-ins in two minutes earn `429 over_request_rate_limit`**, which
+   surfaced as eight unrelated failures and was none of them.
+
+### The extraction that made a signed behaviour change contradictable
+
+`generateReview`'s period moved to `review-period.ts` **unchanged**. The
+obstacle was structural and worth remembering: **`"use server"` makes every
+export in a file an async Server Action**, so the window computation could not be
+exported, could not be called with a fixed `now`, and could only be "tested" by a
+test that re-wrote the same expressions and compared them to itself. ADR-111
+Decision 6's behaviour change had, for five units, **nothing able to contradict
+it**.
+
+Both controls are real: reverting `today` to the host calendar fails **6** cases
+by name; reverting the daily bounds fails **14**. Reverting the person page to
+`formatInstant(…, "UTC")` fails **both** its journey cases with the exact UTC
+spellings it rendered.
+
+### The leak, and the reason it was the failing run that leaked
+
+The first hosted run's `beforeAll` threw *after* creating two accounts, and
+cleanup keyed off a variable the throw had prevented assigning. **The run that
+most needed cleaning up was exactly the one that could not clean up.** Removed by
+explicit id, each verified `@example.com` first, never by a predicate sweep; then
+fixed at the cause — the id is recorded *before* seeding can throw, proved by the
+deliberately failing mutation run, which left nothing.
+
+### Three residuals, none of them a date defect
+
+- `src/app/[locale]/app/loading.tsx` announces **`"Carregando página"` in both
+  locales** on a `role="status"` live region. → `2N-ACCESS`.
+- `loadQuestionPreviews` is wrapped in `.catch(() => new Map())`: a row shape its
+  schema rejects yields no preview and **no error**. → Phase 2N provenance.
+- A **live** `generateReview` against production is **NOT EXECUTED** — it needs a
+  paid provider call behind the BYOK gate. → the owner; a cost decision, not a
+  technical blocker.
+
+`calendar-view.tsx`'s `timeZone: "UTC"` was checked and is **correct** — it
+formats an already-decided `LocalDate` at UTC noon. Recorded because it reads
+alarmingly and the next audit will meet it again.
+
+### Slice 2N.0, re-audited and NOT implemented
+
+Its privacy, bounds and identity halves stand as signed. **Its time half needs
+three corrections before implementation, and they are the owner's to authorize:**
+
+- **`2N-TIME-002` is obsolete as written.** It plans to extend `2M-TIME-007`'s
+  *named* corpus with Phase 2N's directories. A **tree-wide** guard now holds
+  four families at zero over 400+ files, those directories included. Adding a
+  narrower list beside it produces two guards with different reaches for one
+  defect — and re-teaches exactly what §59 recorded: *a guard whose corpus is a
+  list is exactly as wide as somebody remembered to make it.*
+- **`2N-TIME-004` is moot.** The four `daily-cycle` exemptions were repaired in
+  Unit 2 and `HOST_ZONE_FORMATTERS_CARRIED_PAST_CLOSE` is retired. The
+  requirement now asks 2N.0 to **preserve a list that does not exist**, and the
+  easiest way to satisfy it literally is to re-create one.
+- **`2N-TIME-005`'s population was 31, not ~27.** Its own "whichever is current"
+  clause absorbs this, so it is satisfied rather than violated — but the gap is
+  instructive: the extra families were invisible to an audit counting
+  *formatters*, and the worst of them changed **what a review contained**.
+
+**Nothing in Phase 2N was implemented, amended, added or removed.** ADR-111
+Decision 8 makes amending a signed 2N contract a stop condition, so the re-audit
+**proposes and does not edit**.
+
+### THE LOOP STOPS HERE — THE INITIATIVE IS CLOSED
+
+**Unchanged throughout:** 92 migrations, **zero created and zero spent**, hosted
+parity `202608120092` verified against the live project, `verify:edge-parity`
+green, zero Edge Function changes, `planned_at` untouched, push **not** resumed
+(still HTTP 403 on a real iPhone, Android **NOT EXECUTED**), signup closed,
+rollout 25 · 3 · 2, **Phase 2N planned and unimplemented**, **Phase 2O not
+started**, M1/M2/M3 still allocated and non-transferable, and A13 still guarding
+the roadmap successor.

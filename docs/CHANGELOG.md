@@ -2,6 +2,32 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-13 - LOCAL DAY CORRECTION, UNIT 5: the correction is proved to render, and the initiative CONCLUDES
+
+**The initiative is CONCLUDED.** Thirty-one occurrences repaired across four families, all at zero tree-wide, and — new here — the correction is proved to *render*, in a real browser, against the deployed application.
+
+**Everything before this unit was structural.** A tree-wide guard at zero, a convergence test and 6563 unit tests are all statements about source; none of them renders a page. Handoff §59 said so in the plainest terms available: *"not proven anywhere yet: that any of this renders correctly in a real browser, or against production."*
+
+**`e2e/online-local-day.spec.ts` runs one instant past two owners whose zones are on different calendar dates at that instant, in opposite directions.** `Pacific/Auckland` sees **15 May**, `America/Los_Angeles` sees **13 May**, and UTC — which is the deployment's own host zone — sees **14 May**. So a surface pinned to UTC fails for both owners, and a surface that merely picked some other zone fails for at least one. **Before this initiative every one of those read 14 May.** The two owners take different locales, so both renderings are exercised. May was chosen because today is in August: a fixture dated today would let a page's own "today" satisfy an assertion about a stored instant.
+
+**Eleven surfaces each** — entry detail, memory detail, person, project, conversations, question panels, inbox, files, work, calendar, search — **plus the Home header and a DST pair per hemisphere**, six months apart at the same UTC clock time, where a fixed offset cannot pass: `Pacific/Auckland` renders 22:00 and 21:00, `America/New_York` 12:00 and 13:00.
+
+**Executed four ways: 29/29 desktop and 29/29 mobile against the hosted project, then 29/29 desktop and 29/29 mobile against `https://my-brain-dusky.vercel.app`.** The deployment matters specifically: its host zone is UTC while the development machine's is `America/Cayenne`, and a host-zone defect renders differently in the two. **116 assertions. Zero fixture residue**, verified across every account on the project.
+
+**`generateReview`'s period moved to `src/features/agent/review-period.ts` — unchanged.** An extraction, not a second correction. The obstacle was structural: `actions.ts` carries `"use server"`, so every export in it is an async Server Action, and the window computation could not be exported, could not be called with a fixed `now`, and could only be "tested" by a test that re-wrote the same expressions and compared them to themselves. **The one behaviour change ADR-111 Decision 6 signed had, until now, nothing able to contradict it.** `review-period.test.ts` is that test: 26 cases over two disagreeing zones, Monday-based weeks, month boundaries crossed in both directions, a half-hour offset, a DST case per hemisphere, `America/Santiago`'s `2026-09-06` which has **no local midnight at all**, and a ~2000-window sweep across every 2026 transition these zones have. **Proved able to fail twice:** reverting `today` to the host calendar fails **6** cases by name; reverting the daily bounds fails **14**, including every DST case.
+
+**The journey is proved able to fail too.** Reverting the person page to `formatInstant(…, "UTC")` fails both its cases, reporting the exact UTC spellings the page rendered.
+
+**Four things the journey learned only by running, each a way a test can report success while proving nothing.** An **absence assertion passes on a page that never rendered** — eleven cases "passed" while one read a body containing only the nav shell and "Carregando página", so `settle()` now waits out the Suspense fallback and every surface names a marker from its own fixture. **A test that pins a format tests the format** — the calendar was *correct* and failed anyway, because it labels a column `Wed, May 13` rather than `May 13, 2026`; a day is now checked as a **set** of spellings. **`innerText` does not report collapsed content** — the question panels are `<details>`, opened by clicking, scoped to `main` because the nav shell's own `<details>` is hidden at desktop widths and never becomes clickable. **Thirty sign-ins in two minutes earn `429 over_request_rate_limit`**, which surfaced as eight unrelated failures and was none of them; one session per owner now.
+
+**A fixture leak was found, cleaned and fixed at its cause.** The first run's `beforeAll` threw *after* creating two accounts, and cleanup keyed off a variable the throw had prevented assigning — so the run that most needed cleaning up was exactly the one that leaked. Both were removed **by explicit id**, each verified to be an `@example.com` address first, never by a predicate sweep. The account id is now recorded *before* seeding can throw, proved by the deliberately failing mutation run, which left nothing.
+
+**Three findings recorded rather than fixed, none of them a date defect:** `src/app/[locale]/app/loading.tsx` labels its `role="status"` fallback `"Carregando página"` in **both** locales, so a screen reader in `en` announces Portuguese; `calendar-view.tsx`'s `timeZone: "UTC"` is **correct** and was verified as such, formatting an already-decided `LocalDate` at UTC noon; and `loadQuestionPreviews` is wrapped in `.catch(() => new Map())`, so a row shape its schema rejects yields no preview and **no error**.
+
+**Slice 2N.0 was re-audited and NOT implemented.** Its privacy, bounds and identity halves stand as signed; its time half needs three corrections first, and they are the owner's to authorize. `docs/reports/local-day-correction/PHASE_2N_SLICE_0_REAUDIT.md`.
+
+**Zero migrations created and zero spent. 92 migrations, hosted parity `202608120092` verified against the live project.** No schema, RLS, grant, policy, RPC or preference change; no Edge Function change; `planned_at` untouched; push **not** resumed; signup **closed**; rollout **25 · 3 · 2**; **Phase 2N planned and unimplemented; Phase 2O not started.**
+
 ## 2026-08-12 - LOCAL DAY CORRECTION, UNIT 4b: the three families reach zero, and the resolvers become one
 
 **All thirty-one occurrences the census found are repaired. `OPEN_OCCURRENCES` is empty and every family is at zero tree-wide.**
