@@ -4916,3 +4916,137 @@ parity `202608120092`, budget non-transferable with a **fourth a STOP
 CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
 A13 still guarding the roadmap successor. Slices 2N.2–2N.7 remain.
+
+## §66 — Slice 2N.2 ships: the project page says what changed, what a reading called a decision, and what it cannot know (2026-08-13)
+
+**PR #209**, merged at `<MERGE_SHA>`, **CI green on that exact SHA**. Head at
+review was `<HEAD_SHA>`, also green. Base was `main` at `7e27b53`.
+`docs/reports/phase-2n/PHASE_2N_SLICE_2_ACCEPTANCE.md`.
+
+**Migrations: 0 created. 92 total, parity `202608120092`.** M1/M3 remain
+allocated to 2N.3 and M2 to 2N.7, unspent and non-transferable.
+
+**7 requirements: 4 built, 3 baseline**, plus the risk half of `2N-PROJECT-005`
+closing **`not-built-by-rule`**.
+
+### The re-audit is the part that mattered most, and it subtracted work
+
+Three of seven were **already true on `main`** and are recorded baseline rather
+than re-claimed. `2N-PROJECT-002` is the one worth carrying forward: *"people
+render with their roles"* reads like an obligation, and `AssociationPanel` has
+received `role` from `person_projects` and printed it since UX-08. **A
+requirement can be satisfied by a slice that never mentioned it**, and the only
+way to know is to open the component rather than the plan.
+
+### A classification that closes by rule must fail when the rule changes
+
+Decisions are representable: `entry_interpretations.concepts` is a stored
+`text[]` whose vocabulary contains `decision`. **Risks are not** — no risk
+concept, column or table exists in the schema, the app vocabulary or the
+worker's. The nearest members are `blocker`, `dependency` and
+`waiting_for_third_party`, and **a blocker is something that IS stopping work
+while a risk is something that MIGHT**; mapping one onto the other would mint a
+vocabulary the product does not have.
+
+So the classification is **asserted against the tree**, not narrated in a
+report: the guard scans all three vocabularies and the migrations, **with a
+non-vacuity control proving the same scan finds the `decision` that did ship**.
+A later phase that makes risks representable fails this guard in the same change
+that makes it representable. A `not-built-by-rule` whose only evidence is a
+sentence is a classification nobody re-checks.
+
+### Two reads, two opposite correct answers, from one apparent pattern
+
+`sourceResult` reads `.data` directly **on purpose**: a row that does not arrive
+stays absent from the levels map and lands in the most-protective arm, so the
+failure closes.
+
+Copying that into the interpretation read is a **bug**, and it looked like
+consistency. That result feeds a section whose empty state *asserts* something —
+"no entry on this project was read as a decision" — so swallowing an error turns
+**we could not look** into **there are none**. It uses `requireSupabaseData`,
+which is what every other list on the page already does.
+
+**A failure posture is a property of what the caller renders, not of the query.**
+
+### Reuse was the design, and one of the two vocabularies already existed
+
+"What changed recently" is `audit_logs` described by the **same
+`describeHistoryEvent` and rendered by the same `HistoryList`** that `/app/history`
+uses. The guard forbids the project surface from naming an action type at all,
+so one audit row cannot acquire two narrations. The audit `reason` is **not even
+selected** (UX-28).
+
+The section's explainer **states its own coverage** — project edits and person
+links — so a change the trail never records, such as linking a task, reads as
+outside the list rather than as an absence of history. That is the honest
+alternative to silently under-reporting.
+
+### Bounds, one hop further out than the last two slices found
+
+`2N-PERSON-003` found the defect at the render, §64 found it at the second read
+hop, and this slice found it at a **third**: `associationIds`, bounded at 100,
+feeds the association-change lookup, so a project with a long association history
+would have left rows unqueried while the list looked complete. **Every hop that
+narrows a set has to carry the bound**, and each slice so far has discovered one
+more hop than the last.
+
+### A count under a bound says "at least"
+
+The state line reports open linked tasks, and the task list is bounded, so the
+dropped rows may hold more. The confident and uncertain phrasings are **separate
+copy strings** rather than one with a conditional prefix — that is what stops a
+caller printing the first over the second's number. `pelo menos 0 em aberto` is
+reachable and awkward; the alternative would be false.
+
+### The journeys had to run serially, and that is a finding
+
+**28/28** for 2N.2, **12/12** for 2N.0, **14/14** for 2N.1 — all with
+**`--workers=1`**. In parallel, four fixtures of one page (one rendering a
+hundred masked entries) saturated the local production server and a hosted write
+was still showing "Saving…" at **45 s** with every control disabled and no
+error. Serially the same case took **10.6 s**. Also: **28 sign-ins per run earns
+`429 over_request_rate_limit` from GoTrue**, and a re-run costs a ~25 minute
+cooldown — budget one clean serial run rather than several parallel attempts.
+
+The change journey **edits through the product's own form** before asserting the
+sentence appears; a fixture row written behind the surface would have proved the
+reader and left the writer untested. It also needs **one project per locale** —
+sharing one made the second run's edit a no-op, and the assertion then failed
+against a page behaving exactly as specified.
+
+**Zero residue**, two ways: 0 accounts under each of `codex-2n0-`, `codex-2n1-`
+and `codex-2n2-`, and 0 rows for each of 19 markers, with a control proving the
+probe can read at all.
+
+### Recorded, not smoothed
+
+Mobile is a **viewport simulation on Pixel 7 metrics, not a device**, and **no
+screen-reader run is claimed**. The lane is a **local production build against
+the hosted Supabase**, not the Vercel deployment. `OPEN_TASK_STATUSES` stays
+triplicated across `calendar`, `day-review` and `planning` — consolidating it is
+a Work-domain refactor beyond this surface. A change row about the project
+renders a link to the project, which is truthful and redundant; suppressing it
+would mean editing a component `/app/history` depends on.
+`element_classifications.concepts` would let each decision row say whether its
+concepts were classified `fact`, `interpretation`, `inference` or `suggestion` —
+**available, deliberately not surfaced**, because no requirement asks and it
+would mint user-facing copy for a four-value vocabulary that has none.
+
+### THE LOOP STOPS HERE — 2N.3 IS NOT STARTED
+
+Stopped **between slices**. 2N.3 is the phase's **critical path and its only
+irreversible operation**: inspection, correction and deletion
+(`2N-KNOWS-001…009`, `2N-CORRECT-001…013`, `2N-IDENTITY-005…007`), carrying
+**M1** (validity-aware retrieval) and **M3** (transactional deletion), which are
+**internally sequenced — M1 first, then a deletion re-audit per type, then M3**,
+because a deletion built before retrieval eviction works produces an object that
+is deleted and still retrievable. Its stop condition is a propagation that
+cannot be truthfully undone (`2N-CORRECT-013`), which returns the case to the
+owner rather than shipping an undo that claims more than it restores.
+
+**Unchanged:** 92 migrations, **zero of Phase 2N's three spent, none created**,
+parity `202608120092`, budget non-transferable with a **fourth a STOP
+CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
+A13 still guarding the roadmap successor. Slices 2N.3–2N.7 remain.

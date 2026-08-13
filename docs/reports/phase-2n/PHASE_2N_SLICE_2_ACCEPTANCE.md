@@ -90,7 +90,7 @@ existed since `202607160006` and this page never looked at it, so a memory the
 owner recorded about a project was reachable only through a person it also
 mentioned, or not at all.
 
-## 4. Two defects found in the diff review, not by a test
+## 4. Three defects found in the diff review, not by a test
 
 - **A third hop carried no bound.** `associationIds` is read under
   `CONTEXTUAL_LIMIT` and feeds the association-change lookup. A project with
@@ -103,6 +103,16 @@ mentioned, or not at all.
   unreachable. A section that disappears leaves the reader unable to tell an
   empty answer from a surface that never had the question — the distinction
   every other section on this page states. It now renders its empty state.
+- **A failed read that would have read as an answer.** The interpretation query
+  originally took `.data` directly, copying `sourceResult` above it. That is
+  right *there* — a row that does not arrive stays absent from the levels map
+  and lands in the most-protective arm, so the failure closes. It is wrong
+  *here*: an empty result renders a sentence that **asserts** something about
+  the readings ("no entry on this project was read as a decision"), so
+  swallowing an error would turn *we could not look* into *there are none*. It
+  now uses `requireSupabaseData`, the posture every other list on the page
+  already takes. **Two reads, two opposite correct answers, from one apparent
+  pattern.**
 
 ## 5. Proofs
 
@@ -133,8 +143,15 @@ mentioned, or not at all.
 
 ### Journeys — `e2e/online-phase-2n-project.spec.ts`, **28/28**
 
-Both locales × desktop and Pixel 7. Three fixtures, because one would
-contaminate itself:
+Both locales × desktop and Pixel 7, run with **`--workers=1`**. That is not a
+detail: the parallel run saturated the local production server, and a hosted
+write was caught still showing "Saving…" at 45 s with every control disabled and
+no error. Serial execution completed the same case in **10.6 s**. Four fixtures
+of one page — one of them rendering a hundred masked entries — is more than one
+Node server answers concurrently, and shortening the wait instead would have
+turned a slow path into a red test.
+
+Three fixtures, because one would contaminate itself:
 
 - **STATE** is read-only. Two linked tasks, one completed — a count of *linked*
   tasks would read 2 where the state line reads 1. Two linked people, one with a
@@ -158,10 +175,19 @@ The fixture recorded two schema facts the first run found the hard way:
 `entry_entities.interpretation_id` and `.mention` are both `not null`, so a
 project link cannot be fabricated without a reading to attribute it to.
 
-### Regression
+### Regression — executed, not assumed
 
-`online-phase-2n-foundations` and `online-phase-2n-person` re-run — see §7 for
-the executed result. Shared modules touched are **additive only**:
+`online-phase-2n-foundations` **12/12** and `online-phase-2n-person` **14/14**,
+both serial, both against this build. No regression.
+
+**Zero owner-scoped residue**, proved two independent ways and never by a global
+count: **0** accounts under each of `codex-2n0-`, `codex-2n1-` and `codex-2n2-`,
+and **0** rows for each of **19** synthetic markers across `projects`, `people`,
+`memories`, `entries` and `tasks` — with a control asserting the probe can read
+`projects` at all, so an empty answer cannot come from a probe that matches
+nothing.
+
+Shared modules touched are **additive only**:
 `bounds/contracts.ts` gained one constant, `entities/copy.ts` gained keys.
 `AssociationPanel`, `RelationshipPanel`, `src/features/provenance/**`,
 `src/features/sensitivity/**` and the person page are **unchanged** — the diff
