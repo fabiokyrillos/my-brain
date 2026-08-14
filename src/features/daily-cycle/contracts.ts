@@ -32,6 +32,24 @@ export const attentionReasons = [
    * while hiding the link that ends it.
    */
   "configure_ai_credential",
+  /**
+   * `2N-CONFLICT-002`. Two stored facts that cannot both be right, and the owner
+   * is the only one who may decide which.
+   *
+   * **Emphatically not `resolve_consistency`**, which sits four lines above and
+   * already means something else: *one entry the assistant could not organize*,
+   * with a live producer at `lifecycle.ts:71` and copy in both locales that says
+   * so. Routing a belief conflict there would make one sentence stand for two
+   * unrelated problems — the defect this repository has already paid for when one
+   * vocabulary served two authorities.
+   *
+   * It is also **not** a `TrackedAttentionReason`, and cannot become one without
+   * a migration. `needs_attention_item_opened` validates `attentionReason`
+   * against a five-member enum **inside the database** (`202607170024:206-212`),
+   * so a row bearing this reason must not fire that event. Telemetry for it
+   * belongs to 2N.7 and M2, which is the only remaining migration.
+   */
+  "resolve_validity_conflict",
 ] as const;
 
 export type AttentionReason = (typeof attentionReasons)[number];
@@ -80,6 +98,15 @@ export const dailyCycleActions = [
   "configure_ai_credential",
   /** `BYOK-CAPTURE-004`/`006` — the bounded, explicit pending-entry action. */
   "interpret_pending_entries",
+  /**
+   * `2N-CONFLICT-003` — opens the memory whose validity window is impossible.
+   *
+   * It navigates. There is no in-place variant and there must not be one: the
+   * write it leads to is `setMemoryLifecycle`, and offering it as one tap from a
+   * list would resolve the contradiction without the owner ever seeing the two
+   * dates that caused it.
+   */
+  "resolve_validity_conflict",
 ] as const;
 
 export type DailyCycleAction = (typeof dailyCycleActions)[number];
@@ -170,6 +197,41 @@ export type NeedsAttentionItemView = {
   readonly secondaryAction?: AvailableAction;
   readonly occurredAt: string;
   readonly groupKey: string;
+};
+
+/**
+ * A conflict row in the same queue (`2N-CONFLICT-003`).
+ *
+ * A **separate shape** rather than a widened `NeedsAttentionItemView`, and the
+ * reason is structural rather than stylistic. That view requires `entryId`,
+ * because every row it describes comes from `list_needs_attention` and is
+ * hydrated from `entries.original_content`. **A memory is not an entry** — and
+ * `memories.source_entry_id` is `on delete set null`, so a memory may have no
+ * entry at all. Making `entryId` optional to fit this in would have weakened the
+ * field for the twenty rows that genuinely have one, and the analytics event the
+ * entry row fires would then have had an `undefined` to send.
+ *
+ * Both shapes render in **one** queue, on the same page, inside the same list.
+ * The separation is in the types, not in the surface.
+ */
+export type ConflictAttentionItemView = {
+  readonly key: string;
+  readonly reason: "resolve_validity_conflict";
+  readonly memoryId: string;
+  /** The memory's own words. Masked by the surface, exactly like an entry preview. */
+  readonly content: string;
+  readonly sensitivity: SensitivityLevel;
+  /**
+   * Both halves of the impossible window, raw.
+   *
+   * Formatted at the surface with the owner's zone and locale, never here:
+   * `LDC-DAILY-001`, and the same threading `NeedsAttentionItemRow` already uses
+   * for its timestamp. A projection that pre-formatted them would be a second
+   * place the owner's zone is decided.
+   */
+  readonly validFrom: string;
+  readonly validUntil: string;
+  readonly action: AvailableAction;
 };
 
 export type HumanFieldView = {

@@ -25,7 +25,7 @@ describe("daily cycle product contracts", () => {
     ]);
   });
 
-  it("defines only the six supported attention reasons", () => {
+  it("defines only the seven supported attention reasons", () => {
     expect(contracts.attentionReasons).toEqual([
       "review_interpretation",
       "confirm_existing_candidates",
@@ -33,7 +33,26 @@ describe("daily cycle product contracts", () => {
       "retry_processing",
       "resolve_consistency",
       "configure_ai_credential",
+      "resolve_validity_conflict",
     ]);
+  });
+
+  /**
+   * `2N-CONFLICT-003`. The regression that matters most in this slice.
+   *
+   * `resolve_consistency` already means *one entry the assistant could not
+   * organize*, and it has a live producer at `lifecycle.ts:71`. 2N.4 needed a
+   * reason for two facts that cannot both be right, and the failure mode it had
+   * to avoid was reusing that one — which would make a single sentence stand for
+   * two unrelated problems.
+   *
+   * Asserted as two distinct members with two distinct meanings, so a later
+   * "simplification" that collapses them fails here rather than in the queue.
+   */
+  it("keeps resolve_consistency and resolve_validity_conflict as two different reasons", () => {
+    expect(contracts.attentionReasons).toContain("resolve_consistency");
+    expect(contracts.attentionReasons).toContain("resolve_validity_conflict");
+    expect("resolve_consistency").not.toBe("resolve_validity_conflict");
   });
 
   it("keeps the tracked subset to exactly what the database enum admits", () => {
@@ -50,12 +69,22 @@ describe("daily cycle product contracts", () => {
     ]);
 
     // And the relationship between the two: the tracked list is a strict subset,
-    // and `configure_ai_credential` is exactly what it excludes.
+    // and these two are exactly what it excludes.
+    //
+    // `resolve_validity_conflict` joined that exclusion in 2N.4 for the same
+    // reason `configure_ai_credential` was already in it, and the assertion is
+    // the point: the DB enum still has five members, 2N.4 spent no migration, and
+    // the conflict row therefore must not fire `needs_attention_item_opened`.
+    // Widening the tracked list to "fix" a future compile error would ship a
+    // runtime `22023`.
     const all = contracts.attentionReasons ?? [];
     const tracked = contracts.trackedAttentionReasons ?? [];
     const wider = new Set<string>(all);
     for (const reason of tracked) expect(wider.has(reason)).toBe(true);
-    expect(all.filter((reason) => !tracked.includes(reason))).toEqual(["configure_ai_credential"]);
+    expect(all.filter((reason) => !tracked.includes(reason))).toEqual([
+      "configure_ai_credential",
+      "resolve_validity_conflict",
+    ]);
   });
 
   it("exposes product-oriented actions and semantic message keys", () => {
