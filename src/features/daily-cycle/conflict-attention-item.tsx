@@ -53,7 +53,12 @@ export function ConflictAttentionItemRow({ item, locale, agentName, surface, tim
   const masked = presentationFor(surface === "home" ? "hoje" : "attention", item.sensitivity).outcome === "mask";
 
   return (
-    <a className="list-row needs-attention-row conflict-row" href={item.action.href}>
+    <a
+      className="list-row needs-attention-row conflict-row"
+      data-conflict="row"
+      data-conflict-kind="memory_validity_window"
+      href={item.action.href}
+    >
       <div className="list-row-main">
         <strong>{reason.title}</strong>
         <p>{reason.description}</p>
@@ -66,11 +71,11 @@ export function ConflictAttentionItemRow({ item, locale, agentName, surface, tim
         <dl className="conflict-dates">
           <div>
             <dt>{text.validFromLabel}</dt>
-            <dd>{formatInstant(item.validFrom, "dayAndTime", locale, timeZone)}</dd>
+            <dd data-conflict="valid-from">{formatInstant(item.validFrom, "dayAndTime", locale, timeZone)}</dd>
           </div>
           <div>
             <dt>{text.validUntilLabel}</dt>
-            <dd>{formatInstant(item.validUntil, "dayAndTime", locale, timeZone)}</dd>
+            <dd data-conflict="valid-until">{formatInstant(item.validUntil, "dayAndTime", locale, timeZone)}</dd>
           </div>
         </dl>
 
@@ -84,7 +89,7 @@ export function ConflictAttentionItemRow({ item, locale, agentName, surface, tim
         {masked ? (
           <p className="home-masked" data-masked="true">{text.masked}</p>
         ) : (
-          <p className="conflict-content">{item.content}</p>
+          <p className="conflict-content" data-conflict="content">{item.content}</p>
         )}
 
         <p className="conflict-why">{text.whyNotDecided}</p>
