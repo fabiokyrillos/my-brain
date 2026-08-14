@@ -1,4 +1,5 @@
-import { FileStack, RefreshCw, TriangleAlert } from "lucide-react";
+import { FileStack, RefreshCw, Search, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   retryAttachmentJob,
@@ -6,7 +7,37 @@ import {
 } from "@/features/agent/actions";
 import { JobRetryForm, UploadForm } from "@/features/agent/forms";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
-import { boundedList, FAILED_JOB_LIMIT, withProbe } from "@/features/bounds/contracts";
+import {
+  boundedList,
+  FAILED_JOB_LIMIT,
+  RELATION_LIMIT,
+  withProbe,
+} from "@/features/bounds/contracts";
+import { loadLinksForAttachments } from "@/features/library/attachment-links";
+import {
+  ATTACHMENT_LINK_LIMIT,
+  narrowAttachmentLinks,
+  linksByAttachment,
+  type AttachmentLink,
+} from "@/features/library/link-contracts";
+import { getFileLibraryCopy } from "@/features/library/copy";
+import { FileFilterBar, type LinkedFilterOption } from "@/features/library/file-filters";
+import {
+  CLASSIFIED_MIME_TYPES,
+  fileFiltersRecord,
+  hasActiveFileFilter,
+  mimeTypesForKind,
+  parseFileFilters,
+  periodSince,
+} from "@/features/library/filters";
+import { LinkedSubjectsSection } from "@/features/library/linked-subjects-section";
+import {
+  NO_CLASSIFICATION,
+  resolveLinkedSubjects,
+  subjectIdsByType,
+  subjectKey,
+  type ResolvedSubjectRow,
+} from "@/features/library/linked-subjects";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -65,6 +96,9 @@ const filesCopy = {
     emptyTitle: "Nenhum arquivo",
     emptyBody:
       "Envie um arquivo acima. O original fica privado e a análise aparece separadamente.",
+    emptyFilteredTitle: "Nenhum arquivo com esses filtros",
+    emptyFilteredBody:
+      "Os filtros ativos não encontraram nada. Seus outros arquivos continuam aqui.",
   },
   en: {
     eyebrow: "PRIVATE FILES",
@@ -85,6 +119,9 @@ const filesCopy = {
     emptyTitle: "No files",
     emptyBody:
       "Upload one above. The original stays private and its analysis appears separately.",
+    emptyFilteredTitle: "No files match these filters",
+    emptyFilteredBody:
+      "The active filters found nothing. Your other files are still here.",
   },
 } as const;
 
@@ -93,30 +130,79 @@ export default async function FilesPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const copy = filesCopy[locale];
-  const page = parsePage((await searchParams).page);
+  const libraryCopy = getFileLibraryCopy(locale);
+  const resolvedSearchParams = await searchParams;
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page);
+  // `2N-FILES-010`. Read from the URL rather than from client state, because the
+  // predicate has to reach the query — see `features/library/filters.ts` on why
+  // filtering a page in memory is the one shape this slice refused.
+  const filters = parseFileFilters(resolvedSearchParams);
   const { supabase } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
   // other contextual surface stamp instants from the same source.
   const timeZone = await getOwnerTimeZone();
 
-  const [fileResult, failedJobResult] = await Promise.all([
-    supabase
-      .from("attachments")
-      .select(
-        // `sensitivity` joins this projection because `2N-PRIVACY-002` names file
-        // names as content the contract governs, and `attachments` has carried
-        // the column all along — the page simply never read it.
-        "id,storage_path,original_name,mime_type,size_bytes,status,description,processing_error,sensitivity,created_at",
-      )
-      .order("created_at", { ascending: false })
-      .range(from, to),
+  /*
+   * The linked-subject filter is the one axis that cannot be a predicate on
+   * `attachments`, because the relationship lives on another table. So it costs
+   * exactly **one** extra read, sequential, and **only when the filter is
+   * active** — the cost the slice's measurement recorded rather than discovered
+   * later.
+   *
+   * `requireSupabaseData` rather than a fallback to `[]`: a failed read here
+   * would otherwise produce an empty id list, which would filter the page down
+   * to nothing and render as "no files match" — a failure wearing the shape of
+   * an answer.
+   */
+  const filteredAttachmentIds = filters.linked
+    ? narrowAttachmentLinks(
+        requireSupabaseData(
+          await supabase
+            .from("entity_attachments")
+            .select("attachment_id,entity_type,entity_id")
+            .eq("entity_type", filters.linked.entityType)
+            .eq("entity_id", filters.linked.entityId)
+            .limit(withProbe(RELATION_LIMIT)),
+          "load linked file ids",
+        ),
+      ).map((link) => link.attachmentId)
+    : null;
+
+  let fileQuery = supabase
+    .from("attachments")
+    .select(
+      // `sensitivity` joins this projection because `2N-PRIVACY-002` names file
+      // names as content the contract governs, and `attachments` has carried
+      // the column all along — the page simply never read it.
+      "id,storage_path,original_name,mime_type,size_bytes,status,description,processing_error,sensitivity,created_at",
+    );
+  // Every filter is applied HERE, before `.range()`. That ordering is the whole
+  // honesty property: the page that comes back is a page of the filtered set,
+  // and the pagination beneath it describes that same set.
+  if (filters.state) fileQuery = fileQuery.eq("status", filters.state);
+  if (filters.kind) {
+    const mimeTypes = mimeTypesForKind(filters.kind);
+    fileQuery = mimeTypes
+      ? fileQuery.in("mime_type", mimeTypes as string[])
+      : // `other` is the complement of everything the named kinds cover, so a
+        // MIME type added to the allowlist tomorrow still has a home today.
+        fileQuery.not("mime_type", "in", `(${CLASSIFIED_MIME_TYPES.join(",")})`);
+  }
+  if (filters.period) {
+    const since = periodSince(filters.period, new Date());
+    if (since) fileQuery = fileQuery.gte("created_at", since);
+  }
+  if (filteredAttachmentIds) fileQuery = fileQuery.in("id", filteredAttachmentIds);
+
+  const [fileResult, failedJobResult, linkOptionResult] = await Promise.all([
+    fileQuery.order("created_at", { ascending: false }).range(from, to),
     supabase
       .from("jobs")
       .select(
@@ -129,6 +215,20 @@ export default async function FilesPage({
       // failed uploads saw 20 and was told the rest did not exist — on the one
       // section of this page whose entire purpose is "these need your attention".
       .limit(withProbe(FAILED_JOB_LIMIT)),
+    /*
+     * The filter axis's options, read across everything the owner owns rather
+     * than from the current page — a chip list that changed as you paged would
+     * be describing the page instead of the filter.
+     *
+     * Bounded at `RELATION_LIMIT`, the bound this repository already uses for
+     * relation rows, rather than a number minted for this list.
+     */
+    supabase
+      .from("entity_attachments")
+      .select("attachment_id,entity_type,entity_id")
+      .in("entity_type", ["person", "project"])
+      .order("created_at", { ascending: false })
+      .limit(withProbe(RELATION_LIMIT)),
   ]);
 
   const paginated = paginateRows(
@@ -158,7 +258,33 @@ export default async function FilesPage({
     ),
   ];
 
-  const [interpretationResult, signedResult, failedAttachmentResult] =
+  /*
+   * `2N-FILES-003`/`-009` — `entity_attachments` gains its first reader.
+   *
+   * The outcome is kept rather than flattened, because a failed read and an
+   * empty table are different claims and the sections below render them
+   * differently. Nothing here can write a link: the loader module exports no
+   * writer, and `authenticated` holds no `INSERT` on the table.
+   */
+  const linkOutcome = await loadLinksForAttachments(supabase, ids);
+  const pageLinks: readonly AttachmentLink[] =
+    linkOutcome.status === "ok" ? linkOutcome.list.items : [];
+  /*
+   * The filter axis degrades to *absent* when its read fails, rather than taking
+   * the page down — the posture `loadAliasesForEntity` records for an
+   * enrichment. It is safe here for a reason that does NOT hold for the sections
+   * below: an axis that is not rendered makes **no claim at all**, whereas a
+   * linked-files section that rendered empty would be asserting there are none.
+   */
+  const filterLinks = narrowAttachmentLinks(linkOptionResult.data);
+  const boundedFilterLinks = boundedList(filterLinks, RELATION_LIMIT);
+
+  // One query per type, never one per link — `2N-FILES-010`'s measurement
+  // forbids a round trip per item, and the union of both purposes is resolved in
+  // the same read so the filter chips cost no queries of their own.
+  const subjectIds = subjectIdsByType([...pageLinks, ...boundedFilterLinks.items]);
+
+  const [interpretationResult, signedResult, failedAttachmentResult, entrySubjectResult, personSubjectResult, projectSubjectResult] =
     await Promise.all([
       ids.length
         ? supabase
@@ -185,6 +311,15 @@ export default async function FilesPage({
             .select("id,original_name,sensitivity")
             .in("id", failedAttachmentIds)
         : { data: [], error: null },
+      subjectIds.entry.length
+        ? supabase.from("entries").select("id,original_content,sensitivity").in("id", subjectIds.entry as string[])
+        : { data: [], error: null },
+      subjectIds.person.length
+        ? supabase.from("people").select("id,name").in("id", subjectIds.person as string[])
+        : { data: [], error: null },
+      subjectIds.project.length
+        ? supabase.from("projects").select("id,name").in("id", subjectIds.project as string[])
+        : { data: [], error: null },
     ]);
 
   const interpretations = requireSupabaseData(
@@ -197,11 +332,23 @@ export default async function FilesPage({
       analyses.set(analysis.attachment_id, analysis);
   });
 
+  /*
+   * Signed URLs, kept **per path with their own failure**.
+   *
+   * The previous shape filtered failures out, so a storage error and a file with
+   * no link were the same thing: the control simply vanished, and the user was
+   * told nothing. Storage returns a per-item error inside a successful response,
+   * so this is the one read on the page where a failure cannot reach the error
+   * boundary — which is exactly why it has to be rendered rather than dropped.
+   */
   const signedUrls = requireSupabaseData(signedResult, "sign file links") ?? [];
   const urls = new Map(
     signedUrls
       .filter((item) => !item.error)
       .map((item) => [item.path, item.signedUrl]),
+  );
+  const failedSignedPaths = new Set(
+    signedUrls.filter((item) => item.error).map((item) => item.path),
   );
   const failedAttachments = requireSupabaseData(
     failedAttachmentResult,
@@ -219,10 +366,78 @@ export default async function FilesPage({
   // "not on this page" instead of "unreadable".
   const fileLevels = readableLevelsOf(paginated.items);
   const failedFileLevels = readableLevelsOf(failedAttachments);
+
+  /*
+   * The resolved subjects, keyed by `type:id`.
+   *
+   * Built from rows that actually came back, never from the ids that were asked
+   * for. An id the query requested and did not return is removed, foreign or
+   * unreadable — and all three land in the same place: absent from this map, and
+   * therefore absent from the page.
+   */
+  const entrySubjects = (entrySubjectResult.data ?? []) as { id: string; original_content: string; sensitivity: string | null }[];
+  const entrySubjectLevels = readableLevelsOf(entrySubjects);
+  const resolvedSubjects = new Map<string, ResolvedSubjectRow>();
+  for (const entry of entrySubjects) {
+    resolvedSubjects.set(subjectKey("entry", entry.id), {
+      label: entry.original_content,
+      sensitivity: deriveSubjectSensitivity(entry.id, entrySubjectLevels),
+    });
+  }
+  for (const person of (personSubjectResult.data ?? []) as { id: string; name: string }[]) {
+    // `people` carries no `sensitivity` column and `2N-PRIVACY-003` forbids
+    // adding one, so this is the arm that renders in the clear because there is
+    // genuinely nothing to look up — never because `normal` was inferred.
+    resolvedSubjects.set(subjectKey("person", person.id), {
+      label: person.name,
+      sensitivity: NO_CLASSIFICATION,
+    });
+  }
+  for (const project of (projectSubjectResult.data ?? []) as { id: string; name: string }[]) {
+    resolvedSubjects.set(subjectKey("project", project.id), {
+      label: project.name,
+      sensitivity: NO_CLASSIFICATION,
+    });
+  }
+
+  const linksByFile = linksByAttachment(pageLinks);
+  /*
+   * The filter's options — only the subjects that both have a link and resolved.
+   *
+   * When this is empty the axis is not rendered at all. With no writer for
+   * `entity_attachments` that is the normal case, and a chip list with nothing
+   * in it, or a disabled control promising a future one, would be a capability
+   * the product does not have wearing the shape of one it does.
+   */
+  const linkedOptions: LinkedFilterOption[] = [];
+  const seenOptions = new Set<string>();
+  for (const link of boundedFilterLinks.items) {
+    if (link.entityType === "entry") continue;
+    const key = subjectKey(link.entityType, link.entityId);
+    if (seenOptions.has(key)) continue;
+    const subject = resolvedSubjects.get(key);
+    if (!subject) continue;
+    seenOptions.add(key);
+    linkedOptions.push({
+      entityType: link.entityType,
+      entityId: link.entityId,
+      label: subject.label,
+    });
+  }
+
   const rows = paginated.items.map((file) => ({
     ...file,
     url: urls.get(file.storage_path),
+    signingFailed: failedSignedPaths.has(file.storage_path),
     analysis: analyses.get(file.id),
+    links: boundedList(
+      resolveLinkedSubjects(linksByFile.get(file.id) ?? [], resolvedSubjects),
+      ATTACHMENT_LINK_LIMIT,
+      // The page-level read carries its own bound, and every card inherits it —
+      // see `PAGE_LINK_LIMIT` on why guessing which card was truncated would be
+      // the surface inventing an answer it does not have.
+      linkOutcome.status === "ok" && linkOutcome.list.bounded,
+    ),
   }));
   return (
     <div className="content-page">
@@ -232,9 +447,26 @@ export default async function FilesPage({
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
         </div>
+        {/*
+          `2N-FILES-011`. Where the answer is a search, the library **links** to
+          search rather than growing one of its own: no second index, no second
+          snippet builder, no second copy of the seven-domain contract. The
+          existing search already reads `original_name`, `description` and
+          `extracted_text` under OD-1's sensitivity predicate, and duplicating
+          any of that here is precisely what "the library does not become a
+          second storage system" forbids.
+        */}
+        <Link className="row-action" href={`/${locale}/app/search`}>
+          <Search aria-hidden="true" size={14} />
+          {libraryCopy.searchInFiles}
+        </Link>
       </header>
+      <p className="quiet-state">{libraryCopy.searchInFilesHint}</p>
 
       <UploadForm action={uploadAttachment} locale={locale} />
+
+      <FileFilterBar filters={filters} linkedOptions={linkedOptions} locale={locale} />
+      <BoundedNotice list={boundedFilterLinks} locale={locale} />
 
       {failedJobs.length > 0 && (
         <section className="failed-jobs" aria-labelledby="failed-jobs-title">
@@ -282,6 +514,12 @@ export default async function FilesPage({
                       {copy.attempt} {job.attempts}/{job.max_attempts}
                     </small>
                   </div>
+                  {/*
+                    `2N-FILES-007`. The retry control appears only where a retry
+                    is a real action: an exhausted job has no path left, and
+                    offering the button anyway would be a recovery affordance for
+                    a recovery that cannot happen.
+                  */}
                   {!terminal && (
                     <div className="job-retry-controls">
                       <JobRetryForm
@@ -306,7 +544,7 @@ export default async function FilesPage({
       {rows.length ? (
         <div className="list-stack file-list">
           {rows.map((file) => (
-            <article className="file-card" key={file.id}>
+            <article className="file-card" id={`file-${file.id}`} key={file.id}>
               <header>
                 <div>
                   {/*
@@ -340,7 +578,7 @@ export default async function FilesPage({
                     {attachmentStatusLabel(locale, file.status) ??
                       getVocabularyCopy(locale).unknownState}
                   </span>
-                  {file.url && (
+                  {file.url ? (
                     <a
                       className="row-action"
                       href={file.url}
@@ -349,7 +587,14 @@ export default async function FilesPage({
                     >
                       {copy.openOriginal}
                     </a>
-                  )}
+                  ) : file.signingFailed ? (
+                    // Signing failed for THIS file. Saying so is the difference
+                    // between "the link is temporarily unavailable" and the user
+                    // concluding their original is gone.
+                    <span className="quiet-state" role="note">
+                      {libraryCopy.originalUnavailable}
+                    </span>
+                  ) : null}
                 </div>
               </header>
               {file.processing_error && (
@@ -378,53 +623,104 @@ export default async function FilesPage({
                       </ProtectedContent>
                     </div>
                   )}
-                  {[
-                    ...file.analysis.extracted_people,
-                    ...file.analysis.extracted_projects,
-                    ...file.analysis.extracted_dates,
-                  ].length > 0 && (
-                    <div className="tag-cloud">
-                      {[
-                        ...file.analysis.extracted_people,
-                        ...file.analysis.extracted_projects,
-                        ...file.analysis.extracted_dates,
-                      ].map((item, index) => (
-                        <span key={`${item}-${index}`}>{item}</span>
-                      ))}
-                    </div>
-                  )}
-                  {file.analysis.task_candidates.length > 0 && (
-                    <div>
-                      <h3>{copy.taskCandidates}</h3>
-                      <div className="mini-list">
-                        {file.analysis.task_candidates.map((task, index) => (
-                          <article key={`${task.title}-${index}`}>
-                            <strong>{task.title}</strong>
-                            {task.dueAt && <span>{task.dueAt}</span>}
-                          </article>
-                        ))}
+                  {/*
+                    `2N-FILES-006`, and the defect this slice's census found.
+
+                    These two blocks rendered **outside** any classification: on a
+                    `highly_sensitive` file the name, the description and the
+                    extracted text were withheld, and directly beneath them the
+                    page printed the names of people found inside the document
+                    and candidate task titles that are frequently a sentence
+                    lifted verbatim from it. Extracted text was reaching a surface
+                    the classification masks, through the two fields derived from
+                    it rather than through the field named after it.
+
+                    They are withheld together and under a control of their own,
+                    for the same reason the extracted text is: opening the
+                    disclosure and revealing what the model read out of the
+                    document are two separate acts.
+                  */}
+                  {(() => {
+                    const found = [
+                      ...file.analysis.extracted_people,
+                      ...file.analysis.extracted_projects,
+                      ...file.analysis.extracted_dates,
+                    ];
+                    const candidates = file.analysis.task_candidates;
+                    if (found.length === 0 && candidates.length === 0) return null;
+                    return (
+                      <div>
+                        <h3>{libraryCopy.analysisEntities}</h3>
+                        <ProtectedContent
+                          locale={locale}
+                          revealKey={`file-derived-${file.id}`}
+                          sensitivity={deriveSubjectSensitivity(file.id, fileLevels)}
+                          surface="file"
+                        >
+                          {found.length > 0 && (
+                            <span className="tag-cloud">
+                              {found.map((item, index) => (
+                                <span key={`${item}-${index}`}>{item}</span>
+                              ))}
+                            </span>
+                          )}
+                          {candidates.length > 0 && (
+                            <span className="mini-list">
+                              <span className="mini-list-title">{copy.taskCandidates}</span>
+                              {candidates.map((task, index) => (
+                                <span key={`${task.title}-${index}`}>
+                                  <strong>{task.title}</strong>
+                                  {task.dueAt && <span>{task.dueAt}</span>}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </ProtectedContent>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   <small>{file.analysis.model}</small>
                 </details>
               )}
+              {/*
+                `2N-FILES-003`/`-009`, `2N-FILES-005`. The links this file
+                actually has — read from `entity_attachments`, never inferred
+                from the analysis above it. The anchor is what brings the reader
+                back to this card rather than to the top of the list.
+              */}
+              <LinkedSubjectsSection
+                back={`/${locale}/app/files#file-${file.id}`}
+                locale={locale}
+                outcome={linkOutcome}
+                subjects={file.links}
+              />
             </article>
           ))}
         </div>
       ) : (
         <div className="empty-list">
           <FileStack size={30} />
-          <strong>{copy.emptyTitle}</strong>
-          <p>{copy.emptyBody}</p>
+          {/*
+            An empty filtered set is not an empty library, and saying so is what
+            stops a user concluding their files are gone because they clicked a
+            chip.
+          */}
+          <strong>{hasActiveFileFilter(filters) ? copy.emptyFilteredTitle : copy.emptyTitle}</strong>
+          <p>{hasActiveFileFilter(filters) ? copy.emptyFilteredBody : copy.emptyBody}</p>
         </div>
       )}
 
+      {/*
+        The filters travel with the page number. Page two of a filtered list is
+        page two **of that list**; without this the Next link dropped every
+        predicate and the filter ended one click after it was applied.
+      */}
       <PaginationLinks
         locale={locale}
         path="files"
         page={page}
         hasNext={paginated.hasNext}
+        query={fileFiltersRecord(filters)}
       />
     </div>
   );
