@@ -131,7 +131,7 @@ library imports neither `searchEverything` nor `DOMAIN_SPECS` nor `buildSnippet`
 | `2N-FILES-005` a subject that is gone is not a live association; no second orphan concept | **built** | Unresolved subjects are **dropped**, not placeheld; removed, foreign and unreadable are byte-identical (asserted); a guard proves the feature never uses the word "orphan" |
 | `2N-FILES-006` extracted text reaches no masked surface | **built** — *and a live defect closed* | §2.1; the hosted journey asserts the control first, then the four absences |
 | `2N-FILES-007` recovery reachable from where the failure is shown | **baseline** | Shipped before this slice; preserved and re-proved. The retry appears only where a retry is a real action — an exhausted job gets none |
-| `2N-FILES-008` the library is **genuinely more useful** | **PARTIAL** | See §4 |
+| `2N-FILES-008` the library is **genuinely more useful** | **PARTIAL** | See §4. Remainder: no writer for `entity_attachments`. **Destination `2N-FILES-WRITER`** — new authority, an owner decision, not transferable into M2 |
 | `2N-FILES-009` navigable in both directions | **built**, *empty by construction* | Both directions real, shared, proved with harness-planted links; the emptiness for owners without legacy links is `2N-FILES-008`'s remainder, not a defect in this read path |
 | `2N-FILES-010` classified and filtered, count never an oracle | **built** | Four axes, all in-query, page-preserving; no count rendered at all |
 | `2N-FILES-011` discovery does not duplicate search | **built** | §2.4 — an evidenced negative plus a link |

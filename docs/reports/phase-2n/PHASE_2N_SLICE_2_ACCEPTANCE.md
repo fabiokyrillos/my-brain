@@ -17,7 +17,7 @@ are recorded as baseline rather than re-claimed.
 | `2N-PROJECT-002` people **with their roles** | `AssociationPanel` already received `role` from `person_projects` and rendered it; delivered by UX-08/EGC.2 | **baseline**, re-verified by journey |
 | `2N-PROJECT-003` current state from records that exist | status ✓, recent entries ✓, **open commitments absent** | **built** |
 | `2N-PROJECT-004` recent changes from audit/interpretation history | nothing | **built** |
-| `2N-PROJECT-005` decisions and risks, only if representable | nothing | **decisions built · risks `not-built-by-rule`** |
+| `2N-PROJECT-005` decisions and risks, only if representable | nothing | **decisions built · risks `not-built-by-rule`** — closed **by rule**, on the requirement's own *"only if representable"* clause: no stored vocabulary represents a risk. §2 |
 | `2N-PROJECT-006` bounds exactly as `2N-PERSON-003` | three lists bounded by 2N.0 and PR #205 | **baseline** for those, **built** for the four lists this slice adds |
 | `2N-PROJECT-007` every mutation reuses an existing authority path | true, and **unasserted** | **built** (the assertion) |
 

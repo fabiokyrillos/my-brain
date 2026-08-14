@@ -74,7 +74,7 @@ ADR-112 already use.
 | 001, 002, 007 | `baseline` | Shipped by UX-10 and 2N.0. Not re-claimed. |
 | 003 | **built** | Both memory surfaces derive through `deriveClaimProvenance`; three copy strings deleted. |
 | 004 | **built** | Three freshness facts where the page showed two. |
-| 005 | `not-built-by-rule` | The epistemic three-way is not representable; asserted against schema, types and copy with a non-vacuity control. |
+| 005 | `not-built-by-rule` | Closed **by rule**: the epistemic three-way is not representable; asserted against schema, types and copy with a non-vacuity control. |
 | 006 | `baseline` (words) / **made true by M1** | The sentence was true of the citation list; M1 made it true of retrieval. |
 | 008 | **built** | The detail page's two pickers truncated in silence. |
 | 009 | **built (guard)** | No provider import reaches either memory surface. |

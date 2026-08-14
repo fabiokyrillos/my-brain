@@ -249,10 +249,21 @@ export function buildMatrix(root = REPOSITORY_ROOT) {
 
     const adjudicated = priorClasses.length > 1;
     const row = closeouts.length > 0 ? closeouts[closeouts.length - 1] : priors[priors.length - 1];
-    if (row.class === "partial" && !DESTINATION.test(row.evidence)) {
+    /*
+     * The subject's own id is not a destination, and the mutation control caught
+     * that it was being read as one.
+     *
+     * `DESTINATION` admits a `2N-…` token because a remainder is usually named
+     * that way — but **every row contains its own id**, so an unqualified match
+     * made the check vacuous: a `partial` would have satisfied it by existing.
+     * Stripping the subject first is the narrowing, and the control below proves
+     * it still refuses a row that names nowhere to go.
+     */
+    const evidence = row.evidence.split(id).join(" ");
+    if (row.class === "partial" && !DESTINATION.test(evidence)) {
       problems.push(`${id} is partial and its evidence names no destination`);
     }
-    if (row.class === "not-built-by-rule" && !RULE.test(row.evidence)) {
+    if (row.class === "not-built-by-rule" && !RULE.test(evidence)) {
       problems.push(`${id} is not-built-by-rule and cites no rule`);
     }
     resolved.push({
@@ -330,7 +341,10 @@ function render({ declared, resolved, tally, migrations }) {
     }
     lines.push("");
   }
-  return `${lines.join("\n")}\n`;
+  // `trimEnd` before the single newline: every family block ends with a blank
+  // separator line, so joining them leaves a trailing blank at EOF that
+  // `git diff --check` reports as an error on every regeneration.
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
