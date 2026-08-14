@@ -5438,3 +5438,188 @@ proved.
 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started, not
 planned and not retargeted**, and A13 still guarding the roadmap successor.
 Slices 2N.4–2N.7 remain, and **2N.3 is complete**.
+
+## §70 — Slice 2N.4 ships: the Brain says two facts cannot both be right, instead of quietly calling one archived (2026-08-14)
+
+**PR #219**, merged at `da9b787`, **CI green on that exact merge SHA**. Head at
+review was `3cf69cf`, also green on all three job families. Base was `main` at
+`674965d`. `docs/reports/phase-2n/PHASE_2N_SLICE_4_ACCEPTANCE.md`, and the
+enumeration that authorized it at `..._SLICE_4_CONFLICT_ENUMERATION.md`.
+
+**ZERO MIGRATIONS. 94 total, hosted parity `202608140094`, local = remote, read
+live.** Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**,
+unspent and non-transferable, and a **fourth is a STOP CONDITION**.
+
+**6 requirements: 6 built.**
+
+### The silence this slice ends
+
+A memory whose validity window is impossible — in force **after** it stopped
+being in force — read as **"arquivada"**. `memoryLifecycleState` resolves it that
+way because *archived wins over scheduled*: right about the code, **wrong about
+the world**. The memory is not "no longer true", it is a pair of dates that
+cannot both be right.
+
+### The enumeration ran first, and it closed at one
+
+Eight candidates, **one implementable**, seven declared out **by name**. A wider
+detector was available and is deliberately not here.
+
+**The one worth remembering is C7.** The identical fault on `entity_aliases` is
+**already refused by a database CHECK** — `(valid_to IS NULL) OR (valid_from IS
+NULL) OR (valid_to >= valid_from)`, read live. Its set is empty by construction
+and can only ever be empty, so a detector there would be **a control that cannot
+fail**. It closes `not-built-by-rule` rather than being quietly skipped, because
+its absence is otherwise indistinguishable from an oversight.
+
+### Three facts that corrected or extended the re-audit
+
+1. **`memories` has no validity CHECK; its sibling does.** Confirmed across **all
+   94 migrations**, not only the one that created the table.
+2. **`memories.valid_from` has NO WRITER anywhere in the product.** Every
+   occurrence in the migrations, both Edge Function entrypoints and all of `src/`
+   is a **read**. So an inverted window **cannot be created through any product
+   surface today** and the expected population is **zero**. The detector is a
+   read-time safety net over a column nothing writes — **recorded rather than
+   smoothed**, because a slice implying it was cleaning up existing bad rows
+   would be claiming something it cannot show.
+3. **The re-audit named `updateMemory` as the correction path.**
+   `memoryUpdateSchema` carries **neither** timestamp. The conclusion survived;
+   the mechanism did not.
+
+### A signed requirement refused the obvious implementation
+
+Widening `memoryUpdateSchema` with the two timestamps needs **no migration, no
+RPC and no new authority** — the columns exist, `authenticated` already holds
+`update`, and `AUDITED_COLUMNS` already compares both. It was refused anyway, on
+`2N-CORRECT-002`: *"correcting stays distinct from archiving."* A raw
+`valid_until` field is archiving wearing an edit form's clothes, and
+`memories/schema.ts` already refuses raw timestamps **in writing**. **2N.4 does
+not reverse a signed decision to make its own item prettier.**
+
+`archive` was rejected on measurement rather than principle: it stamps
+`valid_until = now()`, and with a **future** `valid_from` the window is **still
+inverted**. `setMemoryLifecycle(restore)` clears `valid_until` to `null`, and a
+null half can never satisfy the predicate — it resolves **every** instance with
+no case analysis.
+
+**And "refuse a new inverted window" has no validator, because there is no input
+to validate.** The refusal is **structural**, and a guard fails the moment any
+code introduces a raw timestamp write. A validator on a field that does not exist
+would be the vacuous control this phase refuses.
+
+### Two structural facts about the queue that neither the plan nor the re-audit carried
+
+**It is welded to `entries`.** Every row comes from `list_needs_attention`, is
+hydrated from `entries.original_content`, and `NeedsAttentionItemView.entryId` is
+**required**. A memory is not an entry, and `memories.source_entry_id` is
+`on delete set null`. So the conflict carries **its own view shape** — making
+`entryId` optional would have weakened the field for the twenty rows that
+genuinely have one, and the analytics event those rows fire would then have had
+an `undefined` to send. **Both shapes render in ONE queue: the separation is in
+the types, not on the surface.**
+
+**Its reason vocabulary is enforced in Postgres.**
+`needs_attention_item_opened` validates `attentionReason` against a **five-member
+enum inside the database**, so `resolve_validity_conflict` is deliberately **not**
+a `TrackedAttentionReason` and the conflict row fires **no product event at all**.
+That is required twice over: telemetry belongs to **2N.7 and M2**.
+
+`resolve_consistency` keeps its **exact prior sentence in both locales** and its
+live producer at `lifecycle.ts:71`, asserted by guard — routing belief conflicts
+there would have made one sentence stand for two unrelated problems.
+
+### Hoje could have said "Nada pendente" while a conflict existed
+
+Its `saved` branch renders *"Nada pendente. Tudo salvo."* — a categorical claim
+about the whole product. `conflictCount` is now **required** on
+`deriveHomeOperationalStatus`, and the compiler found every caller. One
+`pendingCount` drives the heading, the "view all" link, the empty state and the
+end-of-day summary, so a conflict can never render under a heading that says zero.
+
+### Two product defects the diff review found and no test would have
+
+1. **The row obeyed the wrong governed surface.** It hardcoded
+   `presentationFor("attention", …)` while Hoje's is `"hoje"`. **No visible defect
+   today — the two carry identical rules — and that is what made it worth fixing
+   rather than noting.** The day they diverge, the row would obey the wrong one
+   and **nothing would fail**.
+2. **It shipped with six class names and no CSS**, and would have rendered as
+   unstyled prose in a list of styled cards. The first draft then reached for
+   `--amber`, `--surface-muted`, `--muted` and `--border`: **`:root` defines none
+   of them.** `experience.css` already references two without definitions —
+   pre-existing, not this slice's to repair, but adding four more would have been
+   copying a fault forward.
+
+### Three guard defects, all one class, and the class is worth naming
+
+**A scan for a generic token finds the history of every phase that used the same
+word.** `conflict` matched `202607170021_fix_interpretation_timestamp_conflict`;
+bare `slice_4` matched `202607220041_phase_2c_slice_4_…`; and a bare `valid_from`
+scan flagged **four correct files** whose only sin is a type annotation. Each was
+**narrowed to what discriminates** — a phase-qualified token, and the identifier
+**inside a mutation payload** — **never weakened**, and each narrowing carries a
+control proving it still refuses what it exists to refuse **and** does not refuse
+what it must allow.
+
+One **inherited** guard caught this work correctly:
+`local-day-correction-convergence` counts consumers of the owner's zone on Hoje,
+and it moved 2 → 3 because a third row type now renders an instant. Raised with
+the three consumers **named**, so the number is a claim about the surface rather
+than a literal bumped to go green.
+
+### Proofs
+
+Detector **23**, projection **15**, row **18**, queue integration **21**, guards
+**42 with a mutation control each**. Full suite **7000 passed** (3 failed files =
+the Windows-only shebang baseline); lint, typecheck, build and
+`git diff --check` clean.
+
+Hosted **18/18**, desktop and Pixel 7, both locales, **`--workers=1`**, **no
+`429`**. Two pairings carry the file: the correction runs **end to end through
+the product's own form** and a separate test proves **the memory survived it** —
+without the pair, "gone from the queue" is satisfied by a delete; and the
+cross-tenant control asserts the stranger sees **their own** conflict first, so
+"does not see the owner's" cannot pass on a blank page.
+
+**The hosted proof ran BEFORE the merge**, and that is sound here precisely
+because **2N.4 spends no migration**: the lane is a local production build
+against hosted Supabase, and the database is identical either side of the merge.
+
+Regressions: M1 knowledge **12/12** (desktop + Pixel 7), memories **6/6
+desktop**, M3 deletion **7/7 desktop**, 2N.0 foundations **6/6 desktop**.
+
+**Zero residue**, two probes with non-vacuous controls. 2N.4's control plants
+**two** rows — one with an inverted window and one with none — and asserts the
+windowed probe finds the first and **ignores** the second. Without the second, a
+probe that silently dropped its filter would still read 1 and look correct.
+
+### Recorded, not smoothed
+
+**`online-memories.spec.ts:85` still fails on mobile** — **21 px** against a 44 px
+minimum, reproduced unchanged this session, cause `.list-row-main a` carrying no
+sizing rule on **any** list surface. **Not weakened, skipped, deleted or
+absorbed.** Destination **`2N-MOBILE`**. Checked against the owner's own criterion
+and it does **not** apply: the affected control is an `<a>` *inside*
+`.list-row-main` on the memories **list**, while the conflict row *is* an
+`<a class="list-row">` that *contains* a `.list-row-main` and has no nested
+anchor.
+
+**`needs_attention_viewed.itemCount` still counts entry rows only.** Redefining
+what an existing 2J metric measures is telemetry work; destination **2N.7**.
+
+**2N.2's 28-test project journey was NOT re-run** — it shares no contract this
+slice touches, named rather than implied by an unqualified "regressions pass".
+Mobile is a **viewport simulation**, not a device; **no screen-reader run is
+claimed**.
+
+### THE LOOP STOPS HERE — 2N.5 IS RE-AUDITED BUT NOT STARTED
+
+Stopped **between slices**, a sanctioned stopping point. **No migration is
+partially deployed**: 2N.4 created none, and M1 and M3 remain merged, deployed,
+at parity and proved.
+
+**Unchanged:** signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started, not
+planned and not retargeted**, and A13 still guarding the roadmap successor.
+Slices **2N.5, 2N.6 and 2N.7** remain.

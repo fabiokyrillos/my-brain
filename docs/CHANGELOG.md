@@ -2,6 +2,62 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PHASE 2N slice 2N.4 COMPLETE: the Brain says two facts cannot both be right, instead of quietly calling one archived
+
+**PR #219**, merged at `da9b787`, CI green on that exact merge SHA. **Zero migrations.** 94 total, hosted parity `202608140094`, local = remote, read live. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **6 requirements: 6 built.**
+
+### What changed for the user
+
+A memory whose validity window is impossible — it comes into force **after** it stopped being in force — used to read as **"arquivada"**. `memoryLifecycleState` resolves it that way because *archived wins over scheduled*: right about the code, wrong about the world. The memory is not "no longer true", it is a pair of dates that cannot both be right.
+
+It now appears in **"Precisa de você"** with both dates in the owner's zone and locale, a plain sentence saying why the assistant did not choose, and one labelled action reaching the owner's own existing correction path.
+
+### The enumeration came first, and it closed at one
+
+`2N-CONFLICT-001` obliges the phase to enumerate the detectable set **and declare the rest out by name**. Eight candidates were examined; **one is implementable**. Two are detectable but complementary rather than contradictory; one needs semantics; one would be an existence oracle across tenants; one would use `confidence` as precedence, which `OD-2N-7` A forbids; one has no owner-facing action; and one — the identical fault on `entity_aliases` — is **already refused by a database CHECK**, so its set is empty by construction and a detector there would be a control that cannot fail.
+
+A wider detector was available and is deliberately not here.
+
+### Three measured facts that correct or extend the pre-implementation re-audit
+
+- **`memories` has no validity CHECK; `entity_aliases` does.** Read live from `pg_constraint`, and confirmed absent across **all 94 migrations** rather than only the one that created the table.
+- **`memories.valid_from` has no writer anywhere in the product.** Every occurrence in the migrations, both Edge Function entrypoints and all of `src/` is a read. So an inverted window **cannot be created through any product surface today**, and the expected population is zero: this is a read-time safety net over a column nothing writes, not a cleanup of data known to exist. Recorded rather than smoothed.
+- **The re-audit named `updateMemory` as the correction path.** `memoryUpdateSchema` carries neither timestamp. The conclusion survives; the mechanism does not.
+
+### The correction action, and two rejected alternatives
+
+`setMemoryLifecycle(restore)` clears `valid_until` to `null`, and a null half can never satisfy the predicate — so it resolves **every** instance with no case analysis, through a path that already exists and is already audited.
+
+**`archive` was rejected because it does not reliably resolve**: it stamps `valid_until = now()`, and with a future `valid_from` the window is still inverted. **Widening `memoryUpdateSchema` with raw timestamps was rejected on a signed requirement**, not on capability — `2N-CORRECT-002` binds the phase to *"correcting stays distinct from archiving"*, and a raw `valid_until` field is archiving wearing an edit form's clothes.
+
+### The queue is welded to entries, and its reason vocabulary is enforced in Postgres
+
+Neither fact is in the plan or the re-audit, and both shaped the design. Every queue row comes from `list_needs_attention`, is hydrated from `entries.original_content`, and requires `entryId` — but a memory is not an entry, and `memories.source_entry_id` is `on delete set null`. So the conflict carries **its own view shape**; making `entryId` optional would have weakened the field for the twenty rows that genuinely have one. Both shapes render in **one** queue: the separation is in the types, not on the surface.
+
+And `needs_attention_item_opened` validates its reason against a **five-member enum inside the database**, so `resolve_validity_conflict` is deliberately **not** a `TrackedAttentionReason` and the conflict row fires **no** product event. Telemetry belongs to 2N.7 and M2.
+
+### Hoje could have said "Nada pendente" while a conflict existed
+
+`deriveHomeOperationalStatus`'s `saved` branch renders a categorical claim about the whole product. `conflictCount` is now **required** on it — an optional parameter would let a future caller omit it silently — and one `pendingCount` drives the section heading, the "view all" link, the empty state and the end-of-day summary.
+
+### Defects found by this slice's own review
+
+Two product defects no test would have caught: the row **obeyed the wrong governed surface** (`attention` hardcoded where Hoje's is `hoje` — identical rules today, which is what made it worth fixing rather than noting), and it **shipped with six class names and no CSS**. Three guard defects, all one class: a scan for a generic token finds the history of every phase that used the same word. Each was narrowed to what discriminates, never weakened, each with a control.
+
+One inherited guard caught this work correctly: `local-day-correction-convergence`'s zone-consumer count moved 2 → 3 because a third row type now renders an instant.
+
+### Proofs
+
+Detector **23**, projection **15**, row **18**, queue integration **21**, guards **42** with a mutation control each. Full suite **7000 passed**; lint, typecheck, build and `git diff --check` clean.
+
+Hosted **18/18**, desktop and Pixel 7, both locales, `--workers=1`, no `429`. The correction runs end to end through the product's own form, and a separate test proves **the memory survived it** — without the pair, "gone from the queue" would be satisfied by a delete. The cross-tenant control asserts the stranger sees **their own** conflict first, so "does not see the owner's" cannot pass on a blank page.
+
+Regressions: M1 knowledge **12/12**, memories **6/6 desktop**, M3 deletion **7/7 desktop**, 2N.0 foundations **6/6 desktop**. **Zero residue**, two probes with non-vacuous controls.
+
+### Recorded, not smoothed
+
+`online-memories.spec.ts:85` still fails on mobile at **21 px** against a 44 px minimum — pre-existing, reproduced unchanged, **not weakened, skipped or absorbed**, destination `2N-MOBILE`. The conflict surface does **not** reuse the affected control. `needs_attention_viewed.itemCount` still counts entry rows only; redefining an existing 2J metric is telemetry work, destination 2N.7. 2N.2's 28-test journey was **not** re-run.
+
 ## 2026-08-14 - PHASE 2N slice 2N.3 COMPLETE: the product can remove a person, a project and a memory, and the undo returns the same one
 
 **The phase's second migration.** `202608140094_phase_2n_slice_3_entity_deletion.sql` is **M3** of the three ADR-109 allocated, all non-transferable. Budget moves to **`3 allocated · 2 spent`**; **M2** stays with slice 2N.7, and **a fourth is a stop condition**. 94 migrations, hosted parity `202608140094`, local = remote.
