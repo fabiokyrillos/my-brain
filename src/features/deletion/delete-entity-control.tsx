@@ -33,7 +33,8 @@
  * and testing them nowhere.
  */
 
-import { useActionState, useCallback, useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { startTransition, useActionState, useCallback, useId, useState } from "react";
 
 import type { Locale } from "@/lib/preferences";
 import { ConfirmDialog } from "@/features/task-commands/confirm-dialog";
@@ -48,6 +49,13 @@ import { IDLE_DELETION_STATE, type DeletionState } from "./state";
 import { affectedConsequences, isIsolated, type DeletableEntityType } from "./contracts";
 import { getDeletionCopy } from "./copy";
 
+/** Where an owner is sent once the thing they were looking at is gone. */
+const INDEX_SEGMENT: Readonly<Record<DeletableEntityType, string>> = {
+  person: "people",
+  project: "projects",
+  memory: "memories",
+};
+
 export function DeleteEntityControl({
   locale,
   entityType,
@@ -58,6 +66,7 @@ export function DeleteEntityControl({
   entityId: string;
 }) {
   const copy = getDeletionCopy(locale);
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const headingId = useId();
 
@@ -77,10 +86,29 @@ export function DeleteEntityControl({
   const [result, runApply, applying] = useActionState(applyDeletion, IDLE_DELETION_STATE);
   const [undone, runUndo, undoing] = useActionState(undoDeletion, IDLE_DELETION_STATE);
 
+  /** Deleted and NOT undone — the only state in which the route has no subject. */
+  const removed = result.status === "deleted" && undone.status === "idle";
+
+  /**
+   * Closing is where the route catches up, and it is the ONLY place that may.
+   *
+   * The actions deliberately do not call `revalidatePath`: doing so refreshes
+   * the page the dialog is on — Next's own documentation says a Server Function
+   * "updates the UI immediately (if viewing the affected path)" — which
+   * destroys this component and takes the undo control with it. The hosted
+   * journey caught exactly that.
+   *
+   * So the refresh happens here, after the owner has read the outcome and had
+   * the chance to undo. If the subject is gone, staying on its detail route
+   * would show them a page for something that no longer exists, so they are
+   * sent to the list instead.
+   */
   const close = useCallback(() => {
     setOpen(false);
     setOperationKey(`del-${crypto.randomUUID()}`);
-  }, []);
+    if (removed) router.replace(`/${locale}/app/${INDEX_SEGMENT[entityType]}`);
+    else router.refresh();
+  }, [entityType, locale, removed, router]);
 
   /**
    * The state actually on screen, newest-first.
@@ -119,7 +147,19 @@ export function DeleteEntityControl({
           data.set("entityId", entityId);
           data.set("operationKey", operationKey);
           data.set("locale", locale);
-          runPreview(data);
+          /*
+           * `startTransition`, and it is not ceremony.
+           *
+           * A `useActionState` action passed to `<form action>` is wrapped in a
+           * transition by React; one called directly, as this one is, is not —
+           * and React's warning names the consequence exactly: **`isPending`
+           * will not update correctly**. `isPending` here is `previewing`,
+           * which draws the loading sentence and disables the confirm button
+           * while the census is in flight. Without the transition the dialog
+           * can open with neither, which is the state where a second click
+           * lands on a control that looks ready and is not.
+           */
+          startTransition(() => runPreview(data));
         }}
       >
         {copy.trigger[entityType]}

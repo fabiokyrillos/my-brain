@@ -31,13 +31,12 @@
  * selects among the caller's own confirmations and authorizes nothing.
  */
 
-import { revalidatePath } from "next/cache";
 import type { PostgrestError } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth/require-user";
 import { resolveLocale, type Locale } from "@/lib/preferences";
 
-import type { DeletableEntityType, DeletionOutcome } from "./contracts";
+import type { DeletionOutcome } from "./contracts";
 import { getDeletionCopy } from "./copy";
 import {
   deletionConfirmationSchema,
@@ -91,23 +90,31 @@ function fields(formData: FormData) {
 }
 
 /**
- * Revalidates the surfaces a deletion or an undo changes.
+ * NOTHING HERE CALLS `revalidatePath`, AND THAT IS THE FIX FOR A REAL DEFECT.
  *
- * The list is per type and deliberately includes the **index** as well as the
- * detail route: after a deletion the detail route 404s, and a stale index that
- * still lists the row is the one place a user would reasonably conclude the
- * deletion silently failed.
+ * The first version of this module revalidated the index and the detail route
+ * from inside `applyDeletion`. The hosted journey then failed in a way no unit
+ * test could have shown: after a successful deletion the status region was
+ * still reading `confirmed` with no outcome, because the dialog had been
+ * **destroyed and remounted**, taking the deletion result — and the undo
+ * control — with it.
+ *
+ * `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/
+ * revalidatePath.md` states it plainly: *"Server Functions: Updates the UI
+ * immediately (if viewing the affected path)."* The affected path is the page
+ * the dialog is on, so revalidating from the action is a instruction to throw
+ * away the component that is about to offer the undo. **A deletion whose undo
+ * button vanishes before it can be pressed is worse than one with no undo at
+ * all**, because the product promised the undo in the preview.
+ *
+ * Cache correctness does not depend on this call. Every surface involved reads
+ * Supabase through the request's cookies, so it renders dynamically and a
+ * navigation always re-fetches. What `revalidatePath` would have bought is the
+ * **client router cache**, and the client is the right place to clear that — at
+ * the moment the dialog closes, which `delete-entity-control.tsx` does with
+ * `router.refresh()` and, when the subject is gone, a navigation away from a
+ * route that no longer has a subject.
  */
-function revalidateFor(locale: Locale, entityType: DeletableEntityType, entityId: string): void {
-  const segment = entityType === "person" ? "people" : entityType === "project" ? "projects" : "memories";
-  revalidatePath(`/${locale}/app/${segment}`);
-  revalidatePath(`/${locale}/app/${segment}/${entityId}`);
-  // Deleting a person nulls `tasks.waiting_on_person_id`, and deleting either a
-  // person or a project nulls a memory's link — surfaces that render those
-  // would otherwise keep showing a name that no longer resolves.
-  revalidatePath(`/${locale}/app/waiting`);
-  revalidatePath(`/${locale}/app/memories`);
-}
 
 /**
  * `2N-CORRECT-010` — the preview, produced entirely by the server.
@@ -194,8 +201,6 @@ export async function applyDeletion(
   const result = deletionResultSchema.safeParse(data);
   if (!result.success) return errored(locale, "failed");
 
-  revalidateFor(locale, parsed.data.entityType, parsed.data.entityId);
-
   return {
     status: "deleted",
     outcome: "deleted",
@@ -218,8 +223,6 @@ export async function undoDeletion(
 ): Promise<DeletionState> {
   const locale = resolveLocale(formData.get("locale"));
   const undoId = formData.get("undoId");
-  const entityType = formData.get("entityType");
-  const entityId = formData.get("entityId");
   if (typeof undoId !== "string" || undoId.length === 0) return errored(locale, "failed");
 
   const { supabase } = await requireUser(locale);
@@ -229,15 +232,10 @@ export async function undoDeletion(
   const result = undoResultSchema.safeParse(data);
   if (!result.success) return errored(locale, "failed");
 
-  if (typeof entityType === "string" && typeof entityId === "string") {
-    const request = deletionRequestSchema.safeParse({
-      entityType,
-      entityId,
-      operationKey: "undo-revalidate",
-    });
-    if (request.success) revalidateFor(locale, request.data.entityType, request.data.entityId);
-  }
-
+  // No revalidation here either, and for the mirror of the reason above: the
+  // owner has just been told the restore succeeded, and refreshing the route
+  // out from under that sentence would replace it with a page that says
+  // nothing at all about what just happened.
   return {
     status: "undone",
     outcome: "undone",

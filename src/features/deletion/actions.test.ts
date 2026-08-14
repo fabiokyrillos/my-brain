@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireUser } from "@/lib/auth/require-user";
@@ -155,6 +156,37 @@ describe("applyDeletion", () => {
     expect(state.status).toBe("deleted");
     expect(state.undoId).toBe(UNDO_ID);
     expect(JSON.stringify(calls[0]?.args)).not.toContain("consequences");
+  });
+
+  it("does NOT revalidate the route the dialog is on", async () => {
+    /**
+     * A regression lock on a defect the hosted journey found and no unit test
+     * could have.
+     *
+     * Next's own documentation: a Server Function's `revalidatePath` "updates
+     * the UI immediately (if viewing the affected path)". The affected path is
+     * the page the dialog is on, so revalidating here destroys the component
+     * that is about to offer the undo — and the journey saw exactly that: a
+     * successful deletion whose status region still read `confirmed`, with the
+     * undo control gone.
+     *
+     * A deletion whose undo button vanishes before it can be pressed is worse
+     * than one with no undo, because the preview promised it.
+     */
+    stub({
+      data: {
+        deleted: true,
+        entityType: "person",
+        entityId: ENTITY_ID,
+        consequences: zeroConsequences,
+        undoId: UNDO_ID,
+        undoExpiresAt: "2026-08-15T00:00:00Z",
+      },
+      error: null,
+    });
+
+    await applyDeletion(IDLE_DELETION_STATE, form());
+    expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled();
   });
 
   it("reports a changed world as stale rather than as a failure, and keeps nothing", async () => {
