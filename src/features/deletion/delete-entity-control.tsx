@@ -100,8 +100,17 @@ export function DeleteEntityControl({
 
   return (
     <>
+      {/*
+        Stable, locale-independent hooks for the hosted journeys.
+        A journey that selected on translated copy would assert the translation
+        rather than the behaviour, and would have to be edited every time a
+        sentence improves — which is how an absence assertion quietly stops
+        being able to fail.
+      */}
       <button
         type="button"
+        data-deletion="trigger"
+        data-deletion-type={entityType}
         className="button button-danger"
         onClick={() => {
           setOpen(true);
@@ -128,12 +137,19 @@ export function DeleteEntityControl({
           so a screen reader hears the outcome rather than only sighted users
           seeing a button change. `2N-ACCESS-003`: announced, not merely styled.
         */}
-        <p role="status" aria-live="polite" className="dialog-status">
+        <p
+          role="status"
+          aria-live="polite"
+          className="dialog-status"
+          data-deletion="status"
+          data-deletion-state={previewing ? "loading" : shown.status}
+          data-deletion-outcome={shown.outcome ?? ""}
+        >
           {previewing ? copy.previewLoading : shown.message ?? ""}
         </p>
 
         {shown.status === "deleted" && shown.undoId ? (
-          <form action={runUndo}>
+          <form action={runUndo} data-deletion="undo-form">
             <input type="hidden" name="undoId" value={shown.undoId} />
             <input type="hidden" name="entityType" value={entityType} />
             <input type="hidden" name="entityId" value={entityId} />
@@ -146,14 +162,16 @@ export function DeleteEntityControl({
         ) : null}
 
         {consequences && shown.status !== "deleted" ? (
-          <div aria-labelledby={headingId}>
+          <div aria-labelledby={headingId} data-deletion="preview">
             <h3 id={headingId}>{copy.consequenceHeading}</h3>
             {isIsolated(consequences) ? (
-              <p>{copy.nothingElseAffected}</p>
+              <p data-deletion="isolated">{copy.nothingElseAffected}</p>
             ) : (
               <ul>
                 {affectedConsequences(consequences).map(({ key, count }) => (
-                  <li key={key}>{copy.consequences[key](count)}</li>
+                  <li key={key} data-consequence={key} data-count={count}>
+                    {copy.consequences[key](count)}
+                  </li>
                 ))}
               </ul>
             )}
@@ -161,7 +179,7 @@ export function DeleteEntityControl({
             <h3>{copy.retentionHeading}</h3>
             <ul>
               {(shown.preview?.retention ?? []).map((kind) => (
-                <li key={kind}>{copy.retention[kind]}</li>
+                <li key={kind} data-retention={kind}>{copy.retention[kind]}</li>
               ))}
             </ul>
 
@@ -170,7 +188,7 @@ export function DeleteEntityControl({
         ) : null}
 
         {shown.status === "previewed" || shown.status === "error" ? (
-          <form action={runConfirm}>
+          <form action={runConfirm} data-deletion="confirm-form">
             <input type="hidden" name="entityType" value={entityType} />
             <input type="hidden" name="entityId" value={entityId} />
             <input type="hidden" name="operationKey" value={operationKey} />
@@ -182,7 +200,7 @@ export function DeleteEntityControl({
         ) : null}
 
         {shown.status === "confirmed" ? (
-          <form action={runApply}>
+          <form action={runApply} data-deletion="apply-form">
             <input type="hidden" name="entityType" value={entityType} />
             <input type="hidden" name="entityId" value={entityId} />
             <input type="hidden" name="operationKey" value={operationKey} />
