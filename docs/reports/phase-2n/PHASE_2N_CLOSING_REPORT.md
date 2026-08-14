@@ -10,7 +10,7 @@ authorized through closeout by ADR-112, and extended once by ADR-113.
 | Classification | **93 built · 20 baseline · 3 partial · 11 not-built-by-rule · 0 undelivered** |
 | Migrations | **`3 allocated · 2 spent`** — M1 `202608130093`, M3 `202608140094`, **M2 UNSPENT** |
 | Parity | **94 local = 94 hosted, `202608140094`**, read live |
-| Slices | 2N.0 → 2N.7, eight, all merged with CI green on their exact merge SHAs |
+| Slices | 2N.0 → 2N.7, eight. **The seven before this one are merged with CI green on their exact merge SHAs**; 2N.7 is this change, and its own merge SHA is verified at the close rather than claimed here |
 
 The matrix is `PHASE_2N_TRACEABILITY_MATRIX.md`, **generated** by
 `scripts/generate-phase-2n-traceability.mjs` and re-checked in CI. It reads the
