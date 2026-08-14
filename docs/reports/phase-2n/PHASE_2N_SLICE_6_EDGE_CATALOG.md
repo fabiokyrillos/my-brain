@@ -130,9 +130,9 @@ Every candidate the schema offers, measured. `owner scope` is `user_id not null`
 | Label | `describeRelationshipType(locale, relationship_type)`; a value outside the closed 14-member vocabulary renders raw and neutral, never guessed |
 | State | live iff `valid_until is null`; the readers already filter it |
 | Role | n/a — the type *is* the role |
-| Description | `description` — owner free text. **Not carried onto this surface** (§2.3) |
+| Description | `description` — owner free text. Carried, **protected** by ADR-110 Decision 4's posture (§2.3) |
 | Provenance | **owner-authored, by construction.** No trigger, no RPC and no worker writes this table |
-| Sensitivity | label is a localized vocabulary term, carries no user content |
+| Sensitivity | the label is a localized vocabulary term and carries no user content; `description` is governed (§2.3) |
 | Validity | `valid_from`, `valid_until` |
 | Open source | **none.** No `source_entry_id` exists to open |
 | Entity removed | the person row is absent from the resolved map → the edge and its node are dropped entirely |
@@ -306,31 +306,61 @@ by name.
   on both the person and the project page, and `2N-RELATION-009` requires roles
   preserved. Masking it here and not there would create exactly the divergence
   `2N-PRIVACY-001` exists to prevent.
-- `person_relationships.description` — **not carried onto this surface.** It is
-  free text about a human being, on a table with no classification and no
-  classifiable source: the same shape as `people.notes`, which Decision 5 keeps
-  off the graph by name. ADR-110 did not extend Decision 4 to it, so **the person
-  page is not changed** — this surface simply does not propagate an unclassified
-  free-text field onto a new indirect surface, and links to the person page where
-  the owner's own sentence already lives.
+- `person_relationships.description` — **rendered, and protected.** It is the
+  owner's own sentence about a relationship (*"sister-in-law, but really more of
+  a friend"*, the example `relationship-vocabulary.ts:42-44` gives), and
+  `2N-RELATION-009` asks an edge to say what it asserts. It is also **free text
+  about a human being, on a table with no `sensitivity` column and no
+  classifiable source** — ADR-110 Decision 4's predicate, word for word.
+
+  So it takes Decision 4's posture: `deriveFreeTextSensitivity()`, masked by
+  default, **revealed locally and explicitly**, through the same
+  `ProtectedContent` every other governed subject uses.
+
+  **And that fixes a live divergence rather than creating one.** On the person
+  page today, `people.notes` is masked and `person_relationships.description`
+  renders in the clear **one section below it** — two free-text fields about the
+  same human being, on the same page, under two different postures. That is the
+  shape 2N.5's census found (*"the leak was one step to the side"*). This slice
+  makes the relationship panel render `description` through `ProtectedContent`
+  with `surface="person"`, so the person page and the relations surface converge
+  on one contract instead of diverging on a new one.
+
+- `person_projects.role` — **rendered in the clear, unchanged.** It describes a
+  function on a project ("designer", "PM"), not the person, and it renders in the
+  clear on **both** the person page and the project page today. Masking it only
+  here would be the divergence `2N-PRIVACY-001` exists to prevent, and masking it
+  everywhere would extend a posture ADR-110 signed for a field whose predicate
+  `role` does not match.
 
   **Recorded as an open question for the owner, not smoothed:** should ADR-110
-  Decision 4's posture extend to `person_relationships.description` and
-  `person_projects.role` on the *contextual* pages? 2N.6 does not decide it and
-  does not act on it. Destination: `2N-PRIVACY-FREETEXT`.
+  Decision 4's posture extend to `person_projects.role`? 2N.6 does not decide it
+  and does not act on it. Destination: **`2N-PRIVACY-FREETEXT`**.
 
-### 2.4 Where the `graph` surface key applies
+### 2.4 Where the `graph` surface key applies, and what actually consumes it
 
 `graph` joins `GOVERNED_SURFACES` **in the same change as its first real
-consumer**, which is what `contracts.ts:125-129` reserved it for. Its rules are
-identical to the four contextual surfaces — `normal`/`private` shown,
-`highly_sensitive` **masked in place**, revealable locally — for the reason that
-paragraph gives: a dropped node makes a count a lie and an absence an oracle.
+consumer**, which is exactly what `contracts.ts:125-129` reserved it for — and
+that paragraph also states the alternative plainly: *"It joins in 2N.6, with its
+consumer, or not at all."* A rules row nobody reads is the producer-with-no-
+consumer failure this repository has already paid for twice.
 
-In practice the drawable node labels are all structural identifiers, so the mask
-is reached only through the derived state of a linked subject. The rule exists
-anyway, and is asserted, because a surface whose protection depends on nobody
-adding a governed field later is not protected.
+**The consumer is real and is named:** `person_relationships.description`,
+resolved by `deriveFreeTextSensitivity()` and rendered through
+`<ProtectedContent surface="graph">` in the relation list. `resolveGraphContent`
+joins the four resolvers in `subject-derivation.ts` — the one module allowed to
+name a surface literal — and `sensitivity-convergence.test.ts` gains the positive
+half for it.
+
+The rules are identical to the four contextual surfaces — `normal`/`private`
+shown, `highly_sensitive` **masked in place**, revealable locally — for the
+reason that module's header gives: a dropped node makes a count a lie and an
+absence an oracle.
+
+Every other string this surface renders is a **structural identifier**
+(`people.name`, `projects.name`, `contexts.name`, `organizations.name`) or a
+**localized vocabulary term**, and neither is governed content under ADR-110
+Decision 2.
 
 ---
 

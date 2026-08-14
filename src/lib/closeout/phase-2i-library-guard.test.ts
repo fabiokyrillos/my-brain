@@ -30,9 +30,12 @@ describe("2I-LIB-001: Library renders the grouping that already exists", () => {
     expect(CONTRACTS).toContain('capability.group === "context"');
   });
 
-  it("holds exactly the six context domains", () => {
+  it("holds exactly the seven context domains", () => {
+    // Six until 2N.6 added `relations`. The list is derived from the shell, so
+    // this is the transcription that makes an accidental addition visible — and
+    // the test below asserts the two stay in step in both directions.
     expect([...LIBRARY_MEMBERS].sort()).toEqual(
-      ["contexts", "files", "memories", "organizations", "people", "projects"].sort(),
+      ["contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
     );
   });
 

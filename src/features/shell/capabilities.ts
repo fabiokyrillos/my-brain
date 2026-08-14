@@ -110,6 +110,24 @@ export const navigationCapabilities = [
   { key: "contexts", route: "contexts", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "memories", route: "memories", group: "context", visibility: "more", nested: false, aliases: [] },
   { key: "files", route: "files", group: "context", visibility: "more", nested: false, aliases: [] },
+  /*
+   * `2N-RELATION-006`, slice 2N.6. The relations surface — a list of every link
+   * the Brain holds, and a secondary drawing of the part it can explain.
+   *
+   * `more` rather than `primary`, and that is the requirement rather than
+   * restraint this time: `2N-RELATION-006` says the graph *"is never primary
+   * navigation"*, and `2I-SHELL-001` pins the four primary destinations as a
+   * delivered baseline. `calendar` above took the same position in Phase 2M and
+   * recorded promotion as an owner decision; this one is the same, with a signed
+   * ceiling on top of it.
+   *
+   * In the `context` group beside `people`, `projects`, `organizations` and
+   * `contexts`, because those four are exactly the node types it draws.
+   *
+   * `nested: false` — the surface has no sub-route. It is one page, and both of
+   * its presentations live on it.
+   */
+  { key: "relations", route: "relations", group: "context", visibility: "more", nested: false, aliases: [] },
   { key: "reviews", route: "reviews", group: "reflection", visibility: "more", nested: false, aliases: [] },
   { key: "questions", route: "questions", group: "reflection", visibility: "more", nested: false, aliases: [] },
   /*

@@ -282,6 +282,52 @@ const INVENTORY: readonly RouteEntry[] = [
    */
   { route: "library", sections: [] },
   { route: "questions", sections: [] },
+  /*
+   * 2N.6. It renders three collections and **owns no writer for any of them**,
+   * which is the point rather than a gap: `2N-RELATION-004` requires a relation
+   * to be corrected and ended through an **existing** authority path, and those
+   * paths are the person and project pages. A second set of controls here would
+   * be a second place for the soft-end contract to disagree with itself — the
+   * risk `EGC-ASSOC-003` names by number.
+   *
+   * Every node in the list and in the drawing is a link to the page that owns
+   * the write, so the writer is reachable in one click from every row.
+   */
+  {
+    route: "relations",
+    sections: [
+      {
+        section: "Relationships to you",
+        table: "person_relationships",
+        writer: {
+          kind: "elsewhere",
+          route: "people/[personId]",
+          module: "src/features/entities/relationships.ts",
+          exportName: "createOwnerRelationship",
+        },
+      },
+      {
+        section: "Links to projects",
+        table: "person_projects",
+        writer: {
+          kind: "elsewhere",
+          route: "people/[personId]",
+          module: "src/features/entities/associations.ts",
+          exportName: "associatePersonProject",
+        },
+      },
+      {
+        section: "Links to contexts",
+        table: "person_contexts",
+        writer: {
+          kind: "elsewhere",
+          route: "people/[personId]",
+          module: "src/features/entities/associations.ts",
+          exportName: "associatePersonContext",
+        },
+      },
+    ],
+  },
   { route: "reminders", sections: [] },
   { route: "reviews", sections: [] },
   /*
