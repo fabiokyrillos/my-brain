@@ -514,9 +514,19 @@ test.describe("2N.6 — the relations surface draws only what it can explain", (
     await page.goto(`/pt-BR/app/people/${person.id}`);
     await expect(page.locator("body")).toContainText("Mentora/Mentor");
     await page.getByRole("button", { name: copy.endRelationship }).first().click();
-    // The action's own confirmation, so the next navigation is not a race
-    // against a write that has not landed.
-    await expect(page.locator("body")).toContainText("Relação encerrada");
+    /*
+     * The panel's own empty state, which is the product's actual confirmation.
+     *
+     * The first draft waited for *"Relação encerrada"*. That string exists, and
+     * it reaches only an `sr-only` live region **inside the row being removed** —
+     * so `revalidatePath` unmounts it in the same commit that sets it. The
+     * visible confirmation an owner gets is the row's absence, and that is what
+     * this waits for. Recorded as `2N-RELATION-END-ANNOUNCEMENT` rather than
+     * repaired here: it is the §69 shape one component over, it is not needed by
+     * the graph's contract, and fixing it while nearby is how a slice acquires
+     * scope nobody authorized.
+     */
+    await expect(page.locator("body")).toContainText("Nenhuma relação registrada.");
 
     await page.goto("/pt-BR/app/relations");
     await expect(page.getByRole("heading", { level: 1, name: copy.heading })).toBeVisible();

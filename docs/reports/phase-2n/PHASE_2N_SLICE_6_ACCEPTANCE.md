@@ -237,7 +237,63 @@ must.
 
 ### 4.2 Hosted
 
-*(filled in below after execution — see §7)*
+A **local production build against the hosted Supabase project**, `--workers=1`,
+serially. Not a Vercel deployment.
+
+| Lane | Result |
+| --- | --- |
+| 2N.6 journey, **desktop**, pt-BR + en | **21/21** |
+| 2N.6 journey, **Pixel 7**, pt-BR + en | **21/21** |
+| EGC.2 relationships regression, desktop + Pixel 7 | **8/8** |
+| 2N.1 person regression, desktop + Pixel 7 | **14/14** |
+| 2N.0 foundations regression, desktop + Pixel 7 | **12/12** |
+| 2N.2 project regression, desktop | **14/14** |
+| 2N.5 library regression, desktop | **16/16** |
+| **Total** | **42 journeys for 2N.6 + 64 regressions = 106 hosted executions** |
+
+**No `429` across roughly 130 sign-ins**, run serially and spaced.
+
+**The pairings that carry the file.** The drawing is proved non-empty by three
+assertions *before* Rafael's absence from it is claimed, so *"not drawn"* cannot
+pass on a picture that failed to render. The cross-tenant control asserts the
+stranger sees **their own** relation first, so *"does not see the owner's"*
+cannot pass on a blank page. The masked-note assertion is preceded by a marker
+proving the row rendered, and followed by a DOM sweep proving the string reached
+**no attribute** either.
+
+**The removal journey runs end to end through the product's own form** on the
+person page — `2N-RELATION-004` requires an existing authority path, and the
+relations surface deliberately owns no writer — and it plants its own row so a
+second run is not asserting against a relation the first already ended.
+
+### 4.3 Zero residue, with a control that discriminates
+
+`scripts/verify-phase-2n-slice-6-cleanup.mjs`. **All 11 residue reads at zero and
+all 7 control assertions green.**
+
+None of the three relation tables carries a text column, so residue is reachable
+only by **joining through the marked person** — and a probe that silently failed
+to join would read zero against a table full of relations. The control therefore
+plants **two** marked people, gives **one** a relationship, and requires the probe
+to find exactly one:
+
+```
+ok   probe FINDS both planted people: 2
+ok   relation probe FINDS exactly the related one: 1
+ok   relation probe IGNORES the unrelated one: 0
+ok   audit probe FINDS the planted row: 1
+ok   cascade removes both people / the relationship / the audit row: 0 / 0 / 0
+```
+
+The audit row is read **directly**, because `audit_logs.entity_id` carries no
+foreign key: a row that outlived the association it describes is precisely the
+residue worth naming, and a probe reaching it through that association would go
+blind at the moment it mattered.
+
+**And it ran after a deliberately failed journey.** The desktop lane's first pass
+failed its removal test (§6.1) and left four accounts and their fixtures behind;
+the probe reads zero afterwards, which is the second half of *"prove cleanup
+after a failure"* rather than a claim about the happy path.
 
 ---
 
@@ -269,7 +325,48 @@ converge.
 
 ---
 
-## 6. Recorded, not smoothed
+## 6. What the hosted run found, and what it did not
+
+### 6.1 One journey failed, and the product was right
+
+The removal journey waited for **"Relação encerrada"** after ending a
+relationship. The end succeeded — the panel showed *"Nenhuma relação
+registrada."* in the same DOM the failure printed — but the sentence never
+appeared.
+
+**The test was wrong, not the product.** That string exists and reaches only an
+`sr-only` live region **inside the row being removed**, so `revalidatePath`
+unmounts it in the same commit that sets it. The visible confirmation an owner
+receives is the row's absence and the panel's empty state, which is what the
+journey waits for now.
+
+**The underlying behaviour is recorded, not repaired.** A successful *end* is
+announced to a screen reader through a region that is destroyed before it can be
+read — the §69 shape (`revalidatePath` destroying the thing that was about to
+speak) one component over. Destination **`2N-RELATION-END-ANNOUNCEMENT`**, to be
+taken with 2N.7's accessibility work. It is **not** needed by the graph's
+contract, and fixing it while nearby is how a slice acquires scope nobody
+authorized.
+
+### 6.2 One inherited assertion had to change, and it is a claim rather than a bump
+
+`online-relationships.spec.ts:148` asserted the relationship's description was
+**visible** after a server re-read. §2.4's convergence makes that false, so the
+assertion was rewritten to the new posture — withheld on a page re-read from the
+server, and the exact saved text produced by an explicit reveal. **The storage
+proof it existed for is unchanged and its shape is stronger**: a round trip that
+lost the sentence fails here exactly as it did before.
+
+### 6.3 What the hosted run proved that no unit test could
+
+The page **rendered**, in a real browser, at two viewports, in two locales. That
+is not a formality in this repository: handoff §58 records two surfaces that
+shipped green and never rendered, and the RSC boundary is only real in a
+production build. Keyboard focus, the 44px minimum, the absence of horizontal
+document overflow and the emptiness of the SVG's accessibility tree are all
+measured here rather than asserted about jsdom.
+
+## 7. Recorded, not smoothed
 
 - **`online-memories.spec.ts:85` still fails on mobile** — a **21px** touch
   target against a 44px minimum, cause `.list-row-main a` carrying no sizing rule
@@ -296,9 +393,18 @@ converge.
   none of its own, which is the point: a second one would be a second answer.
 - **`attachment_interpretations` bounds** and the other items 2N.5 recorded are
   untouched by this slice.
+- **`2N-RELATION-END-ANNOUNCEMENT`** — see §6.1. Found by the hosted run, not by
+  re-reading, and recorded with a destination rather than absorbed.
 
 ---
 
-## 7. Hosted execution
+## 8. Unchanged
 
-*(appended after the journeys run)*
+Signup **closed**. Rollout gate **25 pass · 3 fail · 2 owner-signature**. Push
+**not resumed** — HTTP 403 on a real iPhone, Android **NOT EXECUTED**. ADR-055 is
+neither satisfied nor superseded and expires **2026-10-27**. **Phase 2O is not
+started, not planned and not retargeted**, and **A13 still guards the roadmap
+successor**.
+
+**Slice 2N.7 — telemetry, security, accessibility and closeout, with M2 — is the
+only slice left, and it is NOT started.**
