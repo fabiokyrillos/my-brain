@@ -1,5 +1,5 @@
 .route-loading{max-width:1180px;margin:auto;padding:64px var(--gutter) var(--page-bottom)}
-.route-loading [data-loading-block]{position:relative;overflow:hidden;background:var(--background-subtle-strong);border-radius:12px}
+.route-loading [data-loading-block]{position:relative;overflow:hidden;background:var(--background-subtle-strong);border-radius: var(--radius-lg)}
 .route-loading-heading{width:min(360px,72%);height:44px}
 .route-loading-summary{width:min(620px,92%);height:18px;margin-top:18px}
 .route-loading-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-top:48px}
@@ -24,6 +24,6 @@
    applies no external stylesheet and could not have seen it. */
 .route-loading [data-route-loading-locale="en"]:lang(pt-BR){display:none}
 .route-loading [data-route-loading-locale="pt-BR"]:lang(en){display:none}
-.navigation-pending{font-size:10px;font-weight:750;color:var(--link);white-space:nowrap}
+.navigation-pending{font: var(--type-caption);font-weight:750;color:var(--link);white-space:nowrap}
 .mobile-primary-link .navigation-pending,.capture-fab .navigation-pending{position:absolute;width:1px;height:1px;overflow:hidden}
 .row-action.optimistic{background:var(--tone-information-bg);color:var(--link);border-color:var(--tone-information-line)}

@@ -20,7 +20,7 @@
  */
 .history-filters-disclosure {
   border: 1px solid var(--border-default);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -54,7 +54,7 @@
 }
 
 .history-filter-field > label {
-  font-size: 11px;
+  font: var(--type-caption);
   font-weight: 750;
   color: var(--text-secondary);
 }
@@ -65,11 +65,11 @@
   /* 44 px, so every control is a comfortable target on a phone. */
   min-height: 44px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   background: var(--background-surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .history-filter-field > select {
@@ -106,7 +106,7 @@
 
 .history-active-filters > li {
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 5px 11px;
   background: var(--background-subtle);
   color: var(--text-secondary);
@@ -116,7 +116,7 @@
 .history-filters-note {
   margin: 0;
   color: var(--tone-attention-fg);
-  font-size: 12px;
+  font: var(--type-caption);
 }
 
 /* The list ---------------------------------------------------------------- */
@@ -141,7 +141,7 @@
   width: 9px;
   height: 9px;
   margin-top: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--link);
   box-shadow: 0 0 0 4px var(--tone-information-bg);
 }
@@ -156,7 +156,7 @@
    a long one should wrap and stay readable rather than be cut off. */
 .history-sentence {
   margin: 0;
-  font-size: 14px;
+  font: var(--type-body);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -166,7 +166,7 @@
   gap: 4px;
   margin: 0;
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-subtle);
 }
 
@@ -186,7 +186,7 @@
 
 .history-change > dd {
   margin: 0;
-  font-size: 12px;
+  font: var(--type-caption);
   overflow-wrap: anywhere;
 }
 
@@ -205,13 +205,13 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   margin: 0;
-  font-size: 11px;
+  font: var(--type-caption);
   color: var(--text-secondary);
 }
 
 .history-kind {
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 2px 8px;
   background: var(--background-surface);
   font: var(--type-eyebrow);
@@ -274,7 +274,7 @@
     min-height: 44px;
     padding: 0 14px;
     border: 1px solid var(--border-strong);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     background: var(--background-surface);
   }
 }

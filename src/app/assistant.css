@@ -16,7 +16,7 @@
 .assistant-composer-form {
   position: relative;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
   box-shadow: var(--elevation-2);
   overflow: hidden;
@@ -47,7 +47,7 @@
   padding: 10px 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 15px;
+  font: var(--type-lead);
   line-height: 1.6;
 }
 
@@ -89,7 +89,7 @@
   margin-top: 16px;
   padding: 18px 20px;
   border: 1px solid var(--border-default);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -102,7 +102,7 @@
 .assistant-composer-notice > p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.6;
 }
 
@@ -125,7 +125,7 @@
 
 .assistant-composer-echo > q {
   color: var(--text-primary);
-  font-size: 14px;
+  font: var(--type-body);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -137,9 +137,9 @@
   margin-top: 14px;
   padding: 11px 16px;
   border: 1px solid var(--border-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 700;
 }
 

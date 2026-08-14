@@ -19,7 +19,7 @@
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -134,7 +134,7 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
@@ -210,7 +210,7 @@
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
 }
 
@@ -224,7 +224,7 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   font-size: 0.875rem;
   font-weight: 600;
@@ -284,7 +284,7 @@
   margin-bottom: 22px;
   padding: 14px 16px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--tone-information-bg);
 }
 
@@ -308,7 +308,7 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
@@ -390,7 +390,7 @@
 .conversation-sources[data-evidence="insufficient"] {
   padding: 10px 12px;
   border: 1px solid var(--tone-attention-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--tone-attention-bg);
 }
 
@@ -514,7 +514,7 @@
 .conversation-suggestions-list > li {
   padding: 9px 12px;
   border: 1px solid var(--tone-suggestion-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--tone-suggestion-bg);
   color: var(--tone-suggestion-fg);
   font-size: 0.875rem;

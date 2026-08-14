@@ -254,7 +254,7 @@
 .ux-chip-kind[data-kind="project"] { background: var(--tone-success-fg); }
 .ux-chip-kind[data-kind="organization"] { background: var(--tone-suggestion-fg); }
 .ux-chip-kind[data-kind="context"] { background: var(--tone-attention-fg); }
-.ux-chip-remove { border: 0; background: transparent; color: var(--text-secondary); font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: var(--radius-full); }
+.ux-chip-remove { border: 0; background: transparent; color: var(--text-secondary); font: var(--type-lead); line-height: 1; padding: 2px 4px; border-radius: var(--radius-full); }
 
 .ux-source {
   display: grid; gap: 3px; padding: 12px 14px;
@@ -403,7 +403,7 @@
   margin: 8px 0;
 }
 .conflict-dates dt { font: var(--type-label); color: var(--text-secondary); }
-.conflict-dates dd { margin: 0; font: var(--type-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.conflict-dates dd { margin: 0; font: var(--type-mono); font: var(--type-body); font-variant-numeric: tabular-nums; }
 .conflict-content {
   margin: 0 0 8px;
   padding: 8px 10px;

@@ -14,7 +14,7 @@
   margin: 0 0 24px;
   padding: 20px;
   border: 1px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -31,7 +31,7 @@
 .task-command-console > header p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.55;
 }
 
@@ -53,7 +53,7 @@
   flex: 1 1 220px;
   min-height: 44px;
   border: 1px solid var(--border-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   padding: 11px 13px;
   background: var(--background-surface);
   color: var(--text-primary);
@@ -72,7 +72,7 @@
   gap: 8px;
   min-height: 44px;
   padding: 11px 16px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-weight: 750;
 }
 
@@ -133,7 +133,7 @@
   margin: 12px 0;
   padding: 14px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-subtle);
 }
 
@@ -160,7 +160,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 10px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .task-command-delta dt {
@@ -178,7 +178,7 @@
 .task-command-effects {
   margin: 0 0 10px;
   padding-left: 18px;
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.5;
 }
 
@@ -207,7 +207,7 @@
   min-height: 44px;
   padding: 10px;
   border: 1px solid var(--border-default);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   margin-bottom: 8px;
   background: var(--background-surface);
   cursor: pointer;
@@ -229,7 +229,7 @@
 
 .task-command-candidate-meta,
 .task-command-evidence {
-  font-size: 12px;
+  font: var(--type-caption);
   color: var(--text-secondary);
 }
 
@@ -249,7 +249,7 @@
   width: min(100%, 460px);
   padding: 24px;
   border: 1px solid var(--border-default);
-  border-radius: 18px;
+  border-radius: var(--radius-sheet);
   background: var(--background-surface);
   box-shadow: var(--elevation-3);
 }
@@ -282,7 +282,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 700;
   color: var(--link);
 }
@@ -297,7 +297,7 @@
 
 .task-command-recovery-meta {
   margin: 4px 0 0;
-  font-size: 12px;
+  font: var(--type-caption);
   color: var(--text-secondary);
 }
 

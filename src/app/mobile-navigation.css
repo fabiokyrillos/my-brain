@@ -4,7 +4,7 @@
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .side-nav {
@@ -48,11 +48,11 @@
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--text-primary);
   color: var(--background-surface);
   box-shadow: var(--elevation-undo);
-  font-size: 14px;
+  font: var(--type-body);
   font-weight: 700;
   transform: none;
 }
@@ -89,9 +89,9 @@
   gap: 12px;
   min-height: 44px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: 14px;
+  font: var(--type-body);
   font-weight: 600;
   cursor: pointer;
   list-style: none;
@@ -144,7 +144,7 @@
   gap: 10px;
   min-height: 44px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -170,7 +170,7 @@
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--tone-information-bg);
   color: var(--link);
 }
@@ -191,7 +191,7 @@
    widening the rail or wrapping into the panel below it. */
 .account-summary-text strong {
   overflow: hidden;
-  font-size: 13px;
+  font: var(--type-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -210,10 +210,10 @@
   min-height: 44px;
   padding: 10px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 600;
   text-align: left;
 }
@@ -245,7 +245,7 @@
   margin: 4px 0 0;
   padding: 0 12px;
   color: var(--tone-risk-fg);
-  font-size: 12px;
+  font: var(--type-caption);
   line-height: 1.5;
 }
 
@@ -281,7 +281,7 @@
     justify-content: center;
     gap: 4px;
     color: var(--text-secondary);
-    font-size: 9px;
+    font: var(--type-caption);
     font-weight: 700;
   }
 
@@ -322,7 +322,7 @@
     gap: 4px;
     padding: 10px;
     border: 1px solid var(--border-default);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     background: var(--background-surface);
     box-shadow: var(--elevation-2);
   }
@@ -341,7 +341,7 @@
   .mobile-more-menu .nav-item {
     min-height: 48px;
     padding: 9px 10px;
-    font-size: 11px;
+    font: var(--type-caption);
   }
 
   /*
@@ -359,12 +359,12 @@
   .account-menu-overflow > summary {
     flex-direction: row;
     gap: 10px;
-    font-size: 13px;
+    font: var(--type-body);
   }
 
   /* The overflow panel is already a floating card; a nested one would read as a
      second layer over it, so the account panel stays inline. */
   .account-menu-overflow .account-menu-item {
-    font-size: 12px;
+    font: var(--type-caption);
   }
 }

@@ -17,10 +17,10 @@
   min-height: 44px;
   padding: 11px 16px;
   border: 1px solid var(--border-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 700;
 }
 
@@ -56,7 +56,7 @@
   gap: 16px;
   padding: 22px;
   border: 1px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
   box-shadow: var(--elevation-2);
 }
@@ -64,7 +64,7 @@
 .entity-edit-form > label {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 750;
 }
 
@@ -74,7 +74,7 @@
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--border-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   padding: 11px 13px;
   background: var(--background-surface);
   color: var(--text-primary);
@@ -96,7 +96,7 @@
   display: block;
   margin-top: -8px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font: var(--type-caption);
   font-weight: 500;
   line-height: 1.5;
 }
@@ -116,7 +116,7 @@
   min-height: 44px;
   padding: 11px 18px;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-weight: 750;
 }
 
@@ -141,7 +141,7 @@
 
 .entity-edit-feedback {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 650;
 }
 
@@ -177,7 +177,7 @@
 }
 
 .entity-relation-line > strong {
-  font-size: 13px;
+  font: var(--type-body);
   overflow-wrap: anywhere;
 }
 
@@ -213,7 +213,7 @@
 .relation-explainer {
   margin: -4px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font: var(--type-caption);
 }
 
 .relation-list {
@@ -229,35 +229,35 @@
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
 .relation-row-main {
   display: grid;
   gap: 3px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .relation-row-main strong {
-  font-size: 14px;
+  font: var(--type-body);
 }
 
 .relation-row-main span {
   color: var(--text-secondary);
-  font-size: 12px;
+  font: var(--type-caption);
 }
 
 /* A stored value outside the vocabulary, rendered rather than hidden (EGC-REL-006). */
 .relation-unknown {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 13px;
+  font: var(--type-body);
   opacity: 0.85;
 }
 
 .relation-unknown-note {
   color: var(--text-secondary);
-  font-size: 11px;
+  font: var(--type-caption);
   font-style: italic;
 }
 
@@ -276,10 +276,10 @@
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 650;
 }
 
@@ -296,7 +296,7 @@
 .relation-form > label {
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 750;
 }
 
@@ -305,7 +305,7 @@
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   font: inherit;
   font-weight: 400;
@@ -316,7 +316,7 @@
    that is always present is one users stop reading. */
 .bounded-notice {
   margin: 10px 0 0;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -339,7 +339,7 @@
   align-items: baseline;
   gap: 4px 8px;
   margin: 6px 0 0;
-  font-size: 12px;
+  font: var(--type-caption);
   color: var(--text-secondary);
   /* Long unbroken content must wrap rather than widen the page (2N-MOBILE-001). */
   min-width: 0;
@@ -380,7 +380,7 @@
 
 .section-origin {
   margin: -2px 0 6px;
-  font-size: 11px;
+  font: var(--type-caption);
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -392,7 +392,7 @@
   align-items: center;
   min-height: 32px;
   padding: 4px 0;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 600;
   color: var(--link);
   text-decoration: underline;
@@ -410,7 +410,7 @@
 .entity-decisions,
 .entity-changes {
   border: 1px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
   padding: 22px;
   margin-top: 16px;
@@ -431,7 +431,7 @@
   align-items: baseline;
   gap: 6px 12px;
   margin: 8px 0 0;
-  font-size: 13px;
+  font: var(--type-body);
   color: var(--text-secondary);
 }
 
@@ -443,7 +443,7 @@
 }
 
 .entity-state-line > strong {
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 /*
@@ -458,7 +458,7 @@
 /* A sentence about what a section covers, sized below its heading. */
 .section-explainer {
   margin: 0 0 12px;
-  font-size: 12px;
+  font: var(--type-caption);
   color: var(--text-secondary);
   max-width: 60ch;
   overflow-wrap: anywhere;

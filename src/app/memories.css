@@ -15,13 +15,13 @@
   padding: 14px 16px;
   border: 1px solid var(--border-default);
   border-left: 3px solid var(--link);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-elevated);
 }
 
 .memory-explainer > p {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.55;
   color: var(--text-secondary);
 }
@@ -63,7 +63,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--type-eyebrow);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -99,7 +99,7 @@
   align-items: center;
   gap: 8px;
   margin: 10px 0 0;
-  font-size: 13px;
+  font: var(--type-body);
   color: var(--text-secondary);
 }
 
@@ -112,7 +112,7 @@
   margin: 22px 0;
   padding: 18px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -131,7 +131,7 @@
 
 .memory-facts dd {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   /* Person and project names are owner content and can be long. */
   overflow-wrap: anywhere;
 }
@@ -159,7 +159,7 @@
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   font: 600 13px var(--font-ui), sans-serif;
   color: var(--text-primary);
@@ -183,7 +183,7 @@
 
 .memory-lifecycle-hint {
   max-width: 62ch;
-  font-size: 12px;
+  font: var(--type-caption);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -193,7 +193,7 @@
   flex-direction: row;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .memory-checkbox input {
@@ -212,7 +212,7 @@
   margin: 14px 0 0;
   padding: 16px;
   border: 1px dashed var(--border-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--background-elevated);
 }
 
@@ -230,7 +230,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   font: 400 14px var(--font-ui), sans-serif;
   color: inherit;
@@ -253,7 +253,7 @@
   gap: 7px;
   min-height: 44px;
   padding: 10px 17px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   font: 600 13px var(--font-ui), sans-serif;
   cursor: pointer;
 }
@@ -289,9 +289,9 @@
   margin: 14px 0 0;
   padding: 14px 16px;
   border: 1px solid var(--border-default);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--background-elevated);
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .memory-proposal-closed > div > p {

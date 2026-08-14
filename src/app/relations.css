@@ -50,7 +50,7 @@
 
 .relations-subsection > h3 {
   margin: 0;
-  font-size: 15px;
+  font: var(--type-lead);
   letter-spacing: -0.01em;
 }
 
@@ -58,7 +58,7 @@
 .relations-disclaimer {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.6;
 }
 
@@ -69,7 +69,7 @@
   padding: 10px 14px;
   border: 1px solid var(--border-default);
   border-left: 3px solid var(--tone-attention-fg);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-subtle);
 }
 
@@ -90,7 +90,7 @@
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-surface);
 }
 
@@ -112,7 +112,7 @@
 
 .relations-row-relation {
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 650;
 }
 
@@ -126,10 +126,10 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--background-surface);
   color: var(--text-primary);
-  font-size: 14px;
+  font: var(--type-body);
   font-weight: 700;
 }
 
@@ -155,7 +155,7 @@
   align-items: center;
   padding: 3px 9px;
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--background-subtle);
   color: var(--text-secondary);
   font: var(--type-eyebrow);
@@ -198,7 +198,7 @@
   gap: 8px;
   margin: 0;
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.55;
 }
 
@@ -219,7 +219,7 @@
   margin: 0;
   padding: 14px;
   border: 1px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--background-canvas);
 }
 
@@ -262,7 +262,7 @@
   gap: 2px;
   padding: 6px 12px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   /* Opaque, deliberately: see `.relations-lines`. */
   background: var(--background-surface);
   box-shadow: var(--elevation-1);
@@ -277,7 +277,7 @@
 .relations-node-name {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 700;
   line-height: 1.25;
   /* Two lines, then an ellipsis. The box's height is fixed by the layout so a
@@ -334,7 +334,7 @@ a.relations-node:focus-visible {
   padding-top: 12px;
   border-top: 1px solid var(--border-default);
   color: var(--text-secondary);
-  font-size: 12px;
+  font: var(--type-caption);
   line-height: 1.55;
 }
 

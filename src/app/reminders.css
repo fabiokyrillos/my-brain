@@ -30,7 +30,7 @@
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--background-surface);
   color: var(--text-secondary);
   font: 650 13px var(--font-ui);
@@ -84,13 +84,13 @@
   gap: 8px;
   margin-top: 6px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .reminder-status-hint {
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font: var(--type-caption);
 }
 
 .reminder-overdue {
@@ -121,7 +121,7 @@
 }
 
 .reminder-subject-none {
-  font-size: 12.5px;
+  font: var(--type-caption);
   color: var(--text-secondary);
 }
 
@@ -163,10 +163,10 @@
   min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .reminder-button {
@@ -177,7 +177,7 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
   font: 650 13px var(--font-ui);
@@ -226,7 +226,7 @@
   margin-top: 10px;
   padding: 14px;
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--background-subtle);
 }
 
@@ -249,7 +249,7 @@
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
   font: 400 14px var(--font-ui);
@@ -273,7 +273,7 @@
 
 /* Current vs proposed, stated together — the distinction UX-12 asks for. */
 .reminder-panel-current {
-  font-size: 13px;
+  font: var(--type-body);
   color: var(--text-secondary);
 }
 
@@ -283,7 +283,7 @@
 }
 
 .reminder-panel-body {
-  font-size: 13px;
+  font: var(--type-body);
   color: var(--text-secondary);
 }
 
