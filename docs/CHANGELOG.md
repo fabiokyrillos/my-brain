@@ -32,7 +32,7 @@ The empty state says both true things: no link is recorded, and there is no way 
 
 ### Proofs
 
-127 unit and component tests; **45 structural guards, each with a mutation control**, two-sided where a false positive was the risk; full suite 7140 passing; lint, typecheck, build and `git diff --check` clean; 11 hosted journeys across both locales on desktop and Pixel 7 at `--workers=1`.
+127 unit and component tests; **45 structural guards, each with a mutation control**, two-sided where a false positive was the risk; full suite 7140 passing; lint, typecheck, build and `git diff --check` clean; **10 hosted journey bodies executed 32 times** (16 desktop + 16 Pixel 7, six of them once per locale) at `--workers=1`, plus **59 regression journeys** from 2N.0–2N.4 re-run green. That is a local build against the **hosted Supabase project**, not a Vercel deployment.
 
 The residue probe needed a shape no earlier slice needed: `entity_attachments` carries no text column, so its rows can only be found by joining through the attachment that carries the marker — and a join that silently failed would read zero against a table full of links. The control plants a linked **and** an unlinked attachment under one marker and requires the probe to find exactly one.
 

@@ -5623,3 +5623,124 @@ at parity and proved.
 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started, not
 planned and not retargeted**, and A13 still guarding the roadmap successor.
 Slices **2N.5, 2N.6 and 2N.7** remain.
+
+## §71 — Slice 2N.5 ships: the file library reads links it cannot create, and says so (2026-08-14)
+
+**PR #221**, merged at `51900b4`; head at review `37f085e`, CI green on all three
+job families. **Zero migrations, zero RPCs, zero grants widened, zero writers.**
+94 local = 94 hosted, parity **`202608140094`** unchanged. Budget stays
+`3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop
+condition. **13 requirements: 9 built · 3 baseline · 1 partial · 0
+not-built-by-rule.**
+
+### The decision the slice was built on
+
+`entity_attachments` has existed since `202607160007` with **neither a reader nor
+a writer** in product code. `202607170016:239` revoked `insert, update, delete`
+from `authenticated` deliberately; the live grants read `REFERENCES, SELECT,
+TRIGGER, TRUNCATE` and nothing else. The only insert anywhere in the repository
+is M3's deletion undo (`202608140094:803`), restoring links that already existed.
+
+The owner signed **option A** — ship the read side, name the missing writer as a
+remainder, create no new authority. Option B (restore `INSERT` or add an RPC) is
+new authority and a stop condition; option C (let the worker derive links) is
+persisted inference and contradicts `OD-2N-8` **A**. **This slice created the
+first reader and no writer.**
+
+### The census found a live privacy defect, and it was not where the requirement pointed
+
+`2N-FILES-006` names `extracted_text`. The census found `extracted_text`
+correctly governed in both of its two product readers. **The leak was one step to
+the side:** the tag cloud built from `extracted_people`, `extracted_projects` and
+`extracted_dates`, and the candidate task titles, rendered **outside any
+classification** — one block below the extracted text that was masked.
+
+So on a `highly_sensitive` file the product withheld the name, the description
+and the document text, and then printed the names of people found inside the
+document and task titles frequently lifted verbatim from it. That is `R-16d`, it
+was live, and **a census that had grepped only for the column name would have
+concluded the requirement already held.**
+
+A second correction of the same shape: a per-item signed-URL failure was filtered
+out of the map, so the "open original" link simply vanished — a failure rendered
+as absence, on the one read of that page whose failure cannot reach the error
+boundary.
+
+### The four measurements, and what each cost
+
+1. **`extracted_text` census** — two governed product readers; search keeps
+   ADR-093/OD-1's default exclusion and was not reopened. **One defect found.**
+2. **Bounds** — the file list paginates with a probe, the failed-job list bounds
+   with a notice, and a failed read throws rather than emptying. Two findings:
+   the signing failure above, and `attachment_interpretations` stating no bound
+   (recorded; it renders no list).
+3. **Filter cost** — state, kind and period are predicates on the query the page
+   already issues: **zero extra round trips**, existing index unchanged. Linked
+   entity costs one sequential read, only when active. Every predicate is applied
+   **before** `.range()`, because filtering an already-paginated page is the
+   misleading filter the slice was told to report rather than ship.
+4. **Discovery** — ADR-110's narrowing touched **`people` only**. File discovery
+   is unaffected, so `2N-FILES-011` closes by linking to search.
+
+### The one partial, and its remainder
+
+**`2N-FILES-008`.** Six of its seven capabilities ship. The seventh — *files
+linked to people and projects* — ships as a real read path that **renders empty
+for every owner without legacy or restored links, permanently**.
+
+The user is told this, not only the acceptance record: *no link is recorded*, and
+*the Brain shows links that already exist; there is no way to create a new one
+here yet.* **No button, no form, no disabled control** — a guard and a component
+test both fail if one appears.
+
+Destination **`2N-FILES-WRITER`**. Creating one needs `INSERT` restored or a new
+`SECURITY DEFINER` RPC: **new authority, an owner decision, a stop condition**,
+and **not transferable into M2**.
+
+`2N-FILES-009` and `2N-PERSON-008` close as **built, empty by construction**
+rather than partial — their subject is the link's navigability, complete whenever
+a link exists, not the ability to make one.
+
+### Three things worth carrying forward
+
+- **A residue probe on a table with no text column needs a join, and a join needs
+  a discriminating control.** `entity_attachments` can only be found through the
+  attachment carrying the marker, and a join that silently failed would read zero
+  against a table full of links. The control plants a linked **and** an unlinked
+  attachment under one marker and requires the probe to find exactly one.
+- **Harness fixtures planted with the service role prove the reader, not the
+  capability.** `authenticated` holds no `INSERT`; the spec says so where a later
+  reader would otherwise assume the product can create links.
+- **A cancelled CI run is not a failed one.** The run on `6d04dd1` shows
+  `cancelled` because the next push superseded it. Read the conclusion, not the
+  colour.
+
+### Proofs
+
+127 unit and component tests; **45 structural guards, each with a mutation
+control**, two-sided where a false positive was the risk; full suite **7140
+passing**; lint, typecheck, build and `git diff --check` clean. **32 hosted
+journeys** (16 desktop + 16 Pixel 7, both locales, `--workers=1`) — a local build
+against the hosted Supabase project, **not a Vercel deployment**. **59 regression
+journeys** from 2N.0–2N.4 re-run and green. **Zero residue** on all three probes
+(2N.3, 2N.4, 2N.5), each with a non-vacuous control.
+
+### Carried, not absorbed
+
+`online-memories.spec.ts:85`'s **21px touch target** against a 44px minimum stays
+a `2N-MOBILE` remainder — not weakened, not deleted, not marked passing. ADR-055
+is neither satisfied nor superseded and expires **2026-10-27**.
+
+**Unchanged:** signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started, not
+planned and not retargeted**, and A13 still guarding the roadmap successor.
+Slices **2N.6 and 2N.7** remain.
+
+**2N.6 re-audited and NOT started** — `docs/reports/phase-2n/PHASE_2N_SLICE_6_REAUDIT.md`.
+Its load-bearing finding: **there is no graph of any kind on `main`** — no route,
+no component, no feature directory. `e2e/online-entity-graph.spec.ts` is EGC.1's
+*entity graph capability* (Companies and Contexts gaining routes and writers),
+not a graph surface; the filename is the trap. Five of the eleven relation
+requirements already ship from EGC.2 and 2N.1/2N.2, so the open work is the graph
+itself, `2N-RELATION-003`'s proposal posture, and the parts of `-002`/`-009` that
+only exist once edges do.
