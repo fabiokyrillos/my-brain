@@ -144,8 +144,8 @@
 
 /* `2I-LANG-002`. The border and the label carry the distinction; the tint is
    reinforcement, never the signal. */
-.ux-authored { border-left: 3px solid var(--line); padding-left: 14px; }
-.ux-authored-user { border-left-color: var(--ink); }
+.ux-authored { border-left: 3px solid var(--border-default); padding-left: 14px; }
+.ux-authored-user { border-left-color: var(--text-primary); }
 .ux-authored-interpretation { border-left-color: var(--tone-information-fg); border-left-style: dashed; }
 .ux-authored-suggestion { border-left-color: var(--tone-suggestion-fg); border-left-style: dotted; }
 .ux-authored-confirmed { border-left-color: var(--tone-success-fg); }
@@ -154,7 +154,7 @@
   font: 650 10px var(--font-mono);
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   margin-bottom: 6px;
 }
 
@@ -165,28 +165,28 @@
   gap: 12px;
   align-items: flex-start;
   padding: 16px 18px;
-  border: 1px solid var(--tone-line, var(--line));
-  border-radius: 14px;
-  background: var(--tone-bg, var(--mist));
-  color: var(--ink);
+  border: 1px solid var(--tone-line, var(--border-default));
+  border-radius: var(--radius-lg);
+  background: var(--tone-bg, var(--background-subtle));
+  color: var(--text-primary);
 }
-.ux-state-icon { flex: 0 0 auto; color: var(--tone-fg, var(--ink-soft)); margin-top: 1px; }
+.ux-state-icon { flex: 0 0 auto; color: var(--tone-fg, var(--text-secondary)); margin-top: 1px; }
 .ux-state-body { min-width: 0; display: grid; gap: 4px; }
-.ux-state-title { margin: 0; font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
-.ux-state-description { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+.ux-state-title { margin: 0; font: var(--type-heading); letter-spacing: -.01em; }
+.ux-state-description { margin: 0; font: var(--type-body); color: var(--text-secondary); }
 /* The reassurance that the user's content is durable. Given its own weight
    because on `interpreting` it is the most important sentence on the screen. */
-.ux-state-safety { margin: 0; font-size: 12px; font-weight: 650; color: var(--tone-fg, var(--ink)); }
+.ux-state-safety { margin: 0; font: var(--type-caption); font-weight: 500; color: var(--tone-fg, var(--text-primary)); }
 .ux-state-action {
   justify-self: start;
   margin-top: 6px;
-  border: 1px solid var(--tone-line, var(--line));
-  border-radius: 10px;
-  background: var(--white);
-  color: var(--ink);
+  border: 1px solid var(--tone-line, var(--border-default));
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
   padding: 8px 14px;
-  font-weight: 700;
-  font-size: 13px;
+  font: var(--type-label);
+  font: var(--type-body);
   /* 44px touch target on mobile — `2I-LANG-006`. */
   min-height: 40px;
 }
@@ -194,7 +194,7 @@
 
 /* A skeleton that matches the final layout, so nothing reflows on arrival. */
 .ux-skeleton { display: grid; gap: 10px; }
-.ux-skeleton-row { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--border-divider), var(--border-default), var(--border-divider)); background-size: 200% 100%; }
+.ux-skeleton-row { height: 14px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--border-divider), var(--border-default), var(--border-divider)); background-size: 200% 100%; }
 .ux-skeleton-row:nth-child(2) { width: 82%; }
 .ux-skeleton-row:nth-child(3) { width: 64%; }
 
@@ -211,34 +211,34 @@
   display: grid;
   gap: 10px;
   padding: 18px;
-  border: 1px solid var(--tone-line, var(--line));
-  border-radius: 16px;
-  background: var(--white);
+  border: 1px solid var(--tone-line, var(--border-default));
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 /* The suggestion card is tinted; the confirmation card is not, because a
    confirmation must not look like a proposal. */
 .ux-card-suggestion { background: var(--tone-bg); }
 .ux-card-head { display: flex; align-items: center; gap: 9px; }
 .ux-card-icon { color: var(--tone-fg); flex: 0 0 auto; }
-.ux-card-title { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
-.ux-card-detail { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-soft); }
+.ux-card-title { margin: 0; font: var(--type-heading); letter-spacing: -.01em; }
+.ux-card-detail { margin: 0; font: var(--type-body); color: var(--text-secondary); }
 /* The consequence of a destructive action. Never quiet. */
 .ux-card-consequence {
-  margin: 0; padding: 10px 12px; border-radius: 10px;
+  margin: 0; padding: 10px 12px; border-radius: var(--radius-md);
   background: var(--tone-bg); color: var(--tone-fg);
-  font-size: 13px; font-weight: 700; line-height: 1.5;
+  font: var(--type-body); font-weight: 500;
 }
 .ux-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 
 .ux-action {
   min-height: 40px; padding: 9px 15px;
-  border: 1px solid var(--line); border-radius: 10px;
-  background: var(--white); color: var(--ink);
-  font-weight: 700; font-size: 13px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--background-surface); color: var(--text-primary);
+  font: var(--type-label);
 }
-.ux-action-primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
-.ux-action-destructive { background: var(--tone-risk-fg); color: var(--white); border-color: var(--tone-risk-fg); }
-.ux-action-quiet { background: transparent; border-color: transparent; color: var(--ink-soft); }
+.ux-action-primary { background: var(--text-primary); color: var(--background-surface); border-color: var(--text-primary); }
+.ux-action-destructive { background: var(--tone-risk-fg); color: var(--background-surface); border-color: var(--tone-risk-fg); }
+.ux-action-quiet { background: transparent; border-color: transparent; color: var(--text-secondary); }
 @media (max-width: 899px) {
   /* 44px targets, and actions stack rather than wrapping into slivers. */
   .ux-action { min-height: 44px; flex: 1 1 100%; }
@@ -246,58 +246,58 @@
 
 .ux-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--mist); font-size: 12px; font-weight: 650;
+  padding: 4px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-full);
+  background: var(--background-subtle); font: var(--type-label);
 }
-.ux-chip-kind { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); }
+.ux-chip-kind { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--text-secondary); }
 .ux-chip-kind[data-kind="person"] { background: var(--tone-information-fg); }
 .ux-chip-kind[data-kind="project"] { background: var(--tone-success-fg); }
 .ux-chip-kind[data-kind="organization"] { background: var(--tone-suggestion-fg); }
 .ux-chip-kind[data-kind="context"] { background: var(--tone-attention-fg); }
-.ux-chip-remove { border: 0; background: transparent; color: var(--ink-soft); font-size: 15px; line-height: 1; padding: 2px 4px; }
+.ux-chip-remove { border: 0; background: transparent; color: var(--text-secondary); font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: var(--radius-full); }
 
 .ux-source {
   display: grid; gap: 3px; padding: 12px 14px;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--white);
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--background-surface);
 }
-.ux-source:hover { background: var(--mist); }
+.ux-source:hover { background: var(--background-subtle); }
 /* Type as text. A result list that encoded type by tint alone would be
    unreadable to a screen reader and to anyone with a colour-vision difference. */
-.ux-source-type { font: 650 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
-.ux-source-title { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
-.ux-source-snippet { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
-.ux-source-meta { font-size: 11px; color: var(--ink-soft); }
+.ux-source-type { font: var(--type-eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; color: var(--text-muted); }
+.ux-source-title { font: var(--type-body); font-weight: 500; letter-spacing: -.01em; }
+.ux-source-snippet { font: var(--type-reading-sm); color: var(--text-secondary); }
+.ux-source-meta { font: var(--type-caption); color: var(--text-muted); }
 
 .ux-banner {
   display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; border-radius: 12px;
+  padding: 11px 14px; border-radius: var(--radius-lg);
   border: 1px solid var(--tone-line); background: var(--tone-bg);
-  color: var(--ink); font-size: 13px; line-height: 1.5;
+  color: var(--text-primary); font: var(--type-body);
 }
 .ux-banner em { font-style: normal; font-weight: 700; color: var(--tone-fg); }
 
 .ux-undo {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 11px 14px; border-radius: 12px;
+  padding: 11px 14px; border-radius: var(--radius-lg);
   border: 1px solid var(--tone-line); background: var(--tone-bg);
-  font-size: 13px;
+  font: var(--type-body);
 }
-.ux-undo-none { color: var(--ink-soft); font-size: 12px; }
+.ux-undo-none { color: var(--text-secondary); font: var(--type-caption); }
 
 /* Desktop: a side panel. Mobile: the full-screen equivalent. One contract. */
 .ux-detail {
   position: fixed; z-index: 40; top: 0; right: 0; bottom: 0;
   width: min(460px, 100vw);
   display: flex; flex-direction: column;
-  border-left: 1px solid var(--line); background: var(--white);
+  border-left: 1px solid var(--border-default); background: var(--background-surface);
   box-shadow: var(--elevation-2);
 }
 .ux-detail-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 18px 20px; border-bottom: 1px solid var(--line);
+  padding: 18px 20px; border-bottom: 1px solid var(--border-default);
 }
-.ux-detail-title { margin: 0; font-size: 16px; letter-spacing: -.02em; }
-.ux-detail-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-soft); }
+.ux-detail-title { margin: 0; font: var(--type-title-2); font-size: 20px; letter-spacing: -.01em; }
+.ux-detail-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--text-secondary); }
 .ux-detail-body { flex: 1; min-height: 0; overflow: auto; padding: 20px; }
 @media (max-width: 899px) {
   .ux-detail { left: 0; width: 100vw; border-left: 0; }
@@ -309,15 +309,14 @@
    acted on rather than read. */
 .home-priorities { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .home-priorities li { margin: 0; }
-.home-priority-rule { margin: 10px 0 0; font-size: 12px; color: var(--text-muted); }
+.home-priority-rule { margin: var(--space-3) 0 0; font: var(--type-caption); color: var(--text-muted); }
 .priority-reason {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
   padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
+  border-radius: var(--radius-full);
+  font: var(--type-label);
   letter-spacing: 0.02em;
   background: var(--background-subtle);
   color: var(--text-muted);
@@ -334,8 +333,8 @@
   margin: 0;
   padding: 12px 14px;
   border: 1px dashed var(--border-strong);
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font: var(--type-body);
   color: var(--text-muted);
 }
 
@@ -354,17 +353,16 @@
 .attention-filters legend {
   padding: 0;
   margin-right: 4px;
-  font-size: 12px;
-  font-weight: 700;
+  font: var(--type-label);
   color: var(--text-muted);
 }
 .attention-filter {
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
-  font-size: 13px;
+  font: var(--type-body);
   cursor: pointer;
 }
 .attention-filter[aria-pressed="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
@@ -404,18 +402,18 @@
   gap: 4px 16px;
   margin: 8px 0;
 }
-.conflict-dates dt { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.conflict-dates dd { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.conflict-dates dt { font: var(--type-label); color: var(--text-secondary); }
+.conflict-dates dd { margin: 0; font: var(--type-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 .conflict-content {
   margin: 0 0 8px;
   padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--white);
-  font-size: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--background-surface);
+  font: var(--type-body);
 }
-.conflict-why, .conflict-what { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
-.conflict-what { font-weight: 650; color: var(--ink); }
+.conflict-why, .conflict-what { margin: 0 0 var(--space-1); font: var(--type-body); color: var(--text-secondary); }
+.conflict-what { font-weight: 650; color: var(--text-primary); }
 
 /* `2J-CAPTURE-001`. The modality tabs. Sized for a thumb (2J-ACCESS-006's 24px
    floor is a minimum, not a target) and labelled with words as well as icons --
@@ -429,13 +427,13 @@
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
-  font-size: 14px;
+  font: var(--type-body);
   cursor: pointer;
 }
 .capture-mode[aria-selected="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
-.capture-no-classification { margin: 0; font-size: 12px; color: var(--text-muted); }
+.capture-no-classification { margin: 0; font: var(--type-caption); color: var(--text-muted); }
 
 /* `2J-VOICE-006`. The recording state, visible and unmistakable. The dot
    animates only where motion is allowed -- reduced-motion users get a solid
@@ -443,9 +441,9 @@
 .voice-composer { display: grid; gap: 12px; }
 .voice-controls { display: grid; gap: 8px; }
 .voice-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.voice-live button, .voice-record, .voice-denied button { min-height: 36px; padding: 0 12px; border-radius: 8px; cursor: pointer; }
+.voice-live button, .voice-record, .voice-denied button { min-height: 36px; padding: 0 12px; border-radius: var(--radius-md); cursor: pointer; }
 .voice-record { display: inline-flex; align-items: center; gap: 6px; justify-self: start; border: 1px solid var(--border-strong); background: transparent; }
-.voice-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--tone-risk-fg); }
+.voice-indicator { width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--tone-risk-fg); }
 .voice-indicator[data-recording="true"] { animation: voice-pulse 1.2s ease-in-out infinite; }
 @keyframes voice-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
@@ -453,19 +451,19 @@
 }
 .voice-duration { font-variant-numeric: tabular-nums; font-weight: 700; }
 .voice-transcribing { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-muted); }
-.voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--tone-risk-line); border-radius: 10px; background: var(--tone-risk-bg); }
-.voice-denied p { margin: 0; font-size: 13px; }
+.voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--tone-risk-line); border-radius: var(--radius-md); background: var(--tone-risk-bg); }
+.voice-denied p { margin: 0; font: var(--type-body); }
 .voice-draft-form { display: grid; gap: 8px; }
-.voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; font: inherit; }
-.voice-notice { margin: 0; font-size: 12px; color: var(--text-muted); }
+.voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font: inherit; }
+.voice-notice { margin: 0; font: var(--type-caption); color: var(--text-muted); }
 
 /* `2J-DAY-003`. The closing summary is a short list of what is still open --
    counts that are the subject of an action, not decorative metrics. */
-.home-endofday { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--text-muted); }
+.home-endofday { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); font: var(--type-body); color: var(--text-muted); }
 
 /* `2J-PRIVACY-001`, review summaries. Masked by default because `summaries`
    carries no classification to key on -- see review-body.tsx for why that is
    the conservative reading rather than an oversight. */
 .review-body { display: grid; gap: 6px; }
 .review-masked { margin: 0; color: var(--text-muted); font-style: italic; }
-.review-reveal { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; }
+.review-reveal { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: transparent; font: var(--type-label); cursor: pointer; }
