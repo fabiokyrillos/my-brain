@@ -2,6 +2,46 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PHASE 2N slice 2N.5 COMPLETE: the file library reads links it cannot create, and says so
+
+**PR #221.** **Zero migrations, zero RPCs, zero grants widened, zero writers.** 94 total, hosted parity `202608140094` unchanged. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **13 requirements: 9 built · 3 baseline · 1 partial · 0 not-built-by-rule.**
+
+### The decision the slice was built on
+
+`entity_attachments` has existed since `202607160007` with **neither a reader nor a writer** in product code. `202607170016:239` revoked `insert, update, delete` from `authenticated` deliberately, and the only insert anywhere in the repository is M3's deletion undo restoring links that already existed. The owner signed **option A**: ship the read side, name the missing writer as a remainder, create no new authority.
+
+This slice created the **first reader** and **no writer** — not a stub, not a disabled export, not a TODO for a later caller to reach for. The proof is a closed export list rather than a name pattern, because a pattern permissive enough to accept `linksByAttachment` accepts `linkAttachment` too.
+
+### What changed for the user
+
+The library shows which people, projects and entries each file is linked to, and a person or project page shows its linked files. The two directions share one component, one resolver and one bound, so a file linked to a project and a file linked to a person cannot end up described two different ways. Opening a subject and coming back lands on the exact card the reader left.
+
+Files can be filtered by processing state, kind, period and linked subject. Every predicate reaches the query before the page is taken, so a filtered page is a page of the filtered set — and the filter travels with the page number instead of dying one click after it was applied. Where the answer is a search, the library links to search rather than growing a second one.
+
+### The census found a live privacy defect and closed it
+
+The tag cloud built from `extracted_people`, `extracted_projects` and `extracted_dates`, and the candidate task titles, rendered **outside any classification** — one block below the extracted text that was masked. On a `highly_sensitive` file the product withheld the name, the description and the document text, and then printed the names of people found inside the document and task titles frequently lifted verbatim from it. Extracted text was reaching a surface the classification masks, through the fields *derived* from it rather than the field named after it. That is `R-16d` in the traceability contract, and it was live.
+
+A second correction of the same shape: a per-item signed-URL failure was filtered out of the map, so the "open original" link simply vanished — a failure rendered as absence, on the one read of that page whose failure cannot reach the error boundary.
+
+### The one partial, with its remainder named
+
+**`2N-FILES-008`.** Six of its seven capabilities ship. The seventh — *"files linked to people and projects"* — ships as a real read path that **renders empty for every owner without legacy or restored links, permanently, because the product offers no way to create a link.**
+
+The empty state says both true things: no link is recorded, and there is no way to create one here yet. It offers **no button, no form and no disabled control**; a guard and a component test both fail if one appears. Creating a writer would need `INSERT` restored to `authenticated` or a new `SECURITY DEFINER` RPC — **new authority, an owner decision, and a stop condition**. Destination `2N-FILES-WRITER`, not transferable into M2.
+
+### Proofs
+
+127 unit and component tests; **45 structural guards, each with a mutation control**, two-sided where a false positive was the risk; full suite 7140 passing; lint, typecheck, build and `git diff --check` clean; 11 hosted journeys across both locales on desktop and Pixel 7 at `--workers=1`.
+
+The residue probe needed a shape no earlier slice needed: `entity_attachments` carries no text column, so its rows can only be found by joining through the attachment that carries the marker — and a join that silently failed would read zero against a table full of links. The control plants a linked **and** an unlinked attachment under one marker and requires the probe to find exactly one.
+
+The link fixtures are planted with the service-role key, because `authenticated` holds no `INSERT`. **They prove the reader. They are not evidence that the product can create a link.**
+
+### Carried, not absorbed
+
+`online-memories.spec.ts:85`'s 21px touch target against a 44px minimum stays a `2N-MOBILE` remainder — not weakened, not deleted, not marked passing. ADR-055 is neither satisfied nor superseded by this slice and expires 2026-10-27.
+
 ## 2026-08-14 - PHASE 2N slice 2N.4 COMPLETE: the Brain says two facts cannot both be right, instead of quietly calling one archived
 
 **PR #219**, merged at `da9b787`, CI green on that exact merge SHA. **Zero migrations.** 94 total, hosted parity `202608140094`, local = remote, read live. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **6 requirements: 6 built.**
