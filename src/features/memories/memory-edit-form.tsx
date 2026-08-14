@@ -110,7 +110,21 @@ export function MemoryEditForm({
             ? ""
             : lifecycle.message}
       </div>
-      <button className="memory-lifecycle-button" disabled={lifecyclePending} type="submit">
+      {/*
+        `data-memory-lifecycle` names the transition this control performs, so a
+        journey can select the correction without selecting a translated
+        sentence. It is `restore` for an inverted window, because
+        `memoryLifecycleState` resolves that row to `archived` — which is exactly
+        the reading `2N-CONFLICT` exists to correct, and exactly the transition
+        that clears the impossible end date.
+      */}
+      <button
+        className="memory-lifecycle-button"
+        data-memory-lifecycle={archived ? "restore" : "archive"}
+        data-memory-lifecycle-state={lifecycleState}
+        disabled={lifecyclePending}
+        type="submit"
+      >
         {lifecyclePending ? (
           <LoaderCircle aria-hidden="true" className="spin" size={15} />
         ) : archived ? (

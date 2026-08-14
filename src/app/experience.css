@@ -288,6 +288,47 @@
 .attention-inline-retry { justify-self: start; min-height: 32px; }
 .attention-bulk-retry { margin-bottom: 12px; min-height: 36px; }
 
+/* `2N-CONFLICT-002`/`006`. The conflict row.
+
+   Visually distinct from the entry rows beside it and in the SAME list -- a
+   contradiction is not a different queue, it is a different kind of item.
+
+   The left rule and the warm wash are `.question-block`'s, deliberately: that is
+   already this product's shape for "something here needs you", and inventing a
+   second one would make two things that mean the same read as two different
+   things. Tokens are the real ones -- `--signal`, `--line`, `--ink-soft` -- and
+   not `--muted`/`--border`, which this file references but `:root` never
+   defines.
+
+   The dates are a `<dl>`, so each label reaches a screen reader with its own
+   value instead of both being parsed out of a sentence. Two columns that
+   collapse to one on a narrow screen: side by side at 360px they would wrap
+   mid-value and read as four fragments. */
+.attention-conflicts { display: grid; gap: 8px; margin-bottom: 12px; }
+.conflict-row {
+  align-items: flex-start;
+  border-left: 3px solid var(--signal);
+  background: #fff8ea;
+}
+.conflict-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 4px 16px;
+  margin: 8px 0;
+}
+.conflict-dates dt { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.conflict-dates dd { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.conflict-content {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  font-size: 14px;
+}
+.conflict-why, .conflict-what { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
+.conflict-what { font-weight: 650; color: var(--ink); }
+
 /* `2J-CAPTURE-001`. The modality tabs. Sized for a thumb (2J-ACCESS-006's 24px
    floor is a minimum, not a target) and labelled with words as well as icons --
    an icon-only tab row is a guessing game on first use. */

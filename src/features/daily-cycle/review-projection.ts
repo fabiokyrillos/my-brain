@@ -148,6 +148,20 @@ export function attentionActionId(reason: AttentionReason): DailyCycleAction {
     case "retry_processing": return "retry_processing";
     case "resolve_consistency": return "resolve_consistency";
     case "configure_ai_credential": return "configure_ai_credential";
+    /*
+      `2N-CONFLICT-003`. Reached by neither caller today, and here because the
+      switch is exhaustive and the compiler said so — which is exactly what this
+      mapping is for.
+
+      Both callers derive their reason from an **entry**: `attention-projection`
+      from `list_needs_attention`, `toEntryReviewProjection` from
+      `resolveDailyCycleLifecycle`. A validity conflict belongs to a memory and
+      reaches the queue through `loadMemoryConflicts`, which carries its own
+      action and never consults this function. The arm is written truthfully
+      rather than thrown, so a future entry-shaped conflict gets the right verb
+      instead of a runtime error.
+    */
+    case "resolve_validity_conflict": return "resolve_validity_conflict";
   }
 }
 

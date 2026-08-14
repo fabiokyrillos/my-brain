@@ -7,10 +7,41 @@ import {
   recordAttentionItemResolved,
 } from "@/features/product-analytics/interaction-events";
 import { presentationFor } from "@/features/sensitivity/contracts";
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import type { Bounded } from "@/features/bounds/contracts";
 import { NeedsAttentionItemRow } from "./needs-attention-item";
-import { trackedAttentionReasons, type NeedsAttentionItemView, type TrackedAttentionReason } from "./contracts";
+import { ConflictAttentionItemRow } from "./conflict-attention-item";
+import {
+  trackedAttentionReasons,
+  type ConflictAttentionItemView,
+  type NeedsAttentionItemView,
+  type TrackedAttentionReason,
+} from "./contracts";
 import type { AttentionCursor } from "./attention-projection";
-import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
+import { getConflictSectionCopy, getDailyCycleCopy, type DailyCycleLocale } from "./copy";
+
+/**
+ * `2N-CONFLICT-003`. The filter's vocabulary, widened by exactly one.
+ *
+ * Conflicts are a filterable type in the **same** queue rather than a second
+ * list: the chip row, the empty-filtered sentence and the load-more control all
+ * keep working over one set of items. A separate surface would have needed its
+ * own version of each, and two of them would eventually disagree.
+ */
+type AttentionFilter = TrackedAttentionReason | "conflict" | "all";
+
+/**
+ * What a caller that derives no conflicts passes.
+ *
+ * `bounded: false` and `limit: 0` are the honest values for "nothing was
+ * withheld because nothing was read" — a preview surface that never ran the
+ * derivation must not render a notice claiming more exist.
+ */
+const NO_CONFLICTS: Bounded<ConflictAttentionItemView> = Object.freeze({
+  items: Object.freeze([]),
+  bounded: false,
+  limit: 0,
+});
 
 export type LoadMoreNeedsAttentionPage = {
   readonly items: readonly NeedsAttentionItemView[];
@@ -104,6 +135,7 @@ export function NeedsAttentionList({
   loadMore,
   retryAction,
   timeZone,
+  conflicts = NO_CONFLICTS,
 }: {
   initialItems: readonly NeedsAttentionItemView[];
   initialCursor: AttentionCursor | null;
@@ -111,6 +143,13 @@ export function NeedsAttentionList({
   locale: DailyCycleLocale;
   agentName: string;
   loadMore: LoadMoreNeedsAttention;
+  /**
+   * `2N-CONFLICT-003`. Derived at read time by `loadMemoryConflicts`, never
+   * paginated with the entry rows — the two come from different reads and share
+   * no cursor. Bounded, so a truncated derivation can say so instead of implying
+   * the owner's memories are consistent when the scan simply stopped.
+   */
+  conflicts?: Bounded<ConflictAttentionItemView>;
   /** Omitted by callers that do not offer in-place retry (e.g. a preview). */
   retryAction?: RetryProcessingAction;
   /**
@@ -126,12 +165,21 @@ export function NeedsAttentionList({
   const [error, setError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retried, setRetried] = useState<ReadonlySet<string>>(new Set());
-  const [activeFilter, setActiveFilter] = useState<TrackedAttentionReason | "all">("all");
+  const [activeFilter, setActiveFilter] = useState<AttentionFilter>("all");
   const [isPending, startTransition] = useTransition();
   const [isRetrying, startRetry] = useTransition();
   const pt = locale === "pt-BR";
   const text = filterCopy[locale];
   const copy = getDailyCycleCopy(locale, agentName);
+  const conflictText = getConflictSectionCopy(locale);
+
+  /**
+   * Conflicts obey the same filter as everything else.
+   *
+   * Leaving them always visible would have made "filter by type" mean "filter
+   * the entry rows", which is a control that lies about its own scope.
+   */
+  const visibleConflicts = activeFilter === "all" || activeFilter === "conflict" ? conflicts.items : [];
 
   /**
    * `2J-ATTN-005`. A pure narrowing of what is already loaded -- not a second
@@ -151,6 +199,15 @@ export function NeedsAttentionList({
     () => (activeFilter === "all" ? items : items.filter((item) => item.kind === activeFilter)),
     [items, activeFilter],
   );
+
+  /**
+   * The chips offered, conflicts included when there are any.
+   *
+   * `availableReasons` already refuses to advertise a filter that would yield
+   * nothing, and the conflict chip follows the same rule for the same reason.
+   */
+  const hasConflicts = conflicts.items.length > 0;
+  const filterCount = availableReasons.length + (hasConflicts ? 1 : 0);
 
   /**
    * `2J-ATTN-010`. Bulk is offered only where the items are semantically
@@ -227,7 +284,7 @@ export function NeedsAttentionList({
     <div className="list-stack needs-attention-list">
       <NeedsAttentionViewed surface="needs_attention" itemCount={items.length} locale={locale} />
 
-      {availableReasons.length > 1 ? (
+      {filterCount > 1 ? (
         <fieldset className="attention-filters">
           <legend>{text.legend}</legend>
           <button
@@ -238,6 +295,16 @@ export function NeedsAttentionList({
           >
             {text.all}
           </button>
+          {hasConflicts ? (
+            <button
+              type="button"
+              className="attention-filter"
+              aria-pressed={activeFilter === "conflict"}
+              onClick={() => setActiveFilter("conflict")}
+            >
+              {copy.attentionReasons.resolve_validity_conflict.title}
+            </button>
+          ) : null}
           {availableReasons.map((reason) => (
             <button
               key={reason}
@@ -252,6 +319,29 @@ export function NeedsAttentionList({
         </fieldset>
       ) : null}
 
+      {/*
+        `2N-CONFLICT-004`. First in the queue, because a contradiction is the one
+        item here that will not resolve itself and that nothing else can act on.
+        Inside the same list container as everything below it -- one queue, not
+        two -- and outside the retry machinery entirely, which has no meaning
+        here.
+      */}
+      {visibleConflicts.length > 0 ? (
+        <section aria-label={conflictText.groupLabel} className="attention-conflicts">
+          {visibleConflicts.map((conflict) => (
+            <ConflictAttentionItemRow
+              agentName={agentName}
+              item={conflict}
+              key={conflict.key}
+              locale={locale}
+              surface="needs_attention"
+              timeZone={timeZone}
+            />
+          ))}
+          <BoundedNotice list={conflicts} locale={locale} />
+        </section>
+      ) : null}
+
       {retryAction && retryable.length > 1 ? (
         <button
           type="button"
@@ -264,7 +354,12 @@ export function NeedsAttentionList({
         </button>
       ) : null}
 
-      {visible.length === 0 && items.length > 0 ? (
+      {/*
+        Widened to count conflicts on both sides. Left as it was, a filter
+        narrowed to a reason that matched no entry would have printed "no item of
+        this type" directly above a conflict row that was plainly of that type.
+      */}
+      {visible.length === 0 && visibleConflicts.length === 0 && (items.length > 0 || hasConflicts) ? (
         <p className="quiet-state">{text.emptyFiltered}</p>
       ) : null}
 

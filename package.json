@@ -69,6 +69,7 @@
     "test:remote:2f:funnel": "node scripts/phase-2f-command-funnel-reader.mjs --proof",
     "test:remote:2x": "node scripts/remote-supabase-smoke.mjs --phase-2x",
     "test:remote:2n3:cleanup": "node scripts/verify-phase-2n-slice-3-cleanup.mjs",
+    "test:remote:2n4:cleanup": "node scripts/verify-phase-2n-slice-4-cleanup.mjs",
     "test:remote:2x:cleanup": "node scripts/verify-phase-2x-cleanup.mjs",
     "test:remote:daily-cycle": "node scripts/remote-daily-cycle-smoke.mjs",
     "test:remote:entry-processing": "node scripts/remote-entry-processing-smoke.mjs",

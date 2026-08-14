@@ -56,6 +56,48 @@ export function getEntryReviewSectionCopy(locale: DailyCycleLocale): EntryReview
   return entryReviewSectionCopy[locale];
 }
 
+/**
+ * The sentences a conflict row needs beyond the shared reason copy
+ * (`2N-CONFLICT-002`/`006`).
+ *
+ * Four obligations, in plain language and in both locales: what is inconsistent,
+ * which two values disagree, why the assistant did not decide, and what the owner
+ * can do about it. Nothing here names a table, an id, a fingerprint or a
+ * confidence, and nothing here says "archived" — which is exactly what the
+ * product wrongly called this row before the detector existed.
+ */
+export type ConflictSectionCopy = {
+  readonly validFromLabel: string;
+  readonly validUntilLabel: string;
+  readonly whyNotDecided: string;
+  readonly whatYouCanDo: string;
+  readonly masked: string;
+  readonly groupLabel: string;
+};
+
+const conflictSectionCopy: Record<DailyCycleLocale, ConflictSectionCopy> = {
+  "pt-BR": {
+    validFromLabel: "Começa em",
+    validUntilLabel: "Deveria terminar em",
+    whyNotDecided: "As duas datas foram preservadas exatamente como estavam. Escolher uma delas por conta própria seria inventar o que você quis dizer.",
+    whatYouCanDo: "Abra a memória e remova a data de término para desfazer a contradição.",
+    masked: "Conteúdo muito sensível, oculto",
+    groupLabel: "Informações que não podem estar certas ao mesmo tempo",
+  },
+  en: {
+    validFromLabel: "Starts on",
+    validUntilLabel: "Was supposed to end on",
+    whyNotDecided: "Both dates were preserved exactly as they were. Picking one of them unprompted would be inventing what you meant.",
+    whatYouCanDo: "Open the memory and remove the end date to undo the contradiction.",
+    masked: "Highly sensitive content, hidden",
+    groupLabel: "Facts that cannot both be right",
+  },
+};
+
+export function getConflictSectionCopy(locale: DailyCycleLocale): ConflictSectionCopy {
+  return conflictSectionCopy[locale];
+}
+
 export const dailyCycleCopy = {
   "pt-BR": {
     productStates: {
@@ -75,6 +117,10 @@ export const dailyCycleCopy = {
         title: "Configure sua chave de IA",
         description: "Seu registro foi salvo por completo. Para o {agent} interpretá-lo, configure sua própria chave de IA em Configurações.",
       },
+      resolve_validity_conflict: {
+        title: "Duas datas que não podem estar certas",
+        description: "Esta memória começa depois da data em que deveria terminar. O {agent} não escolheu uma das duas por você.",
+      },
     },
     actions: {
       open_entry: "Abrir registro",
@@ -93,6 +139,7 @@ export const dailyCycleCopy = {
       reopen_task: "Reabrir",
       configure_ai_credential: "Configurar chave de IA",
       interpret_pending_entries: "Interpretar registros pendentes",
+      resolve_validity_conflict: "Abrir memória e corrigir",
     },
     messages: {
       capture_saved: "Salvo. A organização foi solicitada.",
@@ -134,6 +181,10 @@ export const dailyCycleCopy = {
         title: "Set up your AI key",
         description: "Your record was saved in full. For {agent} to interpret it, set up your own AI key in Settings.",
       },
+      resolve_validity_conflict: {
+        title: "Two dates that cannot both be right",
+        description: "This memory starts after the date it was supposed to end. {agent} did not pick one of them for you.",
+      },
     },
     actions: {
       open_entry: "Open record",
@@ -152,6 +203,7 @@ export const dailyCycleCopy = {
       reopen_task: "Reopen",
       configure_ai_credential: "Set up AI key",
       interpret_pending_entries: "Interpret pending records",
+      resolve_validity_conflict: "Open memory and fix",
     },
     messages: {
       capture_saved: "Saved. Organization was queued.",

@@ -52,6 +52,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     priorities: [],
     attention: [attentionItem()],
     attentionHasMore: false,
+    conflicts: { items: [], bounded: false, limit: 0 },
     today: [{
       taskId: "t1",
       title: LONG_TITLE,

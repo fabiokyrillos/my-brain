@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import type { Bounded } from "@/features/bounds/contracts";
+import type { ConflictAttentionItemView, InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
+import { ConflictAttentionItemRow } from "@/features/daily-cycle/conflict-attention-item";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { NeedsAttentionItemRow } from "@/features/daily-cycle/needs-attention-item";
 import type { PriorityReason } from "@/features/daily-cycle/today-priorities";
@@ -57,6 +60,15 @@ export type HomeViewModel = {
     | { readonly kind: "saved" };
   readonly attention: readonly NeedsAttentionItemView[];
   readonly attentionHasMore: boolean;
+  /**
+   * `2N-CONFLICT-004`. Rendered in the same section as the rows above.
+   *
+   * Hoje's status line can say *"Nada pendente. Tudo salvo."* — so a conflict it
+   * did not know about would turn the queue's silence into a claim. The count in
+   * the section heading and the status line both include these, which is why
+   * they are here rather than only on the full queue.
+   */
+  readonly conflicts: Bounded<ConflictAttentionItemView>;
   /** `2J-HOJE-004`. Already capped and ordered by `selectTodayPriorities`. */
   readonly priorities: readonly HomePriorityView[];
   readonly today: readonly HomeTaskView[];
@@ -143,6 +155,14 @@ export function HomeView({
 }) {
   const copy = getHomeCopy(locale, agentName);
   const { sections } = copy;
+  /**
+   * `2N-CONFLICT-004`. One number for one section.
+   *
+   * The heading count, the "view all" link and the empty state all read this,
+   * so a conflict can never be rendered under a heading that says zero, and the
+   * quiet state can never appear above a row.
+   */
+  const pendingCount = view.attention.length + view.conflicts.items.length;
 
   return (
     <div className="dashboard home-dashboard">
@@ -162,17 +182,32 @@ export function HomeView({
         <Section
           title={sections.attention.title}
           hint={sections.attention.hint}
-          count={view.attention.length ? `${view.attention.length}${view.attentionHasMore ? "+" : ""}` : undefined}
+          count={pendingCount ? `${pendingCount}${view.attentionHasMore || view.conflicts.bounded ? "+" : ""}` : undefined}
           action={
-            view.attention.length ? (
+            pendingCount ? (
               <Link href={`/${locale}/app/inbox?view=needs-you`} className="panel-view-all">
                 {copy.viewAll}
               </Link>
             ) : undefined
           }
         >
-          {view.attention.length ? (
+          {pendingCount ? (
             <div className="home-list">
+              {/*
+                `2N-CONFLICT-004`. First, and in the same list as the entry rows:
+                a contradiction is the one item here that will not resolve itself.
+                Each row masks its own content, so no branch is needed around it.
+              */}
+              {view.conflicts.items.map((conflict) => (
+                <ConflictAttentionItemRow
+                  agentName={agentName}
+                  item={conflict}
+                  key={conflict.key}
+                  locale={locale}
+                  surface="home"
+                  timeZone={view.timeZone}
+                />
+              ))}
               {view.attention.map((item) =>
                 /*
                   `2J-PRIVACY-001`/`004`/`005`. The row is rendered either way --
@@ -188,6 +223,7 @@ export function HomeView({
                   <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" timeZone={view.timeZone} />
                 ),
               )}
+              <BoundedNotice list={view.conflicts} locale={locale} />
             </div>
           ) : (
             <p className="quiet-state">{sections.attention.empty}</p>
@@ -324,17 +360,23 @@ export function HomeView({
           write path that already owns it, with its own confirmation.
         */}
         <Section title={sections.endOfDay.title} hint={sections.endOfDay.hint}>
-          {view.attention.length + view.waitingCount + view.priorities.length > 0 ? (
+          {pendingCount + view.waitingCount + view.priorities.length > 0 ? (
             <ul className="home-endofday">
               {view.priorities.length ? (
                 <li>
                   {sections.priorities.title}: {view.priorities.length} {sections.endOfDay.unresolved}
                 </li>
               ) : null}
-              {view.attention.length ? (
+              {/*
+                `2N-CONFLICT-004`. The same count as the section above, for the
+                same reason: a day that closed reporting nothing unresolved while
+                a contradiction sat in the queue would be the silence this
+                requirement exists to end.
+              */}
+              {pendingCount ? (
                 <li>
-                  {sections.attention.title}: {view.attention.length}
-                  {view.attentionHasMore ? "+" : ""} {sections.endOfDay.unresolved}
+                  {sections.attention.title}: {pendingCount}
+                  {view.attentionHasMore || view.conflicts.bounded ? "+" : ""} {sections.endOfDay.unresolved}
                 </li>
               ) : null}
               {view.waitingCount ? (

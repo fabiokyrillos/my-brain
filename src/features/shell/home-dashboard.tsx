@@ -1,6 +1,7 @@
 import { captureEntry } from "@/features/capture/actions";
 import { QuickCaptureForm } from "@/features/capture/quick-capture-form";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
 import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import type { WorkItemHumanState } from "@/features/daily-cycle/contracts";
@@ -65,11 +66,15 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     section that is empty for a week because something is broken should be
     findable. It just does not take the page down to say so.
   */
-  const [workSettled, supplementalSettled, inboxSettled, attentionSettled] = await Promise.allSettled([
+  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled] = await Promise.allSettled([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
     loadInboxProjection(supabase, { locale, page: 1 }),
     loadAttentionProjection(supabase, { locale, limit: NEEDS_ATTENTION_HOME_LIMIT }),
+    // `2N-CONFLICT-003`. Its own settled slot, on the section-isolation rule
+    // above: a failed conflict derivation degrades to "no conflicts found" and
+    // logs, rather than taking Hoje down.
+    loadMemoryConflicts(supabase, { locale, userId: user.id }),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, section: string): T {
@@ -98,11 +103,17 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     { items: [], hasNext: false, nextCursor: null },
     "attention",
   );
+  const conflicts = settled(
+    conflictSettled,
+    { items: [], bounded: false, limit: 0 } as Awaited<ReturnType<typeof loadMemoryConflicts>>,
+    "conflicts",
+  );
 
   const operationalStatus = deriveHomeOperationalStatus({
     items: inboxProjection.items,
     attentionCount: attentionProjection.items.length,
     attentionHasNext: attentionProjection.hasNext,
+    conflictCount: conflicts.items.length,
   });
 
   /*
@@ -174,6 +185,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     priorities,
     attention: attentionProjection.items,
     attentionHasMore: attentionProjection.hasNext,
+    conflicts,
     today,
     todayHasMore:
       workProjection.items.length - promoted.size > TODAY_HOME_LIMIT || workProjection.hasNext,

@@ -139,18 +139,53 @@ describe("navigation capabilities", () => {
       items: [{ productState: "organizing" }],
       attentionCount: 2,
       attentionHasNext: true,
+      conflictCount: 0,
     })).toEqual({ kind: "attention", count: 2, hasMore: true });
 
     expect(deriveHomeOperationalStatus({
       items: [{ productState: "saved" }, { productState: "organizing" }],
       attentionCount: 0,
       attentionHasNext: false,
+      conflictCount: 0,
     })).toEqual({ kind: "organizing", count: 1, hasMore: false });
 
     expect(deriveHomeOperationalStatus({
       items: [{ productState: "saved" }, { productState: "ready" }],
       attentionCount: 0,
       attentionHasNext: false,
+      conflictCount: 0,
     })).toEqual({ kind: "saved", count: 0, hasMore: false });
+  });
+
+  /**
+   * `2N-CONFLICT-004`. The `saved` branch says *"Nada pendente. Tudo salvo."*, so
+   * a conflict that did not reach this function would turn the queue's silence
+   * into a claim about the whole product.
+   */
+  it("counts a derived conflict as pending, so Home cannot say nothing is pending", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "ready" }],
+      attentionCount: 0,
+      attentionHasNext: false,
+      conflictCount: 1,
+    })).toEqual({ kind: "attention", count: 1, hasMore: false });
+  });
+
+  it("adds conflicts to the entry count rather than replacing it", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [],
+      attentionCount: 2,
+      attentionHasNext: false,
+      conflictCount: 3,
+    })).toEqual({ kind: "attention", count: 5, hasMore: false });
+  });
+
+  it("still reports organizing when there is neither attention nor a conflict", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "organizing" }],
+      attentionCount: 0,
+      attentionHasNext: false,
+      conflictCount: 0,
+    })).toEqual({ kind: "organizing", count: 1, hasMore: false });
   });
 });

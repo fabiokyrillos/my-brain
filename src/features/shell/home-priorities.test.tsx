@@ -44,6 +44,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     priorities: [],
     attention: [],
     attentionHasMore: false,
+    conflicts: { items: [], bounded: false, limit: 0 },
     today: [],
     todayHasMore: false,
     waitingCount: 0,
