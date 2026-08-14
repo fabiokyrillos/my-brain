@@ -48,10 +48,36 @@ const MEMORY_MARKERS = [
   "Acordo antigo sem registro b93c15",
   "Memoria 2n3 que sera arquivada",
   "Memoria 2n3 que permanece em vigor",
+  // M3's journey.
+  "Memoria 2n3 que sera removida e6a4b7",
 ];
 const ENTRY_MARKERS = ["Conversa sobre revisao mensal 7c2e88", "Registro 2n3 que sera apagado a05f31"];
+
+/**
+ * M3's journey writes to five more tables, and they are checked BY NAME.
+ *
+ * Two of them — `people` and `entity_aliases` — are the point. The journey
+ * deletes a person through the product, which removes its alias; but it also
+ * UNDOES that deletion, so both rows exist again when the run ends and leave
+ * only with the account. If `deleteUser` ever stopped cascading one of them,
+ * a probe that only looked at memories would report zero and be wrong.
+ *
+ * `entity_aliases` in particular carries NO foreign key to `people`. Its only
+ * tie to an account is `user_id`, so it is the row most likely to be left
+ * behind by a cascade that regressed — which is exactly why it is named here.
+ */
+const PERSON_MARKERS = [
+  "Pessoa 2n3 a excluir 4f81ac",
+  "Pessoa 2n3 relacionada 9b20de",
+  "Pessoa de outra conta 5d31aa",
+];
+const PROJECT_MARKERS = ["Projeto 2n3 a excluir 71ce33"];
+const ALIAS_MARKERS = ["Apelido 2n3 c0ffee", "Apelido que chegou depois"];
+
 /** `phase_2n_validity_aware_retrieval.sql` is transactional and rolls back; a hit here means it did not. */
 const PGTAP_MARKER = "vigenciaphrase";
+/** `phase_2n_entity_deletion.sql` is transactional too, and names its fixtures distinctly. */
+const PGTAP_DELETION_MARKER = "Subject A";
 const ACCOUNT_PREFIXES = ["codex-2n0-", "codex-2n1-", "codex-2n2-", "codex-2n3-", "codex-memories-"];
 
 const { url, serviceRoleKey } = getLinkedSupabaseCredentials();
@@ -105,9 +131,23 @@ for (const marker of MEMORY_MARKERS) {
 for (const marker of ENTRY_MARKERS) {
   record(`entries ~ "${marker}"`, await countMatching("entries", "original_content", marker), 0);
 }
+for (const marker of PERSON_MARKERS) {
+  record(`people ~ "${marker}"`, await countMatching("people", "name", marker), 0);
+}
+for (const marker of PROJECT_MARKERS) {
+  record(`projects ~ "${marker}"`, await countMatching("projects", "name", marker), 0);
+}
+for (const marker of ALIAS_MARKERS) {
+  record(`entity_aliases ~ "${marker}"`, await countMatching("entity_aliases", "alias", marker), 0);
+}
 record(
   `memories ~ "${PGTAP_MARKER}" (the pgTAP suite must have rolled back)`,
   await countMatching("memories", "content", PGTAP_MARKER),
+  0,
+);
+record(
+  `people ~ "${PGTAP_DELETION_MARKER}" (the deletion pgTAP suite must have rolled back)`,
+  await countMatching("people", "name", PGTAP_DELETION_MARKER),
   0,
 );
 
@@ -145,8 +185,40 @@ try {
   });
   if (!seeded.ok) throw new Error(`control memory not created: ${seeded.status} ${await seeded.text()}`);
 
+  /**
+   * A person and an alias too, and the alias is the one that matters.
+   *
+   * M3's journey writes to `people` and `entity_aliases`, and a control that
+   * only planted a memory would leave both of those zero-checks vacuous — the
+   * exact defect this control was written to fix, one table over.
+   *
+   * `entity_aliases` carries NO foreign key to `people`: its only tie to an
+   * account is `user_id`. So it is both the row most likely to survive a
+   * regressed cascade and the one whose survival nothing else would reveal.
+   */
+  const seededPerson = await rest("people", {
+    method: "POST",
+    body: JSON.stringify({ user_id: controlUserId, name: `control ${controlMarker}` }),
+  });
+  if (!seededPerson.ok) throw new Error(`control person not created: ${seededPerson.status} ${await seededPerson.text()}`);
+  const controlPersonId = (await seededPerson.json())?.[0]?.id;
+
+  const seededAlias = await rest("entity_aliases", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: controlUserId,
+      entity_type: "person",
+      entity_id: controlPersonId,
+      alias: `control ${controlMarker}`,
+      normalized_alias: "placeholder",
+    }),
+  });
+  if (!seededAlias.ok) throw new Error(`control alias not created: ${seededAlias.status} ${await seededAlias.text()}`);
+
   // The step a marker-only check cannot perform.
   record("probe FINDS a planted memory", await countMatching("memories", "content", controlMarker), 1);
+  record("probe FINDS a planted person", await countMatching("people", "name", controlMarker), 1);
+  record("probe FINDS a planted alias", await countMatching("entity_aliases", "alias", controlMarker), 1);
 
   const deleted = await fetch(`${url}/auth/v1/admin/users/${controlUserId}`, {
     method: "DELETE",
@@ -157,7 +229,9 @@ try {
 
   // Deleting the ACCOUNT removed the DATA — which is what every spec's
   // `afterAll` silently relies on.
-  record("cascade removes it with the account", await countMatching("memories", "content", controlMarker), 0);
+  record("cascade removes the memory with the account", await countMatching("memories", "content", controlMarker), 0);
+  record("cascade removes the person with the account", await countMatching("people", "name", controlMarker), 0);
+  record("cascade removes the ALIAS with the account", await countMatching("entity_aliases", "alias", controlMarker), 0);
 } finally {
   if (controlUserId) {
     // The control must not become the residue.
