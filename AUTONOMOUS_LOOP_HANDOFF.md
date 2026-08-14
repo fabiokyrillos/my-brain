@@ -5744,3 +5744,204 @@ not a graph surface; the filename is the trap. Five of the eleven relation
 requirements already ship from EGC.2 and 2N.1/2N.2, so the open work is the graph
 itself, `2N-RELATION-003`'s proposal posture, and the parts of `-002`/`-009` that
 only exist once edges do.
+
+## §72 — Slice 2N.6 ships: the product has a relations surface, and its graph draws only what it can explain (2026-08-14)
+
+**PR #223**, merged at `fc3b565`; head at review `94bd23f`, **CI green on all
+three job families on both**. `docs/reports/phase-2n/PHASE_2N_SLICE_6_ACCEPTANCE.md`,
+and the artefact that authorized it at `..._SLICE_6_EDGE_CATALOG.md`.
+
+**ZERO MIGRATIONS, ZERO RPCs, ZERO GRANTS, ZERO INDEXES, ZERO WRITERS, ZERO
+DEPENDENCIES ADDED.** 94 local = 94 hosted, parity **`202608140094`**, read live.
+Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a
+fourth is a **STOP CONDITION**.
+
+**12 requirements: 8 built · 3 baseline · 1 partial · 0 not-built-by-rule.**
+
+### The catalogue ran first, because the authorization can refuse
+
+`2N-RELATION-011` obliges the work to stop and propose a reduction rather than
+ship a decorative graph, so **ten edge candidates were measured against the
+schema and classified before a line of UI existed**. Verdict: **AUTORIZÁVEL
+DENTRO DO CONTRATO EXISTENTE** — and the three measurements that produced it are
+the reason the surface looks the way it does.
+
+**1. There is no person-to-person edge in this product.**
+`person_relationships.related_person_id` is written `null` by the only writer the
+table has ever had, and a null there means *related to the owner*. The table is a
+**star centred on the owner**. *"Which people are related"* is answered by two
+real edges sharing a node; a line between two people would have to be synthesized
+from a shared project, a shared context or a co-mention, and each of those is a
+conclusion the data does not carry.
+
+**2. `OD-2N-8` A's premise does not hold in the tree.** The threat model says in
+terms that *"what makes it acceptable is T-3's signature, not the graph's own
+design"*. But `link_interpreted_entities` (`202607160011`, **never dropped**)
+still inserts a co-mention into `person_projects` and `person_contexts` on every
+interpretation, carrying `least(a.confidence, b.confidence)`. That is the
+**refused option C**, and `entry_entities` is written by the live interpretation
+RPC, so the path is the product's primary flow. **Removing it is a migration and
+therefore a stop condition.**
+
+**3. So the claim was already wrong on a shipped surface.**
+`association-panel.tsx` rendered **"Informado por você"** for every association
+row — including the trigger's — on the reasoning that the tables carry no
+`source_entry_id` *"so there is nothing else the origin could be"*. **That
+confuses the absence of a provenance column with the absence of another writer.**
+True of one table, false of the other two, and live on the person and project
+pages since 2N.1.
+
+### The discriminator cost nothing, and it proves in one direction only
+
+The owner's creation actions write an `audit_logs` row; the trigger writes none.
+That table is **exempt from every retention sweep by decision**
+(`202608050077:45`), already carries `(user_id, entity_type, entity_id)`, and is
+already read by the project page — **no grant, no index, no RPC**. Narrowed to
+the two `associate_*` actions, because an edit or an end is an owner act on a
+link, not authorship of one.
+
+**Presence proves owner-authorship; absence proves nothing** — an owner action
+whose best-effort audit insert failed is indistinguishable from the trigger — so
+absence resolves to *not attributable*, **never** to *informed by you*. The
+false-negative direction understates what is known; the other fabricates an
+origin.
+
+### What that produced
+
+The **list is canonical and rendered first**, in the DOM and on the page, and
+carries every link. The **drawing receives a strict subset**, so it cannot hold
+exclusive information without somebody deliberately giving it some. Both read one
+`Bounded<RelationEdge>`, so **neither can report a different bound** — a
+type-level property rather than a convention. An unattributable link is listed
+under its own heading with an honest sentence and **deliberately not drawn**, and
+the page says why.
+
+Rendering is **HTML anchors over an `aria-hidden` SVG holding only geometry**,
+chosen against inline SVG, canvas and a library on accessibility, touch targets,
+bundle, SSR, CSP and maintenance. **Zero client JavaScript, zero dependencies.**
+The SVG sits behind opaque boxes, so a line can never cross a label.
+
+`/app/relations` sits in the `context` group at **`more`** visibility, which is
+the requirement rather than restraint: `2N-RELATION-006` forbids primary
+navigation and `2I-SHELL-001`'s four primaries are asserted unchanged.
+
+### `graph` joined the sensitivity contract with its consumer, and closed a divergence doing it
+
+`contracts.ts` reserved the key in 2N.0 with an explicit condition — *"with its
+consumer, or not at all."* The consumer is `person_relationships.description`.
+
+**And the person page converges in the same change.** It masked `people.notes`
+and printed `description` in the clear **one section below it**: two
+unclassifiable free-text fields about the same human being, on one page, under
+two postures, both matching ADR-110 Decision 4's predicate word for word.
+`person_projects.role` is **deliberately unchanged** and recorded as an owner
+question — extending a signed posture to a field whose predicate it does not
+match is not this slice's to do.
+
+### Four defects, and each was found by something checking rather than by re-reading
+
+1. **The node box carried `min-height`.** The layout places rows a `PITCH` apart
+   and calls overlap impossible — but a two-line name under a floor grows past
+   its row and sits on the node below, **while `layout.test.ts` goes on passing,
+   because the arithmetic never saw the text.** Fixed height now.
+2. **A journey clicked the `.first()` reveal control** on a page with several
+   protected subjects, every one of whose buttons is called "Mostrar". It would
+   have uncovered whichever came first and then asserted about a string it never
+   revealed.
+3. **A hosted journey failed and the product was right.** It waited for *"Relação
+   encerrada"* after ending a relationship. The end succeeded; the sentence lives
+   only in an `sr-only` region **inside the row being removed**, so
+   `revalidatePath` unmounts it in the same commit that sets it. That is §69's
+   shape one component over, and it is **recorded as
+   `2N-RELATION-END-ANNOUNCEMENT`, not repaired** — it is not needed by the
+   graph's contract, and fixing it while nearby is how a slice acquires scope.
+4. **An `axe-core` scan of the REAL page found a contrast defect this slice had
+   introduced.** `.provenance-note` is `color: var(--muted, #64748b)` and
+   **`--muted` is defined nowhere in this codebase** — 4.62:1 on white, which
+   passes, and **4.30:1 on `--mist`**, which does not. Tinting the unattributable
+   row tipped an inherited colour below the threshold. **No structural guard
+   would have caught it and no unit test could**: jsdom applies no external
+   stylesheet, so contrast is invisible to every assertion in this repository
+   except one run in a real browser against the real page. The scan is now part
+   of the journey, at both viewports and in both locales, and it reports the
+   failing **elements** rather than a count.
+
+### Two guard tokens narrowed, never weakened, each with a two-sided control
+
+A bare `graph` in a migration filename matched Phase 2C's
+`202607220044_phase_2c_slice_5_task_graph` and its follow-up. A bare
+`content\s*:` matched `align-content: start` on a correct file. **The class keeps
+recurring and the fix is always the same**: narrow to what discriminates, and
+prove the narrowing still refuses what it must refuse *and* still allows what it
+must.
+
+### Proofs
+
+110 focused tests; **38 structural guards, each with a mutation control**; full
+suite **7263 passing** (the local Windows-only shebang parse baseline is three
+files, zero tests; one run concurrent with the Playwright dev server produced one
+flake that passes in isolation and is green in CI). Lint, typecheck, build and
+`git diff --check` clean.
+
+Hosted: **23/23 desktop and 23/23 Pixel 7**, both locales, `--workers=1`, plus
+**64 regressions** — EGC.2 relationships 8/8, 2N.1 person 14/14, 2N.0 foundations
+12/12, 2N.2 project 14/14, 2N.5 library 16/16. **110 hosted executions, no `429`
+across roughly 190 sign-ins.** A local production build against hosted Supabase,
+**not a Vercel deployment**.
+
+**Zero residue**, on a probe whose control **discriminates**: none of the three
+relation tables carries a text column, so residue is reachable only by joining
+through the marked person — and a probe that silently failed to join would read
+zero against a table full of relations. It plants **two** marked people, gives
+**one** a relationship, and requires exactly one to be found. The audit row is
+read **directly**, because `audit_logs.entity_id` has no foreign key and a row
+that outlived its subject is precisely the residue worth naming. **It ran after a
+deliberately failed journey**, which is the second half of the proof.
+
+### Recorded, not smoothed
+
+- **`2N-RELATION-003` closes `partial`**, remainder **`2N-RELATION-TRIGGER`**: a
+  migration, an owner decision, a stop condition, and **not transferable into
+  M2**.
+- **`2N-RELATION-002` and `-008` are claimed as `built`, not baseline.** The
+  2N.6 re-audit read them as *"largely ships"* and *"ships"*; both readings
+  rested on the premise the catalogue measured false.
+- **There is no selection model, and that is a design decision.** The drawing
+  carries no client state, so focus is the only state a node has. A selection
+  would have meant client JavaScript, a second state to keep in step with the
+  list, and an affordance with nothing to do.
+- **`2N-FILES-008`** stays partial with **`2N-FILES-WRITER`**, untouched: this
+  slice creates **no writer** for `entity_attachments` and uses the graph to
+  justify nothing.
+- **`online-memories.spec.ts:85`'s 21px touch target** stays a **`2N-MOBILE`**
+  remainder — not weakened, deleted, skipped or marked passing. Checked against
+  the owner's criterion and it does not apply: the relations surface shares no
+  component with it, and its own controls are chips asserted at 44px in the
+  journey.
+- **`2N-PRIVACY-FREETEXT`** — an owner question about `person_projects.role`,
+  neither decided nor acted on.
+- Mobile is a **viewport simulation**, not a device; **no screen-reader session
+  is claimed**; the error state is proved by unit test, because forcing a hosted
+  read failure would mean breaking the database.
+
+### THE LOOP STOPS HERE — 2N.7 IS RE-AUDITED BUT NOT STARTED
+
+Stopped **between slices**, a sanctioned stopping point. **No migration is
+partially deployed**: 2N.6 created none, and M1 and M3 remain merged, deployed,
+at parity and proved.
+
+`docs/reports/phase-2n/PHASE_2N_SLICE_7_REAUDIT.md`. Its load-bearing findings:
+**M2 may close unspent and that is a correct outcome** (`2N-METRICS-002`); the
+live surface CHECK has **no `person`, `project`, `memory`, `library`, `relation`
+or `graph` surface**, which is why any 2N telemetry costs a migration at all; and
+**a trap this repository has paid for is already closed** —
+`private.record_product_event` no longer carries its own frozen copy of the
+event-name allowlist, deleted by `202608090089`, so 2N.7 inherits **three**
+vocabulary copies to move together, not four. A slice re-auditing from the older
+note would budget for a writer change M2 does not need.
+
+**Unchanged:** signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), ADR-055 neither satisfied nor
+superseded and expiring **2026-10-27**, **Phase 2O not started, not planned and
+not retargeted**, and A13 still guarding the roadmap successor. **Slice 2N.7 is
+the only slice left.**
