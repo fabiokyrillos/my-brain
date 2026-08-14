@@ -57,8 +57,13 @@ const DOOMED_ENTRY = "Registro 2n3 que sera apagado a05f31";
  * never tie — which is what makes the expected id deterministic rather than
  * arbitrary.
  */
-const vec = (k: number) =>
-  `[${Array.from({ length: 1536 }, (_, index) => (index < k ? 1 : 0)).join(",")}]`;
+const vecArray = (k: number) => Array.from({ length: 1536 }, (_, index) => (index < k ? 1 : 0));
+
+/**
+ * The literal a `vector` COLUMN takes on insert, which is pgvector's own text
+ * input form.
+ */
+const vec = (k: number) => `[${vecArray(k).join(",")}]`;
 
 const COPY = {
   "pt-BR": {
@@ -133,7 +138,17 @@ test.describe("2N.3 M1 — the Brain says where a memory came from, and stops us
         authorization: `Bearer ${accessToken}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ p_query_embedding: vec(1), p_match_count: matchCount }),
+      /*
+       * An ARRAY, not the text literal the column insert uses.
+       *
+       * The generated types declare `p_query_embedding: string` — the type
+       * generator maps every unknown Postgres type to `string` — but the
+       * product passes `embedded.embedding`, which is `number[]`
+       * (`src/lib/ai/types.ts`). This proof exists to exercise the same wire
+       * shape the product actually sends; a journey that sent a different one
+       * could pass while the shape chat uses was broken.
+       */
+      body: JSON.stringify({ p_query_embedding: vecArray(1), p_match_count: matchCount }),
     });
     expect(response.ok, `retrieval failed: ${await response.clone().text()}`).toBe(true);
     return (await response.json()) as { source_id: string; content: string }[];
