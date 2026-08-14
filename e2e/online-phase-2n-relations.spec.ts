@@ -218,7 +218,12 @@ test.describe("2N.6 — the relations surface draws only what it can explain", (
       entity_id: marinaAtlas.id,
       actor: "user",
       after_state: { person_id: marinaId, project_id: atlasId },
-      reason: "fixture: owner associated a person with a project",
+      // The marker travels into `reason` so the residue probe can find this row
+      // directly. `audit_logs.entity_id` carries no foreign key, so a probe
+      // joining through the association would go blind the moment the
+      // association was removed — and an audit row that outlived its subject is
+      // exactly the residue worth looking for.
+      reason: `fixture ${MARK}: owner associated a person with a project`,
     });
 
     // The stranger's own relation, so the cross-tenant control is not vacuous.
