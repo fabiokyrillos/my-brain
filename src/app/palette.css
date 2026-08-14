@@ -7,23 +7,24 @@
  */
 
 .palette-trigger {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 38px; padding: 8px 12px;
-  border: 1px solid var(--line); border-radius: 10px;
-  background: var(--white); color: var(--ink-soft);
-  font-size: 13px; font-weight: 650;
+  display: flex; align-items: center; gap: var(--space-2);
+  min-height: 34px; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  background: var(--background-surface); color: var(--text-secondary);
+  font: var(--type-label);
 }
-.palette-trigger:hover { background: var(--mist); color: var(--ink); }
+.palette-trigger:hover { background: var(--background-subtle); color: var(--text-primary); }
 .palette-trigger kbd {
-  font: 650 10px var(--font-mono);
-  padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
-  background: var(--mist); color: var(--ink-soft);
+  font: var(--type-eyebrow);
+  padding: var(--space-1) var(--space-2); border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--background-subtle); color: var(--text-muted);
 }
 
 .palette-backdrop {
   position: fixed; inset: 0; z-index: 60;
   display: flex; align-items: flex-start; justify-content: center;
-  padding: clamp(16px, 10vh, 120px) 16px 16px;
+  padding: clamp(16px, 10vh, 120px) var(--space-4) var(--space-4);
   background: var(--scrim);
   backdrop-filter: blur(3px);
 }
@@ -31,73 +32,99 @@
   width: min(100%, 620px);
   display: flex; flex-direction: column;
   max-height: min(70vh, 560px);
-  border: 1px solid var(--line); border-radius: 18px;
-  background: var(--white);
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  background: var(--background-surface);
   box-shadow: var(--elevation-3);
   overflow: hidden;
 }
-.palette-field { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; border-bottom: 1px solid var(--line); }
-.palette-input { flex: 1; min-height: 48px; border: 0; background: transparent; color: var(--ink); font-size: 16px; }
+.palette-field {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+}
+/* 16px, deliberately: anything smaller makes iOS Safari zoom the page on focus,
+   which on the full-screen mobile palette scrolls the results out of view. */
+.palette-input {
+  flex: 1; min-height: 48px; border: 0; background: transparent;
+  color: var(--text-primary); font-family: var(--font-ui); font-size: 16px;
+}
+.palette-input::placeholder { color: var(--text-muted); }
 .palette-input:focus { outline: 0; }
-.palette-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; color: var(--ink-soft); font-size: 22px; line-height: 1; }
+.palette-close {
+  min-width: var(--touch-target); min-height: var(--touch-target);
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  color: var(--text-secondary); font-size: 22px; line-height: 1;
+}
+.palette-close:hover { background: var(--background-subtle); color: var(--text-primary); }
 
-.palette-results { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
-.palette-group { display: grid; gap: 2px; padding: 6px 0; }
+.palette-results { flex: 1; min-height: 0; overflow: auto; padding: var(--space-2); }
+.palette-group { display: grid; gap: 2px; padding: var(--space-2) 0; }
 .palette-group-label {
-  padding: 4px 10px;
-  font: 650 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--ink-soft);
+  padding: var(--space-1) var(--space-3);
+  font: var(--type-eyebrow); letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .palette-option {
   display: block; width: 100%; text-align: left;
-  min-height: 40px; padding: 10px 12px;
-  border: 0; border-radius: 10px; background: transparent;
-  color: var(--ink); font-size: 14px; font-weight: 600;
+  min-height: var(--touch-target); padding: var(--space-3);
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  color: var(--text-primary); font: var(--type-body); font-weight: 500;
 }
 /* The active option is marked by background AND by aria-selected. A highlight
    that only exists visually is invisible to the screen-reader user the
-   combobox pattern is for. */
-.palette-option.is-active { background: var(--blue-wash); color: var(--blue); }
+   combobox pattern is for.
 
-.palette-empty { display: grid; gap: 4px; padding: 22px 14px; }
-.palette-empty strong { font-size: 14px; }
-.palette-empty span { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+   It is a surface change, not a colour change: `--link` on a wash was the old
+   blue-grey system's signal, and in Papel e Console the reserved accents carry
+   meaning — an active row means "you are on this", not "this is informational". */
+.palette-option.is-active { background: var(--background-subtle-strong); color: var(--text-primary); }
+
+.palette-empty { display: grid; gap: var(--space-1); padding: var(--space-6) var(--space-4); }
+.palette-empty strong { font: var(--type-heading); color: var(--text-primary); }
+.palette-empty span { font: var(--type-caption); color: var(--text-secondary); }
 
 @media (max-width: 899px) {
   /* Full-screen on mobile, and the field sits at the top so the virtual
      keyboard does not cover the results it is filtering. */
   .palette-backdrop { padding: 0; }
   .palette { width: 100vw; max-height: 100vh; height: 100vh; border: 0; border-radius: 0; }
-  .palette-close { min-width: 44px; min-height: 44px; }
   .palette-option { min-height: 46px; }
 }
 
 /* ---- global search — `2I-SEARCH-002` … `2I-SEARCH-009` ------------------- */
 
-.search-surface { max-width: 860px; margin: auto; padding: 48px var(--gutter) 120px; display: grid; gap: 18px; }
-.search-title { margin: 0; font: 500 38px/1 var(--font-reading); letter-spacing: -.04em; }
-.search-form { display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: center; }
+.search-surface { max-width: var(--width-productivity); margin: auto; padding: var(--space-12) var(--gutter) 120px; display: grid; gap: var(--space-5); }
+.search-title { margin: 0; font: var(--type-title-1); letter-spacing: -.01em; color: var(--text-primary); }
+.search-form { display: grid; gap: var(--space-3); grid-template-columns: 1fr auto; align-items: center; }
+/* 16px for the same iOS reason as the palette field. */
 .search-input {
-  min-height: 48px; padding: 12px 14px;
-  border: 1px solid var(--border-strong); border-radius: 12px; background: var(--white);
-  color: var(--ink); font-size: 16px;
+  min-height: 48px; padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary); font-family: var(--font-ui); font-size: 16px;
 }
-.search-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
-.search-filters label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
-.search-filters select { min-height: 40px; border: 1px solid var(--border-strong); border-radius: 10px; padding: 8px 10px; background: var(--white); color: var(--ink); }
-.search-sensitive { flex-direction: row !important; align-items: center; gap: 8px !important; font-weight: 650 !important; }
+.search-input::placeholder { color: var(--text-muted); }
+.search-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; }
+.search-filters label { display: grid; gap: var(--space-2); font: var(--type-label); color: var(--text-secondary); }
+.search-filters select {
+  min-height: 40px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3); background: var(--background-surface);
+  color: var(--text-primary); font: var(--type-body);
+}
+.search-sensitive { flex-direction: row !important; align-items: center; gap: var(--space-2) !important; }
 .search-sensitive input { width: 18px; height: 18px; }
-.search-hint { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+.search-hint { grid-column: 1 / -1; margin: 0; font: var(--type-caption); color: var(--text-secondary); }
 
 /* Visibly active while results are shown -- OD-1. */
 .search-scope-banner, .search-partial {
-  margin: 0; padding: 10px 14px; border-radius: 11px;
+  margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
   border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone-fg);
-  font-size: 13px; font-weight: 700;
+  font: var(--type-body); font-weight: 500;
 }
 
-.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.search-bounded { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
+.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.search-bounded { margin: 0; font: var(--type-caption); color: var(--text-secondary); }
 
 @media (max-width: 899px) {
   .search-surface { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
@@ -109,36 +136,37 @@
 
 /* ---- Library — `2I-LIB-001` … `2I-LIB-008` -------------------------------- */
 
-.library-page { max-width: 980px; margin: auto; padding: 48px var(--gutter) 120px; display: grid; gap: 26px; }
-.library-head { display: grid; gap: 8px; }
-.library-head h1 { margin: 0; font: 500 38px/1 var(--font-reading); letter-spacing: -.04em; }
-.library-head p { margin: 0; color: var(--ink-soft); line-height: 1.6; }
+.library-page { max-width: var(--width-productivity); margin: auto; padding: var(--space-12) var(--gutter) 120px; display: grid; gap: var(--space-6); }
+.library-head { display: grid; gap: var(--space-2); }
+.library-head h1 { margin: 0; font: var(--type-title-1); letter-spacing: -.01em; color: var(--text-primary); }
+.library-head p { margin: 0; font: var(--type-lead); color: var(--text-secondary); }
 /* `2J-ACCESS-006`. This link rendered 16px tall on a Pixel 7 -- below WCAG 2.2
    AA 2.5.8's 24px minimum -- and shipped in Phase 2I because a jsdom test
    cannot measure a painted box. `min-height` plus centring is the smallest fix
    that does not move the link or change its type scale. */
 .library-search-link {
   justify-self: start;
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--blue);
+  margin-top: var(--space-2);
+  font: var(--type-label);
+  color: var(--link);
   display: inline-flex;
   align-items: center;
   min-height: 24px;
 }
 
-.library-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.library-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .library-card {
-  display: grid; gap: 4px; align-content: start;
-  min-height: 104px; padding: 18px;
-  border: 1px solid var(--line); border-radius: 14px; background: var(--white);
+  display: grid; gap: var(--space-1); align-content: start;
+  min-height: 104px; padding: var(--space-5);
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  transition: background var(--motion-fast) ease-out;
 }
-.library-card:hover { background: var(--mist); }
-.library-card-name { font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
-.library-card-note { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+.library-card:hover { background: var(--background-elevated); }
+.library-card-name { font: var(--type-heading); color: var(--text-primary); }
+.library-card-note { font: var(--type-caption); color: var(--text-secondary); }
 /* A navigation aid, not a metric: it says whether the door leads anywhere. */
-.library-card-count { font: 650 11px var(--font-mono); color: var(--ink-soft); }
+.library-card-count { font: var(--type-mono); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 @media (max-width: 899px) {
   .library-page { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
