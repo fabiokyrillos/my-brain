@@ -242,16 +242,22 @@ serially. Not a Vercel deployment.
 
 | Lane | Result |
 | --- | --- |
-| 2N.6 journey, **desktop**, pt-BR + en | **21/21** |
-| 2N.6 journey, **Pixel 7**, pt-BR + en | **21/21** |
+| 2N.6 journey, **desktop**, pt-BR + en | **23/23** |
+| 2N.6 journey, **Pixel 7**, pt-BR + en | **23/23** |
 | EGC.2 relationships regression, desktop + Pixel 7 | **8/8** |
 | 2N.1 person regression, desktop + Pixel 7 | **14/14** |
 | 2N.0 foundations regression, desktop + Pixel 7 | **12/12** |
 | 2N.2 project regression, desktop | **14/14** |
 | 2N.5 library regression, desktop | **16/16** |
-| **Total** | **42 journeys for 2N.6 + 64 regressions = 106 hosted executions** |
+| **Total** | **46 journeys for 2N.6 + 64 regressions = 110 hosted executions** |
 
-**No `429` across roughly 130 sign-ins**, run serially and spaced.
+**No `429` across roughly 190 sign-ins**, run serially and spaced.
+
+Two of the twenty-three are an **`axe-core` scan of the real page**, at both
+viewports and in both locales, asserting **zero `serious` or `critical`**
+violations with the drawing on screen. That is a different instrument from
+`accessibility.spec.ts`, which scans *mirrored fixtures*: this runs against the
+app's own chrome, stylesheets and landmarks. It found a real defect — §6.4.
 
 **The pairings that carry the file.** The drawing is proved non-empty by three
 assertions *before* Rafael's absence from it is claimed, so *"not drawn"* cannot
@@ -357,7 +363,31 @@ server, and the exact saved text produced by an explicit reveal. **The storage
 proof it existed for is unchanged and its shape is stronger**: a round trip that
 lost the sentence fails here exactly as it did before.
 
-### 6.3 What the hosted run proved that no unit test could
+### 6.3 The axe scan found a contrast defect this slice had introduced
+
+Two nodes, `serious`, `color-contrast`: the **origin sentence inside an
+unattributable row**, in both locales.
+
+The cause is a collision between an inherited colour and a new background.
+`.provenance-note` is `color: var(--muted, #64748b)` and **`--muted` is defined
+nowhere in this codebase** — a pre-existing fault 2N.4 recorded — so every one of
+those notes renders at the hardcoded fallback. `#64748b` is **4.62:1 on white**,
+which passes, and **4.30:1 on `--mist`**, which does not. Tinting the
+unattributable row is what tipped it over, and the tint was this slice's.
+
+Fixed by giving `.relations-origin` the product's own `--ink-soft` token —
+**6.15:1 on white and 5.73:1 on the tint** — so the row keeps its grouping and
+the sentence clears the threshold on both backgrounds. The shared
+`.provenance-note` is deliberately **left alone**: its own surfaces are outside
+this slice, and repairing the undefined `--muted` token is not this slice's to
+do.
+
+**No structural guard would have caught this**, and no unit test could: jsdom
+applies no external stylesheet, so a contrast failure is invisible to every
+assertion in the repository except one run in a real browser against the real
+page.
+
+### 6.4 What the hosted run proved that no unit test could
 
 The page **rendered**, in a real browser, at two viewports, in two locales. That
 is not a formality in this repository: handoff §58 records two surfaces that

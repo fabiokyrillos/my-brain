@@ -166,8 +166,24 @@
   border-style: dashed;
 }
 
+/* The origin sentence, in the product's own muted token rather than the
+   hardcoded fallback `.provenance-note` reaches for.
+
+   FOUND BY AXE ON THE REAL PAGE, not by reading. `.provenance-note` is
+   `color: var(--muted, #64748b)` and `--muted` is undefined anywhere in this
+   codebase, so every one of those notes renders at `#64748b` — 4.62:1 on white,
+   which passes, and **4.30:1 on `--mist`**, which does not. Tinting the
+   unattributable row tipped an inherited colour below the threshold: the tint
+   was this slice's, so the repair is too.
+
+   `--ink-soft` is 6.15:1 on white and 5.73:1 on the tint, so the row keeps its
+   grouping and the sentence clears the threshold on both. The shared
+   `.provenance-note` is left alone — its own surfaces are outside this slice,
+   and `--muted` being undefined is a pre-existing fault this is not the place
+   to repair. */
 .relations-origin {
   margin: 0;
+  color: var(--ink-soft);
 }
 
 .relations-row-note {

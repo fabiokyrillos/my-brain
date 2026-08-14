@@ -1,6 +1,17 @@
+import { createRequire } from "node:module";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { signInOnline } from "./support/online-session";
+
+/**
+ * `axe-core` is a **declared devDependency**, resolved rather than borrowed from
+ * someone else's hoisting — the reason `accessibility.spec.ts` gives, and it
+ * matters more here: that file scans *mirrored fixtures*, and this scans the
+ * **real page**, with the app's chrome, the app's stylesheets and the app's
+ * layout landmarks around it.
+ */
+const AXE_PATH = createRequire(__filename).resolve("axe-core");
 
 /**
  * Slice 2N.6's authenticated acceptance — the relations surface, proved
@@ -444,6 +455,39 @@ test.describe("2N.6 — the relations surface draws only what it can explain", (
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(1);
+    });
+
+    test(`carries no serious or critical accessibility violation (${locale})`, async ({ page }) => {
+      await signIn(page, "owner", locale);
+      await page.goto(`/${locale}/app/relations`);
+      await expect(page.getByRole("heading", { level: 1, name: copy.heading })).toBeVisible();
+      // The drawing must be on screen when the scan runs, or contrast and
+      // name-role-value would be measured on a page missing the half this
+      // slice added.
+      await expect(page.getByRole("group", { name: copy.figure })).toBeVisible();
+
+      await page.addScriptTag({ path: AXE_PATH });
+      const violations = await page.evaluate(async () => {
+        // @ts-expect-error injected by addScriptTag
+        const results = await window.axe.run(document, { resultTypes: ["violations"] });
+        return (
+          results.violations as Array<{
+            id: string;
+            impact: string | null;
+            nodes: Array<{ target: string[]; failureSummary?: string }>;
+          }>
+        )
+          .filter((violation) => violation.impact === "serious" || violation.impact === "critical")
+          .map((violation) => ({
+            id: violation.id,
+            impact: violation.impact,
+            // The elements, not just the count. A violation reported as a
+            // number is a defect somebody has to reproduce before they can fix
+            // it, and this lane is slow enough that they may not.
+            targets: violation.nodes.map((node) => node.target.join(" ")),
+          }));
+      });
+      expect(violations).toEqual([]);
     });
 
     test(`a stranger sees their own relations and never the owner's (${locale})`, async ({ page }) => {
