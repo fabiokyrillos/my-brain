@@ -193,7 +193,8 @@ disabled control. A guard and a component test both fail if one appears.
 | Structural guards | **45**, each with a mutation control; two-sided where a false positive was the risk |
 | Full suite | **7140 passed**, 0 failed tests (3 failed *files* are the known Windows-only shebang parse; green in CI) |
 | lint · typecheck · build · `git diff --check` | clean |
-| Hosted journeys | 11 across `pt-BR` and `en`, desktop and Pixel 7, `--workers=1` |
+| Hosted journeys | **10 test bodies → 32 executions** (16 desktop + 16 Pixel 7; six of the ten run once per locale), `--workers=1`. A local build against the **hosted Supabase project** — *not* a Vercel deployment |
+| Regressions re-run | **59** hosted journeys from 2N.0–2N.4, all green |
 | Residue | zero, with a control that plants a linked and an unlinked attachment and proves the probe discriminates |
 
 ## 7. Carried, not absorbed
