@@ -1,10 +1,10 @@
 .route-loading{max-width:1180px;margin:auto;padding:64px var(--gutter) var(--page-bottom)}
-.route-loading [data-loading-block]{position:relative;overflow:hidden;background:#e7ebf1;border-radius:12px}
+.route-loading [data-loading-block]{position:relative;overflow:hidden;background:var(--background-subtle-strong);border-radius:12px}
 .route-loading-heading{width:min(360px,72%);height:44px}
 .route-loading-summary{width:min(620px,92%);height:18px;margin-top:18px}
 .route-loading-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-top:48px}
 .route-loading-card{min-height:220px;border:1px solid var(--line)}
-@media(prefers-reduced-motion:no-preference){.route-loading [data-loading-block]::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);animation:route-loading-shimmer 1.25s ease-in-out infinite}@keyframes route-loading-shimmer{to{transform:translateX(100%)}}}
+@media(prefers-reduced-motion:no-preference){.route-loading [data-loading-block]::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,var(--background-surface),transparent);animation:route-loading-shimmer 1.25s ease-in-out infinite}@keyframes route-loading-shimmer{to{transform:translateX(100%)}}}
 @media(max-width:760px){.route-loading{padding:38px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom,0px))}.route-loading-grid{grid-template-columns:1fr;margin-top:34px}.route-loading-card{min-height:180px}}
 /* 2N-ACCESS-003/-005, ADR-112 D7a. `loading.tsx` takes no props and so cannot know
    the locale; it renders every announcement and the document's own `lang` — set on
@@ -26,4 +26,4 @@
 .route-loading [data-route-loading-locale="pt-BR"]:lang(en){display:none}
 .navigation-pending{font-size:10px;font-weight:750;color:var(--blue);white-space:nowrap}
 .mobile-primary-link .navigation-pending,.capture-fab .navigation-pending{position:absolute;width:1px;height:1px;overflow:hidden}
-.row-action.optimistic{background:var(--blue-wash);color:var(--blue);border-color:rgba(49,92,255,.28)}
+.row-action.optimistic{background:var(--blue-wash);color:var(--blue);border-color:var(--tone-information-line)}

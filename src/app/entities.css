@@ -16,9 +16,9 @@
   gap: 8px;
   min-height: 44px;
   padding: 11px 16px;
-  border: 1px solid #bcc7d6;
+  border: 1px solid var(--border-strong);
   border-radius: 11px;
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
@@ -57,8 +57,8 @@
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: white;
-  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.06);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
 }
 
 .entity-edit-form > label {
@@ -73,10 +73,10 @@
 .entity-edit-form textarea {
   width: 100%;
   min-height: 46px;
-  border: 1px solid #b9c5d5;
+  border: 1px solid var(--border-strong);
   border-radius: 11px;
   padding: 11px 13px;
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
   font-weight: 500;
 }
@@ -122,7 +122,7 @@
 
 .entity-edit-save {
   background: var(--ink);
-  color: white;
+  color: var(--action-primary-text);
 }
 
 .entity-edit-save:disabled {
@@ -130,9 +130,9 @@
 }
 
 .entity-edit-cancel {
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
-  border: 1px solid #bcc7d6;
+  border: 1px solid var(--border-strong);
 }
 
 .entity-edit-cancel:hover:not(:disabled) {
@@ -147,11 +147,11 @@
 
 .entity-edit-feedback.success {
   margin-top: 10px;
-  color: #26714c;
+  color: var(--tone-success-fg);
 }
 
 .entity-edit-feedback.error {
-  color: #a33a32;
+  color: var(--tone-risk-fg);
 }
 
 .entity-edit-form :focus-visible,
@@ -173,7 +173,7 @@
   font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .entity-relation-line > strong {
@@ -212,7 +212,7 @@
 
 .relation-explainer {
   margin: -4px 0 0;
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -230,7 +230,7 @@
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .relation-row-main {
@@ -244,7 +244,7 @@
 }
 
 .relation-row-main span {
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -256,7 +256,7 @@
 }
 
 .relation-unknown-note {
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
   font-size: 11px;
   font-style: italic;
 }
@@ -275,9 +275,9 @@
   gap: 6px;
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid #bcc7d6;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
   font-size: 12px;
   font-weight: 650;
@@ -304,9 +304,9 @@
 .relation-form select {
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid #bcc7d6;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
   font: inherit;
   font-weight: 400;
 }
@@ -340,7 +340,7 @@
   gap: 4px 8px;
   margin: 6px 0 0;
   font-size: 12px;
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
   /* Long unbroken content must wrap rather than widen the page (2N-MOBILE-001). */
   min-width: 0;
   overflow-wrap: anywhere;
@@ -384,7 +384,7 @@
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
 }
 
 .return-to-source {
@@ -411,7 +411,7 @@
 .entity-changes {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: white;
+  background: var(--background-surface);
   padding: 22px;
   margin-top: 16px;
 }
@@ -439,7 +439,7 @@
   font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .entity-state-line > strong {
@@ -459,7 +459,7 @@
 .section-explainer {
   margin: 0 0 12px;
   font-size: 12px;
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
   max-width: 60ch;
   overflow-wrap: anywhere;
 }

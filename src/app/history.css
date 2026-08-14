@@ -21,7 +21,7 @@
 .history-filters-disclosure {
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .history-filters-summary {
@@ -64,10 +64,10 @@
   width: 100%;
   /* 44 px, so every control is a comfortable target on a phone. */
   min-height: 44px;
-  border: 1px solid #b9c5d5;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 12px;
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
   font-size: 13px;
 }
@@ -105,7 +105,7 @@
 }
 
 .history-active-filters > li {
-  border: 1px solid #cfd8e5;
+  border: 1px solid var(--border-default);
   border-radius: 999px;
   padding: 5px 11px;
   background: var(--mist);
@@ -115,7 +115,7 @@
 
 .history-filters-note {
   margin: 0;
-  color: #9b6a24;
+  color: var(--tone-attention-fg);
   font-size: 12px;
 }
 
@@ -181,7 +181,7 @@
   font: 650 10px var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .history-change > dd {
@@ -210,10 +210,10 @@
 }
 
 .history-kind {
-  border: 1px solid #cfd8e5;
+  border: 1px solid var(--border-default);
   border-radius: 999px;
   padding: 2px 8px;
-  background: white;
+  background: var(--background-surface);
   font: 650 9px var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -273,9 +273,9 @@
     align-items: center;
     min-height: 44px;
     padding: 0 14px;
-    border: 1px solid #cfd8e5;
+    border: 1px solid var(--border-strong);
     border-radius: 10px;
-    background: white;
+    background: var(--background-surface);
   }
 }
 

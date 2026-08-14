@@ -20,7 +20,7 @@
   padding: 12px 14px;
   border: 1px solid var(--tone-archived-line);
   border-radius: 12px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .conversation-card-head {
@@ -135,7 +135,7 @@
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
   font-weight: 600;
@@ -211,7 +211,7 @@
   padding: 0 12px;
   border: 1px solid var(--tone-archived-line);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .task-command-edit button,
@@ -225,7 +225,7 @@
   padding: 0 14px;
   border: 1px solid var(--tone-archived-line);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -309,7 +309,7 @@
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
   border-radius: 10px;
-  background: white;
+  background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
   font-weight: 600;
@@ -468,7 +468,7 @@
 
 .conversation-explanation-correct-title {
   font-weight: 600;
-  color: var(--ink, #14233b);
+  color: var(--text-primary);
 }
 
 /* The honest "there is no path yet". Toned down rather than out: it is

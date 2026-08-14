@@ -211,13 +211,13 @@
  * confirmation step.
  */
 .reminder-button.danger {
-  border-color: #e5b4b4;
-  color: #a3282f;
+  border-color: var(--tone-risk-line);
+  color: var(--tone-risk-fg);
 }
 
 .reminder-button.danger:hover:not(:disabled) {
-  border-color: #a3282f;
-  color: #a3282f;
+  border-color: var(--tone-risk-fg);
+  color: var(--tone-risk-fg);
 }
 
 .reminder-panel {
@@ -231,8 +231,8 @@
 }
 
 .reminder-panel.danger {
-  border-color: #e5b4b4;
-  background: #fdf5f5;
+  border-color: var(--tone-risk-line);
+  background: var(--tone-risk-bg);
 }
 
 .reminder-panel label {
@@ -299,11 +299,11 @@
 }
 
 .reminder-feedback.success {
-  color: #1f7a4d;
+  color: var(--tone-success-fg);
 }
 
 .reminder-feedback.error {
-  color: #a3282f;
+  color: var(--tone-risk-fg);
 }
 
 /*

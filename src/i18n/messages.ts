@@ -92,6 +92,7 @@ const messages = {
       mainNavigation: "Navegação principal",
       mobileNavigation: "Navegação móvel",
       switchLanguage: "Mudar idioma para inglês",
+      skipToContent: "Ir para o conteúdo",
     },
   },
   en: {
@@ -133,6 +134,7 @@ const messages = {
       mainNavigation: "Main navigation",
       mobileNavigation: "Mobile navigation",
       switchLanguage: "Switch language to Portuguese",
+      skipToContent: "Skip to content",
     },
   },
 } as const;

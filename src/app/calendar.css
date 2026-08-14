@@ -24,7 +24,7 @@
 }
 
 .calendar-description {
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -57,7 +57,7 @@
    */
   min-height: 44px;
   padding: 0 var(--space-3, 0.75rem);
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-2, 0.5rem);
   text-decoration: none;
 }
@@ -86,8 +86,8 @@
 .calendar-partial {
   margin: 0;
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  border-inline-start: 4px solid var(--border-strong, #888);
-  background: var(--surface-2, #f4f4f5);
+  border-inline-start: 4px solid var(--border-strong);
+  background: var(--background-subtle);
 }
 
 /* Day and agenda: a list, because that is the shape they are. */
@@ -135,7 +135,7 @@
 
 .calendar-week th,
 .calendar-week td {
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border-default);
   min-width: 8.5rem;
   padding: var(--space-2, 0.5rem);
   text-align: start;
@@ -157,7 +157,7 @@
 }
 
 .calendar-item {
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-2, 0.5rem);
   display: flex;
   flex-direction: column;
@@ -183,7 +183,7 @@
   flex-wrap: wrap;
   gap: var(--space-2, 0.5rem);
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 .calendar-item-body {
@@ -191,7 +191,7 @@
 }
 
 .calendar-empty {
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -231,11 +231,11 @@
   min-height: 24px;
   padding-block: var(--space-1, 0.25rem);
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 .calendar-reschedule-summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0b5fff);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -243,7 +243,7 @@
 .calendar-reschedule-unavailable {
   margin-block: var(--space-1, 0.25rem);
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 /*
@@ -317,7 +317,7 @@
 .day-review-item-meta {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 .planner-day-nav,

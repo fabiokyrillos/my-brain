@@ -15,7 +15,7 @@
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .task-command-console > header {
@@ -52,10 +52,10 @@
 .task-command-clarify > input {
   flex: 1 1 220px;
   min-height: 44px;
-  border: 1px solid #b9c5d5;
+  border: 1px solid var(--border-strong);
   border-radius: 11px;
   padding: 11px 13px;
-  background: white;
+  background: var(--background-surface);
   color: var(--ink);
 }
 
@@ -79,19 +79,19 @@
 .task-command-primary {
   border: 0;
   background: var(--ink);
-  color: white;
+  color: var(--action-primary-text);
 }
 
 .task-command-secondary {
-  border: 1px solid #b9c5d5;
-  background: white;
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
   color: var(--ink);
 }
 
 .task-command-destructive {
   border: 0;
-  background: #9b2d24;
-  color: white;
+  background: var(--tone-risk-fg);
+  color: var(--action-primary-text);
 }
 
 .task-command-result {
@@ -185,7 +185,7 @@
 .task-command-gravity {
   margin: 0;
   font-weight: 750;
-  color: #9b2d24;
+  color: var(--tone-risk-fg);
 }
 
 .task-command-candidates fieldset {
@@ -209,7 +209,7 @@
   border: 1px solid var(--line);
   border-radius: 11px;
   margin-bottom: 8px;
-  background: white;
+  background: var(--background-surface);
   cursor: pointer;
 }
 
@@ -241,7 +241,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(20, 35, 59, 0.45);
+  background: var(--scrim);
   z-index: 60;
 }
 
@@ -250,8 +250,8 @@
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: white;
-  box-shadow: 0 24px 70px rgba(20, 35, 59, 0.2);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-3);
 }
 
 .task-command-dialog h3 {
@@ -271,8 +271,8 @@
 
 .task-command-dialog-cancel {
   margin-left: 10px;
-  border: 1px solid #b9c5d5;
-  background: white;
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
   color: var(--ink);
 }
 

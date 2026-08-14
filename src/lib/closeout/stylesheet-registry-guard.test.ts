@@ -138,6 +138,156 @@ describe("every sheet a lane names exists, and every import resolves", () => {
   });
 });
 
+describe("tokens.css declares dark once per selector, and the two copies agree", () => {
+  /*
+   * `experience.css`'s two dark blocks are guarded in
+   * `phase-2i-experience-guard.test.ts`. `tokens.css` has the same shape and the
+   * same hazard, and it went unguarded until a hand edit put a duplicate
+   * `--elevation-undo` and a second `--scrim` inside the media block. CSS took
+   * the last one and nothing complained.
+   *
+   * Two failures are possible here and both are silent: the explicit choice and
+   * the system default drifting apart, and a single block declaring the same
+   * property twice.
+   */
+  const css = read("src/app/tokens.css").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  /** Every custom property in one brace-balanced block, in order. */
+  function propertiesIn(source: string, selector: RegExp): [string, string][] {
+    const start = source.search(selector);
+    if (start === -1) return [];
+    const open = source.indexOf("{", start);
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < source.length; i += 1) {
+      if (source[i] === "{") depth += 1;
+      if (source[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    return [...source.slice(open, end).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [
+      m[1],
+      m[2].trim(),
+    ]);
+  }
+
+  const explicit = propertiesIn(css, /:root\[data-theme="dark"\]/);
+  const system = propertiesIn(css, /@media\s*\(prefers-color-scheme:\s*dark\)/);
+
+  it("parses both dark blocks", () => {
+    // Non-vacuity: two empty lists are equal to each other.
+    expect(explicit.length, "explicit dark block parsed empty").toBeGreaterThanOrEqual(20);
+    expect(system.length, "system dark block parsed empty").toBeGreaterThanOrEqual(20);
+  });
+
+  it("declares no property twice inside one block", () => {
+    for (const [label, block] of [
+      ["explicit", explicit],
+      ["system", system],
+    ] as const) {
+      const names = block.map(([name]) => name);
+      const duplicated = names.filter((name, index) => names.indexOf(name) !== index);
+      expect(
+        [...new Set(duplicated)],
+        `the ${label} dark block declares these twice: ${[...new Set(duplicated)].join(", ")}`,
+      ).toEqual([]);
+    }
+  });
+
+  it("keeps the explicit choice and the system default identical", () => {
+    expect(Object.fromEntries(system)).toEqual(Object.fromEntries(explicit));
+  });
+
+  it("re-tints rather than repeating light under a dark selector", () => {
+    // The control, same as the tone guard's.
+    const light = Object.fromEntries(propertiesIn(css, /:root\s*\{/));
+    const unchanged = explicit
+      .filter(([name, value]) => name in light && light[name] === value)
+      .map(([name]) => name);
+    expect(unchanged, `dark repeats the light value for: ${unchanged.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("no stylesheet outside tokens.css and experience.css holds a raw colour", () => {
+  /*
+   * The rule Papel e Console is built on, made enforceable.
+   *
+   * Before this, nothing stopped a surface picking its own colour — and 390 of
+   * them had. Every one is a defect the moment dark mode exists: a literal
+   * `background:white` paints a white card on a near-black canvas, and a literal
+   * `#526078` body text becomes unreadable on it. The migration removed them
+   * all; this keeps them gone.
+   *
+   * Comments are stripped first. `relations.css` documents a historical
+   * contrast defect by quoting the hex that caused it, and a scan that reads
+   * comments reports the documentation as the violation — the same trap this
+   * repository recorded against the Edge env scan and the 2I dark-mode check.
+   */
+  const OWNS_COLOUR = ["tokens.css", "experience.css"];
+
+  /** Declarations only, with comments removed. */
+  function declarations(css: string): string {
+    return css.replace(/\/\*[\s\S]*?\*\//g, "");
+  }
+
+  const sheets = readdirSync(APP_CSS)
+    .filter((name) => name.endsWith(".css") && !OWNS_COLOUR.includes(name))
+    .map((name) => ({ name, css: declarations(read(`src/app/${name}`)) }));
+
+  it("finds stylesheets to scan", () => {
+    // Non-vacuity: with no sheets, every absence check below passes trivially.
+    expect(sheets.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it.each(sheets.map((sheet) => sheet.name))("%s declares no hex colour", (name) => {
+    const sheet = sheets.find((candidate) => candidate.name === name)!;
+    const found = [...sheet.css.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((entry) => entry[0]);
+    expect(
+      found,
+      `${name} declares raw hex colours: ${[...new Set(found)].join(", ")}. `
+        + "Every colour comes from a token in tokens.css or a tone in experience.css — "
+        + "a literal does not change with the theme, so it is a dark-mode defect the "
+        + "moment it is written.",
+    ).toEqual([]);
+  });
+
+  it.each(sheets.map((sheet) => sheet.name))("%s uses no colour keyword", (name) => {
+    const sheet = sheets.find((candidate) => candidate.name === name)!;
+    // `white`/`black` are the two that actually appeared, and they are the two
+    // that break hardest: both name a surface, and a surface is theme-dependent.
+    const found = [...sheet.css.matchAll(/:\s*(white|black)\b/g)].map((entry) => entry[1]);
+    expect(
+      found,
+      `${name} uses the literal colour keyword(s): ${[...new Set(found)].join(", ")}. `
+        + "`white` names a surface, and a surface in dark mode is dark — use "
+        + "var(--background-surface) or var(--action-primary-text).",
+    ).toEqual([]);
+  });
+
+  it("the comment-stripping does not hide a real declaration", () => {
+    // The control for the two checks above. If `declarations()` were over-eager
+    // it would return empty strings and both would pass over nothing.
+    for (const sheet of sheets) {
+      expect(sheet.css.length, `${sheet.name} stripped to nothing`).toBeGreaterThan(20);
+    }
+    // And the stripper must genuinely remove comments, or the relations.css
+    // comment quoting `#64748b` would be reported as a violation.
+    expect(declarations("/* #ffffff */ .a{color:var(--x)}")).not.toContain("#ffffff");
+  });
+
+  it("still finds a hex when one is really declared, so the scan is not blind", () => {
+    // Two-sided: the detector must fire on a planted literal.
+    const planted = declarations(".a{background:#ff0000}");
+    expect([...planted.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0])).toEqual(["#ff0000"]);
+    const keyword = declarations(".a{background: white}");
+    expect([...keyword.matchAll(/:\s*(white|black)\b/g)].map((m) => m[1])).toEqual(["white"]);
+  });
+});
+
 describe("the palette has exactly one home", () => {
   it("declares the base surface and text tokens only in tokens.css", () => {
     // The bridge in `tokens.css` is what keeps untouched surfaces correct in

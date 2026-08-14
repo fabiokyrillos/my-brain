@@ -134,7 +134,7 @@
 }
 
 .relations-node-link {
-  border-color: #c3cede;
+  border-color: var(--border-strong);
 }
 
 .relations-node-link:hover,
@@ -241,12 +241,12 @@
 }
 
 .relations-lines line {
-  stroke: #a9b6c8;
+  stroke: var(--mark-decorative);
   stroke-width: 1.5;
 }
 
 .relations-lines marker path {
-  fill: #a9b6c8;
+  fill: var(--mark-decorative);
 }
 
 .relations-node {
@@ -260,7 +260,7 @@
   border-radius: 12px;
   /* Opaque, deliberately: see `.relations-lines`. */
   background: var(--white);
-  box-shadow: 0 1px 2px rgba(20, 35, 59, 0.06);
+  box-shadow: var(--elevation-1);
 }
 
 .relations-node-type {
@@ -299,25 +299,25 @@ a.relations-node:focus-visible {
   color: var(--ink);
 }
 .relations-node[data-node-type="person"] {
-  border-color: #9fb2ea;
+  border-color: var(--tone-information-line);
 }
 .relations-node[data-node-type="person"] .relations-node-type {
   color: var(--blue);
 }
 .relations-node[data-node-type="project"] {
-  border-color: #dcb079;
+  border-color: var(--tone-attention-line);
 }
 .relations-node[data-node-type="project"] .relations-node-type {
-  color: #8a5a10;
+  color: var(--tone-attention-fg);
 }
 .relations-node[data-node-type="context"] {
-  border-color: #93c9ac;
+  border-color: var(--tone-success-line);
 }
 .relations-node[data-node-type="context"] .relations-node-type {
-  color: #226a46;
+  color: var(--tone-success-fg);
 }
 .relations-node[data-node-type="organization"] {
-  border-color: #b8c2d1;
+  border-color: var(--border-strong);
 }
 .relations-node[data-node-type="organization"] .relations-node-type {
   color: var(--ink-soft);
@@ -369,16 +369,16 @@ a.relations-node:focus-visible {
   border-color: var(--ink);
 }
 .relations-swatch[data-node-type="person"] {
-  border-color: #9fb2ea;
+  border-color: var(--tone-information-line);
 }
 .relations-swatch[data-node-type="project"] {
-  border-color: #dcb079;
+  border-color: var(--tone-attention-line);
 }
 .relations-swatch[data-node-type="context"] {
-  border-color: #93c9ac;
+  border-color: var(--tone-success-line);
 }
 .relations-swatch[data-node-type="organization"] {
-  border-color: #b8c2d1;
+  border-color: var(--border-strong);
 }
 
 /* -------------------------------------------------------------------------- */

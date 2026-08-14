@@ -13,17 +13,17 @@
   gap: 6px;
   margin: 0 0 20px;
   padding: 14px 16px;
-  border: 1px solid #e3e7ee;
+  border: 1px solid var(--border-default);
   border-left: 3px solid var(--blue);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--background-elevated);
 }
 
 .memory-explainer > p {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--text-secondary);
 }
 
 /* The rows are links now (UX-20): they were `<article>` elements styled as
@@ -35,8 +35,8 @@
 }
 
 .memory-row:hover {
-  border-color: #c9d3e2;
-  background: #fbfcfe;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-row:focus-visible {
@@ -46,7 +46,7 @@
 
 .memory-row-chevron {
   flex: none;
-  color: #9aa6b8;
+  color: var(--mark-decorative);
 }
 
 .memory-related-hint {
@@ -54,7 +54,7 @@
   align-items: center;
   gap: 4px;
   margin-left: 8px;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 /* The lifecycle badge. Colour carries emphasis, never meaning on its own — the
@@ -71,18 +71,18 @@
 }
 
 .memory-state-active {
-  color: #1f6b43;
-  background: #e6f5ec;
+  color: var(--tone-success-fg);
+  background: var(--tone-success-bg);
 }
 
 .memory-state-archived {
-  color: #6b7280;
-  background: #eef1f5;
+  color: var(--tone-archived-fg);
+  background: var(--tone-archived-bg);
 }
 
 .memory-state-scheduled {
-  color: #8a6116;
-  background: #fdf3e0;
+  color: var(--tone-attention-fg);
+  background: var(--tone-attention-bg);
 }
 
 /* Detail: the memory itself is the heading, and it is owner prose up to 4000
@@ -100,7 +100,7 @@
   gap: 8px;
   margin: 10px 0 0;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--text-secondary);
 }
 
 /* The facts grid. `auto-fit` with a floor keeps the pairs side by side on a
@@ -111,9 +111,9 @@
   gap: 14px 20px;
   margin: 22px 0;
   padding: 18px;
-  border: 1px solid #e3e7ee;
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: #fff;
+  background: var(--background-surface);
 }
 
 .memory-facts > div {
@@ -126,7 +126,7 @@
   font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .memory-facts dd {
@@ -148,7 +148,7 @@
   gap: 6px;
   justify-items: start;
   padding-top: 14px;
-  border-top: 1px solid #eef1f5;
+  border-top: 1px solid var(--border-divider);
 }
 
 .memory-lifecycle-button {
@@ -158,17 +158,17 @@
   /* 44px minimum touch target, matching the affordance audit's floor. */
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid #d9dfe8;
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: #fff;
+  background: var(--background-surface);
   font: 600 13px var(--font-ui), sans-serif;
-  color: #40506a;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .memory-lifecycle-button:hover:not(:disabled) {
-  border-color: #c2ccdb;
-  background: #f7f9fc;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-lifecycle-button:disabled {
@@ -185,7 +185,7 @@
   max-width: 62ch;
   font-size: 12px;
   line-height: 1.5;
-  color: #7a8698;
+  color: var(--text-muted);
 }
 
 .memory-checkbox {
@@ -211,9 +211,9 @@
   gap: 12px;
   margin: 14px 0 0;
   padding: 16px;
-  border: 1px dashed #c3cedd;
+  border: 1px dashed var(--border-strong);
   border-radius: 11px;
-  background: #fbfcfe;
+  background: var(--background-elevated);
 }
 
 .memory-proposal > label {
@@ -222,16 +222,16 @@
   font: 650 11px var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #66748a;
+  color: var(--text-secondary);
 }
 
 .memory-proposal textarea,
 .memory-proposal select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #d9dfe8;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--background-surface);
   font: 400 14px var(--font-ui), sans-serif;
   color: inherit;
 }
@@ -261,7 +261,7 @@
 .memory-proposal-confirm {
   border: 1px solid transparent;
   background: var(--ink);
-  color: #fff;
+  color: var(--action-primary-text);
 }
 
 .memory-proposal-confirm:disabled {
@@ -270,14 +270,14 @@
 }
 
 .memory-proposal-discard {
-  border: 1px solid #d9dfe8;
-  background: #fff;
-  color: #40506a;
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
 }
 
 .memory-proposal-discard:hover:not(:disabled) {
-  border-color: #c2ccdb;
-  background: #f7f9fc;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-proposal :focus-visible {
@@ -288,9 +288,9 @@
 .memory-proposal-closed {
   margin: 14px 0 0;
   padding: 14px 16px;
-  border: 1px solid #e3e7ee;
+  border: 1px solid var(--border-default);
   border-radius: 11px;
-  background: #f8fafc;
+  background: var(--background-elevated);
   font-size: 13px;
 }
 

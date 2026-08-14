@@ -23,8 +23,11 @@
  * own text affordance. `2I-LANG-002` and `2I-LANG-006` are enforced by
  * `phase-2i-experience-guard.test.ts`, which fails when a tone has no icon.
  *
- * Dark mode is **out of scope** (`2I-LANG-007`, owner decision D5) and is not
- * partially implemented: there is no dark token set here, not even a stub.
+ * Dark mode ships (`2I-LANG-007` as restated by ADR-114, reversing owner
+ * decision D5). It changes nothing in this module: a tone is a *meaning*, and a
+ * meaning does not have a colour. `experience.css` maps each tone to a light and
+ * a dark triplet; the guard asserts the dark set is complete rather than absent,
+ * so the failure it prevents — a **partial** dark mode — is unchanged.
  */
 
 /** What a thing means. Six, closed. */

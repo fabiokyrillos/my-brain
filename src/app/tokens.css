@@ -118,6 +118,12 @@
   --elevation-sheet: 0 -12px 40px rgba(26, 25, 23, 0.25);
   --elevation-undo: 0 8px 20px rgba(26, 25, 23, 0.28);
 
+  /* The wash behind a modal, sheet or palette. The handoff's elevation table
+     does not name it, but three surfaces need one and each had invented its own
+     — which is how the same dialog got two different backdrops. It is a colour,
+     so it belongs here and it themes. */
+  --scrim: rgba(26, 25, 23, 0.32);
+
   /* ---- motion ----------------------------------------------------------- */
   --motion-fast: 100ms;
   --motion-standard: 160ms;
@@ -171,6 +177,10 @@
   --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
   --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
   --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+  /* Heavier in dark: the canvas is already near-black, so a light scrim would
+     not separate the dialog from the page behind it. */
+  --scrim: rgba(0, 0, 0, 0.62);
 }
 
 /* The untouched default: no stored preference, so the machine decides.
@@ -209,6 +219,10 @@
     --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
     --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
     --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+    /* Heavier in dark: the canvas is already near-black, so a light scrim would
+       not separate the dialog from the page behind it. */
+    --scrim: rgba(0, 0, 0, 0.62);
   }
 }
 

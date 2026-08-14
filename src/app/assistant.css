@@ -15,10 +15,10 @@
 
 .assistant-composer-form {
   position: relative;
-  border: 1px solid #b8c4d4;
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  background: white;
-  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.07);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
   overflow: hidden;
 }
 
@@ -56,14 +56,14 @@
 }
 
 .assistant-composer-row > textarea::placeholder {
-  color: #8793a5;
+  color: var(--text-muted);
 }
 
 .assistant-composer-submit {
   flex: 0 0 auto;
   border: 0;
   background: var(--ink);
-  color: white;
+  color: var(--action-primary-text);
   font-weight: 750;
 }
 
@@ -90,7 +90,7 @@
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: white;
+  background: var(--background-surface);
 }
 
 .assistant-composer-notice h3 {
@@ -120,7 +120,7 @@
   font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .assistant-composer-echo > q {
@@ -136,7 +136,7 @@
   min-height: 44px;
   margin-top: 14px;
   padding: 11px 16px;
-  border: 1px solid #bcc7d6;
+  border: 1px solid var(--border-strong);
   border-radius: 11px;
   color: var(--ink);
   font-size: 13px;
@@ -160,7 +160,7 @@
  */
 .chat-page .conversational-questions {
   border-color: var(--line);
-  background: white;
+  background: var(--background-surface);
 }
 
 .chat-page .conversational-questions-header .eyebrow {
@@ -172,7 +172,7 @@
 }
 
 .chat-page .question-answer-form input {
-  background: white;
+  background: var(--background-surface);
 }
 
 /* Inside a thread the composer stays reachable without scrolling back down. */

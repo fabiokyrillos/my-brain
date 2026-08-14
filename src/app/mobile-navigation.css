@@ -51,7 +51,7 @@
   border-radius: 11px;
   background: var(--ink);
   color: var(--white);
-  box-shadow: 0 8px 20px rgba(20, 35, 59, 0.16);
+  box-shadow: var(--elevation-undo);
   font-size: 14px;
   font-weight: 700;
   transform: none;
@@ -229,12 +229,12 @@
 }
 
 .account-sign-out {
-  color: #9b2d24;
+  color: var(--tone-risk-fg);
 }
 
 .account-sign-out:hover {
-  background: #fff5f3;
-  color: #9b2d24;
+  background: var(--tone-risk-bg);
+  color: var(--tone-risk-fg);
 }
 
 .account-sign-out:disabled {
@@ -244,7 +244,7 @@
 .account-menu-error {
   margin: 4px 0 0;
   padding: 0 12px;
-  color: #9b2d24;
+  color: var(--tone-risk-fg);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -323,8 +323,8 @@
     padding: 10px;
     border: 1px solid var(--line);
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 18px 45px rgba(20, 35, 59, 0.18);
+    background: var(--background-surface);
+    box-shadow: var(--elevation-2);
   }
 
   .mobile-nav-group {

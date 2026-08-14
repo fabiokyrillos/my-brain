@@ -190,7 +190,7 @@
 
 /* A skeleton that matches the final layout, so nothing reflows on arrival. */
 .ux-skeleton { display: grid; gap: 10px; }
-.ux-skeleton-row { height: 14px; border-radius: 7px; background: linear-gradient(90deg, #eef1f6, #e3e8f0, #eef1f6); background-size: 200% 100%; }
+.ux-skeleton-row { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--border-divider), var(--border-default), var(--border-divider)); background-size: 200% 100%; }
 .ux-skeleton-row:nth-child(2) { width: 82%; }
 .ux-skeleton-row:nth-child(3) { width: 64%; }
 
@@ -286,7 +286,7 @@
   width: min(460px, 100vw);
   display: flex; flex-direction: column;
   border-left: 1px solid var(--line); background: var(--white);
-  box-shadow: -18px 0 50px rgba(20, 35, 59, .12);
+  box-shadow: var(--elevation-2);
 }
 .ux-detail-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -315,21 +315,21 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  background: var(--surface-2, #eef1f5);
+  background: var(--background-subtle);
   color: var(--muted);
 }
 /* `2J-HOJE-003`. Overdue and due-today must not read the same. The distinction
    is a tone, not only a word, because the word is the first thing a glance
    skips. */
-.priority-reason[data-reason="overdue"] { background: #fdecec; color: #a11b1b; }
-.priority-reason[data-reason="due_today"] { background: #eaf2fd; color: #12508f; }
+.priority-reason[data-reason="overdue"] { background: var(--tone-risk-bg); color: var(--tone-risk-fg); }
+.priority-reason[data-reason="due_today"] { background: var(--tone-information-bg); color: var(--tone-information-fg); }
 
 /* `2J-PRIVACY-001`. A masked row occupies the same slot as the content it
    withholds, so the surrounding count stays truthful (`2J-PRIVACY-004`). */
 .home-masked {
   margin: 0;
   padding: 12px 14px;
-  border: 1px dashed var(--border, #d6dbe3);
+  border: 1px dashed var(--border-strong);
   border-radius: 10px;
   font-size: 13px;
   color: var(--muted);
@@ -357,13 +357,13 @@
 .attention-filter {
   min-height: 32px;
   padding: 0 12px;
-  border: 1px solid var(--border, #d6dbe3);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: transparent;
   font-size: 13px;
   cursor: pointer;
 }
-.attention-filter[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.attention-filter[aria-pressed="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
 
 /* `2J-ATTN-007`/`010`. The inline and bulk retries. Both are ordinary buttons
    with visible labels -- no icon-only affordance and no gesture, because
@@ -391,8 +391,8 @@
 .attention-conflicts { display: grid; gap: 8px; margin-bottom: 12px; }
 .conflict-row {
   align-items: flex-start;
-  border-left: 3px solid var(--signal);
-  background: #fff8ea;
+  border-left: 3px solid var(--tone-attention-fg);
+  background: var(--tone-attention-bg);
 }
 .conflict-dates {
   display: grid;
@@ -424,13 +424,13 @@
   gap: 6px;
   min-height: 40px;
   padding: 0 14px;
-  border: 1px solid var(--border, #d6dbe3);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: transparent;
   font-size: 14px;
   cursor: pointer;
 }
-.capture-mode[aria-selected="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.capture-mode[aria-selected="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
 .capture-no-classification { margin: 0; font-size: 12px; color: var(--muted); }
 
 /* `2J-VOICE-006`. The recording state, visible and unmistakable. The dot
@@ -440,8 +440,8 @@
 .voice-controls { display: grid; gap: 8px; }
 .voice-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .voice-live button, .voice-record, .voice-denied button { min-height: 36px; padding: 0 12px; border-radius: 8px; cursor: pointer; }
-.voice-record { display: inline-flex; align-items: center; gap: 6px; justify-self: start; border: 1px solid var(--border, #d6dbe3); background: transparent; }
-.voice-indicator { width: 10px; height: 10px; border-radius: 50%; background: #c0392b; }
+.voice-record { display: inline-flex; align-items: center; gap: 6px; justify-self: start; border: 1px solid var(--border-strong); background: transparent; }
+.voice-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--tone-risk-fg); }
 .voice-indicator[data-recording="true"] { animation: voice-pulse 1.2s ease-in-out infinite; }
 @keyframes voice-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
@@ -449,10 +449,10 @@
 }
 .voice-duration { font-variant-numeric: tabular-nums; font-weight: 700; }
 .voice-transcribing { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); }
-.voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid #f0c9c9; border-radius: 10px; background: #fdecec; }
+.voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--tone-risk-line); border-radius: 10px; background: var(--tone-risk-bg); }
 .voice-denied p { margin: 0; font-size: 13px; }
 .voice-draft-form { display: grid; gap: 8px; }
-.voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border, #d6dbe3); border-radius: 10px; font: inherit; }
+.voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; font: inherit; }
 .voice-notice { margin: 0; font-size: 12px; color: var(--muted); }
 
 /* `2J-DAY-003`. The closing summary is a short list of what is still open --
@@ -464,4 +464,4 @@
    the conservative reading rather than an oversight. */
 .review-body { display: grid; gap: 6px; }
 .review-masked { margin: 0; color: var(--muted); font-style: italic; }
-.review-reveal { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--border, #d6dbe3); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; }
+.review-reveal { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; }
