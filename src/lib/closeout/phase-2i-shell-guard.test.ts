@@ -119,10 +119,20 @@ describe("2I-SHELL-003: Mais renders the grouping that already exists as data", 
     }
   });
 
-  it("groups the six context domains together, which is what Library will render", () => {
+  it("groups the seven context domains together, which is what Library will render", () => {
+    /*
+     * Six until Phase 2N slice 2N.6 added `relations` — the surface that shows
+     * how the other six connect, so the `context` group is where it belongs.
+     *
+     * The number is transcribed rather than derived on purpose, and raising it
+     * is a claim rather than a literal bumped to go green: `2I-SHELL-001` pins
+     * the four **primary** destinations and this list is not one of them, and
+     * `2N-RELATION-006` requires the relations surface to stay out of primary
+     * navigation, which `visibility: "more"` is how it does.
+     */
     const context = moreNavigationGroups.find((group) => group.key === "context");
     expect([...(context?.items ?? [])].sort()).toEqual(
-      ["contexts", "files", "memories", "organizations", "people", "projects"].sort(),
+      ["contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
     );
   });
 });

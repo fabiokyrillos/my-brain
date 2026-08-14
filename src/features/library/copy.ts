@@ -28,6 +28,10 @@ const copy: Record<Locale, LibraryCopy> = {
       organizations: "Empresas e clientes.",
       contexts: "Áreas da sua vida.",
       files: "Documentos e anexos.",
+      // 2N.6. Named for what it holds rather than for the drawing on it: the
+      // canonical presentation there is a list, and the sentence should not
+      // promise a picture to a reader who may never see one.
+      relations: "Como essas coisas se ligam.",
     },
   },
   en: {
@@ -44,6 +48,7 @@ const copy: Record<Locale, LibraryCopy> = {
       organizations: "Companies and clients.",
       contexts: "Areas of your life.",
       files: "Documents and attachments.",
+      relations: "How these things connect.",
     },
   },
 };

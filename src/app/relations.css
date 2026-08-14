@@ -1,0 +1,415 @@
+/* Phase 2N slice 2N.6 — the relations surface (`2N-RELATION-006`…`-011`,
+   `2N-ACCESS-004`, `2N-MOBILE-001`).
+
+   Two presentations of one projection: a list, which is canonical, and a
+   drawing, which is secondary. Everything below serves one of three rules.
+
+   1. NOTHING IS DISTINGUISHED BY COLOUR ALONE. A node's type is a word inside
+      the box and a word on the chip in the list; the tint and the column are the
+      second and third copy. Remove every colour here and the surface still says
+      which is which.
+
+   2. NOTHING IS REVEALED BY HOVER. There is no `:hover` rule that shows content,
+      no `title`, no tooltip. `:hover` only softens a background, and every
+      `:hover` treatment has a `:focus-visible` twin so a keyboard reaches the
+      same state.
+
+   3. THE PAGE NEVER SCROLLS SIDEWAYS. The drawing is two-dimensional by nature —
+      WCAG 1.4.10's own exception — so its container scrolls, never the document.
+      The list beside it is complete at every width, which is what makes that
+      acceptable rather than a dodge.
+
+   The palette is `globals.css`'s. No token is invented here: `--muted` is
+   referenced elsewhere in this codebase without ever being defined, and adding
+   more of that would be copying a fault forward. */
+
+.relations-page {
+  display: grid;
+  gap: 28px;
+}
+
+.relations-section {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.relations-section > h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.relations-subsection {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.relations-subsection > h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.relations-intro,
+.relations-disclaimer {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* The `2N-RELATION-010` refusal. Given a border and a tint so it reads as a
+   statement about the drawing rather than as another caption — and it stays
+   text, because a tooltip would not reach `2N-ACCESS-004`. */
+.relations-disclaimer {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--signal);
+  border-radius: 10px;
+  background: var(--mist);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The list — canonical                                                        */
+/* -------------------------------------------------------------------------- */
+
+.relations-rows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relations-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+/* An unattributable link is marked structurally as well as by its sentence, so
+   the two groups are told apart without reading the origin line — and by a
+   dashed border rather than a colour, which is the same rule as the nodes. */
+.relations-row[data-origin="unattributable"] {
+  border-style: dashed;
+  background: var(--mist);
+}
+
+.relations-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.relations-row-relation {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* Both endpoints, link or not, are chips at the 44px minimum.
+   `online-memories.spec.ts:85` fails on a 21px inline anchor inside a list row,
+   and a new surface repeating that shape would be copying a known defect
+   forward. A chip is also what makes the sentence readable when it wraps. */
+.relations-node-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.relations-node-link {
+  border-color: #c3cede;
+}
+
+.relations-node-link:hover,
+.relations-node-link:focus-visible {
+  background: var(--blue-wash);
+  border-color: var(--blue);
+}
+
+.relations-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.relations-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--mist);
+  color: var(--ink-soft);
+  font: 650 11px var(--font-jetbrains);
+  letter-spacing: 0.03em;
+}
+
+.relations-chip-neutral {
+  border-style: dashed;
+}
+
+/* The origin sentence, in the product's own muted token rather than the
+   hardcoded fallback `.provenance-note` reaches for.
+
+   FOUND BY AXE ON THE REAL PAGE, not by reading. `.provenance-note` is
+   `color: var(--muted, #64748b)` and `--muted` is undefined anywhere in this
+   codebase, so every one of those notes renders at `#64748b` — 4.62:1 on white,
+   which passes, and **4.30:1 on `--mist`**, which does not. Tinting the
+   unattributable row tipped an inherited colour below the threshold: the tint
+   was this slice's, so the repair is too.
+
+   `--ink-soft` is 6.15:1 on white and 5.73:1 on the tint, so the row keeps its
+   grouping and the sentence clears the threshold on both. The shared
+   `.provenance-note` is left alone — its own surfaces are outside this slice,
+   and `--muted` being undefined is a pre-existing fault this is not the place
+   to repair. */
+.relations-origin {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.relations-row-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.relations-note-label {
+  color: var(--ink-soft);
+  font: 650 10px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The drawing — secondary                                                     */
+/* -------------------------------------------------------------------------- */
+
+.relations-figure {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+/* Rule 3. The figure scrolls; the document does not. `overscroll-behavior`
+   keeps a horizontal drag inside the figure instead of walking the page back. */
+.relations-canvas-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+}
+
+.relations-canvas {
+  position: relative;
+}
+
+/* The SVG sits BEHIND the boxes and holds only geometry. That is what makes
+   overlap non-destructive: a line passing under a node is hidden by an opaque
+   box, so no label is ever crossed by a stroke. */
+.relations-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.relations-lines line {
+  stroke: #a9b6c8;
+  stroke-width: 1.5;
+}
+
+.relations-lines marker path {
+  fill: #a9b6c8;
+}
+
+.relations-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  /* Opaque, deliberately: see `.relations-lines`. */
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(20, 35, 59, 0.06);
+}
+
+.relations-node-type {
+  font: 650 9px var(--font-jetbrains);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.relations-node-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  /* Two lines, then an ellipsis. The box's height is fixed by the layout so a
+     name can never push it into the node below; the clamp is what keeps the
+     text inside that height. Truncating is only acceptable because the list
+     above always carries the full name — the drawing is never the only place
+     something is written. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+a.relations-node:hover,
+a.relations-node:focus-visible {
+  border-color: var(--blue);
+}
+
+/* The type palette. Never the only signal — every box and every chip prints the
+   type as a word, and the legend repeats it. */
+.relations-node[data-node-type="owner"] {
+  border-color: var(--ink);
+}
+.relations-node[data-node-type="owner"] .relations-node-type {
+  color: var(--ink);
+}
+.relations-node[data-node-type="person"] {
+  border-color: #9fb2ea;
+}
+.relations-node[data-node-type="person"] .relations-node-type {
+  color: var(--blue);
+}
+.relations-node[data-node-type="project"] {
+  border-color: #dcb079;
+}
+.relations-node[data-node-type="project"] .relations-node-type {
+  color: #8a5a10;
+}
+.relations-node[data-node-type="context"] {
+  border-color: #93c9ac;
+}
+.relations-node[data-node-type="context"] .relations-node-type {
+  color: #226a46;
+}
+.relations-node[data-node-type="organization"] {
+  border-color: #b8c2d1;
+}
+.relations-node[data-node-type="organization"] .relations-node-type {
+  color: var(--ink-soft);
+}
+
+.relations-legend {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.relations-legend-heading {
+  font: 650 10px var(--font-jetbrains);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.relations-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relations-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.relations-legend p {
+  margin: 0;
+}
+
+.relations-swatch {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+}
+
+.relations-swatch[data-node-type="owner"] {
+  border-color: var(--ink);
+}
+.relations-swatch[data-node-type="person"] {
+  border-color: #9fb2ea;
+}
+.relations-swatch[data-node-type="project"] {
+  border-color: #dcb079;
+}
+.relations-swatch[data-node-type="context"] {
+  border-color: #93c9ac;
+}
+.relations-swatch[data-node-type="organization"] {
+  border-color: #b8c2d1;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Narrow viewports                                                            */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .relations-page {
+    gap: 22px;
+  }
+
+  /* The list is unchanged and complete: nothing is dropped, collapsed behind a
+     control or moved into a gesture at this width (`2N-MOBILE-002`). Only the
+     figure's padding shrinks, so the drawing keeps as much of the viewport as
+     the phone can give it. */
+  .relations-figure {
+    padding: 10px;
+  }
+
+  .relations-row {
+    padding: 12px;
+  }
+}
+
+/* The only motion on this surface, and it is opt-out by default: a colour
+   transition on a node, gated so a reader who asked for less motion gets an
+   instant state change rather than a fade. There is no entrance animation, no
+   layout transition and nothing that moves. */
+@media (prefers-reduced-motion: no-preference) {
+  .relations-node,
+  .relations-node-label {
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+}

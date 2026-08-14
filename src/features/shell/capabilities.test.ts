@@ -68,7 +68,13 @@ describe("navigation capabilities", () => {
       // EGC.1 puts organizations and contexts beside the two entity destinations
       // they relate, and ahead of the two that are stores rather than graph
       // members. Declared order is rendered order, so this pins both.
-      { key: "context", items: ["projects", "people", "organizations", "contexts", "memories", "files"] },
+      // `2N-RELATION-006` adds `relations` last in this group and NOT among the
+      // primaries — that requirement forbids the graph becoming primary
+      // navigation, and `2I-SHELL-001`'s four are asserted unchanged above.
+      {
+        key: "context",
+        items: ["projects", "people", "organizations", "contexts", "memories", "files", "relations"],
+      },
       { key: "reflection", items: ["reviews", "questions"] },
       // `2M-CAL-001` puts the calendar here rather than among the primaries:
       // `2I-SHELL-001` pins those four as a delivered baseline, and promoting a

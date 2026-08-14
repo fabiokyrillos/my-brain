@@ -122,11 +122,40 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
  * `deriveFreeTextSensitivity` resolves it to the most protective level rather
  * than to `undetermined` — the arm that renders in the clear.
  *
- * `graph` is deliberately **absent**. `2N-PRIVACY-001` admits a surface "in the
- * same change that ships their first governed consumer", and 2N.0 ships no
- * graph. Adding it here would create a governed surface no one reads — a
- * producer with no consumer, which this repository has already paid for twice.
- * It joins in 2N.6, with its consumer, or not at all.
+ * `graph` was deliberately **absent** until 2N.6. `2N-PRIVACY-001` admits a
+ * surface "in the same change that ships their first governed consumer", and
+ * 2N.0 shipped no graph; adding it there would have created a governed surface
+ * no one reads — a producer with no consumer, which this repository has already
+ * paid for twice.
+ */
+/**
+ * `graph` arrives in Phase 2N slice 2N.6 (`2N-RELATION-006`/`-007`, `OD-2N-10`
+ * **option B**), **in the same change as its first real consumer**, which is what
+ * the paragraph above reserved it for.
+ *
+ * **The consumer is named, because a surface key with no reader is the failure
+ * this contract exists to avoid.** It is `person_relationships.description` — the
+ * owner's own sentence about a relationship, rendered on the relations surface
+ * through `ProtectedContent` and resolved by `resolveGraphContent`. Every other
+ * string that surface renders is a **structural identifier** (`people.name`,
+ * `projects.name`, `contexts.name`, `organizations.name`) or a localized
+ * vocabulary term, and ADR-110 Decision 2 keeps those visible.
+ *
+ * `description` is free text about a human being on a table with no
+ * `sensitivity` column and no classifiable source — ADR-110 Decision 4's
+ * predicate word for word — so it takes Decision 4's posture through
+ * `deriveFreeTextSensitivity`, the same one `people.notes` takes.
+ *
+ * **And the same change makes the person page converge.** Before 2N.6 that page
+ * masked `people.notes` and rendered `description` in the clear one section
+ * below it: two unclassifiable free-text fields about the same human being,
+ * under two postures, on one page. `2N-PRIVACY-001` exists to end exactly that,
+ * so the relationship panel now renders `description` through the same
+ * component, as `person`.
+ *
+ * The rules below are identical to the four contextual surfaces, for the reason
+ * the module header gives: a dropped item makes a count a lie and its absence an
+ * oracle.
  */
 export const GOVERNED_SURFACES = [
   "hoje",
@@ -141,6 +170,7 @@ export const GOVERNED_SURFACES = [
   "project",
   "memory",
   "file",
+  "graph",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -205,6 +235,12 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   project: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
   memory: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
   file: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  // The relations surface takes the identical posture, and here "masked rather
+  // than excluded" has a sharper consequence than anywhere else: an excluded
+  // edge would remove a node from the picture, and a missing node in a drawing
+  // is not a gap the reader can see — it looks exactly like a person who has no
+  // links. The relation stays, its own sentence does not.
+  graph: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

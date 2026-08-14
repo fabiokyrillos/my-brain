@@ -90,6 +90,9 @@ describe("AppShell", () => {
       "/pt-BR/app/contexts",
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
+      // 2N.6, last in the context group: it is the surface about how the six
+      // above connect, so it reads after them rather than among them.
+      "/pt-BR/app/relations",
       "/pt-BR/app/reviews",
       "/pt-BR/app/questions",
       // `2M-CAL-001`. In the organization group, ahead of reminders: a calendar
@@ -152,6 +155,9 @@ describe("AppShell", () => {
       "/pt-BR/app/contexts",
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
+      // 2N.6, last in the context group: it is the surface about how the six
+      // above connect, so it reads after them rather than among them.
+      "/pt-BR/app/relations",
       "/pt-BR/app/reviews",
       "/pt-BR/app/questions",
       // `2M-CAL-001`. In the organization group, ahead of reminders: a calendar

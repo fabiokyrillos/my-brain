@@ -23,6 +23,12 @@
 @import "./conversation-cards.css";
 @import "./navigation-performance.css";
 @import "./entities.css";
+/* After entities.css: the relations surface reuses `.provenance-note` and
+   deliberately does NOT reuse `.relation-row`/`.relation-list`, which belong to
+   the person page's panels. Every class it owns carries the `relations-` prefix
+   so the two can never collide by accident — the collision would have been
+   silent, because the panel's rules are close enough to look intentional. */
+@import "./relations.css";
 @import "./memories.css";
 @import "./history.css";
 @import "./reminders.css";

@@ -59,6 +59,18 @@ const messages = {
        */
       chat: "Conversar",
       memories: "Memórias",
+      /*
+       * `Relações`, not `Grafo` (2N.6, `2N-RELATION-006`).
+       *
+       * The route key is `relations` and the sensitivity contract's surface key
+       * is `graph`, because 2N.0 reserved that word for the *drawn* half. The
+       * destination is named after what it holds rather than after how half of
+       * it is presented: the canonical presentation on that page is a list, and
+       * calling the place "Grafo" would promise a picture to a reader who may
+       * never see one — on a phone, with a screen reader, or simply because the
+       * list is above it.
+       */
+      relations: "Relações",
       reviews: "Revisões",
       files: "Arquivos",
       history: "Histórico",
@@ -99,6 +111,7 @@ const messages = {
       questions: "Pending questions",
       chat: "Talk",
       memories: "Memories",
+      relations: "Relations",
       reviews: "Reviews",
       files: "Files",
       history: "History",

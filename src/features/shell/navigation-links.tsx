@@ -23,6 +23,7 @@ import {
   NotebookTabs,
   Plus,
   Settings,
+  Share2,
   UsersRound,
   Wrench,
 } from "lucide-react";
@@ -53,6 +54,7 @@ const icons = {
   organizations: Building2,
   contexts: Layers,
   memories: BrainCircuit,
+  relations: Share2,
   files: Files,
   reviews: NotebookTabs,
   questions: CircleHelp,

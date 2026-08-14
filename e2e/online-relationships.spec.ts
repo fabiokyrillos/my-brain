@@ -146,6 +146,27 @@ test.describe("relationships and associations", () => {
     // was stored".
     await page.reload();
     await expect(page.getByText(/Esposa/)).toBeVisible();
+    /*
+     * Phase 2N slice 2N.6 changed what this assertion may claim, and the change
+     * is deliberate rather than a literal bumped to go green.
+     *
+     * This used to assert the owner's sentence was simply visible. It is free
+     * text about a human being, on a table with no `sensitivity` column and no
+     * classifiable source — ADR-110 Decision 4's predicate word for word — and
+     * it was printing in the clear one section below `people.notes`, which the
+     * same page masks. Two postures for one predicate is a divergence, and
+     * `2N-PRIVACY-001` exists to end it.
+     *
+     * So the storage proof is unchanged and its shape is stronger: the sentence
+     * is withheld on a page re-read from the server, and revealing it produces
+     * the exact text that was saved. A round trip that lost it would fail here
+     * just as it did before.
+     */
+    await expect(page.getByText("casamos em 2019")).toHaveCount(0);
+    await page
+      .locator("li.relation-row", { hasText: /Esposa/ })
+      .getByRole("button", { name: /mostrar/i })
+      .click();
     await expect(page.getByText("casamos em 2019")).toBeVisible();
     // UX-21: the stored token never reaches the screen.
     await expect(page.getByText("spouse", { exact: true })).toHaveCount(0);

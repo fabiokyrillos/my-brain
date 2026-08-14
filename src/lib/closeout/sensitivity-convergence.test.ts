@@ -142,6 +142,53 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
     expect(code("src/app/[locale]/app/files/page.tsx")).toMatch(/surface="file"/);
   });
 
+  it("the relations surface reads the contract, through the same component (2N-RELATION-006/-007)", () => {
+    /*
+     * `graph` joined `GOVERNED_SURFACES` in slice 2N.6, in the same change that
+     * shipped its first consumer — which is what `contracts.ts` reserved it for,
+     * and what 2N.0 deliberately did not do.
+     *
+     * Its one governed subject is `person_relationships.description`: free text
+     * about a human being on a table with no `sensitivity` column and no
+     * classifiable source, which is ADR-110 Decision 4's predicate word for word.
+     *
+     * The **second** assertion is the one that matters, and it is the same shape
+     * as the calendar's. Before 2N.6 the person page masked `people.notes` and
+     * printed `description` in the clear one section below it: two postures for
+     * one predicate, on one page. A relations surface that masked it while the
+     * person page did not would have recreated that divergence one surface over,
+     * so both are asserted together — the convergence, not either half of it.
+     */
+    expect(code("src/features/relations/relation-list.tsx")).toMatch(/<ProtectedContent/);
+    expect(code("src/features/relations/relation-list.tsx")).toMatch(/surface="graph"/);
+    expect(code("src/features/entities/relationship-panel.tsx")).toMatch(/<ProtectedContent/);
+    expect(code("src/features/entities/relationship-panel.tsx")).toMatch(/surface="person"/);
+    for (const file of [
+      "src/features/relations/relation-list.tsx",
+      "src/features/entities/relationship-panel.tsx",
+    ]) {
+      expect(code(file), `${file} derives the note's level some other way`).toMatch(
+        /deriveFreeTextSensitivity\(\)/,
+      );
+    }
+  });
+
+  it("keeps the graph rule in one place too, so the surface does not answer for itself", () => {
+    const walkSrc = (dir: string, found: string[] = []): string[] => {
+      const absolute = join(REPO, dir);
+      for (const entry of readdirSync(absolute)) {
+        const full = join(absolute, entry);
+        if (statSync(full).isDirectory()) walkSrc(join(dir, entry), found);
+        else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(join(dir, entry));
+      }
+      return found;
+    };
+    const callers = walkSrc("src")
+      .filter((file) => /resolveContent\(\s*\n?\s*["']graph["']/.test(code(file)))
+      .map((file) => file.replace(/\\/g, "/"));
+    expect(callers).toEqual(["src/features/sensitivity/subject-derivation.ts"]);
+  });
+
   it("keeps the four contextual rules in one place too, so no surface answers for itself", () => {
     // The negative half for the surfaces added in 2N.0, in the shape `work` and
     // `calendar` already have. Their literals live in `subject-derivation.ts`
