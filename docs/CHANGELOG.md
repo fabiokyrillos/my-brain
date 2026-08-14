@@ -2,6 +2,46 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PHASE 2N COMPLETE: 127 of 127 classified, and the last allocation closes unspent
+
+Slice 2N.7. **Zero migrations created by this slice.** 94 local = 94 hosted, parity `202608140094`.
+
+**127 declared · 127 classified · 0 unclassified — 93 built · 20 baseline · 3 partial · 11 not-built-by-rule · 0 undelivered.** Budget closes `3 allocated · 2 spent`: **M1** `202608130093`, **M3** `202608140094`, and **M2 UNSPENT**.
+
+### M2 closes unspent because no event survived its own contract
+
+`2N-METRICS-002` made M2 conditional and the plan set the standard in terms: *an unspent allocation is not a defect; a migration created to use one up fails the close.* `PHASE_2N_SLICE_7_M2_VERDICT.md` derives six candidate events from the phase's own stated purpose, steelmans each, and refuses each for a named reason in one of three classes: **a better instrument already exists and is the authority** — `audit_logs` records every correction, `undo_operations` every undo, and a direct owner-scoped query answers the rest exactly; **the answer changes no pending decision**; or **recording it would contradict a signed privacy decision**.
+
+The strongest candidate, `protected_content_revealed`, is the only one with no better instrument — and it is refused on privacy. OD-2J-1 made the reveal *local and transient* with **no persisted form and no serializer**, and recording it would create that persistence by a different door. A per-surface reveal count is also a fingerprint of where an owner's protected content lives, which `2N-METRICS-004` forbids as *"any identifier that functions as content."*
+
+Two census corrections: **all 39 declared event names have producers** once the census reads `supabase/functions/` as well as `src/` — three live only in the Deno worker — and **no funnel reader has ever read a real event belonging to a real owner**, which Phase 2M's own acceptance records.
+
+### The matrix is generated, and it refused thirty-five times first
+
+`scripts/generate-phase-2n-traceability.mjs` reads the PRD for what was declared and the eight acceptance records for what was evidenced, and **writes nothing at all** when the two disagree.
+
+It reads **four row shapes**, because the records really use four across six slices: class in the row, class in an enclosing heading, family heading over bare numeric suffixes, and compound classes resolved to a head token. Tolerating four is safe only because of the completeness check — all 127 must come out classified exactly once, so a misread shape surfaces as a refusal rather than a missing row.
+
+It also carries a **narrow adjudication licence**: the closing slice may settle a conflict and may classify an id no record reached, but **may not overturn a class the prior records agree on**.
+
+### A mutation control found the generator's own vacuous check
+
+*"Every partial names a destination"* accepted a `2N-…` token — and **every row contains its own id**, so the check passed for any partial that existed. The generator now strips the subject before testing, and **three rows that had been passing vacuously appeared**. Each was corrected in its **source record**, adding the citation its own surrounding prose already carried; no class changed.
+
+### Two signed premises are false in the tree
+
+`OD-2N-8` A says no inferred relation is persisted — `link_interpreted_entities` still writes a co-mention on every interpretation. **T-3 is live**, remainder **`2N-RELATION-TRIGGER`**.
+
+`2N-IDENTITY-008` forbids inference creating a persisted identity — `persist_interpretation` inserts `people`, `projects`, `contexts` and `organizations` from extracted names **with no user act**. Remainder **`2N-IDENTITY-EXTRACTION`**.
+
+**Neither is transferable into M2**, and both need a migration and an owner decision.
+
+### Threats, and what stays open
+
+All twenty-three dispositioned. Two live: T-3 above, and T-19 retention — inherited, a rollout-gate residual, with **no 2N migration scheduling a sweep**, which M3 enforces by refusing to deploy if one exists.
+
+Push stays implemented and hosted, **failing on a real iPhone with HTTP 403**, **never validated on Android**. ADR-055 is neither satisfied nor superseded, expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. No screen-reader run executed or claimed. **The successor is re-audited and not started; A13 is not retargeted.**
+
 ## 2026-08-14 - PHASE 2N slice 2N.6 COMPLETE: relations, and a graph that draws only what it can explain
 
 **PR #223.** **Zero migrations, zero RPCs, zero grants, zero indexes, zero writers, zero dependencies added.** 94 total, hosted parity `202608140094` unchanged. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **12 requirements: 8 built · 3 baseline · 1 partial · 0 not-built-by-rule.**

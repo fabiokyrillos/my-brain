@@ -24,7 +24,7 @@ stays with 2N.3 and **M2** with 2N.7, both unspent and non-transferable, and a
 | `2N-KNOWS-003` | **built** — two live defects repaired, one gap closed |
 | `2N-KNOWS-004` | **built** — three freshness facts where the page showed two |
 | `2N-KNOWS-008` | **built** — the two pickers state their bound |
-| `2N-KNOWS-005` | **`not-built-by-rule`**, guarded with a control |
+| `2N-KNOWS-005` | **`not-built-by-rule`**, guarded with a control — closed **by rule**: the epistemic three-way is not representable for a memory (§110) |
 | `2N-IDENTITY-005`, `-006`, `-007` | **`not-built-by-rule`**, guarded with a control |
 | `2N-KNOWS-001`, `-002`, `-006`, `-007` | **baseline** — re-verified, not re-claimed |
 | `2N-KNOWS-009` | **baseline + guard** — true by construction, now asserted |
