@@ -159,10 +159,21 @@ describe("LDC-HOME-001: Home's today is computed in the owner's zone, not format
 
   it("passes the same zone down to the rows it renders", () => {
     // `home-view.tsx` carries it on the view model and hands it to the inbox and
-    // attention rows, which are the same components the Records page renders.
+    // attention rows, which are the same components the Records page renders --
+    // and, since 2N.4, to the conflict row, which prints two dates of its own.
+    //
+    // The count went 2 -> 3 because a **third row type** now renders an instant,
+    // which is the guard working: a row that formatted a date without receiving
+    // this zone would fall back to the device's, and that is the defect
+    // `LDC-DAILY-001` exists to prevent. Raised deliberately, with the new
+    // consumer named below so the number is a claim about the surface rather
+    // than a literal someone bumped to go green.
     const view = read("src/features/shell/home-view.tsx");
     expect(view).toMatch(/readonly timeZone: string;/);
-    expect((view.match(/timeZone=\{view\.timeZone\}/g) ?? []).length).toBe(2);
+    expect((view.match(/timeZone=\{view\.timeZone\}/g) ?? []).length).toBe(3);
+    for (const row of ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow"]) {
+      expect(view, `${row} must receive the owner's zone`).toContain(row);
+    }
     expect(read(HOME)).toContain("timeZone: workProjection.timezone,");
   });
 });
