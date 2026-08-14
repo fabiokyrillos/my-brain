@@ -809,6 +809,42 @@ export type Database = {
           },
         ]
       }
+      entity_deletion_confirmations: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          operation_key: string
+          request_fingerprint: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          operation_key: string
+          request_fingerprint: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          operation_key?: string
+          request_fingerprint?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       entity_tags: {
         Row: {
           created_at: string
@@ -2871,6 +2907,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_entity_deletion: {
+        Args: { p_entity_id: string; p_entity_type: string; p_operation_key: string }
+        Returns: Json
+      }
       apply_task_command: {
         Args: {
           p_action: string
@@ -3160,6 +3200,10 @@ export type Database = {
         }
         Returns: string
       }
+      issue_entity_deletion_confirmation: {
+        Args: { p_entity_id: string; p_entity_type: string; p_operation_key: string }
+        Returns: Json
+      }
       issue_task_command_confirmation: {
         Args: {
           p_action: string
@@ -3383,6 +3427,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      preview_entity_deletion: {
+        Args: { p_entity_id: string; p_entity_type: string }
+        Returns: Json
       }
       preview_task_command_creation: {
         Args: {

@@ -344,7 +344,7 @@ inference without confirmation. A `sensitivity` column on `people` or
 
 ## 6. Migration budget — SIGNED
 
-**`3 allocated · obligation ZERO · 1 spent · M1 CREATED`, all three
+**`3 allocated · obligation ZERO · 2 spent · M1 AND M3 CREATED`, all three
 non-transferable** (`OD-2N-14` **option B**). A fourth is a **stop condition**,
 not a decision the implementer makes.
 
@@ -352,8 +352,17 @@ not a decision the implementer makes.
 `202608130093_phase_2n_slice_3_validity_aware_retrieval.sql`: it re-declares
 `match_internal_knowledge` so the memory validity window is applied inside the
 union, ahead of the bound (`2N-CORRECT-003`). It creates no table, no column, no
-policy, no grant change and no schedule. **M3 remains allocated to slice 2N.3
-and M2 to slice 2N.7, both unspent.**
+policy, no grant change and no schedule.
+
+**M3 was spent by slice 2N.3 on 2026-08-14** as
+`202608140094_phase_2n_slice_3_entity_deletion.sql`, after the intermediate
+deletion re-audit proved a true undo by executing it: transactional deletion of
+a person, a project and a memory, with a preview that counts rather than
+estimates, a server-issued single-use confirmation, explicit removal of the four
+polymorphic link tables **no cascade reaches**, snapshots that restore the same
+ids, three registered undo handlers, and an audit row that carries counts and
+no content. Per **ADR-113** it creates **one table** — see the amendment in
+§6.3. **M2 remains allocated to slice 2N.7, unspent.**
 
 | | Destination | Slice | Carries |
 | --- | --- | --- | --- |

@@ -158,6 +158,22 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // schedules NOTHING, and creates no sweep. It touches one function and
       // no data, so the retention posture `202608070084` corrected is untouched.
       "202608130093_phase_2n_slice_3_validity_aware_retrieval.sql",
+      // Phase 2N slice 2N.3: MIGRATION M3 of the three ADR-109 allocated,
+      // NON-TRANSFERABLE, authorized by `OD-2N-11` B and ADR-113. Transactional
+      // deletion of a person, a project and a memory.
+      //
+      // Relevant to THIS guard specifically: it registers NO retention window,
+      // MINTS NO retention value and SCHEDULES NOTHING. It does retain two
+      // things and both are named rather than left implicit — the audit trail,
+      // permanently and WITHOUT the deleted content, and the undo snapshot,
+      // which expires through `undo_operations.expires_at`'s existing 24-hour
+      // default and is reaped by the sweep `202607250052` already ships. Its
+      // own confirmation table is bounded structurally instead: re-issuing
+      // supersedes the caller's unconsumed rows for the same subject, and the
+      // rest leave with the account through `on delete cascade`. Its
+      // verification block asserts that no `cron.job` names the table, so the
+      // "scheduling is authorization" rule fails loudly rather than by review.
+      "202608140094_phase_2n_slice_3_entity_deletion.sql",
     ]);
   });
 });

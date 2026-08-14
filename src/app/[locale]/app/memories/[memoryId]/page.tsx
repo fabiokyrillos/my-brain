@@ -16,6 +16,7 @@ import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { MemoryEditForm } from "@/features/memories/memory-edit-form";
 import { asMemoryKind } from "@/features/memories/read";
+import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { toSensitivityLevel } from "@/features/sensitivity/contracts";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
@@ -331,6 +332,17 @@ export default async function MemoryDetailPage({
         projects={projects}
         state={state}
       />
+
+      {/*
+        `2N-CORRECT-002` keeps archiving and removal distinct, and this is the
+        surface where the distinction stops being free: the two controls now sit
+        on one page. It is placed AFTER the edit form, below archive, so the
+        reversible action is the one in reach and the irreversible one has to be
+        travelled to — and `deletion/copy.ts` never describes it as archiving.
+      */}
+      <section className="entity-danger-zone">
+        <DeleteEntityControl locale={locale} entityType="memory" entityId={memory.id} />
+      </section>
     </div>
   );
 }
