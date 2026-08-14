@@ -58,7 +58,7 @@ have concluded deletion was already impossible and stopped for the wrong reason.
 | --- | --- | --- | --- |
 | **Rows deleted by cascade** | `person_relationships` — **both** `person_id` and `related_person_id` | `CASCADE` | probe: 2 planted → 0 remain |
 | | `person_projects` (carries `role`) | `CASCADE` | probe: 1 → 0 |
-| | `person_contexts` | `CASCADE` | `person_contexts_person_id_fkey` |
+| | `person_contexts` | `CASCADE` | `person_contexts_person_id_fkey`; destroyed and restored in probe 3 |
 | | `task_people` (carries `role`) | `CASCADE` | probe: 1 → 0 |
 | **Foreign keys nulled** | `tasks.waiting_on_person_id` | `SET NULL` | probe: task row survives, column null |
 | | `memories.person_id` | `SET NULL` | probe: memory row survives, column null |
@@ -69,7 +69,8 @@ have concluded deletion was already impossible and stopped for the wrong reason.
 | | `entity_tags` | **no FK, and `entity_type` has no CHECK** | `pg_constraint` |
 | | `audit_logs` (`entity_type`, `entity_id`) | **no FK** — append-only by design | probe: 1 planted → **1 remains** |
 | | `product_events` (`subject_type`, `subject_id`) | **no FK** — append-only by design | column scan |
-| **Rows preserved** | `tasks`, `memories`, `attachments`, `entries`, `organizations`, `contexts` | not referenced by the delete | probe |
+| **Rows preserved, link severed** | `tasks`, `memories` | the row survives; only the column is nulled | probe |
+| **Rows preserved, untouched** | `attachments`, `entries`, `organizations`, `contexts` | never referenced by the delete | probe |
 
 **The orphans are the finding.** The four polymorphic link tables carry
 `entity_type`/`entity_id` as an **unconstrained pair**, validated only by
@@ -102,7 +103,8 @@ correctness defect, not an exposure.
 | **Foreign keys nulled** | `memories.project_id` | `SET NULL` | probe: memory survives, column null |
 | **Deletions blocked** | none | — | probe: `rows=1` |
 | **Rows left ORPHANED** | `entry_entities`, `entity_aliases`, `entity_attachments`, `entity_tags`, `audit_logs`, `product_events` — all with `'project'` | **no FK** | probe |
-| **Rows preserved** | `tasks`, `memories`, `people`, `attachments` | not referenced | probe |
+| **Rows preserved, link severed** | `memories` | the row survives; only `project_id` is nulled | probe |
+| **Rows preserved, untouched** | `tasks`, `people`, `attachments`, `organizations` | never referenced by the delete | probe |
 
 Same shape as person, one hop smaller. `organizations` is untouched: `projects`
 references it, not the reverse.
