@@ -2,6 +2,50 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PAPEL E CONSOLE: the approved direction reaches every surface, and dark mode ships complete
+
+ADR-114. **Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Ten commits on `codex/redesign-papel-e-console`, branched from `main` at `9b7cda7`. Not pushed, no PR, no merge.
+
+### Owner decision D5 is reversed, and the guard inverts rather than weakens
+
+`2I-LANG-007` put dark mode out of scope and `experience.css` carried **no dark tokens at all** — deliberately, so that no reader would mistake a half-set for support. The direction specifies an authored dark palette, so the requirement is **restated, not deleted**, and the guard now asserts the opposite thing for the same reason: every one of the eighteen light tone tokens has a dark counterpart, the explicit `[data-theme="dark"]` block and the `prefers-color-scheme` block are identical, and — the control — the dark values are **not** copies of the light ones. **The failure being prevented is unchanged; only the direction of "partial" moved.**
+
+The default follows the machine, which costs no column. The media block is qualified `:root:not([data-theme="light"])` so an explicit light choice wins on a dark machine — without it that choice is silently overridden, and the bug is invisible to anyone testing on a light OS. **There is no theme toggle**, because there is no theme column and no capability row: a control that cannot persist is the false affordance the direction forbids.
+
+### The palette has one home, and 616 alias uses made the rest landable
+
+`src/app/tokens.css` is the only file permitted to hold a raw colour. The nine legacy tokens (`--ink`, `--paper`, `--blue`, …) were redefined in terms of it rather than replaced, which re-skinned 22 stylesheets at once and kept every untouched surface correct **in both themes** while the slices landed. All nine are now retired at the point of use; they survive only as declarations nothing reads.
+
+`--white` is deliberately **not** `#fff`. It names a surface, and a surface in dark mode is dark.
+
+### Four defect classes were found by doing this, none of them cosmetic
+
+**390 raw colour literals**, each a dark-mode defect the moment dark existed. Two were live bugs: `experience.css` read `var(--surface-2, #eef1f5)` and `var(--border, #d6dbe3)`, and neither variable is declared anywhere, so both had always rendered their fallback.
+
+**Twenty `var()` references that never resolved.** A `var()` with no fallback and no declaration invalidates the **whole declaration** at computed-value time — the property does not apply and the element inherits, with no warning. Nine rules read `color: var(--muted)` and rendered at inherited primary ink instead of muted. `settings-extended.css` read `outline: 3px solid var(--focus)` inside a `:focus-visible` rule, so **that focus ring never painted** — invisible to visual review, because the reviewer sees a ring drawn by some other rule.
+
+**Seventy-nine text sizes below the 12px floor** — three at 8px, four at 9px, twenty-five at 10px, forty-seven at 11px — and none was an eyebrow, since the eyebrows were the mono declarations.
+
+**The direction's own amber fails AA.** `#b0722a` measures 3.46:1 to 3.97:1 on every surface in the palette including its own wash. The handoff's colour table and its accessibility document contradict each other, and the accessibility document is right — the owner confirmed accessibility wins. `--text-muted` had the same shape at 4.46:1 on `--background-subtle`. Both corrected; dark already passed.
+
+### A regression this work caused, and the guard that now prevents it
+
+Tokenising lengths with a blanket regex also rewrote seven **query conditions** — `@container (max-width: 700px)` became `@container (max-width: var(--width-reading))`. Custom properties are **not substituted in a media or container query condition**: the condition fails to parse and the browser drops the entire block. The stylesheet still loads and every other rule still applies; the only symptom is that a layout stops adapting. Here it deleted the single-column fallback for a narrow list container and the record title collapsed to a **32px column** at 1440px and 1920px — precisely the defect the comment above that rule exists to explain. **Playwright caught it; no unit test could have.**
+
+### Three guards added, all with two-sided controls
+
+`stylesheet-registry-guard.test.ts` closes a gap the redesign exposed: four Playwright lanes inline the product's CSS from **hand-written arrays that nothing connected to the imports**, so moving the palette would have left every lane measuring unstyled markup — and a contrast scan over a document with no palette sees black on white and **passes**. It also fails on any raw colour outside the two permitted files, any unresolvable `var()`, any `var()` in a query condition, and any property declared twice inside one dark block.
+
+### What changed for the reader
+
+The interface is IBM Plex Sans, metadata is IBM Plex Mono, and **Newsreader carries what the user or the Brain wrote in sentences** — which is the distinction the whole direction is built on. The immutable original in the record detail is now `--type-reading-lg` at full ink: it was being rendered quieter than the AI's proposal about it. The shell boundary consolidates from thirteen scattered breakpoints to one at 900px, the rail is 212px and the header 52px, and the settings spinner is the one animation `prefers-reduced-motion: reduce` never reached.
+
+### Verification
+
+**7358 unit tests · 181 Playwright across every lane and both projects · lint · typecheck · build · `git diff --check` clean.** Axe clean at desktop and mobile on all fourteen surfaces. Contrast measured in a real browser in both themes at 375, 768 and 1440: worst 5.31:1 light, 5.04:1 dark, zero failures. No horizontal scroll at any width, including a 32px root font. Focus rings confirmed by real keyboard traversal — `solid 2px` at the ring colour with 2px offset. All fourteen routes respond, including the legacy `/today`, `/tasks` and `/waiting` redirects in both locales.
+
+**NOT VERIFIED AND NOT CLAIMED:** no authenticated browser session, so Hoje, Registros, Trabalho, Brain and Conversar were never seen rendered with real data; no comparative screenshots; no screen-reader run; no physical device; no hosted environment; 617 Playwright journeys skipped because they need a live authenticated environment.
+
 ## 2026-08-14 - PHASE 2N COMPLETE: 127 of 127 classified, and the last allocation closes unspent
 
 Slice 2N.7. **Zero migrations created by this slice.** 94 local = 94 hosted, parity `202608140094`.
