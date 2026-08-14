@@ -16,6 +16,10 @@ import {
   RECENT_CHANGE_LIMIT,
   withProbe,
 } from "@/features/bounds/contracts";
+import { loadLinksForEntity } from "@/features/library/attachment-links";
+import { ATTACHMENT_LINK_LIMIT } from "@/features/library/link-contracts";
+import { LinkedFilesSection } from "@/features/library/linked-subjects-section";
+import { resolveLinkedFiles, type ResolvedFileRow } from "@/features/library/linked-subjects";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import {
@@ -34,7 +38,7 @@ import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivi
 import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema";
-import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
+import { attachmentStatusLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
@@ -79,6 +83,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     projectChangeResult,
     organizations,
     peopleOptionsResult,
+    fileLinkOutcome,
   ] = await Promise.all([
     // `organization_id` joins the projection here for the first time: the column
     // has always existed and the page never read it (UX-08).
@@ -118,6 +123,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     // EGC-ASSOC-008. Bounded at 200, the `relation-options.ts` precedent, and
     // owner-scoped by RLS. Loaded here because a client component cannot query.
     supabase.from("people").select("id,name").order("name").limit(PICKER_LIMIT),
+    /*
+     * `2N-FILES-009`, the same reader the person page mounts and deliberately
+     * not a second implementation: the loader, the bound, the collapse of
+     * removed/foreign/unreadable and the three rendered states are all shared,
+     * so a file linked to a project and a file linked to a person cannot end up
+     * described two different ways.
+     */
+    loadLinksForEntity(supabase, "project", projectId),
   ]);
   const project = requireSupabaseData(projectResult, "load project");
   const taskLinks = requireSupabaseData(taskLinkResult, "load project tasks") ?? [];
@@ -132,7 +145,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const taskIds = taskLinks.map((item) => item.task_id);
   const personIds = personLinks.map((item) => item.person_id);
   const entryIds = entryLinks.map((item) => item.entry_id);
-  const [taskResult, peopleResult, entryResult, associationChangeResult] = await Promise.all([
+  const fileLinks = fileLinkOutcome.status === "ok" ? fileLinkOutcome.list.items : [];
+  const linkedFileIds = fileLinks.map((link) => link.attachmentId);
+  const [taskResult, peopleResult, entryResult, associationChangeResult, attachmentResult] = await Promise.all([
     // `source_entry_id` and `sensitivity` join these projections for the same
     // reason they do on the person page: a task's level is derived from the entry
     // it came from, and an entry's level travels with its content.
@@ -143,6 +158,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     // owner has since corrected cannot resurface as one.
     entryIds.length ? supabase.from("entries").select("id,original_content,occurred_at,is_retroactive,sensitivity,current_interpretation_id").in("id", entryIds).order("occurred_at", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
     associationIds.length ? supabase.from("audit_logs").select(CHANGE_SELECT).eq("user_id", user.id).eq("entity_type", "person_project").in("entity_id", associationIds).order("created_at", { ascending: false }).limit(withProbe(RECENT_CHANGE_LIMIT)) : Promise.resolve({ data: [], error: null }),
+    // The same projection the library and the person page read, for the reason
+    // `2N-FILES-004` states: a file name is governed content, so its
+    // classification travels with it rather than being fetched again later.
+    linkedFileIds.length ? supabase.from("attachments").select("id,original_name,status,sensitivity").in("id", linkedFileIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const tasks = requireSupabaseData(taskResult, "load related tasks") ?? [];
   const people = requireSupabaseData(peopleResult, "load related people") ?? [];
@@ -216,6 +235,27 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
    * its bound, so this is what the surface needs to keep compiling.
    */
   const boundedPeople = boundedList(people, CONTEXTUAL_LIMIT, personLinks.length > CONTEXTUAL_LIMIT);
+
+  /*
+   * `2N-FILES-005`/`-009`. Resolved from attachment rows that came back, never
+   * from the ids the links named — a removed, foreign or unreadable attachment
+   * is absent from this map and therefore absent from the section, which is the
+   * same collapse every other list on this page performs.
+   */
+  const linkedFileRows = new Map<string, ResolvedFileRow>();
+  const linkedFileLevels = readableLevelsOf(attachmentResult.data);
+  for (const attachment of attachmentResult.data ?? []) {
+    linkedFileRows.set(attachment.id, {
+      name: attachment.original_name,
+      status: attachment.status,
+      sensitivity: deriveSubjectSensitivity(attachment.id, linkedFileLevels),
+    });
+  }
+  const boundedFiles = boundedList(
+    resolveLinkedFiles(fileLinks, linkedFileRows),
+    ATTACHMENT_LINK_LIMIT,
+    fileLinkOutcome.status === "ok" && fileLinkOutcome.list.bounded,
+  );
 
   const formatDateTime = (iso: string) => formatInstant(iso, "dayAndTime", locale, timeZone) ?? "";
   const changeEvents = describeProjectChanges(
@@ -553,6 +593,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         ) : <p className="quiet-state">{copy.recentChangesEmpty}</p>}
         <BoundedNotice list={boundedChanges} locale={locale} />
       </section>
+
+      {/*
+        `2N-FILES-009`. The same component the person page mounts, with the same
+        three states, so the two surfaces converge by construction rather than by
+        two authors making the same choices twice.
+      */}
+      <LinkedFilesSection
+        files={boundedFiles}
+        locale={locale}
+        outcome={fileLinkOutcome}
+        statusLabel={(value) => attachmentStatusLabel(locale, value) ?? vocabulary.unknownState}
+      />
 
       <section className="entity-timeline" id="timeline">
         <h2>{copy.timeline}</h2>
