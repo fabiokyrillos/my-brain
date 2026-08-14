@@ -8,7 +8,7 @@
 
 .palette-trigger {
   display: flex; align-items: center; gap: var(--space-2);
-  min-height: 34px; padding: var(--space-2) var(--space-3);
+  min-height: 38px; padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-strong); border-radius: var(--radius-md);
   background: var(--background-surface); color: var(--text-secondary);
   font: var(--type-label);
@@ -77,8 +77,18 @@
 
    It is a surface change, not a colour change: `--link` on a wash was the old
    blue-grey system's signal, and in Papel e Console the reserved accents carry
-   meaning — an active row means "you are on this", not "this is informational". */
-.palette-option.is-active { background: var(--background-subtle-strong); color: var(--text-primary); }
+   meaning — an active row means "you are on this", not "this is informational".
+
+   The inset bar is what makes it legible. The wash alone measures **1.29:1**
+   against the option's own surface, and WCAG 1.4.11 asks 3:1 of a state
+   indicator; the bar is 17.6:1 in light and 14.7:1 in dark. It is an inset
+   shadow rather than a border so the row does not shift by three pixels when
+   the keyboard moves through the list. */
+.palette-option.is-active {
+  background: var(--background-subtle-strong);
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 var(--action-primary);
+}
 
 .palette-empty { display: grid; gap: var(--space-1); padding: var(--space-6) var(--space-4); }
 .palette-empty strong { font: var(--type-heading); color: var(--text-primary); }
@@ -112,7 +122,7 @@
   padding: var(--space-2) var(--space-3); background: var(--background-surface);
   color: var(--text-primary); font: var(--type-body);
 }
-.search-sensitive { flex-direction: row !important; align-items: center; gap: var(--space-2) !important; }
+.search-sensitive { flex-direction: row !important; align-items: center; gap: var(--space-2) !important; font-weight: 600 !important; }
 .search-sensitive input { width: 18px; height: 18px; }
 .search-hint { grid-column: 1 / -1; margin: 0; font: var(--type-caption); color: var(--text-secondary); }
 

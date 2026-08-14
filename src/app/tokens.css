@@ -38,9 +38,14 @@
   --text-primary: #1a1917;
   --text-secondary: #55504a;
   /* Darkened from the direction table's #736d64, which measures 4.46:1 on
-     --background-subtle — a hairline AA miss for small text. This clears 4.5
-     on every surface in the palette. It remains the lightest permitted text. */
-  --text-muted: #6f695f;
+     --background-subtle — a hairline AA miss for small text.
+     Darkened once more from #6f695f, which cleared every surface a rule
+     actually pairs it with but measured 4.21:1 on --background-subtle-strong.
+     No live rule pairs those two, so this is a guarantee rather than a repair:
+     at #686259 the claim "clears 4.5 on every surface in this palette" is true
+     for all of them, and the next author cannot make it false by accident.
+     It remains the lightest text tone the direction permits. */
+  --text-muted: #686259;
   --text-inverse: #f7f6f3;
 
   /* ---- lines and marks -------------------------------------------------- */

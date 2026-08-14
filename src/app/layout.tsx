@@ -13,28 +13,34 @@ import "./pagination.css";
  * replaced by the IBM Plex pair: Plex Sans for the interface, Plex Mono for
  * metadata (time, cost, shortcut, eyebrow).
  *
- * Newsreader is a variable font, so it takes a weight *range*. Neither IBM Plex
- * family is variable on Google Fonts, so each must enumerate the weights the
- * design system actually uses — `next/font` errors on a missing `weight` for a
- * static family, and shipping a weight the tokens never reference is dead
- * payload on every page.
+ * **IBM Plex Sans and Newsreader are variable fonts and are loaded without a
+ * `weight`**, which is what covers their whole range. An earlier version of this
+ * file pinned Plex Sans to 400/500/600 on the stated grounds that neither Plex
+ * family is variable. That was wrong — `next/dist/compiled/@next/font/dist/
+ * google/font-data.json` lists `variable` for Plex Sans and for Newsreader — and
+ * the cost was not theoretical: **85 declarations across the stylesheets ask for
+ * 650, 700, 750 or 800**, none of which existed in a loaded face, so every one
+ * of them was being synthesised by smearing the 600. Faux bold is the thing a
+ * type system exists to prevent.
+ *
+ * IBM Plex Mono genuinely is not variable, so it enumerates. It carries 700
+ * because the reminder eyebrows ask for it and the mono face is the one place
+ * where a missing weight cannot be covered by a neighbouring one.
  */
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 const newsreader = Newsreader({
   variable: "--font-newsreader",
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
   display: "swap",
 });
 

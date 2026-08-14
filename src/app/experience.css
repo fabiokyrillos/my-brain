@@ -61,7 +61,7 @@
 
   /* Archived reads as the palette's neutral, not as a cold grey-blue: the
      canvas is warm, and a blue-grey chip on it looks like a different product. */
-  --tone-archived-fg: #6f695f;
+  --tone-archived-fg: #686259;
   --tone-archived-bg: #f1efea;
   --tone-archived-line: #e2ded6;
 
@@ -186,7 +186,6 @@
   color: var(--text-primary);
   padding: 8px 14px;
   font: var(--type-label);
-  font: var(--type-body);
   /* 44px touch target on mobile — `2I-LANG-006`. */
   min-height: 40px;
 }
@@ -403,7 +402,7 @@
   margin: 8px 0;
 }
 .conflict-dates dt { font: var(--type-label); color: var(--text-secondary); }
-.conflict-dates dd { margin: 0; font: var(--type-mono); font: var(--type-body); font-variant-numeric: tabular-nums; }
+.conflict-dates dd { margin: 0; font: var(--type-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 .conflict-content {
   margin: 0 0 8px;
   padding: 8px 10px;

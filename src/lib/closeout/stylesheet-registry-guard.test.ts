@@ -370,6 +370,135 @@ describe("every custom property a stylesheet reads is actually declared", () => 
   });
 });
 
+describe("the font shorthand does not silently discard what precedes it", () => {
+  /*
+   * `font:` is a shorthand. It resets `font-family`, `font-weight`,
+   * `font-style`, `font-size` and `line-height` to their initial values for
+   * anything it does not name. Two failure shapes follow, and an independent
+   * review of ADR-114's diff found four live instances of them:
+   *
+   *   1. Two `font:` declarations in one block. The second wins, in silence.
+   *      `.trust-card > summary > strong` asked for mono and then for body, so
+   *      it rendered as neither; `.ux-state-action`, the primary button on every
+   *      state card, went from 700 to 400 the same way.
+   *
+   *   2. A longhand declared BEFORE the shorthand. `.relation-unknown` set
+   *      `font-family: ui-monospace` and then `font: var(--type-body)`, which
+   *      threw the family away — and that rule exists precisely to print a
+   *      stored value verbatim in monospace.
+   *
+   * Both are invisible in review because the declaration that breaks is the one
+   * that did NOT change.
+   */
+  const LONGHANDS = ["font-family", "font-weight", "font-style", "font-size"];
+
+  const blocks = readdirSync(APP_CSS)
+    .filter((name) => name.endsWith(".css"))
+    .flatMap((name) => {
+      const css = read(`src/app/${name}`).replace(/\/\*[\s\S]*?\*\//g, "");
+      return [...css.matchAll(/\{([^{}]*)\}/g)].map((match) => ({ file: name, body: match[1] }));
+    });
+
+  it("finds declaration blocks to scan", () => {
+    expect(blocks.length, "no declaration blocks were parsed").toBeGreaterThan(200);
+  });
+
+  it("declares font: at most once per block", () => {
+    const offenders = blocks
+      .filter((block) => (block.body.match(/(?:^|[;{\s])font:\s/g) ?? []).length > 1)
+      .map((block) => `${block.file}: ${block.body.trim().replace(/\s+/g, " ").slice(0, 80)}`);
+    expect(
+      offenders,
+      `these declare font: twice, so the second silently overrides the first: ${offenders.join("; ")}`,
+    ).toEqual([]);
+  });
+
+  it("puts no font longhand before the shorthand that would reset it", () => {
+    const offenders = blocks
+      .filter((block) => {
+        const shorthand = block.body.search(/(?:^|[;{\s])font:\s/);
+        if (shorthand === -1) return false;
+        return LONGHANDS.some((longhand) => {
+          const at = block.body.search(new RegExp(`(?:^|[;{\\s])${longhand}\\s*:`));
+          return at > -1 && at < shorthand;
+        });
+      })
+      .map((block) => `${block.file}: ${block.body.trim().replace(/\s+/g, " ").slice(0, 80)}`);
+    expect(
+      offenders,
+      `these declare a font longhand before a font: shorthand, which resets it: ${offenders.join("; ")}`,
+    ).toEqual([]);
+  });
+
+  it("detects both shapes when planted, so neither scan is blind", () => {
+    const twice = ".a{font: var(--type-mono); font: var(--type-body)}";
+    expect((twice.match(/(?:^|[;{\s])font:\s/g) ?? []).length).toBe(2);
+    const before = ".a{font-weight: 700; font: var(--type-body)}";
+    expect(before.search(/(?:^|[;{\s])font-weight\s*:/)).toBeLessThan(
+      before.search(/(?:^|[;{\s])font:\s/),
+    );
+  });
+});
+
+describe("every weight a stylesheet asks for is a weight next/font loads", () => {
+  /*
+   * A `font-weight` with no matching face is synthesised — the browser smears
+   * the nearest one. Faux bold is exactly what a type system exists to prevent,
+   * and it is invisible unless you know to look for it.
+   *
+   * This branch shipped it: `layout.tsx` pinned IBM Plex Sans to 400/500/600 on
+   * the stated grounds that it is not a variable font. It is. Eighty-five
+   * declarations asking for 650, 700, 750 or 800 were being faked.
+   */
+  const layout = read("src/app/layout.tsx");
+
+  /** Families loaded without a `weight` array are variable and cover the range. */
+  function loadedWeights(loader: string): "variable" | number[] {
+    const call = layout.match(new RegExp(`${loader}\\(\\{[\\s\\S]*?\\}\\)`));
+    if (!call) return [];
+    const weights = call[0].match(/weight:\s*\[([^\]]*)\]/);
+    if (!weights) return "variable";
+    return [...weights[1].matchAll(/"(\d+)"/g)].map((entry) => Number(entry[1]));
+  }
+
+  it("reads the three font loaders", () => {
+    // Non-vacuity: a renamed loader would make every check below pass over nothing.
+    expect(layout).toContain("IBM_Plex_Sans(");
+    expect(layout).toContain("IBM_Plex_Mono(");
+    expect(layout).toContain("Newsreader(");
+  });
+
+  it("loads a face for every weight the stylesheets request", () => {
+    const sans = loadedWeights("IBM_Plex_Sans");
+    const mono = loadedWeights("IBM_Plex_Mono");
+
+    const requested = new Set<number>();
+    for (const name of readdirSync(APP_CSS).filter((file) => file.endsWith(".css"))) {
+      const css = read(`src/app/${name}`).replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const match of css.matchAll(/font-weight:\s*(\d{3})/g)) requested.add(Number(match[1]));
+      for (const match of css.matchAll(/(?:^|[;{\s])font:\s*(\d{3})\s/g)) requested.add(Number(match[1]));
+    }
+
+    expect(requested.size, "no weights were parsed from the stylesheets").toBeGreaterThan(0);
+
+    // The sans face carries the interface; the mono face is enumerated, so it
+    // is the one that can actually come up short.
+    const missing = [...requested].filter((weight) => {
+      if (sans === "variable") return false;
+      return !sans.includes(weight);
+    });
+
+    expect(
+      missing.sort(),
+      `these weights are requested by a stylesheet but no loaded face provides them, `
+        + `so the browser fakes them: ${missing.join(", ")}. Either load the variable `
+        + `family (drop \`weight\`) or move the declarations onto the token scale.`,
+    ).toEqual([]);
+
+    expect(Array.isArray(mono) ? mono.length : 0, "the mono family must enumerate its weights").toBeGreaterThan(0);
+  });
+});
+
 describe("no query condition contains a var()", () => {
   /*
    * `@media (max-width: var(--width-reading))` is **invalid**. Custom properties

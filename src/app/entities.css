@@ -250,8 +250,12 @@
 
 /* A stored value outside the vocabulary, rendered rather than hidden (EGC-REL-006). */
 .relation-unknown {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font: var(--type-body);
+  /* Monospace, because this prints a stored value that fell outside the
+     vocabulary (EGC-REL-006) and it must read verbatim. The family comes from
+     the token now, and it comes AFTER the shorthand: `font:` resets
+     `font-family`, so declaring the family first silently threw it away. */
+  font: var(--type-mono);
+  font-size: 13px;
   opacity: 0.85;
 }
 
