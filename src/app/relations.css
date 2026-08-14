@@ -415,6 +415,6 @@ a.relations-node:focus-visible {
 @media (prefers-reduced-motion: no-preference) {
   .relations-node,
   .relations-node-label {
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    transition: border-color var(--motion-standard) var(--ease-enter), background-color var(--motion-standard) var(--ease-enter);
   }
 }
