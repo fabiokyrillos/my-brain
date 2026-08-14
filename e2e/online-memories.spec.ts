@@ -92,7 +92,12 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
 
     // Provenance, relations and validity — every one of them previously
     // unreachable from the product.
-    await expect(page.getByText("Criada por você")).toBeVisible();
+    //
+    // This asserted "Criada por você" until slice 2N.3. `source_entry_id` is
+    // `on delete set null`, so a null also means "the source entry was deleted
+    // and the key nulled the column" — the page cannot tell the two apart, and
+    // calling it authorship manufactured an origin. `2N-KNOWS-003`.
+    await expect(page.getByText("Origem não registrada")).toBeVisible();
     await expect(page.locator(".memory-facts")).toContainText("Sem prazo");
     await expect(page.getByText("Em vigor: pode ser usada nas respostas agora.")).toBeVisible();
 
@@ -212,10 +217,20 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
 
     await page.getByRole("link", { name: "Ver memória" }).click();
     await expect(page.getByRole("heading", { name: new RegExp(subject), level: 1 })).toBeVisible();
-    // The proposed kind was carried through, and provenance is honest: this
-    // memory has no originating entry, so it says the owner created it.
+    /*
+     * The proposed kind was carried through, and provenance says only what it
+     * can substantiate.
+     *
+     * This asserted "Criada por você" until slice 2N.3, and the case is the
+     * instructive one: here the owner really *did* create the memory moments
+     * ago in this same test, so the old string was true **of this fixture**.
+     * The page still may not say it — it reads a null `source_entry_id`, and a
+     * null is equally a source the owner deleted. A claim that happens to be
+     * true is not the same as one the product can substantiate, and
+     * `2N-KNOWS-003` is about the second.
+     */
     await expect(page.locator(".eyebrow")).toHaveText("PREFERÊNCIA");
-    await expect(page.getByText("Criada por você")).toBeVisible();
+    await expect(page.getByText("Origem não registrada")).toBeVisible();
   });
 
   test("a repeated confirmation reports the existing memory instead of storing it twice", async ({ page }) => {

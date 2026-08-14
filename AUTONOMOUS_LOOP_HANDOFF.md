@@ -5058,3 +5058,134 @@ parity `202608120092`, budget non-transferable with a **fourth a STOP
 CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**, and
 A13 still guarding the roadmap successor. Slices 2N.3–2N.7 remain.
+
+## §67 — Slice 2N.3 unit M1 ships and deploys: an archived memory stops being retrieved, at the bound (2026-08-13)
+
+**PR #211**, merged at `ab86208`, **CI green on that exact SHA**. Head at review
+was `87e8d98`, also green. Base was `main` at `9334705`.
+`docs/reports/phase-2n/PHASE_2N_SLICE_3_M1_ACCEPTANCE.md`, and the re-audit that
+preceded it at `docs/reports/phase-2n/PHASE_2N_SLICE_3_REAUDIT.md`.
+
+**The phase's first migration.**
+`202608130093_phase_2n_slice_3_validity_aware_retrieval.sql`, allocation **M1**.
+**93 migrations, hosted parity `202608130093`, local = remote, read live.**
+Budget `3 allocated · 1 spent`; **M3 stays with 2N.3 and M2 with 2N.7**, both
+unspent and non-transferable, and a **fourth is a STOP CONDITION**.
+
+### THIS IS ONE UNIT OF A TWO-UNIT SLICE. M3 IS NOT AUTHORIZED
+
+The intermediate deletion re-audit is what authorizes M3, and it **has not run**.
+It must enumerate, per type — person, project, memory — from the migrations, the
+foreign keys, the functions and the current consumers: cascade, set-null and
+blocked dependencies; associations to remove; rows to preserve; effects on
+retrieval, tasks, files, aliases, tags, relations, contexts, projects, the audit
+trail, undo, and historical citations; and what the owner sees immediately.
+**Its stop condition is a propagation that cannot be undone with truth**, which
+returns the case to the owner rather than shipping an undo that claims more than
+it restores.
+
+Two facts already established that will shape it: **`memories` has no delete
+path today by standing product decision** (`memories/undo.ts`) even though
+`authenticated` holds `delete` — which is what makes `2N-CORRECT-009`'s refusal
+of a client-side multi-delete a live rule rather than an academic one — and
+**`undo_operation` is a handler registry with no handler for memories**, so
+whether M3 can register one inside its own file without acquiring a second
+migration's worth of responsibility is a question that re-audit must answer.
+
+### The defect, and why no amount of TypeScript could have fixed it
+
+`match_internal_knowledge` applied `limit least(…)` **before anything read
+`valid_from` or `valid_until`**. The TypeScript filter removed an archived
+memory from the **citation list** but could not undo what the bound had already
+done: chat asks for **8**, so an archived memory ranking in the top eight
+**consumed one of the eight slots** and the live memory ranked ninth was never
+sent. **No downstream code can recover a row the database did not return.**
+
+The predicate now sits inside the union arm and uses **both halves**, because a
+`valid_until`-only predicate — the shape `phase_2k_memory_undo.sql` uses for its
+own narrower purpose — still retrieves a **scheduled** memory, which is the same
+lie in the other direction. Entries stay unfiltered: they carry no validity
+window.
+
+**The TypeScript filter is kept and is no longer the enforcement.** M1's
+documented rollback is *re-declare the prior definition*, and a rollback that
+also re-admitted archived memories into citations would cost more than the
+displacement fix it undoes.
+
+### The re-audit found a live defect the plan did not carry
+
+The memory detail page printed **"Criada por você"** for every null
+`source_entry_id`, and the column is **`on delete set null`** — so a memory whose
+source entry the owner deleted claimed an origin it cannot have. Its other arm
+asserted a record **"no longer exists"** whenever the row did not come back,
+which under RLS also covers a **foreign** entry, making the sentence both false
+and a probe for whether an entry id is real. Slice 2N.1 had already written the
+contract that refuses both, around this exact table —
+`ownerAuthored("memories")` is a **type error** — and the memory page predates
+it. **A requirement can be satisfied by a slice that never mentioned it, and a
+defect can survive the slice that wrote its cure.**
+
+### A scan that reads prose finds the thing the prose is about
+
+Twice, one level apart, in this unit's own instruments. The migration's
+verification block searched the function definition for `limit` — and the body's
+own comment contained the word, so it would have raised on a correct migration.
+The guard read the **whole migration file**, whose header quotes the offending
+`limit least(…)` clause while explaining the defect, and concluded the bound
+preceded the predicate. Both narrowed: to `limit least(` and to the function
+**body**.
+
+Recorded and **not repaired**: the block also checks that `valid_from` appears
+in the definition, and **that check would have passed against the broken
+function**, because `coalesce(valid_from, created_at)` already mentioned the
+column as an output projection — confirmed by a read of the hosted project
+before deploy (`reads_valid_from = true, reads_valid_until = false`). The checks
+that discriminate are correct. After merge and deploy a new migration is a stop
+condition, not a convenience.
+
+### A control that returns zero against an empty table is not a control
+
+The first residue proof read zero for every marker — and `public.memories` holds
+**no rows at all** on this project, so zero was equally what a broken probe, a
+revoked grant or a typo would have returned. `test:remote:2n3:cleanup` now does a
+round trip: it plants a memory under a disposable account, **asserts the probe
+finds it**, deletes **only the account**, and asserts the probe finds nothing.
+The second half proves what every online spec's `afterAll` silently relies on
+and none of them checks — that deleting the account removes the **data**.
+
+### Proofs, and one failure that is recorded rather than smoothed
+
+pgTAP **15 assertions** proving **eviction at the bound**, with the ranking
+premise asserted directly against the table so the eviction cannot pass because
+the archived row merely ranked low. **Six mutation controls**, each failing
+exactly its own assertion. Hosted journeys **12/12**, both locales × desktop and
+Pixel 7, **`--workers=1`**, in 2.0 min — the archive runs **through the
+product's own form** and then calls the RPC **as that user** with a **synthetic**
+vector, so it observes eviction directly and **spends no provider budget**.
+Regressions **2N.0 12/12** and **2N.1 14/14**.
+
+**`online-memories.spec.ts:85` fails on mobile: a 21 px touch target against a
+44 px minimum.** It is **pre-existing** — reproduced at `289f1f8`, before this
+unit's surface change, by rebuilding and running the same single test. The cause
+is that `.list-row-main a` carries **no sizing rule on any list surface**; the
+row's padding clears 44 px, the link does not. Repairing it touches Work,
+Reminders, People, Projects and Memories, which is the **`2N-MOBILE`** family
+and not this unit's requirements. **Left failing rather than weakened, skipped or
+deleted** — it describes a real defect and is doing its job. **Destination:
+`2N-MOBILE`.**
+
+**`online-phase-2n-project` (2N.2, 28 tests) was NOT re-run.** GoTrue answers
+`429 over_request_rate_limit` around 28 sign-ins and this session spent 51 across
+four suites; it was the lowest-value of the four, and it is **not run** rather
+than implied by an unqualified "regressions pass".
+
+### THE LOOP STOPS HERE — THE DELETION RE-AUDIT IS NOT STARTED
+
+Stopped **between M1 and the intermediate deletion re-audit**, which is one of
+the two sanctioned stopping points inside this slice. **No migration is
+partially deployed**: M1 is merged, deployed, at parity and proved.
+
+**Unchanged:** signup closed, rollout **25 · 3 · 2**, push **not** resumed
+(HTTP 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**,
+and A13 still guarding the roadmap successor. Slices 2N.4–2N.7 remain, and 2N.3
+is half done.
