@@ -305,7 +305,7 @@
    acted on rather than read. */
 .home-priorities { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .home-priorities li { margin: 0; }
-.home-priority-rule { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.home-priority-rule { margin: 10px 0 0; font-size: 12px; color: var(--text-muted); }
 .priority-reason {
   display: inline-flex;
   align-items: center;
@@ -316,7 +316,7 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   background: var(--background-subtle);
-  color: var(--muted);
+  color: var(--text-muted);
 }
 /* `2J-HOJE-003`. Overdue and due-today must not read the same. The distinction
    is a tone, not only a word, because the word is the first thing a glance
@@ -332,7 +332,7 @@
   border: 1px dashed var(--border-strong);
   border-radius: 10px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 /* `2J-ATTN-005`. Filter chips. A fieldset/legend rather than a div/span so the
@@ -352,7 +352,7 @@
   margin-right: 4px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .attention-filter {
   min-height: 32px;
@@ -431,7 +431,7 @@
   cursor: pointer;
 }
 .capture-mode[aria-selected="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
-.capture-no-classification { margin: 0; font-size: 12px; color: var(--muted); }
+.capture-no-classification { margin: 0; font-size: 12px; color: var(--text-muted); }
 
 /* `2J-VOICE-006`. The recording state, visible and unmistakable. The dot
    animates only where motion is allowed -- reduced-motion users get a solid
@@ -448,20 +448,20 @@
   .voice-indicator[data-recording="true"] { animation: none; }
 }
 .voice-duration { font-variant-numeric: tabular-nums; font-weight: 700; }
-.voice-transcribing { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); }
+.voice-transcribing { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-muted); }
 .voice-denied { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--tone-risk-line); border-radius: 10px; background: var(--tone-risk-bg); }
 .voice-denied p { margin: 0; font-size: 13px; }
 .voice-draft-form { display: grid; gap: 8px; }
 .voice-draft { min-height: 120px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; font: inherit; }
-.voice-notice { margin: 0; font-size: 12px; color: var(--muted); }
+.voice-notice { margin: 0; font-size: 12px; color: var(--text-muted); }
 
 /* `2J-DAY-003`. The closing summary is a short list of what is still open --
    counts that are the subject of an action, not decorative metrics. */
-.home-endofday { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.home-endofday { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--text-muted); }
 
 /* `2J-PRIVACY-001`, review summaries. Masked by default because `summaries`
    carries no classification to key on -- see review-body.tsx for why that is
    the conservative reading rather than an oversight. */
 .review-body { display: grid; gap: 6px; }
-.review-masked { margin: 0; color: var(--muted); font-style: italic; }
+.review-masked { margin: 0; color: var(--text-muted); font-style: italic; }
 .review-reveal { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; }

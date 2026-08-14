@@ -288,6 +288,88 @@ describe("no stylesheet outside tokens.css and experience.css holds a raw colour
   });
 });
 
+describe("every custom property a stylesheet reads is actually declared", () => {
+  /*
+   * `var(--x)` with no fallback and no declaration makes the **whole
+   * declaration** invalid at computed-value time. It does not fall back to
+   * anything sensible — the property simply does not apply, and the element
+   * inherits instead. Nothing warns.
+   *
+   * That had happened twenty times before this guard existed. Nine rules in
+   * `experience.css` read `color: var(--muted)`, which is declared nowhere, so
+   * every one of them rendered at the inherited primary ink instead of muted.
+   * `settings-extended.css` read `outline: 3px solid var(--focus)` on a
+   * `:focus-visible` rule — so that focus ring **never painted at all**, which
+   * is an accessibility defect that no amount of visual review catches, because
+   * the reviewer sees a focus ring drawn by some other rule.
+   *
+   * A `var()` **with** a fallback is legal and is not failed here. But a
+   * fallback that hard-codes a value the token system already names is how a
+   * literal sneaks back in, so those are reported separately.
+   */
+  const CSS_FILES = readdirSync(APP_CSS).filter((name) => name.endsWith(".css"));
+
+  /** Emitted onto `<html>` by `next/font` in `layout.tsx`, not by any stylesheet. */
+  const FONT_VARIABLES = ["--font-newsreader", "--font-plex-sans", "--font-plex-mono"];
+
+  const declared = new Set<string>(FONT_VARIABLES);
+  for (const name of CSS_FILES) {
+    for (const match of read(`src/app/${name}`).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) {
+      declared.add(match[1]);
+    }
+  }
+
+  type Reference = { file: string; property: string; hasFallback: boolean };
+  const references: Reference[] = [];
+  for (const name of CSS_FILES) {
+    const css = read(`src/app/${name}`).replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const match of css.matchAll(/var\(\s*(--[a-zA-Z0-9-]+)\s*(,[^)]*)?\)/g)) {
+      references.push({ file: name, property: match[1], hasFallback: Boolean(match[2]) });
+    }
+  }
+
+  it("finds declarations and references to compare", () => {
+    // Non-vacuity: with either set empty, the check below passes over nothing.
+    expect(declared.size, "no custom properties were parsed").toBeGreaterThan(50);
+    expect(references.length, "no var() references were parsed").toBeGreaterThan(200);
+  });
+
+  it("resolves every var() that has no fallback", () => {
+    const broken = references
+      .filter((reference) => !reference.hasFallback && !declared.has(reference.property))
+      .map((reference) => `${reference.file}: var(${reference.property})`);
+
+    expect(
+      [...new Set(broken)],
+      `these read an undeclared custom property with no fallback, so the whole `
+        + `declaration is invalid and silently does not apply: ${[...new Set(broken)].join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("resolves every var() that does have a fallback, so the fallback is dead code", () => {
+    // A fallback is legal, but one that is actually being used means the token
+    // it names does not exist — and the value painting the screen is the
+    // hard-coded fallback rather than anything the design system controls.
+    const relying = references
+      .filter((reference) => reference.hasFallback && !declared.has(reference.property))
+      .map((reference) => `${reference.file}: var(${reference.property})`);
+
+    expect(
+      [...new Set(relying)],
+      `these name a custom property that does not exist, so their hard-coded `
+        + `fallback is what actually renders: ${[...new Set(relying)].join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("detects a planted broken reference, so the scan is not blind", () => {
+    // Two-sided control.
+    const planted = [...".a{color:var(--nope)}".matchAll(/var\(\s*(--[a-zA-Z0-9-]+)\s*(,[^)]*)?\)/g)];
+    expect(planted).toHaveLength(1);
+    expect(planted[0][1]).toBe("--nope");
+    expect(declared.has("--nope")).toBe(false);
+  });
+});
+
 describe("the palette has exactly one home", () => {
   it("declares the base surface and text tokens only in tokens.css", () => {
     // The bridge in `tokens.css` is what keeps untouched surfaces correct in
