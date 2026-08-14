@@ -43,9 +43,8 @@ import {
   confirmDeletion,
   previewDeletion,
   undoDeletion,
-  IDLE_DELETION_STATE,
-  type DeletionState,
 } from "./actions";
+import { IDLE_DELETION_STATE, type DeletionState } from "./state";
 import { affectedConsequences, isIsolated, type DeletableEntityType } from "./contracts";
 import { getDeletionCopy } from "./copy";
 

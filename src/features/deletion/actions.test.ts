@@ -5,10 +5,10 @@ import { requireUser } from "@/lib/auth/require-user";
 import {
   applyDeletion,
   confirmDeletion,
-  IDLE_DELETION_STATE,
   previewDeletion,
   undoDeletion,
 } from "./actions";
+import { IDLE_DELETION_STATE } from "./state";
 import { CONSEQUENCE_KEYS, RETENTION_KINDS } from "./contracts";
 import { getDeletionCopy } from "./copy";
 

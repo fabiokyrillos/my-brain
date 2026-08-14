@@ -37,6 +37,7 @@ import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
 import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -520,6 +521,17 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           </div>
         ) : <p className="quiet-state">{pt ? "A linha do tempo começa na próxima menção." : "The timeline starts with the next mention."}</p>}
         <BoundedNotice list={boundedEntries} locale={locale} />
+      </section>
+
+      {/*
+        Last on the page, deliberately. Everything above it is what the owner
+        would want to read BEFORE deciding, and the preview this control opens
+        re-counts all of it server-side rather than reusing the numbers rendered
+        here — those are bounded reads, and a bound is exactly what a deletion
+        preview must not inherit.
+      */}
+      <section className="entity-danger-zone">
+        <DeleteEntityControl locale={locale} entityType="person" entityId={person.id} />
       </section>
     </div>
   );

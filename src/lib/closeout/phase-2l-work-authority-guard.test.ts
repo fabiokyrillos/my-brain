@@ -80,9 +80,20 @@ const AUTHORITY_ALLOWLIST: readonly CallSite[] = [
   { rpc: "task_command_fingerprint", file: "src/features/task-commands/fingerprint.ts" },
 ];
 
-/** The modules permitted to route an undo through the shared router. */
+/**
+ * The modules permitted to route an undo through the shared router.
+ *
+ * `src/features/deletion/actions.ts` joins in Phase 2N M3 (`202608140094`),
+ * which registers `delete_person`, `delete_project` and `delete_memory` in
+ * `private.undo_operation_handlers`. It belongs here for the reason this list
+ * exists at all: the router is generic, so the check on who may reach it is a
+ * named list rather than a property of the call. A fifth domain arriving
+ * without this line is what the guard is for — and this line is the deliberate,
+ * visible answer rather than a widened pattern.
+ */
 const UNDO_ROUTER_ALLOWLIST: readonly string[] = [
   "src/features/agent/actions.ts",
+  "src/features/deletion/actions.ts",
   "src/features/interpretations/actions.ts",
   "src/features/task-commands/actions.ts",
   "src/features/tasks/actions.ts",

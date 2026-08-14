@@ -45,25 +45,17 @@ import {
   deletionRequestSchema,
   deletionResultSchema,
   undoResultSchema,
-  type ParsedDeletionConfirmation,
-  type ParsedDeletionPreview,
 } from "./schema";
+import type { DeletionState } from "./state";
 
-export type DeletionState = {
-  readonly status: "idle" | "previewed" | "confirmed" | "deleted" | "undone" | "error";
-  readonly outcome: DeletionOutcome | null;
-  readonly message: string | null;
-  readonly preview: ParsedDeletionPreview | ParsedDeletionConfirmation | null;
-  readonly undoId: string | null;
-};
-
-export const IDLE_DELETION_STATE: DeletionState = {
-  status: "idle",
-  outcome: null,
-  message: null,
-  preview: null,
-  undoId: null,
-};
+/**
+ * The state type and the idle value live in `./state`, NOT here.
+ *
+ * A `"use server"` module may export async functions and nothing else. A
+ * constant exported beside these four would pass typecheck and fail at the RSC
+ * boundary — in a production build or on first render, which is the most
+ * expensive place to learn it.
+ */
 
 /**
  * SQLSTATE to outcome, and nothing wider.

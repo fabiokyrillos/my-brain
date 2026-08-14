@@ -37,6 +37,7 @@ import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema
 import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
 import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -586,6 +587,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         ) : <p className="quiet-state">{copy.timelineEmpty}</p>}
         <BoundedNotice list={boundedEntries} locale={locale} />
+      </section>
+
+      {/* Last on the page, for the reason the person page states. */}
+      <section className="entity-danger-zone">
+        <DeleteEntityControl locale={locale} entityType="project" entityId={project.id} />
       </section>
     </div>
   );
