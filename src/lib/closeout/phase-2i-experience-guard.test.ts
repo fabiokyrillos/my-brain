@@ -223,22 +223,102 @@ describe("2I-LANG-004: every state has copy in both locales", () => {
   });
 });
 
-describe("2I-LANG-007: dark mode is out of scope and not partially implemented", () => {
-  it("declares no dark token set", () => {
-    // Comments stripped for the same reason as above: the stylesheet's own
-    // header says there is no `prefers-color-scheme` block here, and the first
-    // version of this assertion read that sentence and failed.
-    const css = readFileSync(join(REPO, "src/app/experience.css"), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(css).not.toMatch(/prefers-color-scheme/);
-    expect(css).not.toMatch(/\[data-theme=/);
+describe("2I-LANG-007: dark mode is complete, and not partially implemented", () => {
+  /*
+   * This guard inverted with ADR-114.
+   *
+   * Owner decision D5 put dark mode out of scope, and the assertion here was
+   * that `experience.css` contained NO dark tokens — the failure it prevented
+   * being a half-set that looked like support. The Papel e Console redesign
+   * reverses the decision, so the assertion now runs from the other side: dark
+   * exists, and every light tone token has a dark counterpart.
+   *
+   * The prevented failure is unchanged. A partial dark mode still fails; only
+   * the direction of "partial" moved.
+   */
+  const stripped = () =>
+    readFileSync(join(REPO, "src/app/experience.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  /** Every `--tone-*` declaration inside one brace-balanced block. */
+  function toneTokensIn(css: string, selector: RegExp): Record<string, string> {
+    const start = css.search(selector);
+    if (start === -1) return {};
+    const open = css.indexOf("{", start);
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < css.length; i += 1) {
+      if (css[i] === "{") depth += 1;
+      if (css[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    const body = css.slice(open, end);
+    const found: Record<string, string> = {};
+    for (const [, name, value] of body.matchAll(/(--tone-[a-z-]+)\s*:\s*([^;]+);/g)) {
+      found[name] = value.trim();
+    }
+    return found;
+  }
+
+  it("declares a dark set, applied both by explicit choice and by system default", () => {
+    const css = stripped();
+    expect(css, "no explicit dark theme selector").toMatch(/:root\[data-theme="dark"\]/);
+    expect(css, "no system-preference dark block").toMatch(/prefers-color-scheme:\s*dark/);
   });
 
-  it("the comment-stripping is real, so the assertion above is not vacuous", () => {
-    // If the stripper removed everything, "no dark mode" would pass over an
-    // empty string. The tone tokens must survive it.
-    const css = readFileSync(join(REPO, "src/app/experience.css"), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "");
+  it("lets an explicit light choice win on a dark machine", () => {
+    // Without the `:not([data-theme="light"])` qualifier the media query would
+    // override the user's stored choice, and choosing light would do nothing on
+    // a dark OS. That is a real bug, and it is invisible in a light-OS test run.
+    expect(stripped()).toMatch(/:root:not\(\[data-theme="light"\]\)/);
+  });
+
+  it("gives every light tone token a dark counterpart", () => {
+    const css = stripped();
+    const light = toneTokensIn(css, /:root\s*\{/);
+    const dark = toneTokensIn(css, /:root\[data-theme="dark"\]/);
+
+    expect(Object.keys(light).length, "no light tone tokens were parsed").toBeGreaterThanOrEqual(18);
+
+    const missing = Object.keys(light).filter((name) => !(name in dark));
+    expect(
+      missing,
+      `tone tokens with no dark value: ${missing.join(", ")}. `
+        + "2I-LANG-007: a tone that is themed in light and inherited in dark renders "
+        + "a light wash on a dark canvas — the partial dark mode D5 refused to ship.",
+    ).toEqual([]);
+  });
+
+  it("keeps the two dark blocks identical, since CSS cannot share a declaration set", () => {
+    // The explicit block and the media-query block are hand-maintained copies.
+    // Drift between them is the failure mode a duplicate actually has: the
+    // stored preference and the system default would render different products.
+    const css = stripped();
+    const explicit = toneTokensIn(css, /:root\[data-theme="dark"\]/);
+    const system = toneTokensIn(css, /@media\s*\(prefers-color-scheme:\s*dark\)/);
+
+    expect(Object.keys(system).length, "no tokens parsed from the media block").toBeGreaterThanOrEqual(18);
+    expect(system).toEqual(explicit);
+  });
+
+  it("actually re-tints, rather than repeating the light value under a dark selector", () => {
+    // The control. A dark block that copied the light values would satisfy
+    // every completeness check above while shipping a light theme twice.
+    const css = stripped();
+    const light = toneTokensIn(css, /:root\s*\{/);
+    const dark = toneTokensIn(css, /:root\[data-theme="dark"\]/);
+    const unchanged = Object.keys(light).filter((name) => light[name] === dark[name]);
+    expect(unchanged, `tone tokens identical in both themes: ${unchanged.join(", ")}`).toEqual([]);
+  });
+
+  it("the comment-stripping is real, so the assertions above are not vacuous", () => {
+    // If the stripper removed everything, the parsers would find nothing and
+    // the equality checks would pass over two empty objects.
+    const css = stripped();
     expect(css).toContain("--tone-risk-fg:");
     expect(css.length).toBeGreaterThan(1500);
   });

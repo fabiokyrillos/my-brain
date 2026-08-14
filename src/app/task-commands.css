@@ -39,7 +39,7 @@
 .task-command-clarify label {
   display: block;
   margin-bottom: 7px;
-  font: 750 12px var(--font-jetbrains);
+  font: 750 12px var(--font-mono);
 }
 
 .task-command-input-row {
@@ -139,7 +139,7 @@
 
 .task-command-notice {
   margin: 0 0 8px;
-  font: 750 10px var(--font-jetbrains);
+  font: 750 10px var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-soft);
@@ -195,7 +195,7 @@
 }
 
 .task-command-candidates legend {
-  font: 750 12px var(--font-jetbrains);
+  font: 750 12px var(--font-mono);
   padding: 0 0 8px;
 }
 

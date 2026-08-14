@@ -25,7 +25,7 @@
 .assistant-composer-form > label {
   display: block;
   padding: 14px 20px 0;
-  font: 750 12px var(--font-jetbrains);
+  font: 750 12px var(--font-mono);
   color: var(--ink-soft);
 }
 
@@ -77,7 +77,7 @@
   border-top: 1px solid var(--line);
   background: var(--mist);
   color: var(--ink-soft);
-  font: 600 10px var(--font-jetbrains);
+  font: 600 10px var(--font-mono);
   letter-spacing: 0.03em;
 }
 
@@ -117,7 +117,7 @@
 }
 
 .assistant-composer-echo > span {
-  font: 650 9px var(--font-jetbrains);
+  font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8290a4;

@@ -158,7 +158,7 @@
   border-radius: 999px;
   background: var(--mist);
   color: var(--ink-soft);
-  font: 650 11px var(--font-jetbrains);
+  font: 650 11px var(--font-mono);
   letter-spacing: 0.03em;
 }
 
@@ -199,7 +199,7 @@
 
 .relations-note-label {
   color: var(--ink-soft);
-  font: 650 10px var(--font-jetbrains);
+  font: 650 10px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -264,7 +264,7 @@
 }
 
 .relations-node-type {
-  font: 650 9px var(--font-jetbrains);
+  font: 650 9px var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -334,7 +334,7 @@ a.relations-node:focus-visible {
 }
 
 .relations-legend-heading {
-  font: 650 10px var(--font-jetbrains);
+  font: 650 10px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }

@@ -39,7 +39,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 const ROOT = join(__dirname, "..");
 
-const STYLESHEETS = ["globals.css", "operations.css", "task-commands.css", "calendar.css"] as const;
+// `tokens.css` and `experience.css` first: since ADR-114 they carry the palette
+// every rule below resolves against, so a fixture without them is unstyled.
+const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css"] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
   .join("\n")

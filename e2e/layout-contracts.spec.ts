@@ -25,6 +25,11 @@ const ROOT = join(__dirname, "..");
  * directive cannot be resolved without the build pipeline.
  */
 const STYLESHEETS = [
+  // First, and load-bearing: since ADR-114 the palette and every measure live
+  // here, so a fixture without it renders unstyled and every geometry assertion
+  // below measures the wrong thing.
+  "tokens.css",
+  "experience.css",
   "globals.css",
   "operations.css",
   "chat.css",
@@ -134,7 +139,7 @@ function listBody() {
 
 function document_(body: string) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{--font-manrope:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-jetbrains:ui-monospace,monospace}
+:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}
 ${css}
 </style></head><body><div class="app-frame">
 <aside class="side-rail"><a href="#" class="brand"><span class="brand-mark">B</span><span>My Brain</span></a><nav aria-label="Navegação principal" class="side-nav">${sideNav()}</nav></aside>

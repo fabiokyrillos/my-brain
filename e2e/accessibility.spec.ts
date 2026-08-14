@@ -60,9 +60,13 @@ const AXE_PATH = require_.resolve("axe-core");
 
 /** Every stylesheet `globals.css` pulls in, minus the unresolvable Tailwind import. */
 const STYLESHEETS = [
+  // First, and load-bearing: since ADR-114 the palette lives here. Without it
+  // every colour resolves to nothing, and the axe contrast scan below would
+  // measure default black-on-white and pass for the wrong reason.
+  "tokens.css",
+  "experience.css",
   "globals.css",
   "palette.css",
-  "experience.css",
   "operations.css",
   "mobile-navigation.css",
   "pagination.css",

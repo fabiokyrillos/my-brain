@@ -15,7 +15,7 @@
 }
 .palette-trigger:hover { background: var(--mist); color: var(--ink); }
 .palette-trigger kbd {
-  font: 650 10px var(--font-jetbrains);
+  font: 650 10px var(--font-mono);
   padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--mist); color: var(--ink-soft);
 }
@@ -45,7 +45,7 @@
 .palette-group { display: grid; gap: 2px; padding: 6px 0; }
 .palette-group-label {
   padding: 4px 10px;
-  font: 650 10px var(--font-jetbrains); letter-spacing: .1em; text-transform: uppercase;
+  font: 650 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--ink-soft);
 }
 .palette-option {
@@ -75,7 +75,7 @@
 /* ---- global search — `2I-SEARCH-002` … `2I-SEARCH-009` ------------------- */
 
 .search-surface { max-width: 860px; margin: auto; padding: 48px var(--gutter) 120px; display: grid; gap: 18px; }
-.search-title { margin: 0; font: 500 38px/1 var(--font-newsreader); letter-spacing: -.04em; }
+.search-title { margin: 0; font: 500 38px/1 var(--font-reading); letter-spacing: -.04em; }
 .search-form { display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: center; }
 .search-input {
   min-height: 48px; padding: 12px 14px;
@@ -111,7 +111,7 @@
 
 .library-page { max-width: 980px; margin: auto; padding: 48px var(--gutter) 120px; display: grid; gap: 26px; }
 .library-head { display: grid; gap: 8px; }
-.library-head h1 { margin: 0; font: 500 38px/1 var(--font-newsreader); letter-spacing: -.04em; }
+.library-head h1 { margin: 0; font: 500 38px/1 var(--font-reading); letter-spacing: -.04em; }
 .library-head p { margin: 0; color: var(--ink-soft); line-height: 1.6; }
 /* `2J-ACCESS-006`. This link rendered 16px tall on a Pixel 7 -- below WCAG 2.2
    AA 2.5.8's 24px minimum -- and shipped in Phase 2I because a jsdom test
@@ -138,7 +138,7 @@
 .library-card-name { font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
 .library-card-note { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
 /* A navigation aid, not a metric: it says whether the door leads anywhere. */
-.library-card-count { font: 650 11px var(--font-jetbrains); color: var(--ink-soft); }
+.library-card-count { font: 650 11px var(--font-mono); color: var(--ink-soft); }
 
 @media (max-width: 760px) {
   .library-page { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }

@@ -170,7 +170,7 @@
 }
 
 .entity-relation-line > span {
-  font: 650 9px var(--font-jetbrains);
+  font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8290a4;
@@ -436,7 +436,7 @@
 }
 
 .entity-state-line > span:first-child {
-  font: 650 9px var(--font-jetbrains);
+  font: 650 9px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8290a4;

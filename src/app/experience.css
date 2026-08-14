@@ -5,42 +5,126 @@
  * in Registros as in Trabalho. `phase-2i-experience-guard.test.ts` fails when a
  * stylesheet declares a state colour outside this block.
  *
- * NO DARK MODE. Owner decision D5, `2I-LANG-007`: out of scope and not
- * partially implemented, so there is no `prefers-color-scheme` block here and
- * no half-set of dark tokens to mislead a later reader.
+ * ## Dark mode
+ *
+ * Owner decision D5 (`2I-LANG-007`) put dark mode out of scope and this file
+ * carried no dark tokens at all — deliberately, so that no reader would mistake
+ * a half-set for support. The Papel e Console redesign reverses that decision
+ * (ADR-114): dark is now a first-class, fully authored palette.
+ *
+ * The guard inverted with it. It no longer asserts the ABSENCE of dark tokens;
+ * it asserts dark is **complete** — every one of the eighteen light tone tokens
+ * has a dark counterpart. The failure it prevents is the same one D5 was
+ * avoiding, just from the other side: a partial dark mode.
+ *
+ * Dark is authored, not derived. It is warm, low-contrast at the surface and
+ * high-contrast at the text; no inversion, no filter.
  */
 
 :root {
   /* Six tones. Each has a foreground, a wash and a border, so a tone can be
      applied to text, to a surface and to an outline without a surface picking
-     its own tint. */
-  --tone-information-fg: #315cff;
-  --tone-information-bg: #eef2ff;
-  --tone-information-line: #c3d0ff;
+     its own tint.
 
-  --tone-success-fg: #226a46;
-  --tone-success-bg: #eaf8f0;
-  --tone-success-line: #b6e0c8;
+     The values are Papel e Console's semantic set: `information` is the blue
+     that also serves `--link` and `--focus-ring`, and `attention` is the amber
+     the direction reserves exclusively for "precisa de você". */
+  --tone-information-fg: #3a6ea5;
+  --tone-information-bg: #ecf1f7;
+  --tone-information-line: #b9cbe0;
 
-  --tone-attention-fg: #8a5a10;
-  --tone-attention-bg: #fdf3e2;
-  --tone-attention-line: #f0d3a1;
+  --tone-success-fg: #2f6b4f;
+  --tone-success-bg: #eaf3ed;
+  --tone-success-line: #bcd6c6;
 
-  --tone-risk-fg: #9b2d24;
-  --tone-risk-bg: #fff0ee;
-  --tone-risk-line: #f3c4bd;
+  --tone-attention-fg: #b0722a;
+  --tone-attention-bg: #fbf3e6;
+  --tone-attention-line: #e0c39a;
+
+  --tone-risk-fg: #9a3b2c;
+  --tone-risk-bg: #fbeeea;
+  --tone-risk-line: #d9b7ad;
 
   /* The Brain proposing something. Deliberately distinct from `information`:
      `2I-LANG-002` requires user text, interpretation, suggestion and confirmed
      action to be visually distinguishable, and two of those would otherwise
-     share a colour. */
-  --tone-suggestion-fg: #5b3fbf;
-  --tone-suggestion-bg: #f1ecff;
-  --tone-suggestion-line: #d6c9f5;
+     share a colour. Papel e Console names no violet, so this is the one tone
+     authored for the palette rather than taken from it — desaturated and warm
+     enough to sit beside the paper neutrals. */
+  --tone-suggestion-fg: #63508f;
+  --tone-suggestion-bg: #f2effa;
+  --tone-suggestion-line: #d5cceb;
 
-  --tone-archived-fg: #5c6879;
-  --tone-archived-bg: #f1f4f8;
-  --tone-archived-line: #d8dfe9;
+  /* Archived reads as the palette's neutral, not as a cold grey-blue: the
+     canvas is warm, and a blue-grey chip on it looks like a different product. */
+  --tone-archived-fg: #736d64;
+  --tone-archived-bg: #f1efea;
+  --tone-archived-line: #e2ded6;
+
+  /* The full-row attention wash. Lighter than `--tone-attention-bg` so a row
+     tinted for attention does not compete with an attention card sitting on it. */
+  --tone-attention-row: #fdfaf5;
+}
+
+/* Dark: authored values, applied from the explicit choice and from the machine
+   default. The two blocks are duplicated rather than shared because CSS has no
+   way to name a set of declarations — the guard asserts they stay identical. */
+:root[data-theme="dark"] {
+  --tone-information-fg: #7aa5d1;
+  --tone-information-bg: #17202a;
+  --tone-information-line: #2e435a;
+
+  --tone-success-fg: #6faa87;
+  --tone-success-bg: #1a2620;
+  --tone-success-line: #31503f;
+
+  --tone-attention-fg: #d99a4e;
+  --tone-attention-bg: #2b2317;
+  --tone-attention-line: #4a3a22;
+
+  --tone-risk-fg: #d1725f;
+  --tone-risk-bg: #2c1c18;
+  --tone-risk-line: #5a332a;
+
+  --tone-suggestion-fg: #a894d8;
+  --tone-suggestion-bg: #211c2e;
+  --tone-suggestion-line: #3d3352;
+
+  --tone-archived-fg: #918a7e;
+  --tone-archived-bg: #24221e;
+  --tone-archived-line: #2e2b26;
+
+  --tone-attention-row: #201b14;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tone-information-fg: #7aa5d1;
+    --tone-information-bg: #17202a;
+    --tone-information-line: #2e435a;
+
+    --tone-success-fg: #6faa87;
+    --tone-success-bg: #1a2620;
+    --tone-success-line: #31503f;
+
+    --tone-attention-fg: #d99a4e;
+    --tone-attention-bg: #2b2317;
+    --tone-attention-line: #4a3a22;
+
+    --tone-risk-fg: #d1725f;
+    --tone-risk-bg: #2c1c18;
+    --tone-risk-line: #5a332a;
+
+    --tone-suggestion-fg: #a894d8;
+    --tone-suggestion-bg: #211c2e;
+    --tone-suggestion-line: #3d3352;
+
+    --tone-archived-fg: #918a7e;
+    --tone-archived-bg: #24221e;
+    --tone-archived-line: #2e2b26;
+
+    --tone-attention-row: #201b14;
+  }
 }
 
 /* ---- tones ------------------------------------------------------------- */
@@ -63,7 +147,7 @@
 .ux-authored-confirmed { border-left-color: var(--tone-success-fg); }
 .ux-authored-label {
   display: block;
-  font: 650 10px var(--font-jetbrains);
+  font: 650 10px var(--font-mono);
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--ink-soft);
@@ -175,7 +259,7 @@
 .ux-source:hover { background: var(--mist); }
 /* Type as text. A result list that encoded type by tint alone would be
    unreadable to a screen reader and to anyone with a colour-vision difference. */
-.ux-source-type { font: 650 10px var(--font-jetbrains); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.ux-source-type { font: 650 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 .ux-source-title { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
 .ux-source-snippet { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
 .ux-source-meta { font-size: 11px; color: var(--ink-soft); }

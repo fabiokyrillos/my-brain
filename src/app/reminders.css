@@ -114,7 +114,7 @@
 }
 
 .reminder-subject-kind {
-  font: 700 11px var(--font-jetbrains, inherit);
+  font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-soft);
@@ -153,7 +153,7 @@
  * sighted user with an unlabelled dropdown while a screen-reader user heard one.
  */
 .reminder-inline-label {
-  font: 700 11px var(--font-jetbrains, inherit);
+  font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-soft);
@@ -238,7 +238,7 @@
 .reminder-panel label {
   display: grid;
   gap: 6px;
-  font: 700 11px var(--font-jetbrains, inherit);
+  font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-soft);
