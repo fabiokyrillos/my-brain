@@ -5945,3 +5945,155 @@ note would budget for a writer change M2 does not need.
 superseded and expiring **2026-10-27**, **Phase 2O not started, not planned and
 not retargeted**, and A13 still guarding the roadmap successor. **Slice 2N.7 is
 the only slice left.**
+
+## §73 — PHASE 2N IS COMPLETE: 127 of 127 classified, and the last allocation closes unspent (2026-08-14)
+
+**PR #225**, merged at `75522f4`; head at review `8135cb5`, **CI green on all
+three job families on both**. `docs/reports/phase-2n/PHASE_2N_CLOSING_REPORT.md`,
+`..._SLICE_7_ACCEPTANCE.md`, `..._SLICE_7_M2_VERDICT.md`, and the generated
+`..._TRACEABILITY_MATRIX.md`.
+
+**`127 declared · 127 classified · 0 unclassified` — 93 built · 20 baseline ·
+3 partial · 11 not-built-by-rule · 0 undelivered.** Budget closes
+`3 allocated · 2 spent`: **M1** `202608130093`, **M3** `202608140094`, and
+**M2 UNSPENT**. 94 local = 94 hosted, parity **`202608140094`**.
+
+### M2 closed unspent because no event survived its own contract
+
+`2N-METRICS-002` made it conditional and the plan set the standard in terms: *an
+unspent allocation is not a defect; **a migration created to use one up fails the
+close**.* So the slice opened with a measurement rather than a schema.
+
+Six candidates were derived from the phase's own stated purpose — *"whether
+anyone inspects, corrects or removes what the Brain knows"* — **steelmanned, then
+refused**, each for a named reason in one of three classes:
+
+| Class | Candidates |
+| --- | --- |
+| A **better instrument already exists and is the authority** — `audit_logs` records every correction, `undo_operations` every undo, and a direct owner-scoped query answers the rest **exactly** | C2, C4, C5, C6 |
+| The answer **changes no pending decision** | C1 |
+| Recording it would **contradict a signed privacy decision** | C3 |
+
+**The strongest candidate is worth remembering.** `protected_content_revealed`
+was the only one with **no better instrument** — a reveal is local and transient
+and leaves no row anywhere. It is refused **on privacy**: OD-2J-1 made that
+reveal transient *deliberately*, with **no persisted form and no serializer**, and
+recording it would create the persistence by a different door. A per-surface
+reveal count is also a **fingerprint of where an owner keeps protected content**,
+which `2N-METRICS-004` forbids as *"any identifier that functions as content."*
+
+Two census facts, both measured rather than assumed: **all 39 declared event
+names have producers** once the census reads `supabase/functions/` as well as
+`src/` — three live **only** in the Deno worker, and a census of `src/` alone
+would have reported three orphans and been wrong about all three — and **no
+funnel reader has ever read a real event belonging to a real owner**, which Phase
+2M's own §5 records after finding all three died at `createClient` and had never
+run.
+
+### The matrix is generated, and it refused thirty-five times first
+
+`scripts/generate-phase-2n-traceability.mjs` reads the PRD for what was declared
+and the eight acceptance records for what was evidenced, and **writes nothing at
+all** when they disagree. A document that silently omits the rows it could not
+verify is worse than no document, because it looks complete.
+
+**It reads four row shapes, because the records really use four**, written across
+six slices: class in the row; class in an enclosing `### Built (17)` heading;
+family heading over **bare numeric suffixes** (`001, 002, 007`); and compound
+classes resolved to a head token. **Tolerating four is safe only because of the
+completeness check** — all 127 must come out classified exactly once, so a shape
+it misreads surfaces as a refusal, never as a missing row.
+
+It carries a **narrow adjudication licence**: the closing slice may settle a
+conflict and may classify an id **no record reached**, but **may not overturn a
+class the prior records agree on**. Two ids needed it, and both were settled in
+favour of the slice that **delivered** the property over the one that inherited
+it.
+
+### A mutation control found the generator's own vacuous check
+
+*"Every `partial` names a destination"* tested the row's evidence for a `2N-…`
+token — and **every row contains its own id**, so the check passed for any
+`partial` that existed. **It had never been capable of failing.**
+
+Stripping the subject id first made **three rows that had been passing vacuously
+appear at once**, across three different acceptance records. Each was corrected in
+its **source record**, adding the citation its own surrounding prose already
+carried. **No class changed.** The narrowing carries a two-sided control.
+
+### Two signed premises are false in the tree, and the close says so
+
+- **`OD-2N-8` A** claims no inferred relation is persisted.
+  `link_interpreted_entities` still writes a co-mention into `person_projects`
+  and `person_contexts` **on every interpretation**. **T-3 is live.** Remainder
+  **`2N-RELATION-TRIGGER`**.
+- **`2N-IDENTITY-008`** forbids inference creating a persisted identity.
+  `persist_interpretation` inserts `people`, `projects`, `contexts` and
+  `organizations` from the model's extracted names **with no user act**. Found by
+  the **closeout**, not by any slice. Remainder **`2N-IDENTITY-EXTRACTION`**.
+
+**Neither is transferable into M2**, which is telemetry's allocation and closes
+unspent regardless. Both need a migration and an owner decision.
+
+### The three partials, each with a destination
+
+| Requirement | Destination |
+| --- | --- |
+| `2N-FILES-008` | **`2N-FILES-WRITER`** — restore `INSERT` or add a definer RPC |
+| `2N-RELATION-003` | **`2N-RELATION-TRIGGER`** — drop the co-mention trigger |
+| `2N-IDENTITY-008` | **`2N-IDENTITY-EXTRACTION`** — gate entity creation behind a user act |
+
+**All three are a migration and an owner decision, and all three are stop
+conditions.**
+
+### Threats
+
+**All twenty-three dispositioned**, each mitigated with named evidence or
+accepted in writing. **Two live**: T-3 above, and **T-19** retention sweeps still
+unscheduled — inherited, a rollout-gate residual, and **no Phase 2N migration
+schedules one**, which M3 enforces by *refusing to deploy* if a sweep exists.
+
+### Two gates inverted rather than deleted
+
+`phase-2n-declarations.test.ts` forbade the closing artifacts while the phase
+ran; it now **requires** them. The assertion is kept rather than removed for the
+reason Phase 2M's equivalent was kept: **a deleted assertion records nothing**,
+and the next reader cannot tell a gate that was satisfied from a gate that was
+removed. **The deployment record stays out** — 2N.7 spends no migration, so it
+has none to record, and inventing a file to satisfy a pattern is the shape this
+family refuses.
+
+### Proofs
+
+lint, typecheck, **full suite 7284 passing** (three unparsed files = the
+Windows-only shebang baseline, green in CI), build, `git diff --check`, and the
+generator's own `--check` all clean. **The generator was re-run against the
+merged tree** and still re-derives `127 declared, all classified` — the matrix is
+not merely a file that travelled with the PR.
+
+**No hosted journey is run or claimed.** This slice ships no product code and no
+surface; the phase's surfaces were proved by their own slices, and re-running
+them here would prove nothing this slice changed.
+
+### One precision correction, made before the merge rather than after
+
+The closing report claimed all eight slices were merged with CI green on their
+exact merge SHAs. **Seven were**; the eighth was the change carrying the
+sentence, whose merge SHA cannot be green before it exists. A closing report is
+the one document a reader trusts about *what was verified*, so it now separates
+the two.
+
+### THE PHASE IS CLOSED — NO PHASE IS ACTIVE
+
+**Unchanged and approved by nothing here:** signup **closed**
+(`enable_signup = false`), rollout **25 pass · 3 fail · 2 owner-signature**, push
+implemented and hosted but **failing on a real iPhone with HTTP 403** and
+**NEVER VALIDATED ON ANDROID**, **ADR-055 neither satisfied nor superseded** and
+expiring **2026-10-27**, **no screen-reader run executed or claimed** (an open
+residual beside `2L-ACCESS-008`), and `2N-MOBILE`'s **21px** touch target carried
+forward unrepaired.
+
+**The successor is re-audited and NOT started.** No successor requirement,
+governing artifact or scope exists anywhere in the repository — verified, not
+assumed: there is no `docs/initiatives/phase-2o/` and no `docs/reports/phase-2o/`.
+**A13 is not retargeted**, and starting one needs its own owner authorization.
