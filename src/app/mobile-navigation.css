@@ -32,8 +32,8 @@
 .nav-group-label,
 .mobile-nav-group-label {
   padding: 0 12px;
-  color: var(--ink-soft);
-  font: 700 9px var(--font-mono);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -49,8 +49,8 @@
   justify-content: flex-start;
   gap: 12px;
   border-radius: 11px;
-  background: var(--ink);
-  color: var(--white);
+  background: var(--text-primary);
+  color: var(--background-surface);
   box-shadow: var(--elevation-undo);
   font-size: 14px;
   font-weight: 700;
@@ -59,7 +59,7 @@
 
 .side-nav > .capture-fab:hover,
 .side-nav > .capture-fab.active {
-  background: var(--blue);
+  background: var(--link);
 }
 
 .top-bar {
@@ -90,7 +90,7 @@
   min-height: 44px;
   padding: 10px 12px;
   border-radius: 10px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -104,16 +104,16 @@
 
 .side-more > summary:hover,
 .side-more.active > summary {
-  background: var(--mist);
-  color: var(--ink);
+  background: var(--background-subtle);
+  color: var(--text-primary);
 }
 
 .side-more.active > summary {
-  color: var(--blue);
+  color: var(--link);
 }
 
 .side-more > summary:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -135,7 +135,7 @@
  */
 .rail-footer {
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-default);
 }
 
 .account-menu > summary {
@@ -156,11 +156,11 @@
 
 .account-menu > summary:hover,
 .account-menu[open] > summary {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .account-menu > summary:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -171,8 +171,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--blue-wash);
-  color: var(--blue);
+  background: var(--tone-information-bg);
+  color: var(--link);
 }
 
 .account-summary-text {
@@ -181,8 +181,8 @@
 }
 
 .account-summary-text small {
-  color: var(--ink-soft);
-  font: 650 9px var(--font-mono);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -212,19 +212,19 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   text-align: left;
 }
 
 .account-menu-item:hover {
-  background: var(--mist);
-  color: var(--ink);
+  background: var(--background-subtle);
+  color: var(--text-primary);
 }
 
 .account-menu-item:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: -2px;
 }
 
@@ -280,7 +280,7 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: var(--ink-soft);
+    color: var(--text-secondary);
     font-size: 9px;
     font-weight: 700;
   }
@@ -297,7 +297,7 @@
   }
 
   .mobile-more > summary:focus-visible {
-    outline: 2px solid var(--blue);
+    outline: 2px solid var(--link);
   }
 
   .mobile-more > summary::-webkit-details-marker {
@@ -307,7 +307,7 @@
   .mobile-more.active > summary,
   .mobile-more[open] > summary,
   .bottom-nav > a.active {
-    color: var(--blue);
+    color: var(--link);
   }
 
   .mobile-more-menu {
@@ -321,7 +321,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     padding: 10px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--border-default);
     border-radius: 16px;
     background: var(--background-surface);
     box-shadow: var(--elevation-2);
@@ -353,7 +353,7 @@
   .mobile-nav-account {
     grid-column: 1 / -1;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border-default);
   }
 
   .account-menu-overflow > summary {

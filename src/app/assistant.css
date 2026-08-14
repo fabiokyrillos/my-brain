@@ -25,8 +25,8 @@
 .assistant-composer-form > label {
   display: block;
   padding: 14px 20px 0;
-  font: 750 12px var(--font-mono);
-  color: var(--ink-soft);
+  font: var(--type-mono);
+  color: var(--text-secondary);
 }
 
 .assistant-composer-row {
@@ -46,7 +46,7 @@
   resize: vertical;
   padding: 10px 0;
   background: transparent;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 15px;
   line-height: 1.6;
 }
@@ -62,7 +62,7 @@
 .assistant-composer-submit {
   flex: 0 0 auto;
   border: 0;
-  background: var(--ink);
+  background: var(--text-primary);
   color: var(--action-primary-text);
   font-weight: 750;
 }
@@ -74,10 +74,10 @@
 .assistant-composer-hint {
   margin: 0;
   padding: 9px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--mist);
-  color: var(--ink-soft);
-  font: 600 10px var(--font-mono);
+  border-top: 1px solid var(--border-default);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.03em;
 }
 
@@ -88,7 +88,7 @@
 .assistant-composer-notice {
   margin-top: 16px;
   padding: 18px 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
   background: var(--background-surface);
 }
@@ -101,7 +101,7 @@
 
 .assistant-composer-notice > p {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -113,18 +113,18 @@
   gap: 4px;
   margin: 0 0 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .assistant-composer-echo > span {
-  font: 650 9px var(--font-mono);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .assistant-composer-echo > q {
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -138,13 +138,13 @@
   padding: 11px 16px;
   border: 1px solid var(--border-strong);
   border-radius: 11px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
 }
 
 .assistant-composer-next:hover {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 /**
@@ -159,16 +159,16 @@
  * they are and what else is on the page with them.
  */
 .chat-page .conversational-questions {
-  border-color: var(--line);
+  border-color: var(--border-default);
   background: var(--background-surface);
 }
 
 .chat-page .conversational-questions-header .eyebrow {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .chat-page .conversational-questions .question-card {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .chat-page .question-answer-form input {

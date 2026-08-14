@@ -151,7 +151,7 @@
 .ux-authored-confirmed { border-left-color: var(--tone-success-fg); }
 .ux-authored-label {
   display: block;
-  font: 650 10px var(--font-mono);
+  font: var(--type-eyebrow);
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--text-secondary);

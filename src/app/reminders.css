@@ -29,17 +29,17 @@
   align-items: center;
   min-height: 40px;
   padding: 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: var(--white);
-  color: var(--ink-soft);
+  background: var(--background-surface);
+  color: var(--text-secondary);
   font: 650 13px var(--font-ui);
   text-decoration: none;
 }
 
 .reminder-view:hover {
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--link);
+  color: var(--link);
 }
 
 /*
@@ -48,9 +48,9 @@
  * and the announced state from ever disagreeing.
  */
 .reminder-view[aria-current="page"] {
-  border-color: var(--blue);
-  background: var(--blue-wash);
-  color: var(--blue);
+  border-color: var(--link);
+  background: var(--tone-information-bg);
+  color: var(--link);
 }
 
 /*
@@ -83,19 +83,19 @@
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .reminder-status-hint {
   margin-top: 4px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 12.5px;
 }
 
 .reminder-overdue {
   margin-top: 4px;
-  color: var(--signal);
+  color: var(--tone-attention-fg);
   font: 650 12.5px var(--font-ui);
 }
 
@@ -104,7 +104,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--blue);
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -117,12 +117,12 @@
   font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .reminder-subject-none {
   font-size: 12.5px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -156,16 +156,16 @@
   font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .reminder-select {
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: var(--white);
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
   font-size: 13px;
 }
 
@@ -176,17 +176,17 @@
   gap: 6px;
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: var(--white);
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
   font: 650 13px var(--font-ui);
   cursor: pointer;
 }
 
 .reminder-button:hover:not(:disabled) {
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--link);
+  color: var(--link);
 }
 
 .reminder-button:disabled {
@@ -195,13 +195,13 @@
 }
 
 .reminder-button.primary {
-  border-color: var(--blue);
-  background: var(--blue);
-  color: var(--white);
+  border-color: var(--link);
+  background: var(--link);
+  color: var(--background-surface);
 }
 
 .reminder-button.primary:hover:not(:disabled) {
-  color: var(--white);
+  color: var(--background-surface);
   filter: brightness(1.06);
 }
 
@@ -225,9 +225,9 @@
   gap: 10px;
   margin-top: 10px;
   padding: 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .reminder-panel.danger {
@@ -241,17 +241,17 @@
   font: 700 11px var(--font-mono, inherit);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .reminder-panel input[type="text"],
 .reminder-panel input[type="datetime-local"] {
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: var(--white);
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
   font: 400 14px var(--font-ui);
 }
 
@@ -263,7 +263,7 @@
   text-transform: none;
   letter-spacing: 0;
   font: 400 13px var(--font-ui);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .reminder-checkbox input {
@@ -274,17 +274,17 @@
 /* Current vs proposed, stated together — the distinction UX-12 asks for. */
 .reminder-panel-current {
   font-size: 13px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .reminder-panel-title {
   font: 700 14px var(--font-ui);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .reminder-panel-body {
   font-size: 13px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .reminder-panel-actions {

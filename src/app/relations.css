@@ -45,7 +45,7 @@
   gap: 10px;
   margin-top: 8px;
   padding-top: 16px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-default);
 }
 
 .relations-subsection > h3 {
@@ -57,7 +57,7 @@
 .relations-intro,
 .relations-disclaimer {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -67,10 +67,10 @@
    text, because a tooltip would not reach `2N-ACCESS-004`. */
 .relations-disclaimer {
   padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--signal);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--tone-attention-fg);
   border-radius: 10px;
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -89,9 +89,9 @@
   display: grid;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--white);
+  background: var(--background-surface);
 }
 
 /* An unattributable link is marked structurally as well as by its sentence, so
@@ -99,7 +99,7 @@
    dashed border rather than a colour, which is the same rule as the nodes. */
 .relations-row[data-origin="unattributable"] {
   border-style: dashed;
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .relations-row-main {
@@ -111,7 +111,7 @@
 }
 
 .relations-row-relation {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 650;
 }
@@ -125,10 +125,10 @@
   align-items: center;
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: var(--white);
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
 }
@@ -139,8 +139,8 @@
 
 .relations-node-link:hover,
 .relations-node-link:focus-visible {
-  background: var(--blue-wash);
-  border-color: var(--blue);
+  background: var(--tone-information-bg);
+  border-color: var(--link);
 }
 
 .relations-row-meta {
@@ -154,11 +154,11 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: var(--mist);
-  color: var(--ink-soft);
-  font: 650 11px var(--font-mono);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.03em;
 }
 
@@ -188,7 +188,7 @@
    grouping and the sentence clears the threshold on both. */
 .relations-origin {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .relations-row-note {
@@ -197,14 +197,14 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.55;
 }
 
 .relations-note-label {
-  color: var(--ink-soft);
-  font: 650 10px var(--font-mono);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -218,9 +218,9 @@
   gap: 14px;
   margin: 0;
   padding: 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
-  background: var(--paper);
+  background: var(--background-canvas);
 }
 
 /* Rule 3. The figure scrolls; the document does not. `overscroll-behavior`
@@ -261,22 +261,22 @@
   justify-content: center;
   gap: 2px;
   padding: 6px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   /* Opaque, deliberately: see `.relations-lines`. */
-  background: var(--white);
+  background: var(--background-surface);
   box-shadow: var(--elevation-1);
 }
 
 .relations-node-type {
-  font: 650 9px var(--font-mono);
+  font: var(--type-eyebrow);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .relations-node-name {
   overflow: hidden;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
@@ -292,22 +292,22 @@
 
 a.relations-node:hover,
 a.relations-node:focus-visible {
-  border-color: var(--blue);
+  border-color: var(--link);
 }
 
 /* The type palette. Never the only signal — every box and every chip prints the
    type as a word, and the legend repeats it. */
 .relations-node[data-node-type="owner"] {
-  border-color: var(--ink);
+  border-color: var(--text-primary);
 }
 .relations-node[data-node-type="owner"] .relations-node-type {
-  color: var(--ink);
+  color: var(--text-primary);
 }
 .relations-node[data-node-type="person"] {
   border-color: var(--tone-information-line);
 }
 .relations-node[data-node-type="person"] .relations-node-type {
-  color: var(--blue);
+  color: var(--link);
 }
 .relations-node[data-node-type="project"] {
   border-color: var(--tone-attention-line);
@@ -325,21 +325,21 @@ a.relations-node:focus-visible {
   border-color: var(--border-strong);
 }
 .relations-node[data-node-type="organization"] .relations-node-type {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .relations-legend {
   display: grid;
   gap: 8px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
+  border-top: 1px solid var(--border-default);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.55;
 }
 
 .relations-legend-heading {
-  font: 650 10px var(--font-mono);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -366,12 +366,12 @@ a.relations-node:focus-visible {
 .relations-swatch {
   width: 12px;
   height: 12px;
-  border: 2px solid var(--line);
+  border: 2px solid var(--border-default);
   border-radius: 4px;
 }
 
 .relations-swatch[data-node-type="owner"] {
-  border-color: var(--ink);
+  border-color: var(--text-primary);
 }
 .relations-swatch[data-node-type="person"] {
   border-color: var(--tone-information-line);

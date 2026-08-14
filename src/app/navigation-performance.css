@@ -3,7 +3,7 @@
 .route-loading-heading{width:min(360px,72%);height:44px}
 .route-loading-summary{width:min(620px,92%);height:18px;margin-top:18px}
 .route-loading-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-top:48px}
-.route-loading-card{min-height:220px;border:1px solid var(--line)}
+.route-loading-card{min-height:220px;border:1px solid var(--border-default)}
 @media(prefers-reduced-motion:no-preference){.route-loading [data-loading-block]::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,var(--background-surface),transparent);animation:route-loading-shimmer 1.25s ease-in-out infinite}@keyframes route-loading-shimmer{to{transform:translateX(100%)}}}
 @media(max-width: 899px){.route-loading{padding:38px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom,0px))}.route-loading-grid{grid-template-columns:1fr;margin-top:34px}.route-loading-card{min-height:180px}}
 /* 2N-ACCESS-003/-005, ADR-112 D7a. `loading.tsx` takes no props and so cannot know
@@ -24,6 +24,6 @@
    applies no external stylesheet and could not have seen it. */
 .route-loading [data-route-loading-locale="en"]:lang(pt-BR){display:none}
 .route-loading [data-route-loading-locale="pt-BR"]:lang(en){display:none}
-.navigation-pending{font-size:10px;font-weight:750;color:var(--blue);white-space:nowrap}
+.navigation-pending{font-size:10px;font-weight:750;color:var(--link);white-space:nowrap}
 .mobile-primary-link .navigation-pending,.capture-fab .navigation-pending{position:absolute;width:1px;height:1px;overflow:hidden}
-.row-action.optimistic{background:var(--blue-wash);color:var(--blue);border-color:var(--tone-information-line)}
+.row-action.optimistic{background:var(--tone-information-bg);color:var(--link);border-color:var(--tone-information-line)}

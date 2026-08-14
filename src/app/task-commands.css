@@ -13,7 +13,7 @@
   display: block;
   margin: 0 0 24px;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   background: var(--background-surface);
 }
@@ -30,7 +30,7 @@
 
 .task-command-console > header p {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -39,7 +39,7 @@
 .task-command-clarify label {
   display: block;
   margin-bottom: 7px;
-  font: 750 12px var(--font-mono);
+  font: var(--type-mono);
 }
 
 .task-command-input-row {
@@ -56,7 +56,7 @@
   border-radius: 11px;
   padding: 11px 13px;
   background: var(--background-surface);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 /* 44px on every control, including inside the dialog and the unified composer.
@@ -78,14 +78,14 @@
 
 .task-command-primary {
   border: 0;
-  background: var(--ink);
+  background: var(--text-primary);
   color: var(--action-primary-text);
 }
 
 .task-command-secondary {
   border: 1px solid var(--border-strong);
   background: var(--background-surface);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .task-command-destructive {
@@ -97,7 +97,7 @@
 .task-command-result {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-default);
 }
 
 /*
@@ -109,7 +109,7 @@
 .task-command-dialog :focus-visible,
 .task-command-console :focus-visible,
 .assistant-composer :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -120,29 +120,29 @@
 
 .task-command-result > p {
   margin: 0 0 10px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   line-height: 1.55;
 }
 
 .task-command-reason {
   font-weight: 650;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .task-command-preview {
   margin: 12px 0;
   padding: 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .task-command-notice {
   margin: 0 0 8px;
-  font: 750 10px var(--font-mono);
+  font: var(--type-eyebrow);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .task-command-task-title {
@@ -164,7 +164,7 @@
 }
 
 .task-command-delta dt {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .task-command-delta dd {
@@ -195,7 +195,7 @@
 }
 
 .task-command-candidates legend {
-  font: 750 12px var(--font-mono);
+  font: var(--type-mono);
   padding: 0 0 8px;
 }
 
@@ -206,7 +206,7 @@
   /* The label is the hit area, so it carries the touch-target minimum. */
   min-height: 44px;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 11px;
   margin-bottom: 8px;
   background: var(--background-surface);
@@ -214,7 +214,7 @@
 }
 
 .task-command-candidate:has(input:focus-visible) {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -230,7 +230,7 @@
 .task-command-candidate-meta,
 .task-command-evidence {
   font-size: 12px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 /* --- the hand-rolled dialog (2E-A11Y-004) --- */
@@ -248,7 +248,7 @@
 .task-command-dialog {
   width: min(100%, 460px);
   padding: 24px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   background: var(--background-surface);
   box-shadow: var(--elevation-3);
@@ -261,7 +261,7 @@
 
 .task-command-dialog p {
   margin: 0 0 16px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   line-height: 1.55;
 }
 
@@ -273,7 +273,7 @@
   margin-left: 10px;
   border: 1px solid var(--border-strong);
   background: var(--background-surface);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 /* --- the cancelled-task recovery surface (2E-DESTRUCTIVE-006) --- */
@@ -284,7 +284,7 @@
   min-height: 44px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--blue);
+  color: var(--link);
 }
 
 .task-command-recovery .list-row {
@@ -298,7 +298,7 @@
 .task-command-recovery-meta {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 /*
