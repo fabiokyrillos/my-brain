@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AttachmentLink } from "./attachment-links";
+import type { AttachmentLink } from "./link-contracts";
 import {
   NO_CLASSIFICATION,
   resolveLinkedFiles,

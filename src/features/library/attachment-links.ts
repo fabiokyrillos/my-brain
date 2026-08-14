@@ -3,9 +3,12 @@ import "server-only";
 import { boundedList, withProbe } from "@/features/bounds/contracts";
 import type { createClient } from "@/lib/supabase/server";
 
+import { RELATION_LIMIT } from "@/features/bounds/contracts";
+
 import {
   ATTACHMENT_LINK_LIMIT,
   PAGE_LINK_LIMIT,
+  REVERSE_LINKED_ENTITY_TYPES,
   toLinkOutcome,
   type AttachmentLink,
   type LinkOutcome,
@@ -82,4 +85,52 @@ export async function loadLinksForEntity(
     .limit(withProbe(ATTACHMENT_LINK_LIMIT));
 
   return toLinkOutcome(data as LinkRow[] | null, error, ATTACHMENT_LINK_LIMIT);
+}
+
+/**
+ * `2N-FILES-010`'s linked-entity axis — the options, across everything the
+ * owner owns.
+ *
+ * Read owner-wide rather than from the current page, because a chip list that
+ * changed as you paged would be describing the page instead of the filter.
+ * Bounded at `RELATION_LIMIT`, the bound this repository already applies to
+ * relation rows, rather than a number minted for this list.
+ */
+export async function loadLinkFilterOptions(
+  supabase: SupabaseClient,
+): Promise<LinkOutcome<AttachmentLink>> {
+  const { data, error } = await supabase
+    .from("entity_attachments")
+    .select(LINK_COLUMNS)
+    .in("entity_type", [...REVERSE_LINKED_ENTITY_TYPES])
+    .order("created_at", { ascending: false })
+    .limit(withProbe(RELATION_LIMIT));
+
+  return toLinkOutcome(data as LinkRow[] | null, error, RELATION_LIMIT);
+}
+
+/**
+ * The attachment ids linked to one subject — `2N-FILES-010`'s linked filter.
+ *
+ * Separate from `loadLinksForEntity` because the two answer different
+ * questions: that one renders a bounded section on the subject's own page, this
+ * one narrows a query. It therefore returns the outcome rather than a bare list,
+ * so the caller can refuse to filter on a read that did not happen — a failure
+ * flattened to `[]` here would filter the library down to nothing and render as
+ * "no files match", which is a failure wearing the shape of an answer.
+ */
+export async function loadAttachmentIdsForSubject(
+  supabase: SupabaseClient,
+  entityType: ReverseLinkedEntityType,
+  entityId: string,
+): Promise<LinkOutcome<AttachmentLink>> {
+  const { data, error } = await supabase
+    .from("entity_attachments")
+    .select(LINK_COLUMNS)
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false })
+    .limit(withProbe(RELATION_LIMIT));
+
+  return toLinkOutcome(data as LinkRow[] | null, error, RELATION_LIMIT);
 }

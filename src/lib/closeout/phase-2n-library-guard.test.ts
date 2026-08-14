@@ -128,7 +128,7 @@ describe("no writer is created for `entity_attachments`", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).sort();
     const regrants = migrations.filter((file) => {
       const sql = stripComments(read(`supabase/migrations/${file}`));
-      return /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/is.test(
+      return /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/i.test(
         sql,
       );
     });
@@ -179,6 +179,16 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     expect(migrations.sort().at(-1)).toBe(
       "202608140094_phase_2n_slice_3_entity_deletion.sql",
     );
+  });
+
+  it("invents no second notion of an orphan", () => {
+    // `2N-FILES-005` requires orphan detection to reuse the existing scanner
+    // (`scripts/verify-storage-orphans.mjs`, SH-STORAGE-001/003). The slice's
+    // stop conditions name "a second orphan concept" first, so the strongest
+    // statement is that the feature never uses the word at all.
+    for (const file of LIBRARY_SOURCES) {
+      expect([file, /orphan/i.test(code(file))]).toEqual([file, false]);
+    }
   });
 
   it("creates no function the library could call", () => {
@@ -406,7 +416,7 @@ describe("mutation controls", () => {
   it("the re-grant scan detects a restored grant", () => {
     const mutated = "grant insert, update on public.entity_attachments to authenticated;";
     expect(
-      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/is.test(
+      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/i.test(
         mutated,
       ),
     ).toBe(true);
@@ -415,7 +425,7 @@ describe("mutation controls", () => {
   it("the re-grant scan does not fire on the revocation itself", () => {
     const revocation = "revoke insert, update, delete on public.entity_attachments from authenticated;";
     expect(
-      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/is.test(
+      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/i.test(
         revocation,
       ),
     ).toBe(false);
@@ -424,7 +434,7 @@ describe("mutation controls", () => {
   it("the re-grant scan does not fire on a select-only grant", () => {
     const selectOnly = "grant select on public.entity_attachments to authenticated;";
     expect(
-      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/is.test(
+      /grant[^;]*\b(insert|update|delete)\b[^;]*public\.entity_attachments[^;]*to[^;]*authenticated/i.test(
         selectOnly,
       ),
     ).toBe(false);
@@ -458,6 +468,22 @@ describe("mutation controls", () => {
   it("the filter-order scan detects a predicate applied after the range", () => {
     const mutated = 'query.range(from, to);\nfileQuery.eq("status", state);';
     expect(mutated.indexOf('fileQuery.eq("status"')).toBeGreaterThan(mutated.indexOf(".range(from, to)"));
+  });
+
+  it("the orphan scan detects a second concept, and ignores unrelated words", () => {
+    expect(/orphan/i.test("function findOrphanedLinks() {}")).toBe(true);
+    expect(/orphan/i.test("const linked = resolveLinkedFiles(links, rows);")).toBe(false);
+  });
+
+  it("the page reads the link table only through the loaders", () => {
+    // The mutation control for the convergence claim: a page assembling its own
+    // query would be a second place the bound, the narrowing and the failure
+    // outcome could disagree.
+    const direct = 'supabase.from("entity_attachments").select("attachment_id")';
+    expect(direct.includes('from("entity_attachments")')).toBe(true);
+    for (const page of [FILES_PAGE, PERSON_PAGE, PROJECT_PAGE]) {
+      expect([page, code(page).includes('from("entity_attachments")')]).toEqual([page, false]);
+    }
   });
 
   it("the comment stripper removes the prose these guards would otherwise read", () => {

@@ -13,10 +13,13 @@ import {
   RELATION_LIMIT,
   withProbe,
 } from "@/features/bounds/contracts";
-import { loadLinksForAttachments } from "@/features/library/attachment-links";
+import {
+  loadAttachmentIdsForSubject,
+  loadLinkFilterOptions,
+  loadLinksForAttachments,
+} from "@/features/library/attachment-links";
 import {
   ATTACHMENT_LINK_LIMIT,
-  narrowAttachmentLinks,
   linksByAttachment,
   type AttachmentLink,
 } from "@/features/library/link-contracts";
@@ -49,7 +52,7 @@ import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { ATTACHMENT_LIMITS } from "@/lib/quotas";
 import { isLocale } from "@/lib/preferences";
 import type { Database } from "@/lib/supabase/database.types";
-import { requireSupabaseData } from "@/lib/supabase/result";
+import { requireSupabaseData, SupabaseQueryError } from "@/lib/supabase/result";
 
 type FileAnalysis = {
   attachment_id: string;
@@ -161,19 +164,23 @@ export default async function FilesPage({
    * to nothing and render as "no files match" — a failure wearing the shape of
    * an answer.
    */
-  const filteredAttachmentIds = filters.linked
-    ? narrowAttachmentLinks(
-        requireSupabaseData(
-          await supabase
-            .from("entity_attachments")
-            .select("attachment_id,entity_type,entity_id")
-            .eq("entity_type", filters.linked.entityType)
-            .eq("entity_id", filters.linked.entityId)
-            .limit(withProbe(RELATION_LIMIT)),
-          "load linked file ids",
-        ),
-      ).map((link) => link.attachmentId)
+  const filteredSubject = filters.linked
+    ? await loadAttachmentIdsForSubject(
+        supabase,
+        filters.linked.entityType,
+        filters.linked.entityId,
+      )
     : null;
+  if (filteredSubject?.status === "failed") {
+    // A failed read here would otherwise produce an empty id list, filter the
+    // page down to nothing, and render as "no files match" — a failure wearing
+    // the shape of an answer. The error boundary is the honest destination.
+    throw new SupabaseQueryError("load linked file ids", { message: "link read failed" });
+  }
+  const filteredAttachmentIds =
+    filteredSubject?.status === "ok"
+      ? filteredSubject.list.items.map((link) => link.attachmentId)
+      : null;
 
   let fileQuery = supabase
     .from("attachments")
@@ -192,8 +199,14 @@ export default async function FilesPage({
     fileQuery = mimeTypes
       ? fileQuery.in("mime_type", mimeTypes as string[])
       : // `other` is the complement of everything the named kinds cover, so a
-        // MIME type added to the allowlist tomorrow still has a home today.
-        fileQuery.not("mime_type", "in", `(${CLASSIFIED_MIME_TYPES.join(",")})`);
+        // MIME type added to the allowlist tomorrow still has a home today. The
+        // values are quoted because a MIME type is punctuation-heavy and
+        // PostgREST reads an unquoted list positionally.
+        fileQuery.not(
+          "mime_type",
+          "in",
+          `(${CLASSIFIED_MIME_TYPES.map((value) => `"${value}"`).join(",")})`,
+        );
   }
   if (filters.period) {
     const since = periodSince(filters.period, new Date());
@@ -201,7 +214,7 @@ export default async function FilesPage({
   }
   if (filteredAttachmentIds) fileQuery = fileQuery.in("id", filteredAttachmentIds);
 
-  const [fileResult, failedJobResult, linkOptionResult] = await Promise.all([
+  const [fileResult, failedJobResult, linkOptionOutcome] = await Promise.all([
     fileQuery.order("created_at", { ascending: false }).range(from, to),
     supabase
       .from("jobs")
@@ -215,20 +228,10 @@ export default async function FilesPage({
       // failed uploads saw 20 and was told the rest did not exist — on the one
       // section of this page whose entire purpose is "these need your attention".
       .limit(withProbe(FAILED_JOB_LIMIT)),
-    /*
-     * The filter axis's options, read across everything the owner owns rather
-     * than from the current page — a chip list that changed as you paged would
-     * be describing the page instead of the filter.
-     *
-     * Bounded at `RELATION_LIMIT`, the bound this repository already uses for
-     * relation rows, rather than a number minted for this list.
-     */
-    supabase
-      .from("entity_attachments")
-      .select("attachment_id,entity_type,entity_id")
-      .in("entity_type", ["person", "project"])
-      .order("created_at", { ascending: false })
-      .limit(withProbe(RELATION_LIMIT)),
+    // The filter axis's options, read across everything the owner owns rather
+    // than from the current page — a chip list that changed as you paged would
+    // be describing the page instead of the filter.
+    loadLinkFilterOptions(supabase),
   ]);
 
   const paginated = paginateRows(
@@ -276,8 +279,10 @@ export default async function FilesPage({
    * below: an axis that is not rendered makes **no claim at all**, whereas a
    * linked-files section that rendered empty would be asserting there are none.
    */
-  const filterLinks = narrowAttachmentLinks(linkOptionResult.data);
-  const boundedFilterLinks = boundedList(filterLinks, RELATION_LIMIT);
+  const boundedFilterLinks =
+    linkOptionOutcome.status === "ok"
+      ? linkOptionOutcome.list
+      : boundedList<AttachmentLink>([], RELATION_LIMIT);
 
   // One query per type, never one per link — `2N-FILES-010`'s measurement
   // forbids a round trip per item, and the union of both purposes is resolved in

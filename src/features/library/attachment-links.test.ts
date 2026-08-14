@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { loadLinksForAttachments, loadLinksForEntity } = await import("./attachment-links");
+const {
+  loadAttachmentIdsForSubject,
+  loadLinkFilterOptions,
+  loadLinksForAttachments,
+  loadLinksForEntity,
+} = await import("./attachment-links");
 const { ATTACHMENT_LINK_LIMIT, PAGE_LINK_LIMIT } = await import("./link-contracts");
 
 /**
@@ -115,9 +120,46 @@ describe("a failed read reaches the caller as failed", () => {
   });
 });
 
+describe("2N-FILES-010: the filter's two reads", () => {
+  it("offers options across the owner's whole set, not the current page", async () => {
+    const { stub, calls } = linkStub({ data: [], error: null });
+    await loadLinkFilterOptions(supabase(stub));
+    // No `attachment_id` predicate: a chip list scoped to the page would be
+    // describing the page rather than the filter.
+    expect(calls.some((call) => call.method === "in" && call.args[0] === "attachment_id")).toBe(
+      false,
+    );
+    expect(calls.find((call) => call.method === "in")?.args).toEqual([
+      "entity_type",
+      ["person", "project"],
+    ]);
+  });
+
+  it("narrows by subject with both halves of the predicate", async () => {
+    const { stub, calls } = linkStub({ data: [], error: null });
+    await loadAttachmentIdsForSubject(supabase(stub), "project", "project-1");
+    expect(calls.filter((call) => call.method === "eq").map((call) => call.args)).toEqual([
+      ["entity_type", "project"],
+      ["entity_id", "project-1"],
+    ]);
+  });
+
+  it("reports a failed narrowing rather than an empty id list", async () => {
+    // An empty list here would filter the library down to nothing and render as
+    // "no files match" — a failure wearing the shape of an answer.
+    const { stub } = linkStub({ data: null, error: { message: "boom" } });
+    expect((await loadAttachmentIdsForSubject(supabase(stub), "person", "p")).status).toBe("failed");
+  });
+});
+
 describe("the loader module ships no writer", () => {
-  it("exports exactly the two reads", async () => {
-    const module = await import("./attachment-links");
-    expect(Object.keys(module).sort()).toEqual(["loadLinksForAttachments", "loadLinksForEntity"]);
+  it("exports exactly the four reads", async () => {
+    const moduleExports = await import("./attachment-links");
+    expect(Object.keys(moduleExports).sort()).toEqual([
+      "loadAttachmentIdsForSubject",
+      "loadLinkFilterOptions",
+      "loadLinksForAttachments",
+      "loadLinksForEntity",
+    ]);
   });
 });

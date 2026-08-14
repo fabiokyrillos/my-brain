@@ -167,8 +167,8 @@ describe("the contract module ships no writer", () => {
    * and whoever adds one has to state whether it writes.
    */
   it("exports exactly the read surface, and nothing else", async () => {
-    const module = await import("./link-contracts");
-    expect(Object.keys(module).sort()).toEqual(
+    const moduleExports = await import("./link-contracts");
+    expect(Object.keys(moduleExports).sort()).toEqual(
       [
         "ATTACHMENT_LINK_LIMIT",
         "LINKED_ENTITY_TYPES",
