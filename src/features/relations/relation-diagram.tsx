@@ -131,11 +131,18 @@ export function RelationDiagram({
                     <span className="relations-node-name">{node.label}</span>
                   </>
                 );
+                /*
+                 * A fixed height, not a floor. The layout guarantees no overlap
+                 * by placing rows a `PITCH` apart, and that guarantee is only
+                 * true if a box cannot grow: a long name under `min-height`
+                 * would push past its row and sit on the node below, while the
+                 * arithmetic went on saying it could not.
+                 */
                 const style = {
                   left: `${node.x}px`,
                   top: `${node.y}px`,
                   width: `${NODE_WIDTH}px`,
-                  minHeight: `${NODE_HEIGHT}px`,
+                  height: `${NODE_HEIGHT}px`,
                 };
                 return node.href ? (
                   <Link

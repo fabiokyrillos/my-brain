@@ -369,7 +369,19 @@ test.describe("2N.6 — the relations surface draws only what it can explain", (
 
       await expect(page.getByRole("heading", { level: 1 })).toContainText(MARINA);
       await expect(page.locator("body")).not.toContainText(PRIVATE_NOTE);
-      await page.getByRole("button", { name: copy.reveal }).first().click();
+
+      /*
+       * Scoped to the relationship's own row rather than `.first()`.
+       *
+       * This page has several protected subjects — the note, memories, entries —
+       * and every one of their reveal controls is called "Mostrar". A `.first()`
+       * here would reveal whichever happens to come first in the DOM and then
+       * assert about a string it never uncovered.
+       */
+      await page
+        .locator("li.relation-row", { hasText: copy.manager })
+        .getByRole("button", { name: copy.reveal })
+        .click();
       await expect(page.locator("body")).toContainText(PRIVATE_NOTE);
     });
 
@@ -495,8 +507,11 @@ test.describe("2N.6 — the relations surface draws only what it can explain", (
     // `2N-RELATION-004` requires an existing path, and the relations surface
     // deliberately owns no writer.
     await page.goto(`/pt-BR/app/people/${person.id}`);
+    await expect(page.locator("body")).toContainText("Mentora/Mentor");
     await page.getByRole("button", { name: copy.endRelationship }).first().click();
-    await expect(page.locator("body")).not.toContainText("Mentora/Mentor");
+    // The action's own confirmation, so the next navigation is not a race
+    // against a write that has not landed.
+    await expect(page.locator("body")).toContainText("Relação encerrada");
 
     await page.goto("/pt-BR/app/relations");
     await expect(page.getByRole("heading", { level: 1, name: copy.heading })).toBeVisible();

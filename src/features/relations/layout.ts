@@ -45,12 +45,17 @@ import {
 /**
  * Node geometry, in CSS pixels.
  *
- * `NODE_HEIGHT` is 48 rather than 44 so a node clears the 44px minimum with its
- * border, and `PITCH` exceeds it so two nodes can never touch — the property
- * `2N-MOBILE-001` asks for, expressed as a number the layout cannot violate.
+ * `NODE_HEIGHT` clears the 44px minimum with room to spare, and it is a **fixed**
+ * height rather than a floor. That distinction is the whole reason this constant
+ * is what it is: the box holds a type label and a name clamped to two lines, and
+ * a `min-height` would let a long name grow the box past `PITCH` and sit on top
+ * of the node below — an overlap the arithmetic would still call impossible.
+ *
+ * 60 = 12 padding + 13 for the type label + 32.5 for two 13px/1.25 lines, with
+ * 2.5px of slack. `PITCH` then exceeds it by 16, so two nodes can never touch.
  */
 export const NODE_WIDTH = 168;
-export const NODE_HEIGHT = 48;
+export const NODE_HEIGHT = 60;
 export const COLUMN_GAP = 88;
 export const ROW_GAP = 16;
 export const PITCH = NODE_HEIGHT + ROW_GAP;

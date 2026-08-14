@@ -259,10 +259,11 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
-  /* Two lines, then an ellipsis. A name that overflowed its box would collide
-     with the node below it, and truncating without the full name available
-     somewhere would make the drawing the only place it is written — so the list
-     above always carries it in full. */
+  /* Two lines, then an ellipsis. The box's height is fixed by the layout so a
+     name can never push it into the node below; the clamp is what keeps the
+     text inside that height. Truncating is only acceptable because the list
+     above always carries the full name — the drawing is never the only place
+     something is written. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
