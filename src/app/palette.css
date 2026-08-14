@@ -63,7 +63,7 @@
 .palette-empty strong { font-size: 14px; }
 .palette-empty span { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
 
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   /* Full-screen on mobile, and the field sits at the top so the virtual
      keyboard does not cover the results it is filtering. */
   .palette-backdrop { padding: 0; }
@@ -99,7 +99,7 @@
 .search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .search-bounded { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
 
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   .search-surface { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
   .search-form { grid-template-columns: 1fr; }
   .search-input { min-height: 50px; }
@@ -140,7 +140,7 @@
 /* A navigation aid, not a metric: it says whether the door leads anywhere. */
 .library-card-count { font: 650 11px var(--font-mono); color: var(--ink-soft); }
 
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   .library-page { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
   .library-grid { grid-template-columns: 1fr; }
   .library-card { min-height: 88px; }

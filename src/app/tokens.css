@@ -37,7 +37,10 @@
   /* ---- text ------------------------------------------------------------- */
   --text-primary: #1a1917;
   --text-secondary: #55504a;
-  --text-muted: #736d64;
+  /* Darkened from the direction table's #736d64, which measures 4.46:1 on
+     --background-subtle — a hairline AA miss for small text. This clears 4.5
+     on every surface in the palette. It remains the lightest permitted text. */
+  --text-muted: #6f695f;
   --text-inverse: #f7f6f3;
 
   /* ---- lines and marks -------------------------------------------------- */

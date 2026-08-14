@@ -131,7 +131,7 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 .status-badge.needs_attention{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}.status-badge.could_not_organize{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.status-badge.saved,.status-badge.organizing{background:var(--blue-wash);color:var(--blue)}.status-badge.ready{background:var(--tone-success-bg);color:var(--tone-success-fg)}.list-attention-hint{color:var(--ink-soft)}
 
 /* Phase 2X.9: decision-first progressive disclosure review */
-.entry-review{display:grid;gap:18px;max-width:760px}
+.entry-review{display:grid;gap:18px;max-width: 899px}
 .review-facts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0}
 .review-facts div{display:flex;gap:5px;align-items:baseline;border:1px solid var(--border-strong);border-radius:999px;padding:6px 10px;background:var(--mist);font:600 10px var(--font-mono);color:var(--ink-soft)}
 .review-facts dt,.review-facts dd{margin:0}

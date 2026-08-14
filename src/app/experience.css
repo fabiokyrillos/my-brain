@@ -37,7 +37,11 @@
   --tone-success-bg: #eaf3ed;
   --tone-success-line: #bcd6c6;
 
-  --tone-attention-fg: #b0722a;
+  /* #b0722a from the direction table measures 3.46–3.97:1 and fails AA for
+     small text on every surface, including its own wash. 07-acessibilidade.md
+     anticipates this and prescribes the darker amber for small text; axe caught
+     it on the Conversar cards, where five state labels render at 14px. */
+  --tone-attention-fg: #8a5a1e;
   --tone-attention-bg: #fbf3e6;
   --tone-attention-line: #e0c39a;
 
@@ -57,7 +61,7 @@
 
   /* Archived reads as the palette's neutral, not as a cold grey-blue: the
      canvas is warm, and a blue-grey chip on it looks like a different product. */
-  --tone-archived-fg: #736d64;
+  --tone-archived-fg: #6f695f;
   --tone-archived-bg: #f1efea;
   --tone-archived-line: #e2ded6;
 
@@ -186,7 +190,7 @@
   /* 44px touch target on mobile — `2I-LANG-006`. */
   min-height: 40px;
 }
-@media (max-width: 760px) { .ux-state-action { min-height: 44px; width: 100%; text-align: center; } }
+@media (max-width: 899px) { .ux-state-action { min-height: 44px; width: 100%; text-align: center; } }
 
 /* A skeleton that matches the final layout, so nothing reflows on arrival. */
 .ux-skeleton { display: grid; gap: 10px; }
@@ -235,7 +239,7 @@
 .ux-action-primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
 .ux-action-destructive { background: var(--tone-risk-fg); color: var(--white); border-color: var(--tone-risk-fg); }
 .ux-action-quiet { background: transparent; border-color: transparent; color: var(--ink-soft); }
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   /* 44px targets, and actions stack rather than wrapping into slivers. */
   .ux-action { min-height: 44px; flex: 1 1 100%; }
 }
@@ -295,7 +299,7 @@
 .ux-detail-title { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .ux-detail-close { min-width: 40px; min-height: 40px; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-soft); }
 .ux-detail-body { flex: 1; min-height: 0; overflow: auto; padding: 20px; }
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   .ux-detail { left: 0; width: 100vw; border-left: 0; }
   .ux-detail-close { min-width: 44px; min-height: 44px; }
 }

@@ -249,7 +249,7 @@
   line-height: 1.5;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   /*
    * Five equal columns, one per `mobileBarSlots` entry (UX-14).
    *
