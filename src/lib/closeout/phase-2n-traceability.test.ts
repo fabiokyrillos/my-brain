@@ -55,6 +55,39 @@ describe("2N-CLOSE-001: every declared requirement is classified exactly once", 
   });
 });
 
+describe("the tally the prose states is the tally the generator produces", () => {
+  const result = buildMatrix(REPO);
+
+  it("keeps STATE, CHANGELOG and the closing report in step with the source", () => {
+    /*
+     * The one number in this close that is typed rather than generated.
+     *
+     * The matrix cannot drift — a guard re-derives it — but four documents
+     * *quote* its tally in prose, and a later correction to any acceptance
+     * record would move the generator's answer while leaving those sentences
+     * saying the old one. That is the "generated rather than typed" failure
+     * wearing prose, so the sentence is asserted against the source too.
+     */
+    // Counted off `resolved` rather than read off the generator's untyped
+    // `tally`, so the assertion stays typed and still measures the same source.
+    const count = (klass: string) => result.resolved.filter((row) => row.class === klass).length;
+    const tally = `${count("built")} built · ${count("baseline")} baseline · `
+      + `${count("partial")} partial · ${count("not-built-by-rule")} not-built-by-rule · `
+      + `${count("undelivered")} undelivered`;
+    for (const file of [
+      "docs/STATE.md",
+      "docs/CHANGELOG.md",
+      "docs/reports/phase-2n/PHASE_2N_CLOSING_REPORT.md",
+    ]) {
+      expect(read(file), `${file} quotes a stale tally`).toContain(tally);
+    }
+  });
+
+  it("mutation control: a changed tally would not be found", () => {
+    expect(read("docs/STATE.md")).not.toContain("94 built · 20 baseline");
+  });
+});
+
 describe("2N-CLOSE-002: every partial carries a destination", () => {
   const result = buildMatrix(REPO);
 
