@@ -24,6 +24,10 @@ import {
 import { loadAliasesForEntity } from "@/features/entities/aliases";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
+import { loadLinksForEntity } from "@/features/library/attachment-links";
+import { ATTACHMENT_LINK_LIMIT } from "@/features/library/link-contracts";
+import { LinkedFilesSection } from "@/features/library/linked-subjects-section";
+import { resolveLinkedFiles, type ResolvedFileRow } from "@/features/library/linked-subjects";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { deriveClaimProvenance, isOpenable, resolvableEntryIdsOf } from "@/features/provenance/contracts";
 import { getProvenanceCopy } from "@/features/provenance/copy";
@@ -34,7 +38,7 @@ import {
   readableLevelsOf,
 } from "@/features/sensitivity/subject-derivation";
 import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
-import { getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
+import { attachmentStatusLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
@@ -66,6 +70,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     contextOptions,
     projectOptionsResult,
     aliases,
+    fileLinkOutcome,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
     supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at").eq("id", personId).maybeSingle(),
@@ -107,6 +112,18 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     // nicknames the owner recorded could not explain why searching one found
     // this person. Owner-scoped under forced RLS, validity-windowed at now.
     loadAliasesForEntity(supabase, "person", personId, new Date()),
+    /*
+     * `2N-PERSON-008`, `2N-FILES-009` — `entity_attachments` gains its first
+     * reader on a contextual page, and gains no writer anywhere.
+     *
+     * The outcome is kept rather than flattened to a list: "no file is linked to
+     * this person" and "the link table could not be read" are different claims,
+     * and the section renders them differently. The section also states, in the
+     * empty case, that the product currently offers no way to create a link —
+     * `authenticated` holds no `INSERT` on the table and this slice adds none —
+     * so the emptiness is explained rather than left to look like a bug.
+     */
+    loadLinksForEntity(supabase, "person", personId),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];
@@ -121,7 +138,9 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const projectIds = projectLinks.map((item) => item.project_id);
   const entryIds = entryLinks.map((item) => item.entry_id);
   const contextIds = contextLinks.map((item) => item.context_id);
-  const [taskResult, projectResult, entryResult, contextResult] = await Promise.all([
+  const fileLinks = fileLinkOutcome.status === "ok" ? fileLinkOutcome.list.items : [];
+  const linkedFileIds = fileLinks.map((link) => link.attachmentId);
+  const [taskResult, projectResult, entryResult, contextResult, attachmentResult] = await Promise.all([
     // `source_entry_id` joins this projection so a task's classification can be
     // derived at all: `tasks` carries no `sensitivity` column and OD-2L-1 B
     // forbids adding one, so the level comes from the entry the task came from.
@@ -129,6 +148,11 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     projectIds.length ? supabase.from("projects").select("id,name,status").in("id", projectIds).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
     entryIds.length ? supabase.from("entries").select("id,original_content,occurred_at,is_retroactive,sensitivity").in("id", entryIds).order("occurred_at", { ascending: false }).limit(withProbe(CONTEXTUAL_LIMIT)) : Promise.resolve({ data: [], error: null }),
     contextIds.length ? supabase.from("contexts").select("id,name,kind").in("id", contextIds).limit(withProbe(RELATION_LIMIT)) : Promise.resolve({ data: [], error: null }),
+    // `2N-FILES-004`: `sensitivity` travels with the name, because
+    // `2N-PRIVACY-002` names a file name as content this contract governs — the
+    // same projection the library itself reads, so a file masked there is masked
+    // here.
+    linkedFileIds.length ? supabase.from("attachments").select("id,original_name,status,sensitivity").in("id", linkedFileIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const tasks = requireSupabaseData(taskResult, "load related tasks") ?? [];
   const projects = requireSupabaseData(projectResult, "load related projects") ?? [];
@@ -219,6 +243,30 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const boundedRelationships = boundedList(relationships, RELATION_LIMIT);
   const boundedContexts = boundedList(contexts, RELATION_LIMIT, contextLinks.length > RELATION_LIMIT);
   const boundedProjects = boundedList(projects, CONTEXTUAL_LIMIT, projectLinks.length > CONTEXTUAL_LIMIT);
+
+  /*
+   * `2N-PERSON-008`, `2N-FILES-005`/`-009`.
+   *
+   * Built from attachment rows that actually came back, never from the ids the
+   * links named. A file that was deleted, belongs to someone else, or simply did
+   * not return is absent from this map and therefore absent from the section —
+   * the same collapse `resolvableEntryIdsOf` performs above, so the page cannot
+   * be used to test whether a particular attachment id exists.
+   */
+  const linkedFileRows = new Map<string, ResolvedFileRow>();
+  const linkedFileLevels = readableLevelsOf(attachmentResult.data);
+  for (const attachment of attachmentResult.data ?? []) {
+    linkedFileRows.set(attachment.id, {
+      name: attachment.original_name,
+      status: attachment.status,
+      sensitivity: deriveSubjectSensitivity(attachment.id, linkedFileLevels),
+    });
+  }
+  const boundedFiles = boundedList(
+    resolveLinkedFiles(fileLinks, linkedFileRows),
+    ATTACHMENT_LINK_LIMIT,
+    fileLinkOutcome.status === "ok" && fileLinkOutcome.list.bounded,
+  );
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.
@@ -478,6 +526,21 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           <BoundedNotice list={boundedMemories} locale={locale} />
         </section>
       )}
+
+      {/*
+        `2N-PERSON-008`. Rendered unconditionally rather than only when it has
+        rows, because the two things this section says when it is empty are both
+        useful: that no file is linked to this person, and that the product does
+        not yet offer a way to link one. A section that disappeared when empty
+        would leave the second fact unsaid and the first indistinguishable from
+        the page having no opinion.
+      */}
+      <LinkedFilesSection
+        files={boundedFiles}
+        locale={locale}
+        outcome={fileLinkOutcome}
+        statusLabel={(value) => attachmentStatusLabel(locale, value) ?? vocabulary.unknownState}
+      />
 
       <section className="entity-timeline">
         <h2>{pt ? "Linha do tempo" : "Timeline"}</h2>

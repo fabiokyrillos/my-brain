@@ -82,7 +82,8 @@
     "verify:edge-parity": "node scripts/verify-edge-function-parity.mjs",
     "verify:egc:cleanup": "node scripts/verify-egc-cleanup.mjs",
     "verify:online-residue": "node scripts/verify-online-fixture-residue.mjs",
-    "verify:storage:orphans": "node scripts/verify-storage-orphans.mjs"
+    "verify:storage:orphans": "node scripts/verify-storage-orphans.mjs",
+    "test:remote:2n5:cleanup": "node scripts/verify-phase-2n-slice-5-cleanup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
