@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
 // `2J-ATTN-007`. The EXISTING reinterpretation action, passed down. The list
 // never imports it, and there is no generic attention-mutation executor: the
 // only write reachable from this surface is the one that already owned it.
@@ -52,7 +53,14 @@ export default async function InboxPage({
   const timeZone = await getOwnerTimeZone();
 
   if (view === "needs-you") {
-    const projection = await loadAttentionProjection(supabase, { locale });
+    // `2N-CONFLICT-003`. Two independent reads, deliberately: the queue's rows
+    // come from `list_needs_attention` and conflicts are derived from the owner's
+    // own memories, so neither can fail the other. Run together because they are
+    // independent, not because they are related.
+    const [projection, conflicts] = await Promise.all([
+      loadAttentionProjection(supabase, { locale }),
+      loadMemoryConflicts(supabase, { locale, userId: user.id }),
+    ]);
 
     return (
       <div className="content-page">
@@ -65,8 +73,14 @@ export default async function InboxPage({
         </header>
         <InboxViewTabs locale={locale} active="needs-you" />
         <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="pull" limit={5} />
-        {projection.items.length ? (
+        {/*
+          Counts conflicts too. Left as `projection.items.length`, a queue whose
+          only item was a contradiction would have rendered "nothing needs you
+          right now" — which is the exact silence `2N-CONFLICT-004` forbids.
+        */}
+        {projection.items.length || conflicts.items.length ? (
           <NeedsAttentionList agentName={agentName}
+            conflicts={conflicts}
             initialItems={projection.items}
             initialCursor={projection.nextCursor}
             initialHasNext={projection.hasNext}
