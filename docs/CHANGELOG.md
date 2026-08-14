@@ -40,9 +40,19 @@ Tokenising lengths with a blanket regex also rewrote seven **query conditions** 
 
 The interface is IBM Plex Sans, metadata is IBM Plex Mono, and **Newsreader carries what the user or the Brain wrote in sentences** — which is the distinction the whole direction is built on. The immutable original in the record detail is now `--type-reading-lg` at full ink: it was being rendered quieter than the AI's proposal about it. The shell boundary consolidates from thirteen scattered breakpoints to one at 900px, the rail is 212px and the header 52px, and the settings spinner is the one animation `prefers-reduced-motion: reduce` never reached.
 
+### The independent review found four defects the author's own review missed
+
+All one family: **the `font:` shorthand discards what it does not name.** Three blocks declared `font:` twice and the second won in silence — `.trust-card > summary > strong` asked for mono then body and rendered as neither, `.ux-state-action` (the primary button on every state card) fell from 700 to 400, and `.conflict-dates dd` never received its monospace. One block declared `font-family: ui-monospace` *before* the shorthand, throwing away the family that rule exists for.
+
+It also caught that the font swap rested on a false premise: `layout.tsx` pinned IBM Plex Sans to three weights on the stated grounds that it is not variable. **It is** — and so is Newsreader; only Plex Mono is not. **85 declarations at 650/700/750/800 were being synthesised as faux bold.**
+
+Three more: the `760 → 899` sweep also hit `.entry-review`'s **max-width**, a length rather than a query, widening that column 18%; two state indicators were reduced to near-invisible neutrals (the palette's keyboard highlight at **1.29:1** and the active nav item at **1.15:1**, against WCAG 1.4.11's 3:1, with `--elevation-1` resolving to `none` in dark so no shadow compensated); and `.palette-trigger` lost 4px of touch target while `.search-sensitive` lost the `!important` that was the only thing distinguishing the sensitive filter from every other label.
+
+**The review named the guard gap exactly**, and it is now closed: nothing had checked for a duplicated `font:`, a longhand reset by a later shorthand, or a weight no loaded face provides. All three fail now, each with a planted control.
+
 ### Verification
 
-**7358 unit tests · 181 Playwright across every lane and both projects · lint · typecheck · build · `git diff --check` clean.** Axe clean at desktop and mobile on all fourteen surfaces. Contrast measured in a real browser in both themes at 375, 768 and 1440: worst 5.31:1 light, 5.04:1 dark, zero failures. No horizontal scroll at any width, including a 32px root font. Focus rings confirmed by real keyboard traversal — `solid 2px` at the ring colour with 2px offset. All fourteen routes respond, including the legacy `/today`, `/tasks` and `/waiting` redirects in both locales.
+**7364 unit tests · 211 Playwright across every lane and both projects · lint · typecheck · build · `git diff --check` clean.** Axe clean at desktop and mobile on all fourteen surfaces. Contrast measured in a real browser in both themes at 375, 768 and 1440: worst 5.31:1 light, 5.04:1 dark, zero failures. No horizontal scroll at any width, including a 32px root font. Focus rings confirmed by real keyboard traversal — `solid 2px` at the ring colour with 2px offset. All fourteen routes respond, including the legacy `/today`, `/tasks` and `/waiting` redirects in both locales.
 
 **NOT VERIFIED AND NOT CLAIMED:** no authenticated browser session, so Hoje, Registros, Trabalho, Brain and Conversar were never seen rendered with real data; no comparative screenshots; no screen-reader run; no physical device; no hosted environment; 617 Playwright journeys skipped because they need a live authenticated environment.
 
