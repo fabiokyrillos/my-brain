@@ -123,7 +123,22 @@ const REPO = resolve(__dirname, "../../..");
 // the citations while it has already displaced a live one, which no downstream
 // code can undo. Moved deliberately and visibly in the same commit that adds
 // the migration, which is the only way this pin is allowed to change.
-const AUTHORIZED_MIGRATION_HEAD = "202608130093";
+// Moved by PHASE 2N SLICE 2N.3 to `202608140094`, transactional deletion.
+// This is MIGRATION M3 of the three ADR-109 allocated, all NON-TRANSFERABLE:
+// M1 was spent by this same slice at `202608130093` and M2 stays with slice
+// 2N.7 for the telemetry vocabulary, so the budget is now `3 allocated · 2
+// spent` with **a fourth a stop condition**. It creates ONE table — the
+// server-issued, single-use deletion confirmation ADR-113 authorized after the
+// intermediate re-audit found that §6.3's "no new table" prediction could not
+// hold — plus one census, one fingerprint and three RPCs, and it registers
+// three undo handlers in the registry that already ships. The deletion removes
+// `entry_entities`, `entity_aliases`, `entity_tags` and `entity_attachments`
+// EXPLICITLY, because those four carry `entity_type`/`entity_id` as an
+// unconstrained pair and no cascade reaches them: leaving them is the partial
+// deletion `2N-CORRECT-012` forbids. Moved deliberately and visibly in the same
+// commit that adds the migration, which is the only way this pin is allowed to
+// change.
+const AUTHORIZED_MIGRATION_HEAD = "202608140094";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

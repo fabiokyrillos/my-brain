@@ -1,9 +1,14 @@
--- Phase 2N slice 2N.3 — M3: transactional deletion of a person, a project and
--- a memory (PRD `2N-CORRECT-004…005`, `009…013`; `OD-2N-11` **B**; ADR-113).
+-- Phase 2N · slice 2N.3 · MIGRATION M3 of the three ADR-109 allocated.
 --
--- This is the phase's third allocated migration and its ONLY irreversible
--- operation. `3 allocated · M1 spent · M3 here · M2 reserved for 2N.7`, all
--- non-transferable, and **a fourth is a STOP CONDITION**.
+-- Allocation: M3 — transactional deletion and its propagation. NON-TRANSFERABLE.
+--   M1 (validity-aware retrieval) was spent by this same slice at
+--   `202608130093`. M2 stays allocated to slice 2N.7 (telemetry vocabulary).
+--   Budget after this migration: 3 allocated · 2 spent. A FOURTH IS A STOP
+--   CONDITION, not a decision available inside a branch.
+--
+-- Transactional deletion of a person, a project and a memory (PRD
+-- `2N-CORRECT-004…005`, `009…013`; `OD-2N-11` **B**; ADR-113). This is the
+-- phase's ONLY irreversible operation.
 --
 -- ===========================================================================
 -- WHY THIS FILE LOOKS THE WAY IT DOES

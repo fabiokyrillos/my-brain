@@ -212,8 +212,14 @@ select is(
   -- is not a weakened ceiling but an absent one. The worker reaches its
   -- admission through `claim_rate_limit_slot_for_user`, which decides and
   -- records rather than handing out table DML.
-  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
-  'exactly the ten RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  -- `entity_deletion_confirmations` joins in Phase 2N M3 (`202608140094`) for
+  -- the same reason `task_command_confirmations` did, one step sharper: it is
+  -- the single-use evidence that a destructive act was deliberated over, and a
+  -- role that could INSERT one could authorize the deletion of a person,
+  -- project or memory it was never shown a preview of. Its two writers are
+  -- SECURITY DEFINER functions that derive the binding rather than accept it.
+  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
+  'exactly the eleven RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -393,6 +399,11 @@ select is(
   || E'conversation_messages -> INSERT,SELECT\n'
   || E'credential_validation_attempts -> INSERT,SELECT\n'
   || E'entity_attachments -> SELECT\n'
+  -- Phase 2N M3 (`202608140094`). SELECT-only, and that is the whole posture:
+  -- the owner may read the confirmations they were issued, and no client role
+  -- may create, alter or consume one. A line here gaining INSERT would mean a
+  -- caller could mint its own authorization for an irreversible act.
+  || E'entity_deletion_confirmations -> SELECT\n'
   || E'entry_embeddings -> INSERT,SELECT,UPDATE\n'
   || E'entry_entities -> SELECT\n'
   || E'entry_interpretations -> SELECT\n'

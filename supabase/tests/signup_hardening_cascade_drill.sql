@@ -438,6 +438,22 @@ begin
     );
   exception when others then failures := failures || ('task_command_confirmations: ' || sqlerrm); end;
 
+  -- Phase 2N M3's deletion confirmation (`202608140094`). Inserted directly for
+  -- the same reason the row above is: the drill needs a row-complete account,
+  -- not a rehearsal of the issuing RPC, which would require a JWT this context
+  -- does not have. The row matters here because it is the one table M3 adds,
+  -- and its `user_id` is the ONLY thing tying it to an account — `entity_id`
+  -- carries no foreign key by design, so nothing else would take it away. If
+  -- the `on delete cascade` from `auth.users` were ever dropped, this drill is
+  -- what says so, by name.
+  begin
+    insert into public.entity_deletion_confirmations (
+      user_id, entity_type, entity_id, operation_key, request_fingerprint, status
+    ) values (
+      p_user, 'person', v_person, 'sh0-del-' || p_tag, repeat('0', 64), 'issued'
+    );
+  exception when others then failures := failures || ('entity_deletion_confirmations: ' || sqlerrm); end;
+
   -- 2H.1's recovery row. Inserted DIRECTLY rather than by transitioning the
   -- account to `deleting`, because the transition would block every insert
   -- above it through the SH.1 predicates and the drill's whole subject is a
