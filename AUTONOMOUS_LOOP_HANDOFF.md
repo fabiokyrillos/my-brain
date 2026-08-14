@@ -5303,3 +5303,138 @@ that reads as "the delete passes them by."
 a **fourth a STOP CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not**
 resumed, **Phase 2O not started, not planned and not retargeted**, and A13 still
 guarding the roadmap successor. Slices 2N.4–2N.7 remain.
+
+## §69 — Slice 2N.3 COMPLETE: the product can remove a person, a project and a memory, and the undo returns the same one (2026-08-14)
+
+**PR #215**, merged at `20fbbd0`, and **PR #216** at `0b7565c`, **CI green on
+both exact merge SHAs**. `docs/reports/phase-2n/PHASE_2N_SLICE_3_ACCEPTANCE.md`.
+ADR-113 and handoff §68 landed first as **PR #214** at `df64395`.
+
+**The phase's second migration.**
+`202608140094_phase_2n_slice_3_entity_deletion.sql`, allocation **M3**.
+**94 migrations, hosted parity `202608140094`, local = remote, read live.**
+Budget `3 allocated · 2 spent`; **M2 stays with 2N.7**, unspent and
+non-transferable, and a **fourth is a STOP CONDITION**.
+
+**25 requirements: 15 built, 5 baseline, 5 `not-built-by-rule`.**
+
+### The re-audit answered its stop condition by executing it
+
+`2N-CORRECT-013` asks whether every propagation can be undone *with truth*. That
+was not argued. A fully populated person — relationships in **both** directions
+with types and descriptions, an association with a `role`, a context, a task
+assignment, a task `waiting`, a memory with a real 1536-dimension embedding, an
+alias, an entry mention — was snapshotted, deleted, restored under the **same
+ids**, and compared: **nine row sets byte-identical**. Repeated for project and
+memory. **The embedding survives a `jsonb` round trip at cosine distance 0**, so
+a restored memory is retrieved exactly as before **with no provider call** — the
+largest technical risk to a true undo, closed by measurement.
+
+### The cascade does not reach the tables that matter most
+
+`entry_entities`, `entity_aliases`, `entity_tags` and `entity_attachments` carry
+`entity_type`/`entity_id` as an **unconstrained pair**, validated only by a
+`BEFORE INSERT OR UPDATE` trigger that never fires on the parent's delete.
+Deleting a person left all four alive, pointing at a dead id, and
+`entry_entities` has four live readers — so an entry would have gone on
+reporting a mention of someone the owner deleted. **No `on delete cascade`
+prevents this**, and M3 removes all four explicitly.
+
+**`authenticated` holds no `DELETE` on two of them**, so `2N-CORRECT-009`'s
+refusal of a client sequence stops being a rule and becomes a proof: a client
+**cannot** complete this deletion correctly. It also forces `SECURITY DEFINER`,
+because an invoker path would remove zero rows and **raise nothing**.
+
+**And the price of that was measured**: `postgres` holds `rolbypassrls`, so
+inside the function RLS is **not consulted at all** and the `FORCE ROW LEVEL
+SECURITY` those tables carry protects nothing there. The explicit
+`user_id = v_owner` predicate on every statement is the only isolation there is,
+and the suite asserts it against a second owner **with RLS bypassed** — because a
+check run under RLS could not tell *protected* from *deleted*.
+
+### A signed plan's prediction was wrong, and it went to the owner rather than into the diff
+
+§6.3 said M3 would create *"one new function, no new table"*. A server-issued,
+single-use, fingerprint-bound confirmation **is a row**, and the only existing
+store is welded to `tasks` by a foreign key and a **closed** `CHECK` Phase 2E's
+tests defend. The re-audit **stopped** — because after deployment, removing a
+table costs a fourth migration, which is a stop condition. **ADR-113** authorized
+one table inside M3; §6.3's sentence is **preserved verbatim and annotated**.
+
+### The defect only a browser could find
+
+`applyDeletion` called `revalidatePath`. Next's own documentation: a Server
+Function's `revalidatePath` *"updates the UI immediately (if viewing the affected
+path)"* — and the affected path was the page the dialog sits on. **So a
+successful deletion destroyed the component that was about to offer the undo.**
+The hosted journey saw it: status still reading `confirmed`, no outcome, no undo
+control. **A deletion whose undo button disappears before it can be pressed is
+worse than one with no undo, because the preview promised it.** Neither action
+revalidates now; the client refreshes when the dialog closes, after the owner has
+read the outcome and had the chance to undo.
+
+Beside it: the preview action is called from `onClick` rather than a form action
+and was not wrapped in a transition, so **`isPending` did not update** — and
+`isPending` is what draws the loading sentence and disables the confirm button.
+
+### Six defects were found by something checking, not by re-reading
+
+Two in SQL that would have shipped silently: `jsonb_build_object` turns a `CASE`
+with no `ELSE` into **JSON `null`**, which `coalesce` can never repair because
+JSON null is not SQL NULL; and `'cron'::regnamespace` **raises** when the schema
+is absent, which is how CI builds this database — **a guard that errors on a
+clean database is not a guard**.
+
+And the new guard failed twice on its own subject. First it read its own prose —
+`copy.ts`'s header explains that deletion copy may never say "archive", and
+therefore contains the word, the failure M1 recorded twice in one migration.
+Then, after stripping comments, it failed again *correctly*: Portuguese spells
+the noun *arquivo* — a **file** — with the same five letters as the verb
+*arquivar*, and the copy legitimately says "os arquivos continuam na sua
+biblioteca" because `2N-CORRECT-012` requires it to say what is kept. The stem
+was **narrowed** to `arquiva`, with a control proving it still refuses the
+sentence it exists to refuse. **Narrowed, not deleted.**
+
+Three more were in the journey and each made a test lie: a bulk insert whose rows
+carried different keys; a staleness test that moved the world **before**
+issuance, so the confirmation was validly bound to the changed facts and the test
+**failed by passing**; and an assertion on a **sibling test's** fixture, which
+passed only when that sibling had run.
+
+### Proofs, and one pending item closed
+
+pgTAP **43 assertions** from an empty database. Hosted structural proof read live
+after deploy. Hosted **behavioural** proof as `authenticated`, rolled back:
+foreign → `P0002` identical to absent, facts moved → `55P03` with the
+confirmation **not burned**, delete leaving **aliases=0**, undo returning the
+same id with its note, its relationship description and both aliases. Journey
+**14/14** serially, both locales × desktop and Pixel 7.
+
+Regressions **2N.0 12/12**, **M1 12/12**, **2N.1 14/14**, and **2N.2 28/28** —
+which §67 recorded as **NOT RUN**. That pending item is closed. **No `429` across
+roughly 110 sign-ins**, run serially and spaced.
+
+**Zero residue**, 22 markers, with a control that plants a person, a project and
+an alias and proves the probe finds all three before the account is deleted.
+
+### Recorded, not smoothed
+
+`online-memories.spec.ts:85` still fails on mobile — a **21 px touch target**
+against a 44 px minimum, reproduced at `289f1f8` before any of this slice's
+changes, cause `.list-row-main a` carrying no sizing rule on **any** list
+surface. Destination **`2N-MOBILE`**. Mobile is a **viewport simulation**, not a
+device; **no screen-reader run is claimed**; the lane is a **local production
+build** against hosted Supabase. The undo window is **24 hours** and the deleted
+content lives in `undo_operations.before_state` for it — retention, named as
+retention in the preview, and permanent thereafter.
+
+### THE LOOP STOPS HERE — 2N.4 IS NOT STARTED
+
+Stopped **between slices**, which is a sanctioned stopping point. **No migration
+is partially deployed**: M1 and M3 are both merged, deployed, at parity and
+proved.
+
+**Unchanged:** signup closed, rollout **25 · 3 · 2**, push **not** resumed (HTTP
+403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started, not
+planned and not retargeted**, and A13 still guarding the roadmap successor.
+Slices 2N.4–2N.7 remain, and **2N.3 is complete**.

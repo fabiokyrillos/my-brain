@@ -2,6 +2,46 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PHASE 2N slice 2N.3 COMPLETE: the product can remove a person, a project and a memory, and the undo returns the same one
+
+**The phase's second migration.** `202608140094_phase_2n_slice_3_entity_deletion.sql` is **M3** of the three ADR-109 allocated, all non-transferable. Budget moves to **`3 allocated · 2 spent`**; **M2** stays with slice 2N.7, and **a fourth is a stop condition**. 94 migrations, hosted parity `202608140094`, local = remote.
+
+Before this, the product had **no deletion at all** — not one `.delete()` in `src/features/`. Archiving a memory was the closest thing that existed, and people and projects had not even that.
+
+### The stop condition was answered by executing it, not by arguing it
+
+`2N-CORRECT-013` asks whether every propagation can be undone *with truth*. A fully populated person — relationships in **both** directions with types and descriptions, a project association with a `role`, a context, a task assignment, a task `waiting`, a memory with a real 1536-dimension embedding, an alias, an entry mention — was snapshotted with `to_jsonb`, deleted, restored with `jsonb_populate_recordset` under the **same ids**, and compared: **nine row sets byte-identical**. Repeated for project and memory.
+
+**The embedding survives a `jsonb` round trip at cosine distance 0**, so a restored memory is retrieved exactly as before **with no provider call**. That was the largest technical risk to a true undo, and it is closed by measurement rather than by hope.
+
+### The cascade does not reach the tables that matter most
+
+`entry_entities`, `entity_aliases`, `entity_tags` and `entity_attachments` carry `entity_type`/`entity_id` as an **unconstrained pair** — no foreign key at all — validated only by a `BEFORE INSERT OR UPDATE` trigger that never fires on the parent's delete. Deleting a person left all four alive, pointing at a dead id, and `entry_entities` has four live readers: an entry would have gone on reporting a mention of someone the owner deleted. **That is the partial deletion `2N-CORRECT-012` forbids**, and M3 removes all four explicitly.
+
+`authenticated` holds **no `DELETE`** on two of them, which turns `2N-CORRECT-009`'s refusal of a client sequence from a rule into a proof — a client *cannot* complete this deletion correctly — and forces `SECURITY DEFINER`, because an invoker path would remove **zero** rows and **raise nothing**.
+
+The price of that was measured too: **`postgres` holds `rolbypassrls`**, so inside the function RLS is not consulted at all and the `FORCE ROW LEVEL SECURITY` those tables carry protects nothing there. The explicit `user_id = v_owner` predicate on every statement is the only isolation, and the suite asserts it against a second owner **with RLS bypassed**, because a check run under RLS could not tell "protected" from "deleted".
+
+### One table, authorized rather than assumed
+
+§6.3 predicted M3 would create no table. A server-issued, single-use, fingerprint-bound confirmation **is a row**, and `task_command_confirmations` is welded to `tasks` by a foreign key and a closed `CHECK` that Phase 2E's tests defend. The re-audit stopped and put it to the owner, because after deployment removing a table costs a fourth migration. **ADR-113** authorized one table inside M3; §6.3's sentence is preserved verbatim and annotated.
+
+It stores **identifiers and hashes only** — no name, title, note, content or excerpt — with the consequences bound as a digest. The fingerprint helper is `private` and granted to **nobody**, stronger than Phase 2E's, whose helper is derivable by the caller.
+
+### Content lives only in the 24-hour reservation
+
+`audit_logs` is permanent, so content there would be retention rather than removal. It carries the consequence counts and the resulting state and nothing else; the snapshot lives in `undo_operations.before_state` until the undo expires. The preview names four retentions — the audit trail, telemetry, linked files that stay in the library, and that 24-hour snapshot — and calls them retention.
+
+### The defect only a browser could find
+
+`applyDeletion` called `revalidatePath`, which Next documents as updating the UI immediately if you are viewing the affected path — and the affected path was the page the dialog sits on. **A successful deletion destroyed the component that was about to offer the undo.** A deletion whose undo button disappears before it can be pressed is worse than one with no undo, because the preview promised it. Neither action revalidates now; the client refreshes when the dialog closes.
+
+### Proofs
+
+pgTAP **43 assertions** from an empty database. Hosted structural and **behavioural** proofs read live after deploy, the latter as `authenticated` and rolled back. Journey **14/14** serially, both locales × desktop and Pixel 7. Regressions **2N.0 12/12**, **M1 12/12**, **2N.1 14/14** and **2N.2 28/28** — the run the M1 acceptance recorded as not executed, now closed. **Zero residue**, 22 markers, with a control that plants a person, a project and an alias.
+
+**Left failing rather than weakened:** `online-memories.spec.ts:85`, a 21 px mobile touch target against a 44 px minimum, pre-existing at `289f1f8`, destination `2N-MOBILE`.
+
 ## 2026-08-13 - PHASE 2N slice 2N.3 unit M1: an archived memory stops being retrieved, at the bound
 
 **The phase's first migration.** `202608130093_phase_2n_slice_3_validity_aware_retrieval.sql` is **M1** of the three ADR-109 allocated, all non-transferable. Budget moves to **`3 allocated · 1 spent`**; **M3** stays with slice 2N.3 and **M2** with 2N.7, and **a fourth is a stop condition**. 93 migrations local.
