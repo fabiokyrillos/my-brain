@@ -2,6 +2,62 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PHASE 2N slice 2N.6 COMPLETE: relations, and a graph that draws only what it can explain
+
+**PR #223.** **Zero migrations, zero RPCs, zero grants, zero indexes, zero writers, zero dependencies added.** 94 total, hosted parity `202608140094` unchanged. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **12 requirements: 8 built · 3 baseline · 1 partial · 0 not-built-by-rule.**
+
+### The catalogue came first, because the authorization is a contract that can refuse
+
+`2N-RELATION-011` obliges the work to **stop and propose a reduction** rather than ship a decorative graph, so the slice opened by measuring ten edge candidates against the schema and classifying each — `docs/reports/phase-2n/PHASE_2N_SLICE_6_EDGE_CATALOG.md`. Verdict: **AUTORIZÁVEL DENTRO DO CONTRATO EXISTENTE**, with two consequences recorded rather than smoothed.
+
+### There is no person-to-person edge in this product
+
+`person_relationships.related_person_id` is written `null` by the only writer the table has ever had, and `relationship-vocabulary.ts` records why: a null there means *related to the owner*. Across all 94 migrations the only other insert is M3's undo restore. So the table is a **star centred on the owner**, and *"which people are related"* is answered by two real edges sharing a node — never by a synthesized line.
+
+### The premise that authorizes the graph does not hold in the tree
+
+The threat model states that T-3's signature — not the graph's design — is what makes `OD-2N-10` B acceptable. But `link_interpreted_entities` (`202607160011`) and its `after insert` trigger on `entry_entities` still persist a **co-mention** into `person_projects`/`person_contexts` on every interpretation, carrying `least(a.confidence, b.confidence)`. That is `OD-2N-8`'s **refused option C**, it has never been dropped, and the path is the product's primary flow.
+
+**Removing it is a migration, therefore a stop condition.** So this slice repairs the *claim* and refuses to draw what it cannot explain.
+
+### And the claim was already wrong on a shipped surface
+
+`association-panel.tsx` rendered **"Informado por você"** for every association row on the person and project pages — including the trigger's — justified by a comment reasoning that the tables carry no `source_entry_id` *"so there is nothing else the origin could be"*. **That confuses the absence of a provenance column with the absence of another writer.**
+
+### The discriminator, and the one direction it proves in
+
+The owner's creation actions write an `audit_logs` row; the trigger writes none. `audit_logs` is **exempt from every retention sweep by decision** (`202608050077:45`), already carries `audit_logs_user_entity_idx (user_id, entity_type, entity_id)`, and is already read by the project page — **no grant, no index, no RPC, no new authority**. Narrowed to the two `associate_*` actions, because `update_person_project_role` and `end_person_*` write rows with the same `entity_type`/`entity_id` and reading either as proof of authorship would be inference.
+
+**Presence proves owner-authorship; absence proves nothing** and resolves to *not attributable*, never to *informed by you*.
+
+### What shipped
+
+`/app/relations`, in the `context` group at `more` visibility — which is the requirement rather than restraint, since `2N-RELATION-006` says the graph is never primary navigation and `2I-SHELL-001`'s four primaries are asserted unchanged.
+
+**One projection, two presentations.** The list is canonical, rendered first in the DOM and on the page, and carries every edge including the ones the drawing may not show. The drawing receives a **strict subset**, so it cannot hold exclusive information. Both read one `Bounded<RelationEdge>`, so neither can report a different bound — a type-level property rather than a convention.
+
+**Rendering is HTML anchors positioned by CSS over an `aria-hidden` SVG holding only geometry**, chosen by comparison against inline SVG, canvas and a library. Zero client JavaScript, **zero dependencies added**, native focus, 44px targets from the stylesheet, no `title`, no hover-only affordance, and the SVG sits behind opaque boxes so a line can never cross a label.
+
+Eight queries, three round trips, none per node or per edge, on indexes that already exist.
+
+### `graph` joined the sensitivity contract with its consumer, and closed a divergence doing it
+
+`contracts.ts` reserved the key in 2N.0 and stated the condition — *"with its consumer, or not at all"*. The consumer is `person_relationships.description`, resolved by `resolveGraphContent`.
+
+**And the person page converges in the same change.** It masked `people.notes` and printed `description` in the clear **one section below it**: two unclassifiable free-text fields about the same human being, on one page, under two postures, both matching ADR-110 Decision 4's predicate word for word. `person_projects.role` is deliberately unchanged and recorded as an owner question (`2N-PRIVACY-FREETEXT`).
+
+### Two guard tokens narrowed, never weakened
+
+A bare `graph` in a migration filename matched Phase 2C's `202607220044_phase_2c_slice_5_task_graph`; a bare `content\s*:` matched `align-content: start` on a correct file. Each was narrowed to what discriminates and each carries a **two-sided** control.
+
+### Proofs
+
+110 focused tests; **38 structural guards, each with a mutation control**; full suite **7263 passing**; lint, typecheck, build and `git diff --check` clean. Hosted journeys, regressions and the residue probe are recorded in `PHASE_2N_SLICE_6_ACCEPTANCE.md`.
+
+### Partials
+
+**`2N-RELATION-003`** — remainder `2N-RELATION-TRIGGER`, an owner decision and a migration, **not transferable into M2**. **`2N-FILES-008`** stays partial with `2N-FILES-WRITER`, untouched: this slice creates no writer for `entity_attachments` and uses the graph to justify nothing.
+
 ## 2026-08-14 - PHASE 2N slice 2N.5 COMPLETE: the file library reads links it cannot create, and says so
 
 **PR #221.** **Zero migrations, zero RPCs, zero grants widened, zero writers.** 94 total, hosted parity `202608140094` unchanged. Budget stays `3 allocated · 2 spent (M1, M3)`; **M2 stays with 2N.7**, and a fourth is a stop condition. **13 requirements: 9 built · 3 baseline · 1 partial · 0 not-built-by-rule.**
