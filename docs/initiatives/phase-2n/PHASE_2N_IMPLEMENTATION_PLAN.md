@@ -432,6 +432,19 @@ the recommendation against it was a budget judgement, not a product one.
 - **Second alternative.** Do not build deletion. Declined by the owner.
 - **Affects.** One new function. **No new table**, so `2N-SEC-005`'s cascade
   requirement is not engaged.
+  *(Amended by ADR-113 on 2026-08-13: **this prediction is wrong and the
+  sentence above is preserved as written**. A confirmation that is
+  server-issued, single-use and fingerprint-bound **is a row**, and the only
+  existing store — `task_command_confirmations` — is FK-bound to `tasks` and
+  carries a **closed** `CHECK (action in ('cancel_task','create_task'))` that
+  `taxonomy.ts` and `copy.ts` assert against, so reusing it would widen a Phase
+  2E vocabulary its own tests defend. The owner authorized M3 to create **one**
+  table, `public.entity_deletion_confirmations`, **inside M3's own file**. It is
+  **not** an additional migration, the budget is unchanged at `3 allocated · 1
+  spent`, and **a fourth remains a STOP CONDITION**. `2N-SEC-005` **is** engaged
+  and is satisfied by `user_id … references auth.users(id) on delete cascade`.
+  §6.5's proof that no fourth migration is hidden still holds. Established by
+  `docs/reports/phase-2n/PHASE_2N_SLICE_3_DELETION_REAUDIT.md` §9.)*
 - **Rollback.** Drop the function; nothing else changes. **Rows already deleted
   by it are not restored by a rollback** — which is precisely why
   `2N-CORRECT-005` requires a registered undo and `2N-CORRECT-013` makes an

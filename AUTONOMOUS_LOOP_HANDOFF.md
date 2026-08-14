@@ -5189,3 +5189,117 @@ partially deployed**: M1 is merged, deployed, at parity and proved.
 (HTTP 403 on a real iPhone, Android **NOT EXECUTED**), **Phase 2O not started**,
 and A13 still guarding the roadmap successor. Slices 2N.4–2N.7 remain, and 2N.3
 is half done.
+
+## §68 — The deletion re-audit answers its own stop condition by executing it, and M3 is authorized with one correction to the plan (2026-08-13)
+
+**PR #213**, merged at `456750b`, **CI green on that exact SHA**. Head at review
+was `01ab6e9`, also green. Base was `main` at `0f521f4`.
+`docs/reports/phase-2n/PHASE_2N_SLICE_3_DELETION_REAUDIT.md`.
+
+**Migrations: 0 created. 93 total, parity `202608130093`, local = remote, read
+live.** Budget `3 allocated · 1 spent (M1)`; **M3 stays with 2N.3 and M2 with
+2N.7**, and a **fourth is a STOP CONDITION**.
+
+### The catalogue could not answer the first question, so it was measured
+
+Every table referencing `people` or `projects` carries **two** keys to it: a
+single-column `CASCADE`/`SET NULL`, and a composite ownership key `(user_id, id)`
+with **`NO ACTION`**, none `DEFERRABLE`. Whether the second **blocks** the delete
+or is satisfied because the first already removed the child is **not readable**
+— both are after-triggers on one event and the answer depends on firing order.
+
+**Measured: the delete succeeds.** A re-audit that read `NO ACTION` as
+"protected" would have concluded deletion was already impossible and stopped for
+the wrong reason. Four probes ran, each inside a `DO` block whose only exit is a
+`raise`, so nothing committed and the owner's rows — 3 people, 1 project, 7
+tasks, 5 entries, 33 audit rows — were not modified.
+
+### The finding: the cascade does not reach the tables that matter most
+
+`entry_entities`, `entity_aliases`, `entity_attachments` and `entity_tags` carry
+`entity_type`/`entity_id` as an **unconstrained pair with no foreign key**,
+validated only by `validate_polymorphic_entity_owner` — a **`BEFORE INSERT OR
+UPDATE`** trigger that never fires on the parent's delete. Nothing cascades,
+nothing nulls: **the rows survive pointing at a dead id**, measured, 1 planted →
+1 remaining. `entry_entities` has four live readers and `entity_aliases` gained
+its first in 2N.0/2N.1, so an entry would keep reporting a mention of a deleted
+person. **That is the partial deletion `2N-CORRECT-012` forbids, and M3 must
+remove them explicitly.** Search does not leak — it matches alias ids against
+`id`, so an orphan yields no row — which makes this a correctness defect, not an
+exposure, and the difference is recorded rather than blurred.
+
+### Authority, proved from grants rather than asserted
+
+`authenticated` holds **no `DELETE` and no `INSERT`** on `entry_entities` or
+`entity_attachments`. So a `SECURITY INVOKER` path would delete **zero** of them
+and **raise nothing** — RLS filters a `DELETE` silently. **M3 must be
+`SECURITY DEFINER`**, and `2N-CORRECT-009`'s refusal of a client-side sequence
+stops being a rule and becomes a proof: a client **cannot** complete this
+deletion correctly. `public.undo_operation` is already `SECURITY DEFINER`, so the
+compensation needs **no new authority**.
+
+### The stop condition was answered by executing it, not by arguing it
+
+`2N-CORRECT-013` asks whether every propagation can be undone **with truth**. A
+probe planted a fully populated person — relationships in **both** directions
+with types, descriptions and confidences; a project association with a `role`; a
+context; a task assignment with a `role`; a task `waiting`; a memory with a real
+1536-dimension embedding; an alias; an entry mention — snapshotted with
+`to_jsonb`, deleted the way M3 would, restored with `jsonb_populate_recordset`
+under the **same ids**, and compared. **Nine row sets byte-identical.** Repeated
+for project and memory: identical, embedding included.
+
+Two secondary results carry it. **The embedding survives a `jsonb` round trip at
+cosine distance 0**, so a restored memory is retrieved exactly as before **with
+no provider call** — the largest technical risk to a true undo, closed by
+measurement rather than by hope. And **`normalized_alias` is recomputed by its
+trigger to the same value**, so determinism is proved rather than assumed. There
+are **no identity or serial columns** on any affected table: restoration
+preserves identity, it does not mint a substitute.
+
+**Verdict: `M3 AUTORIZÁVEL DENTRO DO CONTRATO EXISTENTE`**, with all fourteen
+stop conditions checked individually and none found.
+
+### A prediction in the signed plan was wrong, and it was surfaced rather than absorbed
+
+§6.3 said M3 would create *"One new function. **No new table**."* A
+server-issued, single-use, fingerprint-bound confirmation **is a row**, and the
+only existing store is FK-bound to `tasks` behind a **closed** `CHECK` that Phase
+2E's own tests defend. The re-audit stopped and put it to the owner instead of
+choosing — because after deployment, removing a table costs a **fourth
+migration, which is a stop condition**.
+
+**The owner authorized it: ADR-113.** One table inside M3, **not** an additional
+migration, budget unchanged, `task_command_confirmations` neither reused nor
+widened, and the table stores **identifiers and hashes only** — no name, title,
+note, memory content, excerpt or endpoint, with the consequences bound as a
+**digest** rather than stored. §6.3's sentence is **preserved verbatim** and
+annotated `*(Amended by ADR-113: …)*`, the mechanism ADR-109, ADR-110 and
+ADR-112 already use. **A plan whose wrong predictions quietly vanish teaches
+nothing.**
+
+### Recorded, not smoothed
+
+One full-suite run showed `question-answer-form.test.tsx > runs the undo flow`
+failing; it passes **17/17 in isolation** and **did not reproduce** — the re-run
+was **6823/6823 with 3 failed files, exactly the Windows-only shebang-parse
+baseline**. It is a **pre-existing test-side race**: the assertion captures the
+`role="status"` node and asserts its text without a `waitFor`, so full-suite load
+widens the window. In a file this work does not touch. **Not weakened, not
+skipped, not deleted, not absorbed.** The `online-memories.spec.ts:85` 21 px
+touch target remains open with destination **`2N-MOBILE`**, and 2N.2's 28-test
+journey remains **not re-run**.
+
+Also recorded: the review of this PR's own diff found **two rows of the
+propagation tables calling `tasks` and `memories` "not referenced by the
+delete"** — two rows below the `SET NULL` entries that reference them. The rows
+survive; the columns do not. Split into *preserved, link severed* and *preserved,
+untouched*, because a table whose value is precision cannot afford a sentence
+that reads as "the delete passes them by."
+
+### THE LOOP CONTINUES — M3 IS NEXT, AND IT IS THE PHASE'S ONLY IRREVERSIBLE OPERATION
+
+**Unchanged:** 93 migrations, parity `202608130093`, budget non-transferable with
+a **fourth a STOP CONDITION**, signup closed, rollout **25 · 3 · 2**, push **not**
+resumed, **Phase 2O not started, not planned and not retargeted**, and A13 still
+guarding the roadmap successor. Slices 2N.4–2N.7 remain.
