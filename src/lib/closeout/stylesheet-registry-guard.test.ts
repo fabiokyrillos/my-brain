@@ -370,6 +370,54 @@ describe("every custom property a stylesheet reads is actually declared", () => 
   });
 });
 
+describe("no query condition contains a var()", () => {
+  /*
+   * `@media (max-width: var(--width-reading))` is **invalid**. Custom properties
+   * are not substituted in a media or container query condition — the condition
+   * fails to parse and the browser drops the entire block.
+   *
+   * That is the worst possible failure shape for a responsive rule, because the
+   * stylesheet still loads, every other rule still applies, and the only symptom
+   * is that a layout stops adapting. It cost a real regression here: tokenising
+   * `@container (max-width: 700px)` in `operations.css` silently deleted the
+   * single-column fallback for a narrow list container, and the record title
+   * collapsed to a 32px column at 1440px and 1920px — the exact defect the
+   * comment above that rule was written to explain.
+   *
+   * A query condition must be a literal length. This is the one place in the
+   * stylesheets where a hard-coded value is correct.
+   */
+  const offenders: string[] = [];
+  for (const name of readdirSync(APP_CSS).filter((file) => file.endsWith(".css"))) {
+    const css = read(`src/app/${name}`).replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const match of css.matchAll(/@(media|container)[^{]*/g)) {
+      if (/var\(\s*--/.test(match[0])) offenders.push(`${name}: ${match[0].trim()}`);
+    }
+  }
+
+  it("finds query conditions to check", () => {
+    // Non-vacuity.
+    const total = readdirSync(APP_CSS)
+      .filter((file) => file.endsWith(".css"))
+      .flatMap((name) => [...read(`src/app/${name}`).matchAll(/@(media|container)[^{]*/g)]);
+    expect(total.length, "no @media or @container rules were parsed").toBeGreaterThan(20);
+  });
+
+  it("uses a literal length in every condition", () => {
+    expect(
+      offenders,
+      `these query conditions contain a var(), which does not parse — the browser `
+        + `drops the whole block and the layout silently stops adapting: ${offenders.join("; ")}`,
+    ).toEqual([]);
+  });
+
+  it("detects a planted var() in a condition, so the scan is not blind", () => {
+    const planted = [..."@media (max-width: var(--x)) {".matchAll(/@(media|container)[^{]*/g)];
+    expect(planted).toHaveLength(1);
+    expect(/var\(\s*--/.test(planted[0][0])).toBe(true);
+  });
+});
+
 describe("the palette has exactly one home", () => {
   it("declares the base surface and text tokens only in tokens.css", () => {
     // The bridge in `tokens.css` is what keeps untouched surfaces correct in

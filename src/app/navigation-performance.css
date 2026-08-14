@@ -1,4 +1,4 @@
-.route-loading{max-width:1180px;margin:auto;padding:64px var(--gutter) var(--page-bottom)}
+.route-loading{max-width:var(--width-productivity);margin:auto;padding:64px var(--gutter) var(--page-bottom)}
 .route-loading [data-loading-block]{position:relative;overflow:hidden;background:var(--background-subtle-strong);border-radius: var(--radius-lg)}
 .route-loading-heading{width:min(360px,72%);height:44px}
 .route-loading-summary{width:min(620px,92%);height:18px;margin-top:18px}
