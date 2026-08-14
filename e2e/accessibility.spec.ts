@@ -80,10 +80,22 @@ const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
 
-async function render(page: Page, body: string, { reducedMotion = false } = {}) {
+async function render(
+  page: Page,
+  body: string,
+  { reducedMotion = false, theme }: { reducedMotion?: boolean; theme?: "light" | "dark" } = {},
+) {
   if (reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
+  /*
+   * `theme` stamps `data-theme` on the root, which is how a stored preference
+   * reaches the page (ADR-114). It matters that this is a parameter rather than
+   * an `emulateMedia({ colorScheme })` call: the explicit choice and the system
+   * default are two different code paths in `tokens.css`, and the one a user
+   * actually picks is the one a media emulation would never exercise.
+   */
+  const themeAttribute = theme ? ` data-theme="${theme}"` : "";
   await page.setContent(
-    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">`
+    `<!doctype html><html lang="pt-BR"${themeAttribute}><head><meta charset="utf-8">`
       + `<meta name="viewport" content="width=device-width, initial-scale=1">`
       + `<title>Acessibilidade</title><style>${css}</style></head>`
       + `<body><div class="app-shell">${body}</div></body></html>`,
@@ -599,6 +611,43 @@ for (const surface of SURFACES) {
     expect(await axeViolations(page)).toEqual([]);
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * ADR-114 — the same scan in dark.
+ *
+ * Dark is an authored palette, not a filter over the light one, so its
+ * contrast pairs are genuinely different numbers and a light-only scan says
+ * nothing about them. Shipping a theme that nothing checks is how the amber
+ * that fails AA on its own wash reached this branch in the first place.
+ *
+ * `data-theme="dark"` rather than `emulateMedia({ colorScheme: "dark" })`:
+ * the explicit choice and the system default are two separate blocks in
+ * `tokens.css`, and this exercises the one a user actually picks.
+ * ------------------------------------------------------------------ */
+
+for (const surface of SURFACES) {
+  test(`ADR-114: ${surface.name} has no serious or critical axe violations in dark`, async ({ page }) => {
+    await render(page, surface.body(), { theme: "dark" });
+    expect(await axeViolations(page)).toEqual([]);
+  });
+}
+
+test("ADR-114: the dark fixture really is dark, so the scan above is not vacuous", async ({ page }) => {
+  // Without this, a `data-theme` that failed to apply would leave every dark
+  // test scanning the light palette and passing for the wrong reason.
+  await render(page, workList(), { theme: "dark" });
+  const canvas = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--background-canvas").trim(),
+  );
+  expect(canvas).toBe("#141311");
+
+  await render(page, workList(), { theme: "light" });
+  const light = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--background-canvas").trim(),
+  );
+  expect(light).toBe("#f7f6f3");
+  expect(light).not.toBe(canvas);
+});
 
 /* ------------------------------------------------------------------ *
  * 2J-ACCESS-005 — visible focus, measured from paint, not from source.
