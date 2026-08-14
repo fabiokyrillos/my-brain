@@ -130,9 +130,12 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
     ]);
     strangerPersonId = strangers[0]?.id;
 
+    // `notes: null` on the second row is not padding: PostgREST answers
+    // `PGRST102 "All object keys must match"` when the rows of one bulk insert
+    // carry different keys, and this fixture hit it on the first hosted run.
     const people = await insert<{ id: string; name: string }>("people", [
       { user_id: userId, name: SUBJECT, notes: "uma nota que precisa voltar" },
-      { user_id: userId, name: RELATED },
+      { user_id: userId, name: RELATED, notes: null },
     ]);
     subjectId = people.find((row) => row.name === SUBJECT)?.id;
     relatedId = people.find((row) => row.name === RELATED)?.id;
@@ -253,7 +256,18 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
     await signIn(page, "pt-BR");
     await openDialog(page, "pt-BR", `/app/people/${subjectId}`);
 
-    // Change the world BEHIND the surface, exactly as a second device would.
+    // ISSUE THE CONFIRMATION FIRST, then change the world.
+    //
+    // The first version of this test inserted the alias before clicking
+    // confirm, and it failed by PASSING the apply: `issue_entity_deletion_
+    // confirmation` re-censuses at issuance, so a confirmation created after
+    // the change is bound to the CHANGED facts and is perfectly valid. The
+    // window this requirement is about is the one between issuance and apply,
+    // and a test that changes the world outside it proves nothing.
+    await page.locator('[data-deletion="confirm-form"] button[type="submit"]').click();
+    await expect(page.locator('[data-deletion="apply-form"]')).toBeVisible({ timeout: 20_000 });
+
+    // Now the world moves, exactly as a second device would move it.
     await insert("entity_aliases", [
       {
         user_id: userId,
@@ -264,7 +278,6 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
       },
     ]);
 
-    await page.locator('[data-deletion="confirm-form"] button[type="submit"]').click();
     await page.locator('[data-deletion="apply-form"] button[type="submit"]').click();
 
     // Refused by fact, not by clock — and the person is still there.
@@ -280,6 +293,7 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
     await openDialog(page, "pt-BR", `/app/people/${subjectId}`);
 
     await page.locator('[data-deletion="confirm-form"] button[type="submit"]').click();
+    await expect(page.locator('[data-deletion="apply-form"]')).toBeVisible({ timeout: 20_000 });
     await page.locator('[data-deletion="apply-form"] button[type="submit"]').click();
     await expect(page.locator('[data-deletion="status"]')).toHaveAttribute("data-deletion-outcome", "deleted", {
       timeout: 30_000,
@@ -296,7 +310,36 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
     // the truth contract refuses to call an undo.
     await page.goto(`/pt-BR/app/people/${subjectId}`);
     await expect(page.locator("body")).toContainText(SUBJECT);
-    await expect(page.locator("body")).toContainText(RELATED);
+
+    /**
+     * The relationship's own DESCRIPTION, not the related person's name.
+     *
+     * The first version asserted `RELATED` and failed against a page that had
+     * restored everything correctly: the person surface renders a relationship
+     * by its type and description, and never prints the other person's name.
+     * The assertion was testing a sentence the product does not have.
+     *
+     * The description is the better assertion anyway. A restored relationship
+     * row proves an edge came back; a restored *description* proves the row
+     * came back CARRYING WHAT IT SAID — which is the difference between an undo
+     * and a re-creation, and the difference the truth contract turns on.
+     */
+    await expect(page.locator("body")).toContainText("aresta que precisa voltar");
+    // The role on the project association, for the same reason: an association
+    // without its role is not the same association.
+    await expect(page.locator("body")).toContainText("owner");
+    /**
+     * The FIXTURE's alias, and only that one.
+     *
+     * A first attempt also asserted the alias the staleness test inserts, which
+     * made this test pass only when that one had run before it — and it failed
+     * the moment it was run alone with `--grep`. **A test that depends on a
+     * sibling having run is a test that cannot be trusted in isolation**, and
+     * the property here does not need the second row: an alias carries no
+     * foreign key to `people`, so its return proves the snapshot restored a row
+     * that nothing in the database would have restored on its own.
+     */
+    await expect(page.locator("body")).toContainText(ALIAS);
   });
 
   test("a deleted memory stops being retrievable, in the same unit that removed it", async ({ page }) => {
@@ -312,6 +355,7 @@ test.describe("2N.3 M3 — the Brain removes what should not exist, and can say 
     await expect(page.locator('[data-deletion="isolated"]')).toBeVisible();
 
     await page.locator('[data-deletion="confirm-form"] button[type="submit"]').click();
+    await expect(page.locator('[data-deletion="apply-form"]')).toBeVisible({ timeout: 20_000 });
     await page.locator('[data-deletion="apply-form"] button[type="submit"]').click();
     await expect(page.locator('[data-deletion="status"]')).toHaveAttribute("data-deletion-outcome", "deleted", {
       timeout: 30_000,
