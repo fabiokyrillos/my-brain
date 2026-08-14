@@ -37,6 +37,7 @@ import { useState, type ReactNode } from "react";
 import { NO_REVEALS } from "@/features/sensitivity/contracts";
 import {
   resolveFileContent,
+  resolveGraphContent,
   resolveMemoryContent,
   resolvePersonContent,
   resolveProjectContent,
@@ -73,8 +74,22 @@ import { getWorkCopy } from "./copy";
  * questions: a task's level comes from its source entry (`task-derivation.ts`),
  * a subject's from its own row (`subject-derivation.ts`). Both produce the same
  * three-arm value, which is why one component can consume either.
+ *
+ * `2N-RELATION-006`/`-007` adds `graph` in slice 2N.6, through this same
+ * component again. Its one governed subject is a relationship's own sentence,
+ * and the reason it goes here rather than getting a bespoke mask is the sharpest
+ * version of the header's argument: the **same field** renders on the person
+ * page, so two components would be two chances for the two surfaces to disagree
+ * about whether the owner's note about a human being is shown.
  */
-export type ProtectedSurface = "work" | "calendar" | "person" | "project" | "memory" | "file";
+export type ProtectedSurface =
+  | "work"
+  | "calendar"
+  | "person"
+  | "project"
+  | "memory"
+  | "file"
+  | "graph";
 
 const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
   work: resolveTaskContent,
@@ -83,6 +98,7 @@ const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
   project: resolveProjectContent,
   memory: resolveMemoryContent,
   file: resolveFileContent,
+  graph: resolveGraphContent,
 };
 
 export function ProtectedContent({

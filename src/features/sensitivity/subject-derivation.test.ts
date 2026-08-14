@@ -14,6 +14,7 @@ import {
   deriveSubjectSensitivity,
   readableLevelsOf,
   resolveFileContent,
+  resolveGraphContent,
   resolveMemoryContent,
   resolvePersonContent,
   resolveProjectContent,
@@ -52,12 +53,37 @@ describe("2N-PRIVACY-001: the four contextual surfaces are governed", () => {
     }
   });
 
-  it("does NOT admit `graph`, which ships no consumer in this slice", () => {
-    // `2N-PRIVACY-001` admits a surface in the change that ships its first
-    // governed consumer. A governed surface nobody reads is a producer with no
-    // consumer, and asserting its absence is what stops one being added ahead of
-    // its reader.
-    expect(GOVERNED_SURFACES).not.toContain("graph");
+  it("admits `graph`, and only because slice 2N.6 ships its consumer with it", () => {
+    /*
+     * Inverted rather than deleted, which is the move this repository already
+     * uses when a reserved thing arrives (`phase-2n-declarations.test.ts` was
+     * inverted the same way at 2N's implementation gate).
+     *
+     * Until 2N.6 this asserted the **absence** of `graph`, because
+     * `2N-PRIVACY-001` admits a surface only in the change that ships its first
+     * governed consumer, and a governed surface nobody reads is the
+     * producer-with-no-consumer failure. 2N.6 ships that consumer — a
+     * relationship's own sentence, resolved by `resolveGraphContent` — so the
+     * assertion becomes the positive half, and the negative half is asserted by
+     * naming the resolver rather than by trusting the surface list.
+     */
+    expect(GOVERNED_SURFACES).toContain("graph");
+    expect(resolveGraphContent(deriveFreeTextSensitivity(), "k")).toEqual({
+      show: false,
+      masked: true,
+      revealable: true,
+    });
+  });
+
+  it("keeps `graph` masking free text by default, and revealing it only on request", () => {
+    // The whole reason `graph` needed a rule: `person_relationships.description`
+    // has no classification and no classifiable source, so it takes ADR-110
+    // Decision 4's posture — protective by default, local and explicit reveal.
+    expect(resolveGraphContent(deriveFreeTextSensitivity(), "k", { revealed: new Set(["k"]) })).toEqual({
+      show: true,
+      masked: false,
+      revealable: true,
+    });
   });
 });
 

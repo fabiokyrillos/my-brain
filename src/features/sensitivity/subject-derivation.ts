@@ -178,6 +178,25 @@ export function resolveFileContent(
 }
 
 /**
+ * `2N-RELATION-006`/`-007` — the relations surface, added in 2N.6 with its
+ * consumer.
+ *
+ * Its one governed subject is `person_relationships.description`, which reaches
+ * this through `deriveFreeTextSensitivity` rather than through
+ * `deriveSubjectSensitivity`: there is no classified row to look for, so the
+ * answer is constant because the fact is. Everything else that surface renders
+ * is a structural identifier or a localized vocabulary term.
+ */
+export function resolveGraphContent(
+  sensitivity: SubjectSensitivity,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  if (!isDerivedLevel(sensitivity)) return { show: true, masked: false, revealable: false };
+  return resolveContent("graph", sensitivity.level, key, state);
+}
+
+/**
  * Builds the map the derivations consume, from rows the caller already read.
  *
  * Exists so every contextual surface builds it the same way rather than each

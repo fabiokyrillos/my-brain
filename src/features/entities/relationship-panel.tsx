@@ -25,7 +25,9 @@ import { useActionState, useId, useState } from "react";
 
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
+import { ProtectedContent } from "@/features/operations/protected-content";
 import { ownerAuthored } from "@/features/provenance/contracts";
+import { deriveFreeTextSensitivity } from "@/features/sensitivity/subject-derivation";
 import { ProvenanceNote, SectionOriginNote } from "@/features/provenance/provenance-note";
 import type { Locale } from "@/lib/preferences";
 
@@ -235,7 +237,34 @@ function RelationshipRowItem({
           {known ? relationship.label : relationship.storedType}
         </strong>
         {known ? null : <small className="relation-unknown-note">{copy.unknownRelationship}</small>}
-        <span>{relationship.description ?? `${copy.since} ${relationship.since}`}</span>
+        {/*
+          `2N-PRIVACY-001`, ADR-110 Decision 4 — slice 2N.6's convergence fix.
+
+          Until 2N.6 this printed the owner's own sentence about another human
+          being in the clear, one section below `people.notes`, which the same
+          page masks. Both are free text about a person on a table with no
+          `sensitivity` column and no classifiable source — Decision 4's
+          predicate word for word — so two postures on one page was a divergence
+          rather than a distinction, the shape 2N.5's census found one domain
+          over.
+
+          The relations surface renders the same field through the same
+          component, so the two cannot drift. Masked by default, revealed by an
+          explicit local act, and never in an attribute. The date branch is
+          untouched: an instant is not free text about anybody.
+        */}
+        {relationship.description ? (
+          <ProtectedContent
+            locale={locale}
+            revealKey={`relationship-description-${relationship.id}`}
+            sensitivity={deriveFreeTextSensitivity()}
+            surface="person"
+          >
+            {relationship.description}
+          </ProtectedContent>
+        ) : (
+          <span>{`${copy.since} ${relationship.since}`}</span>
+        )}
       </div>
       {/*
         Both controls carry an `aria-label` naming the relationship they act on.
