@@ -30,6 +30,7 @@ const loadWorkProjection = vi.fn();
 const loadHomeSupplementalProjection = vi.fn();
 const loadInboxProjection = vi.fn();
 const loadAttentionProjection = vi.fn();
+const loadMemoryConflicts = vi.fn();
 
 vi.mock("@/features/daily-cycle/work-projection", () => ({
   loadWorkProjection: (...args: unknown[]) => loadWorkProjection(...args),
@@ -44,6 +45,17 @@ vi.mock("@/features/daily-cycle/attention-projection", () => ({
   loadAttentionProjection: (...args: unknown[]) => loadAttentionProjection(...args),
   ATTENTION_PAGE_SIZE: 20,
 }));
+/*
+  `2N-CONFLICT-003` joined this contract in 2N.4. Hoje now composes **five**
+  independent reads, and the conflict derivation is the newest — so it is the one
+  most likely to be the section that takes the page down if it is not isolated
+  like the other four.
+*/
+vi.mock("@/features/daily-cycle/conflict-projection", () => ({
+  loadMemoryConflicts: (...args: unknown[]) => loadMemoryConflicts(...args),
+  CONFLICT_SCAN_LIMIT: 200,
+  CONFLICT_PAGE_SIZE: 20,
+}));
 
 import { HomeDashboard } from "./home-dashboard";
 
@@ -52,6 +64,7 @@ function healthy() {
   loadHomeSupplementalProjection.mockResolvedValue({ waitingCount: 0, openQuestionPreview: null });
   loadInboxProjection.mockResolvedValue({ items: [], hasNext: false });
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });
+  loadMemoryConflicts.mockResolvedValue({ items: [], bounded: false, limit: 20 });
 }
 
 beforeEach(() => {
@@ -70,6 +83,7 @@ const PROJECTIONS = [
   ["supplemental", loadHomeSupplementalProjection],
   ["inbox", loadInboxProjection],
   ["attention", loadAttentionProjection],
+  ["conflicts", loadMemoryConflicts],
 ] as const;
 
 describe("2J-HOJE-010: a failing section degrades that section only", () => {

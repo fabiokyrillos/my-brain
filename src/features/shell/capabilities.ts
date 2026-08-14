@@ -45,13 +45,26 @@ export function deriveHomeOperationalStatus({
   items,
   attentionCount,
   attentionHasNext,
+  conflictCount,
 }: {
   items: readonly { productState: ProductState }[];
   attentionCount: number;
   attentionHasNext: boolean;
+  /**
+   * `2N-CONFLICT-004`. Derived memory conflicts, folded into the same count.
+   *
+   * **Required, not optional.** The `saved` branch below says *"Nada pendente.
+   * Tudo salvo."* — a categorical claim about the whole product. A conflict the
+   * owner has not resolved is pending by definition, so a Hoje that reached that
+   * sentence while one existed would be making the queue's silence into a
+   * statement. An optional parameter would let a future caller omit it and
+   * reintroduce exactly that, without the compiler noticing.
+   */
+  conflictCount: number;
 }) {
-  if (attentionCount > 0) {
-    return { kind: "attention" as const, count: attentionCount, hasMore: attentionHasNext };
+  const pending = attentionCount + conflictCount;
+  if (pending > 0) {
+    return { kind: "attention" as const, count: pending, hasMore: attentionHasNext };
   }
   const organizingCount = items.filter((item) => item.productState === "organizing").length;
   if (organizingCount > 0) {
