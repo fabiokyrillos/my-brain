@@ -334,6 +334,7 @@ export function NeedsAttentionList({
               item={conflict}
               key={conflict.key}
               locale={locale}
+              surface="needs_attention"
               timeZone={timeZone}
             />
           ))}

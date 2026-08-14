@@ -204,6 +204,7 @@ export function HomeView({
                   item={conflict}
                   key={conflict.key}
                   locale={locale}
+                  surface="home"
                   timeZone={view.timeZone}
                 />
               ))}

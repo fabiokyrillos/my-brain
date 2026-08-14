@@ -29,17 +29,28 @@ import { presentationFor } from "@/features/sensitivity/contracts";
 import type { ConflictAttentionItemView } from "./contracts";
 import { getConflictSectionCopy, getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 
-export function ConflictAttentionItemRow({ item, locale, agentName, timeZone }: {
+export function ConflictAttentionItemRow({ item, locale, agentName, surface, timeZone }: {
   item: ConflictAttentionItemView;
   locale: DailyCycleLocale;
   agentName: string;
+  /**
+   * Which governed surface is rendering this row (`2J-PRIVACY-001`).
+   *
+   * **Required, and not a constant inside this file.** The whole point of
+   * `GOVERNED_SURFACES` is that the *surface* decides what may be shown, and
+   * `NeedsAttentionItemRow` takes this prop for exactly the same reason. `hoje`
+   * and `attention` happen to carry identical rules today; hardcoding one of
+   * them would make this row obey the wrong one silently on the day they
+   * diverge, and nothing would fail.
+   */
+  surface: "home" | "needs_attention";
   /** The owner's zone (`LDC-DAILY-001`). Required, never defaulted to the device's. */
   timeZone: string;
 }) {
   const copy = getDailyCycleCopy(locale, agentName);
   const text = getConflictSectionCopy(locale);
   const reason = copy.attentionReasons[item.reason];
-  const masked = presentationFor("attention", item.sensitivity).outcome === "mask";
+  const masked = presentationFor(surface === "home" ? "hoje" : "attention", item.sensitivity).outcome === "mask";
 
   return (
     <a className="list-row needs-attention-row conflict-row" href={item.action.href}>
