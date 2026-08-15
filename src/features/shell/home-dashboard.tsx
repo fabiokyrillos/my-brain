@@ -8,6 +8,9 @@ import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import type { WorkItemHumanState } from "@/features/daily-cycle/contracts";
 import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
 import { selectTodayPriorities } from "@/features/daily-cycle/today-priorities";
+import { dismissOnboarding } from "@/features/onboarding/actions";
+import { OnboardingPanel } from "@/features/onboarding/onboarding-panel";
+import { loadOnboardingPath } from "@/features/onboarding/onboarding-view";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
@@ -68,7 +71,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     findable. It just does not take the page down to say so.
   */
   const now = new Date();
-  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled] = await Promise.allSettled([
+  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled, onboardingSettled] = await Promise.allSettled([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
     loadInboxProjection(supabase, { locale, page: 1 }),
@@ -84,6 +87,13 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       panel could not resolve a timezone would take the capture box down with it.
     */
     loadHomeAgendaProjection(supabase, { userId: user.id, locale, now }),
+    /*
+      `2O-ONBOARD-001`. Its own settled slot on the same rule: the guided path
+      is an *offer*, and an offer that could take the cockpit down with it would
+      be the imposition the requirement forbids. Every read inside already
+      degrades to `unreadable`, so this slot catches only what none of them can.
+    */
+    loadOnboardingPath(supabase, user.id),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, section: string): T {
@@ -92,6 +102,13 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     return fallback;
   }
 
+  /*
+    `null` rather than an empty path: an empty `OnboardingPath` would have to
+    claim five states it never read, and the panel would render "pending" over
+    an account that has done everything. Nothing rendered is the only honest
+    fallback for an offer whose whole content is a set of facts.
+  */
+  const onboarding = settled(onboardingSettled, null as Awaited<ReturnType<typeof loadOnboardingPath>> | null, "onboarding");
   const workProjection = settled(
     workSettled,
     { items: [], hasNext: false, timezone: "UTC", editControlsByTaskId: {}, statusByTaskId: {} } as Awaited<ReturnType<typeof loadWorkProjection>>,
@@ -257,6 +274,11 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
         locale={locale}
         view={view}
         capture={<QuickCaptureForm action={captureEntry} agentName={agentName} locale={locale} captureSource="home" />}
+        onboarding={
+          onboarding ? (
+            <OnboardingPanel locale={locale} path={onboarding} dismissAction={dismissOnboarding} />
+          ) : null
+        }
       />
     </>
   );

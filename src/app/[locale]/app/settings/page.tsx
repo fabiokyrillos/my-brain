@@ -6,6 +6,9 @@ import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
 import { loadSettingsFormValues } from "@/features/profile/settings-view";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { restoreOnboarding } from "@/features/onboarding/actions";
+import { OnboardingRestore } from "@/features/onboarding/onboarding-restore";
+import { readDismissal } from "@/features/onboarding/onboarding-view";
 import { CapabilitySummary } from "@/features/shell/capability-summary";
 import { DataAiSection } from "@/features/transparency/data-ai-section";
 import { requireUser } from "@/lib/auth/require-user";
@@ -16,10 +19,11 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
-  const [values, credential, pending] = await Promise.all([
+  const [values, credential, pending, onboardingDismissed] = await Promise.all([
     loadSettingsFormValues(supabase, user.id),
     loadCredentialMetadata(supabase, user.id),
     loadPendingEntryCount(supabase, user.id),
+    readDismissal(),
   ]);
 
   return (
@@ -42,6 +46,18 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         timeZone={await getOwnerTimeZone()}
       />
       <SettingsForm action={updateProfile} locale={locale} values={values} />
+      {/*
+        `2O-ONBOARD-010`'s reversal. It renders only when the guide is actually
+        dismissed, so it is never a control that changes nothing (`R-2O-12`),
+        and it governs a per-browser cookie rather than a persisted preference
+        column — which is why it needs no capability-registry row and why the
+        registry would have nothing true to say about it.
+      */}
+      <OnboardingRestore
+        locale={locale}
+        dismissed={onboardingDismissed}
+        restoreAction={restoreOnboarding}
+      />
       {/*
         `2O-ACTIVATION-004`. The page's own intro claims that only preferences
         with a verifiable consumer are offered here. Until this section that was

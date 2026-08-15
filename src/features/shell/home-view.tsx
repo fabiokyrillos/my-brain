@@ -199,12 +199,20 @@ export function HomeView({
   locale,
   view,
   capture,
+  onboarding,
   agentName,
 }: {
   locale: Locale;
   view: HomeViewModel;
   /** The capture form, injected so this component stays free of Server Actions. */
   capture: ReactNode;
+  /**
+   * The guided path (`2O-ONBOARD-001`), injected for the same reason and
+   * rendered **below** the composer. Optional, and `null` on an account that
+   * finished or dismissed it — this component never decides that, so the
+   * decision lives in one place rather than two.
+   */
+  onboarding?: ReactNode;
   agentName: string;
 }) {
   const copy = getHomeCopy(locale, agentName);
@@ -250,6 +258,14 @@ export function HomeView({
       {/* Capture sits at the top of the content, not inside a hero card
           (`02-arquitetura-e-rotas.md`: *captura → precisa de você → …*). */}
       <div className="today-capture">{capture}</div>
+
+      {/*
+        `2O-ONBOARD-001` — offered, never imposed. It sits *after* capture, and
+        the order is the requirement rather than a layout preference: an
+        onboarding that came first would put a guide between a first-time owner
+        and the one interaction this product is built around.
+      */}
+      {onboarding}
 
       <div className="today-columns">
         <div className="today-main">

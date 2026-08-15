@@ -2,6 +2,61 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O SLICE 2O.2 — the first conquest, derived and offered
+
+**`2O-ONBOARD-001` … `-011`. Zero migrations created. 94, parity
+`202608140094`. Signup closed, rollout 25 · 3 · 2. CSP unchanged.
+`embedding_model` untouched. A13 not retargeted. 26 of 116 delivered.**
+
+### Added
+
+- `src/features/onboarding/` — the guided path. `contracts.ts` declares seven
+  ordered steps as data: the activation fact each mirrors (or `null` for the
+  two `2O-ONBOARD-004` and `-008` ask for that activation does not declare),
+  the existing data its state derives from, the destination it reaches and
+  **the module it mounts rather than reimplements**.
+  `pathMirrorsActivationOrder` asserts the five facts appear in the path in
+  exactly activation's order.
+- A fourth state, **`blocked`** — *"the owner could not do this even if they
+  wanted to"* — claimed **only** when the AI credential is known absent, never
+  when it could not be read. `2O-ONBOARD-011`'s recovery resolves through the
+  same `byokSettingsHref` the `awaiting_ai_configuration` state uses.
+- `onboarding-view.ts` — the path's one read. It calls `loadActivationProgress`
+  rather than re-asking the same five questions, so the path and the activation
+  contract cannot answer differently about one account.
+- `dismissal.ts` / `actions.ts` — dismissal as an `httpOnly`, `sameSite=lax`
+  cookie with **one accepting value**, set and deleted by two `requireUser`-gated
+  Server Actions. No column, no migration, and it fails toward *offering* the
+  path rather than toward hiding it.
+- `onboarding-panel.tsx` on `/app`, below the composer; `onboarding-restore.tsx`
+  on `/app/settings`, rendered only when there is something to reverse.
+- `copy.ts` — pt-BR and en keyed by `OnboardingStepKey`, so a step added without
+  copy fails to compile in both locales. `src/app/onboarding.css`, tokens only.
+- `src/lib/closeout/onboarding-guard.test.ts` — the plan's second risk in its
+  strongest form: **the feature writes nothing at all**. No write verb on any
+  `.from(…)` chain, no `.rpc(`, no import of `updateProfile`,
+  `saveAiCredential` or `captureEntry`; every declared mount and destination
+  resolved against the tree; the composer asserted to precede the panel; and
+  `ASSISTANT_IDENTITY_DEFAULTS` re-read from the identity migration.
+- `e2e/online-onboarding.spec.ts` — five authenticated journeys on a disposable
+  account, both locales, desktop and mobile. Credential-gated, so it skips in CI
+  and must be **run** for its claim to exist.
+
+### Changed
+
+- `home-view.tsx` takes an `onboarding` slot rendered **after** `capture`;
+  `home-dashboard.tsx` loads the path in its own `Promise.allSettled` slot, so a
+  failed offer can never take the cockpit down with it.
+- `home-resilience.test.tsx` covers the seventh read, and gained the
+  non-vacuity assertion it was missing.
+
+### Recorded, not repaired
+
+- `defaultAgentPreferences.tone` is `direct` while `agent_preferences.tone`
+  defaults to `informal`. Latent — no product path reads that field — but
+  deriving the identity step from it would have read a brand-new account as
+  already personalised. **Destination: slice 2O.3.**
+
 ## 2026-08-15 - PHASE 2O SLICE 2O.1 — the product says what it is, and the closed door says so first
 
 **`2O-ENTRY-001` … `-008`. Zero migrations created. 94, parity `202608140094`.
