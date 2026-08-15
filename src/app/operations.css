@@ -298,13 +298,133 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .needs-attention-row .list-attention-hint,.needs-attention-action-hint{color:var(--link);font-weight:700}
 .panel-view-all{display:inline-block;margin-top:16px;color:var(--link);font:var(--type-mono)}
 .panel-view-all:hover{text-decoration:underline}
-.inbox-view-tabs{display:flex;gap:8px;margin-bottom:20px}
-.inbox-view-tabs a{border:1px solid var(--border-default);border-radius: var(--radius-full);padding:9px 15px;min-height:44px;display:inline-flex;align-items:center;color:var(--text-secondary);font:600 12px var(--font-sans);background:var(--background-surface)}
-.inbox-view-tabs a[aria-current="page"]{background:var(--text-primary);color:var(--action-primary-text);border-color:var(--text-primary)}
 .needs-attention-list{margin-top:4px}
 .load-more-button{width:auto;margin:6px auto 0}
 .needs-attention-error{margin-top:6px}
-@media(max-width:600px){.inbox-view-tabs{flex-wrap:wrap}}
+
+/*
+ * The record detail — decision column and explanation column (mockup 03,
+ * frame 04).
+ *
+ * The page used to stack everything in one column, which put the decision in the
+ * middle of a long text. The split is grid placement of two wrappers, in DOM
+ * order, so focus order still equals visual order at both widths.
+ *
+ * 1080px, matching Hoje: below it the decision column is narrower than the
+ * labelled field grid wants and the fields start wrapping their values.
+ */
+.record-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-6);padding-bottom:var(--space-6)}
+.record-detail-head h1{font:var(--type-title-1);letter-spacing:-.02em;margin:0}
+.record-detail-provenance{margin:var(--space-2) 0 0;font:var(--type-mono);letter-spacing:var(--eyebrow-tracking);text-transform:uppercase;color:var(--text-muted)}
+.record-detail-columns{display:grid;gap:var(--space-5)}
+.record-decision,.record-explanation{display:grid;gap:var(--space-4);align-content:start;min-width:0}
+@media(min-width:1080px){
+  /* 1fr + the entry panel's own 372px measure from the direction's scale. */
+  .record-detail-columns{grid-template-columns:minmax(0,1fr) 372px;gap:var(--space-6);align-items:start}
+}
+.record-decision .review-understanding{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);padding:var(--space-5)}
+.review-understanding-body{margin:var(--space-4) 0 0;font:var(--type-reading);color:var(--text-primary)}
+/* The explanation column is quieter than the decision column: it is read, not
+   acted on, and a second column of equal weight would compete with the bar. */
+.record-explanation{font-size:13px}
+.record-explanation .section-heading h2{font:var(--type-heading)}
+
+/*
+ * Registros as a decision queue — Papel e Console, mockup 03 frame 03.
+ *
+ * `.inbox-view-tabs` retired here: it styled a two-tab strip, and the surface
+ * now carries the five views the architecture names. The rules are not kept
+ * "just in case" — dead CSS with a plausible name is how two chip styles end up
+ * in one product.
+ */
+.records-page > h1,.records-header h1{font:500 clamp(38px,5vw,60px)/1 var(--font-reading);letter-spacing:-.04em;margin:var(--space-2) 0 0}
+.records-header{margin-bottom:var(--space-6)}
+.records-lead{margin:var(--space-2) 0 0;color:var(--text-secondary);font:var(--type-lead);max-width:var(--width-reading)}
+
+/* Views are links, so the strip scrolls rather than wraps on a narrow screen —
+   `05-responsividade.md`: *chips roláveis*. `-webkit-overflow-scrolling` is not
+   set: the default is already momentum on every browser this ships to. */
+.records-views{display:flex;gap:var(--space-2);margin-bottom:var(--space-5);overflow-x:auto;scrollbar-width:none}
+.records-views::-webkit-scrollbar{display:none}
+.records-view{
+  flex:none;
+  display:inline-flex;align-items:center;
+  min-height:var(--touch-target);padding:0 var(--space-4);
+  border:1px solid var(--border-default);border-radius:var(--radius-full);
+  background:var(--background-surface);color:var(--text-secondary);
+  font:var(--type-label);
+}
+.records-view:hover{border-color:var(--border-strong);color:var(--text-primary)}
+.records-view[aria-current="page"]{background:var(--action-primary);color:var(--action-primary-text);border-color:var(--action-primary)}
+
+.records-queue{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);overflow:hidden}
+/* The four tracks, declared once and inherited by the head and every row so a
+   column cannot drift between them. */
+.records-head,.records-link{
+  display:grid;
+  grid-template-columns:132px minmax(0,1.6fr) minmax(0,1fr) 116px;
+  gap:var(--space-4);
+  align-items:center;
+}
+.records-head{
+  padding:var(--space-3) var(--space-5);
+  border-bottom:1px solid var(--border-default);
+  background:var(--background-subtle);
+  font:var(--type-eyebrow);letter-spacing:var(--eyebrow-tracking);text-transform:uppercase;
+  color:var(--text-muted);
+}
+.records-list{list-style:none;margin:0;padding:0}
+.records-row{border-bottom:1px solid var(--border-divider)}
+.records-row:last-child{border-bottom:0}
+/* The 3px rule is the row's third signal for "precisa de você", after the word
+   and the dot — `04-estados.md` forbids colour alone. */
+.records-row[data-attention="true"]{box-shadow:inset 3px 0 0 var(--tone-attention-fg);background:var(--tone-attention-row)}
+.records-link{
+  min-height:var(--row-height);
+  padding:var(--space-3) var(--space-5);
+  color:var(--text-primary);
+}
+.records-row:hover{background:var(--background-elevated)}
+.records-row[data-attention="true"]:hover{background:var(--tone-attention-bg)}
+
+.records-state{display:inline-flex;align-items:center;gap:var(--space-2);min-width:0}
+.records-dot{flex:none;width:6px;height:6px;border-radius:var(--radius-full);background:var(--mark-decorative)}
+.records-row[data-state="needs_attention"] .records-dot{background:var(--tone-attention-fg)}
+.records-row[data-state="organizing"] .records-dot{background:var(--tone-information-fg)}
+.records-row[data-state="ready"] .records-dot{background:var(--tone-success-fg)}
+.records-row[data-state="could_not_organize"] .records-dot{background:var(--tone-risk-fg)}
+.records-state-label{font:var(--type-label);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.records-row[data-state="needs_attention"] .records-state-label{color:var(--tone-attention-fg);font-weight:600}
+
+/* The owner's own words. One line with an ellipsis and the full text one click
+   away — `03-componentes.md`, ListRow: *título em uma linha com elipse*. */
+.records-content{min-width:0}
+.records-original{display:block;font:var(--type-reading-sm);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.records-proposal{min-width:0;font:var(--type-body);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.records-when{font:var(--type-mono);font-variant-numeric:tabular-nums;color:var(--text-muted);text-align:right;white-space:nowrap}
+
+/*
+ * Below the shell breakpoint the row becomes a card and the proposal becomes its
+ * second line (`05-responsividade.md`). Same DOM, regrouped — a second markup
+ * path is how two layouts start disagreeing about what a row contains.
+ */
+@media(max-width:899px){
+  .records-head{display:none}
+  .records-link{
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"state when" "record record" "proposal proposal";
+    row-gap:var(--space-1);
+    align-items:baseline;
+    padding:var(--space-3) var(--space-4);
+  }
+  .records-state{grid-area:state}
+  .records-when{grid-area:when}
+  .records-content{grid-area:record}
+  .records-proposal{grid-area:proposal}
+  /* The card has room for two lines of the original; the queue's job on a phone
+     is still to be scannable, so it is bounded rather than unbounded. */
+  .records-original{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
+}
 
 /* Phase 2X.12: canonical Work surface */
 .work-view-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}

@@ -8,7 +8,16 @@ import { getDailyCycleCopy, getEntryReviewSectionCopy, type DailyCycleLocale } f
 
 const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "resolve_consistency"];
 
-export function ReviewUnderstanding({
+/**
+ * The record's own identity, at the top of the page.
+ *
+ * The `<h1>` is the record's **date and time**, which is what the architecture's
+ * screen map names this page (`02-arquitetura-e-rotas.md`: *Detalhe do registro
+ * · (data e hora do registro)*). It used to be the model's paraphrase, which put
+ * the assistant's reading above the owner's own words in the reading order — the
+ * one thing `03-componentes.md` says the InterpretationCard must never do.
+ */
+export function ReviewIdentity({
   view,
   locale,
   agentName,
@@ -23,29 +32,72 @@ export function ReviewUnderstanding({
   const statusCopy = getDailyCycleCopy(locale, agentName).productStates[view.productState];
 
   return (
-    <header className="entry-heading review-understanding">
+    <header className="record-detail-head">
       <div>
-        <p className="eyebrow">{pt ? "INTERPRETAÇÃO DO BRAIN" : "BRAIN INTERPRETATION"}</p>
-        <h1>{view.understanding}</h1>
-        <p>{occurredAtLabel}</p>
-        {view.humanFields.length > 0 && (
-          <dl className="review-facts">
-            {view.humanFields.map((field) => (
-              <div key={field.key}>
-                <dt>{field.label}</dt>
-                <dd>{field.value ?? "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-        {view.productState === "organizing" && (
-          <p className="review-organizing-note"><Sparkles size={14} aria-hidden="true" />{statusCopy.description}</p>
-        )}
+        <h1>{occurredAtLabel}</h1>
+        <p className="record-detail-provenance">
+          {pt ? "original preservado" : "original preserved"}
+        </p>
       </div>
       <span className={`entry-status entry-status-${view.productState}`}>
         <Clock3 size={16} aria-hidden="true" />{statusCopy.label}
       </span>
     </header>
+  );
+}
+
+/**
+ * What the assistant understood — **below** the original, never above it.
+ *
+ * An `<h2>` since the Papel e Console recomposition: it is one section of the
+ * record, not the record's name. `07-acessibilidade.md` fixes the focus order as
+ * *original → interpretação → ações → painel de explicação → técnico*, and a
+ * heading level that disagreed with that order would make the reading order and
+ * the document outline tell two different stories.
+ */
+export function ReviewUnderstanding({
+  view,
+  locale,
+  agentName,
+}: {
+  view: InterpretationReviewView;
+  locale: DailyCycleLocale;
+  agentName: string;
+}) {
+  const pt = locale === "pt-BR";
+  const statusCopy = getDailyCycleCopy(locale, agentName).productStates[view.productState];
+
+  return (
+    <section className="review-understanding" aria-labelledby="review-understanding-title">
+      <div className="section-heading">
+        <Sparkles size={17} aria-hidden="true" />
+        <div>
+          <h2 id="review-understanding-title">{pt ? `O que o ${agentName} entendeu` : `What ${agentName} understood`}</h2>
+          <p>{pt ? "Uma leitura do seu texto. Nada aqui substitui o original." : "A reading of your text. Nothing here replaces the original."}</p>
+        </div>
+      </div>
+      <p className="review-understanding-body">{view.understanding}</p>
+      {view.humanFields.length > 0 && (
+        /*
+          The labelled field grid (`03-componentes.md`, InterpretationCard). A
+          `<dl>` rather than rows of `<span>`s so each label reaches a screen
+          reader attached to its own value.
+        */
+        <dl className="review-facts">
+          {view.humanFields.map((field) => (
+            <div key={field.key}>
+              <dt>{field.label}</dt>
+              {/* "não identificado" rather than an empty cell: an empty value
+                  reads as missing data, not as *the model found nothing*. */}
+              <dd>{field.value ?? (pt ? "não identificado" : "not identified")}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {view.productState === "organizing" && (
+        <p className="review-organizing-note"><Sparkles size={14} aria-hidden="true" />{statusCopy.description}</p>
+      )}
+    </section>
   );
 }
 
@@ -240,7 +292,7 @@ export type EntryReviewSlots = {
  * It now runs in the order the questions are asked:
  *
  * 1. **what did I write** — `OriginalRecord`, open, no click
- * 2. **what did it understand** — the heading and its facts
+ * 2. **what did it understand** — the reading and its labelled fields
  * 3. **what still needs me** — attention, then the actions that resolve it
  * 4. **what now exists** — tasks, reminders, memories and recognized entities,
  *    each linked to where it can be inspected
@@ -248,9 +300,11 @@ export type EntryReviewSlots = {
  * 6. **how it was decided** — model, scores and trust policy, behind the
  *    disclosure, which is what that disclosure is for
  *
- * The heading keeps the `<h1>` because a page needs one and the understanding
- * is what names this record in every list that points here; what changed is
- * that it is no longer the only thing above the fold.
+ * The Papel e Console recomposition splits that sequence into two columns —
+ * 1–3 decide, 4–6 explain — and moves the `<h1>` off the model's paraphrase and
+ * onto the record's own date and time. Both changes serve the same rule: the
+ * assistant's reading may not come before the owner's words, in the layout or in
+ * the document outline.
  */
 export function EntryReview({
   view,
@@ -275,18 +329,43 @@ export function EntryReview({
    */
   timeZone: string;
 }) {
+  const pt = locale === "pt-BR";
+
   return (
-    <div className="entry-review">
+    <div className="entry-review record-detail">
       <InterpretationReviewViewed entryId={view.entryId} locale={locale} />
-      <ReviewUnderstanding view={view} locale={locale} agentName={agentName} occurredAtLabel={occurredAtLabel} />
-      <OriginalRecord original={view.original} locale={locale} />
-      <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
-        {slots.attentionAction}
-      </ReviewAttention>
-      <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
-      {outcomes === undefined ? null : <EntryOutcomes outcomes={outcomes} locale={locale} />}
-      <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} timeZone={timeZone} />
-      {slots.technicalDetails}
+      <ReviewIdentity view={view} locale={locale} agentName={agentName} occurredAtLabel={occurredAtLabel} />
+
+      {/*
+        Two columns: decide on the left, understand on the right (mockup 03,
+        frame 04 — *uma coluna de decisão e uma coluna de explicação*). One DOM
+        order serves both layouts, and it is the order `07-acessibilidade.md`
+        fixes, so focus order equals visual order on a phone and on a desktop.
+      */}
+      <div className="record-detail-columns">
+        <div className="record-decision">
+          <OriginalRecord original={view.original} locale={locale} />
+          <ReviewUnderstanding view={view} locale={locale} agentName={agentName} />
+          <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
+            {slots.attentionAction}
+          </ReviewAttention>
+          <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
+        </div>
+
+        {/*
+          The explanation column. `<aside>` is the landmark `07-acessibilidade.md`
+          names for it, and everything in it is a reading of the record rather
+          than a decision on it — which is exactly why it is not in the left
+          column competing with the decision bar.
+        */}
+        <aside className="record-explanation" aria-label={pt ? "Como este registro foi lido" : "How this record was read"}>
+          {outcomes === undefined ? null : <EntryOutcomes outcomes={outcomes} locale={locale} />}
+          <CandidateOutcomeHistory outcomes={view.candidateOutcomes} locale={locale} timeZone={timeZone} />
+          {/* Last, and collapsed: model ids, versions and policies are the
+              answer to "how", asked after "what". */}
+          {slots.technicalDetails}
+        </aside>
+      </div>
     </div>
   );
 }

@@ -51,17 +51,62 @@ function toFailClosedInboxItemView(
     significantAt,
     availableActions,
     originalPreserved: true,
+    // An entry the mapper could not read is emphatically not "read and proposed
+    // nothing" — that is a claim about a successful interpretation.
+    isRecordOnly: false,
   });
 }
 
+/**
+ * The queue's views (`02-arquitetura-e-rotas.md`: `?view=`).
+ *
+ * `needs-you` is deliberately **absent**: it is not a filter over this
+ * projection, it is `list_needs_attention` — a different read with its own
+ * ordering and its own cursor — and the page routes to it before reaching here.
+ * Listing it as a value would invite someone to implement it as a filter, which
+ * is how one queue would end up with two definitions of "needs you".
+ */
+export const inboxViews = ["all", "organizing", "failed", "record-only"] as const;
+export type InboxView = (typeof inboxViews)[number];
+
+export function isInboxView(value: unknown): value is InboxView {
+  return typeof value === "string" && (inboxViews as readonly string[]).includes(value);
+}
+
+/**
+ * The entry statuses a view can possibly contain.
+ *
+ * A **superset**, and only a pre-filter. The product state is decided by
+ * `resolveDailyCycleLifecycle` from the entry status, the job, the open
+ * questions and the candidates together — so no SQL predicate can be exact, and
+ * a filter that pretended to be would drop rows that belong. Narrowing here just
+ * stops the page from being mostly rows the post-filter will discard; the
+ * post-filter below is what actually decides.
+ */
+const STATUSES_BY_VIEW: Record<Exclude<InboxView, "all">, readonly string[]> = {
+  // `saved` is here because an entry whose job is pending reads as organizing
+  // while its own status has not moved yet.
+  organizing: ["saved", "interpreting", "reprocessing"],
+  failed: ["saved", "recoverable_error", "terminal_error", "completed"],
+  "record-only": ["completed"],
+};
+
+const STATE_BY_VIEW: Record<Exclude<InboxView, "all">, (item: InboxItemView) => boolean> = {
+  organizing: (item) => item.productState === "organizing",
+  failed: (item) => item.productState === "could_not_organize",
+  "record-only": (item) => item.isRecordOnly,
+};
+
 export async function loadInboxProjection(
   supabase: SupabaseClient,
-  { locale, page }: { locale: "pt-BR" | "en"; page: number },
+  { locale, page, view = "all" }: { locale: "pt-BR" | "en"; page: number; view?: InboxView },
 ): Promise<InboxProjectionPage> {
   const { from, to } = pageRange(page);
-  const entriesResult = await supabase
+  const query = supabase
     .from("entries")
-    .select("id,original_content,status,occurred_at,created_at,current_interpretation_id")
+    .select("id,original_content,status,occurred_at,created_at,current_interpretation_id");
+  const scoped = view === "all" ? query : query.in("status", STATUSES_BY_VIEW[view]);
+  const entriesResult = await scoped
     .order("created_at", { ascending: false })
     .range(from, to);
   const rows = requireSupabaseData(entriesResult, "load inbox entries") ?? [];
@@ -167,5 +212,15 @@ export async function loadInboxProjection(
       ?? toFailClosedInboxItemView(entry.id, title, originalPreview, entry.occurred_at, availableActions);
   });
 
-  return { items, hasNext: paginated.hasNext };
+  /*
+    The post-filter, and the only thing that decides membership.
+
+    `hasNext` stays the SQL page's answer rather than being recomputed from the
+    filtered list. It means "there are more rows in this view's source", which is
+    exactly what the next-page link does, and a `hasNext` derived from a filtered
+    page would stop the user one page short of rows that exist.
+  */
+  const scopedItems = view === "all" ? items : items.filter(STATE_BY_VIEW[view]);
+
+  return { items: scopedItems, hasNext: paginated.hasNext };
 }

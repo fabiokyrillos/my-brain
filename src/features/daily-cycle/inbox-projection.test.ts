@@ -316,3 +316,69 @@ describe("loadInboxProjection", () => {
     expect(page.hasNext).toBe(true);
   });
 });
+
+/**
+ * The queue's views (`02-arquitetura-e-rotas.md`: `?view=`).
+ *
+ * The product state is decided by `resolveDailyCycleLifecycle` from the entry
+ * status, the job, the open questions and the candidates *together*, so no SQL
+ * predicate can select a view exactly. The status filter is a superset and the
+ * derived state is what decides — these prove the second half actually runs,
+ * because a superset that nothing narrowed would look like a working filter on
+ * any fixture where the two happen to agree.
+ */
+describe("loadInboxProjection: views", () => {
+  it("keeps only what is really organizing, not everything the status admits", async () => {
+    const { client } = clientMock({
+      entries: [
+        entry({ id: "reading", status: "interpreting" }),
+        // Same status set, and deliberately not organizing: no job, so the
+        // lifecycle resolves it to `saved`. A status-only filter would keep it.
+        entry({ id: "just-saved", status: "saved" }),
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1, view: "organizing" });
+
+    expect(page.items.map((item) => item.entryId)).toEqual(["reading"]);
+  });
+
+  it("keeps only what could not be organized", async () => {
+    const { client } = clientMock({
+      entries: [
+        entry({ id: "broken", status: "terminal_error" }),
+        entry({ id: "fine", status: "completed" }),
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1, view: "failed" });
+
+    expect(page.items.map((item) => item.entryId)).toEqual(["broken"]);
+  });
+
+  it("separates a record that proposed nothing from one that produced tasks", async () => {
+    const { client } = clientMock({
+      entries: [
+        entry({ id: "nothing", status: "completed" }),
+        entry({ id: "produced", status: "completed", current_interpretation_id: "i1" }),
+      ],
+      interpretations: [{ id: "i1", summary: "Ligar para a Marina", task_candidates: [{ title: "Ligar" }] }],
+      tasks: [{ source_entry_id: "produced", source_interpretation_id: "i1", candidate_index: 0 }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1, view: "record-only" });
+
+    expect(page.items.map((item) => item.entryId)).toEqual(["nothing"]);
+    expect(page.items[0]?.isRecordOnly).toBe(true);
+  });
+
+  it("returns everything when no view is asked for", async () => {
+    const { client } = clientMock({
+      entries: [entry({ id: "a", status: "completed" }), entry({ id: "b", status: "terminal_error" })],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items).toHaveLength(2);
+  });
+});

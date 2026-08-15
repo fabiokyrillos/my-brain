@@ -61,6 +61,7 @@ function item(overrides: Partial<InboxItemView> = {}): InboxItemView {
     significantAt: "2026-07-17T12:00:00.000Z",
     availableActions: [{ id: "open_entry", href: "/pt-BR/app/inbox/72f1f8af-8b90-4f1d-9916-ec6d983fd4c6" }],
     originalPreserved: true,
+    isRecordOnly: false,
     ...overrides,
   };
 }

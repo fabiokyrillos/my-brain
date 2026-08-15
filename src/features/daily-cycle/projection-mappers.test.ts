@@ -132,6 +132,9 @@ describe("daily cycle product projection mappers", () => {
       significantAt: occurredAt,
       availableActions: entryActions,
       originalPreserved: true,
+      // Not "record only": this entry has candidates waiting on a decision, so
+      // saying it proposed nothing would deny them.
+      isRecordOnly: false,
     });
     expect(Object.keys(item as object)).toEqual([
       "entryId",
@@ -142,6 +145,7 @@ describe("daily cycle product projection mappers", () => {
       "significantAt",
       "availableActions",
       "originalPreserved",
+      "isRecordOnly",
     ]);
     expect(Object.isFrozen(item as object)).toBe(true);
     expect(Object.isFrozen((item as { availableActions: object }).availableActions)).toBe(true);
