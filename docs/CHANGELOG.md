@@ -2,6 +2,82 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PAPEL E CONSOLE, PART THREE: the four open findings, and the five surfaces part two named as absences
+
+**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Five commits on `codex/redesign-papel-e-console`, continuing from `0d2bb2c`. Not pushed, no PR, no merge.
+
+### The four findings the previous commit recorded as open
+
+All four were confirmed in the tree before anything was touched. **None is a false positive, and none is preexisting** — every one was introduced, or made reachable, by this redesign.
+
+**An entry being retried appeared only in "Tudo".** `fail_entry_interpretation` writes `recoverable_error` on a non-terminal failure and the job keeps a future `next_attempt_at`; the lifecycle resolver reads that live retry and answers `organizing`. The "Organizando" view's status superset omitted the status, so the row was discarded in SQL before the post-filter that decides membership ever saw it. The resolver was always right; the prefilter was wrong, and every existing view test used a status the prefilter happened to admit.
+
+**`awaiting_ai_configuration` reached no view the owner lands on.** `list_needs_attention` never selects it, and widening that RPC costs a migration this initiative does not have. `contracts.ts` states that the state "still reaches the user, through the two surfaces that read `entries.status` directly" — true while the Inbox opened on the archive, and quietly false from the moment **this redesign flipped the default to needs-you**. The one state whose entire meaning is *nothing will happen until you act* became reachable only by typing a URL.
+
+Repaired without a migration: a view of its own over the same projection, mapper and actions, offered as a chip only when the account holds such entries, and a notice on needs-you carrying the two links that are genuinely different acts — see what is waiting, and fix why it is waiting.
+
+**`agendaHasMore` was computed, threaded through the view model and read by nothing.** Five of nineteen commitments looked exactly like five of five.
+
+**`/app/reviews` opened at level two.** The earlier repair demoted the day review's `<h1>`, which fixed the **count** and left the **order** wrong — the page's own name arrived several screens down, after a flat run of `<h2>`s in which the review's title was a sibling of its own sections. That is the half of `07-acessibilidade.md` an axe violation count does not measure.
+
+### The task detail is an object again
+
+Decide on the left, understand on the right — the fields stay with the controls that change them, because a due date in one column and the field that sets it in the other is the arrangement the split exists to avoid. **Placed by grid, never by `order`**, so focus order equals visual order in both layouts.
+
+**Nothing in the route architecture moved.** `/app/work/[taskId]`, the `@panel` parallel route, the `(.)`-intercepting route, `default.tsx`, the `[...catchAll]` closer, `TaskDetailSurface` as the single implementation, the injected Server Actions, the authorization and the real undo are untouched.
+
+The panel is a **frame**, and a frame may not take a control away: it is one column at any width, and a test renders both mounts and asserts the panel's regions and controls are the page's rather than a subset.
+
+### The week was never a grid
+
+`display: block` sat on the `<table>` to give `overflow-x` a block box. It also replaces the table box and re-parents the rows into an anonymous table wrapper, so **`table-layout` never applied** and the seven columns were sized by their contents — one busy Tuesday rendered as one wide column and six narrow ones, at every viewport.
+
+**A hidden lane had stopped looking hidden.** Removing the invalid `aria-pressed` from the five lane links was right; the CSS rule keyed on it stayed, matching nothing, so a hidden lane lost its dashed edge and its reduced opacity and its state survived only in a visually-hidden word.
+
+That rule outlived its attribute because **`calendar-view.tsx` was missing from the mirror guard's component list** — the week grid, the control band and the lane chips were mirrored by nothing and rendered by no browser lane. Adding it surfaced two more classes no browser had ever rendered, one of them `2M-CAL-006`'s bound state.
+
+### Revisoes states the day before it shows its parts
+
+Counts only — closed, still open, captured. No score, no proportion and no target. A task both planned and due today is **one** pendencia. A day is reported *quiet* only when everything was read **and** every count is zero; without the first clause, four failed queries render as a peaceful day.
+
+**There is no pendencias list, and its absence is the decision:** every open item is already a row below with the verbs its status admits, and a second list would be `2J-HOJE-004`'s repetition with the second copy carrying less. The rows say their own state where they already are.
+
+### Conversar is a transcript, not a chat log
+
+The bubbles set the owner's and the Brain's **prose** in the UI face and spent the width on alignment. Both are sentences somebody wrote, so both are now in the reading face in one column, separated by a mono speaker line and a rule. The question is marked by a leading edge, never by a side or a fill.
+
+**Typed content now survives a failed turn.** React resets a form once its action settles, so a knowledge answer that failed cleared the box, and a too-long refusal discarded up to twelve thousand characters while announcing that they were too long. **No "stop generating" control was added**, because there is no cancellation behind one.
+
+### Three inert producers, found and consumed
+
+`data-route` on the composer's outcome region — four outcomes painting as one neutral card. `statusTone` on the stored review's badge — three statuses on one wash. `conversation_messages.created_at` — selected since the thread existed, rendered never, so a conversation resumed three weeks later read as one continuous exchange.
+
+### Two lanes were measuring something other than the product
+
+`e2e/layout-contracts.spec.ts`'s navigation mirror had gone **stale**: Conversar in the rail where Brain now is, a comment asserting Registros was demoted when it had returned, and `Inicio` where the product says `Hoje`. Every *shape* was unchanged — four rail items, five bar slots with capture in the middle — so "capture stays centred and in source order" kept passing while measuring navigation the product does not render. `shell-mirror-guard.test.ts` now derives both lists from `capabilities.ts` and `messages.ts`, and found the `Hoje` label on its first run.
+
+`e2e/accessibility.spec.ts` **never stubbed the three `next/font` variables**. `--font-reading: var(--font-newsreader), Georgia, serif` — a `var()` with no declaration and no fallback poisons the property containing it, so every family in that lane resolved to the document default and **any assertion about type would have passed whatever the stylesheet said.** Found by a new assertion failing on correct code, which is the moment a guard usually gets weakened instead.
+
+### A dev-server-only defect, recorded rather than worked around
+
+Under Turbopack `next dev`, the RSC request for an intercepted task answers **500 — `Invalid interception route: /pt-BR/app/work/(.)x86<taskId>`**, the `(.)` marker repeated eighty-six times before the id. The router falls back to a full document navigation, `default.tsx` answers the slot with `null`, and the detail renders as the whole page with no panel.
+
+**Every route file involved is untouched by this branch** (`git log main..HEAD -- src/app/[locale]/app/work` is empty) and `next build` compiles the interception without complaint. The lane passes against `next start` and documents the requirement.
+
+### Verification
+
+**7431 unit tests, 269 Playwright across every offline lane and both projects, lint, typecheck, build, `git diff --check` clean.** Authenticated against the **production build**: 20 surfaces at 375/412/768/1024/1440/1920 in both themes and both locales with no horizontal scroll, axe clean in light and dark, and eight new route assertions covering panel-on-soft-navigation, page-on-hard, refresh, back, forward, a shareable URL, the narrow-viewport surface and the catch-all closing the panel.
+
+Each new behavioural fix was run against the pre-fix code to confirm it fails there: both projection tests, both composer restore tests, and three of the week-grid contracts.
+
+### What is NOT done, and is not claimed
+
+- **Brain's workspaces were not recomposed.** Person, project, memory, files and relations keep their existing compositions.
+- **The transparency surfaces were not consolidated.** Historico, Custos and Processamento are still three destinations rather than tabs of Ajustes -> Dados e IA.
+- **The mobile bar still departs from the handoff in one slot**, unchanged from part two.
+- **No screen-reader run, no physical device, no hosted environment.** Unchanged from parts one and two.
+- **Dense-list composition is still only structurally verified.** The authenticated account holds four tasks and no records in most views, so a long list has been reasoned about and not seen.
+
 ## 2026-08-14 - PAPEL E CONSOLE, PART TWO: the surfaces the first pass preserved, recomposed
 
 **Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Five commits on `codex/redesign-papel-e-console`, continuing from `f7da296`. Not pushed, no PR, no merge.
