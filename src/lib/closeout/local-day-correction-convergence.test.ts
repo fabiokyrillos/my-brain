@@ -184,6 +184,42 @@ describe("LDC-HOME-001: Home's today is computed in the owner's zone, not format
       new Set(["timeZone={view.timeZone}"]),
     );
 
+    /*
+      The completeness half, and it has to be derived rather than listed.
+
+      A hand-written list plus `length >= list.length` is what an independent
+      review caught here: adding `<NewDateRow item={x} />` with no zone leaves
+      both numbers at five and both assertions pass, which is the exact
+      regression this guard exists for. So the components are DISCOVERED from
+      the file — every capitalised element whose name ends in `Row` or `Card` —
+      and each one is required to carry the prop. The list below is only the
+      floor, so a rename cannot empty the discovery and pass vacuously.
+    */
+    const imported = new Set(
+      [...view.matchAll(/^import\s*\{([^}]+)\}/gm)]
+        .flatMap((match) => match[1].split(","))
+        .map((name) => name.trim())
+        .filter((name) => /(?:Row|Card)$/.test(name)),
+    );
+    const rendered = [...view.matchAll(/<([A-Z][A-Za-z]*(?:Row|Card))\b([^>]*)>/g)]
+      /*
+        **Imported** rows only.
+
+        A row defined in this file is visible to whoever reads it, and one of
+        them — `TaskRow` — legitimately takes no zone: it renders a `dueLabel`
+        the dashboard already formatted, so it never touches an instant. The
+        rows that DO format instants are the shared ones this file imports, and
+        those are the ones a future edit can add without noticing the prop.
+      */
+      .filter(([, name]) => imported.has(name));
+    expect(
+      rendered.length,
+      "no imported date-bearing row was discovered — the scan is broken, not the surface",
+    ).toBeGreaterThanOrEqual(4);
+    for (const [, name, attributes] of rendered) {
+      expect(attributes, `${name} renders without the owner's zone`).toContain("timeZone={view.timeZone}");
+    }
+
     const rows = ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow", "NeedsAttentionLeadCard", "AgendaRow"];
     for (const row of rows) {
       expect(view, `${row} must receive the owner's zone`).toContain(row);

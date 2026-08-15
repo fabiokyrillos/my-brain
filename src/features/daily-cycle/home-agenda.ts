@@ -1,5 +1,5 @@
 import "server-only";
-import { loadCalendarProjection } from "@/features/calendar/calendar-projection";
+import { loadCalendarProjection, requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import type { CalendarCommitment, CalendarLane } from "@/features/calendar/calendar-query";
 import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { localDateOf } from "@/lib/time/local-day";
@@ -88,33 +88,38 @@ export async function loadHomeAgendaProjection(
   const exclude = input.excludeTaskIds ?? new Set<string>();
 
   /*
+    The owner's zone is resolved **before** the anchor, because the anchor is a
+    local date and which date that is depends on the zone. This is the same
+    ordering the calendar route uses, and for the same reason.
+
+    An earlier draft anchored on `localDateOf(now, input.timezone ?? "UTC")` and
+    reasoned that a one-day drift could only *include* yesterday. That is true
+    for positive offsets and false for negative ones — which is every zone this
+    product defaults to. In America/Sao_Paulo at 22:30 local, the UTC date is
+    already tomorrow, so the window started at tonight's local midnight and
+    **excluded the rest of today**: a task due 23:00 was never read, and no day
+    in the range was `isToday`. It happened every evening, for as many hours as
+    the zone is behind UTC.
+  */
+  const timezone = input.timezone ?? await requireProfileTimeZone(supabase, userId);
+
+  /*
     `agenda` is the calendar's own forward-looking orientation (a fortnight from
     the anchor), so "what is next" is answered by the module that already
     defines it rather than by a window invented here.
-
-    The anchor has to be a local date, and `localDateOf` is the same function
-    the calendar route uses — a zone is resolved inside the projection, so this
-    passes the owner's own today only when a test hands one in.
   */
   const projection = await loadCalendarProjection(supabase, {
     userId,
     locale,
     now,
-    timezone: input.timezone,
+    timezone,
     query: {
       orientation: "agenda",
-      anchor: localDateOf(now, input.timezone ?? "UTC"),
+      anchor: localDateOf(now, timezone),
       lanes: ["deadline", "intention", "reminder"],
     },
   });
 
-  /*
-    Anchoring on the owner's zone rather than on the UTC guess above: the
-    projection has now resolved the real one, and re-deriving the anchor from it
-    would need a second call. The fortnight is wide enough that a one-day anchor
-    drift cannot lose an item — it can only include yesterday, which the elapsed
-    filter below removes anyway.
-  */
   const nowIso = now.toISOString();
   const flattened = projection.days.flatMap((day) =>
     day.items

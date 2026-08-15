@@ -160,8 +160,14 @@ describe("HomeView", () => {
 
   /**
    * `04-estados.md`, Hoje **V**: the quiet state owes an account of the day, not
-   * only the absence of work. Without it "nada precisa de você" reads as
-   * "nothing happened".
+   * only the absence of work.
+   *
+   * The **view** renders it correctly and this proves that. What no longer
+   * happens is the dashboard computing a number to put here: the only timestamp
+   * it had is the AI-extracted event date, so counting it produced two false
+   * sentences. `home-dashboard.tsx` has the account. The link is asserted to
+   * carry its view, because the default view is the queue of things that were
+   * *not* organized — the opposite of what this label promises.
    */
   it("reports what was organized today inside the quiet attention state", () => {
     renderHome(viewModel({ attention: [], conflicts: { items: [], bounded: false, limit: 0 }, organizedTodayCount: 7 }));
@@ -169,7 +175,7 @@ describe("HomeView", () => {
     expect(screen.getByText("7 registros foram organizados hoje sem ambiguidade.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ver o que foi organizado" })).toHaveAttribute(
       "href",
-      "/pt-BR/app/inbox",
+      "/pt-BR/app/inbox?view=record-only",
     );
   });
 
@@ -272,9 +278,11 @@ describe("HomeView", () => {
       "href",
       "/pt-BR/app/questions",
     );
+    // Carries its view: a bare link would land on needs-you, which is not the
+    // list of what is being organized.
     expect(screen.getByRole("link", { name: "Ver todos os registros" })).toHaveAttribute(
       "href",
-      "/pt-BR/app/inbox",
+      "/pt-BR/app/inbox?view=organizing",
     );
   });
 

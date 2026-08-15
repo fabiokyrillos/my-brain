@@ -48,7 +48,17 @@ function RecordsViews({ locale, active }: { locale: Locale; active: RecordsView 
         <Link
           aria-current={view.id === active ? "page" : undefined}
           className="records-view"
-          href={view.id === "all" ? `/${locale}/app/inbox` : `/${locale}/app/inbox?view=${view.id}`}
+          /*
+            Every chip names its view, **including "Tudo"**.
+
+            It used to link to the bare `/app/inbox`, which was correct while
+            that resolved to the archive. When the default became needs-you, the
+            chip started landing on a different view than the one it says — and
+            `aria-current` could never mark it, so it could not even look
+            selected. Nothing else in the product linked to `?view=all`, which
+            left the complete archive reachable only by typing the URL.
+          */
+          href={`/${locale}/app/inbox?view=${view.id}`}
           key={view.id}
         >
           {view.label}
@@ -165,19 +175,32 @@ export default async function InboxPage({
       <RecordsViews locale={locale} active={view} />
       {projection.items.length ? (
         <RecordsQueue agentName={agentName} items={projection.items} locale={locale} timeZone={timeZone} />
+      ) : projection.hasNext ? (
+        /*
+          Empty **page**, not empty view.
+
+          The status prefilter is a declared superset and the derived product
+          state decides membership, so a page can be filled entirely with rows
+          the post-filter discards while matching rows sit further along. Showing
+          the view's empty copy here would print "Nenhuma falha. Nada ficou pelo
+          caminho." above a "Próxima" link, with a terminal_error on page three —
+          a categorical claim that is false, which is worse than saying nothing.
+        */
+        <div className="empty-list"><Inbox size={30} /><strong>{copy.emptyPage.title}</strong><p>{copy.emptyPage.body}</p></div>
       ) : (
         <div className="empty-list"><Inbox size={30} /><strong>{emptyCopy.title}</strong><p>{emptyCopy.body}</p></div>
       )}
       {/*
         The view has to survive the page change, or page 2 of "falhas" silently
-        becomes page 2 of everything.
+        becomes page 2 of everything — and "Tudo" is not an exception, because
+        the parameter is what distinguishes it from the default.
       */}
       <PaginationLinks
         locale={locale}
         path="inbox"
         page={page}
         hasNext={projection.hasNext}
-        query={view === "all" ? undefined : { view }}
+        query={{ view }}
       />
     </div>
   );

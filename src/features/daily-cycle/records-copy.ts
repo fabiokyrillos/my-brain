@@ -44,6 +44,14 @@ export type RecordsCopy = {
     readonly failed: string;
     readonly recordOnly: string;
   };
+  /**
+   * An empty **page** of a view that has more pages.
+   *
+   * Deliberately not one of the sentences above. Those are categorical — "no
+   * failures, nothing was left behind" — and a page emptied by the post-filter
+   * while later pages hold matches would make them false.
+   */
+  readonly emptyPage: { readonly title: string; readonly body: string };
   /** The queue's own subtitle under the heading, per view. */
   readonly lead: {
     readonly needsYou: string;
@@ -80,6 +88,10 @@ export const recordsCopy = {
       failed: "Nenhuma falha. Nada ficou pelo caminho.",
       recordOnly: "Nenhum registro sem ação até agora.",
     },
+    emptyPage: {
+      title: "Nada desta visão nesta página",
+      body: "Há mais registros adiante. Continue para a próxima página.",
+    },
     lead: {
       needsYou: "Nada aqui virou tarefa, memória ou lembrete ainda.",
       all: "Tudo que você entregou ao Brain, com o original sempre preservado.",
@@ -112,6 +124,10 @@ export const recordsCopy = {
       organizing: "Nothing is being organized right now.",
       failed: "No failures. Nothing was left behind.",
       recordOnly: "No record without an action so far.",
+    },
+    emptyPage: {
+      title: "Nothing from this view on this page",
+      body: "There are more records ahead. Continue to the next page.",
     },
     lead: {
       needsYou: "Nothing here has become a task, memory or reminder yet.",

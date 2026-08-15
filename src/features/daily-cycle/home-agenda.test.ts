@@ -122,3 +122,60 @@ describe("Hoje's agenda panel", () => {
     expect(HOME_AGENDA_LIMIT).toBeLessThanOrEqual(6);
   });
 });
+
+/**
+ * The production path — `timezone` NOT passed.
+ *
+ * Every case above hands one in, which is exactly how the defect an independent
+ * review found survived them: production never passes it (`home-dashboard.tsx`
+ * resolves nothing and lets the projection do it), and the first draft anchored
+ * the window on `localDateOf(now, "UTC")` while the bounds were computed in the
+ * owner's zone. In a zone behind UTC that starts the fortnight at tonight's
+ * local midnight and loses the rest of today — every evening, for as many hours
+ * as the zone is behind.
+ */
+describe("Hoje's agenda in the owner's zone, resolved rather than assumed", () => {
+  it("keeps tonight's tasks when the UTC date has already rolled over", async () => {
+    // 22:30 on 14 August in America/Sao_Paulo. In UTC it is already the 15th.
+    const late = new Date("2026-08-15T01:30:00.000Z");
+    const captured: string[] = [];
+
+    const projection = await loadHomeAgendaProjection(
+      client({
+        // The zone the product would read, and the only place it comes from.
+        profiles: { data: { timezone: ZONE }, error: null },
+        tasks: (column) => {
+          if (column !== "due_at") return { data: [], error: null };
+          return {
+            data: [
+              // 23:00 tonight, local. Behind the UTC date, ahead of `now`.
+              { id: "tonight", title: "Ligar para o João", due_at: "2026-08-15T02:00:00.000Z", planned_at: null, status: "pending", source_entry_id: null },
+            ],
+            error: null,
+          };
+        },
+      }) as never,
+      { userId: "user-1", locale: "pt-BR", now: late },
+    );
+
+    captured.push(...projection.items.map((item) => item.key));
+    expect(captured, "tonight's task fell outside the window").toContain("deadline:tonight");
+    expect(projection.timezone).toBe(ZONE);
+  });
+
+  it("marks the owner's today as today, not a day that is not in the range", async () => {
+    const late = new Date("2026-08-15T01:30:00.000Z");
+    const projection = await loadHomeAgendaProjection(
+      client({
+        profiles: { data: { timezone: ZONE }, error: null },
+        tasks: (column) => column === "due_at"
+          ? { data: [{ id: "tonight", title: "Hoje ainda", due_at: "2026-08-15T02:00:00.000Z", planned_at: null, status: "pending", source_entry_id: null }], error: null }
+          : { data: [], error: null },
+      }) as never,
+      { userId: "user-1", locale: "pt-BR", now: late },
+    );
+
+    // Anchored on the UTC date, no day in the fortnight was the owner's today.
+    expect(projection.items.some((item) => item.isToday)).toBe(true);
+  });
+});

@@ -10,7 +10,6 @@ import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
 import { selectTodayPriorities } from "@/features/daily-cycle/today-priorities";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
 import { requireUser } from "@/lib/auth/require-user";
-import { localDayBounds } from "@/lib/time/local-day";
 import type { Locale } from "@/lib/preferences";
 import { deriveHomeOperationalStatus } from "./capabilities";
 import { HomeView, type HomePriorityView, type HomeTaskView, type HomeViewModel } from "./home-view";
@@ -180,15 +179,33 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     was organized today" computed from the server's clock would name a different
     day than the greeting sitting three lines above it (`LDC-HOME-001`).
   */
-  const dayBounds = localDayBounds(now, workProjection.timezone);
   const organizing = inboxProjection.items
     .filter((item) => item.productState === "organizing")
     .slice(0, ORGANIZING_HOME_LIMIT);
-  const organizedToday = inboxProjection.items.filter((item) =>
-    item.productState === "ready"
-    && item.significantAt >= new Date(dayBounds.start).toISOString()
-    && item.significantAt < new Date(dayBounds.end).toISOString()
-  ).length;
+
+  /*
+    The day's account is NOT computed here, and the reason is that the field it
+    would need does not mean what it looks like it means.
+
+    `04-estados.md` asks the quiet state to say how many records were organized
+    today. The only per-entry timestamp this projection carries is
+    `significantAt`, which is `entries.occurred_at` — and the worker
+    **overwrites** that with the model's extracted event date
+    (`202607170026_phase_2x_entry_interpretation_worker.sql:247`). So a Tuesday
+    capture reading "reunião na sexta" carries Friday, and counting it would
+    produce two false sentences: Tuesday under-reports, and Friday claims a
+    record was organized on a day nothing happened.
+
+    An independent review caught this. Two further errors sat on the same line:
+    the count came from page one of the inbox, so it silently capped at fifty,
+    and it used `workProjection.timezone` — which is `"UTC"` when that
+    projection fell back, naming the wrong day for exactly the evening hours
+    `LDC-HOME-001` exists to protect.
+
+    Reporting nothing is the honest option until an ingestion timestamp is
+    available to count. The quiet state keeps its reassurance and its link.
+  */
+  const organizedToday = 0;
 
   const view: HomeViewModel = {
     timeZone: workProjection.timezone,

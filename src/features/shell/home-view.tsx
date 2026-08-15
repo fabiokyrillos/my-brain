@@ -334,7 +334,11 @@ export function HomeView({
                         view.organizedTodayCount,
                       )}
                     </p>
-                    <Link href={`/${locale}/app/inbox`} className="panel-view-all">
+                    {/* `?view=record-only`, not the bare route. The default view
+                        is needs-you — the queue of things that were *not*
+                        organized — so a bare link here landed on the opposite of
+                        what the label promises. */}
+                    <Link href={`/${locale}/app/inbox?view=record-only`} className="panel-view-all">
                       {sections.attention.viewOrganized}
                     </Link>
                   </>
@@ -501,7 +505,7 @@ export function HomeView({
               hint={sections.organizing.hint}
               count={`${view.organizing.length}`}
               action={
-                <Link href={`/${locale}/app/inbox`} className="panel-view-all">
+                <Link href={`/${locale}/app/inbox?view=organizing`} className="panel-view-all">
                   {copy.viewAllRecords}
                 </Link>
               }
