@@ -86,7 +86,23 @@ export async function proxy(request: NextRequest) {
   const inAuth = parts[2] === "auth";
 
   if (inApp && !authenticated) {
-    const redirected = NextResponse.redirect(new URL(`/${locale}/auth/login`, request.url));
+    const login = new URL(`/${locale}/auth/login`, request.url);
+    /*
+     * `2O-ENTRY-007`. The surface that was asked for travels with the redirect,
+     * so signing in returns there rather than dropping the visitor on the app's
+     * home — which, for anyone who followed a link to a specific entry or task,
+     * meant the link simply did not work.
+     *
+     * **Only the path and query**, never `request.url`. Carrying an absolute URL
+     * would put an origin into a parameter that later becomes a redirect target,
+     * and that is the exact shape `resolveConfiguredOrigin` exists to refuse.
+     * What is written here is untrusted by the time it comes back regardless —
+     * `signIn` re-validates it with `safeReturnPath` and ignores anything that is
+     * not this locale's own `/app` path — so this is a convenience, not a trust
+     * boundary, and it is deliberately not the place the checking happens.
+     */
+    login.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    const redirected = NextResponse.redirect(login);
     redirected.headers.set("Cache-Control", NO_STORE);
     return redirected;
   }
