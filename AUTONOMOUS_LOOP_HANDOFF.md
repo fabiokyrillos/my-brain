@@ -6097,3 +6097,258 @@ forward unrepaired.
 governing artifact or scope exists anywhere in the repository — verified, not
 assumed: there is no `docs/initiatives/phase-2o/` and no `docs/reports/phase-2o/`.
 **A13 is not retargeted**, and starting one needs its own owner authorization.
+
+## §74 — Phase 2O is authorized for PLANNING ONLY, the audit was re-run against a tree that moved, and twelve decisions are open (2026-08-15)
+
+**ADR-115.** Baseline `main` `9cc1175`, CI green on that exact merge SHA (run
+`31896527259`), worktree clean, **no open PR and no competing branch**. **94
+local = 94 hosted, parity `202608140094`**, confirmed by a live read-only
+`migration list --linked`. Signup **closed**; the rollout gate **re-read by
+running** `npm run rollout:verify` — **25 pass · 3 fail · 2 owner-signature**.
+
+**Zero product code. Zero migrations created. Zero deploy. Zero secret touched.**
+
+§73's closing sentence above is a point-in-time record and is left standing:
+`docs/initiatives/phase-2o/` and `docs/reports/phase-2o/` exist as of this
+section, and A13 has moved. That is what an owner authorization is for, and the
+earlier line is not rewritten to agree with it.
+
+### The predecessor's baseline was stale within a day, and this is why nothing was carried forward
+
+Phase 2N closed 2026-08-14 at `9b7cda7`. **PR #227 — the Papel e Console
+redesign, ADR-114 — merged 2026-08-15 at `9cc1175`: 39 commits, 138 files,
++13,345/−1,861, zero migrations.** Two of Phase 2O's own subjects moved with it.
+**Dados e IA** now exists — `/app/history`, `/app/costs` and `/app/jobs` named
+and reached as one centre **with every URL, filter and deep link preserved**,
+because a redirect would have ended three rendering surfaces. And **Brain is one
+space with nine lenses** over routes that were likewise untouched.
+
+So the roadmap's Etapa 6 is **corrected in six places** rather than followed, and
+the correction is recorded in the audit's §8 instead of applied silently.
+
+### The census was wrong before it was right, again
+
+The first preference-column census returned **zero consumers** for `personality`,
+`tone` and `quiet_start` — columns the product demonstrably reads. Cause: the
+sandbox's working directory was not the repository. Re-run against absolute
+paths over **920 files**; every figure in the package comes from the corrected
+run. **Suspect the probe before the product.**
+
+### What the audit found, each from an executed scan
+
+- **No landing page.** `src/app/page.tsx` is three lines: an unconditional
+  `redirect("/pt-BR/app")`. A stranger's first frame is a login form for
+  something unnamed, in Portuguese whatever their browser says.
+- **No onboarding.** One tree-wide match, and it is a remote test fixture.
+- **No data export. No session surface. No private mode.**
+- **Three review-time preferences steer a surface and cannot be set** —
+  `daily_review_time`, `weekly_review_time`, `weekly_review_day` are read by
+  `review-schedule.ts`, carried by `day-review-projection.ts`, rendered on
+  `/app/reviews`. `planning_day` and `planning_time` are **retired by decision**
+  (`2M-AUDIT-005`) and must stay retired.
+- **Nine preference columns have no behavioural consumer at all.**
+  `privacy_preferences`, `quiet_periods` and `avatar_path` have zero references
+  outside the generated types; six more are written, carried, and read by
+  nothing.
+- **`capabilityRegistry` is imported by exactly two files, one of which is its
+  own test.** Sixteen declared rows governing nothing, and `scheduled_reviews`
+  is already ambiguous in a way no guard can resolve.
+- **`<UniversalState/>` renders on one surface** — search — while ten app pages
+  and thirteen feature components answer in their own words. Seven closed states
+  adopted by one of twenty-four destinations is a contract in name.
+- **ADR-114 Decision 3 is half-built.** The CSS for an explicit theme choice is
+  complete in both directions, including the `:not([data-theme="light"])`
+  qualifier that makes a light choice win on a dark machine — and **nothing in
+  the product ever writes `data-theme`**. This is the package's only finding
+  that is a *contradiction* with a signed decision rather than an unbuilt
+  roadmap item, and a guard now fails the day a theme control appears without
+  the audit being reconciled.
+
+### The package
+
+`docs/initiatives/phase-2o/PHASE_2O_PRD.md` + `..._IMPLEMENTATION_PLAN.md` as the
+governing pair; `PHASE_2O_CURRENT_EXPERIENCE_AUDIT.md`,
+`..._UX_GAPS_AND_OPPORTUNITIES.md`, `..._THREAT_MODEL.md`,
+`..._TRACEABILITY_CONTRACT.md` under `docs/reports/phase-2o/`.
+
+**113 requirements · sixteen families · nine slices (2O.0 … 2O.8) · none
+executed.** Estimated **13–18 weeks** against the roadmap's 7–10, and the
+difference is named rather than absorbed: the universal-state adoption debt over
+23 surfaces, the export's tenant boundary across four trigger-validated
+polymorphic tables, making the capability registry load-bearing, and a
+screen-reader session no phase has run.
+
+**Migration budget proposed and UNSIGNED: 2 allocated · obligation ZERO · 0
+spent · none created · NON-TRANSFERABLE.** Both conditional; a third is a **STOP
+CONDITION**.
+
+### Twelve owner decisions are open and none is signed
+
+`OD-2O-1` landing page · `OD-2O-2` the appearance control ADR-114 already decided
+· `OD-2O-3` how onboarding progress is remembered · `OD-2O-4` export shape ·
+`OD-2O-5` sessions · `OD-2O-6` which inert preferences get controls · `OD-2O-7`
+the nine consumer-less columns · `OD-2O-8` activation telemetry · `OD-2O-9` the
+budget · `OD-2O-10` public-opening readiness · `OD-2O-11` which inherited
+residuals are admitted · `OD-2O-12` whether the screen-reader run blocks
+closeout.
+
+**This phase is the first authorized while *every* decision is open**, so the
+failure mode it is uniquely exposed to is a package reading its own
+recommendation as an outcome. `phase-2o-declarations.test.ts` asserts that
+directly: three signature-shaped phrases are forbidden across all six documents,
+with a control proving the pattern matches the shape it forbids.
+
+### The A13 retarget, and the thing that is different this time
+
+Tenth application, in the same commit as the authorization, so the invariant is
+never unenforced in between. **The published roadmap ends at Phase 2O.** What the
+guard now protects is not a scoped phase — it is the next name the lettered
+series would take, named in a **detector** and in no governing artifact, and
+ADR-115's heading does not name it.
+
+**A range covering every remaining letter was considered and rejected:**
+`docs/initiatives/phase-2x/` is a real historical directory and
+`IMPLEMENTATION_MARKED_FILE` would have collided with it. One letter, moved once
+per authorization, is the shape nine prior applications proved.
+
+**Both guards were proved able to fail, not assumed to work.** A planted
+`docs/PHASE_2P_PRD.md` carrying `- **2P-PLANTED-001:**` made A13 report
+`governing-artifact` **and** `declared-requirement`; a planted
+`PHASE_2O_SLICE_00_ACCEPTANCE.md` made the closing-artifact gate fire by name.
+Both planted files were removed and their absence verified.
+
+### A guard that tested the line wrap instead of the claim
+
+Three assertions failed on first run because these documents are hard-wrapped at
+80 columns and `**Implementation is NOT\nauthorized.**` does not match a regex
+written for one line. A fourth failed one step further in: a claim inside a
+blockquote wraps as `Nothing in the\n> product ever writes …`, so collapsing
+whitespace alone left a stray `>` mid-sentence. **The fix was to normalise once,
+in a `flat()` helper used only for prose** — re-wrapping the documents to satisfy
+a regex would have been repairing the wrong artifact. Structural assertions —
+declaration shape, table rows, file names — deliberately still read raw text,
+because there a line break is meaningful.
+
+One failure was **not** a wrap artifact and was a real omission: the
+implementation plan did not restate the rollout gate. It does now.
+
+### Inherited and NOT absorbed — `OD-2O-11` offers each explicitly, with its cost
+
+`2N-RELATION-TRIGGER` · `2N-IDENTITY-EXTRACTION` · `2N-FILES-WRITER` ·
+`2N-MOBILE`'s 21px target · `2N-PRIVACY-FREETEXT` ·
+`2N-RELATION-END-ANNOUNCEMENT` · push **failing with HTTP 403 on a real iPhone
+and NEVER EXECUTED ON ANDROID** · **no screen-reader run executed or claimed** ·
+`T-19`'s retention sweeps still unscheduled · **ADR-055 neither satisfied nor
+superseded, expiring 2026-10-27**.
+
+Phase 2N stays **COMPLETE** and unclaimed. Signup stays **closed**, the rollout
+gate stays **25 · 3 · 2**, and **the roadmap successor is not started, not
+scoped and not named by ADR-115's heading**.
+
+### Where this stops
+
+**At the owner's twelve signatures.** The draft PR is open and stays a draft. No
+slice may begin, no migration may be created, no deploy may run and signup may
+not open until implementation has its own authorization.
+
+## §75 — The twelve signatures land, three requirements are appended, and the second allocation dies (2026-08-15)
+
+**ADR-116**, on branch `codex/phase-2o-planning`, into draft PR **#228**. Every
+decision took its recommendation. **Implementation is still not authorized** —
+signing the decisions and authorizing the work are two separate acts, and this
+repository has separated them at ADR-104/ADR-105 and ADR-108/ADR-112 before.
+**ADR-115 is amended by addition and not rewritten.**
+
+**Zero product code. Zero migrations created. 94, parity `202608140094`. Signup
+closed, rollout 25 · 3 · 2. A13 not moved by this commit.**
+
+### What the signatures actually changed, in order of consequence
+
+**1. M2 died, and no single signature shows it.** ADR-115 reserved the second
+allocation for **exactly one** of `OD-2O-2` **B**, `OD-2O-3` **B** or `OD-2O-4`
+**B**. All three were signed **A**. The budget is non-transferable, so **M2 has
+no destination it may be spent on and closes unspent by construction** — the
+correct close, not an omission. `R-2O-25` now refuses spending it at all,
+because the tempting failure is a schema change made to improve the appearance
+of a budget. A reader who sees "2 allocated" and hunts for a second spend finds
+a refusal instead of a vacancy.
+
+**2. Three requirements had to be appended.** `OD-2O-2` **A** signed a
+capability the PRD carried **no requirement for**, because it had been
+conditional and I had not declared one. A signed decision with no requirement is
+scope with no traceability — `2O-CLOSE-001` would have had nothing to classify.
+`2O-PREF-013` … `-015` declare the appearance control; **113 → 116**;
+`2O-PREF` 12 → 15; **nothing renumbered, reused or deleted.** The guard now
+holds the **pre-signature family distribution**, because exact totals alone
+would not catch a family losing one and gaining one.
+
+**3. Four requirements are restated in place, each keeping its superseded
+text** — `2O-ACTIVATION-002`, `2O-AICONFIG-004`, `2O-MOBILE-003`,
+`2O-ACCESS-006`. The pattern is ADR-112's: restate with a marker, renumber
+nothing, and leave the old words visible so a reader can see what moved.
+
+**4. `R-2O-5` inverted rather than being deleted.** It refused a document
+calling an open decision settled; it now refuses one calling a settled decision
+open. **The failure being prevented is unchanged. Only the direction moved.**
+Four refusals added, `R-2O-25` … `R-2O-28`; twenty-four → twenty-eight.
+
+### One threat is new, and a signature created it
+
+**`T-16`.** `OD-2O-2` **A** puts the appearance value in `localStorage` — which
+any script on the origin can write — and applies it to a DOM attribute **before
+first paint**, earlier than any React boundary exists to sanitise it. It is
+attacker-controlled input by definition. Validated against the closed set of
+three, and the inline script never interpolates the stored value into its own
+source.
+
+### A conclusion I nearly published, and did not
+
+I was going to record the anti-flash script as a **CSP stop condition** — an
+inline script under a strict CSP is a deployment-boundary change, and this
+repository has paid for CSP surprises before. **I checked `next.config.ts`
+first.** `script-src` already carries `'unsafe-inline'`, so `OD-2O-2` **A**
+needs no CSP change at all. The blocker I was about to assert does not exist.
+`R-2O-27` keeps the header shape frozen anyway, and the guard now asserts
+`'unsafe-inline'` is still there — so if it is ever removed, the claim fails
+rather than rots.
+
+### Two corrections of my own, both disclosed rather than absorbed
+
+**An arithmetic error I shipped in the previous section.** §74 and the plan
+published **13–18 weeks**. The plan's own table summed to **13.5–19**; the total
+was typed, not added. With 2O.3 growing for the appearance control it is
+**14–19.5**, and the totals are now derived from the column beside them.
+
+**An interpretation, flagged rather than taken as a signature.** `OD-2O-6` was
+framed over *inert* preferences; `embedding_model` is not inert — six
+consumers, no control — and `2O-AICONFIG-004` had offered a disjunction. The
+conservative reading gives it a registry row and no control. That is **the
+agent's reading, not the owner's**, it adds no scope, and reversing it costs one
+form field. Recorded in the ADR, the PRD and the audit so nobody later mistakes
+it for a decision.
+
+### `OD-2O-11`'s "only" is load-bearing
+
+**Admitted, and only these two:** the 21px touch target (`2N-MOBILE` →
+`2O-MOBILE-003`, now unconditional, and the one place the phase changes a
+surface it did not create) and a real screen-reader validation
+(`2O-ACCESS-006`).
+
+**Declined by name:** `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`,
+`2N-FILES-WRITER`, retention sweeps and their scheduling, any resolution of
+ADR-055. **Declined by the word "only", and named so the exclusion is recorded
+rather than inferred:** `2N-PRIVACY-FREETEXT`, `2N-RELATION-END-ANNOUNCEMENT`,
+and the push HTTP 403 / Android track.
+
+**`OD-2O-12` **B** traded a blocking gate for an absolute evidence rule.** The
+screen-reader run does not alone block closeout, and in exchange it may **never**
+be promoted to a pass by documentation, an emulator, an automated scan, or
+inference from one. `2O-ACCESS-006` closes `built` only on a recorded execution
+naming device, software and version; absent one it closes `partial` with a
+destination. There is no third outcome, and `R-2O-26` says so.
+
+### Where this stops
+
+**At an implementation authorization, which ADR-116 deliberately is not.** The PR
+stays a draft. No slice may begin, no migration may be created, no deploy may
+run, and signup may not open.
