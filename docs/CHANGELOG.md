@@ -4,7 +4,9 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 ## 2026-08-15 - PAPEL E CONSOLE, PART FOUR: Brain as a space, the transparency centre, the mobile decision, and the account seen full
 
-**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Eight commits on `codex/redesign-papel-e-console`, continuing from `4e4a801`. **36 commits on the branch, 138 files, +12 995 / −1 860. Not pushed, no PR, no merge.**
+**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** This part is everything on `codex/redesign-papel-e-console` after `4e4a801`. **Not pushed, no PR, no merge.**
+
+*The branch total is deliberately not written here.* Two earlier drafts of this entry stated one and both were stale before the entry was committed, because the commit that records a count is itself one more — which is the smallest version of the defect this branch spent four parts finding. `git rev-list --count main..HEAD` is the number, and it is correct by construction.
 
 This part closes the six things parts one to three recorded as absences, and the two limitations all three of them carried.
 
