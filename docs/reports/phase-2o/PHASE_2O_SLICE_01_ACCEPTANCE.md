@@ -115,7 +115,32 @@ account-existence half needs a registered address to compare against and belongs
 to the authenticated suite, not to a lane with no database. **Stated, not
 claimed.**
 
-### 3.3 The guard read its own commentary
+### 3.3 I ran one spec locally and CI runs five
+
+The first CI run of this slice failed, and **not on anything this slice wrote**:
+285 tests passed, including every new journey, and two failed in
+`e2e/task-command.spec.ts` — a spec I never ran, which asserted the login
+redirect was *exactly* `/pt-BR/auth/login` and now sees `?next=…`.
+
+The CI job's step is
+`npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts`.
+**Five specs, and I ran one.** A change to `proxy.ts` touches every route in the
+product, so the blast radius was never one file — and the way to have known that
+before CI was to run the command CI runs, which is written down in
+`.github/workflows/ci.yml` and costs 36 seconds.
+
+Corrected there the same way as in `foundation.spec.ts`: the assertion now checks
+the login pathname **and** that `next` carries the requested path, query and all
+— stronger than what it replaced, because `?page=2` is part of where that visitor
+was going. **Then the full five-spec set was run locally: 287 passed, 5 skipped,
+0 failed.**
+
+The general rule this earns: **when a change touches the proxy, a layout or a
+shared component, run the whole command the CI job runs, not the spec whose name
+matches the work.**
+
+### 3.4 The guard read its own commentary
 
 Three assertions failed on first run because they scanned source text that
 included the comments explaining them: `entry-page.tsx` says *"it does not link
@@ -204,7 +229,7 @@ Every file restored from a backup; the guard verified green again (23/23).
 | `npm run typecheck` | **zero errors** |
 | `npm test` | **7726 passed, 0 failed** (+72); the 3 failing *files* are the Windows-only shebang parse, green in CI |
 | `npm run build` | **passes** |
-| Playwright | **22 passed** on `desktop` **and** `mobile`, against the production build |
+| Playwright | **287 passed, 5 skipped, 0 failed** on `desktop` **and** `mobile` — the exact five-spec set CI's foundation job runs, against the production build |
 | `git diff --cached --check` | clean |
 | Migrations created | **0** |
 | Hosted parity | `202608140094`, unchanged |
