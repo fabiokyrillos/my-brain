@@ -77,6 +77,9 @@ const SURFACES: readonly Surface[] = [
 
 const EMAIL = process.env.ONLINE_AUTH_TEST_EMAIL ?? "";
 
+const BY_LOCALE = (what: string, locale: string) => what + " in " + locale;
+const BY_LOCALE_PATH = (path: string, locale: string) => "/" + locale + path;
+
 test.describe("Papel e Console, authenticated", () => {
   test.skip(!onlineEnvironment.configured || !EMAIL, "linked Supabase credentials or ONLINE_AUTH_TEST_EMAIL absent");
   test.describe.configure({ mode: "serial" });
@@ -213,6 +216,85 @@ test.describe("Papel e Console, authenticated", () => {
       }
 
       expect(failures, `axe violations in ${theme}:\n${failures.join("\n")}`).toEqual([]);
+    });
+  }
+/**
+   * The three workspaces, which no path-based list can reach.
+   *
+   * Person, project and memory details live behind an id, so the lane above —
+   * which navigates to fixed paths — has never seen one. They are reached the
+   * way an owner reaches them: open the list, follow the first row. That also
+   * makes the assertion stronger than a hard-coded id would, because it proves
+   * the list's own link works.
+   *
+   * With the dense fixture loaded these are the widest rows the schema permits:
+   * a 110-character name, a 240-character task title, and a memory body longer
+   * than any line. A workspace column that refuses to shrink below its content
+   * shows up here and nowhere else.
+   */
+  const WORKSPACES = [
+    { name: "pessoa", list: "/app/people", row: ".list-row" },
+    { name: "projeto", list: "/app/projects", row: ".list-row" },
+    { name: "memoria", list: "/app/memories", row: ".memory-row a[href*='/app/memories/']" },
+  ] as const;
+
+  for (const locale of ["pt-BR", "en"] as const) {
+    test(BY_LOCALE("each workspace holds its shape", locale), async ({ page }, testInfo) => {
+      testInfo.setTimeout(15 * 60_000);
+      mkdirSync(SHOTS, { recursive: true });
+      await signInOnline(page, { email: EMAIL, locale, appOrigin: testInfo.project.use.baseURL });
+
+      for (const workspace of WORKSPACES) {
+        await page.goto(BY_LOCALE_PATH(workspace.list, locale));
+        const first = page.locator(workspace.row).first();
+        // A list that rendered nothing would let every assertion below pass by
+        // never navigating. The row has to be there before it is followed.
+        await expect(
+          first,
+          workspace.name + " list rendered no row in " + locale,
+        ).toBeVisible({ timeout: 30_000 });
+        await first.click();
+
+        /*
+         * Wait for the **URL**, not for an `<h1>`.
+         *
+         * The list has an `<h1>` too, so a click that navigated nowhere would
+         * satisfy a visibility assertion instantly — which is exactly what the
+         * first run of this block did, and what the URL check below caught. The
+         * wait is the fix; the check stays, because a wait that timed out
+         * differently tomorrow should still not be able to pass on a list.
+         */
+        await page.waitForURL(/\/app\/(people|projects|memories)\/[0-9a-f-]{36}/, {
+          timeout: 30_000,
+        });
+        await expect(
+          page.locator("h1").first(),
+          workspace.name + " detail did not render in " + locale,
+        ).toBeVisible({ timeout: 30_000 });
+        expect(page.url(), workspace.name + " did not open a detail route").toMatch(
+          /\/app\/(people|projects|memories)\/[0-9a-f-]{36}/,
+        );
+
+        for (const width of WIDTHS) {
+          await page.setViewportSize({ width, height: 900 });
+          for (const theme of ["light", "dark"] as const) {
+            await setTheme(page, theme);
+            await assertNoHorizontalScroll(
+              page,
+              workspace.name + " @" + width + " " + theme + " " + locale,
+            );
+            if ((width === 375 || width === 1440) && (locale === "pt-BR" || width === 1440)) {
+              await page.screenshot({
+                path: SHOTS + "/" + workspace.name + "-" + locale + "-" + width + "-" + theme + ".png",
+                fullPage: true,
+              });
+            }
+          }
+        }
+
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await setTheme(page, "light");
+      }
     });
   }
 });
