@@ -2,6 +2,67 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-14 - PAPEL E CONSOLE, PART TWO: the surfaces the first pass preserved, recomposed
+
+**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Five commits on `codex/redesign-papel-e-console`, continuing from `f7da296`. Not pushed, no PR, no merge.
+
+### What this part exists to correct
+
+The first pass applied the visual language to every surface and then declared the redesign complete — but its own final matrix recorded that the **composition** of Hoje, Registros, Trabalho, Brain and Conversar had been *deliberately preserved*. Tokens, type, colour, radii and motion had reached them; the layouts had not changed. This part recomposes them.
+
+### Hoje is a cockpit again
+
+The page runs the handoff's fixed daily order — captura → precisa de você → hoje e atrasado → adiante → sendo organizado → fechar o dia — and splits the last three into a secondary column above 1080px. The split is **grid placement of two wrappers, never `order` on the sections**: focus order has to equal visual order in both layouts, and `order` would have made them disagree in one.
+
+"Precisa de você" opens with its first item expanded into a decision card — the owner's own words in the reading face, the proposal below them, and the fact that nothing has been created yet — with the rest collapsed to a line each.
+
+**The card does not confirm, and that is a decision rather than an omission.** The mockup's caption says the user decides without leaving the page; `06-interacoes.md` §4 says reviewing an interpretation opens the record and §5 puts the confirmation there. The documentation wins by the handoff's own rule, and it is also where the stale-interpretation check, the idempotency key and the undo window already live. Two surfaces on one mutation would have meant the second lacking all three.
+
+"Adiante" is new and **owns no time rule**: it asks the calendar projection for its own forward orientation and flattens the window, excluding tasks the day's list already drew.
+
+### Registros is a decision queue
+
+The default view moved from the full archive to **precisa de você**, and the list gained a fixed grammar: estado · registro · o que o Brain propõe · quando. The third column is the substance — a queue that only says "needs you" makes you open every row to learn what is at stake.
+
+`?view=` gained organizing, failed and record-only. **None is an SQL filter pretending to be exact**: the product state comes from the entry status, the job, the open questions and the candidates together, so the status predicate is a declared superset and the derived state decides membership. `needs-you` is deliberately *not* one of those values — it is `list_needs_attention`, a different read with its own cursor, and naming it as a filter is how one queue ends up with two definitions of itself.
+
+The record detail became two columns — decide on the left, understand on the right — and the `<h1>` moved off the model's paraphrase onto the record's own date and time. The paraphrase as the page's name put the assistant's reading above the owner's words **in the document outline**, which `03-componentes.md` forbids in the layout for the same reason.
+
+### Trabalho stopped being a wall of chips
+
+Seven always-open filter groups — about forty controls — sat above the list with the command console in a full card above them. The narrowing was taller than the work it narrowed. Both are `<details>` disclosures now, keeping every capability, and the filter summary carries a badge and opens itself when a narrowing is active.
+
+**Lista · Calendário · Planejar** became a real tab strip on all three surfaces. The routes are untouched: the consolidation table says to keep the URLs as aliases of the tabs.
+
+`.empty-list` stopped being a centred 330px dashed card — the exact object `03-componentes.md` says an empty state must not be — on **fifteen surfaces at once**, with no markup change.
+
+### Brain is the fourth destination
+
+The rail carried Hoje · Registros · Trabalho · **Conversar**, and Brain was not in the navigation at all. `2I-SHELL-001` pinned the old four and said why: to stop a later slice changing them quietly. This is the opposite of quietly — the handoff names the four by hand, and the authorization covers information architecture.
+
+No route moved. `library` is still the route; **Brain** is what it is called, and the page had been calling itself "Biblioteca" while the navigation that reached it said Brain.
+
+### The residual the first pass named, closed
+
+Its closing report called this the largest remaining risk: the surfaces had been changed and **never once rendered with a real session**. `e2e/online-redesign-visual.spec.ts` renders all twenty signed in, at the six widths `05-responsividade.md` names, in both themes and both locales, asserts no horizontal scroll at every combination, and runs axe on the live page.
+
+**It found three defects no other lane could see**: `aria-pressed` on the calendar's five lane chips (invalid on a link), `<ul role="status">` in the day review (an explicit role replaces the implicit one, so the list stopped being a list), and **two `<h1>` on `/app/reviews`**.
+
+### The lane's own first verdict was wrong, and is recorded as wrong
+
+It reported three contrast failures on Custos with blended values — `#807c77` on `#fdfdfc`, neither of them a token. Measured directly, the settled colours are `#55504a` on `#ffffff` and pass comfortably: the scan had caught an entrance animation mid-flight. The fix was not a longer wait but scanning the state the product rests in, under reduced motion. It now reports failing selectors rather than only counts — a rule name and a number say a page is wrong, the target says which element.
+
+### What is NOT done, and is not claimed
+
+- **Conversar was not recomposed.** Its route, grounding, citations and actions are untouched and it moved to the context group; the editorial chat composition of `04 - Desktop, Brain e apoio` frame 07 is not built.
+- **Brain's workspaces were not recomposed.** Person, project, memory, files and relations keep their existing compositions. Brain is a promoted, renamed destination over the lens list that already existed — not the list-plus-workspace surface the handoff draws.
+- **The task detail was not recomposed.** The Parallel/Intercepting route pair is preserved and untouched.
+- **Calendário, Planejar and Revisões received the mode tabs and the accessibility repairs only.** The calendar grid and the planner proposal table were not recomposed.
+- **Apoio was not recomposed**, beyond the empty-state change that reached it and the day-review repairs. Histórico, Custos and Processamento are still three separate destinations rather than tabs of Ajustes → Dados e IA.
+- **The mobile bar departs from the handoff in one slot.** Registros returns to the bar as required; the fifth slot stays `more` rather than Brain, because `more` is the only route to fourteen destinations on a phone and this codebase keeps all of them as real routes. Brain is one tap further away on a phone than in the rail.
+- **The screenshots were taken against an account with almost no data.** Empty surfaces render every layout correctly, so the composition of dense lists — long titles, many rows, grouped work — is **not** visually verified.
+- **No screen-reader run, no physical device, no hosted environment.** Unchanged from the first pass.
+
 ## 2026-08-14 - PAPEL E CONSOLE: the approved direction reaches every surface, and dark mode ships complete
 
 ADR-114. **Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Ten commits on `codex/redesign-papel-e-console`, branched from `main` at `9b7cda7`. Not pushed, no PR, no merge.
