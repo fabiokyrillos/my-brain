@@ -151,7 +151,9 @@ export function AssociationPanel({
 
   return (
     <section className="relation-panel">
-      <h2>{heading}</h2>
+      {/* `<h3>` — see `relationship-panel.tsx` on why the panels sit a level
+          below the workspace column that contains them. */}
+      <h3>{heading}</h3>
       {/*
         Persisted, and owner-authored by construction: neither `person_contexts`
         nor `person_projects` carries a `source_entry_id` or an

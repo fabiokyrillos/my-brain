@@ -123,6 +123,28 @@ type EntityCopy = {
   readonly companyExplainer: string;
   readonly relationshipExplainer: string;
   /**
+   * The workspace template's own words (`03-componentes.md`, EntityWorkspace).
+   *
+   * Shared by the person and project surfaces rather than written twice: the
+   * handoff calls them *one* template, and two copies of a heading is two
+   * chances for the same column to be called different things on two pages that
+   * are meant to feel identical.
+   */
+  readonly editSummary: string;
+  readonly openWork: string;
+  readonly whatBrainKnows: string;
+  readonly whereItAppears: string;
+  /**
+   * The person workspace's changes band.
+   *
+   * `recentChanges` is shared with the project — one heading for one section —
+   * but the explainer and the empty sentence are **not**, because both name the
+   * subject and the trail's scope, and those differ. A shared "neste projeto"
+   * would have appeared under a person's name.
+   */
+  readonly personChangesExplainer: string;
+  readonly personChangesEmpty: string;
+  /**
    * The project surface (`2N-PROJECT-003`…`-005`, `2N-ACCESS-005`).
    *
    * Every string below is chosen against a rule rather than for tone, because
@@ -270,6 +292,16 @@ const copy = {
     editRole: "Editar papel",
     companyExplainer: "Onde a pessoa trabalha.",
     relationshipExplainer: "Quem essa pessoa é para você.",
+    editSummary: "Editar",
+    openWork: "Trabalho em aberto",
+    // "acredita saber" in the handoff. "sabe" here, because every claim in this
+    // column already carries its own provenance and confidence — hedging the
+    // heading as well would say twice, and vaguely, what the rows say once and
+    // precisely.
+    whatBrainKnows: "O que o Brain sabe",
+    whereItAppears: "Onde aparece",
+    personChangesExplainer: "Vem do registro de alterações: edições feitas nesta pessoa.",
+    personChangesEmpty: "Nenhuma alteração registrada nesta pessoa ainda.",
     stateLabel: "Estado",
     // "Em aberto" is the word `work-filters-copy.ts` already prints for the same
     // set of statuses. Taking it rather than minting one keeps the product from
@@ -398,6 +430,12 @@ const copy = {
     editRole: "Edit role",
     companyExplainer: "Where this person works.",
     relationshipExplainer: "Who this person is to you.",
+    editSummary: "Edit",
+    openWork: "Open work",
+    whatBrainKnows: "What the Brain knows",
+    whereItAppears: "Where it appears",
+    personChangesExplainer: "From the recorded changes: edits made to this person.",
+    personChangesEmpty: "No change has been recorded on this person yet.",
     stateLabel: "State",
     openCommitments: (count) => `${count} open`,
     openCommitmentsAtLeast: (count) => `at least ${count} open`,

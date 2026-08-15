@@ -89,6 +89,15 @@ const STYLESHEETS = [
     than the two greys the strip actually uses to separate current from the rest.
   */
   "brain.css",
+  /*
+    The entity workspace's own two. `entities.css` carries the column grid, the
+    card chrome and the disclosure's target size; `timelines.css` carries the
+    hero, the mini-list and the timeline rows the workspace still mounts. Without
+    both, the fixture below is unstyled markup and every geometric assertion over
+    it measures the document default.
+  */
+  "timelines.css",
+  "entities.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -658,11 +667,71 @@ function workFilters() {
     + `</div>`;
 }
 
+/**
+ * Mirrors the person and project workspaces — `03-componentes.md`'s
+ * EntityWorkspace, which both pages now implement.
+ *
+ * The **outline** is what this fixture exists for. The template names its two
+ * columns as `<h2>`s and drops every panel to `<h3>`, which is the half of
+ * `07-acessibilidade.md` an axe violation count does not measure: `/app/reviews`
+ * shipped with the right heading *count* and the wrong order, and the repair
+ * came several screens later than the defect.
+ *
+ * The long name and the long task title are deliberate. A workspace column that
+ * refused to shrink below its content is how one title pushes the other column
+ * off a phone, and no fixture in this lane had a string long enough to show it.
+ */
+function entityWorkspace() {
+  const editDisclosure = `<details class="entity-edit-disclosure"><summary>Editar</summary>`
+    + `<form><label for="ws-name">Nome</label><input id="ws-name" value="Marina"></form></details>`;
+
+  const changes = `<section class="entity-changes"><h2>O que mudou recentemente</h2>`
+    + `<p class="section-explainer">Vem do registro de alterações: edições feitas nesta pessoa.</p>`
+    + `<ol class="history-list"><li class="history-event"><span class="history-dot"></span>`
+    + `<div class="history-event-body"><p class="history-sentence">Você alterou o nome.</p></div></li></ol>`
+    + `</section>`;
+
+  const openColumn = `<section class="entity-workspace-column" aria-labelledby="ws-open">`
+    + `<h2 id="ws-open">Trabalho em aberto</h2>`
+    + `<section class="entity-tasks"><h3>Pendências e tarefas</h3>`
+    + `<div class="mini-list"><article><strong>Revisar o contrato de prestação de serviços da Aurora`
+    + ` antes da reunião de quinta-feira com o time jurídico</strong><span>Em aberto</span></article></div>`
+    + `</section>`
+    + `<section class="relation-panel"><h3>Projetos</h3><ul class="relation-list">`
+    + `<li class="relation-row"><a href="#">Aurora</a></li></ul></section>`
+    + `</section>`;
+
+  const knowsColumn = `<section class="entity-workspace-column" aria-labelledby="ws-knows">`
+    + `<h2 id="ws-knows">O que o Brain sabe</h2>`
+    + `<section class="relation-panel"><h3>Relação com você</h3><ul class="relation-list">`
+    + `<li class="relation-row"><span>Sócia</span></li></ul></section>`
+    + `<section class="entity-memory"><h3>Memórias</h3>`
+    + `<article><strong>Prefere reuniões pela manhã.</strong><span>Preferência</span></article></section>`
+    + `<section class="entity-files"><h3>Arquivos vinculados</h3>`
+    + `<p class="quiet-state">Nenhum arquivo vinculado.</p></section>`
+    + `</section>`;
+
+  return `<div class="content-page entity-workspace">`
+    + `<a class="back-link" href="#">Pessoas</a>`
+    + `<header class="entity-hero"><div><p class="eyebrow">PESSOA</p>`
+    + `<h1>Marina Alexandrina Bittencourt de Albuquerque Vasconcelos</h1>`
+    + `<p class="entity-relation-line"><span>Empresa</span><strong>Aurora</strong></p></div></header>`
+    + editDisclosure
+    + changes
+    + `<div class="entity-workspace-columns">${openColumn}${knowsColumn}</div>`
+    + `<section class="entity-timeline"><h2>Onde aparece</h2>`
+    + `<div class="timeline-list"><article><span class="timeline-dot"></span><div>`
+    + `<a href="#"><strong>Conversa com a Marina sobre o contrato</strong></a><small>12 de agosto</small>`
+    + `</div></article></div></section>`
+    + `</div>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
   { name: "global search", body: () => searchSurface() },
   { name: "Brain overview", body: () => brainSurface() },
+  { name: "entity workspace", body: () => entityWorkspace() },
   { name: "Conversar cards", body: () => conversationCards() },
   { name: "Conversar controls", body: () => conversationControls() },
   { name: "Conversar resumed", body: () => conversationResumed() },
@@ -1111,4 +1180,88 @@ test.describe("Conversar reads as a transcript, not as a chat log", () => {
       ).toEqual([]);
     });
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * The entity workspace — one template, and the outline it owes.
+ * ------------------------------------------------------------------ */
+
+test.describe("the entity workspace reads as one template", () => {
+  test("names its two columns, and every panel sits below the column that holds it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+
+    /*
+     * The order, not merely the count. `/app/reviews` shipped with the right
+     * number of headings and the wrong nesting — the page's own name arrived
+     * after a flat run of `<h2>`s in which a review's title was a sibling of its
+     * own sections. This asserts the whole outline in document order.
+     */
+    const outline = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("h1, h2, h3")).map(
+        (heading) => `${heading.tagName}:${heading.textContent?.trim().slice(0, 24)}`,
+      ));
+
+    expect(outline).toEqual([
+      "H1:Marina Alexandrina Bitte",
+      "H2:O que mudou recentemente",
+      "H2:Trabalho em aberto",
+      "H3:Pendências e tarefas",
+      "H3:Projetos",
+      "H2:O que o Brain sabe",
+      "H3:Relação com você",
+      "H3:Memórias",
+      "H3:Arquivos vinculados",
+      "H2:Onde aparece",
+    ]);
+  });
+
+  test("gives each column an accessible name taken from its own heading", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+
+    // `aria-labelledby` rather than a duplicated `aria-label`, so the name a
+    // screen reader announces cannot drift from the one on the screen.
+    const columns = page.locator(".entity-workspace-column");
+    await expect(columns).toHaveCount(2);
+    await expect(columns.nth(0)).toHaveAccessibleName("Trabalho em aberto");
+    await expect(columns.nth(1)).toHaveAccessibleName("O que o Brain sabe");
+  });
+
+  test("runs as two columns on a desktop and one on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+    const wide = await page.evaluate(() =>
+      getComputedStyle(document.querySelector(".entity-workspace-columns")!).gridTemplateColumns.split(" ").length);
+    expect(wide).toBe(2);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const narrow = await page.evaluate(() =>
+      getComputedStyle(document.querySelector(".entity-workspace-columns")!).gridTemplateColumns.split(" ").length);
+    expect(narrow).toBe(1);
+  });
+
+  test("a very long title does not push the neighbouring column off the page", async ({ page }) => {
+    // 320px is the WCAG 1.4.10 reflow width. The fixture's task title is one
+    // unbroken sentence of ninety characters, which is the shape that finds a
+    // grid item refusing to shrink below its content.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, entityWorkspace());
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("the edit disclosure is a real target, and closed at rest", async ({ page }, testInfo) => {
+    await render(page, entityWorkspace());
+    const details = page.locator(".entity-edit-disclosure");
+    // Closed at rest is the whole point of the move: the form is available and
+    // is not what the workspace opens with.
+    await expect(details).not.toHaveAttribute("open", /.*/);
+
+    const box = await details.locator("summary").boundingBox();
+    const minimum = testInfo.project.name === "mobile" ? 44 : 24;
+    expect(box!.height).toBeGreaterThanOrEqual(minimum);
+  });
 });

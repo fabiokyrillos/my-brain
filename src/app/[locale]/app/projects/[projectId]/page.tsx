@@ -25,7 +25,7 @@ import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import {
   decisionEntryIds,
   deriveProjectState,
-  describeProjectChanges,
+  describeEntityChanges,
 } from "@/features/entities/project-context";
 import { getHistoryCopy } from "@/features/history/copy";
 import { HistoryList } from "@/features/history/history-list";
@@ -258,7 +258,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   );
 
   const formatDateTime = (iso: string) => formatInstant(iso, "dayAndTime", locale, timeZone) ?? "";
-  const changeEvents = describeProjectChanges(
+  const changeEvents = describeEntityChanges(
     [...projectChanges, ...associationChanges],
     historyCopy,
     formatDateTime,
@@ -324,7 +324,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     `/${locale}/app/inbox/${entryId}?back=${encodeURIComponent(`/${locale}/app/projects/${project.id}#${anchor}`)}`;
 
   return (
-    <div className="content-page entity-detail">
+    <div className="content-page entity-workspace">
       <Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{copy.allProjects}</Link>
 
       <header className="entity-hero">
@@ -391,24 +391,47 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
       </header>
 
-      <EntityEditForm
-        action={updateProject}
-        createOrganizationAction={createOrganizationForSubject}
-        fields={{
-          kind: "project",
-          id: project.id,
-          name: project.name,
-          description: project.description,
-          status,
-          organizationId: project.organization_id,
-        }}
-        locale={locale}
-        organizations={organizations}
-      />
+      {/* Behind a disclosure — see the person workspace on why a nine-field
+          form is not what `03-componentes.md` means by *ações* in the header. */}
+      <details className="entity-edit-disclosure">
+        <summary>{copy.editSummary}</summary>
+        <EntityEditForm
+          action={updateProject}
+          createOrganizationAction={createOrganizationForSubject}
+          fields={{
+            kind: "project",
+            id: project.id,
+            name: project.name,
+            description: project.description,
+            status,
+            organizationId: project.organization_id,
+          }}
+          locale={locale}
+          organizations={organizations}
+        />
+      </details>
 
-      <div className="entity-columns">
-        <section>
-          <h2>{copy.linkedTasks}</h2>
+      {/*
+        The changes band takes the position the handoff draws the generated
+        summary in — the same move the person workspace makes, and for the same
+        reason: no per-entity summary exists, and inventing one would cost a
+        migration and a model call per page load.
+      */}
+      <section className="entity-changes" id="changes">
+        <h2>{copy.recentChanges}</h2>
+        <SectionOriginNote locale={locale} origin="derived" />
+        <p className="section-explainer">{copy.recentChangesExplainer}</p>
+        {boundedChanges.items.length ? (
+          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+        ) : <p className="quiet-state">{copy.recentChangesEmpty}</p>}
+        <BoundedNotice list={boundedChanges} locale={locale} />
+      </section>
+
+      <div className="entity-workspace-columns">
+        <section className="entity-workspace-column" aria-labelledby="workspace-open">
+          <h2 id="workspace-open">{copy.openWork}</h2>
+        <section className="entity-tasks">
+          <h3>{copy.linkedTasks}</h3>
           {/*
             Derived: this list is assembled at render from `task_projects` and
             `tasks`, and the task itself is edited on Work, not here. Saying so is
@@ -485,7 +508,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           }))}
           target={{ kind: "project-person", projectId: project.id }}
         />
-      </div>
+        </section>
+
+        <section className="entity-workspace-column" aria-labelledby="workspace-knows">
+          <h2 id="workspace-knows">{copy.whatBrainKnows}</h2>
 
       {/*
         `2N-PROJECT-005`. The heading says these are a **reading**, because that
@@ -500,7 +526,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         `project-context.ts` and the guard that asserts the premise.
       */}
       <section className="entity-decisions" id="decisions">
-        <h2>{copy.decisions}</h2>
+        <h3>{copy.decisions}</h3>
         <SectionOriginNote locale={locale} origin="derived" />
         <p className="section-explainer">{copy.decisionsExplainer}</p>
         {boundedDecisions.items.length ? (
@@ -538,7 +564,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         which is the distinction every other section on this page states.
       */}
       <section className="entity-memory" id="memories">
-        <h2>{copy.projectMemories}</h2>
+        <h3>{copy.projectMemories}</h3>
         <SectionOriginNote locale={locale} origin="derived" />
         {boundedMemories.items.length ? (
           boundedMemories.items.map((memory, index) => {
@@ -575,26 +601,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </section>
 
       {/*
-        `2N-PROJECT-004`. Derived from `audit_logs` and described by the same
-        function the History surface uses, so one change is narrated one way
-        wherever it is read. No change-log table is added, and none is needed:
-        every writer on this page already records what it did.
-
-        The explainer states the two things the trail carries for a project, so a
-        change it never recorded — linking a task, for instance — reads as
-        outside this list rather than as an absence of history.
-      */}
-      <section className="entity-changes" id="changes">
-        <h2>{copy.recentChanges}</h2>
-        <SectionOriginNote locale={locale} origin="derived" />
-        <p className="section-explainer">{copy.recentChangesExplainer}</p>
-        {boundedChanges.items.length ? (
-          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <p className="quiet-state">{copy.recentChangesEmpty}</p>}
-        <BoundedNotice list={boundedChanges} locale={locale} />
-      </section>
-
-      {/*
         `2N-FILES-009`. The same component the person page mounts, with the same
         three states, so the two surfaces converge by construction rather than by
         two authors making the same choices twice.
@@ -605,9 +611,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         outcome={fileLinkOutcome}
         statusLabel={(value) => attachmentStatusLabel(locale, value) ?? vocabulary.unknownState}
       />
+        </section>
+      </div>
 
+      {/* "Onde aparece" — the fourth band of the template. The id stays
+          `timeline` so every existing anchor into this page keeps landing. */}
       <section className="entity-timeline" id="timeline">
-        <h2>{copy.timeline}</h2>
+        <h2>{copy.whereItAppears}</h2>
         {/*
           Derived, and the one section that needs no per-row provenance: these
           rows ARE the records. A "de um registro seu" line under an entry would
