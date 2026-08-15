@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   capabilityRegistry,
   classifyNavigationPath,
+  consumerlessPreferenceColumns,
   deriveHomeOperationalStatus,
   getCapabilityRegistryView,
   getLocaleSwitchHref,
@@ -141,17 +142,59 @@ describe("navigation capabilities", () => {
       { key: "ai_routing", state: "advanced", visible: true },
       { key: "identity_names", state: "operational", visible: true },
       { key: "locale_preference", state: "future", visible: false },
-      { key: "scheduled_reviews", state: "future", visible: false },
+      // `2O-ACTIVATION-006`: `uncontrolled` rather than `future`, because the
+      // three review columns have a consumer and no control, and `future` could
+      // be read as either.
+      { key: "scheduled_reviews", state: "uncontrolled", visible: false },
       { key: "autonomy", state: "future", visible: false },
       { key: "follow_up_intensity", state: "future", visible: false },
       { key: "privacy_default", state: "future", visible: false },
       { key: "reasoning_route", state: "future", visible: false },
       { key: "background_route", state: "future", visible: false },
+      // `2O-ACTIVATION-007`'s four that had no row at all.
+      { key: "privacy_preferences", state: "future", visible: false },
+      { key: "quiet_periods", state: "future", visible: false },
+      { key: "avatar", state: "future", visible: false },
+      { key: "ai_provider", state: "future", visible: false },
     ]);
 
     for (const capability of capabilityRegistry.filter((item) => item.visible)) {
       expect(capability.consumerEvidence.length, capability.key).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps `future` meaning no consumer, and `uncontrolled` meaning the opposite", () => {
+    // `2O-ACTIVATION-006`. The two states are only worth having if they cannot
+    // be confused, so the invariant is asserted rather than left to the comment.
+    for (const capability of capabilityRegistry) {
+      if (capability.state === "future") {
+        expect(capability.consumerEvidence, `${capability.key} is \`future\` with evidence`).toEqual([]);
+      }
+      if (capability.state === "uncontrolled") {
+        expect(
+          capability.consumerEvidence.length,
+          `${capability.key} is \`uncontrolled\` and names no consumer`,
+        ).toBeGreaterThan(0);
+        expect(capability.visible, `${capability.key} is \`uncontrolled\` and rendered`).toBe(false);
+      }
+    }
+    // Non-vacuous: both states really are in use.
+    expect(capabilityRegistry.some((item) => item.state === "future")).toBe(true);
+    expect(capabilityRegistry.some((item) => item.state === "uncontrolled")).toBe(true);
+  });
+
+  it("derives the nine consumer-less columns `2O-ACTIVATION-007` names", () => {
+    expect([...consumerlessPreferenceColumns].sort()).toEqual([
+      "ai_provider",
+      "autonomy_level",
+      "avatar_path",
+      "background_model",
+      "follow_up_intensity",
+      "privacy_default",
+      "privacy_preferences",
+      "quiet_periods",
+      "reasoning_model",
+    ]);
   });
 
   it("derives the observable Home status with attention before organizing before saved", () => {

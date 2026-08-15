@@ -1,10 +1,16 @@
 # Phase 2O — Activation, preferences, and control (PRD)
 
-**Authorization:** planning only, by **ADR-115**; **all twelve owner decisions
-signed by ADR-116** (2026-08-15). **Implementation is NOT authorized.** No
-requirement below is authorized for execution, no migration may be created
-during planning, signup does not open, and no successor phase is started, scoped
-or named by this document.
+**Authorization:** planning by **ADR-115**; **all twelve owner decisions signed
+by ADR-116** and the one flagged interpretation confirmed by **ADR-117**
+(2026-08-15). **Implementation is authorized through closeout by ADR-118**
+(2026-08-15), slice by slice in the planned order, each re-audited against the
+`main` the previous one produced.
+
+**What that authorization does not carry.** No third migration and no spend of
+**M2**, which has no destination. Signup does not open and the rollout gate does
+not move. The CSP does not change, `embedding_model` is not touched, and no
+declined residual is absorbed. No successor phase is started, scoped or named by
+this document.
 
 **What ADR-116 changed, stated once here so no reader has to diff two ADRs.**
 Every decision took its recommendation. Three requirements were **appended** —

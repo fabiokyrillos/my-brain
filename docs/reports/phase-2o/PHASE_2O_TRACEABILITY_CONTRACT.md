@@ -6,10 +6,17 @@ is mechanically forbidden from claiming. Its enforcement lives in
 implementation is authorized — in a generated matrix that may not be typed by
 hand.
 
-The phase is authorized for **planning only** (ADR-115), and **all twelve owner
-decisions are SIGNED by ADR-116** (2026-08-15). **Implementation is still not
-authorized** — signing the decisions and authorizing the work are two separate
-acts.
+Planning was authorized by ADR-115, **all twelve owner decisions are SIGNED by
+ADR-116**, the one flagged interpretation was confirmed by **ADR-117**, and
+**implementation through closeout is authorized by ADR-118** (2026-08-15).
+Signing the decisions and authorizing the work were two separate acts, as they
+were at ADR-104/ADR-105 and ADR-108/ADR-112.
+
+**Two refusals moved when ADR-118 landed, and neither was deleted.** `R-2O-7`
+inverted — an acceptance record per delivered slice is now required rather than
+forbidden, while the *phase*-closing artifacts stay refused until 2O.8 — and
+`R-2O-8` is **discharged**, because product code is what the authorization is
+for. Both are restated in place below with their superseded form quoted.
 
 **Twenty-eight numbered refusals — eleven live during planning, seventeen armed
 at implementation — plus one sub-refusal, `R-2O-13b`, added by ADR-117.** The
@@ -74,17 +81,30 @@ an outcome, is refused."*
 A decision whose alternatives have been deleted is a decision nobody can review.
 Every `OD-2O-*` keeps its A/B/C.
 
-**R-2O-7 — Closing artifacts may not exist.**
-No acceptance record, traceability matrix, closing report or deployment record
-for this phase may exist during planning. A planning package that grows an
-acceptance record has started implementing under an authorization that forbids
-it. This refusal **inverts at closeout**, and is kept rather than deleted then,
-because a deleted assertion cannot be told apart from a satisfied one.
+**R-2O-7 — A delivered slice leaves an acceptance record; an undelivered phase
+leaves no closing artifact.** *(Inverted in part by ADR-118, and kept rather
+than deleted.)*
+Every slice that ships records its acceptance under `docs/reports/phase-2o/`,
+and the **absence** of that record for a delivered slice is now the defect. The
+*phase*-closing artifacts — the traceability matrix, the closing report and a
+deployment record — stay refused until 2O.8, because any of them mid-flight is a
+phase claiming to be finished. That half inverts in 2O.8's own commit.
+*Pre-authorization form, retained: "No acceptance record, traceability matrix,
+closing report or deployment record for this phase may exist during planning. A
+planning package that grows an acceptance record has started implementing under
+an authorization that forbids it."*
 
-**R-2O-8 — No product code may change.**
-The planning commit touches documentation and governance guards only. A change
-under `src/app/`, `src/features/`, `supabase/`, `public/` or `e2e/` that is not a
-guard is refused.
+**R-2O-8 — DISCHARGED by ADR-118.** *(Retained, because a deleted refusal
+records nothing.)*
+It refused any change under `src/app/`, `src/features/`, `supabase/`, `public/`
+or `e2e/` that was not a guard, and it was correct for as long as the
+authorization was planning-only. Implementation is now authorized and product
+code is the thing being authorized, so the refusal is spent rather than broken.
+**What replaces it is not nothing:** the migration ceiling (`R-2O-4`,
+`R-2O-25`), the CSP freeze (`R-2O-27`), the authority refusals and the stop
+conditions all bind product code directly, and every one of them is live.
+*Pre-authorization form, retained: "No product code may change. The planning
+commit touches documentation and governance guards only."*
 
 **R-2O-9 — The successor may not be started.**
 No `2P-*` requirement, no `PHASE_2P_*` governing artifact, no accepted ADR whose

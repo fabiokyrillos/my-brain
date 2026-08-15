@@ -202,9 +202,9 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     /*
      * The "planning" half came back at ADR-102, went again at ADR-103, came back
      * at ADR-104, went again at ADR-105, came back at ADR-108, went again at
-     * ADR-112 — and **comes back at ADR-115** — in the commit that recorded
-     * each. That is not a guard being loosened and tightened at convenience; it
-     * is one rule applied to seven different facts.
+     * ADR-112, came back at ADR-115 — and **goes again at ADR-118** — in the
+     * commit that recorded each. That is not a guard being loosened and
+     * tightened at convenience; it is one rule applied to eight different facts.
      *
      * The rule: **the line cites every authorization the phase has received and
      * overstates none of them.** ADR-104 gave planning only, so the word
@@ -214,19 +214,24 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * mirror-image error, and the one that made this assertion drop the word at
      * Phase 2K's close under ADR-101. ADR-108 authorized planning only for Phase
      * 2N, so the word was required again; ADR-112 authorized implementation, so
-     * it went again. **ADR-115 authorizes planning only for Phase 2O**, so the
-     * word is required for the seventh time — and the implementation assertion
-     * inverts with it, because a line claiming implementation under a
-     * planning-only authorization is the overstatement this rule exists to
-     * refuse.
+     * it went again. ADR-115 authorized planning only for Phase 2O, so it came
+     * back a seventh time. **ADR-118 authorizes implementation through
+     * closeout**, so it goes again — and requiring "PLANNING ONLY" now would
+     * force the line to understate an authorization the owner has given, which
+     * is the same error in the other direction.
      *
      * What does not move: the line names the phase, cites every ADR it has, and
-     * does not announce a successor.
+     * does not announce a successor. Phase 2O has received four, and all four
+     * are required here so that a line quoting only the newest — and thereby
+     * losing the signatures and the confirmation the phase is bound by — fails.
      */
-    expect(line, "ADR-115 authorizes planning only, and the line must not overstate it")
-      .toMatch(/PLANNING ONLY/i);
-    expect(line, "no implementation is authorized, and the line must not claim it")
-      .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    for (const adr of ["ADR-115", "ADR-116", "ADR-117", "ADR-118"]) {
+      expect(line, `the line drops ${adr}`).toContain(adr);
+    }
+    expect(line, "ADR-118 authorizes implementation, and the line must say so")
+      .toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    expect(line, "implementation is authorized, so the line must not call the phase planning-only")
+      .not.toMatch(/PLANNING ONLY/i);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2P/);
   });
