@@ -637,7 +637,10 @@ describe("Phase 2O: every delivered slice leaves an acceptance record", () => {
     // The delivered slices, and the record each must have left. A slice is added
     // here **in its own commit**, so this authorization commit asserts the rule
     // and the slice that follows asserts itself.
-    const DELIVERED: readonly string[] = ["PHASE_2O_SLICE_00_ACCEPTANCE.md"];
+    const DELIVERED: readonly string[] = [
+      "PHASE_2O_SLICE_00_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_01_ACCEPTANCE.md",
+    ];
     for (const record of DELIVERED) {
       expect(reports, `a delivered slice left no acceptance record: ${record}`).toContain(record);
     }

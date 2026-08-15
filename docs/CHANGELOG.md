@@ -2,6 +2,52 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O SLICE 2O.1 — the product says what it is, and the closed door says so first
+
+**`2O-ENTRY-001` … `-008`. Zero migrations created. 94, parity `202608140094`.
+Signup closed, rollout 25 · 3 · 2. CSP unchanged. A13 not retargeted.**
+
+### Added
+
+- `src/app/[locale]/page.tsx` and `src/features/entry/` — the public entry page
+  at `/pt-BR` and `/en`, with **four claims and no fifth**, each checked against
+  the tree. The evidence map is a `Record` over the claim union, so a claim added
+  without evidence fails to compile.
+- `src/features/entry/locale-negotiation.ts` — `Accept-Language` parsed to the
+  closed `Locale` union. Quality beats source order, `q=0` is respected, a
+  malformed header returns a locale rather than throwing, and **`pt-BR` is the
+  fallback rather than the answer**.
+- `src/features/entry/return-path.ts` — the `next` allowlist for
+  `2O-ENTRY-007`. One leading slash, this locale's own `/app` with a separator
+  boundary, no scheme, no backslash, no control character; everything else is
+  `null`.
+- `src/lib/closeout/entry-page-guard.test.ts`, and six journeys in
+  `e2e/foundation.spec.ts` running on desktop **and** mobile in both locales.
+
+### Changed
+
+- `src/app/page.tsx` — was `redirect("/pt-BR/app")`, unconditionally. Now
+  negotiates for an unauthenticated visitor and sends an authenticated one to
+  `/{storedLocale}/app` with no intermediate page.
+- `src/app/[locale]/auth/register/page.tsx` — states the closed door **before**
+  the form, from the same predicate `signUp` enforces. The form stays: *"before
+  asking"* presupposes the asking, and an earlier cut that removed it was
+  reverted as beyond what `OD-2O-1` **A** signed.
+- `src/proxy.ts`, `src/app/[locale]/auth/login/page.tsx`,
+  `src/features/auth/actions.ts` — the requested surface survives the round trip
+  through login. **`signIn` re-validates it**; the login page's check only decides
+  what is rendered.
+
+### Corrected while implementing
+
+The uniform-refusal journey was written three times. Byte equality failed on a
+per-response identifier; "the query is not reflected" failed because
+`searchParams` reaches the RSC flight payload (which hands the caller back what
+the caller sent, and is not what `SH-SIGNUP-001` protects); and comparing whole
+pages failed on the **generic** error banner — a test that would have made a
+working security control fail. What ships compares *the statement*, which is what
+the requirement names.
+
 ## 2026-08-15 - PHASE 2O SLICE 2O.0 — implementation is authorized (ADR-118), and the capability registry stops being a comment
 
 **Zero migrations created. 94, parity `202608140094`. Signup closed, rollout 25 · 3 · 2. CSP unchanged. A13 not retargeted.**
