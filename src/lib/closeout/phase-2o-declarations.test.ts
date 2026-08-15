@@ -319,14 +319,43 @@ describe("Phase 2O governance: the authorization is planning-only and says so", 
     }
   });
 
-  it("states in the PRD and the plan that implementation is NOT authorized", () => {
+  it("states in the PRD and the plan that implementation IS authorized, by ADR-118", () => {
+    /*
+     * **Inverted by ADR-118, and kept rather than deleted — the fourth
+     * inversion in this phase and the one with the most at stake.**
+     *
+     * Under ADR-115 this refused a governing document that failed to say
+     * implementation was unauthorized. The owner has now authorized it, so the
+     * old assertion would hold a **false statement** in place with a test —
+     * exactly the failure ADR-117 corrected for `embedding_model` one ADR
+     * earlier. The direction moves; the property does not: **the governing pair
+     * states the authorization it actually has, and states no other.**
+     *
+     * The superseded form is quoted below rather than deleted, because a
+     * deleted assertion cannot be told apart from a satisfied one.
+     *
+     * *Superseded form: `expect(flat(document)).toMatch(/\*\*Implementation is
+     * NOT authorized\.?\*\*|\*\*No slice below is authorized/i)`.*
+     */
     for (const document of [PRD, PLAN]) {
-      expect(flat(document), `${document} does not refuse implementation`)
-        .toMatch(/\*\*Implementation is NOT authorized\.?\*\*|\*\*No slice below is authorized/i);
-      expect(read(document)).toMatch(/ADR-115/);
+      const source = flat(document);
+      expect(source, `${document} does not record the implementation authorization`)
+        .toMatch(/\*\*Implementation is authorized through closeout by ADR-118\.?\*\*/i);
+      expect(source, `${document} still refuses the implementation the owner authorized`)
+        .not.toMatch(/\*\*Implementation is NOT authorized/i);
+      expect(source, `${document} still refuses every slice`)
+        .not.toMatch(/\*\*No slice below is authorized/i);
+      // The prior authorizations stay cited. An implementation authorization
+      // does not replace the signatures it was given on top of.
+      for (const adr of ["ADR-115", "ADR-116", "ADR-118"]) {
+        expect(read(document), `${document} drops ${adr}`).toMatch(new RegExp(adr));
+      }
     }
-    // Non-vacuous: the pattern is not one that any prose would satisfy.
-    expect("planning only, and busy").not.toMatch(/\*\*Implementation is NOT authorized/i);
+    // Non-vacuous, in both directions: the pattern really matches the claim it
+    // requires, and really does not match the one it now forbids.
+    expect("Implementation is authorized through closeout by ADR-118.")
+      .toMatch(/Implementation is authorized through closeout by ADR-118/i);
+    expect("planning only, and busy").not.toMatch(/Implementation is authorized through closeout/i);
   });
 
   it("keeps ADR-108 through ADR-114 intact rather than rewritten", () => {
@@ -582,25 +611,72 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
   });
 });
 
-describe("Phase 2O: the closing artifacts do not exist yet", () => {
-  it("carries no acceptance record, matrix, closing report or deployment record", () => {
+describe("Phase 2O: every delivered slice leaves an acceptance record", () => {
+  it("carries one acceptance record per delivered slice, and none for a slice not started", () => {
     /*
-     * **This assertion inverts at closeout, and must be kept rather than
-     * deleted then.** Under planning, any of these is proof that work started
-     * under an authorization that forbade it. At closeout their *absence* is
-     * what would be wrong. A deleted assertion records nothing, and the next
-     * reader cannot tell a gate that was satisfied from a gate that was removed.
+     * **Inverted by ADR-118, exactly as this block said it would be.**
+     *
+     * The prior form refused *any* acceptance record, matrix, closing report or
+     * deployment record, because under a planning-only authorization each was
+     * proof that work had started under a decision that forbade it. That was
+     * right then. Implementation is now authorized, so the **absence** of an
+     * acceptance record for a delivered slice is the defect, and the assertion
+     * turns over rather than being removed — a deleted gate cannot be told apart
+     * from a satisfied one.
+     *
+     * *Superseded form: every name matching `/ACCEPTANCE|TRACEABILITY_MATRIX|
+     * CLOSING_REPORT|DEPLOYMENT/i` was refused.*
+     *
+     * What did **not** invert: the closing artifacts of the *phase*. A matrix,
+     * a closing report or a deployment record while eight slices are unbuilt is
+     * still a phase claiming to be finished, and is still refused below.
      */
     const directory = join(REPO, "docs", "reports", "phase-2o");
     const reports = existsSync(directory) ? readdirSync(directory) : [];
-    for (const forbidden of [/ACCEPTANCE/i, /TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
-      const offenders = reports.filter((name) => forbidden.test(name));
-      expect(offenders, `a closing artifact exists during planning: ${offenders.join(", ")}`).toEqual([]);
+
+    // The delivered slices, and the record each must have left. A slice is added
+    // here **in its own commit**, so this authorization commit asserts the rule
+    // and the slice that follows asserts itself.
+    const DELIVERED: readonly string[] = [];
+    for (const record of DELIVERED) {
+      expect(reports, `a delivered slice left no acceptance record: ${record}`).toContain(record);
     }
-    // Non-vacuous: the directory really has the planning evidence in it, and the
-    // filter really matches the shape it forbids.
+
+    // Non-vacuous: this is a real directory listing rather than an empty one,
+    // and the shape a record takes is fixed so a slice cannot invent its own.
     expect(reports.length).toBeGreaterThanOrEqual(4);
-    expect(["PHASE_2O_SLICE_00_ACCEPTANCE.md"].filter((name) => /ACCEPTANCE/i.test(name))).toHaveLength(1);
+    expect(["PHASE_2O_SLICE_00_ACCEPTANCE.md"].filter((name) => /^PHASE_2O_SLICE_\d\d_ACCEPTANCE\.md$/.test(name)))
+      .toHaveLength(1);
+  });
+
+  it("carries no matrix, closing report or deployment record while the phase is mid-flight", () => {
+    // The half of the old refusal that is still live, and the one Phase 2M's
+    // guard was built for. It inverts at closeout, in 2O.8's own commit.
+    const directory = join(REPO, "docs", "reports", "phase-2o");
+    const reports = existsSync(directory) ? readdirSync(directory) : [];
+    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
+      const offenders = reports.filter((name) => forbidden.test(name));
+      expect(offenders, `a phase-closing artifact exists mid-flight: ${offenders.join(", ")}`).toEqual([]);
+    }
+    // Non-vacuous: the filters really match the shapes they forbid.
+    expect(["PHASE_2O_TRACEABILITY_MATRIX.md"].filter((name) => /TRACEABILITY_MATRIX/i.test(name))).toHaveLength(1);
+    expect(["PHASE_2O_DEPLOYMENT_RECORD.md"].filter((name) => /DEPLOYMENT/i.test(name))).toHaveLength(1);
+  });
+
+  it("records ADR-118 as an accepted implementation authorization that names no successor", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-118 — The owner authorizes Phase 2O implementation through closeout/);
+    const start = decisions.indexOf("## ADR-118");
+    const next = decisions.indexOf("\n## ADR-", start + 1);
+    const body = decisions.slice(start, next === -1 ? undefined : next);
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "the budget must be restated rather than assumed").toMatch(/2 allocated/);
+    expect(body, "a third migration must stay a stop condition").toMatch(/third migration is a STOP CONDITION/i);
+    expect(body, "M2 must stay unspendable").toMatch(/M2 has no destination and may not be spent/);
+    expect(body, "signup must stay closed").toMatch(/no opening of signup/i);
+    expect(body, "an authorizing ADR must not name the successor").not.toMatch(/2P/i);
+    expect(decisions, "ADR-117 must point at what superseded it in part")
+      .toMatch(/\*\*Superseded in part by ADR-118\*\*/);
   });
 
   it("declares no requirement outside the PRD", () => {

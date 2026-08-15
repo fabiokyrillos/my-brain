@@ -1,9 +1,15 @@
 # Phase 2O — Activation, preferences, and control (Implementation Plan)
 
-**Authorization:** planning only, by **ADR-115**; **all twelve owner decisions
-signed by ADR-116** (2026-08-15). **No slice below is authorized for
-execution.** No migration may be created during planning. Signup does not open.
-The roadmap successor is not started, scoped or named.
+**Authorization:** planning by **ADR-115**; **all twelve owner decisions signed
+by ADR-116**, the one flagged interpretation confirmed by **ADR-117**, and
+**Implementation is authorized through closeout by ADR-118** (2026-08-15). Every
+slice below is authorized for execution, in the order given, each re-audited
+against the `main` the previous one produced.
+
+**The ceiling is unchanged.** At most the two allocated migrations, both
+conditional and neither obligatory — and **M2 has no destination, so a spend of
+it is a stop condition**. Signup does not open. The roadmap successor is not
+started, scoped or named.
 
 **What the signatures changed in this plan.** Every conditional migration
 resolved to **none**: `OD-2O-3` **A** and `OD-2O-4` **A** each removed one, and
@@ -469,19 +475,30 @@ recorded execution naming device, software and version.
 
 ---
 
-## 8. Preconditions before implementation may be authorized
+## 8. Preconditions before implementation may be authorized — ALL SIX DISCHARGED
+
+Kept in full rather than deleted, with what discharged each. A precondition list
+that disappears once it is met leaves the next reader unable to tell a gate that
+was passed from a gate that was dropped.
 
 1. ~~All twelve owner decisions signed~~ — **DONE, ADR-116, 2026-08-15.**
 2. ~~A migration budget signed~~ — **DONE, `OD-2O-9`**: 2 allocated, obligation
    zero, non-transferable, M2 already without a destination.
-3. **STILL REQUIRED — a re-audit of the tree at the authorization baseline**,
-   because the baseline moves. It moved during Phase 2M's review and every
-   finding had to be re-executed; it moved again between Phase 2N's close and
-   this package, by 138 files.
-4. **STILL REQUIRED —** CI green on the exact merge SHA of the authorizing
-   commit.
-5. **STILL REQUIRED —** hosted parity confirmed by a live
-   `migration list --linked`, not from a document.
-6. **STILL REQUIRED —** an explicit owner authorization to implement. **ADR-116
-   signed the decisions and authorized no implementation**; the two are separate
-   acts, as they were at ADR-108/ADR-112 and ADR-104/ADR-105.
+3. ~~A re-audit of the tree at the authorization baseline~~ — **DONE,
+   2026-08-15.** The baseline moves: it moved during Phase 2M's review and every
+   finding had to be re-executed, and again between Phase 2N's close and this
+   package, by 138 files. This time it did **not** move where it matters — the
+   delta from `9cc1175` to `57beb06` is documentation and two governance guards,
+   with **zero product-code files changed** — so every finding in the audit still
+   describes the tree it was written against. The re-audit is recorded in
+   `PHASE_2O_SLICE_00_ACCEPTANCE.md` §2, including three divergences it found.
+4. ~~CI green on the exact merge SHA of the authorizing commit~~ — **DONE.**
+   `e4f2668` green on all three job families; `57beb06` green.
+5. ~~Hosted parity confirmed by a live read~~ — **DONE.** 94 local = 94 hosted,
+   `202608140094`, read from the project rather than from a document. The
+   rollout gate was re-read the same way, by running `npm run rollout:verify`:
+   **25 pass · 3 fail · 2 owner-signature**, unchanged.
+6. ~~An explicit owner authorization to implement~~ — **DONE, ADR-118,
+   2026-08-15.** ADR-116 signed the decisions and authorized no implementation;
+   the two are separate acts, as they were at ADR-108/ADR-112 and
+   ADR-104/ADR-105.
