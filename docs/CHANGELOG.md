@@ -2,6 +2,100 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PAPEL E CONSOLE, PART FOUR: Brain as a space, the transparency centre, the mobile decision, and the account seen full
+
+**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Six commits on `codex/redesign-papel-e-console`, continuing from `4e4a801`. **34 commits on the branch, 137 files, +12 743 / −1 860. Not pushed, no PR, no merge.**
+
+This part closes the six things parts one to three recorded as absences, and the two limitations all three of them carried.
+
+### Brain is one space with nine lenses
+
+Part two promoted `library` to the fourth destination and renamed it; part three's own changelog said what it still was — *"a promoted, renamed destination over the lens list that already existed, not the list-plus-workspace surface the handoff draws"*. It is the space now.
+
+**A lens is the destination it always was.** Not a tab that swaps a panel, not a query parameter over a second loader — the same route, the same server-rendered loader, the same authorization, wearing the strip that says which part of Brain you are in. `/app/library`, `/app/people`, `/app/projects`, `/app/organizations`, `/app/contexts`, `/app/memories`, `/app/files`, `/app/relations` and `/app/chat` are untouched as URLs, and **no loader, RLS rule or Server Action was duplicated**. `02-arquitetura-e-rotas.md` proposes `/app/brain?lens=` with the list routes redirecting to it; that is not built, because a redirect would end nine rendering surfaces, and ADR-114 Decision 6 preserves every current URL.
+
+**The overview says what is behind each door** — three plain `created_at` rows per domain and a count as a navigation aid. `LIBRARY_RECENCY` had carried `column` and `label` since Phase 2I with nothing reading either, and `LibraryDomainSummary.recent` had never been produced: the contract designed for this surface is now consumed by it. Counts were derived from that same record, so Contextos and Conversas rendered as doors with no number while every neighbour had one; a separate `LIBRARY_COUNTS` fixes it, and Relações still has none because a relation has no row to count.
+
+**Three states, never two, in both directions.** `countSupported` separates *no countable table* from *the count failed*; `recencySupported` separates *recency is not shown here* from *nothing recent*.
+
+**The two governed labels are asked, not printed.** `memories.content` and `attachments.original_name` reach `ProtectedContent` under the same surface literals their own pages use. The decision is a **required field on the recency record** rather than a second record kept in step, and the guard re-derives the answer from the generated types on every run — so a sixth recency source over a classified table fails the build instead of leaking. `conversations` is deliberately not a recency source: it carries `sensitivity` and `ProtectedSurface` has no `conversation` arm.
+
+**On Conversar the strip is below the composer**, because UX-07's fix is that the composer is the first interactive element and nine links above it would be nine.
+
+### Pessoa and Projeto are one workspace template
+
+`03-componentes.md` calls both surfaces the **same** EntityWorkspace. They were two stacks of six sections in slightly different orders.
+
+Four of the five bands are built: identity, the changes band, the two columns, and "onde aparece". **The generated summary is not, and is not faked.** No per-entity summary exists; storing one costs a migration this initiative does not have, and generating one at render would spend the owner's own credential on a model call per page load — the shape `2K-SUGG-001` refused. `04-estados.md` offers *"Ainda não há material suficiente para um resumo"* as its empty arm, and **that sentence is deliberately unused**: it says the capability exists and is waiting for material. A guard asserts neither page renders it.
+
+What occupies that position is real. The project workspace already carried `2N-PROJECT-004`'s audit-trail band; the person workspace mounts **that section**, not a second one, and `describeProjectChanges` is renamed `describeEntityChanges` because nothing in it was ever project-specific.
+
+**The columns are named and the outline says what belongs to what.** *Trabalho em aberto* and *O que o Brain sabe* are the `<h2>`s; every panel inside them dropped to `<h3>`. Grid placement, never `order`. `min-width: 0` on the columns, because a grid item refuses to shrink below its content and one 240-character title would otherwise push its neighbour off a phone. The edit form went behind a `<details>`, keeping every capability.
+
+### The memory says it is in conflict, on the page the queue sends you to
+
+`isInvertedValidityWindow` has existed since slice 2N.4, and the needs-attention row it feeds says *"Abra a memória e remova a data de término"*. The memory then rendered **arquivada** beside two dates and said nothing about them. The block renders on the memory now, from the same detector, the same copy and the same warm rule.
+
+**Five resolutions are not built, and that is the signature rather than the omission.** `03-componentes.md` draws five; OD-2N-7 **A** signs derivation from existing data with no conflict table, no persisted lifecycle and exactly one action.
+
+The memory also gained the corrections band — *histórico sem reescrever revisões*: it writes nothing, rewrites nothing, and adds no revision table.
+
+### A file says what it is
+
+The file rows carried no type marker, so a reader scanning for "the spreadsheet" had nothing to scan. `fileKindOf` derives a mono label from **the same map the filter chips use**, so the word on a row and the chip that would select it cannot disagree; a test walks every declared type in both directions.
+
+### Dados e IA — three surfaces, one place, no route dead
+
+`02-arquitetura-e-rotas.md` makes Atividade, Custos and Processamento three tabs of Ajustes with the three routes redirecting. **The redirect is not built**: a tab of Settings would have to re-implement History's filters and its date range in the owner's zone, Costs' RPC and price snapshots, and Processamento's states. Each route stays what it is and wears the strip.
+
+The requirement the handoff is actually making is met, and half of it already was: *nenhuma delas na navegação primária* — `history` and `costs` stay in the overflow and `jobs` stays `context-only` with no navigation label, both asserted. *"Jobs" deixa de ser conceito de usuário* — the route is untouched and the word is **Processamento** everywhere.
+
+**Processamento was reachable from nothing.** The failed-jobs section on `/app/files` — the one place in the product that knows something went wrong — offered no way to see what. It links there now, and Processamento is also a door in Ajustes: "no menu entry" is a statement about navigation, not an instruction that an owner must wait for a failure before being allowed to look.
+
+The section in Ajustes renders **three links and no control**; a test asserts there is no button, checkbox, switch or form in it, because a transparency section is exactly where a *clear history* or an *export* would look natural and be a lie.
+
+### The mobile bar's fifth slot, decided with the census that supports it
+
+Part two wrote that `Mais` was the only route to **fourteen** destinations. That was true then. Twelve are now absorbed — eight contextual ones by Brain's strip and overview, Calendário and the planner by Trabalho's tabs, Revisões and Perguntas by Hoje, and the three transparency views by Ajustes.
+
+**Lembretes was the thirteenth and was genuinely orphaned.** `/app/reminders` was reachable only from a calendar item that *is* a reminder or an entry outcome that produced one, so an account with none had no path at all — and you cannot create a reminder from a page you cannot open. The calendar's control band links to it unconditionally now.
+
+**The fourteenth is the account, and it decides this.** `AccountMenu` is mounted in exactly two places: the desktop rail's foot and the mobile overflow panel. On a phone the top bar carries the palette, the locale switch and notifications — no avatar. Retiring `Mais` today would take Ajustes with it, and with Ajustes the whole of Dados e IA, and **sign-out**. So `Mais` stays, and **the departure from the handoff is one destination wide instead of fourteen**. `02-arquitetura-e-rotas.md` specifies the remedy — *Avatar no cabeçalho* — and it is not built here because moving the account surface changes the shell on both viewports, and the last delimited part of an initiative is not where the way out of the product gets rebuilt unvalidated. `mobile-reachability-guard.test.ts` holds the census and **fails in both directions**: the day the account reaches the mobile header, it tells whoever did it that slot five is free.
+
+### Two mirrors that were measuring a product that does not exist
+
+`GROUPS` in `layout-contracts.spec.ts` was **stale by six destinations** — four context members where the product renders eight, no Conversar, Empresas, Contextos or Relações, and Organização holding only Lembretes after Calendário joined it in Phase 2M. Every assertion over the overflow panel was measuring a navigation that does not exist. This is the failure `PRIMARY` and `MOBILE_BAR` had one part ago, surviving in the third list, which the guard built to catch it did not cover. It does now, with a planted-divergence control per group.
+
+And that fixture **never emitted `aria-current="page"` at all**, so the lane had no way to check the active state: a bar marking every slot, or none, rendered identically.
+
+The accessibility lane's Library fixture was carrying `<h1>Biblioteca</h1>` two commits after the destination was renamed.
+
+### The account, seen full
+
+Parts one, two and three each closed with the same limitation: *"dense-list composition is still only structurally verified"*. **An empty surface satisfies every layout.**
+
+`scripts/redesign-dense-fixture.mjs` seeds 233 rows into the linked project: 54 people, 23 projects, 48 tasks across atrasada · hoje · aguardando · cancelada · concluída, 41 memories across in-force · scheduled · archived · **conflicting** · private · highly sensitive, 12 companies, 11 contexts, 9 reminders. The long strings are **the schema's own ceilings** — 120 characters for a name, 240 for a task title — and `assertLengths` fails the seed if either drifts below 90% of its ceiling.
+
+Owner-scoped by shape: the owner id is resolved once and every insert takes `user_id` from that one variable. Identifiable by a marker prefix. Re-seedable, because it cleans first. **Removed, and proven so by a probe that could have failed**: verify → **233** → clean → verify → **0**, and `npm run verify:online-residue` reports zero.
+
+### Verification
+
+**7537 unit tests, 311 offline Playwright across both projects, lint, typecheck, build, `git diff --check` clean.** Three unit test *files* fail to load on the Windows baseline (a shebang parse defect) and are green in CI; they contain zero failing tests.
+
+Authenticated against the **production build** with the dense fixture loaded, on **both** Playwright projects: 20 fixed surfaces plus the three id-bearing workspaces, at 375 · 412 · 768 · 1024 · 1440 · 1920, in light and dark, in both locales, with no horizontal scroll anywhere, and axe clean in both themes with the theme asserted before each scan. 138 screenshots per project.
+
+**The workspace block passed on the wrong page on its first run**: the list has an `<h1>` too, so a click that navigated nowhere satisfied a visibility assertion instantly. The URL check beside it caught that; a `waitForURL` fixed it, and the check stays.
+
+### What is NOT done, and is not claimed
+
+- **No generated entity summary.** The handoff's *resumo do Brain com fontes e data de geração* is absent by decision, not by oversight — see above.
+- **No `/app/brain` route.** `library` remains the canonical URL and Brain is the product's word for it, which is the alternative `09-decisoes-pendentes.md` names and ADR-114 Decision 6 settles.
+- **The three transparency routes do not redirect into Ajustes.** They are reached from it and wear its strip.
+- **The mobile bar still departs from the handoff in one slot**, for the account, with the release condition in a guard.
+- **The five-resolution conflict block is not built**, and cannot be under OD-2N-7 A.
+- **No screen-reader run, no physical device, no hosted environment.** Unchanged from parts one to three; `2J-ACCESS-008` remains a manual requirement this branch does not discharge.
+- **The dense fixture writes no `entries`, `jobs`, `audit_logs`, `ai_usage_events` or `product_events`**, so Registros, Processamento, Custos and the changes bands were seen with whatever the account already held rather than at depth.
+
 ## 2026-08-15 - PAPEL E CONSOLE, PART THREE: the four open findings, and the five surfaces part two named as absences
 
 **Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Five commits on `codex/redesign-papel-e-console`, continuing from `0d2bb2c`. Not pushed, no PR, no merge.
