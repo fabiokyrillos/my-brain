@@ -99,21 +99,27 @@ function workItem(overrides: Partial<WorkItemView> = {}): WorkItemView {
 }
 
 describe("HomeDashboard", () => {
-  it("renders recent activity through the shared inbox projection with localized product-state labels", async () => {
+  /**
+   * The Papel e Console cockpit replaced Hoje's feed of recent records with the
+   * *sendo organizado* panel (mockup 03, frame 01). The inbox projection is
+   * still the source — what changed is which of its rows Hoje draws: the ones
+   * the worker has not finished, not the last four of everything.
+   */
+  it("renders the entries still being organized, through the shared inbox projection", async () => {
     setup({
       items: [
-        item({ entryId: "entry-1", title: "Ligar para a Marina", productState: "ready" }),
-        item({ entryId: "entry-2", title: "Revisar orçamento", productState: "needs_attention", attentionReason: "confirm_existing_candidates" }),
+        item({ entryId: "entry-1", title: "Ata da reunião de embarque", productState: "organizing" }),
+        item({ entryId: "entry-2", title: "Ligar para a Marina", productState: "ready" }),
       ],
     });
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Registrado recentemente")).toBeInTheDocument();
-    expect(screen.getByText("Ligar para a Marina")).toBeInTheDocument();
-    expect(screen.getByText("Revisar orçamento")).toBeInTheDocument();
-    expect(screen.getByText("Pronto")).toBeInTheDocument();
-    expect(screen.getByText("Precisa de você", { selector: ".status-badge" })).toBeInTheDocument();
+    expect(screen.getByText("Sendo organizado")).toBeInTheDocument();
+    expect(screen.getByText("Ata da reunião de embarque")).toBeInTheDocument();
+    expect(screen.getByText("Organizando")).toBeInTheDocument();
+    // A finished record is not in this panel: it has nothing left to wait for.
+    expect(screen.queryByText("Ligar para a Marina")).not.toBeInTheDocument();
   });
 
   it("never renders a raw internal product state or entry lifecycle string", async () => {
@@ -123,16 +129,15 @@ describe("HomeDashboard", () => {
 
     expect(screen.queryByText("could_not_organize")).not.toBeInTheDocument();
     expect(screen.queryByText("retry_processing")).not.toBeInTheDocument();
-    expect(screen.getByText("Could not organize")).toBeInTheDocument();
   });
 
-  it("shows an empty state for recent activity when the inbox projection has no items", async () => {
+  it("does not render the organizing panel when nothing is being organized", async () => {
+    // *Painéis vazios não renderizam* — `02-arquitetura-e-rotas.md`.
     setup({ items: [] });
 
     render(await HomeDashboard({ locale: "pt-BR" }));
 
-    expect(screen.getByText("Registrado recentemente")).toBeInTheDocument();
-    expect(screen.getByText(/Nada por aqui ainda/)).toBeInTheDocument();
+    expect(screen.queryByText("Sendo organizado")).not.toBeInTheDocument();
   });
 
   it("shows an observable all-saved status without a review-time promise", async () => {

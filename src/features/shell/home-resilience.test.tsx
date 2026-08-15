@@ -31,6 +31,7 @@ const loadHomeSupplementalProjection = vi.fn();
 const loadInboxProjection = vi.fn();
 const loadAttentionProjection = vi.fn();
 const loadMemoryConflicts = vi.fn();
+const loadHomeAgendaProjection = vi.fn();
 
 vi.mock("@/features/daily-cycle/work-projection", () => ({
   loadWorkProjection: (...args: unknown[]) => loadWorkProjection(...args),
@@ -56,6 +57,19 @@ vi.mock("@/features/daily-cycle/conflict-projection", () => ({
   CONFLICT_SCAN_LIMIT: 200,
   CONFLICT_PAGE_SIZE: 20,
 }));
+/*
+  The Papel e Console redesign adds "Adiante", so Hoje now composes **six**
+  independent reads. This one is the likeliest of them all to throw in
+  production: `loadCalendarProjection` raises on an unsupported profile timezone
+  (`2M-TIME-003`) rather than guessing a zone, so a single bad `profiles.timezone`
+  row would have taken the whole cockpit down — capture box included — if it were
+  not isolated like the other five.
+*/
+vi.mock("@/features/daily-cycle/home-agenda", () => ({
+  loadHomeAgendaProjection: (...args: unknown[]) => loadHomeAgendaProjection(...args),
+  EMPTY_HOME_AGENDA: { items: [], hasMore: false, timezone: "UTC" },
+  HOME_AGENDA_LIMIT: 5,
+}));
 
 import { HomeDashboard } from "./home-dashboard";
 
@@ -65,6 +79,7 @@ function healthy() {
   loadInboxProjection.mockResolvedValue({ items: [], hasNext: false });
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });
   loadMemoryConflicts.mockResolvedValue({ items: [], bounded: false, limit: 20 });
+  loadHomeAgendaProjection.mockResolvedValue({ items: [], hasMore: false, timezone: "America/Sao_Paulo" });
 }
 
 beforeEach(() => {
@@ -84,6 +99,7 @@ const PROJECTIONS = [
   ["inbox", loadInboxProjection],
   ["attention", loadAttentionProjection],
   ["conflicts", loadMemoryConflicts],
+  ["agenda", loadHomeAgendaProjection],
 ] as const;
 
 describe("2J-HOJE-010: a failing section degrades that section only", () => {

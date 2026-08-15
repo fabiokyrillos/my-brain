@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
+import type { HomeAgendaItem } from "@/features/daily-cycle/home-agenda";
 import type { Locale } from "@/lib/preferences";
 import { getWorkCopy } from "@/features/operations/copy";
 import { HomeView, type HomeViewModel } from "./home-view";
@@ -44,6 +45,21 @@ function inboxItem(overrides: Partial<InboxItemView> = {}): InboxItemView {
   };
 }
 
+function agendaItem(overrides: Partial<HomeAgendaItem> = {}): HomeAgendaItem {
+  return {
+    key: "deadline:t9",
+    lane: "deadline",
+    commitment: "committed",
+    at: "2026-07-30T18:00:00.000Z",
+    date: "2026-07-30",
+    isToday: true,
+    title: "Orçamento com o João",
+    sensitivity: { kind: "undetermined" as const },
+    href: "/pt-BR/app/work/t9",
+    ...overrides,
+  };
+}
+
 function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
     timeZone: "America/Sao_Paulo",
@@ -63,7 +79,10 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     todayHasMore: false,
     waitingCount: 2,
     openQuestion: "O retorno da Marina é para esta semana ou para a próxima?",
-    recent: [inboxItem()],
+    organizing: [inboxItem({ productState: "organizing" })],
+    organizedTodayCount: 0,
+    agenda: [agendaItem()],
+    agendaHasMore: false,
     ...overrides,
   };
 }
@@ -81,31 +100,39 @@ describe("HomeView", () => {
     expect(screen.getByRole("status")).toHaveTextContent("2 itens precisam de você.");
   });
 
-  it("orders the sections to answer needs-me, today, blocked, open question, recent", () => {
+  /**
+   * The cockpit's fixed reading order (`02-arquitetura-e-rotas.md`): captura →
+   * precisa de você → hoje/atrasado → adiante → sendo organizado → fechar o dia.
+   *
+   * Asserted as DOM order rather than as visual order on purpose. Wide viewports
+   * split this list into two columns by grid placement, so the DOM order **is**
+   * the focus order in both layouts — which is what `07-acessibilidade.md`
+   * requires and what a CSS `order` would have quietly broken.
+   */
+  it("orders the sections into the handoff's fixed daily order", () => {
     renderHome(viewModel());
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Precisa de você",
-      "Prioridades de hoje",
-      "Para hoje",
+      "Hoje e atrasado",
       "Aguardando outras pessoas",
       "Pergunta em aberto",
+      "Adiante",
+      "Sendo organizado",
       "Encerrar o dia",
-      "Registrado recentemente",
     ]);
   });
 
   it("drops the sections that have nothing to say instead of reserving space", () => {
     // Waiting and the open question are the two that used to render as panels
-    // holding a single sentence, or nothing at all, at a 188px floor.
-    renderHome(viewModel({ waitingCount: 0, openQuestion: null }));
+    // holding a single sentence, or nothing at all, at a 188px floor. Adiante and
+    // Sendo organizado join them: *painéis vazios não renderizam*.
+    renderHome(viewModel({ waitingCount: 0, openQuestion: null, agenda: [], organizing: [] }));
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Precisa de você",
-      "Prioridades de hoje",
-      "Para hoje",
+      "Hoje e atrasado",
       "Encerrar o dia",
-      "Registrado recentemente",
     ]);
   });
 
@@ -118,16 +145,75 @@ describe("HomeView", () => {
         today: [],
         waitingCount: 0,
         openQuestion: null,
-        recent: [],
+        organizing: [],
+        agenda: [],
       }),
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("Nada pendente. Tudo salvo.");
     expect(screen.getByText("Nada precisa de você agora.")).toBeInTheDocument();
     expect(screen.getByText("Nenhum prazo exige sua atenção hoje.")).toBeInTheDocument();
-    expect(screen.getByText("Nada por aqui ainda. Capture algo para começar.")).toBeInTheDocument();
     // Nothing to view, so no link that leads to an empty list.
     expect(screen.queryByRole("link", { name: "Ver tudo" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * `04-estados.md`, Hoje **V**: the quiet state owes an account of the day, not
+   * only the absence of work. Without it "nada precisa de você" reads as
+   * "nothing happened".
+   */
+  it("reports what was organized today inside the quiet attention state", () => {
+    renderHome(viewModel({ attention: [], conflicts: { items: [], bounded: false, limit: 0 }, organizedTodayCount: 7 }));
+
+    expect(screen.getByText("7 registros foram organizados hoje sem ambiguidade.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver o que foi organizado" })).toHaveAttribute(
+      "href",
+      "/pt-BR/app/inbox",
+    );
+  });
+
+  it("says nothing about the day's account when there is nothing to report", () => {
+    renderHome(viewModel({ attention: [], conflicts: { items: [], bounded: false, limit: 0 }, organizedTodayCount: 0 }));
+
+    // A zero would turn reassurance into "nothing worked".
+    expect(screen.queryByRole("link", { name: "Ver o que foi organizado" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The lead expands and the rest collapse — mockup 03, frame 01.
+   *
+   * The proposal is legible before the record is opened, which is what the
+   * collapsed row could not do. The decision itself stays on the record
+   * (`06-interacoes.md` §4/§5), so this asserts the card renders the proposal and
+   * routes there, not that it writes.
+   */
+  it("expands the first attention item and collapses the rest", () => {
+    renderHome(
+      viewModel({
+        attention: [
+          attentionItem({ key: "a1", title: "Preciso falar com o João sobre o orçamento." }),
+          attentionItem({ key: "a2", title: "Segundo item" }),
+        ],
+      }),
+    );
+
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    // The lead carries the owner's own words and the proposal's own heading.
+    expect(within(attention).getByText("Preciso falar com o João sobre o orçamento.")).toBeInTheDocument();
+    expect(within(attention).getByText("Revise a interpretação")).toBeInTheDocument();
+    // Nothing has been created, and the card says so.
+    expect(within(attention).getByText("Nada foi criado ainda.")).toBeInTheDocument();
+    // The second is a row, not a second card: it has no proposal eyebrow.
+    expect(within(attention).getAllByText(/o Brain propõe/i)).toHaveLength(1);
+  });
+
+  it("renders the agenda in the owner's zone, not the runner's", () => {
+    renderHome(viewModel({ agenda: [agendaItem({ isToday: true, at: "2026-07-30T18:00:00.000Z" })] }));
+
+    const agenda = screen.getByRole("region", { name: "Adiante" });
+    // 18:00Z is 15:00 in America/Sao_Paulo. A row formatted in UTC would say 18:00.
+    expect(within(agenda).getByText("15:00")).toBeInTheDocument();
+    expect(within(agenda).getByText("Orçamento com o João")).toBeInTheDocument();
   });
 
   it("reports an organizing state without claiming anything needs the user", () => {
@@ -157,12 +243,12 @@ describe("HomeView", () => {
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Needs you",
-      "Today's priorities",
-      "For today",
+      "Today and overdue",
       "Waiting on other people",
       "Open question",
+      "Ahead",
+      "Being organized",
       "Close the day",
-      "Recently captured",
     ]);
     // The ordinal kickers were hardcoded Portuguese literals, so an English user
     // read "PRECISA DE VOCÊ" on their own Home (UX-18).

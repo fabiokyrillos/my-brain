@@ -47,7 +47,10 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     todayHasMore: false,
     waitingCount: 0,
     openQuestion: null,
-    recent: [],
+    organizing: [],
+    organizedTodayCount: 0,
+    agenda: [],
+    agendaHasMore: false,
     ...overrides,
   };
 }

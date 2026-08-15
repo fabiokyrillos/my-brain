@@ -94,6 +94,120 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 @media(max-width:600px){.home-section{padding:18px 16px}.home-task{align-items:flex-start;flex-direction:column;gap:8px}}
 
 /*
+ * Hoje as a cockpit — Papel e Console, `02-arquitetura-e-rotas.md`.
+ *
+ * One DOM order for both layouts: capture → precisa de você → hoje/atrasado →
+ * adiante → sendo organizado → fechar o dia. Wide viewports move the last three
+ * into a secondary column by GRID PLACEMENT of the two wrappers, never by
+ * `order` on the sections themselves — `07-acessibilidade.md` requires focus
+ * order to equal visual order, and `order` would break that on one of the two.
+ *
+ * The breakpoint is a literal, not `var(--width-productivity)`: a custom
+ * property in a media condition is invalid, the whole block is dropped, and the
+ * layout silently stops adapting. `query-condition-guard.test.ts` fails on it.
+ *
+ * 1080px rather than the 900px shell breakpoint: below it the 1.5fr column is
+ * narrower than the interpretation card's field grid wants, and the amber lead
+ * card starts wrapping its labels.
+ */
+.today-hero{max-width:var(--width-reading)}
+.today-capture{margin-top:var(--space-8)}
+.today-columns{display:grid;gap:var(--space-4);margin-top:var(--space-10)}
+.today-main,.today-side{display:grid;gap:var(--space-4);align-content:start;min-width:0}
+@media(min-width:1080px){
+  .today-columns{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:var(--space-5);align-items:start}
+}
+
+/* A group inside the day's list — "prioridades" then "o resto do dia", the
+   grammar the Work mockup uses for "atrasado · 2" / "hoje · 4". */
+.home-group{display:grid;gap:var(--space-2)}
+.home-group+.home-group{margin-top:var(--space-4)}
+.home-group-title{margin:0;font:var(--type-eyebrow);letter-spacing:var(--eyebrow-tracking);text-transform:uppercase;color:var(--text-muted)}
+.home-group-hint{margin:0 0 var(--space-1);font:var(--type-caption);color:var(--text-muted)}
+.home-group .home-priority-rule{margin-top:var(--space-2)}
+.home-quiet{display:grid;gap:var(--space-2);justify-items:start}
+.home-quiet .quiet-state{margin:0}
+.home-quiet .panel-view-all{margin-top:var(--space-1)}
+
+/*
+ * The expanded lead of "Precisa de você".
+ *
+ * The 3px amber rule and the amber wash are the direction's reserved signal for
+ * *precisa de você* and appear on nothing else. The quotation is on the plain
+ * surface and the proposal on the wash, which is what makes "the assistant's
+ * reading is not your words" visible without reading either.
+ */
+.attention-lead{
+  display:grid;
+  border:1px solid var(--tone-attention-line);
+  border-left:3px solid var(--tone-attention-fg);
+  border-radius:var(--radius-lg);
+  background:var(--background-surface);
+  overflow:hidden;
+}
+.attention-lead-original{padding:var(--space-4) var(--space-5)}
+.attention-lead-quote{
+  margin:0;
+  font:var(--type-reading);
+  color:var(--text-primary);
+  /* The owner's own words, unwrapped and unclipped: `04-estados.md` lets the
+     block grow and scroll rather than truncating what someone wrote. */
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  max-height:14em;
+  overflow-y:auto;
+}
+.attention-lead-stamp{margin:var(--space-2) 0 0;font:var(--type-mono);font-variant-numeric:tabular-nums;color:var(--text-muted)}
+.attention-lead-proposal{
+  padding:var(--space-4) var(--space-5);
+  border-top:1px solid var(--tone-attention-line);
+  background:var(--tone-attention-bg);
+}
+.attention-lead-eyebrow{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2);
+  margin:0 0 var(--space-2);
+  font:var(--type-eyebrow);letter-spacing:var(--eyebrow-tracking);text-transform:uppercase;
+  color:var(--tone-attention-fg);
+}
+.attention-lead-reversible{color:var(--text-muted);text-transform:none;letter-spacing:0}
+.attention-lead-title{margin:0;font:var(--type-heading);font-size:15.5px;letter-spacing:-.01em;color:var(--text-primary)}
+.attention-lead-explanation{margin:var(--space-1) 0 0;font:var(--type-body);color:var(--text-secondary)}
+.attention-lead-actions{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-4)}
+.attention-lead-primary,.attention-lead-secondary{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:40px;padding:0 var(--space-4);
+  border-radius:var(--radius-md);
+  font:var(--type-label);
+}
+.attention-lead-primary{background:var(--action-primary);color:var(--action-primary-text);border:1px solid var(--action-primary)}
+.attention-lead-primary:hover{background:var(--action-primary-hover);border-color:var(--action-primary-hover)}
+.attention-lead-secondary{background:var(--background-surface);color:var(--text-primary);border:1px solid var(--border-strong)}
+.attention-lead-secondary:hover{border-color:var(--tone-attention-fg)}
+@media(max-width:899px){
+  /* 44px targets, and full-width actions rather than two slivers. */
+  .attention-lead-primary,.attention-lead-secondary{min-height:var(--touch-target);flex:1 1 100%}
+}
+
+/* "Adiante" — anchors, not a second task list. The time is mono and tabular so
+   a column of them lines up; the lane is carried by the row's own data
+   attribute for styling only, never as the sole signal. */
+.home-agenda{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-1)}
+.home-agenda-item{margin:0}
+.home-agenda-link{
+  display:flex;align-items:baseline;gap:var(--space-3);
+  min-height:var(--touch-target);padding:var(--space-2) var(--space-2);
+  border-radius:var(--radius-md);
+  color:var(--text-primary);
+}
+a.home-agenda-link:hover{background:var(--background-subtle)}
+.home-agenda-time{flex:none;font:var(--type-mono);font-variant-numeric:tabular-nums;color:var(--text-muted)}
+.home-agenda-title{min-width:0;font:var(--type-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A reminder is a commitment the owner asked for, not a deadline someone set:
+   the marker distinguishes them without relying on colour alone, because the
+   time and the title already say what and when. */
+.home-agenda-item[data-lane="reminder"] .home-agenda-time::after{content:" ·";color:var(--mark-decorative)}
+
+/*
  * Row density is a property of the row's container, not of the viewport.
  *
  * `.list-row` was authored for the ~1036px `.list-stack` on Registros, where its
