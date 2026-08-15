@@ -6549,3 +6549,123 @@ Signup stays closed, the rollout gate stays 25 · 3 · 2, push stays a parallel
 residual failing with HTTP 403 on a real iPhone and never executed on Android,
 ADR-055 stays neither satisfied nor superseded and expires **2026-10-27**, and
 **the roadmap successor is neither started nor scoped**.
+
+## §78 — Slice 2O.1 ships: the product says what it is, and the closed door says so first (2026-08-15)
+
+PR **#231**, merged at **`bdd22e4`**; head at merge **`e608614`**, **CI green on
+both** — five checks on the head, all three job families on the merge SHA.
+`main` local equals `origin/main` at `bdd22e4`, worktree clean, no open PR.
+
+**`2O-ENTRY-001` … `-008`. Zero migrations created. 94 local = 94 hosted, parity
+`202608140094`. Signup closed. Rollout gate 25 · 3 · 2. CSP unchanged.
+`embedding_model` untouched. A13 not retargeted.**
+
+**15 of 116 requirements delivered.** Slices 2O.0 and 2O.1; seven slices remain.
+
+### What a stranger saw before this
+
+`src/app/page.tsx` was two lines — `redirect("/pt-BR/app")`, unconditionally. A
+first visit bounced to the app, bounced again by the proxy to
+`/pt-BR/auth/login`, and landed on **a login form for an unnamed product in a
+language the browser had not asked for**.
+
+Now `/` negotiates `Accept-Language` — quality beats source order, `q=0` means
+*not this one*, a malformed header returns a locale rather than throwing, and
+**`pt-BR` is the fallback and never the answer** — while an authenticated visitor
+still goes straight to `/{storedLocale}/app`. `/pt-BR` and `/en` are real public
+URLs carrying **four claims and no fifth**, each checked against the tree by a
+guard whose evidence map is a `Record` over the claim union, **so a claim added
+without evidence fails to compile**.
+
+### The `lang` decision, recorded because the next surface will face it
+
+The root layout hardcodes `<html lang="pt-BR">` and there is **no**
+`[locale]/layout.tsx`, so an English page announces Portuguese — the defect slice
+2N.0's hosted proof found in the loading state. The Next 16 guide's canonical
+answer is to move the root layout under `[lang]`; **that was declined**, because
+it relocates the layout for every route in the product to serve one new page, and
+`/` has no locale segment to supply. `lang` is declared on the first element
+below `[locale]` that knows it, exactly as `app-shell.tsx` does under ADR-112
+Decision 7a. **No framework-level change was made, and the docs were read before
+deciding**, as `CLAUDE.md` requires.
+
+### `2O-ENTRY-007` introduced a redirect target, so it introduced an allowlist
+
+The requested surface now survives the round trip through login: the proxy
+carries the path, the login page renders it only if valid, and **`signIn`
+re-validates it — that is the boundary**, because a form field is whatever the
+client sends. An open redirect firing immediately after a successful sign-in is
+the worst possible moment for one: the cookie is fresh and the visitor has just
+proved they trust the page.
+
+`safeReturnPath` **recognises rather than sanitises**: one leading slash, this
+locale's own `/app` with a separator boundary so `/pt-BR/apple` is refused, no
+scheme, no backslash, no control character, 512 characters. Everything else is
+`null` and sign-in lands on the app's home. This repository has paid for the
+request-supplied-redirect shape once already, at `resolveConfiguredOrigin`.
+
+### Four mistakes, all mine, none caught by reasoning
+
+1. **I removed the register form while the door was shut.** Beyond what
+   `OD-2O-1` **A** signed — that decision is about the *public entry page* — and
+   it deleted the surface `SH-LEGAL-007`'s consent assertions are made against.
+   The existing foundation journey failed on it. **Reverted.**
+   `2O-ENTRY-005` says *"before asking"*, which presupposes the asking, and the
+   order is now asserted as **DOM position**.
+
+2. **The uniform-refusal journey was wrong three times, and the third is the one
+   to remember.** Byte equality failed on a per-response identifier Next injects.
+   *"The query is not reflected"* failed because **`searchParams` reaches the RSC
+   flight payload** whether or not anything renders it — which hands the caller
+   back what the caller sent, reveals nothing, and is not what `SH-SIGNUP-001`
+   protects. Comparing whole pages then failed on the **generic** error banner —
+   **which is the uniform-outcome mechanism working**. A test written to protect a
+   security control would have made that control fail. What ships compares *the
+   statement*, which is the requirement's own word.
+
+3. **The guard read its own explanatory comments.** `entry-page.tsx` says *"it
+   does not link to `/auth/register`"*; `page.tsx` records the
+   `redirect("/pt-BR/app")` it replaced. This is the mirror of a check passing by
+   containing its subject. **Strip the commentary; never delete the comment.**
+
+4. **I ran one spec locally and CI runs five.** The first CI run failed with 285
+   passing and two failures in `task-command.spec.ts` — a spec this slice never
+   opened, asserting the login redirect was *exactly* `/pt-BR/auth/login`. The CI
+   step is `foundation` + `task-command` + `accessibility` + `calendar` +
+   `daily-surfaces`. **A change to `proxy.ts` touches every route in the product,
+   so the blast radius was never one file.** The rule this earns: *when a change
+   touches the proxy, a layout or a shared component, run the whole command the
+   CI job runs* — it is written in `ci.yml` and costs 36 seconds.
+
+### What this slice could prove that 2O.0 could not
+
+Its surfaces are **public**, so six journeys run against the production build on
+**desktop and Pixel 7, in both locales**, inside `foundation.spec.ts` — which CI
+runs on every push. The plan's browser proof obligation for 2O.1 is **discharged
+in CI rather than deferred**. Slice 2O.0's was not, and its acceptance record says
+so rather than implying otherwise.
+
+### Carried, unabsorbed, with destinations
+
+- **`ai_provider` and `embedding_model` are written as literals** by
+  `buildSettingsPayload` rather than passed through, so `2O-ACTIVATION-007`'s
+  *"no save wipes a value"* is imprecise for those two → **slice 2O.4**. ADR-117
+  forbids touching `embedding_model`.
+- **`embedding_model`'s capability-registry row** → `2O-AICONFIG-004`, slice
+  2O.4. The `uncontrolled` vocabulary it needs already exists.
+- **`scheduled_reviews`'s final wording and `visible` value** → `2O-PREF-004`,
+  slice 2O.3, exactly as `2O-ACTIVATION-006` specifies.
+- Every Phase 2N residual `OD-2O-11` declined, unchanged and unclaimed; push
+  still failing with HTTP 403 on a real iPhone and **never executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.2 — the first
+conquest** (`2O-ONBOARD-001` … `-011`, eleven requirements, no migration, since
+`OD-2O-3` **A** made stored progress absolutely forbidden). Its re-audit against
+`bdd22e4` is done and recorded: **no onboarding exists anywhere in the tree**, and
+all four surfaces it must *mount rather than reimplement* are present —
+`byok/credential-panel.tsx`, `profile/settings-form.tsx`, `capture/actions.ts`
+and the activation contract slice 2O.0 delivered. Its two declared dependencies,
+2O.0 and 2O.1, are both merged with CI green on their merge SHAs.
