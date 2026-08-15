@@ -123,6 +123,18 @@ export default async function ReviewsPage({
 
     <section aria-labelledby="reviews-history" className="reviews-history">
       <h2 id="reviews-history">{pt ? "Revisões geradas" : "Generated reviews"}</h2>
+      {/*
+        The section says what its four buttons do before offering them. It read
+        as a toolbar with no subject: the day review above closes a day from
+        records that already exist, and these ask the assistant to write a
+        period up — a different act, and the only one on this page that spends
+        anything.
+      */}
+      <p className="reviews-history-lead">
+        {pt
+          ? "Cada botão pede ao Brain uma síntese escrita do período. Nada aqui roda sozinho — e nada é alterado por gerar uma revisão."
+          : "Each button asks Brain to write up a period. Nothing here runs on its own, and generating a review changes nothing."}
+      </p>
       <div className="review-buttons"><ReviewButton action={generateReview} locale={locale} period="daily" /><ReviewButton action={generateReview} locale={locale} period="weekly_review" /><ReviewButton action={generateReview} locale={locale} period="weekly_plan" /><ReviewButton action={generateReview} locale={locale} period="monthly" /></div>
       {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h3>{review.title}</h3></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <div className="empty-list"><NotebookTabs size={30} /><strong>{pt ? "Nenhuma revisão ainda" : "No reviews yet"}</strong><p>{pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."}</p></div>}
       <PaginationLinks locale={locale} path="reviews" page={page} hasNext={hasNext} />

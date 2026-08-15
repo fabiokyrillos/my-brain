@@ -43,6 +43,35 @@ export type DayReviewCopy = {
   readonly generatedHeading: string;
   readonly generatedNone: string;
   readonly openReviews: string;
+  /**
+   * The closing's one-line reading (`summarizeDayReview`).
+   *
+   * Every string is a count or a statement about the counts. There is no grade,
+   * no proportion and no target: `2M-REVIEW-002` forbids the surface proposing
+   * changes the user did not ask for, and a review that scored the day would be
+   * proposing the loudest change there is.
+   */
+  readonly synthesis: {
+    readonly heading: string;
+    readonly completed: (count: number) => string;
+    /** What the day committed to and did not close. */
+    readonly open: (count: number) => string;
+    readonly captured: (count: number) => string;
+    /** Said when nothing happened **and** every source was read. */
+    readonly quiet: string;
+    /** Said when a count is a floor rather than a total, naming what is missing. */
+    readonly partial: (sections: string) => string;
+    /**
+     * The word a row in "intenções" or "prazos" carries about itself.
+     *
+     * There is deliberately **no** separate pendências list: every open item is
+     * already a row in one of those two sections with the verbs its status
+     * admits, and a second list would be `2J-HOJE-004`'s repetition — the same
+     * task twice on one screen, the second copy carrying less.
+     */
+    readonly stateOpen: string;
+    readonly stateDone: string;
+  };
 };
 
 const PT_BR: DayReviewCopy = {
@@ -99,6 +128,16 @@ const PT_BR: DayReviewCopy = {
   generatedHeading: "Revisão gerada",
   generatedNone: "Nenhuma revisão gerada cobre este dia.",
   openReviews: "Ver todas as revisões",
+  synthesis: {
+    heading: "Como o dia ficou",
+    completed: (count) => (count === 1 ? "1 tarefa concluída" : `${count} tarefas concluídas`),
+    open: (count) => (count === 1 ? "1 continua em aberto" : `${count} continuam em aberto`),
+    captured: (count) => (count === 1 ? "1 registro capturado" : `${count} registros capturados`),
+    quiet: "Nada foi concluído, nada ficou em aberto e nada foi capturado neste dia.",
+    partial: (sections) => `Estes números estão incompletos: não foi possível ler ${sections}.`,
+    stateOpen: "em aberto",
+    stateDone: "concluída",
+  },
 };
 
 const EN: DayReviewCopy = {
@@ -155,6 +194,16 @@ const EN: DayReviewCopy = {
   generatedHeading: "Generated review",
   generatedNone: "No generated review covers this day.",
   openReviews: "See every review",
+  synthesis: {
+    heading: "How the day turned out",
+    completed: (count) => (count === 1 ? "1 task completed" : `${count} tasks completed`),
+    open: (count) => (count === 1 ? "1 still open" : `${count} still open`),
+    captured: (count) => (count === 1 ? "1 record captured" : `${count} records captured`),
+    quiet: "Nothing was completed, nothing was left open and nothing was captured on this day.",
+    partial: (sections) => `These numbers are incomplete: ${sections} could not be read.`,
+    stateOpen: "open",
+    stateDone: "completed",
+  },
 };
 
 export function getDayReviewCopy(locale: string): DayReviewCopy {

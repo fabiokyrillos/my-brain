@@ -580,6 +580,22 @@
 .reviews-lead { margin: var(--space-2) 0 0; color: var(--text-secondary); font: var(--type-lead); max-width: var(--width-reading); }
 .reviews-history { margin-top: var(--space-8); }
 .reviews-history > h2 { margin: 0 0 var(--space-4); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+.reviews-history-lead { margin: calc(var(--space-4) * -1) 0 var(--space-4); color: var(--text-secondary); font: var(--type-body); max-width: var(--width-reading); }
+
+/*
+ * The stored review's status, in colour as well as in words.
+ *
+ * `review-presentation.ts` has emitted `statusTone` — positive, neutral,
+ * warning — since Phase 2J, and `page.tsx` has rendered it as `data-tone` on
+ * the badge. **No rule ever selected it.** All three statuses painted on the
+ * same neutral wash, so "Pode estar desatualizada" and "Concluída" were one
+ * object with different text: a producer with no consumer, and the second one
+ * this session has found.
+ *
+ * `neutral` deliberately has no rule — the base wash is what neutral means.
+ */
+.status-badge[data-tone="positive"] { background: var(--tone-success-bg); color: var(--tone-success-fg); }
+.status-badge[data-tone="warning"] { background: var(--tone-attention-bg); color: var(--tone-attention-fg); }
 
 /*
  * The planner's orientation band — capacity and conflicts, side by side.
@@ -630,3 +646,62 @@
 
 /* The two lists' own headings, matched to the band above them. */
 .planner-list > h2 { margin: 0 0 var(--space-3); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+
+/*
+ * The closing's synthesis — `/app/reviews`, above the five sections.
+ *
+ * The surface listed the day's parts and left the reader to count four of them
+ * to answer "how did the day go". This states it first; everything below is the
+ * working out. The counts are set in the reading face because they are the
+ * sentence, and the labels around them are not.
+ */
+.day-review-synthesis { border-block-end: 1px solid var(--border-default); padding-block-end: var(--space-4); }
+.day-review-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.day-review-counts li { font: var(--type-reading); color: var(--text-primary); }
+
+/* A count over a source that failed is not a small count — it is an unknown
+   one, so the sentence that says so carries a rule and full ink rather than
+   sitting in the muted register the disclaimers use. */
+.day-review-partial {
+  margin: var(--space-3) 0 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+
+/*
+ * A row's own state, in "intenções" and "prazos" only — those are the two
+ * sections where a row may be either, and the word is the difference between a
+ * list of what the day held and a list of what it left.
+ *
+ * There is no separate pendências list, deliberately: every open item is
+ * already a row here with the verbs its status admits, and a second list would
+ * be `2J-HOJE-004`'s repetition with the second copy carrying less.
+ */
+.day-review-state {
+  flex: none;
+  align-self: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-mono);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.day-review-item[data-open="true"] .day-review-state {
+  background: var(--tone-attention-bg);
+  color: var(--tone-attention-fg);
+}
+.day-review-item[data-open="false"] .day-review-state {
+  background: var(--tone-success-bg);
+  color: var(--tone-success-fg);
+}

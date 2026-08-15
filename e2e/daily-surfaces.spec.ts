@@ -68,6 +68,11 @@ const COPY = {
     reviewsPageLead: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
     reviewsHistory: "Revisões geradas",
     reviewsHistoryEmpty: "Nenhuma revisão ainda.",
+    synthesisHeading: "Como o dia ficou",
+    synthesisCompleted: "2 tarefas concluídas",
+    synthesisOpen: "1 continua em aberto",
+    synthesisCaptured: "3 registros capturados",
+    synthesisPartial: "Estes números estão incompletos: não foi possível ler Concluído.",
     nothingScheduled: "Nada é executado por horário configurado; esta revisão só existe quando você a abre.",
     unreadableHeading: "O que não pôde ser lido",
     completed: "Concluído",
@@ -92,6 +97,11 @@ const COPY = {
     reviewsPageLead: "Generate a review when you choose; nothing runs from a configured schedule.",
     reviewsHistory: "Generated reviews",
     reviewsHistoryEmpty: "No reviews yet.",
+    synthesisHeading: "How the day turned out",
+    synthesisCompleted: "2 tasks completed",
+    synthesisOpen: "1 still open",
+    synthesisCaptured: "3 records captured",
+    synthesisPartial: "These numbers are incomplete: Completed could not be read.",
     nothingScheduled: "Nothing runs from a configured schedule; this review exists only when you open it.",
     unreadableHeading: "What could not be read",
     completed: "Completed",
@@ -153,10 +163,13 @@ function plannerRow(options: { locale: Locale; masked?: boolean; selectable?: bo
 }
 
 /** One day-review row, mirroring `src/features/day-review/day-review-view.tsx`. */
-function reviewRow(options: { locale: Locale; masked?: boolean }): string {
+function reviewRow(options: { locale: Locale; masked?: boolean; open?: boolean }): string {
   const body = options.masked
     ? '<span class="protected-content"><button type="button" class="row-action">Mostrar</button></span>'
     : '<a href="/pt-BR/app/work/t1">Entregar o relatório</a>';
+  const state = options.open === undefined
+    ? ""
+    : `<span class="day-review-state">${options.open ? "em aberto" : "concluída"}</span>`;
   const verb = (kind: string, action: string, controlKind: "date" | "choice" | "immediate", value?: string) =>
     `<div class="day-review-verb" data-verb="${kind}">
       <p class="quiet-state">${kind}</p>
@@ -164,8 +177,8 @@ function reviewRow(options: { locale: Locale; masked?: boolean }): string {
         <ul class="task-control-list">${controlMarkup({ action, label: "Aplicar", kind: controlKind, value })}</ul>
       </div>
     </div>`;
-  return `<li class="day-review-item">
-    <div class="day-review-item-head">${body}</div>
+  return `<li class="day-review-item"${options.open === undefined ? "" : ` data-open="${options.open}"`}>
+    <div class="day-review-item-head">${state}${body}</div>
     <div class="day-review-verbs">
       ${verb("carry_forward", "set_planned", "date", "2026-08-12")}
       ${verb("plan", "set_planned", "date")}
@@ -242,6 +255,11 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
       </nav>
     </header>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
+    <section aria-label="${copy.synthesisHeading}" class="day-review-synthesis">
+      <h3>${copy.synthesisHeading}</h3>
+      <ul class="day-review-counts"><li>${copy.synthesisCompleted}</li><li>${copy.synthesisOpen}</li><li>${copy.synthesisCaptured}</li></ul>
+      ${options.unreadable ? `<p class="day-review-partial" role="status">${copy.synthesisPartial}</p>` : ""}
+    </section>
     <section aria-label="Seu horário de revisão" class="day-review-schedule">
       <h3>Seu horário de revisão</h3>
       <p>Já passou das 22:00, o horário que você escolheu para revisar o dia.</p>
@@ -742,6 +760,80 @@ test.describe("the planner orients before it lists", () => {
     head = await page.locator(".planner-item-head").boundingBox();
     meta = await page.locator(".planner-item-meta").boundingBox();
     expect(head!.y).toBeLessThan(meta!.y);
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+});
+
+/**
+ * Revisões, recomposed — the closing's synthesis, and the page around it.
+ */
+test.describe("the review states the day before it shows its parts", () => {
+  test("the counts come first, above every section", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR" })]));
+
+    const [synthesis, firstSection] = await Promise.all([
+      page.locator(".day-review-synthesis").boundingBox(),
+      page.locator(".day-review-schedule").boundingBox(),
+    ]);
+    expect(synthesis!.y).toBeLessThan(firstSection!.y);
+    await expect(page.locator(".day-review-counts li")).toHaveCount(3);
+  });
+
+  /*
+    The load-bearing one. A count over a source that failed is not a small
+    count, it is an unknown one — a review that reads "0 concluídas" for a query
+    that never returned is the lie `2M-REVIEW-001` is written against.
+  */
+  test("says the numbers are incomplete when a source could not be read", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR" })], { unreadable: true }));
+
+    const partial = page.locator(".day-review-partial");
+    await expect(partial).toHaveText(COPY["pt-BR"].synthesisPartial);
+    await expect(partial).toHaveAttribute("role", "status");
+  });
+
+  test("does not say it when every source was read", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR" })]));
+
+    await expect(page.locator(".day-review-partial")).toHaveCount(0);
+  });
+
+  /*
+    `2J-HOJE-004`'s rule, held to on this surface: the pendências are counted
+    above and marked on the rows that already hold them, never listed a second
+    time with fewer controls than the first copy.
+  */
+  test("marks an open row in place, in words as well as in colour", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, reviewPage("pt-BR", [
+      reviewRow({ locale: "pt-BR", open: true }),
+      reviewRow({ locale: "pt-BR", open: false }),
+    ]));
+
+    const open_ = page.locator('.day-review-item[data-open="true"] .day-review-state');
+    const done = page.locator('.day-review-item[data-open="false"] .day-review-state');
+    await expect(open_).toHaveText("em aberto");
+    await expect(done).toHaveText("concluída");
+    const [openBg, doneBg] = await Promise.all([
+      open_.evaluate((node) => getComputedStyle(node).backgroundColor),
+      done.evaluate((node) => getComputedStyle(node).backgroundColor),
+    ]);
+    expect(openBg).not.toBe(doneBg);
+    // Both rows still carry every verb the taxonomy admits — the marker is a
+    // label, never a capability gate.
+    await expect(page.locator('.day-review-item[data-open="true"] .day-review-verb')).toHaveCount(5);
+  });
+
+  test("reflows at 320 CSS px with the counts intact", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR", open: true })]));
+
+    await expect(page.locator(".day-review-counts li")).toHaveCount(3);
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
