@@ -30,12 +30,15 @@ describe("2I-LIB-001: Library renders the grouping that already exists", () => {
     expect(CONTRACTS).toContain('capability.group === "context"');
   });
 
-  it("holds exactly the seven context domains", () => {
-    // Six until 2N.6 added `relations`. The list is derived from the shell, so
-    // this is the transcription that makes an accidental addition visible — and
-    // the test below asserts the two stay in step in both directions.
+  it("holds exactly the eight context domains", () => {
+    // Six until 2N.6 added `relations`; eight since the Papel e Console
+    // recomposition made Brain a primary destination and moved Conversar inside
+    // it as the Conversas lens (`02-arquitetura-e-rotas.md`). The list is
+    // derived from the shell, so this is the transcription that makes an
+    // accidental addition visible — and the test below asserts the two stay in
+    // step in both directions.
     expect([...LIBRARY_MEMBERS].sort()).toEqual(
-      ["contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
+      ["chat", "contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
     );
   });
 
@@ -131,7 +134,24 @@ describe("2I-LIB: copy in both locales, no ternary", () => {
         expect(text.descriptions[key], `${locale} has no description for ${key}`).toBeTruthy();
       }
     }
-    expect(getLibraryCopy("pt-BR").title).not.toBe(getLibraryCopy("en").title);
+    /*
+      The proof that this copy is really translated, moved off the title.
+
+      It used to assert the two titles differ — a cheap proxy for "somebody
+      localized this". The title is now **Brain**, the destination's own name,
+      and a proper noun is identical in both locales by design: "My Brain" is not
+      translated in the brand either. Keeping the old assertion would have forced
+      a worse name to satisfy a test.
+
+      The descriptions are the honest subject: every one of them is a sentence,
+      every one is translated, and one shared string among them would be the
+      untranslated copy this guard exists to catch.
+    */
+    const pt = getLibraryCopy("pt-BR").descriptions;
+    const en = getLibraryCopy("en").descriptions;
+    for (const key of LIBRARY_MEMBERS) {
+      expect(pt[key], `${key} carries the same sentence in both locales`).not.toBe(en[key]);
+    }
   });
 
   it("adds no inline locale ternary", () => {

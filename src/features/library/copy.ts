@@ -15,7 +15,14 @@ export type LibraryCopy = {
 
 const copy: Record<Locale, LibraryCopy> = {
   "pt-BR": {
-    title: "Biblioteca",
+    /*
+      "Brain", matching the destination's label in the rail.
+      The page said "Biblioteca" while the navigation that reached it said
+      "Brain" — one destination with two names, which is the naming collision
+      `2I-SHELL-002` removed between "Início" and "Hoje". The route is still
+      `library`; only the name changed.
+    */
+    title: "Brain",
     intro: "Tudo que o Brain sabe sobre o seu mundo, em um lugar só.",
     searchLink: "Buscar em tudo",
     empty: "Nada aqui ainda.",
@@ -32,10 +39,13 @@ const copy: Record<Locale, LibraryCopy> = {
       // canonical presentation there is a list, and the sentence should not
       // promise a picture to a reader who may never see one.
       relations: "Como essas coisas se ligam.",
+      // The Conversas lens. Named for what it gives you access to, not for the
+      // mechanism: a conversation is how you ask the Brain about everything above.
+      chat: "Perguntar sobre tudo isto.",
     },
   },
   en: {
-    title: "Library",
+    title: "Brain",
     intro: "Everything the Brain knows about your world, in one place.",
     searchLink: "Search everything",
     empty: "Nothing here yet.",
@@ -49,6 +59,7 @@ const copy: Record<Locale, LibraryCopy> = {
       contexts: "Areas of your life.",
       files: "Documents and attachments.",
       relations: "How these things connect.",
+      chat: "Ask about all of this.",
     },
   },
 };

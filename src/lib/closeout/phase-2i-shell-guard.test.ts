@@ -37,10 +37,22 @@ const LINKS = readFileSync(join(REPO, "src/features/shell/navigation-links.tsx")
 const GLOBALS = readFileSync(join(REPO, "src/app/globals.css"), "utf8");
 
 describe("2I-SHELL-001: the primary destinations are the delivered baseline", () => {
-  it("exposes exactly home, inbox, work and chat as primary", () => {
-    // BASELINE, not built. This asserts what product-UX slice H delivered and
-    // forbids a later slice from quietly changing it.
-    expect([...primaryNavigationKeys].sort()).toEqual(["chat", "home", "inbox", "work"]);
+  it("exposes exactly home, inbox, work and library as primary", () => {
+    /*
+     * BASELINE, not built. This asserts what the shell delivers and forbids a
+     * later slice from quietly changing it.
+     *
+     * It changed once, and not quietly: the Papel e Console handoff names the
+     * four destinations by hand — Hoje · Registros · Trabalho · Brain — and the
+     * redesign's authorization covers information architecture, which is the
+     * decision this guard was holding for an owner to make. `library` is the
+     * route; "Brain" is what it is called. `chat` keeps its route and moves into
+     * the `context` group as Brain's Conversas lens.
+     *
+     * The guard's job is unchanged: the next change to this list has to be as
+     * deliberate as this one.
+     */
+    expect([...primaryNavigationKeys].sort()).toEqual(["home", "inbox", "library", "work"]);
   });
 
   it("keeps capture as a global action rather than a primary destination", () => {
@@ -119,10 +131,12 @@ describe("2I-SHELL-003: Mais renders the grouping that already exists as data", 
     }
   });
 
-  it("groups the seven context domains together, which is what Library will render", () => {
+  it("groups the eight context domains together, which is what Brain renders", () => {
     /*
      * Six until Phase 2N slice 2N.6 added `relations` — the surface that shows
      * how the other six connect, so the `context` group is where it belongs.
+     * Eight since the redesign moved `chat` here: Conversar is the lens through
+     * which the owner asks about everything the other seven hold.
      *
      * The number is transcribed rather than derived on purpose, and raising it
      * is a claim rather than a literal bumped to go green: `2I-SHELL-001` pins
@@ -132,7 +146,7 @@ describe("2I-SHELL-003: Mais renders the grouping that already exists as data", 
      */
     const context = moreNavigationGroups.find((group) => group.key === "context");
     expect([...(context?.items ?? [])].sort()).toEqual(
-      ["contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
+      ["chat", "contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
     );
   });
 });

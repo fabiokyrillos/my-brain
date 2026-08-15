@@ -99,7 +99,36 @@ export const navigationCapabilities = [
   // slice exists to remove. `tasks` and `waiting` are unaffected -- both are
   // genuinely Work views and neither is the name of another destination.
   { key: "work", route: "work", group: "primary", visibility: "primary", nested: true, aliases: ["tasks", "waiting"] },
-  { key: "chat", route: "chat", group: "primary", visibility: "primary", nested: true, aliases: [] },
+  /*
+   * Brain — the fourth primary destination (`02-arquitetura-e-rotas.md`).
+   *
+   * `2I-SHELL-001` pinned the four primary destinations as a delivered baseline
+   * *and said why*: to stop a later slice changing them quietly. This is the
+   * opposite of quietly. The approved handoff names the four by hand — Hoje ·
+   * Registros · Trabalho · Brain — and the redesign's authorization covers
+   * information architecture, which is exactly the decision that comment was
+   * holding for an owner to make.
+   *
+   * The route stays `library`. Renaming the URL would break every existing link
+   * for a change that is entirely about what the destination is *called* and
+   * where it sits — the same move `home`/"Hoje" and `inbox`/"Registros" already
+   * made, and the compatibility rule says no URL dies at this step.
+   *
+   * `nested: false`: `/app/library` has no sub-route. The lenses it opens are
+   * separate destinations with their own keys below, so each keeps its own
+   * active state rather than borrowing this one.
+   */
+  { key: "library", route: "library", group: "primary", visibility: "primary", nested: false, aliases: [] },
+  /*
+   * Conversar leaves the primary rail.
+   *
+   * Not a demotion of the feature — the route, the grounding, the citations and
+   * every action are untouched. The architecture places it *inside* Brain as the
+   * Conversas lens, and the rail holds four destinations, so it moves to the
+   * `context` group beside the other lenses Brain opens. It is still one click
+   * from the rail, and `mobileBarSlots` still carries it.
+   */
+  { key: "chat", route: "chat", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "projects", route: "projects", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "people", route: "people", group: "context", visibility: "more", nested: true, aliases: [] },
   // EGC.1. Both tables predate every route in this list; what they never had was
@@ -196,15 +225,32 @@ export const primaryNavigationKeys = navigationCapabilities
  * `capture` at the midpoint — so a future edit that adds a sixth destination to
  * balance geometry fails instead of quietly decentring the button.
  *
- * Why these four destinations, and why `inbox` is not among them (owner decision,
- * 2026-07-30): Início is the attention and orientation surface, Trabalho is the
- * primary execution surface, Capturar is the central global action, Brain is the
- * primary assistant surface, and Mais is the overflow and account surface.
- * Registros is a complete archive and consultation surface rather than an
- * operational queue, so on a five-slot bar it belongs in overflow. Desktop is
- * unchanged: it still carries all four primary destinations.
+ * **Registros returns to the bar**, reversing the 2026-07-30 owner decision that
+ * put it in overflow. That decision reasoned Registros was "a complete archive
+ * and consultation surface rather than an operational queue" — which was true of
+ * the surface as it then was, and is not true of the surface the redesign
+ * delivers. `02-arquitetura-e-rotas.md` states the requirement directly:
+ * *Registros volta para a barra — é a fila de decisão, e não pode viver em
+ * overflow.* Its default view is now the decision queue, so the premise of the
+ * old decision is gone with it.
+ *
+ * ## The one place this bar departs from the handoff
+ *
+ * The handoff's bar is `Hoje · Registros · [Capturar] · Trabalho · Brain`, and
+ * it adds that *"Mais" deixa de existir*. The first four slots are exactly that.
+ * The fifth is **not** `library`, and the reason is a rule that outranks the
+ * layout: `more` is the only route to fourteen destinations on a phone —
+ * reviews, questions, calendar, reminders, files, memories, relations, people,
+ * projects, organizations, contexts, history, costs, settings. The handoff can
+ * retire it because its Brain absorbs those as lenses; this codebase keeps every
+ * one of them as its own route, so dropping the disclosure would strand them on
+ * mobile with no way back. Losing a destination is not a composition change.
+ *
+ * Brain is therefore one tap further away on a phone than on the desktop rail,
+ * which is a real and recorded shortfall against the handoff — not a decision
+ * that Brain matters less. It closes when Brain genuinely absorbs the lenses.
  */
-export const mobileBarSlots = ["home", "work", "capture", "chat", "more"] as const;
+export const mobileBarSlots = ["home", "inbox", "capture", "work", "more"] as const;
 
 export type MobileBarSlot = (typeof mobileBarSlots)[number];
 

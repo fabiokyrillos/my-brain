@@ -29,6 +29,14 @@ const messages = {
        */
       inbox: "Registros",
       work: "Trabalho",
+      /*
+       * `Brain`, not `Biblioteca`.
+       *
+       * The fourth primary destination, named the way the other three are: after
+       * what it holds rather than after its shelf. The route key stays
+       * `library`, so no URL changes.
+       */
+      library: "Brain",
       calendar: "Calendário",
       tasks: "Tarefas",
       waiting: "Aguardando",
@@ -100,6 +108,7 @@ const messages = {
       home: "Today",
       today: "Today",
       inbox: "Records",
+      library: "Brain",
       work: "Work",
       calendar: "Calendar",
       tasks: "Tasks",
