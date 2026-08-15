@@ -161,4 +161,16 @@ export type LibraryDomainSummary = {
    * would have made the two indistinguishable to the surface.
    */
   readonly recencySupported: boolean;
+  /**
+   * Whether the recent read **failed**, as opposed to returning nothing.
+   *
+   * The third state, and it was missing. The loader returned `[]` on error and
+   * the surface had two arms, so a denied or failed read printed *"Nada aqui
+   * ainda"* — a positive claim about the owner's own data, made out of a
+   * failure. The count half of this record already had all three states and
+   * `overview.ts`'s header already asserted the recency half did too; it was one
+   * field short of the thing it claimed, and an independent review of the branch
+   * found it.
+   */
+  readonly recentFailed: boolean;
 };

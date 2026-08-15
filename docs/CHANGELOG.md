@@ -76,17 +76,31 @@ Parts one, two and three each closed with the same limitation: *"dense-list comp
 
 `scripts/redesign-dense-fixture.mjs` seeds 233 rows into the linked project: 54 people, 23 projects, 48 tasks across atrasada · hoje · aguardando · cancelada · concluída, 41 memories across in-force · scheduled · archived · **conflicting** · private · highly sensitive, 12 companies, 11 contexts, 9 reminders. The long strings are **the schema's own ceilings** — 120 characters for a name, 240 for a task title — and `assertLengths` fails the seed if either drifts below 90% of its ceiling.
 
-Owner-scoped by shape: the owner id is resolved once and every insert takes `user_id` from that one variable. Identifiable by a marker prefix. Re-seedable, because it cleans first. **Removed, and proven so by a probe that could have failed**: verify → **233** → clean → verify → **0**, and `npm run verify:online-residue` reports zero.
+Owner-scoped by shape: the owner id is resolved once and every insert takes `user_id` from that one variable. Identifiable by a marker prefix. Re-seedable, because it cleans first. **Removed, and proven so by a probe that could have failed**: verify → **233** → clean → verify → **0**.
+
+**One residue it cannot remove, and must not try to.** Seeding a task fires `tasks_audit_changes` (`202607160014`), which writes a `task_created` row **unconditionally** — not only when a due date is set. Four seed attempts during this part left **192** such rows in the linked project. They carry no marker, because the trigger's payload is status, due date, priority and source and never the title, so nothing can identify them afterwards; and `audit_logs` is append-only, so nothing may delete them. They are the same rows a person creating 48 tasks would produce, and they will appear on `/app/history` as creations of tasks that no longer exist. **An earlier version of this entry, and of the script's own header, claimed the fixture "does not touch `audit_logs`".** It does not *write* to it; the trigger does, and that is not the same claim. An independent review of the branch found it, and `seed` now prints the cost before writing.
+
+`npm run verify:online-residue` also reports zero, and it is cited here **separately on purpose**: it enumerates auth accounts whose email ends in `@example.com` and never touches a table, so it corroborates that no disposable account was left behind and says nothing at all about rows. The earlier version of this entry put it in the same sentence as the row count, where it read as a second independent proof of removal.
 
 ### Verification
 
-**7537 unit tests, 311 offline Playwright across both projects, lint, typecheck, build, `git diff --check` clean.** Three unit test *files* fail to load on the Windows baseline (a shebang parse defect) and are green in CI; they contain zero failing tests.
+**7542 unit tests, 311 offline Playwright across both projects, lint, typecheck, build, `git diff --check` clean.** Three unit test *files* fail to load on the Windows baseline (a shebang parse defect) and are green in CI; they contain zero failing tests.
 
 Authenticated against the **production build** with the dense fixture loaded, on **both** Playwright projects: 20 fixed surfaces plus the three id-bearing workspaces, at 375 · 412 · 768 · 1024 · 1440 · 1920, in light and dark, in both locales, with no horizontal scroll anywhere, and axe clean in both themes with the theme asserted before each scan. 138 screenshots per project.
 
 **The workspace block passed on the wrong page on its first run**: the list has an `<h1>` too, so a click that navigated nowhere satisfied a visibility assertion instantly. The URL check beside it caught that; a `waitForURL` fixed it, and the check stays.
 
 **Both strips are proved with a router, not with a component.** `e2e/online-brain-lenses.spec.ts` adds ten authenticated assertions across both projects: every one of the nine lenses as a deep link that lands and marks itself, the same nine links on every surface rather than a per-page subset, back and forward and a **refresh** all keeping the marked tab (the strip is server-rendered from the route, so a tab marked only in client state is a lie the first reload exposes), the overview's panels opening the routes they name, the way up present on all three Dados e IA views, and each of those three landing on **its own URL** when followed from Ajustes — which is the assertion that would catch someone later building the redirect this part refused.
+
+### What the independent review of the whole branch found
+
+A full adversarial pass over `main..HEAD` returned **eleven findings. All eleven are fixed; none was a false positive.** The severe one is the audit residue above — a claim in two documents that the code did not support.
+
+**Two were state collapses this branch had already named as its own standard, and then committed.** A **failed recency read on the Brain overview rendered as *"Nada aqui ainda"*** — a positive claim about the owner's own data made out of a refusal — while the loader's header asserted three states and the record was one field short of them. And **`line-height` was missing from the `font:` shorthand guard's own list of longhands**, with one live instance shipping past it: `globals.css`'s `.empty-state p,.quiet-state` declared `line-height:1.65` before `font: var(--type-body)`, so the authored value was discarded on the empty-state paragraph of essentially every surface.
+
+**And the guard's control was exempt from the mechanism it controlled.** It re-implemented the two scans by hand rather than calling them, so removing an entry from the list left both real assertions reporting zero offenders and the control green over its own private copy — which is precisely how the omission survived. Both scans are named functions now and the control plants **every** member through them.
+
+The remaining seven: the Perguntas census correction above; three inline locale ternaries on the person page where the project page read shared copy, so the two surfaces the branch calls one template said different words through different mechanisms; a dead `.home-sections` rule the Hoje rewrite left behind; a component comment naming a guard file that does not exist; a `TRANSPARENCY_LENSES` comment claiming a derivation the code does not perform — the list is declared **on purpose**, because unlike a Brain lens a transparency view needs a tab word and a sentence no derivation can invent, and failing the build is the right behaviour; `verify:online-residue` cited where it read as a second independent proof of row removal; and a card-rule assertion that could not have caught the drift its own title named.
 
 ### What is NOT done, and is not claimed
 

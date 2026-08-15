@@ -200,9 +200,21 @@ describe("the workspace layout is a grid, and never `order`", () => {
     expect(narrow).toMatch(/\.entity-workspace-columns\s*\{\s*grid-template-columns:\s*1fr/);
   });
 
+  /**
+   * **One** rule, which is what the title promises and what the previous version
+   * of this test did not check.
+   *
+   * It asserted only that each selector appeared somewhere, so a second,
+   * divergent card rule for the same block — the exact drift the title names —
+   * would have passed. An independent review of the branch caught it.
+   *
+   * The check is now: every one of the seven blocks appears in the **same**
+   * declaration, and no block carries a second rule declaring `border-radius` or
+   * `padding` of its own.
+   */
   it("gives every workspace block one card rule, so two cannot drift apart", () => {
     const css = read(CSS);
-    for (const selector of [
+    const BLOCKS = [
       ".entity-workspace .entity-tasks",
       ".entity-workspace .relation-panel",
       ".entity-workspace .entity-memory",
@@ -210,8 +222,29 @@ describe("the workspace layout is a grid, and never `order`", () => {
       ".entity-workspace .entity-decisions",
       ".entity-workspace .entity-timeline",
       ".entity-workspace .entity-changes",
-    ]) {
-      expect(css, `${selector} has no card chrome`).toContain(selector);
+    ];
+
+    // The one rule: a selector list containing all seven, followed by a body
+    // that declares the chrome.
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    const cardRules = rules.filter(([, selectors, body]) =>
+      BLOCKS.every((block) => selectors.includes(block)) && /border-radius/.test(body));
+    expect(cardRules, "the seven blocks are no longer styled by one rule").toHaveLength(1);
+
+    /*
+     * …and no block has a second rule of its own giving it different chrome.
+     * `border-radius` is the probe: a divergent card would have to redeclare it,
+     * and a rule that only adjusted layout (`display`, `gap`) is legitimate and
+     * is not what this is looking for.
+     */
+    for (const block of BLOCKS) {
+      const divergent = rules.filter(
+        ([, selectors, body]) =>
+          selectors.includes(block)
+          && /border-radius/.test(body)
+          && !BLOCKS.every((other) => selectors.includes(other)),
+      );
+      expect(divergent, `${block} carries a second, divergent card rule`).toHaveLength(0);
     }
   });
 });

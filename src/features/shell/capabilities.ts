@@ -253,17 +253,28 @@ export const primaryNavigationKeys = navigationCapabilities
  * | --- | --- |
  * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview |
  * | calendar (and the planner) | Trabalho's mode tabs |
- * | reviews, questions | Hoje |
- * | reminders | the calendar's control band |
+ * | reviews | Hoje, unconditionally |
+ * | reminders | the calendar's control band, unconditionally |
  * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
  *
- * **One thing is left, and it is the account.** `AccountMenu` is mounted in
- * exactly two places: the desktop rail's foot, and the mobile overflow panel. On
- * a phone the top bar carries the palette, the locale switch and notifications —
- * no avatar, no profile chip. So retiring `more` today would take Ajustes with
- * it, and with Ajustes the whole of Dados e IA, and **sign-out**. That is not a
- * destination being one tap further away; it is the way out of the product
- * disappearing.
+ * **Two things are left, and the first of them is the account.** `AccountMenu`
+ * is mounted in exactly two places: the desktop rail's foot, and the mobile
+ * overflow panel. On a phone the top bar carries the palette, the locale switch
+ * and notifications — no avatar, no profile chip. So retiring `more` today would
+ * take Ajustes with it, and with Ajustes the whole of Dados e IA, and
+ * **sign-out**. That is not a destination being one tap further away; it is the
+ * way out of the product disappearing.
+ *
+ * **The second is `questions`, and this row is a correction.** An earlier
+ * version of this table claimed Hoje reached it. Hoje's only link to
+ * `/app/questions` sits inside `{view.openQuestion ? … : null}`, and the other
+ * in-product path — `conversational-questions.tsx` — returns `null` on an empty
+ * list. So an owner with no open question has no path to Perguntas but the
+ * disclosure, which is the same shape Lembretes had before this part fixed it.
+ * It is left as a **stated dependency rather than patched with a new link**: the
+ * handoff makes Perguntas a *view of Registros* rather than a destination Hoje
+ * advertises, and adding a permanent control to the cockpit to make this census
+ * true would be arranging the product around its own bookkeeping.
  *
  * `02-arquitetura-e-rotas.md` already specifies the fix — *Conta e ajustes ·
  * Avatar no cabeçalho* on mobile. It is not built here because moving the

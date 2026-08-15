@@ -108,7 +108,16 @@ export default async function LibraryPage({
                   </div>
                   <p className="brain-domain-note">{text.descriptions[domain.key]}</p>
                   {domain.recencySupported ? (
-                    domain.recent.length ? (
+                    /*
+                      Three arms, not two. A failed read used to reach the
+                      `nothingYet` branch and print a positive claim about the
+                      owner's own data — the shape this surface refuses for the
+                      count and, until an independent review found it, did not
+                      refuse for the rows.
+                    */
+                    domain.recentFailed ? (
+                      <p className="brain-domain-quiet" role="note">{text.recentUnavailable}</p>
+                    ) : domain.recent.length ? (
                       <>
                         <p className="brain-recent-label">{text.recentLabel}</p>
                         <ul className="brain-recent">

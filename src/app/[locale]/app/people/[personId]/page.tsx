@@ -480,7 +480,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         <section className="entity-workspace-column" aria-labelledby="workspace-open">
           <h2 id="workspace-open">{copy.openWork}</h2>
           <section className="entity-tasks">
-            <h3>{pt ? "Pendências e tarefas" : "Open work and tasks"}</h3>
+            <h3>{copy.linkedTasks}</h3>
             {/*
               `2N-PERSON-004`. Derived: this list is assembled at render from
               `task_people` and `tasks`, and the task itself is edited on Work, not
@@ -537,7 +537,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                   );
                 })}
               </div>
-            ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
+            ) : <p className="quiet-state">{copy.linkedTasksEmpty}</p>}
             <BoundedNotice list={boundedTasks} locale={locale} />
           </section>
           <AssociationPanel
@@ -599,7 +599,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         />
       {boundedMemories.items.length > 0 && (
         <section className="entity-memory">
-          <h3>{pt ? "Memórias" : "Memories"}</h3>
+          <h3>{copy.personMemories}</h3>
           <SectionOriginNote locale={locale} origin="derived" />
           {boundedMemories.items.map((memory, index) => {
             const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);

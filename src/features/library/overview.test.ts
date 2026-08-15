@@ -103,7 +103,16 @@ describe("a refusal is a missing answer, never a wrong one", () => {
     expect(domain(summaries, "people").countSupported).toBe(true);
   });
 
-  it("renders a failed recent read as an empty list rather than throwing", async () => {
+  /**
+   * The third state, and the reason this test changed.
+   *
+   * It used to assert only that a failed read produced an empty list — which
+   * locked in the very collapse this module's header claims not to make: the
+   * surface then had two arms and printed *"Nada aqui ainda"*, a positive claim
+   * about the owner's own data, out of a refusal. An independent review of the
+   * branch found it. `recentFailed` is what keeps the three apart.
+   */
+  it("marks a failed recent read as failed rather than as empty", async () => {
     const { supabase } = client({
       memories: { recent: { data: null, error: { message: "denied" } } },
     });
@@ -111,6 +120,27 @@ describe("a refusal is a missing answer, never a wrong one", () => {
 
     expect(domain(summaries, "memories").recent).toEqual([]);
     expect(domain(summaries, "memories").recencySupported).toBe(true);
+    expect(domain(summaries, "memories").recentFailed).toBe(true);
+  });
+
+  it("does not mark an empty-but-successful read as failed", async () => {
+    // The other side of the same distinction: without this, `recentFailed` could
+    // be hardcoded `true` and the test above would still pass.
+    const { supabase } = client({ memories: { recent: { data: [], error: null } } });
+    const summaries = await loadBrainOverview(supabase, "pt-BR");
+
+    expect(domain(summaries, "memories").recent).toEqual([]);
+    expect(domain(summaries, "memories").recentFailed).toBe(false);
+  });
+
+  it("does not mark a domain with no recency source as failed", async () => {
+    // Contextos never reads recents, so it has not failed to. Three states, and
+    // a domain that skipped the read must not land in the failure arm.
+    const { supabase } = client({});
+    const summaries = await loadBrainOverview(supabase, "pt-BR");
+
+    expect(domain(summaries, "contexts").recencySupported).toBe(false);
+    expect(domain(summaries, "contexts").recentFailed).toBe(false);
   });
 
   it("keeps 'no recency here' apart from 'nothing recent'", async () => {

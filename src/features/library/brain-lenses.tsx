@@ -22,9 +22,10 @@ import { BRAIN_LENSES, type BrainLensKey } from "./lenses";
  * Reading `usePathname()` would make this a client component on nine
  * server-rendered surfaces to answer a question each of them already knows the
  * answer to. The risk it trades for — a page passing the wrong key — is closed
- * by `brain-lens-mount-guard.test.ts`, which re-derives the expected key from
- * each route file's own directory and fails on a mismatch. A guard that reads
- * the filesystem cannot drift the way a mount site can.
+ * by the *"passes each surface its own lens key"* case in
+ * `src/lib/closeout/phase-2i-library-guard.test.ts`, which re-derives the
+ * expected key from each route file's own directory and fails on a mismatch. A
+ * guard that reads the filesystem cannot drift the way a mount site can.
  */
 export function BrainLensTabs({ active, locale }: { active: BrainLensKey; locale: Locale }) {
   const copy = getLibraryCopy(locale);

@@ -41,15 +41,43 @@
  * `verify` count that disagree is exactly the shape of a fixture leaking, and a
  * reader should be able to tell this apart from that in one place.
  *
- * ## What it deliberately does not touch
+ * ## The residue `clean` CANNOT remove, and must not try to
  *
- * `entries`, `entry_interpretations`, `jobs`, `audit_logs`, `ai_usage_events`
- * and `product_events` — the append-only and worker-owned tables. Seeding an
- * entry would enqueue interpretation work against the owner's real credential,
- * and seeding an append-only ledger directly is what the documented RPCs exist
- * to prevent. The surfaces that read them are validated with whatever the
- * account already holds, and that limitation is recorded rather than worked
- * around.
+ * **Seeding a task writes an `audit_logs` row, and that row is permanent.**
+ * `202607160014_task_change_audit.sql` puts an `after insert or update` trigger
+ * on `public.tasks` which writes `task_created` unconditionally — not only when
+ * `due_at` is set, and not only for user-facing creations. So a seed of 48 tasks
+ * leaves **48 audit rows**, and `seed` cleaning first means every re-seed leaves
+ * 48 more.
+ *
+ * Three things about them, each worth stating rather than discovering:
+ *
+ * 1. **They cannot be identified.** The trigger's payload is
+ *    `status`, `due_at`, `priority`, `source_entry_id` — **not the title** — so
+ *    the marker this script relies on is not in them. No predicate can find them
+ *    afterwards.
+ * 2. **They must not be deleted.** `audit_logs` is append-only by this
+ *    repository's own rule and `202607170016` revokes `delete` from
+ *    `authenticated`. A cleanup that removed them would be a worse defect than
+ *    the residue.
+ * 3. **They are indistinguishable from real usage**, because they *are* the same
+ *    rows a person creating 48 tasks would produce. They will appear on
+ *    `/app/history` as task creations whose tasks no longer exist.
+ *
+ * This is the honest cost of the fixture. `seed` prints it before writing, so
+ * nobody incurs it without being told. **An earlier version of this header
+ * claimed the script "deliberately does not touch `audit_logs`". That was false**
+ * — it does not *write* to it, and the trigger does, which is not the same
+ * claim. Four seed attempts during this part's work left **192** such rows.
+ *
+ * ## What it genuinely does not touch
+ *
+ * `entries`, `entry_interpretations`, `jobs`, `ai_usage_events` and
+ * `product_events`. Seeding an entry would enqueue interpretation work against
+ * the owner's real credential, and writing an append-only ledger directly is
+ * what the documented RPCs exist to prevent. The surfaces that read them are
+ * validated with whatever the account already holds, and that limitation is
+ * recorded rather than worked around.
  *
  * ## Usage
  *
@@ -349,6 +377,19 @@ function rows(userId) {
 
 async function seed() {
   assertLengths();
+  /*
+   * The price, before the purchase.
+   *
+   * A cost stated only in a header is a cost the operator does not see. This is
+   * the number of permanent, unidentifiable `audit_logs` rows this run will
+   * leave — see the header on why they cannot be cleaned and must not be.
+   */
+  const taskCount = rows("00000000-0000-0000-0000-000000000000").tasks.length;
+  console.log(
+    `NOTE: seeding ${taskCount} tasks writes ${taskCount} permanent audit_logs rows`
+    + " (tasks_audit_changes). They carry no marker, cannot be identified afterwards,"
+    + " and must not be deleted — audit_logs is append-only.",
+  );
   /*
    * Cleans first, always.
    *

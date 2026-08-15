@@ -141,7 +141,8 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
  * gets ~1052px instead of 359-593px, and a section with nothing to say collapses
  * to its heading and one line instead of holding a place.
  */
-.home-sections{display:grid;gap:16px;margin-top:44px}
+/* `.home-sections` was deleted with the Hoje rewrite: `home-view.tsx` no longer
+   renders it, and a rule matching nothing still reads as a layout somebody uses. */
 .home-section{border:1px solid var(--border-default);background:var(--background-surface);border-radius: var(--radius-lg);padding:22px 24px}
 .home-section>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .home-section h2{margin:0;font-size:17px;letter-spacing:-.02em}

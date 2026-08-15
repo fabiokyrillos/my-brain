@@ -63,7 +63,7 @@ async function summariseDomain(
 
   const [count, recent] = await Promise.all([
     countTable ? countRows(supabase, countTable) : Promise.resolve(null),
-    recency ? recentRows(supabase, recency) : Promise.resolve([]),
+    recency ? recentRows(supabase, recency) : Promise.resolve(OK_EMPTY),
   ]);
 
   return {
@@ -71,11 +71,15 @@ async function summariseDomain(
     href,
     count,
     countSupported: Boolean(countTable),
-    recent,
+    recent: recent.rows,
     recencySupported: Boolean(recency),
+    recentFailed: recent.failed,
     recentSurface: recency?.surface ?? null,
   };
 }
+
+/** A domain with no recency source has not failed to read one. */
+const OK_EMPTY = { rows: [] as readonly LibraryRecentRow[], failed: false } as const;
 
 async function countRows(supabase: SupabaseClient, table: string): Promise<number | null> {
   // `head: true` — the count is the whole answer, so no row leaves the database.
@@ -87,10 +91,19 @@ async function countRows(supabase: SupabaseClient, table: string): Promise<numbe
   return error ? null : (count ?? 0);
 }
 
+/**
+ * The recent rows, **and whether the read failed**.
+ *
+ * Returning a bare array made a refusal indistinguishable from an empty domain,
+ * and the surface then printed *"Nada aqui ainda"* about data it had not been
+ * allowed to see. The distinction is carried out of this function rather than
+ * reconstructed from an empty array, because an empty array is exactly what both
+ * cases produce.
+ */
 async function recentRows(
   supabase: SupabaseClient,
   recency: LibraryRecencySpec,
-): Promise<readonly LibraryRecentRow[]> {
+): Promise<{ readonly rows: readonly LibraryRecentRow[]; readonly failed: boolean }> {
   const surface = recency.surface;
   /*
    * `sensitivity` is selected **only** where the label is governed content, and
@@ -109,16 +122,19 @@ async function recentRows(
     .order(recency.column, { ascending: false })
     .limit(OVERVIEW_RECENT_LIMIT);
 
-  if (error || !data) return [];
+  if (error || !data) return { rows: [], failed: true };
 
   const rows = data as unknown as readonly { id: string; sensitivity?: string }[];
   // Built from rows that came back, never from ids that were asked for — the
   // same collapse the contextual pages make, so absence has exactly one meaning.
   const levels = surface ? readableLevelsOf(rows) : null;
 
-  return rows.map((row) => ({
-    id: row.id,
-    label: String((row as unknown as Record<string, unknown>)[recency.label] ?? ""),
-    sensitivity: levels ? deriveSubjectSensitivity(row.id, levels) : null,
-  }));
+  return {
+    failed: false,
+    rows: rows.map((row) => ({
+      id: row.id,
+      label: String((row as unknown as Record<string, unknown>)[recency.label] ?? ""),
+      sensitivity: levels ? deriveSubjectSensitivity(row.id, levels) : null,
+    })),
+  };
 }

@@ -120,12 +120,31 @@ describe("consolidating does not promote anything into primary navigation", () =
   });
 
   it("covers every menu-visible transparency destination, and adds the advanced one", () => {
-    // Derived in one direction and declared in the other, so a fourth
-    // transparency surface cannot be added without appearing here.
+    /*
+     * Derived in one direction and declared in the other. **This failing is the
+     * intended behaviour** when the registry gains a transparency destination:
+     * unlike a Brain lens, a view here needs a tab word and a sentence in
+     * `TransparencyCopy` that no derivation can supply, so it must stop the
+     * build rather than render a tab labelled `undefined`. See
+     * `contracts.ts`'s `TRANSPARENCY_LENSES`.
+     */
     expect([...TRANSPARENCY_LENSES].sort()).toEqual(
       [...TRANSPARENCY_MENU_MEMBERS, TRANSPARENCY_ADVANCED_MEMBER].sort(),
     );
     expect(TRANSPARENCY_MENU_MEMBERS.length).toBeGreaterThan(0);
+  });
+
+  it("has a word and a sentence for every lens, which is why a fourth cannot be derived", () => {
+    // The reason the list is declared rather than composed, asserted rather than
+    // only explained: every rendered lens must have both strings in both
+    // locales, and nothing can produce them from a registry key.
+    for (const locale of ["pt-BR", "en"] as const) {
+      const copy = getTransparencyCopy(locale);
+      for (const lens of TRANSPARENCY_LENSES) {
+        expect(copy.lenses[lens], `${locale} has no tab word for ${lens}`).toBeTruthy();
+        expect(copy.descriptions[lens], `${locale} has no sentence for ${lens}`).toBeTruthy();
+      }
+    }
   });
 });
 

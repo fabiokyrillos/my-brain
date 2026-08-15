@@ -390,7 +390,40 @@ describe("the font shorthand does not silently discard what precedes it", () => 
    * Both are invisible in review because the declaration that breaks is the one
    * that did NOT change.
    */
-  const LONGHANDS = ["font-family", "font-weight", "font-style", "font-size"];
+  /*
+   * **`line-height` was missing, and one live instance was shipping past it.**
+   *
+   * The paragraph above this list names five properties the shorthand resets and
+   * the list held four. `globals.css`'s `.empty-state p,.quiet-state` declared
+   * `line-height:1.65` before `font: var(--type-body)`, and `--type-body` carries
+   * its own `/1.6` — so the authored value was discarded on the empty-state
+   * paragraph of essentially every surface, and this guard walked past it.
+   *
+   * An independent review of the branch found both the omission and the
+   * instance. The control below now plants `line-height` specifically.
+   */
+  const LONGHANDS = ["font-family", "font-weight", "font-style", "font-size", "line-height"];
+
+  /**
+   * The two scans, as functions the control can call.
+   *
+   * They were inline in the assertions, and the control re-implemented their
+   * regexes by hand — so a change to either scan left both assertions reporting
+   * zero offenders while the control stayed green over its own private copy.
+   * That is how the `line-height` omission survived: **a control exempt from the
+   * mechanism it controls is not a control.**
+   */
+  const declaresFontTwice = (body: string) =>
+    (body.match(/(?:^|[;{\s])font:\s/g) ?? []).length > 1;
+
+  const longhandBeforeShorthand = (body: string) => {
+    const shorthand = body.search(/(?:^|[;{\s])font:\s/);
+    if (shorthand === -1) return false;
+    return LONGHANDS.some((longhand) => {
+      const at = body.search(new RegExp(`(?:^|[;{\\s])${longhand}\\s*:`));
+      return at > -1 && at < shorthand;
+    });
+  };
 
   const blocks = readdirSync(APP_CSS)
     .filter((name) => name.endsWith(".css"))
@@ -405,7 +438,7 @@ describe("the font shorthand does not silently discard what precedes it", () => 
 
   it("declares font: at most once per block", () => {
     const offenders = blocks
-      .filter((block) => (block.body.match(/(?:^|[;{\s])font:\s/g) ?? []).length > 1)
+      .filter((block) => declaresFontTwice(block.body))
       .map((block) => `${block.file}: ${block.body.trim().replace(/\s+/g, " ").slice(0, 80)}`);
     expect(
       offenders,
@@ -415,14 +448,7 @@ describe("the font shorthand does not silently discard what precedes it", () => 
 
   it("puts no font longhand before the shorthand that would reset it", () => {
     const offenders = blocks
-      .filter((block) => {
-        const shorthand = block.body.search(/(?:^|[;{\s])font:\s/);
-        if (shorthand === -1) return false;
-        return LONGHANDS.some((longhand) => {
-          const at = block.body.search(new RegExp(`(?:^|[;{\\s])${longhand}\\s*:`));
-          return at > -1 && at < shorthand;
-        });
-      })
+      .filter((block) => longhandBeforeShorthand(block.body))
       .map((block) => `${block.file}: ${block.body.trim().replace(/\s+/g, " ").slice(0, 80)}`);
     expect(
       offenders,
@@ -430,13 +456,27 @@ describe("the font shorthand does not silently discard what precedes it", () => 
     ).toEqual([]);
   });
 
-  it("detects both shapes when planted, so neither scan is blind", () => {
-    const twice = ".a{font: var(--type-mono); font: var(--type-body)}";
-    expect((twice.match(/(?:^|[;{\s])font:\s/g) ?? []).length).toBe(2);
-    const before = ".a{font-weight: 700; font: var(--type-body)}";
-    expect(before.search(/(?:^|[;{\s])font-weight\s*:/)).toBeLessThan(
-      before.search(/(?:^|[;{\s])font:\s/),
-    );
+  /*
+   * The control, **through the scans themselves**.
+   *
+   * Every planted string is fed to the same function the assertions above call,
+   * so removing an entry from `LONGHANDS` or breaking a regex fails here rather
+   * than leaving two silent assertions and a green control.
+   */
+  it("detects every shape when planted, through the scans the assertions use", () => {
+    expect(declaresFontTwice(".a{font: var(--type-mono); font: var(--type-body)}")).toBe(true);
+    expect(declaresFontTwice(".a{font: var(--type-body)}")).toBe(false);
+
+    for (const longhand of LONGHANDS) {
+      expect(
+        longhandBeforeShorthand(`.a{${longhand}: 700; font: var(--type-body)}`),
+        `the scan does not see ${longhand} before the shorthand`,
+      ).toBe(true);
+    }
+    // …and the same longhand AFTER the shorthand is legitimate, so the scan must
+    // not report it. Without this the filter could pass by matching everything.
+    expect(longhandBeforeShorthand(".a{font: var(--type-body); line-height: 1.65}")).toBe(false);
+    expect(longhandBeforeShorthand(".a{color: red}")).toBe(false);
   });
 });
 

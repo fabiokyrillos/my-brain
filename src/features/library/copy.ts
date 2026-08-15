@@ -28,6 +28,15 @@ export type LibraryCopy = {
   readonly nothingYet: string;
   /** Said where a count exists but a recent list is deliberately not offered. */
   readonly noRecency: string;
+  /**
+   * Said where the recent read itself failed.
+   *
+   * Distinct from `nothingYet` on purpose: one is a fact about the domain, the
+   * other is a fact about the read, and printing the first when the second
+   * happened is the surface asserting something about data it was not allowed
+   * to see.
+   */
+  readonly recentUnavailable: string;
   /** Said where the count itself could not be read. Never rendered as a zero. */
   readonly countUnavailable: string;
   /** The overview's own section heading, above the domain panels. */
@@ -66,6 +75,7 @@ const copy: Record<Locale, LibraryCopy> = {
     overviewLens: "Visão geral",
     nothingYet: "Nada aqui ainda.",
     noRecency: "Sem lista recente por aqui.",
+    recentUnavailable: "Não foi possível ler os recentes agora. Isso não quer dizer que não existam.",
     countUnavailable: "Não foi possível contar agora.",
     holdsHeading: "O que o Brain guarda",
   },
@@ -88,6 +98,7 @@ const copy: Record<Locale, LibraryCopy> = {
     overviewLens: "Overview",
     nothingYet: "Nothing here yet.",
     noRecency: "No recent list here.",
+    recentUnavailable: "The recent items could not be read right now. That does not mean there are none.",
     countUnavailable: "Could not count right now.",
     holdsHeading: "What the Brain holds",
   },

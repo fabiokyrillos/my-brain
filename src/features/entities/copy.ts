@@ -145,6 +145,18 @@ type EntityCopy = {
   readonly personChangesExplainer: string;
   readonly personChangesEmpty: string;
   /**
+   * The person workspace's two remaining section names.
+   *
+   * The project surface read `linkedTasks`, `linkedTasksEmpty` and
+   * `projectMemories` from this module while the person surface carried three
+   * inline locale ternaries for the same sections — so the two pages the branch
+   * calls ONE template said different words through different mechanisms. An
+   * independent review found it. `linkedTasks` and `linkedTasksEmpty` are shared
+   * outright; the memories heading is not, because *"Memórias deste projeto"*
+   * would read wrongly under a person's name.
+   */
+  readonly personMemories: string;
+  /**
    * The project surface (`2N-PROJECT-003`…`-005`, `2N-ACCESS-005`).
    *
    * Every string below is chosen against a rule rather than for tone, because
@@ -302,6 +314,7 @@ const copy = {
     whereItAppears: "Onde aparece",
     personChangesExplainer: "Vem do registro de alterações: edições feitas nesta pessoa.",
     personChangesEmpty: "Nenhuma alteração registrada nesta pessoa ainda.",
+    personMemories: "Memórias desta pessoa",
     stateLabel: "Estado",
     // "Em aberto" is the word `work-filters-copy.ts` already prints for the same
     // set of statuses. Taking it rather than minting one keeps the product from
@@ -436,6 +449,7 @@ const copy = {
     whereItAppears: "Where it appears",
     personChangesExplainer: "From the recorded changes: edits made to this person.",
     personChangesEmpty: "No change has been recorded on this person yet.",
+    personMemories: "Memories about this person",
     stateLabel: "State",
     openCommitments: (count) => `${count} open`,
     openCommitmentsAtLeast: (count) => `at least ${count} open`,

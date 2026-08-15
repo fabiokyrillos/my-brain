@@ -86,10 +86,81 @@ describe("the rest of the census, path by path", () => {
     expect(code("src/features/daily-cycle/work-view.tsx")).toContain("<WorkModeTabs");
   });
 
-  it("Hoje reaches Revisões and Perguntas", () => {
+  /**
+   * Unconditional, or it is not a path.
+   *
+   * The first version of this file asserted only that `home-view.tsx` *contained*
+   * `/app/questions`, while its neighbour went to real trouble to prove the
+   * reminders link was not gated. An independent review found the asymmetry and
+   * the defect behind it: Hoje's only link to Perguntas is inside
+   * `{view.openQuestion ? … : null}`, so an owner with no open question has no
+   * path to it. The census now says so, and this check is generalised — every
+   * claimed path is held to the same standard, so the class cannot recur in the
+   * one destination nobody wrote a bespoke assertion for.
+   */
+  /**
+   * The text immediately before an href — where the JSX conditional gating it,
+   * if any, would be.
+   *
+   * A **named gate**, not a general parser. Whether an expression is inside an
+   * open JSX conditional is not something a regex decides on this file: it holds
+   * nineteen ternaries before the reviews link alone, most of them in props. A
+   * heuristic that answered anyway would be a guard whose verdict nobody could
+   * trust — worse than one that admits its scope. So each assertion below names
+   * the gate it is claiming, and fails if that gate moves.
+   */
+  const preceding = (source: string, route: string, chars = 400) => {
+    const at = source.indexOf(route);
+    expect(at, `${route} is not linked at all`).toBeGreaterThan(-1);
+    return source.slice(Math.max(0, at - chars), at);
+  };
+
+  /**
+   * Revisões, asserted through the property that actually guarantees it.
+   *
+   * "Is this href inside an open conditional" is not a question a regex settles
+   * on this file, so this asserts the *semantic* guarantee instead: the
+   * end-of-day section has **both** arms — a list when there is something
+   * unresolved and `sections.endOfDay.clear` when there is not — so the section
+   * itself renders for every account, and the link is its `<Link>` rather than a
+   * child of either arm. A section that lost its empty arm would stop rendering
+   * on a quiet day and take the link with it, which is the failure this catches.
+   */
+  it("Hoje's closing section renders on a quiet day too, so its link always exists", () => {
     const home = code("src/features/shell/home-view.tsx");
-    expect(home).toContain("/app/reviews");
-    expect(home).toContain("/app/questions");
+    expect(home, "the closing section lost its quiet-day arm").toContain("sections.endOfDay.clear");
+    expect(home).toContain("sections.endOfDay.openReview");
+    // The link follows the section's own ternary rather than sitting inside it:
+    // the two characters before it close a conditional.
+    expect(preceding(home, "/app/reviews", 40)).toMatch(/\)\}\s*<Link/);
+  });
+
+  /**
+   * The correction, asserted as a correction.
+   *
+   * Deliberately a POSITIVE assertion that the link IS gated rather than
+   * silence. An earlier version of this file asserted only that the file
+   * *contained* the href, while its neighbour proved the reminders link was
+   * ungated — and an independent review found both the asymmetry and the defect
+   * behind it. If somebody later makes this one unconditional, this fails and
+   * tells them the census row can move: the same two-directional shape the
+   * account check has, and the reason that check exists.
+   */
+  it("records that Hoje's link to Perguntas is gated, which is why the census says so", () => {
+    const home = code("src/features/shell/home-view.tsx");
+    expect(
+      preceding(home, "/app/questions"),
+      "Hoje now reaches Perguntas unconditionally — move it out of the `more`-only set in capabilities.ts",
+    ).toMatch(/view\.openQuestion\s*\?/);
+  });
+
+  it("names the same dependency in the census, so the two cannot drift", () => {
+    const census = read("src/features/shell/capabilities.ts");
+    expect(census, "the census no longer records the Perguntas dependency").toMatch(
+      /The second is `questions`/,
+    );
+    // …and it must NOT still claim Hoje reaches it.
+    expect(census).not.toMatch(/\| reviews, questions \| Hoje \|/);
   });
 
   /**

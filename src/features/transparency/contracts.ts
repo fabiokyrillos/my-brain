@@ -20,13 +20,21 @@
  * already half met: `history` and `costs` sit in the `transparency` group at
  * `more` visibility, and `jobs` is `context-only` with no menu entry at all.
  *
- * ## Why the membership is derived
+ * ## Why the membership is derived, and what that derivation is for
  *
- * The two menu-visible members are read off `capabilities.ts` rather than
- * restated, so a fourth transparency destination added tomorrow appears here
- * tomorrow. `jobs` is named because it is *not* in that group — it is
- * `advanced`/`context-only`, reached from a failure — and a list that derived it
- * from the group would silently drop it.
+ * `TRANSPARENCY_MENU_MEMBERS` reads `group: "transparency"` off
+ * `capabilities.ts`. It is **not** what the surfaces render — the strip and the
+ * section both map `TRANSPARENCY_LENSES` — and its whole job is to be the
+ * guard's *independent* second opinion: `transparency.test.tsx` compares the two
+ * and fails when the registry gains a member this file has not answered for.
+ *
+ * That is the intended behaviour rather than a shortfall, and it differs from
+ * Brain's lenses on purpose. See `TRANSPARENCY_LENSES` below for why a fourth
+ * view has to fail rather than appear.
+ *
+ * `jobs` is named rather than derived because it is *not* in that group — it is
+ * `advanced`/`context-only`, reached from a failure — so a list built from the
+ * group alone would silently drop it.
  */
 
 import { navigationCapabilities, type NavigationKey } from "@/features/shell/capabilities";
@@ -48,9 +56,20 @@ export const TRANSPARENCY_ADVANCED_MEMBER = "jobs" as const satisfies Navigation
 
 /**
  * The strip, in reading order: what happened, what it cost, what is still
- * running. Declared, because the order is a reading decision the registry
- * cannot express — and checked against the derived membership by the guard, so
- * nothing can be lost from it.
+ * running.
+ *
+ * **Listed, and a fourth transparency destination FAILS the build rather than
+ * appearing here.** That is the opposite of how Brain composes its lenses, and
+ * the difference is the copy: a Brain lens takes its label from `messages.nav`,
+ * which every navigation key has, so a ninth can appear with nothing written.
+ * A view here needs a **tab word and a sentence** in `TransparencyCopy`, which
+ * no compiler can invent — so composing this list would produce a tab labelled
+ * `undefined`.
+ *
+ * The header above this file once claimed a fourth would "appear here tomorrow".
+ * It would not, and an independent review of the branch found the gap between
+ * that claim and the code. Failing is the right behaviour; overstating it was
+ * not.
  */
 export const TRANSPARENCY_LENSES = [
   "history",
