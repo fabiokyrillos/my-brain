@@ -209,16 +209,25 @@ describe("2N-PERSON-007 / 2N-SEC-003: the page introduces no new authority", () 
 describe("2N-PERSON-004: every section says whether the owner maintains it", () => {
   it("marks each section of the person page as persisted or derived", () => {
     /*
-     * Counted rather than merely present: the page has six sections a reader
+     * Counted rather than merely present: the page has seven sections a reader
      * could edit or not, and one unmarked section is exactly the case where a
      * derived list reads as something they can change.
      *
-     * Two of the six are marked inside the panels they render
+     * Two of the seven are marked inside the panels they render
      * (`RelationshipPanel` and the two `AssociationPanel`s), so the assertion
      * spans both files rather than the page alone.
+     *
+     * **Five, not four, since the workspace recomposition.** The changes band
+     * the project workspace already carried is now mounted here too, and it is
+     * the section on this page where the distinction matters most: a list of
+     * sentences describing edits, none of which the reader can change from
+     * here, sitting directly under a form that edits the same fields.
      */
     const onPage = code(PERSON_PAGE).match(/<SectionOriginNote/g) ?? [];
-    expect(onPage.length, "the person page marks identity, tasks, memories and timeline").toBe(4);
+    expect(
+      onPage.length,
+      "the person page marks identity, changes, tasks, memories and timeline",
+    ).toBe(5);
 
     for (const panel of [
       "src/features/entities/relationship-panel.tsx",

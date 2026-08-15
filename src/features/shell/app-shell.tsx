@@ -53,6 +53,16 @@ export function AppShell({
      * read, and nothing awaited that would delay an instant fallback.
      */
     <div className="app-frame" lang={locale}>
+      {/*
+        First in DOM order, so it is the first thing a keyboard reaches. It is
+        offscreen until focused, which is why it needs no `sr-only` — a skip link
+        that never becomes visible is one a sighted keyboard user cannot follow.
+        The target is `<main>`, which carries `tabIndex={-1}` so it can receive
+        programmatic focus without entering the tab order itself.
+      */}
+      <a className="skip-link" href="#main-content">
+        {t.shell.skipToContent}
+      </a>
       <aside className="side-rail">
         <Link href={`/${locale}/app`} className="brand" aria-label="My Brain">
           <span className="brand-mark">B</span>
@@ -86,7 +96,9 @@ export function AppShell({
             <NotificationsLink locale={locale} />
           </div>
         </header>
-        <main>{children}</main>
+        <main id="main-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
       <nav aria-label={t.shell.mobileNavigation} className="bottom-nav">
         {/*

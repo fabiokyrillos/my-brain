@@ -7,9 +7,9 @@ import {
   DECISION_CONCEPT,
   decisionEntryIds,
   deriveProjectState,
-  describeProjectChanges,
+  describeEntityChanges,
   TERMINAL_TASK_STATUSES,
-  type ProjectChangeRow,
+  type EntityChangeRow,
 } from "./project-context";
 
 const copy = getHistoryCopy("pt-BR", "Cérebro");
@@ -19,7 +19,7 @@ function task(status: string) {
   return { id: status, status };
 }
 
-function changeRow(overrides: Partial<ProjectChangeRow> = {}): ProjectChangeRow {
+function changeRow(overrides: Partial<EntityChangeRow> = {}): EntityChangeRow {
   return {
     id: "row-1",
     action_type: "update_project",
@@ -107,7 +107,7 @@ describe("2N-PROJECT-003: current state is counted, never estimated", () => {
 
 describe("2N-PROJECT-004: changes are described from the audit trail, newest first", () => {
   it("orders by when it happened, not by the order the two queries returned", () => {
-    const events = describeProjectChanges(
+    const events = describeEntityChanges(
       [
         changeRow({ id: "old", created_at: "2026-08-01T10:00:00+00:00" }),
         changeRow({ id: "new", created_at: "2026-08-12T10:00:00+00:00" }),
@@ -125,12 +125,12 @@ describe("2N-PROJECT-004: changes are described from the audit trail, newest fir
       changeRow({ id: "old", created_at: "2026-08-01T10:00:00+00:00" }),
       changeRow({ id: "new", created_at: "2026-08-12T10:00:00+00:00" }),
     ];
-    describeProjectChanges(rows, copy, formatDate);
+    describeEntityChanges(rows, copy, formatDate);
     expect(rows.map((row) => row.id)).toEqual(["old", "new"]);
   });
 
   it("names the project once, in the heading, and not in every sentence", () => {
-    const [event] = describeProjectChanges([changeRow()], copy, formatDate);
+    const [event] = describeEntityChanges([changeRow()], copy, formatDate);
     expect(event!.sentence).toBe("Você alterou o projeto");
     expect(event!.sentence).not.toContain("“");
   });
@@ -139,12 +139,12 @@ describe("2N-PROJECT-004: changes are described from the audit trail, newest fir
     // `label: null` chooses the phrasing; it must not be mistaken for
     // `found: false`, which would print "unavailable" beside a project the
     // reader is currently looking at.
-    const [event] = describeProjectChanges([changeRow()], copy, formatDate);
+    const [event] = describeEntityChanges([changeRow()], copy, formatDate);
     expect(event!.subject).toBe("resolved");
   });
 
   it("describes what actually changed when the payloads say so", () => {
-    const [event] = describeProjectChanges(
+    const [event] = describeEntityChanges(
       [
         changeRow({
           before_state: { name: "Mudança", description: "antes", status: "active", organization_id: null },
@@ -164,7 +164,7 @@ describe("2N-PROJECT-004: changes are described from the audit trail, newest fir
      * (EGC-ASSOC-004). This asserts the consequence at the surface: the sentence
      * says a role changed and nothing the owner typed reaches the list.
      */
-    const [event] = describeProjectChanges(
+    const [event] = describeEntityChanges(
       [
         changeRow({
           action_type: "update_person_project_role",
@@ -187,7 +187,7 @@ describe("2N-PROJECT-004: changes are described from the audit trail, newest fir
     // A raw token would leak an internal name; dropping the row would hide a
     // real change from an audit trail. The describer already answers this, and
     // this asserts the project surface inherits that answer.
-    const [event] = describeProjectChanges(
+    const [event] = describeEntityChanges(
       [changeRow({ action_type: "some_future_action" })],
       copy,
       formatDate,

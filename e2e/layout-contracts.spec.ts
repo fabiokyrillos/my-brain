@@ -25,6 +25,11 @@ const ROOT = join(__dirname, "..");
  * directive cannot be resolved without the build pipeline.
  */
 const STYLESHEETS = [
+  // First, and load-bearing: since ADR-114 the palette and every measure live
+  // here, so a fixture without it renders unstyled and every geometry assertion
+  // below measures the wrong thing.
+  "tokens.css",
+  "experience.css",
   "globals.css",
   "operations.css",
   "chat.css",
@@ -49,26 +54,65 @@ const LONG_TITLE =
 
 const ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"></svg>';
 
-/** Mirrors `src/features/shell/navigation-links.tsx` — primary keys, capture, then groups. */
-const PRIMARY = ["Início", "Registros", "Trabalho", "Conversar"] as const;
+/**
+ * Mirrors `src/features/shell/navigation-links.tsx` — primary keys, capture,
+ * then groups.
+ *
+ * **This mirror had gone stale, and the stale copy still passed.** The redesign
+ * promoted Brain to the fourth destination and moved Conversar into the context
+ * group; this list still read `Conversar`, and the bar below still claimed
+ * Registros was demoted. Both fixtures had the right *shape* — four rail items,
+ * five bar slots with capture in the middle — so every geometric assertion in
+ * this file kept passing while measuring navigation the product no longer
+ * renders. `shell-mirror-guard.test.ts` now derives both from `capabilities.ts`
+ * and fails when they diverge.
+ */
+const PRIMARY = ["Hoje", "Registros", "Trabalho", "Brain"] as const;
 /**
  * The mobile bar, mirroring `mobileBarSlots` (UX-14, DEC-1).
  *
- * Five slots with capture in the middle. Registros is not here: it moved into
- * `Mais` so the bar carries an even number of destinations, which is what makes
- * exact centring possible at all.
+ * Five slots with capture in the middle. Registros returned to the bar with the
+ * redesign; Brain is the destination that sits in `Mais` instead, which
+ * `mobileDemotedKeys` derives rather than lists.
  */
-const MOBILE_BAR = ["Início", "Trabalho", "Captura rápida", "Conversar", "Mais"] as const;
+const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Mais"] as const;
+/*
+ * The overflow disclosure's five groups.
+ *
+ * **This list was stale by six destinations.** It carried four context members
+ * where the product renders eight, missed Conversar, Empresas, Contextos and
+ * Relações entirely, and had Organização holding only Lembretes when Calendário
+ * had joined it in Phase 2M. Every assertion over the panel was therefore
+ * measuring a navigation the product does not render — the same failure the
+ * `PRIMARY` and `MOBILE_BAR` lists had, found and fixed one commit before this
+ * one, by a guard that only covered those two.
+ *
+ * `shell-mirror-guard.test.ts` now derives this one from `capabilities.ts` and
+ * `messages.ts` too, with a planted-divergence control per group.
+ */
 const GROUPS = [
-  ["Contexto", ["Projetos", "Pessoas", "Memórias", "Arquivos"]],
+  ["Contexto", ["Conversar", "Projetos", "Pessoas", "Empresas", "Contextos", "Memórias", "Arquivos", "Relações"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
-  ["Organização", ["Lembretes"]],
+  ["Organização", ["Calendário", "Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],
   ["Preferências", ["Configurações"]],
 ] as const;
 
+/**
+ * Mirrors `navLink` in `navigation-links.tsx`, including the thing this fixture
+ * never emitted: `aria-current="page"` on the destination you are standing in,
+ * and the `active` class beside it.
+ *
+ * Its absence meant the lane had **no** way to check the active state — a bar
+ * that marked every slot, or none, would have rendered identically here. The
+ * fixture composes Hoje, so Hoje is the current destination.
+ */
+const CURRENT = "Hoje";
+
 function navLink(label: string, className = "nav-item") {
-  return `<a class="${className}" href="#">${ICON}<span>${label}</span></a>`;
+  const active = label === CURRENT;
+  const current = active ? ` aria-current="page"` : "";
+  return `<a class="${className}${active ? " active" : ""}"${current} href="#">${ICON}<span>${label}</span></a>`;
 }
 
 function sideNav() {
@@ -93,8 +137,8 @@ function bottomNav() {
         .map((item) => navLink(item))
         .join("")}</div></div>`,
   ).join("");
-  // Registros leads the panel's destinations: demoted off the bar, not buried.
-  const demoted = `<div class="mobile-nav-group mobile-nav-demoted" role="group" aria-label="Principal"><div class="nav-group-items">${navLink("Registros")}</div></div>`;
+  // Brain leads the panel's destinations: demoted off the bar, not buried.
+  const demoted = `<div class="mobile-nav-group mobile-nav-demoted" role="group" aria-label="Principal"><div class="nav-group-items">${navLink("Brain")}</div></div>`;
   const more = `<details class="mobile-more"><summary aria-label="Mais">${ICON}<span>Mais</span></summary><div class="mobile-more-menu">${demoted}${groups}</div></details>`;
   // Built from the declared slot order, so the fixture cannot drift from the
   // component's own sequence without this list changing too.
@@ -134,7 +178,7 @@ function listBody() {
 
 function document_(body: string) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{--font-manrope:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-jetbrains:ui-monospace,monospace}
+:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}
 ${css}
 </style></head><body><div class="app-frame">
 <aside class="side-rail"><a href="#" class="brand"><span class="brand-mark">B</span><span>My Brain</span></a><nav aria-label="Navegação principal" class="side-nav">${sideNav()}</nav></aside>
@@ -233,6 +277,9 @@ test("usable content width never shrinks as the viewport grows", async ({ page }
  * fewer destinations rather than making the overflow prettier.
  */
 
+const BAR_TARGET_TITLE = (name: string) =>
+  "every bar slot meets the 44px touch minimum at " + name;
+
 test.describe("mobile bottom navigation", () => {
   for (const viewport of VIEWPORTS.filter((entry) => entry.width <= 412)) {
     test(`capture stays centred and in source order at ${viewport.name}`, async ({ page }) => {
@@ -268,7 +315,7 @@ test.describe("mobile bottom navigation", () => {
        * capture control sat third of six and no distribution can put slot 3 of 6 on
        * the centre line — making it exact required deciding how many destinations
        * the bar carries, which a stylesheet may not decide. That decision is taken:
-       * five slots, capture in the middle, Registros in `Mais`. Five equal grid
+       * five slots, capture in the middle, Brain in `Mais`. Five equal grid
        * columns put the third column's centre on the bar's centre, so the tolerance
        * is now sub-pixel rounding rather than a third of the screen.
        */
@@ -278,6 +325,52 @@ test.describe("mobile bottom navigation", () => {
       ).toBeLessThanOrEqual(2);
     });
   }
+
+  /*
+   * The bar is the only navigation a phone has, so its slots are the targets
+   * that matter most. Asserted at both widths the brief names, because a
+   * five-column grid divides 375 and 412 differently and a slot that clears 44px
+   * at one can fail at the other.
+   */
+  for (const viewport of VIEWPORTS.filter((entry) => entry.width <= 412)) {
+    test(BAR_TARGET_TITLE(viewport.name), async ({ page }) => {
+      await render(page, homeBody(), viewport.width, viewport.height);
+
+      const boxes = await page.evaluate(() => {
+        const nav = document.querySelector(".bottom-nav")!;
+        return [...nav.children].map((element) => {
+          // A disclosure is measured by its summary — the thing a thumb lands
+          // on — not by the panel it opens.
+          const target = element.querySelector("summary") ?? element;
+          const rect = target.getBoundingClientRect();
+          const named = (target.textContent ?? "").trim().split(/\s+/)[0];
+          return { named, width: rect.width, height: rect.height };
+        });
+      });
+
+      expect(boxes.length, "the bar rendered no slots to measure").toBe(5);
+      for (const box of boxes) {
+        expect(box.height, box.named + " is " + box.height.toFixed(1) + "px tall").toBeGreaterThanOrEqual(44);
+        expect(box.width, box.named + " is " + box.width.toFixed(1) + "px wide").toBeGreaterThanOrEqual(44);
+      }
+    });
+  }
+
+  /*
+   * Exactly one destination is current, and the disclosure is current only when
+   * what you are reading lives inside it. Two marks would tell a screen-reader
+   * user they are in two places; none would tell them they are nowhere.
+   */
+  test("marks exactly one slot as the current destination", async ({ page }) => {
+    await render(page, homeBody(), 375, 667);
+    const marked = await page.evaluate(() => {
+      const nav = document.querySelector(".bottom-nav")!;
+      return [...nav.querySelectorAll('[aria-current="page"]')].map(
+        (node) => (node.textContent ?? "").trim().split(/\s+/)[0],
+      );
+    });
+    expect(marked).toHaveLength(1);
+  });
 
   test("the bar reserves the device safe area", async ({ page }) => {
     await render(page, homeBody(), 375, 667);
@@ -311,4 +404,130 @@ test("no surface scrolls horizontally", async ({ page }) => {
       );
     }
   }
+});
+
+/**
+ * The recomposed task detail — `03-componentes.md`, and `2L-EDIT-007`.
+ *
+ * Mirrors the DOM `src/features/daily-cycle/task-detail-view.tsx` emits: the
+ * header, the two wrappers, and one section in each. Only the geometry is under
+ * test here, so the sections carry a heading and a line rather than every field.
+ */
+function taskDetailBody(options: { panel?: boolean } = {}) {
+  const frame = options.panel
+    ? "content-page task-detail-page task-detail-panel"
+    : "content-page task-detail-page";
+  const back = options.panel
+    ? '<button type="button" class="back-link task-panel-close">Trabalho</button>'
+    : '<a class="back-link" href="#">Trabalho</a>';
+  return `<div class="work-shell"><div class="work-shell-main">${listBody()}</div><div class="${frame}">
+    ${back}
+    <header class="task-detail-header">
+      <div><p class="eyebrow">TAREFA</p><h1>${LONG_TITLE}</h1><p class="task-description">Conferir a cláusula de rescisão.</p></div>
+      <span class="status-badge" data-state="blocked">Bloqueada</span>
+    </header>
+    <div class="task-detail-body">
+      <div class="task-detail-primary">
+        <div class="task-detail-actions"><div class="row-actions"><button class="row-action" type="button">Concluir</button></div></div>
+        <section class="task-detail-section" aria-label="Detalhes"><h2>Detalhes</h2><dl class="task-fields"><div class="task-field"><dt>Prazo</dt><dd>31 de julho de 2026</dd></div><div class="task-field"><dt>Dia planejado</dt><dd>Sem dia planejado</dd></div></dl></section>
+        <ul class="task-control-list"><li class="task-control"><form><label for="d">Prazo</label><input id="d" type="date"><button class="row-action" type="submit">Aplicar</button></form></li></ul>
+      </div>
+      <div class="task-detail-secondary">
+        <section class="task-detail-section" aria-label="Relações"><h2>Relações</h2><dl class="task-relations"><div class="task-relation-group"><dt>Projetos</dt><dd><a class="task-relation" href="#">Aurora Participações</a></dd></div></dl></section>
+        <section class="task-detail-section" aria-label="Histórico desta tarefa"><h2>Histórico desta tarefa</h2><ol class="task-history"><li><strong>Você alterou a tarefa</strong><time>29/07/2026</time></li></ol></section>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+test.describe("the task detail composes into two columns without reordering them", () => {
+  /*
+    The load-bearing assertion, and the one no unit test can make: the columns
+    are grid *placement*, so the element that comes first in the DOM is also the
+    element that appears first on screen. A CSS `order` would satisfy every
+    jsdom test in the repository and put the focus order behind the visual one
+    on exactly one viewport.
+  */
+  test("the decide column is left of the understand column, in DOM order", async ({ page }) => {
+    await render(page, taskDetailBody(), 1440, 900);
+
+    const [primary, secondary] = await Promise.all([
+      page.locator(".task-detail-primary").boundingBox(),
+      page.locator(".task-detail-secondary").boundingBox(),
+    ]);
+    expect(primary && secondary).toBeTruthy();
+    expect(primary!.x).toBeLessThan(secondary!.x);
+    // Genuinely two columns, not one column with a gap: they overlap vertically.
+    expect(primary!.y).toBeCloseTo(secondary!.y, 0);
+  });
+
+  test("collapses to one column below the split, keeping the same order", async ({ page }) => {
+    await render(page, taskDetailBody(), 1024, 900);
+
+    const [primary, secondary] = await Promise.all([
+      page.locator(".task-detail-primary").boundingBox(),
+      page.locator(".task-detail-secondary").boundingBox(),
+    ]);
+    expect(primary!.x).toBeCloseTo(secondary!.x, 0);
+    expect(primary!.y).toBeLessThan(secondary!.y);
+  });
+
+  /*
+    `2L-EDIT-007`. The panel is a frame, and a frame may not take a control
+    away. The panel is narrow enough that the two-column split must not apply
+    to it — at 460px the side column would be 180px and the eleven-control grid
+    would collapse — so the wrapper is a plain block there.
+  */
+  test("the docked panel is one column and still holds every control", async ({ page }) => {
+    await render(page, taskDetailBody({ panel: true }), 1440, 900);
+
+    const panel = page.locator(".task-detail-panel");
+    await expect(panel).toBeVisible();
+    // Docked beside the list, not over it.
+    await expect(page.locator(".work-shell-main")).toBeVisible();
+    const [main, box] = await Promise.all([
+      page.locator(".work-shell-main").boundingBox(),
+      panel.boundingBox(),
+    ]);
+    expect(main!.x + main!.width).toBeLessThanOrEqual(box!.x + 1);
+    expect(box!.width).toBeLessThanOrEqual(460);
+
+    const [primary, secondary] = await Promise.all([
+      page.locator(".task-detail-primary").boundingBox(),
+      page.locator(".task-detail-secondary").boundingBox(),
+    ]);
+    expect(primary!.x).toBeCloseTo(secondary!.x, 0);
+    await expect(panel.locator("button[type=submit]")).toBeVisible();
+    await expect(panel.locator(".task-detail-actions .row-action")).toBeVisible();
+  });
+
+  test("on a narrow viewport the panel is the surface and the list is removed", async ({ page }) => {
+    await render(page, taskDetailBody({ panel: true }), 412, 915);
+
+    // `display:none`, not covered: a covered list stays in the accessibility
+    // tree and stays reachable while the user believes they are on the task.
+    await expect(page.locator(".work-shell-main")).toBeHidden();
+    await expect(page.locator(".task-detail-panel")).toBeVisible();
+    // And it drops the docked frame, which would read as a dialog with no
+    // backdrop once it fills the page.
+    const border = await page.locator(".task-detail-panel").evaluate((node) =>
+      getComputedStyle(node).borderTopWidth,
+    );
+    expect(border).toBe("0px");
+  });
+
+  test("neither frame scrolls horizontally at any width", async ({ page }) => {
+    for (const viewport of VIEWPORTS) {
+      for (const body of [taskDetailBody(), taskDetailBody({ panel: true })]) {
+        await render(page, body, viewport.width, viewport.height);
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+        expect(overflow.scrollWidth, `horizontal overflow at ${viewport.name}`).toBeLessThanOrEqual(
+          overflow.clientWidth + 1,
+        );
+      }
+    }
+  });
 });

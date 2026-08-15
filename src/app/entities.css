@@ -16,16 +16,16 @@
   gap: 8px;
   min-height: 44px;
   padding: 11px 16px;
-  border: 1px solid #bcc7d6;
-  border-radius: 11px;
-  background: white;
-  color: var(--ink);
-  font-size: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
   font-weight: 700;
 }
 
 .entity-edit-open:hover {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 /**
@@ -48,23 +48,23 @@
 .entity-inline-create {
   margin: -14px 0 26px;
   padding-left: 22px;
-  border-left: 2px solid var(--line);
+  border-left: 2px solid var(--border-default);
 }
 
 .entity-edit-form {
   display: grid;
   gap: 16px;
   padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: white;
-  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.06);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
 }
 
 .entity-edit-form > label {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 750;
 }
 
@@ -73,11 +73,11 @@
 .entity-edit-form textarea {
   width: 100%;
   min-height: 46px;
-  border: 1px solid #b9c5d5;
-  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   padding: 11px 13px;
-  background: white;
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -88,15 +88,15 @@
 }
 
 .entity-edit-form select:disabled {
-  background: var(--mist);
-  color: var(--ink-soft);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
 }
 
 .entity-edit-hint {
   display: block;
   margin-top: -8px;
-  color: var(--ink-soft);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font: var(--type-caption);
   font-weight: 500;
   line-height: 1.5;
 }
@@ -116,13 +116,13 @@
   min-height: 44px;
   padding: 11px 18px;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-weight: 750;
 }
 
 .entity-edit-save {
-  background: var(--ink);
-  color: white;
+  background: var(--text-primary);
+  color: var(--action-primary-text);
 }
 
 .entity-edit-save:disabled {
@@ -130,33 +130,33 @@
 }
 
 .entity-edit-cancel {
-  background: white;
-  color: var(--ink);
-  border: 1px solid #bcc7d6;
+  background: var(--background-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .entity-edit-cancel:hover:not(:disabled) {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .entity-edit-feedback {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 650;
 }
 
 .entity-edit-feedback.success {
   margin-top: 10px;
-  color: #26714c;
+  color: var(--tone-success-fg);
 }
 
 .entity-edit-feedback.error {
-  color: #a33a32;
+  color: var(--tone-risk-fg);
 }
 
 .entity-edit-form :focus-visible,
 .entity-edit-open:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -170,14 +170,14 @@
 }
 
 .entity-relation-line > span {
-  font: 650 9px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .entity-relation-line > strong {
-  font-size: 13px;
+  font: var(--type-body);
   overflow-wrap: anywhere;
 }
 
@@ -212,8 +212,8 @@
 
 .relation-explainer {
   margin: -4px 0 0;
-  color: var(--muted, #64748b);
-  font-size: 12px;
+  color: var(--text-secondary);
+  font: var(--type-caption);
 }
 
 .relation-list {
@@ -228,36 +228,40 @@
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: white;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .relation-row-main {
   display: grid;
   gap: 3px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .relation-row-main strong {
-  font-size: 14px;
+  font: var(--type-body);
 }
 
 .relation-row-main span {
-  color: var(--muted, #64748b);
-  font-size: 12px;
+  color: var(--text-secondary);
+  font: var(--type-caption);
 }
 
 /* A stored value outside the vocabulary, rendered rather than hidden (EGC-REL-006). */
 .relation-unknown {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Monospace, because this prints a stored value that fell outside the
+     vocabulary (EGC-REL-006) and it must read verbatim. The family comes from
+     the token now, and it comes AFTER the shorthand: `font:` resets
+     `font-family`, so declaring the family first silently threw it away. */
+  font: var(--type-mono);
   font-size: 13px;
   opacity: 0.85;
 }
 
 .relation-unknown-note {
-  color: var(--muted, #64748b);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font: var(--type-caption);
   font-style: italic;
 }
 
@@ -275,16 +279,16 @@
   gap: 6px;
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid #bcc7d6;
-  border-radius: 10px;
-  background: white;
-  color: var(--ink);
-  font-size: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-caption);
   font-weight: 650;
 }
 
 .relation-row-actions button:hover:not(:disabled) {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .relation-form {
@@ -296,7 +300,7 @@
 .relation-form > label {
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 750;
 }
 
@@ -304,9 +308,9 @@
 .relation-form select {
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid #bcc7d6;
-  border-radius: 10px;
-  background: white;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
   font: inherit;
   font-weight: 400;
 }
@@ -316,9 +320,9 @@
    that is always present is one users stop reading. */
 .bounded-notice {
   margin: 10px 0 0;
-  font-size: 12px;
+  font: var(--type-caption);
   font-weight: 600;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 /*
@@ -339,8 +343,8 @@
   align-items: baseline;
   gap: 4px 8px;
   margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--muted, #64748b);
+  font: var(--type-caption);
+  color: var(--text-secondary);
   /* Long unbroken content must wrap rather than widen the page (2N-MOBILE-001). */
   min-width: 0;
   overflow-wrap: anywhere;
@@ -348,12 +352,12 @@
 
 .provenance-label {
   font-weight: 650;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 .provenance-label::after { content: ":"; }
 
 .provenance-note a {
-  color: var(--blue);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 2px;
   /*
@@ -380,11 +384,11 @@
 
 .section-origin {
   margin: -2px 0 6px;
-  font-size: 11px;
+  font: var(--type-caption);
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--muted, #64748b);
+  color: var(--text-secondary);
 }
 
 .return-to-source {
@@ -392,9 +396,9 @@
   align-items: center;
   min-height: 32px;
   padding: 4px 0;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 600;
-  color: var(--blue);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -409,9 +413,9 @@
  */
 .entity-decisions,
 .entity-changes {
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: white;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
   padding: 22px;
   margin-top: 16px;
 }
@@ -431,19 +435,19 @@
   align-items: baseline;
   gap: 6px 12px;
   margin: 8px 0 0;
-  font-size: 13px;
-  color: var(--ink-soft);
+  font: var(--type-body);
+  color: var(--text-secondary);
 }
 
 .entity-state-line > span:first-child {
-  font: 650 9px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .entity-state-line > strong {
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 /*
@@ -458,8 +462,8 @@
 /* A sentence about what a section covers, sized below its heading. */
 .section-explainer {
   margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--muted, #64748b);
+  font: var(--type-caption);
+  color: var(--text-secondary);
   max-width: 60ch;
   overflow-wrap: anywhere;
 }
@@ -476,4 +480,169 @@
 
 .entity-decisions .mini-list article {
   align-items: baseline;
+}
+
+/* ---- The entity workspace (`03-componentes.md`, EntityWorkspace) ----------- */
+
+/*
+ * Person and Project share one template, so they share one block of rules.
+ *
+ * `.entity-detail` is deliberately left where it was: Empresa, Contexto and
+ * Memória still use it, and re-pointing three surfaces at a layout they were
+ * not recomposed for would change them by accident. The workspaces get their
+ * own class, and the two sets of rules never select the same element.
+ */
+.entity-workspace {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+}
+
+/*
+ * The two columns the template names — trabalho em aberto, and what the Brain
+ * knows. `1.35fr / 1fr`: the left column carries task rows with a state and a
+ * provenance line each, the right carries panels of short pairs.
+ *
+ * **Grid placement, never `order`.** Focus order has to equal visual order in
+ * both layouts, and DOM order is already the reading order — the same rule Hoje
+ * and the task detail were built to.
+ */
+.entity-workspace-columns {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.entity-workspace-column {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  /* Grid items refuse to shrink below their content by default, which is what
+     turns one long task title into a column that pushes the other off the
+     page. */
+  min-width: 0;
+}
+
+/*
+ * The column's own name — a band label, not a title.
+ *
+ * Uppercase mono at the section scale, so it reads as the name of a region
+ * rather than competing with the person's name above it. `<h2>` because the
+ * panels inside it are `<h3>`s, and the outline has to say what belongs to what.
+ */
+.entity-workspace-column > h2 {
+  margin: 0;
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Card chrome for every block inside a column, and for the two bands outside
+   them. One rule, so a panel and a section cannot drift apart. */
+.entity-workspace .entity-tasks,
+.entity-workspace .relation-panel,
+.entity-workspace .entity-memory,
+.entity-workspace .entity-files,
+.entity-workspace .entity-decisions,
+.entity-workspace .entity-timeline,
+.entity-workspace .entity-changes {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  padding: var(--space-5);
+}
+
+/*
+ * `timelines.css` and the 2N.2 block above give these a top margin for the
+ * stacked layout they used to sit in. Inside a grid with its own gap that
+ * margin is a second, uneven one — and between two columns it would push the
+ * right-hand one down by 16px for no reason a reader could name.
+ */
+.entity-workspace .entity-memory,
+.entity-workspace .entity-decisions,
+.entity-workspace .entity-changes,
+.entity-workspace .entity-timeline {
+  margin-top: 0;
+}
+
+.entity-workspace .entity-tasks,
+.entity-workspace .entity-memory,
+.entity-workspace .entity-decisions {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.entity-workspace h3 {
+  margin: 0;
+  font: var(--type-lead);
+  color: var(--text-primary);
+}
+
+/* The two bands outside the columns keep a page-level heading rather than a
+   column label, because nothing contains them. */
+.entity-workspace .entity-timeline > h2 {
+  margin: 0 0 var(--space-3);
+  font: var(--type-lead);
+  color: var(--text-primary);
+}
+
+.entity-workspace .entity-changes > h2 {
+  margin: 0;
+  font: var(--type-lead);
+  color: var(--text-primary);
+}
+
+/*
+ * The edit form, behind a disclosure.
+ *
+ * A `<summary>` is the control, so it carries the target size rather than the
+ * text inside it — the shape `2J-ACCESS-006` found rendering at 16px on a Pixel
+ * 7 when only the label was styled.
+ */
+.entity-edit-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+.entity-edit-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.entity-edit-disclosure > summary:hover {
+  color: var(--text-primary);
+  background: var(--background-elevated);
+}
+
+.entity-edit-disclosure[open] > summary {
+  margin-bottom: var(--space-4);
+}
+
+.entity-workspace .entity-changes {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+@media (max-width: 899px) {
+  .entity-workspace-columns {
+    grid-template-columns: 1fr;
+  }
+
+  /* WCAG 2.2 AA 2.5.8 on the one control this block owns. */
+  .entity-edit-disclosure > summary {
+    min-height: var(--touch-target);
+  }
 }

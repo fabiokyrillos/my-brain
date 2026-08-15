@@ -19,8 +19,8 @@
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 12px;
-  background: white;
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .conversation-card-head {
@@ -134,8 +134,8 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
   font-weight: 600;
@@ -210,8 +210,8 @@
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
 }
 
 .task-command-edit button,
@@ -224,8 +224,8 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-archived-line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -284,7 +284,7 @@
   margin-bottom: 22px;
   padding: 14px 16px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--tone-information-bg);
 }
 
@@ -308,8 +308,8 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--tone-information-line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
   color: var(--tone-information-fg);
   font-size: 0.875rem;
   font-weight: 600;
@@ -390,7 +390,7 @@
 .conversation-sources[data-evidence="insufficient"] {
   padding: 10px 12px;
   border: 1px solid var(--tone-attention-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--tone-attention-bg);
 }
 
@@ -468,7 +468,7 @@
 
 .conversation-explanation-correct-title {
   font-weight: 600;
-  color: var(--ink, #14233b);
+  color: var(--text-primary);
 }
 
 /* The honest "there is no path yet". Toned down rather than out: it is
@@ -514,7 +514,7 @@
 .conversation-suggestions-list > li {
   padding: 9px 12px;
   border: 1px solid var(--tone-suggestion-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--tone-suggestion-bg);
   color: var(--tone-suggestion-fg);
   font-size: 0.875rem;

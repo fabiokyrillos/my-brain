@@ -15,7 +15,7 @@
  *   as a total (`deriveProjectState`);
  * - a change is described only from `audit_logs`, through the describer the
  *   History surface already uses, so no second vocabulary exists for the same
- *   fact (`describeProjectChanges`);
+ *   fact (`describeEntityChanges`);
  * - a decision is a **stored concept** on the entry's current interpretation,
  *   never a phrase matched in text (`decisionEntryIds`).
  *
@@ -112,7 +112,7 @@ export function deriveProjectState(input: {
  * stopped rendering it for that reason (UX-28); a second surface reading it
  * would resurrect a field the product decided not to show.
  */
-export type ProjectChangeRow = {
+export type EntityChangeRow = {
   readonly id: string;
   readonly action_type: string;
   readonly entity_type: string;
@@ -125,6 +125,15 @@ export type ProjectChangeRow = {
 
 /**
  * `2N-PROJECT-004` — audit rows turned into sentences, newest first.
+ *
+ * ## Renamed from `describeProjectChanges` when the person workspace arrived
+ *
+ * Nothing in it was ever project-specific: it sorts rows and delegates each to
+ * `describeHistoryEvent`. The person workspace needs exactly this, and the
+ * choice was between a second copy under a second name and one function under a
+ * name that says what it does. The alternative was the failure this module's own
+ * header warns about — *a second vocabulary for one fact* — arriving through the
+ * back door of a name that made reuse look wrong.
  *
  * ## Why this delegates rather than describes
  *
@@ -158,8 +167,8 @@ export type ProjectChangeRow = {
  * and their payloads carry `has_role` rather than the role text, so nothing a
  * person typed reaches this list.
  */
-export function describeProjectChanges(
-  rows: readonly ProjectChangeRow[],
+export function describeEntityChanges(
+  rows: readonly EntityChangeRow[],
   copy: HistoryCopy,
   formatDate: (iso: string) => string,
 ): readonly HistoryEvent[] {

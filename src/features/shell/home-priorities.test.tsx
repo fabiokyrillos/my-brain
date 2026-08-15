@@ -7,7 +7,7 @@
  * ignores it looks identical to a correct product until someone opens it.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
@@ -49,7 +49,10 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     todayHasMore: false,
     waitingCount: 0,
     openQuestion: null,
-    recent: [],
+    organizing: [],
+    organizedTodayCount: 0,
+    agenda: [],
+    agendaHasMore: false,
     ...overrides,
   };
 }
@@ -93,10 +96,32 @@ describe("2J-HOJE-004/006: the priorities section shows what qualifies, and no m
     ).toBeInTheDocument();
   });
 
+  /**
+   * The Papel e Console cockpit merges the two task sections into one — "Hoje e
+   * atrasado" — with the promoted rows as its first group. The heading and the
+   * cap it does not promise both survive that merge, which is what this asserts.
+   *
+   * Rendered with a task rather than on an entirely empty day: an empty day
+   * renders the section's own quiet state and no group at all, and an absent
+   * heading cannot promise three either.
+   */
   it("does not promise three in its heading", () => {
-    renderHome();
+    renderHome({
+      priorities: [{ taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: null, sensitivity: { kind: "undetermined" as const } }],
+    });
     expect(screen.getByText("Prioridades de hoje")).toBeInTheDocument();
     expect(screen.getByText(/No máximo três/)).toBeInTheDocument();
+  });
+
+  it("keeps the day's two groups under one heading", () => {
+    renderHome({
+      priorities: [{ taskId: "a", title: "Enviar o contrato", reason: "overdue", dueLabel: null, sensitivity: { kind: "undetermined" as const } }],
+      today: [{ taskId: "t1", title: "Uma tarefa qualquer", dueLabel: null, stateLabel: "Não iniciada", sensitivity: { kind: "undetermined" as const } }],
+    });
+
+    const section = screen.getByRole("region", { name: "Hoje e atrasado" });
+    expect(within(section).getByText("Prioridades de hoje")).toBeInTheDocument();
+    expect(within(section).getByText("Para hoje")).toBeInTheDocument();
   });
 });
 

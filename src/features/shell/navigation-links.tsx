@@ -18,6 +18,7 @@ import {
   Home,
   Inbox,
   Layers,
+  Library,
   Menu,
   MessageCircleMore,
   NotebookTabs,
@@ -47,6 +48,9 @@ const icons = {
   home: Home,
   inbox: Inbox,
   work: BriefcaseBusiness,
+  /* Brain. `BrainCircuit` is already `memories`, and two destinations sharing a
+     glyph in one rail is a rail you have to read twice. */
+  library: Library,
   calendar: CalendarDays,
   chat: MessageCircleMore,
   projects: FolderKanban,

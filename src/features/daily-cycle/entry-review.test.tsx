@@ -49,11 +49,19 @@ const attentionItem: AttentionItemView = {
 };
 
 describe("ReviewUnderstanding", () => {
-  it("shows the understanding text as the primary heading and the product state as a status badge", () => {
-    render(<ReviewUnderstanding agentName="Brain" view={baseView()} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+  /**
+   * The Papel e Console recomposition moved the model's paraphrase out of the
+   * `<h1>` and under a section heading of its own — the InterpretationCard rule
+   * that the assistant's reading never comes before the owner's words, applied
+   * to the document outline as well as to the layout. The `<h1>` is now the
+   * record's date and time, on `ReviewIdentity`.
+   */
+  it("renders the understanding as a section, not as the record's name", () => {
+    render(<ReviewUnderstanding agentName="Brain" view={baseView()} locale="pt-BR" />);
 
-    expect(screen.getByRole("heading", { name: "Ligar para a Marina sobre o contrato do Atlas" })).toBeVisible();
-    expect(screen.getByText("Pronto")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "O que o Brain entendeu", level: 2 })).toBeVisible();
+    expect(screen.getByText("Ligar para a Marina sobre o contrato do Atlas")).toBeVisible();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
   });
 
   it("renders the projection's human fields as a compact fact list", () => {
@@ -62,7 +70,6 @@ describe("ReviewUnderstanding", () => {
         agentName="Brain"
         view={baseView({ humanFields: [{ key: "occurredAt", label: "Data do acontecimento", value: "2026-07-18T09:00:00.000Z", editable: true }] })}
         locale="pt-BR"
-        occurredAtLabel="18 de julho de 2026"
       />,
     );
     expect(screen.getByText("Data do acontecimento")).toBeVisible();
@@ -70,10 +77,10 @@ describe("ReviewUnderstanding", () => {
   });
 
   it("surfaces an inline organizing note only while the entry is organizing", () => {
-    const { rerender } = render(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "organizing" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+    const { rerender } = render(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "organizing" })} locale="pt-BR" />);
     expect(screen.getByText("O Brain está organizando este registro.")).toBeVisible();
 
-    rerender(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "ready" })} locale="pt-BR" occurredAtLabel="18 de julho de 2026" />);
+    rerender(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "ready" })} locale="pt-BR" />);
     expect(screen.queryByText("O Brain está organizando este registro.")).not.toBeInTheDocument();
   });
 });
@@ -297,9 +304,17 @@ describe("EntryReview", () => {
     const headings = screen.getAllByRole("heading").map((heading) => heading.textContent);
     const at = (name: string) => headings.indexOf(name);
 
-    expect(at("Ligar para a Marina sobre o contrato do Atlas")).toBe(0);
-    expect(at("O que você escreveu")).toBeGreaterThan(at("Ligar para a Marina sobre o contrato do Atlas"));
-    expect(at("Próximas ações")).toBeGreaterThan(at("O que você escreveu"));
+    /*
+      `07-acessibilidade.md` fixes this order: original → interpretação → ações
+      → painel de explicação → técnico. The record's date and time is the `<h1>`
+      that opens it, and the model's paraphrase is no longer a heading at all —
+      the assistant's reading cannot precede the owner's words in the outline any
+      more than it can in the layout.
+    */
+    expect(at("18 de julho de 2026")).toBe(0);
+    expect(at("O que você escreveu")).toBeGreaterThan(at("18 de julho de 2026"));
+    expect(at("O que o Brain entendeu")).toBeGreaterThan(at("O que você escreveu"));
+    expect(at("Próximas ações")).toBeGreaterThan(at("O que o Brain entendeu"));
     expect(at("O que passou a existir")).toBeGreaterThan(at("Próximas ações"));
 
     expect(screen.getByText("Tente organizar novamente")).toBeVisible();

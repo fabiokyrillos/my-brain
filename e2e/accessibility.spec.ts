@@ -60,15 +60,56 @@ const AXE_PATH = require_.resolve("axe-core");
 
 /** Every stylesheet `globals.css` pulls in, minus the unresolvable Tailwind import. */
 const STYLESHEETS = [
+  // First, and load-bearing: since ADR-114 the palette lives here. Without it
+  // every colour resolves to nothing, and the axe contrast scan below would
+  // measure default black-on-white and pass for the wrong reason.
+  "tokens.css",
+  "experience.css",
   "globals.css",
   "palette.css",
-  "experience.css",
   "operations.css",
   "mobile-navigation.css",
   "pagination.css",
   // Phase 2K's card grammar. Without it the target-size and focus assertions
   // below would measure an unstyled button and pass for the wrong reason.
   "conversation-cards.css",
+  /*
+    Conversar's own two. They were absent while this lane already rendered a
+    `chat-message` — so every message in it was unstyled markup, and the axe
+    contrast scan over it measured default black-on-white and passed for the
+    wrong reason. The redesign's transcript frame is the first thing here that
+    depends on them.
+  */
+  "chat.css",
+  "assistant.css",
+  /*
+    Brain's overview and its lens strip. Without it the strip renders as nine
+    unstyled inline links: the target-size assertion would measure a bare text
+    box and pass, and the contrast scan would read the document default rather
+    than the two greys the strip actually uses to separate current from the rest.
+  */
+  "brain.css",
+  /*
+    The entity workspace's own two. `entities.css` carries the column grid, the
+    card chrome and the disclosure's target size; `timelines.css` carries the
+    hero, the mini-list and the timeline rows the workspace still mounts. Without
+    both, the fixture below is unstyled markup and every geometric assertion over
+    it measures the document default.
+  */
+  "timelines.css",
+  "entities.css",
+  /*
+    The memory workspace's conflict block. It reuses `.conflict-dates` from
+    `experience.css` and adds its own wash and rule here; without this the axe
+    contrast scan below would read the attention tone as the document default.
+  */
+  "memories.css",
+  /*
+    Dados e IA. The strip and the Ajustes section live here; without it the
+    target-size assertion would measure a bare text box and the contrast scan
+    would read the two greys separating the current tab as one colour.
+  */
+  "history.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -76,12 +117,39 @@ const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
 
-async function render(page: Page, body: string, { reducedMotion = false } = {}) {
+async function render(
+  page: Page,
+  body: string,
+  { reducedMotion = false, theme }: { reducedMotion?: boolean; theme?: "light" | "dark" } = {},
+) {
   if (reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
+  /*
+   * `theme` stamps `data-theme` on the root, which is how a stored preference
+   * reaches the page (ADR-114). It matters that this is a parameter rather than
+   * an `emulateMedia({ colorScheme })` call: the explicit choice and the system
+   * default are two different code paths in `tokens.css`, and the one a user
+   * actually picks is the one a media emulation would never exercise.
+   */
+  const themeAttribute = theme ? ` data-theme="${theme}"` : "";
   await page.setContent(
-    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">`
+    `<!doctype html><html lang="pt-BR"${themeAttribute}><head><meta charset="utf-8">`
       + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-      + `<title>Acessibilidade</title><style>${css}</style></head>`
+      /*
+        The three `next/font` variables, stubbed — the same three
+        `layout-contracts.spec.ts` has always stubbed, and absent here until
+        now.
+
+        `tokens.css` declares `--font-reading: var(--font-newsreader), Georgia,
+        serif`, and a `var()` with no declaration and no fallback poisons the
+        custom property it is in. Without these, all three families resolved to
+        the same inherited default, so **every family in this lane was the
+        document default** and any assertion about type would have passed
+        whatever the stylesheet said. Colour and geometry were unaffected, which
+        is why it went unnoticed.
+      */
+      + `<title>Acessibilidade</title><style>`
+      + `:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}`
+      + `${css}</style></head>`
       + `<body><div class="app-shell">${body}</div></body></html>`,
     { waitUntil: "load" },
   );
@@ -170,26 +238,66 @@ function searchSurface() {
     + `</section>`;
 }
 
-/** Mirrors `src/app/[locale]/app/library/page.tsx:52-73`. */
-function librarySurface() {
-  const cards = [
-    ["Projetos", "Trabalhos em andamento", 4],
-    ["Pessoas", "Quem aparece nos seus registros", 12],
-    ["Memórias", "O que o Brain deve lembrar", 7],
-  ] as const;
-  return `<div class="library-page"><header class="library-head"><h1>Biblioteca</h1>`
-    + `<p>Tudo o que o Brain guarda para você.</p>`
-    + `<a class="library-search-link" href="#">Buscar em tudo</a></header>`
-    + `<ul class="library-grid">`
-    + cards
+/**
+ * Mirrors `src/app/[locale]/app/library/page.tsx` and
+ * `src/features/library/brain-lenses.tsx`.
+ *
+ * The strip is included because it renders on **nine** surfaces, so a target
+ * below 44px here is a target below 44px on nine pages. The `Biblioteca` this
+ * fixture used to say was stale by two commits — the destination has been called
+ * Brain since it entered the rail — which is what a hand-written mirror does when
+ * nothing re-derives it, and is why the guard beside it now pins the strip too.
+ *
+ * Three panels rather than eight, and each covers a different arm: a counted
+ * domain with recent rows, a counted domain that deliberately shows none, and an
+ * uncountable one. A fixture with three identical panels would measure one case
+ * three times.
+ */
+function brainSurface() {
+  const lenses = [
+    "Visão geral",
+    "Pessoas",
+    "Projetos",
+    "Empresas",
+    "Contextos",
+    "Memórias",
+    "Arquivos",
+    "Relações",
+    "Conversar",
+  ];
+  const strip = `<nav class="brain-lenses" aria-label="Lentes do Brain">`
+    + lenses
       .map(
-        ([name, note, count]) =>
-          `<li><a class="library-card" href="#"><span class="library-card-name">${name}</span>`
-          + `<span class="library-card-note">${note}</span>`
-          + `<span class="library-card-count">${count}</span></a></li>`,
+        (label, index) =>
+          `<a class="brain-lens" href="#"${index === 0 ? ' aria-current="page"' : ""}>${label}</a>`,
       )
       .join("")
-    + `</ul></div>`;
+    + `</nav>`;
+
+  const panels = [
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Pessoas</a></h3><span class="brain-domain-count">12</span></div>`
+      + `<p class="brain-domain-note">Quem aparece no seu trabalho.</p>`
+      + `<p class="brain-recent-label">Recentes</p>`
+      + `<ul class="brain-recent"><li><span>Marina Duarte</span></li>`
+      + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
+      + `</ul></article></li>`,
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Contextos</a></h3><span class="brain-domain-count">3</span></div>`
+      + `<p class="brain-domain-note">Áreas da sua vida.</p>`
+      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Relações</a></h3></div>`
+      + `<p class="brain-domain-note">Como essas coisas se ligam.</p>`
+      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
+  ];
+
+  return `<div class="brain-page"><header class="brain-head"><h1>Brain</h1>`
+    + `<p>Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p>`
+    + `<a class="brain-search-link" href="#">Buscar em tudo</a></header>`
+    + strip
+    + `<section class="brain-holds"><h2>O que o Brain guarda</h2>`
+    + `<ul class="brain-domains">${panels.join("")}</ul></section></div>`;
 }
 
 /**
@@ -300,7 +408,10 @@ function conversationResumed() {
     + `<a class="conversation-resumed-anchor" href="#message-1">Voltar para onde você estava</a>`
     + `</div>`
     + `<a class="conversation-return" href="#">Voltar para a conversa</a>`
-    + `<article class="chat-message assistant" id="message-1"><span>Brain</span><p>Resposta.</p></article>`
+    + `<article class="chat-message assistant" data-role="assistant" id="message-1">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">Brain</span>`
+    + `<time datetime="2026-08-15T12:00:00.000Z">15 de ago., 09:00</time></p>`
+    + `<p class="chat-message-body">Resposta.</p></article>`
     + `</section>`;
 }
 
@@ -568,11 +679,71 @@ function workFilters() {
     + `</div>`;
 }
 
+/**
+ * Mirrors the person and project workspaces — `03-componentes.md`'s
+ * EntityWorkspace, which both pages now implement.
+ *
+ * The **outline** is what this fixture exists for. The template names its two
+ * columns as `<h2>`s and drops every panel to `<h3>`, which is the half of
+ * `07-acessibilidade.md` an axe violation count does not measure: `/app/reviews`
+ * shipped with the right heading *count* and the wrong order, and the repair
+ * came several screens later than the defect.
+ *
+ * The long name and the long task title are deliberate. A workspace column that
+ * refused to shrink below its content is how one title pushes the other column
+ * off a phone, and no fixture in this lane had a string long enough to show it.
+ */
+function entityWorkspace() {
+  const editDisclosure = `<details class="entity-edit-disclosure"><summary>Editar</summary>`
+    + `<form><label for="ws-name">Nome</label><input id="ws-name" value="Marina"></form></details>`;
+
+  const changes = `<section class="entity-changes"><h2>O que mudou recentemente</h2>`
+    + `<p class="section-explainer">Vem do registro de alterações: edições feitas nesta pessoa.</p>`
+    + `<ol class="history-list"><li class="history-event"><span class="history-dot"></span>`
+    + `<div class="history-event-body"><p class="history-sentence">Você alterou o nome.</p></div></li></ol>`
+    + `</section>`;
+
+  const openColumn = `<section class="entity-workspace-column" aria-labelledby="ws-open">`
+    + `<h2 id="ws-open">Trabalho em aberto</h2>`
+    + `<section class="entity-tasks"><h3>Pendências e tarefas</h3>`
+    + `<div class="mini-list"><article><strong>Revisar o contrato de prestação de serviços da Aurora`
+    + ` antes da reunião de quinta-feira com o time jurídico</strong><span>Em aberto</span></article></div>`
+    + `</section>`
+    + `<section class="relation-panel"><h3>Projetos</h3><ul class="relation-list">`
+    + `<li class="relation-row"><a href="#">Aurora</a></li></ul></section>`
+    + `</section>`;
+
+  const knowsColumn = `<section class="entity-workspace-column" aria-labelledby="ws-knows">`
+    + `<h2 id="ws-knows">O que o Brain sabe</h2>`
+    + `<section class="relation-panel"><h3>Relação com você</h3><ul class="relation-list">`
+    + `<li class="relation-row"><span>Sócia</span></li></ul></section>`
+    + `<section class="entity-memory"><h3>Memórias</h3>`
+    + `<article><strong>Prefere reuniões pela manhã.</strong><span>Preferência</span></article></section>`
+    + `<section class="entity-files"><h3>Arquivos vinculados</h3>`
+    + `<p class="quiet-state">Nenhum arquivo vinculado.</p></section>`
+    + `</section>`;
+
+  return `<div class="content-page entity-workspace">`
+    + `<a class="back-link" href="#">Pessoas</a>`
+    + `<header class="entity-hero"><div><p class="eyebrow">PESSOA</p>`
+    + `<h1>Marina Alexandrina Bittencourt de Albuquerque Vasconcelos</h1>`
+    + `<p class="entity-relation-line"><span>Empresa</span><strong>Aurora</strong></p></div></header>`
+    + editDisclosure
+    + changes
+    + `<div class="entity-workspace-columns">${openColumn}${knowsColumn}</div>`
+    + `<section class="entity-timeline"><h2>Onde aparece</h2>`
+    + `<div class="timeline-list"><article><span class="timeline-dot"></span><div>`
+    + `<a href="#"><strong>Conversa com a Marina sobre o contrato</strong></a><small>12 de agosto</small>`
+    + `</div></article></div></section>`
+    + `</div>`;
+}
+
 const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
   { name: "global search", body: () => searchSurface() },
-  { name: "Library", body: () => librarySurface() },
+  { name: "Brain overview", body: () => brainSurface() },
+  { name: "entity workspace", body: () => entityWorkspace() },
   { name: "Conversar cards", body: () => conversationCards() },
   { name: "Conversar controls", body: () => conversationControls() },
   { name: "Conversar resumed", body: () => conversationResumed() },
@@ -595,6 +766,43 @@ for (const surface of SURFACES) {
     expect(await axeViolations(page)).toEqual([]);
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * ADR-114 — the same scan in dark.
+ *
+ * Dark is an authored palette, not a filter over the light one, so its
+ * contrast pairs are genuinely different numbers and a light-only scan says
+ * nothing about them. Shipping a theme that nothing checks is how the amber
+ * that fails AA on its own wash reached this branch in the first place.
+ *
+ * `data-theme="dark"` rather than `emulateMedia({ colorScheme: "dark" })`:
+ * the explicit choice and the system default are two separate blocks in
+ * `tokens.css`, and this exercises the one a user actually picks.
+ * ------------------------------------------------------------------ */
+
+for (const surface of SURFACES) {
+  test(`ADR-114: ${surface.name} has no serious or critical axe violations in dark`, async ({ page }) => {
+    await render(page, surface.body(), { theme: "dark" });
+    expect(await axeViolations(page)).toEqual([]);
+  });
+}
+
+test("ADR-114: the dark fixture really is dark, so the scan above is not vacuous", async ({ page }) => {
+  // Without this, a `data-theme` that failed to apply would leave every dark
+  // test scanning the light palette and passing for the wrong reason.
+  await render(page, workList(), { theme: "dark" });
+  const canvas = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--background-canvas").trim(),
+  );
+  expect(canvas).toBe("#141311");
+
+  await render(page, workList(), { theme: "light" });
+  const light = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--background-canvas").trim(),
+  );
+  expect(light).toBe("#f7f6f3");
+  expect(light).not.toBe(canvas);
+});
 
 /* ------------------------------------------------------------------ *
  * 2J-ACCESS-005 — visible focus, measured from paint, not from source.
@@ -669,7 +877,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${brainSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
 
   /*
    * `2L-MOBILE-001` widened this locator. Before slice 2L.4 it measured
@@ -846,4 +1054,391 @@ test("2L-MOBILE-009: the Work surfaces reflow at 200% zoom", async ({ page }) =>
   }));
   expect(overflow.scrollWidth, "content is clipped at 200% zoom")
     .toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
+/**
+ * Conversar's editorial transcript — the frame that replaced the bubbles.
+ *
+ * Mirrors `src/app/[locale]/app/chat/[conversationId]/page.tsx`. Only the
+ * geometry and the computed type are under test: the objection to the previous
+ * layout was that it set the owner's and the Brain's **prose** in the UI face
+ * and spent the width on alignment, and neither of those is visible to jsdom.
+ */
+function CHAT_TRANSCRIPT() {
+  const message = (role: "user" | "assistant", body: string, id: string) =>
+    `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
+    + `<time datetime="2026-08-15T12:00:00.000Z">15 de ago., 09:00</time></p>`
+    + `<p class="chat-message-body">${body}</p>`
+    + (role === "assistant"
+      ? `<div class="message-sources"><strong>O que eu usei</strong>`
+        + `<a href="/pt-BR/app/inbox/e1">Você escreveu isto em 12 de agosto</a></div>`
+        + `<small>gpt-5-mini</small>`
+      : "")
+    + `</article>`;
+  return `<div class="content-page chat-thread">`
+    + `<a class="back-link" href="#">Conversas</a>`
+    + `<header><p class="eyebrow">BRAIN COM FONTES</p><h1>Contrato da Aurora</h1></header>`
+    + `<div class="message-stream">`
+    + message("user", "O que a Marina disse sobre o contrato da Aurora?", "message-1")
+    + message("assistant", "Você registrou em 12 de agosto que ela pediu a cláusula de rescisão revisada.", "message-2")
+    + `</div></div>`;
+}
+
+test.describe("Conversar reads as a transcript, not as a chat log", () => {
+  test("both turns run in one column at the full measure", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const [user, assistant] = await Promise.all([
+      page.locator('.chat-message[data-role="user"]').boundingBox(),
+      page.locator('.chat-message[data-role="assistant"]').boundingBox(),
+    ]);
+    // No `justify-self: end`: the two turns start at the same edge.
+    expect(Math.abs(user!.x - assistant!.x)).toBeLessThanOrEqual(16);
+    // And neither is capped at a fraction of the column.
+    const stream = await page.locator(".message-stream").boundingBox();
+    expect(assistant!.width).toBeGreaterThan(stream!.width * 0.95);
+  });
+
+  /*
+    The load-bearing one. Both halves are sentences somebody wrote, so both are
+    set in the reading face — which is the single distinction the whole
+    direction is built on. The previous layout set them in the UI face and
+    distinguished the speakers by side and by fill instead.
+  */
+  test("both turns are set in the reading face, and the labels are not", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    /*
+      Compared against what `--font-reading` actually resolves to rather than
+      against the literal "Newsreader": this lane has no `next/font`, so the
+      variable falls back to a generic serif and a name check would fail on a
+      correct page — which is how a guard gets weakened to make it pass.
+    */
+    const faces = await page.evaluate(() => {
+      const family = (selector: string) =>
+        getComputedStyle(document.querySelector(selector)!).fontFamily.toLowerCase();
+      const probe = document.createElement("p");
+      probe.style.font = "var(--type-reading)";
+      document.body.append(probe);
+      const reading = getComputedStyle(probe).fontFamily.toLowerCase();
+      probe.remove();
+      return {
+        reading,
+        userBody: family('[data-role="user"] .chat-message-body'),
+        assistantBody: family('[data-role="assistant"] .chat-message-body'),
+        speaker: family(".chat-message-speaker"),
+      };
+    });
+    expect(faces.userBody).toBe(faces.reading);
+    expect(faces.assistantBody).toBe(faces.reading);
+    // The machine's label around the prose is emphatically not the reading face.
+    expect(faces.speaker).not.toBe(faces.reading);
+  });
+
+  test("the question is marked by an edge, never by a fill", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const user = await page.locator('.chat-message[data-role="user"]').evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { background: style.backgroundColor, edge: style.borderInlineStartWidth };
+    });
+    // The bubble filled this with `--text-primary` and inverted the text.
+    expect(user.background).toBe("rgba(0, 0, 0, 0)");
+    expect(parseFloat(user.edge)).toBeGreaterThan(0);
+  });
+
+  test("an answer carries its sources and the model that wrote it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const assistant = page.locator('.chat-message[data-role="assistant"]');
+    await expect(assistant.locator(".message-sources a")).toHaveAttribute("href", "/pt-BR/app/inbox/e1");
+    await expect(assistant.locator("small")).toHaveText("gpt-5-mini");
+    // A user turn cites nothing, because it asserted nothing.
+    await expect(page.locator('.chat-message[data-role="user"] .message-sources')).toHaveCount(0);
+  });
+
+  test("every turn is dated, so a thread resumed weeks later says so", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    await expect(page.locator(".chat-message time")).toHaveCount(2);
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on the transcript in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, CHAT_TRANSCRIPT(), { reducedMotion: true, theme });
+      await page.addScriptTag({ path: AXE_PATH });
+      const results = await page.evaluate(async () =>
+        // @ts-expect-error injected by addScriptTag
+        await window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }));
+      const violations = (results as { violations: { id: string; nodes: { target: string[] }[] }[] }).violations;
+      expect(
+        violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(" | ")}`),
+      ).toEqual([]);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * The entity workspace — one template, and the outline it owes.
+ * ------------------------------------------------------------------ */
+
+test.describe("the entity workspace reads as one template", () => {
+  test("names its two columns, and every panel sits below the column that holds it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+
+    /*
+     * The order, not merely the count. `/app/reviews` shipped with the right
+     * number of headings and the wrong nesting — the page's own name arrived
+     * after a flat run of `<h2>`s in which a review's title was a sibling of its
+     * own sections. This asserts the whole outline in document order.
+     */
+    const outline = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("h1, h2, h3")).map(
+        (heading) => `${heading.tagName}:${heading.textContent?.trim().slice(0, 24)}`,
+      ));
+
+    expect(outline).toEqual([
+      "H1:Marina Alexandrina Bitte",
+      "H2:O que mudou recentemente",
+      "H2:Trabalho em aberto",
+      "H3:Pendências e tarefas",
+      "H3:Projetos",
+      "H2:O que o Brain sabe",
+      "H3:Relação com você",
+      "H3:Memórias",
+      "H3:Arquivos vinculados",
+      "H2:Onde aparece",
+    ]);
+  });
+
+  test("gives each column an accessible name taken from its own heading", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+
+    // `aria-labelledby` rather than a duplicated `aria-label`, so the name a
+    // screen reader announces cannot drift from the one on the screen.
+    const columns = page.locator(".entity-workspace-column");
+    await expect(columns).toHaveCount(2);
+    await expect(columns.nth(0)).toHaveAccessibleName("Trabalho em aberto");
+    await expect(columns.nth(1)).toHaveAccessibleName("O que o Brain sabe");
+  });
+
+  test("runs as two columns on a desktop and one on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, entityWorkspace());
+    const wide = await page.evaluate(() =>
+      getComputedStyle(document.querySelector(".entity-workspace-columns")!).gridTemplateColumns.split(" ").length);
+    expect(wide).toBe(2);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const narrow = await page.evaluate(() =>
+      getComputedStyle(document.querySelector(".entity-workspace-columns")!).gridTemplateColumns.split(" ").length);
+    expect(narrow).toBe(1);
+  });
+
+  test("a very long title does not push the neighbouring column off the page", async ({ page }) => {
+    // 320px is the WCAG 1.4.10 reflow width. The fixture's task title is one
+    // unbroken sentence of ninety characters, which is the shape that finds a
+    // grid item refusing to shrink below its content.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, entityWorkspace());
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("the edit disclosure is a real target, and closed at rest", async ({ page }, testInfo) => {
+    await render(page, entityWorkspace());
+    const details = page.locator(".entity-edit-disclosure");
+    // Closed at rest is the whole point of the move: the form is available and
+    // is not what the workspace opens with.
+    await expect(details).not.toHaveAttribute("open", /.*/);
+
+    const box = await details.locator("summary").boundingBox();
+    const minimum = testInfo.project.name === "mobile" ? 44 : 24;
+    expect(box!.height).toBeGreaterThanOrEqual(minimum);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * The memory in conflict — `2N-CONFLICT-002`, said where the queue sends you.
+ * ------------------------------------------------------------------ */
+
+/** Mirrors the conflict block in `src/app/[locale]/app/memories/[memoryId]/page.tsx`. */
+function memoryConflict() {
+  return `<div class="content-page entity-detail memory-detail">`
+    + `<header class="entity-hero"><div><p class="eyebrow">PREFERÊNCIA</p>`
+    + `<h1 class="memory-content-heading">Prefere reuniões pela manhã.</h1></div></header>`
+    + `<section class="memory-conflict" data-memory-conflict="true" role="note">`
+    + `<h2>Informações que não podem estar certas ao mesmo tempo</h2>`
+    + `<dl class="conflict-dates">`
+    + `<div><dt>Começa em</dt><dd>12 de agosto de 2026, 09:00</dd></div>`
+    + `<div><dt>Deveria terminar em</dt><dd>3 de março de 2026, 09:00</dd></div>`
+    + `</dl>`
+    + `<p>As duas datas foram preservadas exatamente como estavam. Escolher uma delas por conta própria`
+    + ` seria inventar o que você quis dizer.</p>`
+    + `<p>Abra a memória e remova a data de término para desfazer a contradição.</p>`
+    + `</section></div>`;
+}
+
+test.describe("a memory in conflict says so on its own page", () => {
+  test("shows both dates, and marks neither as the winner", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, memoryConflict());
+
+    const block = page.locator("[data-memory-conflict='true']");
+    await expect(block).toHaveCount(1);
+    // `2N-CONFLICT-002`: both halves, always. A block that showed one date would
+    // be the product choosing for the owner, which is the thing it refuses.
+    await expect(block.locator("dd")).toHaveCount(2);
+    // Never the word the product wrongly used before the detector existed.
+    await expect(block).not.toContainText(/arquivad/i);
+  });
+
+  test("carries the warm rule the queue's own row carries", async ({ page }) => {
+    await render(page, memoryConflict());
+    const border = await page.evaluate(() => {
+      const node = document.querySelector(".memory-conflict")!;
+      const style = getComputedStyle(node);
+      return { width: style.borderLeftWidth, colour: style.borderLeftColor, background: style.backgroundColor };
+    });
+    // Resolved, not declared: a `var()` that never resolves leaves the property
+    // invalid and the block indistinguishable from an ordinary section — the
+    // failure twenty references in this repository shipped with.
+    expect(border.width).toBe("3px");
+    expect(border.colour).not.toBe("rgba(0, 0, 0, 0)");
+    expect(border.background).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, memoryConflict());
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on the conflict block in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, memoryConflict(), { reducedMotion: true, theme });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Dados e IA — three surfaces, one place.
+ * ------------------------------------------------------------------ */
+
+/** Mirrors `src/features/transparency/data-ai-tabs.tsx` and `data-ai-section.tsx`. */
+function dataAiSurface() {
+  const strip = `<nav class="data-ai-tabs" aria-label="Dados e IA">`
+    + `<a class="data-ai-up" href="#">Ajustes</a>`
+    + `<div class="data-ai-lenses">`
+    + `<a class="data-ai-lens" href="#" aria-current="page">Atividade</a>`
+    + `<a class="data-ai-lens" href="#">Custos</a>`
+    + `<a class="data-ai-lens" href="#">Processamento</a>`
+    + `</div></nav>`;
+
+  const section = `<section class="data-ai-section" aria-labelledby="data-ai-heading">`
+    + `<h2 id="data-ai-heading">Dados e IA</h2>`
+    + `<p class="data-ai-intro">Tudo o que o Brain fez com os seus dados fica aqui.</p>`
+    + `<ul class="data-ai-doors">`
+    + `<li><a class="data-ai-door" href="#"><strong>Atividade</strong>`
+    + `<span>Quem fez o quê, quando e sobre qual objeto.</span></a></li>`
+    + `<li><a class="data-ai-door" href="#"><strong>Custos</strong>`
+    + `<span>Quanto cada operação consumiu, por modelo e por função.</span></a></li>`
+    + `<li><a class="data-ai-door" href="#"><strong>Processamento</strong>`
+    + `<span>O que ainda está sendo processado, e o que falhou.</span></a></li>`
+    + `</ul></section>`;
+
+  return `<div class="content-page"><header class="list-header"><div>`
+    + `<p class="eyebrow">DADOS E IA</p><h1>Histórico de alterações</h1></div></header>`
+    + strip + section + `</div>`;
+}
+
+test.describe("Dados e IA reads as one place", () => {
+  test("marks exactly one lens, and marks it by more than colour", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, dataAiSurface());
+
+    const current = page.locator('.data-ai-lens[aria-current="page"]');
+    await expect(current).toHaveCount(1);
+
+    // `04-estados.md`: never colour alone. The weight and the rule carry it too,
+    // and both are asserted as *resolved* values rather than as declarations.
+    const marks = await page.evaluate(() => {
+      const node = document.querySelector('.data-ai-lens[aria-current="page"]')!;
+      const other = document.querySelectorAll(".data-ai-lens")[1];
+      const style = getComputedStyle(node);
+      return {
+        weight: style.fontWeight,
+        otherWeight: getComputedStyle(other).fontWeight,
+        rule: style.borderBottomWidth,
+        ruleColour: style.borderBottomColor,
+        otherRuleColour: getComputedStyle(other).borderBottomColor,
+      };
+    });
+    expect(Number(marks.weight)).toBeGreaterThan(Number(marks.otherWeight));
+    expect(marks.rule).toBe("2px");
+    expect(marks.ruleColour).not.toBe(marks.otherRuleColour);
+  });
+
+  test("the strip keeps one height whichever lens is current", async ({ page }) => {
+    // The rule is declared at rest and only recoloured, so switching tabs cannot
+    // move the page by 2px.
+    await render(page, dataAiSurface());
+    const heights = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(".data-ai-lens")).map(
+        (node) => Math.round(node.getBoundingClientRect().height),
+      ));
+    expect(new Set(heights).size).toBe(1);
+  });
+
+  test("every door and tab meets the rendered target minimum", async ({ page }, testInfo) => {
+    await render(page, dataAiSurface());
+    const minimum = testInfo.project.name === "mobile" ? 44 : 24;
+    const targets = page.locator(".data-ai-lens, .data-ai-up, .data-ai-door");
+    const total = await targets.count();
+    expect(total).toBe(7);
+    for (let index = 0; index < total; index += 1) {
+      const box = await targets.nth(index).boundingBox();
+      expect(box!.height, `target ${index} is ${box!.height}px`).toBeGreaterThanOrEqual(minimum);
+    }
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, dataAiSurface());
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on Dados e IA in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, dataAiSurface(), { reducedMotion: true, theme });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
 });

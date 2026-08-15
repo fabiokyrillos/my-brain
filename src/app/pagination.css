@@ -4,8 +4,8 @@
   align-items: center;
   gap: 16px;
   margin-top: 24px;
-  color: var(--ink-soft);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font: var(--type-body);
 }
 
 .pagination-links > :last-child {
@@ -18,9 +18,9 @@
   display: inline-flex;
   align-items: center;
   padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
-  color: var(--blue);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--link);
   font-weight: 700;
 }

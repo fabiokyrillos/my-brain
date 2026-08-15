@@ -4,7 +4,7 @@
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .side-nav {
@@ -32,8 +32,8 @@
 .nav-group-label,
 .mobile-nav-group-label {
   padding: 0 12px;
-  color: var(--ink-soft);
-  font: 700 9px var(--font-jetbrains);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -48,18 +48,18 @@
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  border-radius: 11px;
-  background: var(--ink);
-  color: var(--white);
-  box-shadow: 0 8px 20px rgba(20, 35, 59, 0.16);
-  font-size: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--text-primary);
+  color: var(--background-surface);
+  box-shadow: var(--elevation-undo);
+  font: var(--type-body);
   font-weight: 700;
   transform: none;
 }
 
 .side-nav > .capture-fab:hover,
 .side-nav > .capture-fab.active {
-  background: var(--blue);
+  background: var(--link);
 }
 
 .top-bar {
@@ -89,9 +89,9 @@
   gap: 12px;
   min-height: 44px;
   padding: 10px 12px;
-  border-radius: 10px;
-  color: var(--ink-soft);
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: var(--type-body);
   font-weight: 600;
   cursor: pointer;
   list-style: none;
@@ -104,16 +104,16 @@
 
 .side-more > summary:hover,
 .side-more.active > summary {
-  background: var(--mist);
-  color: var(--ink);
+  background: var(--background-subtle);
+  color: var(--text-primary);
 }
 
 .side-more.active > summary {
-  color: var(--blue);
+  color: var(--link);
 }
 
 .side-more > summary:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -135,7 +135,7 @@
  */
 .rail-footer {
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-default);
 }
 
 .account-menu > summary {
@@ -144,7 +144,7 @@
   gap: 10px;
   min-height: 44px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -156,11 +156,11 @@
 
 .account-menu > summary:hover,
 .account-menu[open] > summary {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .account-menu > summary:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -170,9 +170,9 @@
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
-  background: var(--blue-wash);
-  color: var(--blue);
+  border-radius: var(--radius-full);
+  background: var(--tone-information-bg);
+  color: var(--link);
 }
 
 .account-summary-text {
@@ -181,8 +181,8 @@
 }
 
 .account-summary-text small {
-  color: var(--ink-soft);
-  font: 650 9px var(--font-jetbrains);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -191,7 +191,7 @@
    widening the rail or wrapping into the panel below it. */
 .account-summary-text strong {
   overflow: hidden;
-  font-size: 13px;
+  font: var(--type-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -210,31 +210,31 @@
   min-height: 44px;
   padding: 10px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--ink-soft);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font: var(--type-body);
   font-weight: 600;
   text-align: left;
 }
 
 .account-menu-item:hover {
-  background: var(--mist);
-  color: var(--ink);
+  background: var(--background-subtle);
+  color: var(--text-primary);
 }
 
 .account-menu-item:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: -2px;
 }
 
 .account-sign-out {
-  color: #9b2d24;
+  color: var(--tone-risk-fg);
 }
 
 .account-sign-out:hover {
-  background: #fff5f3;
-  color: #9b2d24;
+  background: var(--tone-risk-bg);
+  color: var(--tone-risk-fg);
 }
 
 .account-sign-out:disabled {
@@ -244,12 +244,12 @@
 .account-menu-error {
   margin: 4px 0 0;
   padding: 0 12px;
-  color: #9b2d24;
-  font-size: 12px;
+  color: var(--tone-risk-fg);
+  font: var(--type-caption);
   line-height: 1.5;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 899px) {
   /*
    * Five equal columns, one per `mobileBarSlots` entry (UX-14).
    *
@@ -280,8 +280,8 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: var(--ink-soft);
-    font-size: 9px;
+    color: var(--text-secondary);
+    font: var(--type-caption);
     font-weight: 700;
   }
 
@@ -297,7 +297,7 @@
   }
 
   .mobile-more > summary:focus-visible {
-    outline: 2px solid var(--blue);
+    outline: 2px solid var(--link);
   }
 
   .mobile-more > summary::-webkit-details-marker {
@@ -307,7 +307,7 @@
   .mobile-more.active > summary,
   .mobile-more[open] > summary,
   .bottom-nav > a.active {
-    color: var(--blue);
+    color: var(--link);
   }
 
   .mobile-more-menu {
@@ -321,10 +321,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     padding: 10px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 18px 45px rgba(20, 35, 59, 0.18);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--background-surface);
+    box-shadow: var(--elevation-2);
   }
 
   .mobile-nav-group {
@@ -341,7 +341,7 @@
   .mobile-more-menu .nav-item {
     min-height: 48px;
     padding: 9px 10px;
-    font-size: 11px;
+    font: var(--type-caption);
   }
 
   /*
@@ -353,18 +353,18 @@
   .mobile-nav-account {
     grid-column: 1 / -1;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border-default);
   }
 
   .account-menu-overflow > summary {
     flex-direction: row;
     gap: 10px;
-    font-size: 13px;
+    font: var(--type-body);
   }
 
   /* The overflow panel is already a floating card; a nested one would read as a
      second layer over it, so the account panel stays inline. */
   .account-menu-overflow .account-menu-item {
-    font-size: 12px;
+    font: var(--type-caption);
   }
 }

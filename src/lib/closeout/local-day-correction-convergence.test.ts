@@ -158,22 +158,73 @@ describe("LDC-HOME-001: Home's today is computed in the owner's zone, not format
   });
 
   it("passes the same zone down to the rows it renders", () => {
-    // `home-view.tsx` carries it on the view model and hands it to the inbox and
-    // attention rows, which are the same components the Records page renders --
-    // and, since 2N.4, to the conflict row, which prints two dates of its own.
+    // `home-view.tsx` carries it on the view model and hands it to every row
+    // that prints an instant: the inbox and attention rows the Records page also
+    // renders, the conflict row (2N.4) with two dates of its own, and — since the
+    // Papel e Console cockpit — the expanded attention lead and the agenda row.
     //
-    // The count went 2 -> 3 because a **third row type** now renders an instant,
-    // which is the guard working: a row that formatted a date without receiving
-    // this zone would fall back to the device's, and that is the defect
-    // `LDC-DAILY-001` exists to prevent. Raised deliberately, with the new
-    // consumer named below so the number is a claim about the surface rather
-    // than a literal someone bumped to go green.
+    // This asserted an exact count of three until the cockpit added two more
+    // rows, which made a correct change look like a regression. The literal was
+    // a proxy for the real claim, so the real claim is now asserted instead:
+    //
+    //   1. every zone this file hands to a child is `view.timeZone` — a row
+    //      handed anything else is the `LDC-DAILY-001` defect, and an exact
+    //      count could never have caught it;
+    //   2. each named row type is rendered, and there are at least as many
+    //      zone-passing props as row types.
+    //
+    // Both still fail on the regression that matters — a new row that formats a
+    // date without receiving this zone falls back to the device's — and neither
+    // fails on a row being added correctly.
     const view = read("src/features/shell/home-view.tsx");
     expect(view).toMatch(/readonly timeZone: string;/);
-    expect((view.match(/timeZone=\{view\.timeZone\}/g) ?? []).length).toBe(3);
-    for (const row of ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow"]) {
+
+    const zoneProps = view.match(/timeZone=\{([^}]+)\}/g) ?? [];
+    expect(new Set(zoneProps), "Home hands a child a zone that is not the owner's").toEqual(
+      new Set(["timeZone={view.timeZone}"]),
+    );
+
+    /*
+      The completeness half, and it has to be derived rather than listed.
+
+      A hand-written list plus `length >= list.length` is what an independent
+      review caught here: adding `<NewDateRow item={x} />` with no zone leaves
+      both numbers at five and both assertions pass, which is the exact
+      regression this guard exists for. So the components are DISCOVERED from
+      the file — every capitalised element whose name ends in `Row` or `Card` —
+      and each one is required to carry the prop. The list below is only the
+      floor, so a rename cannot empty the discovery and pass vacuously.
+    */
+    const imported = new Set(
+      [...view.matchAll(/^import\s*\{([^}]+)\}/gm)]
+        .flatMap((match) => match[1].split(","))
+        .map((name) => name.trim())
+        .filter((name) => /(?:Row|Card)$/.test(name)),
+    );
+    const rendered = [...view.matchAll(/<([A-Z][A-Za-z]*(?:Row|Card))\b([^>]*)>/g)]
+      /*
+        **Imported** rows only.
+
+        A row defined in this file is visible to whoever reads it, and one of
+        them — `TaskRow` — legitimately takes no zone: it renders a `dueLabel`
+        the dashboard already formatted, so it never touches an instant. The
+        rows that DO format instants are the shared ones this file imports, and
+        those are the ones a future edit can add without noticing the prop.
+      */
+      .filter(([, name]) => imported.has(name));
+    expect(
+      rendered.length,
+      "no imported date-bearing row was discovered — the scan is broken, not the surface",
+    ).toBeGreaterThanOrEqual(4);
+    for (const [, name, attributes] of rendered) {
+      expect(attributes, `${name} renders without the owner's zone`).toContain("timeZone={view.timeZone}");
+    }
+
+    const rows = ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow", "NeedsAttentionLeadCard", "AgendaRow"];
+    for (const row of rows) {
       expect(view, `${row} must receive the owner's zone`).toContain(row);
     }
+    expect(zoneProps.length).toBeGreaterThanOrEqual(rows.length);
     expect(read(HOME)).toContain("timeZone: workProjection.timezone,");
   });
 });

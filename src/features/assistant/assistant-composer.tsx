@@ -83,6 +83,31 @@ export function AssistantComposer({
   }, [state]);
 
   /**
+   * What the field holds again after a turn that failed.
+   *
+   * `<form action={…}>` resets the form once its action settles — correct after
+   * a turn that landed somewhere, and destructive after one that did not: a
+   * knowledge answer that failed, or a submission refused for being too long,
+   * cleared the box and left the user to retype what they had written. The
+   * routes that carry a failure hand back `echo`, which is the owner's own text,
+   * so the field is restored from it.
+   *
+   * **Only on those two routes.** `memory_intent` also carries an echo and
+   * renders it in the notice as a quotation, so restoring there would put the
+   * same sentence on screen twice and make the composer look un-submitted. A
+   * `command` turn carries no echo at all, because the preview already shows the
+   * task it resolved.
+   *
+   * `key` rather than `defaultValue` alone: an uncontrolled `<textarea>` keeps
+   * its DOM value across re-renders, so a changed default would not be applied.
+   * Keying on the route and the echo makes React mount a fresh field with the
+   * restored text, and leaves a *successful* turn's empty field untouched.
+   */
+  const restored = state.route === "knowledge_failed" || state.route === "invalid"
+    ? state.echo
+    : null;
+
+  /**
    * Enter sends; Shift+Enter breaks the line.
    *
    * `isComposing` is the correctness part rather than a nicety: an IME is
@@ -120,8 +145,10 @@ export function AssistantComposer({
         <div className="assistant-composer-row">
           <textarea
             aria-describedby={hintId}
+            defaultValue={restored ?? ""}
             disabled={pending}
             id={fieldId}
+            key={restored === null ? "empty" : `restored:${restored.length}:${state.route}`}
             maxLength={12000}
             name="composerText"
             onKeyDown={onKeyDown}

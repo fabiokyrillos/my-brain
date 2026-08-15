@@ -324,6 +324,16 @@ export function toInboxItemView(source: InboxItemSource): InboxItemView | null {
     significantAt: source.significantAt,
     availableActions,
     originalPreserved: source.originalPreserved,
+    /*
+      "Só registro" (`04-estados.md`) — the entry was read and proposed nothing.
+
+      Derived here rather than by the surface, from the same `lifecycle` input
+      that decided the product state, because it is a statement about the
+      interpretation and not about the rendering. It is deliberately narrower
+      than `ready`: an entry whose candidates the owner confirmed is also
+      `ready`, and calling that "record only" would deny the tasks it created.
+    */
+    isRecordOnly: productLifecycle.productState === "ready" && lifecycle.hasValidTaskCandidates !== true,
   });
 }
 

@@ -123,7 +123,9 @@ export function LinkedFilesSection({
   const copy = getFileLibraryCopy(locale);
   return (
     <section className="entity-files" data-link-direction="subject-to-file">
-      <h2>{copy.linkedFilesHeading}</h2>
+      {/* `<h3>`, matching the sibling panels: this section renders only inside a
+          workspace column, whose own heading is the `<h2>`. */}
+      <h3>{copy.linkedFilesHeading}</h3>
       {outcome.status === "failed" ? (
         <p className="quiet-state" data-link-state="failed" role="note">
           {copy.linkedFilesFailed}

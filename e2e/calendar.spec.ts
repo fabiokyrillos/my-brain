@@ -40,12 +40,26 @@ import { expect, test, type Page } from "@playwright/test";
 const ROOT = join(__dirname, "..");
 
 /** Every stylesheet the calendar's markup depends on, read from source. */
-const STYLESHEETS = ["globals.css", "operations.css", "task-commands.css", "calendar.css"] as const;
+// `tokens.css` and `experience.css` first: since ADR-114 they carry the palette
+// every rule below resolves against, so a fixture without them is unstyled.
+const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css"] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
   .join("\n")
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
+
+/*
+ * The three `next/font` variables, stubbed.
+ *
+ * `tokens.css` declares `--font-reading: var(--font-newsreader), Georgia,
+ * serif`, and a `var()` with no declaration and no fallback makes the custom
+ * property containing it invalid — which poisons every `--type-*` token that
+ * reads it, which voids every `font: var(--type-*)` declaration including the
+ * one on `body`. Without this the whole fixture renders at the UA default and
+ * every geometric assertion below measures text that is not the product's.
+ */
+const FONT_STUB = ":root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}";
 
 type Locale = "pt-BR" | "en";
 
@@ -64,12 +78,16 @@ const COPY = {
     reschedule: "Datas",
     unavailable: "Este item não tem datas que possam ser alteradas aqui.",
     empty: "Nada marcado para este período.",
+    description: "O que os seus dias contêm, reunido a partir do que você já registrou.",
+    atLatest: "Este é o fim do período que o calendário cobre.",
   },
   en: {
     title: "Calendar",
     reschedule: "Dates",
     unavailable: "This item has no dates that can be changed here.",
     empty: "Nothing scheduled for this period.",
+    description: "What your days actually contain, gathered from what you have already recorded.",
+    atLatest: "This is the end of the period the calendar covers.",
   },
 } as const;
 
@@ -138,9 +156,9 @@ function page(locale: Locale, items: string[]): string {
   const copy = COPY[locale];
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>${css}</style></head><body><main>
+  <style>${FONT_STUB}${css}</style></head><body><main>
   <section aria-labelledby="cal" class="calendar">
-    <header class="calendar-header"><h1 id="cal">${copy.title}</h1></header>
+    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
     <nav aria-label="Orientação" class="calendar-orientation"><ul>
       <li><a href="?orientation=day" aria-current="true">Dia</a></li>
       <li><a href="?orientation=week">Semana</a></li>
@@ -151,6 +169,7 @@ function page(locale: Locale, items: string[]): string {
       <p aria-live="polite" class="calendar-range">sáb., 15 ago.</p>
       <a href="?date=2026-08-15">Hoje</a>
       <a href="?date=2026-08-16" rel="next">Próximo</a>
+    <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
     </nav>
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <ol class="calendar-days"><li class="calendar-day" data-today="true">
@@ -164,6 +183,63 @@ function page(locale: Locale, items: string[]): string {
 
 async function open(target: Page, locale: Locale, items: string[]): Promise<void> {
   await target.setContent(page(locale, items), { waitUntil: "load" });
+}
+
+/**
+ * The **week** orientation, mirroring `calendar-view.tsx`'s `<table>` and the
+ * scroll wrapper around it.
+ *
+ * This lane had never rendered the week at all — only the day's `<ol>` — so the
+ * grid's geometry, its lane chips and its control band were measured by nothing.
+ * The recomposition needed a place to be wrong, and this is it.
+ *
+ * `busyIndex` puts every item in one column, which is the case that exposed the
+ * old layout: with `display:block` on the `<table>`, `table-layout: fixed` never
+ * applied and that one column took the width of six.
+ */
+function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
+  const copy = COPY[locale];
+  const days = ["seg., 10 ago.", "ter., 11 ago.", "qua., 12 ago.", "qui., 13 ago.", "sex., 14 ago.", "sáb., 15 ago.", "dom., 16 ago."];
+  const lane = (name: string, shown: boolean) =>
+    `<li><a data-lane="deadline" data-shown="${shown}" href="?lanes=x">${name}<span class="sr-only">${shown ? "mostrando" : "oculto"}</span></a></li>`;
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>${FONT_STUB}${css}</style></head><body><main>
+  <section aria-labelledby="cal" class="calendar">
+    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
+    <div class="calendar-toolbar">
+      <nav aria-label="Orientação" class="calendar-orientation"><ul>
+        <li><a href="?orientation=day">Dia</a></li>
+        <li><a href="?orientation=week" aria-current="true">Semana</a></li>
+        <li><a href="?orientation=agenda">Agenda</a></li>
+      </ul></nav>
+      <nav aria-label="Faixas" class="calendar-lanes"><ul>
+        ${lane("Prazos", true)}${lane("Intenções", false)}
+      </ul></nav>
+      <nav aria-label="Anterior" class="calendar-navigation">
+        <a href="?date=2026-08-03" rel="prev">Anterior</a>
+        <p aria-live="polite" class="calendar-range">seg., 10 ago. – dom., 16 ago.</p>
+        <a href="?date=2026-08-15">Hoje</a>
+        <a href="?date=2026-08-17" rel="next">Próximo</a>
+      <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
+      </nav>
+    </div>
+    <p class="calendar-bound" role="status">${copy.atLatest}</p>
+    <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
+    <div class="calendar-week-scroll"><table class="calendar-week">
+      <caption class="visually-hidden">seg., 10 ago. – dom., 16 ago.</caption>
+      <thead><tr>${days.map((day, index) =>
+        `<th scope="col"${index === 5 ? ' data-today="true"' : ""}><span class="calendar-week-day">${day}</span>${index === 5 ? '<span class="calendar-today">hoje</span>' : ""}</th>`).join("")}</tr></thead>
+      <tbody><tr>${days.map((_day, index) =>
+        `<td${index === 5 ? ' data-today="true"' : ""}>${index === busyIndex && items.length
+          ? `<ul class="calendar-day-items">${items.join("")}</ul>`
+          : `<p class="calendar-empty">${copy.empty}</p>`}</td>`).join("")}</tr></tbody>
+    </table></div>
+  </section></main></body></html>`;
+}
+
+async function openWeek(target: Page, locale: Locale, items: string[]): Promise<void> {
+  await target.setContent(weekPage(locale, items), { waitUntil: "load" });
 }
 
 const task = (locale: Locale) => itemMarkup({
@@ -346,5 +422,120 @@ test.describe("mobile reflow and target size", () => {
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
     await expect(target.locator('input[type="date"]')).toBeVisible();
+  });
+});
+
+/**
+ * The week grid — the shape the calendar had never been rendered in by any lane.
+ *
+ * Every assertion here is geometric or computed-style, which is precisely why it
+ * belongs in a browser: the defect it guards against is a table that stopped
+ * being a table, and jsdom has no table layout algorithm to be wrong about.
+ */
+test.describe("the week is a grid, not seven columns sized by their contents", () => {
+  test("seven equal columns, whichever day is busy", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR"), task("pt-BR"), task("pt-BR")]);
+
+    const widths = await target.locator(".calendar-week thead th").evaluateAll((cells) =>
+      cells.map((cell) => Math.round(cell.getBoundingClientRect().width)));
+    expect(widths).toHaveLength(7);
+    // The busy column is the third; with a content-sized table it was the widest
+    // by a factor of two or more.
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
+  });
+
+  test("a header sits above the column it names", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+    const aligned = await target.evaluate(() => {
+      const heads = [...document.querySelectorAll<HTMLElement>(".calendar-week thead th")];
+      const cells = [...document.querySelectorAll<HTMLElement>(".calendar-week tbody td")];
+      return heads.every((head, index) =>
+        Math.abs(head.getBoundingClientRect().x - cells[index].getBoundingClientRect().x) <= 1);
+    });
+    expect(aligned).toBe(true);
+  });
+
+  test("today is marked by more than a colour", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+    const today = target.locator('.calendar-week th[data-today="true"]');
+    // The word, first — `2M-ACCESS-005` forbids colour as the only carrier.
+    await expect(today.locator(".calendar-today")).toHaveText("hoje");
+    const border = await today.evaluate((node) => getComputedStyle(node).borderTopWidth);
+    expect(parseFloat(border)).toBeGreaterThan(1);
+  });
+
+  /*
+    The regression that removing `aria-pressed` caused. The attribute was
+    invalid on an anchor and had to go; the CSS rule keyed on it stayed, so a
+    hidden lane became visually identical to a shown one and its state survived
+    only in a visually-hidden word.
+  */
+  test("a hidden lane looks hidden, not only sounds hidden", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+    const shown = target.locator('.calendar-lanes a[data-shown="true"]');
+    const hidden = target.locator('.calendar-lanes a[data-shown="false"]');
+    const [shownStyle, hiddenStyle] = await Promise.all([
+      shown.evaluate((node) => ({ style: getComputedStyle(node).borderTopStyle, opacity: getComputedStyle(node).opacity })),
+      hidden.evaluate((node) => ({ style: getComputedStyle(node).borderTopStyle, opacity: getComputedStyle(node).opacity })),
+    ]);
+    expect(hiddenStyle.style).toBe("dashed");
+    expect(shownStyle.style).not.toBe("dashed");
+    expect(Number(hiddenStyle.opacity)).toBeLessThan(Number(shownStyle.opacity));
+  });
+
+  test("the grid scrolls inside its container and the page never does", async ({ page: target }) => {
+    for (const width of [375, 412, 768, 1024, 1440, 1920]) {
+      await target.setViewportSize({ width, height: 800 });
+      await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+      const overflow = await target.evaluate(() => ({
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        container: (() => {
+          const box = document.querySelector(".calendar-week-scroll")!;
+          return box.scrollWidth > box.clientWidth;
+        })(),
+      }));
+      expect(overflow.page, `page scrolls horizontally at ${width}px`).toBeLessThanOrEqual(1);
+      // The container is what absorbs it on a narrow viewport — proof the
+      // scroll went somewhere rather than the grid being squeezed flat.
+      if (width <= 768) expect(overflow.container, `grid did not scroll at ${width}px`).toBe(true);
+    }
+  });
+
+  /*
+    `2M-CAL-006`. The bound was declared, implemented and never rendered by any
+    browser lane — `.calendar-bound` was one of two classes the widened mirror
+    guard found unmirrored. Reaching the end of what the calendar covers has to
+    be a visible statement, not an empty grid the user reads as a bug.
+  */
+  test("reaching the end of the range says so, next to a grid that is still there", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+    const bound = target.locator(".calendar-bound");
+    await expect(bound).toHaveText(COPY["pt-BR"].atLatest);
+    await expect(bound).toHaveAttribute("role", "status");
+    await expect(target.locator(".calendar-week")).toBeVisible();
+  });
+
+  test("an empty day inside the grid is a line, never a box", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await openWeek(target, "pt-BR", [task("pt-BR")]);
+
+    const empty = target.locator(".calendar-week .calendar-empty").first();
+    await expect(empty).toHaveText(COPY["pt-BR"].empty);
+    const box = await empty.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { border: style.borderTopWidth, background: style.backgroundColor };
+    });
+    expect(parseFloat(box.border)).toBe(0);
+    expect(box.background).toBe("rgba(0, 0, 0, 0)");
   });
 });

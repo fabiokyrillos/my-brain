@@ -2,6 +2,7 @@ import { captureEntry } from "@/features/capture/actions";
 import { QuickCaptureForm } from "@/features/capture/quick-capture-form";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
+import { EMPTY_HOME_AGENDA, loadHomeAgendaProjection } from "@/features/daily-cycle/home-agenda";
 import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import type { WorkItemHumanState } from "@/features/daily-cycle/contracts";
@@ -14,7 +15,7 @@ import { deriveHomeOperationalStatus } from "./capabilities";
 import { HomeView, type HomePriorityView, type HomeTaskView, type HomeViewModel } from "./home-view";
 import { getAgentName } from "@/features/profile/agent-identity";
 
-const RECENT_ACTIVITY_LIMIT = 4;
+const ORGANIZING_HOME_LIMIT = 4;
 const NEEDS_ATTENTION_HOME_LIMIT = 3;
 const TODAY_HOME_LIMIT = 5;
 
@@ -66,7 +67,8 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     section that is empty for a week because something is broken should be
     findable. It just does not take the page down to say so.
   */
-  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled] = await Promise.allSettled([
+  const now = new Date();
+  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled] = await Promise.allSettled([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
     loadInboxProjection(supabase, { locale, page: 1 }),
@@ -75,6 +77,13 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     // above: a failed conflict derivation degrades to "no conflicts found" and
     // logs, rather than taking Hoje down.
     loadMemoryConflicts(supabase, { locale, userId: user.id }),
+    /*
+      "Adiante". Its own settled slot for the same reason as every other
+      section: the calendar projection throws on an unsupported profile zone
+      (`2M-TIME-003`), and a cockpit that refuses to render because the agenda
+      panel could not resolve a timezone would take the capture box down with it.
+    */
+    loadHomeAgendaProjection(supabase, { userId: user.id, locale, now }),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, section: string): T {
@@ -108,6 +117,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     { items: [], bounded: false, limit: 0 } as Awaited<ReturnType<typeof loadMemoryConflicts>>,
     "conflicts",
   );
+  const agenda = settled(agendaSettled, EMPTY_HOME_AGENDA, "agenda");
 
   const operationalStatus = deriveHomeOperationalStatus({
     items: inboxProjection.items,
@@ -129,7 +139,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     timeZone: workProjection.timezone,
   });
   const priorities: HomePriorityView[] = selectTodayPriorities(workProjection.items, {
-    now: new Date(),
+    now,
     timeZone: workProjection.timezone,
   }).map((priority) => ({
     taskId: priority.item.taskId,
@@ -159,6 +169,44 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       sensitivity: task.sensitivity,
     }));
 
+  /*
+    The two readings the side column and the quiet state need, both taken from
+    the inbox page that was already loaded — no second query, and no second
+    definition of "organizing" or "organized".
+
+    `localDayBounds` in `workProjection.timezone` is the same day boundary the
+    header, the priority selection and the due labels above use. A count of "what
+    was organized today" computed from the server's clock would name a different
+    day than the greeting sitting three lines above it (`LDC-HOME-001`).
+  */
+  const organizing = inboxProjection.items
+    .filter((item) => item.productState === "organizing")
+    .slice(0, ORGANIZING_HOME_LIMIT);
+
+  /*
+    The day's account is NOT computed here, and the reason is that the field it
+    would need does not mean what it looks like it means.
+
+    `04-estados.md` asks the quiet state to say how many records were organized
+    today. The only per-entry timestamp this projection carries is
+    `significantAt`, which is `entries.occurred_at` — and the worker
+    **overwrites** that with the model's extracted event date
+    (`202607170026_phase_2x_entry_interpretation_worker.sql:247`). So a Tuesday
+    capture reading "reunião na sexta" carries Friday, and counting it would
+    produce two false sentences: Tuesday under-reports, and Friday claims a
+    record was organized on a day nothing happened.
+
+    An independent review caught this. Two further errors sat on the same line:
+    the count came from page one of the inbox, so it silently capped at fifty,
+    and it used `workProjection.timezone` — which is `"UTC"` when that
+    projection fell back, naming the wrong day for exactly the evening hours
+    `LDC-HOME-001` exists to protect.
+
+    Reporting nothing is the honest option until an ingestion timestamp is
+    available to count. The quiet state keeps its reassurance and its link.
+  */
+  const organizedToday = 0;
+
   const view: HomeViewModel = {
     timeZone: workProjection.timezone,
     /*
@@ -174,7 +222,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       month: "long",
       timeZone: workProjection.timezone,
     })
-      .format(new Date())
+      .format(now)
       .toUpperCase(),
     status:
       operationalStatus.kind === "attention"
@@ -191,7 +239,10 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       workProjection.items.length - promoted.size > TODAY_HOME_LIMIT || workProjection.hasNext,
     waitingCount: supplemental.waitingCount,
     openQuestion: supplemental.openQuestionPreview,
-    recent: inboxProjection.items.slice(0, RECENT_ACTIVITY_LIMIT),
+    organizing,
+    organizedTodayCount: organizedToday,
+    agenda: agenda.items,
+    agendaHasMore: agenda.hasMore,
   };
 
   return (

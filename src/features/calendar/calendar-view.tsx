@@ -38,6 +38,7 @@ import type {
   TaskDetailDateBounds,
 } from "@/features/task-commands/task-detail-controls";
 
+import { WorkModeTabs } from "@/features/daily-cycle/work-modes";
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
@@ -154,6 +155,34 @@ export function CalendarView({
         <p className="calendar-description">{copy.description}</p>
       </header>
 
+      {/*
+        `02-arquitetura-e-rotas.md` makes Calendário a **mode of Trabalho**: it
+        answers *when* about the rows Lista answers *what* about. The tab strip
+        is what makes that relationship visible, and it navigates — the route
+        stays exactly where it was, per the consolidation table's compatibility
+        rule that no existing URL dies at this step.
+      */}
+      <WorkModeTabs active="calendar" locale={locale} />
+
+      {/*
+        The three control rows, in one band.
+
+        Orientation, lanes and navigation were three stacked rows above the
+        grid. They answer one question between them — *which slice of time am I
+        looking at, and which of it* — and `03-componentes.md` puts the controls
+        that scope a view in one band above it rather than in a stack that
+        competes with it.
+
+        **The three status regions below are deliberately not in the band.** The
+        bound notice, the partial-read notice and the summary are statements
+        about the result rather than ways to change it, and two of them are live
+        regions; folding a live region into a row of navigation is how an
+        announcement ends up read as a control.
+
+        Nothing about the controls changed: still links, still the URL, still
+        keyboard-operable, still no gesture anywhere.
+      */}
+      <div className="calendar-toolbar">
       {/* Orientation. Links, so the URL is the state and the keyboard works. */}
       <nav aria-label={copy.orientation.label} className="calendar-orientation">
         <ul>
@@ -181,12 +210,36 @@ export function CalendarView({
             return (
               <li key={lane}>
                 <Link
-                  aria-pressed={shown ? "true" : "false"}
+                  /*
+                    No `aria-pressed`. It is only valid on `role="button"`, and
+                    axe flagged all five of these on the live page — a link that
+                    claims to be a toggle button is an invalid ARIA attribute,
+                    not a shortcut. The state belongs in the accessible name, so
+                    it is a visually hidden word inside the link: screen readers
+                    hear "Prazos, mostrando", pointer users see the same chip,
+                    and the element stays a real link that can be opened in a new
+                    tab. OD-2M-6 A is unaffected — the control is still the URL.
+                  */
+                  /*
+                    `data-shown`, and it is not cosmetic.
+
+                    Removing the invalid `aria-pressed` also removed the only
+                    thing `calendar.css` keyed the *visible* off-state off —
+                    `.calendar-lanes a[aria-pressed="false"]` stopped matching
+                    anything, and a hidden lane lost its dashed edge and its
+                    reduced opacity. What remained was a `sr-only` word: correct
+                    for a screen reader and **nothing at all** for a sighted
+                    user, which is `2M-ACCESS-005` failed in the opposite
+                    direction from the one it was written for. The state is
+                    carried by a data attribute, which no ARIA rule governs.
+                  */
                   data-lane={lane}
+                  data-shown={shown ? "true" : "false"}
                   href={calendarHref(locale, withLaneToggled(query, lane))}
                   title={copy.lanes.descriptions[lane]}
                 >
                   {copy.lanes.names[lane]}
+                  <span className="sr-only">{shown ? copy.lanes.stateShown : copy.lanes.stateHidden}</span>
                 </Link>
               </li>
             );
@@ -212,7 +265,22 @@ export function CalendarView({
         >
           {copy.navigation.next}
         </Link>
+        {/*
+          The one link in the product that reaches Lembretes unconditionally.
+
+          `/app/reminders` was reachable **only** from a calendar item that *is*
+          a reminder, or from an entry outcome that produced one — so an account
+          with no reminder had no path to the surface at all, and a route
+          reachable only once it has content is not reachable. It sits here
+          because this is the surface that already draws reminders beside tasks,
+          which makes "see all of them" a truthful offer rather than a menu entry
+          smuggled into a control band.
+        */}
+        <Link className="calendar-reminders-link" href={`/${locale}/app/reminders`}>
+          {copy.navigation.allReminders}
+        </Link>
       </nav>
+      </div>
 
       {/* `2M-CAL-006`: reaching the bound is a visible state, not an empty grid. */}
       {bound.atEarliest ? <p className="calendar-bound" role="status">{copy.navigation.atEarliest}</p> : null}
@@ -233,43 +301,62 @@ export function CalendarView({
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
       {query.orientation === "week" ? (
-        <table className="calendar-week">
-          <caption className="visually-hidden">{rangeLabel}</caption>
-          <thead>
-            <tr>
-              {projection.days.map((day) => (
-                <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
-                  <span>{formatDayLabel(day.date, locale)}</span>
-                  {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {projection.days.map((day) => (
-                <td key={day.date} data-today={day.isToday ? "true" : undefined}>
-                  {day.items.length === 0 ? (
-                    <p className="calendar-empty">{emptyMessage}</p>
-                  ) : (
-                    <ul className="calendar-day-items">
-                      {day.items.map((item) => (
-                        <CalendarItem
-                          dateBounds={dateBounds}
-                          item={item}
-                          key={item.id}
-                          locale={locale}
-                          rescheduleAction={recordingAction}
-                          timezone={projection.timezone}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+        /*
+          The scroll container is the **table's parent**, not the table.
+
+          `overflow-x` needs a block box, and the previous rule got one by
+          putting `display:block` on the `<table>` itself. That replaces the
+          table box with a block box and hands the rows to an anonymous table
+          wrapper, so `table-layout: fixed` was inert and the seven columns were
+          sized by their contents: a week with one busy Tuesday rendered as one
+          wide column and six narrow ones, on every viewport, and `min-width`
+          was the only thing keeping them legible.
+
+          With the overflow on a wrapper the table is a table again — seven
+          equal columns that line up with their headers, and a container that
+          scrolls only when the viewport is narrower than the grid's own floor.
+          The `<table>`, `<thead>`, `<th scope="col">` and `<caption>` are
+          untouched, so `2M-ACCESS-002` is unchanged.
+        */
+        <div className="calendar-week-scroll">
+          <table className="calendar-week">
+            <caption className="visually-hidden">{rangeLabel}</caption>
+            <thead>
+              <tr>
+                {projection.days.map((day) => (
+                  <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
+                    <span className="calendar-week-day">{formatDayLabel(day.date, locale)}</span>
+                    {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {projection.days.map((day) => (
+                  <td key={day.date} data-today={day.isToday ? "true" : undefined}>
+                    {day.items.length === 0 ? (
+                      <p className="calendar-empty">{emptyMessage}</p>
+                    ) : (
+                      <ul className="calendar-day-items">
+                        {day.items.map((item) => (
+                          <CalendarItem
+                            dateBounds={dateBounds}
+                            item={item}
+                            key={item.id}
+                            locale={locale}
+                            rescheduleAction={recordingAction}
+                            timezone={projection.timezone}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       ) : (
         <ol className="calendar-days">
           {projection.days.map((day) => (

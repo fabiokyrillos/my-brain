@@ -229,12 +229,75 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
     // IS the URL, which is what makes `2M-CAL-004` true rather than aspirational.
     view();
     const controls = Array.from(document.querySelectorAll("nav a"));
-    expect(controls.length).toBeGreaterThanOrEqual(3 + 5 + 3);
+    // The three orientations, five lanes, three navigation controls — and, since
+    // the Papel e Console recomposition, the three mode tabs.
+    expect(controls.length).toBeGreaterThanOrEqual(3 + 5 + 3 + 3);
     for (const control of controls) {
-      expect(control.getAttribute("href")).toMatch(/^\/pt-BR\/app\/calendar\?/);
       expect((control.textContent ?? "").trim().length).toBeGreaterThan(0);
     }
     expect(document.querySelector("nav [role='button']")).toBeNull();
+  });
+
+  /**
+   * The href-shape assertion, kept but scoped.
+   *
+   * It used to run over every `nav a` on the page and required each one to be a
+   * `/app/calendar?…` URL. That was a proxy for "the control IS the URL", and it
+   * stopped being true of the whole page when Calendário became a *mode* of
+   * Trabalho: the tab strip's three links point at `/app/work`,
+   * `/app/calendar` and `/app/calendar/plan` by design, which is the whole point
+   * of the consolidation preserving the routes.
+   *
+   * Narrowed rather than weakened: the calendar's own controls are still held to
+   * carrying the query, and the tabs get their own two-sided check below.
+   *
+   * **The reminders link is excluded by name, and only that one.** It is the
+   * product's one unconditional path to `/app/reminders` and it deliberately
+   * leaves the calendar rather than narrowing it, so holding it to the query
+   * shape would be holding a destination to a filter's contract. Excluding it by
+   * class rather than by loosening the pattern keeps the rule intact for every
+   * other control in the band — a regex widened to `\/app\/` would have admitted
+   * anything.
+   */
+  it("keeps the calendar's own controls addressed by query", () => {
+    view();
+    const owned = Array.from(document.querySelectorAll(
+      ".calendar-orientation a, .calendar-lanes a, .calendar-navigation a:not(.calendar-reminders-link)",
+    ));
+    // The control on the control: if a refactor renamed these regions, an empty
+    // list would satisfy every assertion in the loop below.
+    expect(owned.length).toBeGreaterThanOrEqual(3 + 5 + 2);
+    for (const control of owned) {
+      expect(control.getAttribute("href")).toMatch(/^\/pt-BR\/app\/calendar\?/);
+    }
+  });
+
+  /**
+   * The excluded link, asserted rather than merely excluded.
+   *
+   * An exclusion with no positive counterpart is how a control disappears and a
+   * test keeps passing. This is the only path to Lembretes that does not require
+   * a reminder to already exist, so its absence is a route becoming unreachable.
+   */
+  it("offers the one unconditional way into Lembretes", () => {
+    view();
+    const link = document.querySelector(".calendar-navigation .calendar-reminders-link");
+    expect(link, "the unconditional reminders link is gone").not.toBeNull();
+    expect(link!.getAttribute("href")).toBe("/pt-BR/app/reminders");
+    expect(link!.textContent).toBe("Todos os lembretes");
+  });
+
+  it("relates the calendar to Trabalho without moving its route", () => {
+    view();
+    const tabs = Array.from(document.querySelectorAll(".work-modes a"));
+
+    expect(tabs.map((tab) => tab.getAttribute("href"))).toEqual([
+      "/pt-BR/app/work",
+      "/pt-BR/app/calendar",
+      "/pt-BR/app/calendar/plan",
+    ]);
+    // "Where am I" is answerable without colour, on the mode strip too.
+    expect(tabs.filter((tab) => tab.getAttribute("aria-current") === "page")).toHaveLength(1);
   });
 
   it("marks the current orientation, so 'where am I' is answerable without colour", () => {

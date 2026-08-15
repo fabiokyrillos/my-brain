@@ -128,6 +128,16 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
       ["src/app/[locale]/app/memories/[memoryId]/page.tsx", "memory detail"],
       ["src/app/[locale]/app/memories/page.tsx", "memory listing"],
       ["src/app/[locale]/app/files/page.tsx", "file listing"],
+      /*
+        Brain's overview joins the list with the recomposition that gave it
+        recent rows to print. It renders memory bodies and file names — the same
+        two subjects `memories` and `files` govern — from a different loader, and
+        a third surface printing them unmasked is exactly the divergence
+        `2N-PRIVACY-001` exists to end. The surface literal it passes is taken
+        from `LIBRARY_RECENCY`, so it is asked as `memory` and `file` rather than
+        under a name of its own.
+      */
+      ["src/app/[locale]/app/library/page.tsx", "Brain overview"],
     ] as const) {
       expect(code(file), `${description} does not mount ProtectedContent`).toMatch(/<ProtectedContent/);
     }

@@ -13,17 +13,17 @@
   gap: 6px;
   margin: 0 0 20px;
   padding: 14px 16px;
-  border: 1px solid #e3e7ee;
-  border-left: 3px solid var(--blue);
-  border-radius: 10px;
-  background: #f8fafc;
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--link);
+  border-radius: var(--radius-md);
+  background: var(--background-elevated);
 }
 
 .memory-explainer > p {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--text-secondary);
 }
 
 /* The rows are links now (UX-20): they were `<article>` elements styled as
@@ -35,18 +35,18 @@
 }
 
 .memory-row:hover {
-  border-color: #c9d3e2;
-  background: #fbfcfe;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-row:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
 .memory-row-chevron {
   flex: none;
-  color: #9aa6b8;
+  color: var(--mark-decorative);
 }
 
 .memory-related-hint {
@@ -54,7 +54,7 @@
   align-items: center;
   gap: 4px;
   margin-left: 8px;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 /* The lifecycle badge. Colour carries emphasis, never meaning on its own — the
@@ -63,26 +63,26 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
-  font: 650 10px var(--font-jetbrains);
+  border-radius: var(--radius-full);
+  font: var(--type-eyebrow);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .memory-state-active {
-  color: #1f6b43;
-  background: #e6f5ec;
+  color: var(--tone-success-fg);
+  background: var(--tone-success-bg);
 }
 
 .memory-state-archived {
-  color: #6b7280;
-  background: #eef1f5;
+  color: var(--tone-archived-fg);
+  background: var(--tone-archived-bg);
 }
 
 .memory-state-scheduled {
-  color: #8a6116;
-  background: #fdf3e0;
+  color: var(--tone-attention-fg);
+  background: var(--tone-attention-bg);
 }
 
 /* Detail: the memory itself is the heading, and it is owner prose up to 4000
@@ -99,8 +99,8 @@
   align-items: center;
   gap: 8px;
   margin: 10px 0 0;
-  font-size: 13px;
-  color: #4a5568;
+  font: var(--type-body);
+  color: var(--text-secondary);
 }
 
 /* The facts grid. `auto-fit` with a floor keeps the pairs side by side on a
@@ -111,9 +111,9 @@
   gap: 14px 20px;
   margin: 22px 0;
   padding: 18px;
-  border: 1px solid #e3e7ee;
-  border-radius: 12px;
-  background: #fff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .memory-facts > div {
@@ -123,15 +123,15 @@
 }
 
 .memory-facts dt {
-  font: 650 9px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .memory-facts dd {
   margin: 0;
-  font-size: 13px;
+  font: var(--type-body);
   /* Person and project names are owner content and can be long. */
   overflow-wrap: anywhere;
 }
@@ -148,7 +148,7 @@
   gap: 6px;
   justify-items: start;
   padding-top: 14px;
-  border-top: 1px solid #eef1f5;
+  border-top: 1px solid var(--border-divider);
 }
 
 .memory-lifecycle-button {
@@ -158,17 +158,17 @@
   /* 44px minimum touch target, matching the affordance audit's floor. */
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid #d9dfe8;
-  border-radius: 9px;
-  background: #fff;
-  font: 600 13px var(--font-manrope), sans-serif;
-  color: #40506a;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  font: 600 13px var(--font-ui), sans-serif;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .memory-lifecycle-button:hover:not(:disabled) {
-  border-color: #c2ccdb;
-  background: #f7f9fc;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-lifecycle-button:disabled {
@@ -177,15 +177,15 @@
 }
 
 .memory-lifecycle-button:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
 .memory-lifecycle-hint {
   max-width: 62ch;
-  font-size: 12px;
+  font: var(--type-caption);
   line-height: 1.5;
-  color: #7a8698;
+  color: var(--text-muted);
 }
 
 .memory-checkbox {
@@ -193,7 +193,7 @@
   flex-direction: row;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .memory-checkbox input {
@@ -211,28 +211,28 @@
   gap: 12px;
   margin: 14px 0 0;
   padding: 16px;
-  border: 1px dashed #c3cedd;
-  border-radius: 11px;
-  background: #fbfcfe;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-elevated);
 }
 
 .memory-proposal > label {
   display: grid;
   gap: 6px;
-  font: 650 11px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #66748a;
+  color: var(--text-secondary);
 }
 
 .memory-proposal textarea,
 .memory-proposal select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #d9dfe8;
-  border-radius: 8px;
-  background: #fff;
-  font: 400 14px var(--font-manrope), sans-serif;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  font: 400 14px var(--font-ui), sans-serif;
   color: inherit;
 }
 
@@ -253,15 +253,15 @@
   gap: 7px;
   min-height: 44px;
   padding: 10px 17px;
-  border-radius: 9px;
-  font: 600 13px var(--font-manrope), sans-serif;
+  border-radius: var(--radius-md);
+  font: 600 13px var(--font-ui), sans-serif;
   cursor: pointer;
 }
 
 .memory-proposal-confirm {
   border: 1px solid transparent;
-  background: var(--ink);
-  color: #fff;
+  background: var(--text-primary);
+  color: var(--action-primary-text);
 }
 
 .memory-proposal-confirm:disabled {
@@ -270,28 +270,28 @@
 }
 
 .memory-proposal-discard {
-  border: 1px solid #d9dfe8;
-  background: #fff;
-  color: #40506a;
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
 }
 
 .memory-proposal-discard:hover:not(:disabled) {
-  border-color: #c2ccdb;
-  background: #f7f9fc;
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
 }
 
 .memory-proposal :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
 .memory-proposal-closed {
   margin: 14px 0 0;
   padding: 14px 16px;
-  border: 1px solid #e3e7ee;
-  border-radius: 11px;
-  background: #f8fafc;
-  font-size: 13px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-elevated);
+  font: var(--type-body);
 }
 
 .memory-proposal-closed > div > p {
@@ -313,4 +313,43 @@
     flex: 1 1 100%;
     justify-content: center;
   }
+}
+
+/*
+ * The conflict block on the memory itself (`2N-CONFLICT-002`).
+ *
+ * The same left rule and warm wash the queue's `.conflict-row` uses, and
+ * deliberately so: the owner clicks a row in Hoje that looks like this and
+ * arrives at a page that looks like this. Two shapes for one fact would make the
+ * destination read as a different subject.
+ *
+ * `.conflict-dates` is reused rather than re-declared — it is already the two
+ * labelled values, already collapsing to one column below 180px per track, and
+ * already the `<dl>` that gives each date its own label for a screen reader.
+ */
+.memory-conflict {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--tone-attention-fg);
+  border-radius: var(--radius-md);
+  background: var(--tone-attention-bg);
+}
+
+.memory-conflict > h2 {
+  margin: 0;
+  font: var(--type-heading);
+  color: var(--text-primary);
+}
+
+.memory-conflict p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  max-width: 68ch;
+}
+
+.memory-conflict .conflict-dates {
+  margin: 0;
 }

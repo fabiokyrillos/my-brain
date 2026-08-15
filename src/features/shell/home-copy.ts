@@ -25,8 +25,43 @@ export type HomeCopy = {
   readonly statusOrganizingMany: string;
   readonly statusAllSaved: string;
   readonly sections: {
-    readonly attention: { readonly title: string; readonly hint: string; readonly empty: string };
+    readonly attention: {
+      readonly title: string;
+      readonly hint: string;
+      readonly empty: string;
+      /**
+       * The account the empty state owes (`04-estados.md`, Hoje **V**): "nothing
+       * needs you" is only reassuring next to what *was* organized. Without it
+       * the quiet state reads as "nothing happened".
+       */
+      readonly organizedOne: string;
+      readonly organizedMany: string;
+      readonly viewOrganized: string;
+      /** The expanded lead item's proposal eyebrow — `03-componentes.md`, InterpretationCard. */
+      readonly proposes: string;
+      /** Said on the lead card, because nothing has been created yet. */
+      readonly reversible: string;
+    };
     readonly today: { readonly title: string; readonly hint: string; readonly empty: string };
+    /**
+     * The section that holds both groups of the day's work.
+     *
+     * The mockup draws one list titled *hoje e atrasado*; `2J-HOJE-004`/`005`
+     * require the promoted group to keep its own heading, its cap and its
+     * printed rule. So the section is the mockup's, and the two groups inside it
+     * are the requirement's — neither is lost.
+     */
+    readonly day: { readonly title: string };
+    /**
+     * `02-arquitetura-e-rotas.md` — the day's remaining anchors and what is
+     * committed next. Never rendered empty.
+     */
+    readonly agenda: { readonly title: string; readonly hint: string; readonly viewAll: string };
+    /**
+     * The asynchronous half of the cycle, as its own quiet panel rather than as
+     * an operational status line in the body.
+     */
+    readonly organizing: { readonly title: string; readonly hint: string };
     /** `2J-HOJE-004`. Up to three, and the heading never promises three. */
     /** `2J-DAY-002`/`003`. Closing the day, from Hoje. */
     readonly endOfDay: {
@@ -50,8 +85,9 @@ export type HomeCopy = {
     };
     readonly waiting: { readonly title: string; readonly one: string; readonly many: string };
     readonly question: { readonly title: string; readonly empty: string };
-    readonly recent: { readonly title: string; readonly empty: string };
   };
+  /** Names the cockpit's secondary column for assistive technology. */
+  readonly sideColumnLabel: string;
   readonly viewAll: string;
   readonly viewAllWork: string;
   /** `2J-PRIVACY-001`. What a masked row says instead of the content. */
@@ -76,6 +112,21 @@ export const homeCopy = {
         title: "Precisa de você",
         hint: "Decisões que o {agent} não toma sozinho.",
         empty: "Nada precisa de você agora.",
+        organizedOne: "1 registro foi organizado hoje sem ambiguidade.",
+        organizedMany: "{count} registros foram organizados hoje sem ambiguidade.",
+        viewOrganized: "Ver o que foi organizado",
+        proposes: "o {agent} propõe",
+        reversible: "Nada foi criado ainda.",
+      },
+      day: { title: "Hoje e atrasado" },
+      agenda: {
+        title: "Adiante",
+        hint: "O que ainda está comprometido.",
+        viewAll: "Abrir o calendário",
+      },
+      organizing: {
+        title: "Sendo organizado",
+        hint: "O {agent} está lendo. Você não precisa esperar aqui.",
       },
       endOfDay: {
         title: "Encerrar o dia",
@@ -109,11 +160,8 @@ export const homeCopy = {
         title: "Pergunta em aberto",
         empty: "Nenhuma pergunta em aberto.",
       },
-      recent: {
-        title: "Registrado recentemente",
-        empty: "Nada por aqui ainda. Capture algo para começar.",
-      },
     },
+    sideColumnLabel: "Adiante e fechamento do dia",
     viewAll: "Ver tudo",
     viewAllWork: "Ver todo o trabalho",
     maskedLabel: "Conteúdo muito sensível, oculto",
@@ -135,6 +183,21 @@ export const homeCopy = {
         title: "Needs you",
         hint: "Decisions {agent} will not make on its own.",
         empty: "Nothing needs you right now.",
+        organizedOne: "1 record was organized today with no ambiguity.",
+        organizedMany: "{count} records were organized today with no ambiguity.",
+        viewOrganized: "See what was organized",
+        proposes: "{agent} proposes",
+        reversible: "Nothing has been created yet.",
+      },
+      day: { title: "Today and overdue" },
+      agenda: {
+        title: "Ahead",
+        hint: "What is still committed.",
+        viewAll: "Open the calendar",
+      },
+      organizing: {
+        title: "Being organized",
+        hint: "{agent} is reading. You do not have to wait here.",
       },
       endOfDay: {
         title: "Close the day",
@@ -168,11 +231,8 @@ export const homeCopy = {
         title: "Open question",
         empty: "No open questions.",
       },
-      recent: {
-        title: "Recently captured",
-        empty: "Nothing here yet. Capture something to get started.",
-      },
     },
+    sideColumnLabel: "Ahead and closing the day",
     viewAll: "View all",
     viewAllWork: "View all work",
     maskedLabel: "Highly sensitive content, hidden",

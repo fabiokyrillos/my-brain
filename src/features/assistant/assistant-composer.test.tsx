@@ -191,6 +191,61 @@ describe("AssistantComposer", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     expect(screen.getByText("Enter sends · Shift+Enter adds a line")).toBeTruthy();
   });
+
+  /*
+    A turn that failed must not also delete what the user wrote.
+
+    `<form action={…}>` resets the form once the action settles — correct after a
+    turn that landed somewhere, destructive after one that did not. Before this,
+    a knowledge answer that failed cleared the box and left the user to retype
+    their question, which is the worst moment to ask them to.
+  */
+  describe("what survives a turn that failed", () => {
+    const failed: AssistantComposerState = {
+      ...idleAssistantComposerState,
+      route: "knowledge_failed",
+      notice: { heading: "Não consegui responder agora", detail: "Tente de novo.", nextStep: null },
+      echo: "O que a Marina disse sobre o contrato?",
+      announcement: "Não consegui responder agora. Tente de novo.",
+    };
+
+    it("puts the question back in the field when the answer failed", async () => {
+      render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(failed)} locale="pt-BR" />);
+      await userEvent.type(screen.getByRole("textbox"), "O que a Marina disse sobre o contrato?");
+      await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("textbox")).toHaveValue("O que a Marina disse sobre o contrato?"));
+    });
+
+    it("puts it back when the submission was refused for being too long", async () => {
+      const refused: AssistantComposerState = {
+        ...failed,
+        route: "invalid",
+        notice: { heading: "Texto longo demais", detail: "Encurte e envie de novo.", nextStep: null },
+      };
+      render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(refused)} locale="pt-BR" />);
+      await userEvent.type(screen.getByRole("textbox"), "muito texto");
+      await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+      await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue(failed.echo!));
+    });
+
+    /*
+      The control, and it is the half that would otherwise go wrong: a memory
+      turn also carries an echo and renders it in the notice as a quotation, so
+      restoring there would put the same sentence on screen twice and leave the
+      composer looking un-submitted.
+    */
+    it("clears the field on a turn that landed, even when it carries an echo", async () => {
+      render(<AssistantComposer memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} agentName="Brain" action={resolvesTo(memoryProposal)} locale="pt-BR" />);
+      await userEvent.type(screen.getByRole("textbox"), "Lembre disso sempre");
+      await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+      await waitFor(() => expect(screen.getByText("Você escreveu")).toBeTruthy());
+      expect(screen.getByRole("textbox")).toHaveValue("");
+    });
+  });
 });
 
 /**

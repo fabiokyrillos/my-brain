@@ -1,1 +1,125 @@
-body .side-rail{overflow-y:auto}.chat-page{max-width:950px}.conversation-list{display:grid;gap:9px;margin-top:38px}.conversation-list h2{font-size:13px;margin:0 0 5px}.chat-empty{display:grid;place-items:center;text-align:center;min-height:260px;color:#99a6b8}.chat-empty strong{margin-top:12px;color:var(--ink);font:500 24px var(--font-newsreader)}.chat-empty p{color:var(--ink-soft);font-size:12px}.chat-thread{max-width:900px}.chat-thread>header{margin-bottom:30px}.chat-thread>header h1{font:500 36px/1.1 var(--font-newsreader);letter-spacing:-.035em;margin:8px 0}.message-stream{display:grid;gap:14px;margin-bottom:22px}.chat-message{max-width:82%;border:1px solid var(--line);border-radius:16px;background:white;padding:17px 19px}.chat-message.user{justify-self:end;background:var(--ink);border-color:var(--ink);color:white}.chat-message>span{font:700 9px var(--font-jetbrains);letter-spacing:.08em;text-transform:uppercase;color:#8290a4}.chat-message.user>span{color:#b8c3d2}.chat-message>p{white-space:pre-wrap;margin:9px 0 0;font-size:14px;line-height:1.68}.chat-message>small{display:block;margin-top:10px;color:#9aa6b6;font:600 8px var(--font-jetbrains)}.message-sources{display:grid;gap:7px;margin-top:16px;padding-top:13px;border-top:1px solid var(--line)}.message-sources strong{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-soft)}.message-sources a{display:block;padding:9px 10px;border-radius:8px;background:var(--mist);color:var(--ink-soft);font-size:10px;line-height:1.45}.message-sources a:hover{color:var(--blue)}@media(max-width:600px){.chat-message{max-width:94%}}
+/*
+ * Conversar — the editorial frame (`04 - Desktop, Brain e apoio`, frame 07).
+ *
+ * ## What this replaces, and why it was wrong for this product
+ *
+ * The thread rendered as opposing bubbles: `max-width: 82%`, the user's turn
+ * `justify-self: end` on a solid `--text-primary` fill, both set in the UI face.
+ * That is the generic assistant layout, and the direction exists to not be it —
+ * but the objection is not aesthetic. **Both halves are sentences somebody
+ * wrote**, which is the one distinction this whole redesign is built on: what
+ * the owner or the Brain wrote in prose is set in Newsreader, and the machine's
+ * labels around it are not. A bubble layout sets the prose in the label's face
+ * and spends the width on alignment.
+ *
+ * So: one column, both turns in the reading face, a mono speaker line above
+ * each, and a rule between them. An interview, as it is set on paper.
+ *
+ * ## What separates the two speakers
+ *
+ * Not colour, and not side. The question is marked by a rule on its leading
+ * edge and set one step quieter; the answer runs at full ink and full measure
+ * and carries its sources beneath it. A reader scanning the column sees the
+ * answers, which is what they came for, and the questions read as the headings
+ * they functionally are.
+ */
+
+body .side-rail { overflow-y: auto }
+
+.chat-page { max-width: 950px }
+
+/* The conversation list — titles in the reading face, times in mono. */
+.conversation-list { display: grid; gap: 0; margin-top: var(--space-8) }
+.conversation-list h2 {
+  margin: 0 0 var(--space-3);
+  font: var(--type-section);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.conversation-list .list-row { border-top: 1px solid var(--border-default) }
+.conversation-list .list-row:last-child { border-bottom: 1px solid var(--border-default) }
+.conversation-list .list-row strong { font: var(--type-reading-sm); color: var(--text-primary) }
+.conversation-list .list-row p { margin: var(--space-1) 0 0; font: var(--type-mono); color: var(--text-muted) }
+
+/*
+ * The empty state is a block, not a centred card.
+ *
+ * `03-componentes.md` forbids the centred-card empty state, and
+ * `.empty-list` was corrected across fifteen surfaces earlier in this redesign
+ * while this one — with its own class — kept `place-items: center` and a 260px
+ * reserved void. Left-aligned, no minimum height, and the suggestions sit
+ * directly under the sentence they answer.
+ */
+.chat-empty { display: grid; justify-items: start; gap: var(--space-2); padding: var(--space-6) 0; color: var(--text-secondary) }
+.chat-empty svg { color: var(--mark-decorative) }
+.chat-empty strong { color: var(--text-primary); font: var(--type-reading-lg); letter-spacing: -.01em }
+.chat-empty p { margin: 0; font: var(--type-body); max-width: var(--width-reading); line-height: 1.6 }
+
+.chat-thread { max-width: 900px }
+.chat-thread > header { margin-bottom: var(--space-8) }
+.chat-thread > header h1 { font: var(--type-display); letter-spacing: -.035em; margin: var(--space-2) 0 }
+
+/* One column. No `justify-self`, no percentage width, no fill. */
+.message-stream { display: grid; gap: 0; margin-bottom: var(--space-6) }
+
+.chat-message {
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--border-default);
+}
+.message-stream > .chat-message:first-child { border-top: 0; padding-top: 0 }
+
+/* The speaker line: who, and when. Mono, quiet, and never the subject. */
+.chat-message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  font: var(--type-mono);
+  color: var(--text-muted);
+}
+.chat-message-speaker { text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary) }
+
+.chat-message-body {
+  white-space: pre-wrap;
+  margin: 0;
+  max-width: var(--width-reading);
+  font: var(--type-reading);
+  color: var(--text-primary);
+}
+
+/*
+ * The question, marked by an edge rather than by a side or a fill.
+ *
+ * Indented and set one step quieter, so a reader scanning the column reads the
+ * answers and takes the questions as the headings they functionally are.
+ */
+.chat-message[data-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
+.chat-message[data-role="user"] .chat-message-body { color: var(--text-secondary) }
+
+/* The model that answered — provenance, in the smallest register there is. */
+.chat-message > small { display: block; margin-top: var(--space-3); color: var(--text-muted); font: var(--type-mono) }
+
+/*
+ * The sources under an answer.
+ *
+ * They are the reason to trust the paragraph above them, so they are a titled
+ * block rather than a row of chips — and each one is a link back to the record
+ * it came from, which is the return-to-source the grounding contract promises.
+ */
+.message-sources { display: grid; gap: var(--space-2); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-default) }
+.message-sources strong { display: flex; align-items: center; gap: var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary) }
+.message-sources a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 2px solid var(--border-default);
+  color: var(--text-secondary);
+  font: var(--type-body);
+  line-height: 1.45;
+}
+.message-sources a:hover { border-inline-start-color: var(--action-primary); color: var(--text-primary) }
+
+@media (max-width: 600px) {
+  .chat-message { padding-block: var(--space-5) }
+}

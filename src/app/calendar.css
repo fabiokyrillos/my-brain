@@ -24,8 +24,41 @@
 }
 
 .calendar-description {
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
   margin: 0;
+}
+
+/*
+ * The control band (`03-componentes.md`).
+ *
+ * The three **control** rows answer one question between them — which slice of
+ * time, and which of it — so they sit in one band rather than in three stacked
+ * rows above the grid.
+ *
+ * The band holds the controls and nothing else. `.calendar-bound`,
+ * `.calendar-partial`, `.calendar-summary` and the outcome region stay below it
+ * and above the grid, because they are **statements about the result**, not ways
+ * to change it — and two of them are live regions, which have no business
+ * inside a row of navigation.
+ *
+ * `column-gap` is generous and `row-gap` is not: when the band wraps at a narrow
+ * width the rows must read as rows, not as three separate blocks.
+ */
+.calendar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-block: 1px solid var(--border-default);
+}
+
+/* The range and its arrows go last and take the remaining width, so the label
+   sits at the far edge on a wide viewport and starts its own row on a narrow
+   one instead of squeezing between two chip rows. */
+.calendar-toolbar .calendar-navigation {
+  margin-inline-start: auto;
 }
 
 /*
@@ -57,18 +90,38 @@
    */
   min-height: 44px;
   padding: 0 var(--space-3, 0.75rem);
-  border: 1px solid var(--border, #ccc);
-  border-radius: var(--radius-2, 0.5rem);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   text-decoration: none;
 }
 
+.calendar-orientation a,
+.calendar-lanes a {
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
 .calendar-orientation a[aria-current="true"] {
-  border-width: 2px;
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  border-color: var(--action-primary);
   font-weight: 600;
 }
 
-.calendar-lanes a[aria-pressed="false"] {
-  /* Off is said by opacity AND by a dashed edge, never by colour alone. */
+/*
+ * A hidden lane, said by a dashed edge AND by reduced opacity — never by colour
+ * alone (`2M-ACCESS-005`).
+ *
+ * Keyed on `data-shown` because the selector this replaced read
+ * `a[aria-pressed="false"]`, and `aria-pressed` was removed from these links
+ * when axe flagged it as invalid on an anchor. The attribute went and the rule
+ * stayed, matching nothing: a hidden lane became visually identical to a shown
+ * one, and its state survived only in the visually-hidden word beside it.
+ * Correct for a screen reader, and nothing at all for everyone else.
+ */
+.calendar-lanes a[data-shown="false"] {
   border-style: dashed;
   opacity: 0.65;
 }
@@ -82,12 +135,25 @@
   margin: 0;
 }
 
+/* The range is the band's subject, so it is set in the reading face at the
+   weight a heading would carry — the two arrows beside it are the controls. */
+.calendar-range {
+  font: var(--type-reading);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.calendar-summary {
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
 .calendar-bound,
 .calendar-partial {
   margin: 0;
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  border-inline-start: 4px solid var(--border-strong, #888);
-  background: var(--surface-2, #f4f4f5);
+  border-inline-start: 4px solid var(--border-strong);
+  background: var(--background-subtle);
 }
 
 /* Day and agenda: a list, because that is the shape they are. */
@@ -114,37 +180,98 @@
 
 .calendar-today {
   border: 1px solid currentColor;
-  border-radius: var(--radius-1, 0.25rem);
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   padding: 0 0.35rem;
 }
 
 /*
  * Week: a real table, so assistive technology gets the two-dimensional relation
- * without a single `role` (`2M-ACCESS-002`).
+ * without a single `role` (`2M-ACCESS-002`) — and a real *grid*, which it was
+ * not.
  *
- * It scrolls **inside its own container** rather than scrolling the page, which
- * is what keeps `2M-MOBILE-001` true at 375 px without hiding a column.
+ * `display: block` used to sit on the `<table>` itself, to give `overflow-x`
+ * the block box it needs. That replaces the table box with a block box and
+ * re-parents the rows into an anonymous table wrapper, so `table-layout` never
+ * applied and the seven columns were sized by their contents: a week with one
+ * busy Tuesday rendered as one wide column and six narrow ones, at every width.
+ * The overflow moved to a wrapper; the table is a table again.
+ *
+ * It still scrolls **inside its own container** rather than scrolling the page,
+ * which is what keeps `2M-MOBILE-001` true at 375 px without hiding a column.
  */
+.calendar-week-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* The floor below which the grid stops being readable and starts scrolling:
+     seven columns at the 8.5rem the cells used to carry as `min-width`. */
+  --calendar-week-floor: 59.5rem;
+}
+
 .calendar-week {
   border-collapse: collapse;
-  display: block;
-  overflow-x: auto;
+  /* The whole point: seven columns of equal width, aligned with their headers,
+     regardless of which day is busy. */
+  table-layout: fixed;
   width: 100%;
+  min-width: var(--calendar-week-floor);
 }
 
 .calendar-week th,
 .calendar-week td {
-  border: 1px solid var(--border, #ccc);
-  min-width: 8.5rem;
-  padding: var(--space-2, 0.5rem);
+  border: 1px solid var(--border-default);
+  padding: var(--space-2);
   text-align: start;
   vertical-align: top;
+  /* `fixed` layout does not shrink to content, so a long title has to be told
+     it may break — otherwise it widens the column and defeats the layout. */
+  overflow-wrap: anywhere;
 }
 
+/*
+ * Not sticky, and that is a correction rather than a preference.
+ *
+ * A first draft set `position: sticky; top: 0` here. `.calendar-week-scroll`
+ * declares `overflow-x: auto`, and per CSS Overflow 3 an `overflow-y: visible`
+ * beside a non-visible `overflow-x` computes to `auto` — so the wrapper *is*
+ * the nearest scrollport, its height is its content's height, it never scrolls
+ * vertically, and the header could never move relative to it. The rule painted
+ * a background and nothing else, and the `position: static` override below it
+ * cured a symptom that could not occur.
+ */
+.calendar-week thead th {
+  background: var(--background-canvas);
+  padding-block: var(--space-2);
+}
+
+.calendar-week-day {
+  display: block;
+  font: var(--type-label);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.calendar-week tbody td {
+  /* Enough height that an empty day reads as a day rather than as a seam. */
+  height: 8rem;
+}
+
+/*
+ * Today: a tinted column as well as a heavier edge. Two carriers, and the
+ * column also carries the word `copy.todayLabel` in its header — the third.
+ */
 .calendar-week th[data-today="true"],
 .calendar-week td[data-today="true"] {
   border-width: 2px;
+}
+
+.calendar-week th[data-today="true"] .calendar-week-day {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.calendar-week td[data-today="true"] {
+  background: var(--background-subtle);
 }
 
 .calendar-day-items {
@@ -156,14 +283,31 @@
   padding: 0;
 }
 
+/*
+ * One commitment, as a card small enough to stack seven-across.
+ *
+ * The meta line is mono and quiet, the body is the reading face at full ink —
+ * the same division of labour the whole redesign is built on: what the owner or
+ * the Brain wrote in sentences is set in Newsreader, and the machine's labels
+ * around it are not.
+ */
 .calendar-item {
-  border: 1px solid var(--border, #ccc);
-  border-radius: var(--radius-2, 0.5rem);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: var(--space-2, 0.5rem);
+  gap: var(--space-1);
+  padding: var(--space-2);
 }
+
+.calendar-item-body {
+  font: var(--type-reading-sm);
+  color: var(--text-primary);
+}
+
+.calendar-item-link { color: inherit; text-decoration: none; }
+.calendar-item-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /*
  * The commitment axis, carried by border weight and style **in addition to**
@@ -181,30 +325,44 @@
 .calendar-item-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
-  font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  align-items: baseline;
+  gap: var(--space-2);
+  font: var(--type-mono);
+  color: var(--text-muted);
 }
+
+/* The time is the one piece of metadata a reader scans for, so it is the one
+   piece set at full ink. */
+.calendar-item-time { color: var(--text-secondary); }
 
 .calendar-item-body {
   overflow-wrap: anywhere;
 }
 
+/*
+ * An empty day is a quiet line, not a box. `03-componentes.md` reserves the
+ * bordered treatment for objects, and "nothing here" is not one — inside a cell
+ * that already has a border it would have been a box inside a box.
+ */
 .calendar-empty {
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
   margin: 0;
+  font: var(--type-caption);
 }
 
 /*
  * `2M-MOBILE-001`. One-handed at 375 px and 412 px: the week's own container is
  * what scrolls, the control rows wrap, and nothing on the page is wider than the
  * viewport. `2M-ACCESS`'s reflow case is the same rule read at 200% zoom.
+ *
+ * The floor rises on a phone rather than the columns shrinking: a 5rem column
+ * holding a task title is a column of single words, which is the readability
+ * defect `layout-contracts.spec.ts` exists to catch elsewhere on this product.
  */
 @media (max-width: 30rem) {
-  .calendar-week th,
-  .calendar-week td {
-    min-width: 11rem;
-  }
+  .calendar-week-scroll { --calendar-week-floor: 77rem; }
+  .calendar-week tbody td { height: 6rem; }
+
 }
 
 /*
@@ -231,11 +389,11 @@
   min-height: 24px;
   padding-block: var(--space-1, 0.25rem);
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 .calendar-reschedule-summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0b5fff);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -243,7 +401,7 @@
 .calendar-reschedule-unavailable {
   margin-block: var(--space-1, 0.25rem);
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 /*
@@ -304,6 +462,41 @@
   min-width: 0;
 }
 
+/*
+ * The plan, as rows rather than as stacked blocks.
+ *
+ * Head, meta and controls stacked before this, so twelve available tasks was
+ * thirty-six blocks of prose with no column to scan. Three tracks now — the
+ * task, when it is planned, and what can be done to it — with the row rule
+ * carrying the separation instead of a card border, which `03-componentes.md`
+ * reserves for objects.
+ *
+ * Only above 720px: below it the tracks would each be under 150px and the date
+ * control alone needs more than that, so the row stacks and the grammar becomes
+ * a reading order instead of a set of columns.
+ */
+@media (min-width: 720px) {
+  .planner-list .planner-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(120px, .6fr) minmax(220px, auto);
+    align-items: start;
+    column-gap: var(--space-4);
+    row-gap: var(--space-2);
+  }
+  .planner-list .planner-item-meta { justify-self: start; }
+  .planner-list .planner-item-controls { justify-self: end; min-width: 0; }
+}
+
+/* `> ul >`, not a descendant selector. `TaskDetailControls` renders its own
+   `<ul class="task-control-list"><li class="task-control">` inside every row,
+   and `plannedControlsFor` returns two controls for any active task — so a
+   descendant `li + li` drew a full-width rule between two already-bordered
+   control cards inside the row. The daily-surfaces fixture emits one control
+   per row, which is exactly why no browser lane could see it. */
+.planner-list > ul > li + li { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+.planner-item-head { font: var(--type-reading-sm); color: var(--text-primary); }
+.planner-item-meta { font: var(--type-mono); color: var(--text-muted); }
+
 .planner-item-head,
 .day-review-item-head {
   display: flex;
@@ -317,7 +510,7 @@
 .day-review-item-meta {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--text-muted, #555);
+  color: var(--text-muted);
 }
 
 .planner-day-nav,
@@ -370,4 +563,196 @@
 .day-review-verb input[type="date"],
 .day-review-verb select {
   max-width: 100%;
+}
+
+/*
+ * The day review's own heading — an `<h2>` under the page's `<h1>`.
+ *
+ * It renders inside `/app/reviews`, which owns the page's `<h1>`. The size is
+ * kept: a heading level is a statement about the document outline, not about how
+ * large the text is, and shrinking it would have changed the reading hierarchy
+ * to fix a semantics problem.
+ */
+.day-review-title { margin: 0; font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+
+/*
+ * The sections inside the review, now `<h3>`.
+ *
+ * Sized here rather than left to the browser default, which would have made a
+ * demoted heading *look* demoted — the outline moved, the hierarchy on the page
+ * did not.
+ */
+.day-review-page section > h3 { margin: 0 0 var(--space-2); font: var(--type-heading); color: var(--text-primary); }
+
+/*
+ * `/app/reviews` — the page around the review.
+ *
+ * The surface holds two things that are genuinely different in kind: today's
+ * closing, which is a reading of records that already exist, and the history of
+ * reviews the assistant generated when asked. The header names the page, and
+ * each of the two is a titled section under it, so the outline says which is
+ * which instead of leaving the reader to infer it from a gap.
+ */
+.reviews-header { margin-bottom: var(--space-6); }
+.reviews-header h1 { margin: var(--space-2) 0 0; font: 500 clamp(38px,5vw,60px)/1 var(--font-reading); letter-spacing: -.04em; }
+.reviews-lead { margin: var(--space-2) 0 0; color: var(--text-secondary); font: var(--type-lead); max-width: var(--width-reading); }
+.reviews-history { margin-top: var(--space-8); }
+.reviews-history > h2 { margin: 0 0 var(--space-4); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+.reviews-history-lead { margin: calc(var(--space-4) * -1) 0 var(--space-4); color: var(--text-secondary); font: var(--type-body); max-width: var(--width-reading); }
+
+/*
+ * The stored review's status, in colour as well as in words.
+ *
+ * `review-presentation.ts` has emitted `statusTone` — positive, neutral,
+ * warning — since Phase 2J, and `page.tsx` has rendered it as `data-tone` on
+ * the badge. **No rule ever selected it.** All three statuses painted on the
+ * same neutral wash, so "Pode estar desatualizada" and "Concluída" were one
+ * object with different text: a producer with no consumer, and the second one
+ * this session has found.
+ *
+ * `neutral` deliberately has no rule — the base wash is what neutral means.
+ */
+.status-badge[data-tone="positive"] { background: var(--tone-success-bg); color: var(--tone-success-fg); }
+.status-badge[data-tone="warning"] { background: var(--tone-attention-bg); color: var(--tone-attention-fg); }
+
+/*
+ * The planner's orientation band — capacity and conflicts, side by side.
+ *
+ * They were two stacked sections between the header and the work, putting the
+ * first task about 600px down a page whose subject is the tasks. Both answer
+ * one question — is this day already full, and does anything on it contradict
+ * anything else — so they read as one band above the lists.
+ *
+ * One column below 900px, where two would be under 200px each and the capacity
+ * sentences would break every three words.
+ */
+.planner-orientation {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--border-default);
+}
+@media (min-width: 900px) {
+  .planner-orientation { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-8); }
+}
+.planner-orientation section { margin-block: 0; }
+.planner-orientation h2 { margin: 0 0 var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.planner-orientation p { margin: 0 0 var(--space-1); font: var(--type-body); color: var(--text-secondary); }
+
+/* The two numbers a planner is read for, at full ink in the reading face. */
+.planner-capacity-count,
+.planner-conflict-count { font: var(--type-reading); color: var(--text-primary); }
+
+/*
+ * Overload and conflicts are stated, never colour-only: each keeps its full
+ * sentence and gains a rule on the leading edge. `2M-PLAN-008` is explicit that
+ * a conflict is a fact with nothing already applied, so neither is styled as an
+ * error the user has to clear.
+ */
+.planner-overloaded {
+  margin-top: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+  color: var(--text-primary);
+}
+.planner-conflicts[data-has-conflicts="true"] {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+}
+.planner-conflict-list { margin: var(--space-2) 0; padding-inline-start: var(--space-4); color: var(--text-primary); }
+.planner-conflict-list li { margin-bottom: var(--space-1); font: var(--type-body); }
+
+/* The two lists' own headings, matched to the band above them. */
+.planner-list > h2 { margin: 0 0 var(--space-3); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+
+/*
+ * The closing's synthesis — `/app/reviews`, above the five sections.
+ *
+ * The surface listed the day's parts and left the reader to count four of them
+ * to answer "how did the day go". This states it first; everything below is the
+ * working out. The counts are set in the reading face because they are the
+ * sentence, and the labels around them are not.
+ */
+.day-review-synthesis { border-block-end: 1px solid var(--border-default); padding-block-end: var(--space-4); }
+.day-review-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.day-review-counts li { font: var(--type-reading); color: var(--text-primary); }
+
+/* A count over a source that failed is not a small count — it is an unknown
+   one, so the sentence that says so carries a rule and full ink rather than
+   sitting in the muted register the disclaimers use. */
+.day-review-partial {
+  margin: var(--space-3) 0 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+
+/*
+ * A row's own state, in "intenções" and "prazos" only — those are the two
+ * sections where a row may be either, and the word is the difference between a
+ * list of what the day held and a list of what it left.
+ *
+ * There is no separate pendências list, deliberately: every open item is
+ * already a row here with the verbs its status admits, and a second list would
+ * be `2J-HOJE-004`'s repetition with the second copy carrying less.
+ */
+.day-review-state {
+  flex: none;
+  align-self: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-mono);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.day-review-item[data-open="true"] .day-review-state {
+  background: var(--tone-attention-bg);
+  color: var(--tone-attention-fg);
+}
+.day-review-item[data-open="false"] .day-review-state {
+  background: var(--tone-success-bg);
+  color: var(--tone-success-fg);
+}
+
+/*
+ * The one link in the band that leaves the calendar.
+ *
+ * Every other control in `.calendar-navigation` narrows or moves the range; this
+ * one goes to Lembretes. Set apart by a rule and the link colour so a reader can
+ * see, before pressing it, that it is a destination rather than another step —
+ * a band word that behaved differently from every other word in the band would
+ * be the band lying about what it is.
+ */
+.calendar-reminders-link {
+  margin-inline-start: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 1px solid var(--border-divider);
+  color: var(--link);
+}
+
+.calendar-reminders-link:hover {
+  color: var(--link-hover);
+}
+
+@media (max-width: 899px) {
+  /* Wrapped onto its own line, the rule and the inset read as a stray divider,
+     so both go and the target grows to the phone minimum. */
+  .calendar-reminders-link {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: none;
+    min-height: var(--touch-target);
+    display: inline-flex;
+    align-items: center;
+  }
 }

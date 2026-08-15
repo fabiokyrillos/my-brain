@@ -44,7 +44,9 @@ describe("AppShell", () => {
       "Hoje",
       "Registros",
       "Trabalho",
-      "Conversar",
+      // The fourth destination named by `02-arquitetura-e-rotas.md`. Conversar
+      // moves inside it as the Conversas lens; the route is untouched.
+      "Brain",
     ]);
     expect(screen.getAllByRole("link", { name: "Captura rápida" })).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute(
@@ -68,7 +70,7 @@ describe("AppShell", () => {
       desktopNavigation.querySelectorAll(":scope > .nav-group-primary a, :scope > .capture-fab"),
     ).map((link) => link.textContent);
 
-    expect(alwaysVisible).toEqual(["Hoje", "Registros", "Trabalho", "Conversar", "Captura rápida"]);
+    expect(alwaysVisible).toEqual(["Hoje", "Registros", "Trabalho", "Brain", "Captura rápida"]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
         (summary) => summary.textContent,
@@ -84,6 +86,12 @@ describe("AppShell", () => {
     expect(
       Array.from(more.querySelectorAll("a")).map((link) => link.getAttribute("href")),
     ).toEqual([
+      /*
+        Conversar leads the context group since the redesign. It is a lens of
+        Brain rather than a rail destination (`02-arquitetura-e-rotas.md`), and
+        the route is unchanged — what moved is where it is listed.
+      */
+      "/pt-BR/app/chat",
       "/pt-BR/app/projects",
       "/pt-BR/app/people",
       "/pt-BR/app/organizations",
@@ -203,17 +211,22 @@ describe("AppShell", () => {
      *
      * The bar used to carry six controls with capture third, which cannot be
      * centred in an even number of columns — the reason exact centring was gated.
-     * Registros moved into `Mais` so the bar carries four destinations, two each
-     * side of the capture control.
+     * It has carried five ever since; the redesign changed *which* four
+     * destinations, not the geometry.
+     *
+     * Registros is back on the bar, because its default view is now the decision
+     * queue and `02-arquitetura-e-rotas.md` says a queue cannot live in overflow.
+     * Brain took the slot it left, and `Mais` stays — it is the only route to
+     * fourteen destinations on a phone.
      *
      * DOM order is asserted here and *is* the visual order, because the grid
      * assigns columns in source order and nothing sets `order`.
      */
     expect(topLevelControls).toEqual([
       "Hoje",
-      "Trabalho",
+      "Registros",
       "Captura rápida",
-      "Conversar",
+      "Trabalho",
       "Mais",
     ]);
   });
@@ -231,38 +244,59 @@ describe("AppShell", () => {
     );
   });
 
-  it("keeps Registros reachable as the first product destination inside Mais", () => {
+  /**
+   * The demotion reversed direction with the redesign.
+   *
+   * Registros left the overflow and returned to the bar — `02-arquitetura-e-rotas.md`
+   * requires it, because its default view is now the decision queue and a queue
+   * cannot live behind a disclosure. Brain took the slot it vacated, since `more`
+   * has to stay: it is the only route to fourteen destinations on a phone (see
+   * `mobileBarSlots`).
+   *
+   * The protection is unchanged and still worth having: whatever is demoted must
+   * lead the panel's destinations rather than joining a secondary group, so it
+   * needs no scrolling to reach.
+   */
+  it("keeps the demoted primary destination first inside Mais", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
     const panel = mobile.querySelector(":scope > details > .mobile-more-menu")!;
 
-    // Two requirements meet here and both hold. The account block leads the panel
-    // (Slice D3: the way out must not sit below what you do inside), and Registros
-    // is the first **product destination** after it — demoted, not buried. It is a
-    // primary destination everywhere else, so it leads the destinations rather
-    // than joining a secondary group, and needs no scrolling to reach.
+    // The account block still leads the panel (Slice D3: the way out must not sit
+    // below what you do inside).
     expect(panel.firstElementChild).toHaveClass("mobile-nav-account");
 
     const destinations = Array.from(panel.querySelectorAll(":scope > :not(.mobile-nav-account) a"));
-    expect(destinations[0]).toHaveAttribute("href", "/pt-BR/app/inbox");
-    expect(destinations[0]).toHaveTextContent("Registros");
-    expect(mobileDemotedKeys).toEqual(["inbox"]);
+    expect(destinations[0]).toHaveAttribute("href", "/pt-BR/app/library");
+    expect(destinations[0]).toHaveTextContent("Brain");
+    expect(mobileDemotedKeys).toEqual(["library"]);
+  });
+
+  it("carries Registros on the bar itself, not behind the disclosure", () => {
+    // The requirement in one line: *Registros volta para a barra — é a fila de
+    // decisão, e não pode viver em overflow.*
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+
+    const onTheBar = Array.from(mobile.querySelectorAll(":scope > a"))
+      .map((link) => link.getAttribute("href"));
+    expect(onTheBar).toContain("/pt-BR/app/inbox");
   });
 
   it("marks Mais active while the user is inside the destination it now contains", () => {
-    // The failure this prevents: a phone user reading Registros sees no active
-    // state anywhere, because the destination they are standing in was demoted
-    // out of the bar.
-    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox");
+    // The failure this prevents: a phone user standing in a demoted destination
+    // sees no active state anywhere. The destination changed with the redesign —
+    // Brain now, Registros before — and the failure is the same one.
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/library");
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
 
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
     expect(mobile.querySelector(":scope > details")).toHaveClass("active");
     // And the link inside it is the current page.
-    expect(mobile.querySelector('a[href="/pt-BR/app/inbox"]')).toHaveAttribute("aria-current", "page");
+    expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveAttribute("aria-current", "page");
 
-    // Desktop is unchanged: Registros is still a primary rail destination, so the
-    // rail's own More disclosure must *not* claim the active state.
+    // Desktop is unchanged: Brain is a primary rail destination, so the rail's own
+    // More disclosure must *not* claim the active state.
     const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
     expect(desktop.querySelector(":scope > details")).not.toHaveClass("active");
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
@@ -296,8 +330,8 @@ describe("AppShell", () => {
     const details = mobile.querySelector(":scope > details") as HTMLDetailsElement;
     details.open = true;
 
-    const registros = mobile.querySelector('a[href="/pt-BR/app/inbox"]') as HTMLAnchorElement;
-    fireEvent.click(registros);
+    const demoted = mobile.querySelector('details a[href="/pt-BR/app/library"]') as HTMLAnchorElement;
+    fireEvent.click(demoted);
 
     // Otherwise the panel stays open over the page the user just navigated to.
     expect(details.open).toBe(false);
@@ -404,7 +438,7 @@ describe("AppShell", () => {
       "Today",
       "Records",
       "Work",
-      "Talk",
+      "Brain",
     ]);
     expect(within(desktopNavigation).getByRole("link", { name: "Work" })).toHaveAttribute(
       "href",

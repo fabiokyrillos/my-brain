@@ -1,13 +1,21 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getWorkCopy } from "@/features/operations/copy";
 import type { Locale } from "@/lib/preferences";
 import type { WorkItemView } from "./contracts";
 import { taskDetailCopy } from "./task-detail-copy";
 import { TaskDetailView } from "./task-detail-view";
 import type { TaskDetailProjection } from "./task-detail-projection";
+
+/*
+ * The panel's close affordance is `router.back()`, so mounting the panel needs
+ * an app router. Mocked rather than avoided: skipping the panel mount would
+ * have left `2L-EDIT-007` — one component, one control set, two frames —
+ * asserted only in prose.
+ */
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: () => {} }) }));
 
 afterEach(cleanup);
 
@@ -304,5 +312,92 @@ describe("TaskDetailView: withheld content (OD-2L-1 option B)", () => {
     const source = readFileSync(join(__dirname, "task-detail-view.tsx"), "utf8");
     expect(source).toMatch(/ProtectedContent/);
     expect(source).not.toMatch(/highly_sensitive|presentationFor/);
+  });
+
+  /*
+    The recomposed detail — `03-componentes.md`, decide on the left and
+    understand on the right.
+  */
+  describe("composition", () => {
+    it("puts the fields beside the controls that change them, and the account beside neither", () => {
+      const { container } = render(
+        <TaskDetailView
+          actions={<button type="button">Concluir</button>}
+          agentName="Brain"
+          controls={<div data-testid="controls">controles</div>}
+          detail={detail()}
+          locale="en"
+        />,
+      );
+
+      const primary = container.querySelector(".task-detail-primary");
+      const secondary = container.querySelector(".task-detail-secondary");
+      expect(primary).not.toBeNull();
+      expect(secondary).not.toBeNull();
+
+      // A due date in one column and the field that sets it in the other is the
+      // arrangement this split exists to avoid.
+      expect(within(primary as HTMLElement).getByRole("region", { name: "Details" })).toBeVisible();
+      expect(within(primary as HTMLElement).getByTestId("controls")).toBeVisible();
+      expect(within(secondary as HTMLElement).getByRole("region", { name: "History of this task" })).toBeVisible();
+      expect(within(secondary as HTMLElement).getByRole("region", { name: "Where this came from" })).toBeVisible();
+    });
+
+    /*
+      The load-bearing one. The two columns are grid *placement*, so the focus
+      order is the DOM order in both layouts — a CSS `order` would have made
+      them disagree on exactly one of the two, and only on a wide viewport,
+      which is the class of defect that reaches production.
+    */
+    it("never reorders the columns, so focus order equals visual order", () => {
+      const source = readFileSync(join(__dirname, "..", "..", "app", "operations.css"), "utf8");
+      const block = source.slice(source.indexOf(".task-detail-page"), source.indexOf(".task-detail-actions"));
+
+      expect(block).toContain("grid-template-columns");
+      expect(block).not.toMatch(/(^|[;{\s])order\s*:/);
+    });
+
+    /*
+      `2L-EDIT-007`, as a test rather than as a promise. The panel and the page
+      are one component with one control set; `panel` may select a frame and a
+      back affordance and nothing else.
+    */
+    it("gives the panel every section and every control the page has", () => {
+      const props = {
+        actions: <button type="button">Concluir</button>,
+        agentName: "Brain",
+        controls: <div data-testid="controls">controles</div>,
+        detail: detail(),
+        locale: "en" as const,
+      };
+
+      const page = render(<TaskDetailView {...props} />);
+      const pageRegions = screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"));
+      const pageControls = screen.getAllByRole("button").map((button) => button.textContent);
+      page.unmount();
+
+      render(<TaskDetailView {...props} panel />);
+      expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual(pageRegions);
+      // The panel adds its close affordance; nothing else may differ.
+      expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(
+        expect.arrayContaining(pageControls),
+      );
+    });
+
+    it("says the state in colour as well as in words", () => {
+      const { container } = render(
+        <TaskDetailView
+          actions={null}
+          agentName="Brain"
+          detail={detail({ task: task({ humanState: "blocked" }) })}
+          locale="en"
+        />,
+      );
+
+      const badge = container.querySelector(".status-badge");
+      // The word first — nothing may depend on the tint alone.
+      expect(badge).toHaveTextContent("Blocked");
+      expect(badge).toHaveAttribute("data-state", "blocked");
+    });
   });
 });

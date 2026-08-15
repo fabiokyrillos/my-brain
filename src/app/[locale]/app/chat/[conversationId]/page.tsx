@@ -13,6 +13,7 @@ import { createProposedMemory, undoProposedMemory } from "@/features/memories/ac
 import { getAgentName } from "@/features/profile/agent-identity";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale, type Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
@@ -33,6 +34,7 @@ function ThreadMessage({
   citations,
   content,
   conversationId,
+  createdAt,
   locale,
   messageId,
   model,
@@ -44,6 +46,16 @@ function ThreadMessage({
   citations: ParsedCitations;
   content: string;
   conversationId: string;
+  /**
+   * When the turn happened.
+   *
+   * The query has selected `created_at` since the thread existed and nothing
+   * ever rendered it — a transcript with no times, in which a conversation
+   * resumed three weeks later reads as one continuous exchange. Stamped in the
+   * owner's zone from the same accessor the citations use, so a message and the
+   * source it cites can never be dated differently.
+   */
+  createdAt: string;
   locale: Locale;
   messageId: string;
   model: string | null;
@@ -64,10 +76,26 @@ function ThreadMessage({
   const hasSourceBlock = role !== "user"
     && (sources.length > 0 || citations.evidence !== "unknown" || citations.legacy);
 
+  /*
+    A transcript, not a chat log.
+
+    The stream used to render as opposing bubbles — 82% width, the user's turn
+    right-aligned on a solid dark fill — which is the generic assistant layout
+    the direction exists to not be. Both halves are **sentences somebody wrote**,
+    so both are set in the reading face in one column, and what separates them is
+    a mono speaker line and a rule, exactly as an interview is set on paper.
+
+    `data-role` carries it. The `chat-message assistant`/`user` classes are kept
+    because three Playwright lanes address messages by them, and renaming them
+    to suit a stylesheet would have broken those for no gain.
+  */
   return (
-    <article className={`chat-message ${role}`} id={messageAnchorId(messageId)}>
-      <span>{role === "user" ? (pt ? "Você" : "You") : agentName}</span>
-      <p>{content}</p>
+    <article className={`chat-message ${role}`} data-role={role} id={messageAnchorId(messageId)}>
+      <p className="chat-message-meta">
+        <span className="chat-message-speaker">{role === "user" ? (pt ? "Você" : "You") : agentName}</span>
+        <time dateTime={createdAt}>{formatInstant(createdAt, "dayAndTime", locale, timeZone)}</time>
+      </p>
+      <p className="chat-message-body">{content}</p>
       {hasSourceBlock && (
         <div className="message-sources">
           <SourceList
@@ -161,6 +189,7 @@ export default async function ConversationPage({
             citations={parsed[index]!}
             content={message.content}
             conversationId={conversationId}
+            createdAt={message.created_at}
             key={message.id}
             locale={locale}
             messageId={message.id}

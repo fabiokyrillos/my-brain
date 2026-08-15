@@ -177,6 +177,17 @@ export type InboxItemView = {
   readonly significantAt: string;
   readonly availableActions: readonly AvailableAction[];
   readonly originalPreserved: boolean;
+  /**
+   * "Só registro" — read, understood, and nothing proposed (`04-estados.md`).
+   *
+   * **Required, not optional.** An optional flag would let a projection omit it
+   * and every row would quietly read as "this produced something", which is the
+   * opposite of the fail-closed default this state deserves. It is also strictly
+   * narrower than `productState === "ready"`: a record whose candidates the owner
+   * confirmed is ready *and* produced tasks, and labelling that "record only"
+   * would deny them.
+   */
+  readonly isRecordOnly: boolean;
 };
 
 export type NeedsAttentionItemView = {

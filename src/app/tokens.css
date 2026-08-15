@@ -1,0 +1,288 @@
+/* Papel e Console — the approved visual direction, as tokens.
+ *
+ * This file is the FIRST import in `globals.css` and it is the only place a raw
+ * colour value may be written. Everything downstream — `experience.css`'s tone
+ * tokens, every feature stylesheet, every component — reads a token from here.
+ *
+ * ## Why a bridge layer exists at the bottom of this file
+ *
+ * The product had nine ad-hoc tokens (`--ink`, `--paper`, `--blue`, …) with 616
+ * uses across 22 stylesheets. Redefining those nine in terms of the new palette
+ * re-skins every existing surface in one move, which is what makes the redesign
+ * landable in slices instead of one unreviewable rewrite. The aliases are a
+ * migration seam, not a second palette: they resolve to the tokens above and
+ * hold no values of their own, so light and dark stay correct on surfaces that
+ * have not been touched yet.
+ *
+ * ## Dark is a palette, not an inversion
+ *
+ * The dark set is authored, warm, and low-contrast at the surface while staying
+ * high-contrast at the text. It is declared twice on purpose — once for the
+ * explicit `[data-theme="dark"]` choice and once under `prefers-color-scheme`
+ * for the untouched default — because a media query alone cannot express "the
+ * user asked for light on a dark machine".
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- surfaces --------------------------------------------------------- */
+  --background-canvas: #f7f6f3;
+  --background-surface: #ffffff;
+  --background-subtle: #f1efea;
+  --background-subtle-strong: #e6e2da;
+  --background-elevated: #faf9f6;
+  --background-inverse: #1a1917;
+
+  /* ---- text ------------------------------------------------------------- */
+  --text-primary: #1a1917;
+  --text-secondary: #55504a;
+  /* Darkened from the direction table's #736d64, which measures 4.46:1 on
+     --background-subtle — a hairline AA miss for small text.
+     Darkened once more from #6f695f, which cleared every surface a rule
+     actually pairs it with but measured 4.21:1 on --background-subtle-strong.
+     No live rule pairs those two, so this is a guarantee rather than a repair:
+     at #686259 the claim "clears 4.5 on every surface in this palette" is true
+     for all of them, and the next author cannot make it false by accident.
+     It remains the lightest text tone the direction permits. */
+  --text-muted: #686259;
+  --text-inverse: #f7f6f3;
+
+  /* ---- lines and marks -------------------------------------------------- */
+  --border-default: #e2ded6;
+  --border-strong: #cbc5ba;
+  --border-divider: #eae6df;
+  /* Dot, rule, icon stroke. Never text: it does not reach 4.5:1. */
+  --mark-decorative: #8a8378;
+
+  /* ---- action and focus ------------------------------------------------- */
+  --action-primary: #1a1917;
+  --action-primary-hover: #332f2b;
+  --action-primary-text: #f7f6f3;
+  --focus-ring: #3a6ea5;
+  --link: #3a6ea5;
+  --link-hover: #2a527c;
+
+  /* ---- typography ------------------------------------------------------- */
+  /* The `--font-*` variables are emitted by `next/font` in `layout.tsx`; the
+     fallbacks here keep the stack honest before the font file resolves. */
+  --font-reading: var(--font-newsreader), Georgia, serif;
+  --font-ui: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --type-display: 400 40px/1.06 var(--font-reading);
+  --type-title-1: 400 30px/1.1 var(--font-reading);
+  --type-title-2: 400 26px/1.2 var(--font-reading);
+  --type-reading-lg: 400 19px/1.6 var(--font-reading);
+  --type-reading: 400 17px/1.65 var(--font-reading);
+  --type-reading-sm: 400 15px/1.5 var(--font-reading);
+  --type-lead: 400 15.5px/1.55 var(--font-ui);
+  --type-heading: 600 15px/1.35 var(--font-ui);
+  --type-section: 600 13px/1 var(--font-ui);
+  --type-body: 400 13.5px/1.6 var(--font-ui);
+  --type-label: 500 12.5px/1 var(--font-ui);
+  --type-caption: 400 12px/1.45 var(--font-ui);
+  --type-mono: 500 12px/1 var(--font-mono);
+  --type-eyebrow: 500 11px/1 var(--font-mono);
+  --eyebrow-tracking: 0.12em;
+
+  /* ---- space ------------------------------------------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- shell and content measures --------------------------------------- */
+  --sidebar-width: 212px;
+  --header-height: 52px;
+  --mobilebar-height: 76px;
+  --panel-width-entry: 372px;
+  --panel-width-task: 424px;
+  --list-column-width: 334px;
+  --width-reading: 700px;
+  --width-productivity: 1000px;
+  --width-wide: 1240px;
+  --row-comfortable: 56px;
+  --row-compact: 40px;
+  --touch-target: 44px;
+
+  /* ---- radius ----------------------------------------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-sheet: 20px;
+  --radius-full: 999px;
+
+  /* ---- elevation -------------------------------------------------------- */
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --elevation-2: 0 2px 8px rgba(0, 0, 0, 0.07);
+  --elevation-3: 0 24px 60px rgba(26, 25, 23, 0.28);
+  --elevation-sheet: 0 -12px 40px rgba(26, 25, 23, 0.25);
+  --elevation-undo: 0 8px 20px rgba(26, 25, 23, 0.28);
+
+  /* The wash behind a modal, sheet or palette. The handoff's elevation table
+     does not name it, but three surfaces need one and each had invented its own
+     — which is how the same dialog got two different backdrops. It is a colour,
+     so it belongs here and it themes. */
+  --scrim: rgba(26, 25, 23, 0.32);
+
+  /* ---- motion ----------------------------------------------------------- */
+  --motion-fast: 100ms;
+  --motion-standard: 160ms;
+  --motion-emphasis: 220ms;
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: ease-in;
+
+  /* ---- density ---------------------------------------------------------- */
+  /* Comfortable is the default (owner decision 5). Compact is opt-in. */
+  --row-height: var(--row-comfortable);
+}
+
+/* ---- dark ---------------------------------------------------------------- */
+
+/* Authored once, applied from two places. `--dark-palette` is not a real
+   mechanism in CSS, so the block is repeated below rather than referenced; the
+   guard in `phase-2i-experience-guard.test.ts` asserts the two copies stay in
+   step, which is the failure a hand-maintained duplicate actually has. */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background-canvas: #141311;
+  --background-surface: #1c1b18;
+  --background-subtle: #24221e;
+  --background-subtle-strong: #2e2b26;
+  --background-elevated: #24221e;
+  --background-inverse: #f0ede7;
+
+  --text-primary: #f0ede7;
+  --text-secondary: #b3aca2;
+  --text-muted: #918a7e;
+  --text-inverse: #141311;
+
+  --border-default: #2e2b26;
+  --border-strong: #423e37;
+  --border-divider: #24221e;
+  --mark-decorative: #6f6960;
+
+  --action-primary: #f0ede7;
+  --action-primary-hover: #ded8cf;
+  --action-primary-text: #141311;
+  --focus-ring: #7aa5d1;
+  --link: #7aa5d1;
+  --link-hover: #9dbde0;
+
+  /* In dark, elevation is carried by border and by a lighter surface. A shadow
+     on a near-black canvas reads as dirt, not as height. */
+  --elevation-1: none;
+  --elevation-2: none;
+  --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
+  --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
+  --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+  /* Heavier in dark: the canvas is already near-black, so a light scrim would
+     not separate the dialog from the page behind it. */
+  --scrim: rgba(0, 0, 0, 0.62);
+}
+
+/* The untouched default: no stored preference, so the machine decides.
+   `:not([data-theme="light"])` is what lets an explicit light choice win on a
+   dark machine — without it, choosing light would be silently overridden. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --background-canvas: #141311;
+    --background-surface: #1c1b18;
+    --background-subtle: #24221e;
+    --background-subtle-strong: #2e2b26;
+    --background-elevated: #24221e;
+    --background-inverse: #f0ede7;
+
+    --text-primary: #f0ede7;
+    --text-secondary: #b3aca2;
+    --text-muted: #918a7e;
+    --text-inverse: #141311;
+
+    --border-default: #2e2b26;
+    --border-strong: #423e37;
+    --border-divider: #24221e;
+    --mark-decorative: #6f6960;
+
+    --action-primary: #f0ede7;
+    --action-primary-hover: #ded8cf;
+    --action-primary-text: #141311;
+    --focus-ring: #7aa5d1;
+    --link: #7aa5d1;
+    --link-hover: #9dbde0;
+
+    --elevation-1: none;
+    --elevation-2: none;
+    --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
+    --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+    /* Heavier in dark: the canvas is already near-black, so a light scrim would
+       not separate the dialog from the page behind it. */
+    --scrim: rgba(0, 0, 0, 0.62);
+  }
+}
+
+/* ---- density ------------------------------------------------------------- */
+
+:root[data-density="comfortable"] { --row-height: var(--row-comfortable); }
+:root[data-density="compact"] { --row-height: var(--row-compact); }
+
+/* Compact removes whitespace. It never shrinks a touch target: on a coarse
+   pointer the row floors at 44px regardless of the preference. */
+@media (pointer: coarse) {
+  :root[data-density="compact"] { --row-height: var(--touch-target); }
+}
+
+/* ---- motion -------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-standard: 1ms;
+    --motion-emphasis: 1ms;
+  }
+}
+
+/* ---- the bridge ---------------------------------------------------------- */
+
+/* The nine legacy tokens, redefined in terms of the palette above. These hold
+   no values: a surface still written against `--ink` gets Papel e Console in
+   light and in dark without being touched. Each new slice replaces its uses and
+   the alias retires when the count reaches zero.
+   `--white` is deliberately NOT `#fff` — it names a surface, and a surface in
+   dark mode is dark. Leaving it literal is how a redesign ends up with white
+   cards on a black canvas. */
+:root {
+  --ink: var(--text-primary);
+  --ink-soft: var(--text-secondary);
+  --line: var(--border-default);
+  --paper: var(--background-canvas);
+  --mist: var(--background-subtle);
+  --white: var(--background-surface);
+  --blue: var(--link);
+  /* These two resolve into `experience.css`'s tone set rather than holding a
+     tint of their own — state colour has exactly one source, and a bridge that
+     forked it would quietly become a second one. */
+  --blue-wash: var(--tone-information-bg);
+  --signal: var(--tone-attention-fg);
+
+  /* The page gutter. Clamped rather than a bare `5vw`: every page box is also
+     `max-width`-capped, so an uncapped viewport percentage keeps eating the
+     content box after the box itself has stopped growing — 1920 rendered a
+     narrower reading column than 1440 (UX-16). */
+  --gutter: clamp(18px, 5vw, 40px);
+  /* Bottom clearance for the fixed mobile bar, including the device inset. */
+  --page-bottom: 110px;
+}

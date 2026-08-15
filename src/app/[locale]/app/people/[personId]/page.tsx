@@ -22,8 +22,12 @@ import {
   updateOwnerRelationship,
 } from "@/features/entities/relationships";
 import { loadAliasesForEntity } from "@/features/entities/aliases";
+import { describeEntityChanges } from "@/features/entities/project-context";
+import { getHistoryCopy } from "@/features/history/copy";
+import { HistoryList } from "@/features/history/history-list";
+import { getAgentName } from "@/features/profile/agent-identity";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
-import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
+import { boundedList, CONTEXTUAL_LIMIT, PICKER_LIMIT, RECENT_CHANGE_LIMIT, RELATION_LIMIT, withProbe } from "@/features/bounds/contracts";
 import { loadLinksForEntity } from "@/features/library/attachment-links";
 import { ATTACHMENT_LINK_LIMIT } from "@/features/library/link-contracts";
 import { LinkedFilesSection } from "@/features/library/linked-subjects-section";
@@ -46,6 +50,43 @@ import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
+/**
+ * The person workspace — `03-componentes.md`, EntityWorkspace.
+ *
+ * ## The template, and the one part of it that is not built
+ *
+ * The handoff's order is *cabeçalho → resumo do Brain com fontes → duas colunas
+ * (trabalho em aberto / o que o Brain acredita saber) → "onde aparece"*. Four of
+ * those five are here. The **generated summary is not**, and it is left out
+ * rather than faked: the product has no per-entity summary, storing one would
+ * cost a migration this initiative does not have, and generating one at render
+ * would spend the owner's own credential on a model call per page load —
+ * exactly what `2K-SUGG-001` refused for the same shape of feature.
+ *
+ * `04-estados.md` offers *"Ainda não há material suficiente para um resumo"* as
+ * the empty arm, and that sentence is **not** used, because it says the
+ * capability exists and is waiting for material. It does not exist. An honest
+ * absence is silence plus a record in the changelog, not a placeholder that
+ * implies a feature.
+ *
+ * What occupies that position instead is a band that is real: **what changed
+ * here recently**, read from the audit trail this product already keeps and
+ * linked to the same rows on `/app/history`.
+ *
+ * ## What did not move
+ *
+ * Every loader, bound, provenance derivation, sensitivity derivation, Server
+ * Action, association panel and the deletion control are the code they were.
+ * This commit reorders and regroups; the only new read is the audit band's.
+ */
+/**
+ * The audit columns the changes band needs — the same eight the project page
+ * reads, written once per surface because a shared constant would be a third
+ * module for one string list. Both are checked against each other by
+ * `phase-2n-project-guard.test.ts`'s sibling assertion.
+ */
+const CHANGE_SELECT = "id,action_type,entity_type,entity_id,actor,before_state,after_state,created_at";
+
 export default async function PersonDetailPage({ params }: { params: Promise<{ locale: string; personId: string }> }) {
   const { locale: candidate, personId } = await params;
   if (!isLocale(candidate)) notFound();
@@ -54,7 +95,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const copy = getEntityCopy(locale);
   const provenanceCopy = getProvenanceCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
   // other contextual surface stamp instants from the same source.
   const timeZone = await getOwnerTimeZone();
@@ -71,6 +112,8 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     projectOptionsResult,
     aliases,
     fileLinkOutcome,
+    personChangeResult,
+    agentName,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
     supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at").eq("id", personId).maybeSingle(),
@@ -124,6 +167,18 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
      * so the emptiness is explained rather than left to look like a bug.
      */
     loadLinksForEntity(supabase, "person", personId),
+    /*
+     * The audit trail, scoped to this person — the same read `2N-PROJECT-004`
+     * gave the project workspace, on the surface that answers the same question
+     * about a different subject.
+     *
+     * `(user_id, entity_type, entity_id)` is `audit_logs_user_entity_idx`, so
+     * this is one indexed lookup. It carries the probe row like every other list
+     * on this page, because a changes band that silently stopped at twenty would
+     * be the truncation `2N-PERSON-003` exists to end.
+     */
+    supabase.from("audit_logs").select(CHANGE_SELECT).eq("user_id", user.id).eq("entity_type", "person").eq("entity_id", personId).order("created_at", { ascending: false }).limit(withProbe(RECENT_CHANGE_LIMIT)),
+    getAgentName(),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];
@@ -270,6 +325,27 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
 
   // `person_projects.role` was already read here and never rendered (UX-09):
   // "shared projects" said they were shared, not what this person does on them.
+  /*
+   * `2N-PROJECT-004`'s band, on the person workspace.
+   *
+   * `requireSupabaseData` rather than a silent `[]`: the section states *"nenhuma
+   * alteração registrada"*, which is a claim about the trail. A failed read that
+   * rendered as that sentence would turn "we could not look" into "there is
+   * nothing", which is the shape this page already refuses three times over.
+   *
+   * Only rows whose `entity_type` is `person` are read. The explainer says so,
+   * for the reason the project page's does: a change the trail never recorded
+   * against this subject must read as outside the list rather than as an absence
+   * of history.
+   */
+  const personChanges = requireSupabaseData(personChangeResult, "load person changes") ?? [];
+  const historyCopy = getHistoryCopy(locale, agentName);
+  const formatDateTime = (iso: string) => formatInstant(iso, "dayAndTime", locale, timeZone) ?? "";
+  const boundedChanges = boundedList(
+    describeEntityChanges(personChanges, historyCopy, formatDateTime),
+    RECENT_CHANGE_LIMIT,
+  );
+
   const roleByProjectId = new Map(projectLinks.map((link) => [link.project_id, link.role]));
   const organizationName = organizations.find((item) => item.id === person.organization_id)?.name ?? null;
   const formatDate = (value: string) => formatInstant(value, "day", locale, timeZone) ?? "";
@@ -292,7 +368,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     `/${locale}/app/inbox/${entryId}?back=${encodeURIComponent(`/${locale}/app/people/${person.id}#${anchor}`)}`;
 
   return (
-    <div className="content-page entity-detail">
+    <div className="content-page entity-workspace">
       <Link className="back-link" href={`/${locale}/app/people`}><ArrowLeft size={16} />{pt ? "Pessoas" : "People"}</Link>
 
       <header className="entity-hero">
@@ -356,28 +432,141 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         </div>
       </header>
 
-      <EntityEditForm
-        action={updatePerson}
-        createOrganizationAction={createOrganizationForSubject}
-        fields={{
-          kind: "person",
-          id: person.id,
-          name: person.name,
-          notes: person.notes,
-          organizationId: person.organization_id,
-        }}
-        locale={locale}
-        organizations={organizations}
-      />
+      {/*
+        The edit form, behind a disclosure.
+        `03-componentes.md` puts *ações* in the workspace header; a nine-field
+        form sitting open between the identity and the content is not an action,
+        it is a page of its own wearing the header's position. Behind a
+        `<details>` it keeps every capability — the same move part two made for
+        Trabalho's forty filter controls — and the workspace starts where the
+        handoff says it starts, at what the Brain knows about this person.
+      */}
+      <details className="entity-edit-disclosure">
+        <summary>{copy.editSummary}</summary>
+        <EntityEditForm
+          action={updatePerson}
+          createOrganizationAction={createOrganizationForSubject}
+          fields={{
+            kind: "person",
+            id: person.id,
+            name: person.name,
+            notes: person.notes,
+            organizationId: person.organization_id,
+          }}
+          locale={locale}
+          organizations={organizations}
+        />
+      </details>
 
       {/*
-        EGC.2. These four sections were read-only until now: the page loaded
-        `person_relationships` and `person_contexts` and rendered whatever it
-        found, which was always nothing, because nothing had ever written them.
-        `person_relationships` in particular had no writer in either layer.
+        Where the handoff draws the generated summary. See the module header on
+        why no summary is rendered and why the empty sentence `04-estados.md`
+        offers for it is not used. This band is what genuinely exists in its
+        place — and it is the project workspace's own section, mounted here
+        rather than reimplemented, so one change is narrated one way wherever it
+        is read.
       */}
-      <div className="entity-columns">
-        <RelationshipPanel
+      <section className="entity-changes" id="changes">
+        <h2>{copy.recentChanges}</h2>
+        <SectionOriginNote locale={locale} origin="derived" />
+        <p className="section-explainer">{copy.personChangesExplainer}</p>
+        {boundedChanges.items.length ? (
+          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+        ) : <p className="quiet-state">{copy.personChangesEmpty}</p>}
+        <BoundedNotice list={boundedChanges} locale={locale} />
+      </section>
+
+      <div className="entity-workspace-columns">
+        <section className="entity-workspace-column" aria-labelledby="workspace-open">
+          <h2 id="workspace-open">{copy.openWork}</h2>
+          <section className="entity-tasks">
+            <h3>{copy.linkedTasks}</h3>
+            {/*
+              `2N-PERSON-004`. Derived: this list is assembled at render from
+              `task_people` and `tasks`, and the task itself is edited on Work, not
+              here. Saying so is what stops the reader looking for an edit control
+              that was never meant to be on this page.
+            */}
+            <SectionOriginNote locale={locale} origin="derived" />
+            {boundedTasks.items.length ? (
+              <div className="mini-list">
+                {boundedTasks.items.map((task, index) => {
+                  /*
+                   * Derived ONCE and asked about, rather than the resolvability
+                   * test being re-implemented in the `href`.
+                   *
+                   * Writing `resolvableEntryIds.has(...) ? sourceHref(...)` beside
+                   * `deriveClaimProvenance(...)` would be two answers to one
+                   * question, and they would drift the moment the contract gained
+                   * a condition — leaving a page that offers a link to something
+                   * it simultaneously labels unsourced.
+                   */
+                  const provenance = deriveClaimProvenance(task.source_entry_id, resolvableEntryIds);
+                  return (
+                  <article id={`task-${task.id}`} key={task.id}>
+                    {/*
+                      The same component the Work list and the task detail mount, so
+                      a task masked on `/app/work` is masked here too — the
+                      divergence `2L-PRIVACY-007` found on Hoje, prevented one
+                      domain earlier this time. No `describedAs`: the title IS the
+                      protected content, and passing it would defeat the mask
+                      through the accessible name.
+                    */}
+                    <ProtectedContent
+                      locale={locale}
+                      revealKey={`person-task-${task.id}`}
+                      sensitivity={deriveTaskSensitivity(task.source_entry_id, entryLevels)}
+                      surface="person"
+                    >
+                      <strong>{task.title}</strong>
+                    </ProtectedContent>
+                    <span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span>
+                    {/*
+                      `subject` is positional, never the title. The title is what
+                      `ProtectedContent` above may be withholding, and an
+                      `aria-label` carrying it would hand the masked string to
+                      assistive technology and to the DOM.
+                    */}
+                    <ProvenanceNote
+                      href={isOpenable(provenance) ? sourceHref(provenance.entryId, `task-${task.id}`) : undefined}
+                      locale={locale}
+                      provenance={provenance}
+                      subject={provenanceCopy.taskSubject(index + 1)}
+                    />
+                  </article>
+                  );
+                })}
+              </div>
+            ) : <p className="quiet-state">{copy.linkedTasksEmpty}</p>}
+            <BoundedNotice list={boundedTasks} locale={locale} />
+          </section>
+          <AssociationPanel
+            addAction={associatePersonProject}
+            bound={boundedProjects}
+            endAction={endPersonProject}
+            heading={copy.linkedProjects}
+            locale={locale}
+            options={projectOptions.map((option) => ({ id: option.id, label: option.name }))}
+            roleAction={updatePersonProjectRole}
+            rows={boundedProjects.items.map((project) => ({
+              id: project.id,
+              label: project.name,
+              href: `/${locale}/app/projects/${project.id}`,
+              role: roleByProjectId.get(project.id) ?? null,
+            }))}
+            target={{ kind: "person-project", personId: person.id }}
+          />
+        </section>
+
+        {/*
+          EGC.2. These sections were read-only until EGC.2: the page loaded
+          `person_relationships` and `person_contexts` and rendered whatever it
+          found, which was always nothing, because nothing had ever written them.
+          `person_relationships` in particular had no writer in either layer.
+        */}
+        <section className="entity-workspace-column" aria-labelledby="workspace-knows">
+          <h2 id="workspace-knows">{copy.whatBrainKnows}</h2>
+          <RelationshipPanel
           bound={boundedRelationships}
           createAction={createOwnerRelationship}
           endAction={endOwnerRelationship}
@@ -408,91 +597,9 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           }))}
           target={{ kind: "person-context", personId: person.id }}
         />
-      </div>
-
-      <div className="entity-columns">
-        <section>
-          <h2>{pt ? "Pendências e tarefas" : "Open work and tasks"}</h2>
-          {/*
-            `2N-PERSON-004`. Derived: this list is assembled at render from
-            `task_people` and `tasks`, and the task itself is edited on Work, not
-            here. Saying so is what stops the reader looking for an edit control
-            that was never meant to be on this page.
-          */}
-          <SectionOriginNote locale={locale} origin="derived" />
-          {boundedTasks.items.length ? (
-            <div className="mini-list">
-              {boundedTasks.items.map((task, index) => {
-                /*
-                 * Derived ONCE and asked about, rather than the resolvability
-                 * test being re-implemented in the `href`.
-                 *
-                 * Writing `resolvableEntryIds.has(...) ? sourceHref(...)` beside
-                 * `deriveClaimProvenance(...)` would be two answers to one
-                 * question, and they would drift the moment the contract gained
-                 * a condition — leaving a page that offers a link to something
-                 * it simultaneously labels unsourced.
-                 */
-                const provenance = deriveClaimProvenance(task.source_entry_id, resolvableEntryIds);
-                return (
-                <article id={`task-${task.id}`} key={task.id}>
-                  {/*
-                    The same component the Work list and the task detail mount, so
-                    a task masked on `/app/work` is masked here too — the
-                    divergence `2L-PRIVACY-007` found on Hoje, prevented one
-                    domain earlier this time. No `describedAs`: the title IS the
-                    protected content, and passing it would defeat the mask
-                    through the accessible name.
-                  */}
-                  <ProtectedContent
-                    locale={locale}
-                    revealKey={`person-task-${task.id}`}
-                    sensitivity={deriveTaskSensitivity(task.source_entry_id, entryLevels)}
-                    surface="person"
-                  >
-                    <strong>{task.title}</strong>
-                  </ProtectedContent>
-                  <span>{taskStatusLabel(locale, task.status) ?? vocabulary.unknownState}</span>
-                  {/*
-                    `subject` is positional, never the title. The title is what
-                    `ProtectedContent` above may be withholding, and an
-                    `aria-label` carrying it would hand the masked string to
-                    assistive technology and to the DOM.
-                  */}
-                  <ProvenanceNote
-                    href={isOpenable(provenance) ? sourceHref(provenance.entryId, `task-${task.id}`) : undefined}
-                    locale={locale}
-                    provenance={provenance}
-                    subject={provenanceCopy.taskSubject(index + 1)}
-                  />
-                </article>
-                );
-              })}
-            </div>
-          ) : <p className="quiet-state">{pt ? "Nenhuma tarefa vinculada." : "No linked tasks."}</p>}
-          <BoundedNotice list={boundedTasks} locale={locale} />
-        </section>
-        <AssociationPanel
-          addAction={associatePersonProject}
-          bound={boundedProjects}
-          endAction={endPersonProject}
-          heading={copy.linkedProjects}
-          locale={locale}
-          options={projectOptions.map((option) => ({ id: option.id, label: option.name }))}
-          roleAction={updatePersonProjectRole}
-          rows={boundedProjects.items.map((project) => ({
-            id: project.id,
-            label: project.name,
-            href: `/${locale}/app/projects/${project.id}`,
-            role: roleByProjectId.get(project.id) ?? null,
-          }))}
-          target={{ kind: "person-project", personId: person.id }}
-        />
-      </div>
-
       {boundedMemories.items.length > 0 && (
         <section className="entity-memory">
-          <h2>{pt ? "Memórias" : "Memories"}</h2>
+          <h3>{copy.personMemories}</h3>
           <SectionOriginNote locale={locale} origin="derived" />
           {boundedMemories.items.map((memory, index) => {
             const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
@@ -541,9 +648,17 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         outcome={fileLinkOutcome}
         statusLabel={(value) => attachmentStatusLabel(locale, value) ?? vocabulary.unknownState}
       />
+        </section>
+      </div>
 
+      {/*
+        "Onde aparece", last of the four bands the workspace template names. The
+        heading changed from *Linha do tempo* because the section answers a
+        different question from the one that name asks: it is not this person's
+        chronology, it is the records that mention them.
+      */}
       <section className="entity-timeline">
-        <h2>{pt ? "Linha do tempo" : "Timeline"}</h2>
+        <h2>{copy.whereItAppears}</h2>
         {/*
           Derived, and the one section that needs no per-row provenance: these
           rows ARE the records. A "de um registro seu" line under an entry would

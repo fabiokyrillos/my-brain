@@ -13,6 +13,7 @@ import {
   RELATION_LIMIT,
   withProbe,
 } from "@/features/bounds/contracts";
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import {
   loadAttachmentIdsForSubject,
   loadLinkFilterOptions,
@@ -28,6 +29,7 @@ import { FileFilterBar, type LinkedFilterOption } from "@/features/library/file-
 import {
   CLASSIFIED_MIME_TYPES,
   fileFiltersRecord,
+  fileKindOf,
   hasActiveFileFilter,
   mimeTypesForKind,
   parseFileFilters,
@@ -44,6 +46,7 @@ import {
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { getTransparencyCopy } from "@/features/transparency/copy";
 import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
@@ -466,6 +469,9 @@ export default async function FilesPage({
           {libraryCopy.searchInFiles}
         </Link>
       </header>
+
+      <BrainLensTabs active="files" locale={locale} />
+
       <p className="quiet-state">{libraryCopy.searchInFilesHint}</p>
 
       <UploadForm action={uploadAttachment} locale={locale} />
@@ -480,6 +486,17 @@ export default async function FilesPage({
             <div>
               <h2 id="failed-jobs-title">{copy.failedTitle}</h2>
               <p>{copy.failedSubtitle}</p>
+              {/*
+                `02-arquitetura-e-rotas.md`: Processamento is *alcançável a
+                partir da falha*. This is the failure, and until now it was the
+                one place in the product that knew something had gone wrong and
+                offered no way to see what. The link is here rather than per row
+                because `/app/jobs` is the whole queue, not one job — a per-row
+                link would promise a detail page that does not exist.
+              */}
+              <Link className="row-action" href={`/${locale}/app/jobs`}>
+                {getTransparencyCopy(locale).openProcessing}
+              </Link>
             </div>
           </header>
           <div className="failed-job-list">
@@ -579,6 +596,16 @@ export default async function FilesPage({
                   </ProtectedContent>
                 </div>
                 <div className="list-meta">
+                  {/*
+                    The type, as a mono label rather than an icon
+                    (`08-assets-e-conteudo.md`). Derived from the same map the
+                    filter chips use, so the word on the row and the chip that
+                    would select it cannot disagree. It is not file content — a
+                    MIME type is a format, not something the document says — so
+                    it sits outside the reveal beside the size fallback that was
+                    already there for the same reason.
+                  */}
+                  <span className="file-kind">{libraryCopy.kinds[fileKindOf(file.mime_type)]}</span>
                   <span className={`status-badge ${file.status}`}>
                     {attachmentStatusLabel(locale, file.status) ??
                       getVocabularyCopy(locale).unknownState}

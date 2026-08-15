@@ -99,7 +99,36 @@ export const navigationCapabilities = [
   // slice exists to remove. `tasks` and `waiting` are unaffected -- both are
   // genuinely Work views and neither is the name of another destination.
   { key: "work", route: "work", group: "primary", visibility: "primary", nested: true, aliases: ["tasks", "waiting"] },
-  { key: "chat", route: "chat", group: "primary", visibility: "primary", nested: true, aliases: [] },
+  /*
+   * Brain — the fourth primary destination (`02-arquitetura-e-rotas.md`).
+   *
+   * `2I-SHELL-001` pinned the four primary destinations as a delivered baseline
+   * *and said why*: to stop a later slice changing them quietly. This is the
+   * opposite of quietly. The approved handoff names the four by hand — Hoje ·
+   * Registros · Trabalho · Brain — and the redesign's authorization covers
+   * information architecture, which is exactly the decision that comment was
+   * holding for an owner to make.
+   *
+   * The route stays `library`. Renaming the URL would break every existing link
+   * for a change that is entirely about what the destination is *called* and
+   * where it sits — the same move `home`/"Hoje" and `inbox`/"Registros" already
+   * made, and the compatibility rule says no URL dies at this step.
+   *
+   * `nested: false`: `/app/library` has no sub-route. The lenses it opens are
+   * separate destinations with their own keys below, so each keeps its own
+   * active state rather than borrowing this one.
+   */
+  { key: "library", route: "library", group: "primary", visibility: "primary", nested: false, aliases: [] },
+  /*
+   * Conversar leaves the primary rail.
+   *
+   * Not a demotion of the feature — the route, the grounding, the citations and
+   * every action are untouched. The architecture places it *inside* Brain as the
+   * Conversas lens, and the rail holds four destinations, so it moves to the
+   * `context` group beside the other lenses Brain opens. It is still one click
+   * from the rail, and `mobileBarSlots` still carries it.
+   */
+  { key: "chat", route: "chat", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "projects", route: "projects", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "people", route: "people", group: "context", visibility: "more", nested: true, aliases: [] },
   // EGC.1. Both tables predate every route in this list; what they never had was
@@ -196,15 +225,70 @@ export const primaryNavigationKeys = navigationCapabilities
  * `capture` at the midpoint — so a future edit that adds a sixth destination to
  * balance geometry fails instead of quietly decentring the button.
  *
- * Why these four destinations, and why `inbox` is not among them (owner decision,
- * 2026-07-30): Início is the attention and orientation surface, Trabalho is the
- * primary execution surface, Capturar is the central global action, Brain is the
- * primary assistant surface, and Mais is the overflow and account surface.
- * Registros is a complete archive and consultation surface rather than an
- * operational queue, so on a five-slot bar it belongs in overflow. Desktop is
- * unchanged: it still carries all four primary destinations.
+ * **Registros returns to the bar**, reversing the 2026-07-30 owner decision that
+ * put it in overflow. That decision reasoned Registros was "a complete archive
+ * and consultation surface rather than an operational queue" — which was true of
+ * the surface as it then was, and is not true of the surface the redesign
+ * delivers. `02-arquitetura-e-rotas.md` states the requirement directly:
+ * *Registros volta para a barra — é a fila de decisão, e não pode viver em
+ * overflow.* Its default view is now the decision queue, so the premise of the
+ * old decision is gone with it.
+ *
+ * ## The one place this bar departs from the handoff, and the exact size of it
+ *
+ * The handoff's bar is `Hoje · Registros · [Capturar] · Trabalho · Brain`, and
+ * it adds that *"Mais" deixa de existir*. The first four slots are exactly that.
+ * The fifth is still `more`, and the reason has changed shape twice — so it is
+ * written here as a **census with a release condition** rather than as a
+ * paragraph that has to be re-argued each time.
+ *
+ * The 2026-08-14 version of this comment said `more` was the only route to
+ * **fourteen** destinations. That was true then. Brain's lenses, Trabalho's
+ * modes, Hoje's closing section and Ajustes → Dados e IA have since absorbed
+ * twelve of them, and each has a named in-product path that
+ * `mobile-reachability-guard.test.ts` re-derives from the components on every
+ * run:
+ *
+ * | destination | reached from |
+ * | --- | --- |
+ * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview |
+ * | calendar (and the planner) | Trabalho's mode tabs |
+ * | reviews | Hoje, unconditionally |
+ * | reminders | the calendar's control band, unconditionally |
+ * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
+ *
+ * **Two things are left, and the first of them is the account.** `AccountMenu`
+ * is mounted in exactly two places: the desktop rail's foot, and the mobile
+ * overflow panel. On a phone the top bar carries the palette, the locale switch
+ * and notifications — no avatar, no profile chip. So retiring `more` today would
+ * take Ajustes with it, and with Ajustes the whole of Dados e IA, and
+ * **sign-out**. That is not a destination being one tap further away; it is the
+ * way out of the product disappearing.
+ *
+ * **The second is `questions`, and this row is a correction.** An earlier
+ * version of this table claimed Hoje reached it. Hoje's only link to
+ * `/app/questions` sits inside `{view.openQuestion ? … : null}`, and the other
+ * in-product path — `conversational-questions.tsx` — returns `null` on an empty
+ * list. So an owner with no open question has no path to Perguntas but the
+ * disclosure, which is the same shape Lembretes had before this part fixed it.
+ * It is left as a **stated dependency rather than patched with a new link**: the
+ * handoff makes Perguntas a *view of Registros* rather than a destination Hoje
+ * advertises, and adding a permanent control to the cockpit to make this census
+ * true would be arranging the product around its own bookkeeping.
+ *
+ * `02-arquitetura-e-rotas.md` already specifies the fix — *Conta e ajustes ·
+ * Avatar no cabeçalho* on mobile. It is not built here because moving the
+ * account surface changes the shell on both viewports, and this initiative's
+ * last delimited part is not where the way out of the product gets rebuilt
+ * unvalidated.
+ *
+ * **The release condition, stated so nobody has to rediscover it:** when
+ * `AccountMenu` is mounted somewhere a phone can reach without the disclosure,
+ * the fifth slot becomes `library` and this comment shrinks to nothing. The
+ * guard fails the moment that census changes, in either direction — a
+ * destination losing its path, or the account gaining one.
  */
-export const mobileBarSlots = ["home", "work", "capture", "chat", "more"] as const;
+export const mobileBarSlots = ["home", "inbox", "capture", "work", "more"] as const;
 
 export type MobileBarSlot = (typeof mobileBarSlots)[number];
 

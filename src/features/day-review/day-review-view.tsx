@@ -64,6 +64,7 @@ import { formatInstant } from "@/lib/time/instant-format";
 import { dayReviewControlFor, dayReviewRequiresConfirmation, type DayReviewVerb } from "./contracts";
 import { getDayReviewCopy } from "./copy";
 import type { DayReviewItem, DayReviewProjection } from "./day-review-projection";
+import { summarizeDayReview } from "./synthesis";
 
 /** No relation verb can reach this surface, so there is nothing to populate. */
 const NO_RELATIONS: TaskDetailRelationOptions = Object.freeze({
@@ -90,6 +91,8 @@ export function DayReviewView({
 }) {
   const copy = getDayReviewCopy(locale);
   const [outcome, setOutcome] = useState<TaskDetailCommandState | null>(null);
+
+  const synthesis = summarizeDayReview(projection);
 
   /**
    * Q3's numerator, recorded by a wrapper around the action rather than by an
@@ -143,10 +146,31 @@ export function DayReviewView({
     );
   }
 
-  function Row({ item }: { item: DayReviewItem }) {
+  /**
+   * @param source which section is rendering this row.
+   *
+   * "Concluído" is complete by definition, so a state word there would be a
+   * label that can only say one thing. In "Intenções do dia" and "Prazos do
+   * dia" a row may be either, and the word is the whole difference between a
+   * list of what the day held and a list of what it left — which is what the
+   * synthesis above counts.
+   */
+  function Row({ item, source }: { item: DayReviewItem; source: "completed" | "planned" | "due" }) {
+    const open = source !== "completed" && item.completedAt === null;
     return (
-      <li className="day-review-item" key={item.taskId}>
+      <li
+        className="day-review-item"
+        data-open={source === "completed" ? undefined : String(open)}
+        key={item.taskId}
+      >
         <div className="day-review-item-head">
+          {source === "completed" ? null : (
+            // Word first, tint second — `04-estados.md`, and the reason nothing
+            // on this surface depends on colour alone.
+            <span className="day-review-state">
+              {open ? copy.synthesis.stateOpen : copy.synthesis.stateDone}
+            </span>
+          )}
           {/*
             The title is never rendered directly. `surface="calendar"` because
             the day review shares this phase's governed surface — a second
@@ -185,7 +209,7 @@ export function DayReviewView({
     const heading = copy.sections[source];
     return (
       <section aria-label={heading} className="day-review-section" data-source={source}>
-        <h2>{heading}</h2>
+        <h3>{heading}</h3>
         {projection.sourceStates[source] === "unavailable" ? (
           // `2M-REVIEW-001`. An unreadable source is never rendered as an empty
           // one: "nothing happened" and "I could not read this" are different
@@ -194,18 +218,31 @@ export function DayReviewView({
         ) : items.length === 0 ? (
           <p className="quiet-state">{copy.empty[source]}</p>
         ) : (
-          <ul>{items.map((item) => <Row item={item} key={item.taskId} />)}</ul>
+          <ul>{items.map((item) => <Row item={item} key={item.taskId} source={source} />)}</ul>
         )}
       </section>
     );
   }
 
   return (
-    <div className="content-page day-review-page">
+    /*
+      A `<section>` of `/app/reviews`, not a page of its own.
+
+      It was a second `content-page` nested inside the first, with a flat run of
+      `<h2>`s and the page's own `<h1>` *below* all of them — so the document
+      opened at level two and the review's title was a sibling of its own
+      sections rather than their parent. Demoting the `<h1>` (which is what the
+      first repair did) fixed the count and left the order wrong, which is the
+      half of `07-acessibilidade.md` an axe run does not measure.
+
+      The outline now reads: `<h1>` Revisões → `<h2>` this review → `<h3>` its
+      parts → `<h2>` the history below it.
+    */
+    <section aria-labelledby="day-review-title" className="day-review-page">
       <header className="list-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title(projection.scope)}</h1>
+          <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope)}</h2>
           <p>{copy.description(projection.scope)}</p>
           {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
           <p className="quiet-state">{copy.nothingScheduled}</p>
@@ -225,8 +262,62 @@ export function DayReviewView({
 
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
+      {/*
+        The closing's one-line reading, and the pendências under it.
+
+        The surface listed five sections and left the reader to count four of
+        them to answer "how did the day go". A closing states the day and then
+        shows its parts — so this is first, and everything below it is the
+        working out.
+
+        **Every number is a count over the projection's own arrays.** No score,
+        no proportion, no target and no "productive": `2M-REVIEW-002` forbids
+        the surface proposing changes the user did not ask for, and grading a
+        day is the loudest proposal there is. `summarizeDayReview` carries the
+        derivation and its own account of why `partial` is a field rather than a
+        footnote.
+      */}
+      <section aria-label={copy.synthesis.heading} className="day-review-synthesis">
+        <h3>{copy.synthesis.heading}</h3>
+        {synthesis.quiet ? (
+          <p className="quiet-state">{copy.synthesis.quiet}</p>
+        ) : (
+          <ul className="day-review-counts">
+            <li>{copy.synthesis.completed(synthesis.completed)}</li>
+            <li>{copy.synthesis.open(synthesis.open)}</li>
+            <li>{copy.synthesis.captured(synthesis.captured)}</li>
+          </ul>
+        )}
+        {/*
+          A count over a source that failed is not a small count, it is an
+          unknown one. Announced, because it changes what every number above
+          means and the reader may already have read them.
+        */}
+        {synthesis.partial.length > 0 ? (
+          <p className="day-review-partial" role="status">
+            {copy.synthesis.partial(
+              synthesis.partial.map((source) => copy.sections[source]).join(", "),
+            )}
+          </p>
+        ) : null}
+        {/*
+          The pendências are **not listed here**, and that is deliberate.
+
+          Every one of them is already a row in "Intenções do dia" or "Prazos do
+          dia" below, with the verbs its own status admits. A second list would
+          be the repetition `2J-HOJE-004` removed from Hoje for the same reason —
+          *the same task in two lists on one screen, where the second copy always
+          carries less than the first* — and here it would carry less in the way
+          that matters most: no controls, or a second set of them competing for
+          the same operation key.
+
+          So the count is stated here and the rows say their own state where they
+          already are, which is what `data-open` on the row is for.
+        */}
+      </section>
+
       <section aria-label={copy.schedule.heading} className="day-review-schedule">
-        <h2>{copy.schedule.heading}</h2>
+        <h3>{copy.schedule.heading}</h3>
         {/* `2M-REVIEW-006`. The three preferences, read — and said back. */}
         <p>
           {projection.schedule.dailyAt === null
@@ -248,15 +339,26 @@ export function DayReviewView({
       </section>
 
       <section aria-label={copy.unreadableHeading} className="day-review-unreadable">
-        <h2>{copy.unreadableHeading}</h2>
+        <h3>{copy.unreadableHeading}</h3>
         {projection.unreadable.length === 0 ? (
           <p className="quiet-state">{copy.unreadableNone}</p>
         ) : (
-          <ul role="status">
-            {projection.unreadable.map((source) => (
-              <li key={source}>{copy.unavailable(copy.sections[source])}</li>
-            ))}
-          </ul>
+          /*
+            `role="status"` on the wrapper, not on the `<ul>`.
+
+            An explicit role *replaces* the element's implicit one, so
+            `<ul role="status">` stops being a list and its `<li>` children have
+            no list parent — which is exactly what axe reported on the live page.
+            The announcement and the list structure are two different jobs, and
+            they now sit on two different elements.
+          */
+          <div role="status">
+            <ul>
+              {projection.unreadable.map((source) => (
+                <li key={source}>{copy.unavailable(copy.sections[source])}</li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 
@@ -265,7 +367,7 @@ export function DayReviewView({
       {section(projection.due, "due")}
 
       <section aria-label={copy.sections.captured} className="day-review-section" data-source="captured">
-        <h2>{copy.sections.captured}</h2>
+        <h3>{copy.sections.captured}</h3>
         {projection.sourceStates.captured === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.sections.captured)}</p>
         ) : projection.captured.length === 0 ? (
@@ -293,7 +395,7 @@ export function DayReviewView({
       </section>
 
       <section aria-label={copy.generatedHeading} className="day-review-section" data-source="generated">
-        <h2>{copy.generatedHeading}</h2>
+        <h3>{copy.generatedHeading}</h3>
         {projection.sourceStates.generated === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.generatedHeading)}</p>
         ) : projection.generated === null ? (
@@ -310,7 +412,7 @@ export function DayReviewView({
             <header>
               <div>
                 <span>{projection.generated.periodLabel}</span>
-                <h3>{projection.generated.title}</h3>
+                <h4>{projection.generated.title}</h4>
               </div>
               <span className="status-badge" data-tone={projection.generated.statusTone}>
                 {projection.generated.statusLabel}
@@ -321,6 +423,6 @@ export function DayReviewView({
         )}
         <p><a className="row-action" href={reviewsHref}>{copy.openReviews}</a></p>
       </section>
-    </div>
+    </section>
   );
 }

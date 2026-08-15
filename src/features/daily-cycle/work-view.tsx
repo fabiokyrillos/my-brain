@@ -18,6 +18,7 @@ import type { WorkItemView } from "./contracts";
 import { WorkFilters } from "./work-filters";
 import { getWorkFiltersCopy } from "./work-filters-copy";
 import { groupWorkItems } from "./work-grouping";
+import { WorkModeTabs } from "./work-modes";
 import { isNarrowed, toWorkQueryParams, workHref, type WorkQuery } from "./work-query";
 import { workViews, type WorkViewId } from "./work-projection";
 import { withAgentName } from "@/lib/agent-name";
@@ -95,6 +96,18 @@ export function WorkView({
     ? filtersCopy.emptyFiltered
     : active.empty;
 
+  /*
+    `03-componentes.md`, ListToolbar. The filter set is seven groups of chips —
+    roughly forty controls — and rendering all of them above the list made the
+    narrowing taller than the work it narrows. Collapsed into a disclosure, with
+    the count of what is currently active on the summary so a narrowed list can
+    never look like an unnarrowed one.
+
+    A `<details>` rather than a `useState` panel: it works before hydration, it
+    is keyboard-operable with no code, and this stays a server component.
+  */
+  const narrowed = query ? isNarrowed(query) : false;
+
   return <div className="content-page work-page">
     <WorkViewViewed locale={locale} view={view} />
     <header className="list-header">
@@ -107,8 +120,24 @@ export function WorkView({
           <p className="work-position-adjusted" role="status">{filtersCopy.positionAdjusted}</p>
         ) : null}
       </div>
-      {view === "all" && <InlineCreateForm action={createRecord} kind="task" locale={locale} />}
+      {/*
+        Creating a task is a primary action of this space on every view, not only
+        on "Todas" (`02-arquitetura-e-rotas.md` lists *criar* among Trabalho's
+        main actions). It was hidden on Hoje and Aguardando, which is where a
+        user most often wants it.
+      */}
+      <InlineCreateForm action={createRecord} kind="task" locale={locale} />
     </header>
+
+    {/* Lista · Calendário · Planejar — the same work, three ways of looking at
+        it. The Lista tab carries the current narrowing so a trip through the
+        calendar does not silently reset it. */}
+    <WorkModeTabs
+      active="list"
+      listHref={query ? workHref(locale, query) : undefined}
+      locale={locale}
+    />
+
     <nav className="work-view-tabs" aria-label={text.navigation}>
       {workViews.map((candidate) => <Link
         aria-current={candidate === view ? "page" : undefined}
@@ -120,8 +149,30 @@ export function WorkView({
         {text.views[candidate].label}
       </Link>)}
     </nav>
-    <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
-    {query ? <WorkFilters locale={locale} query={query} /> : null}
+
+    <div className="work-toolbar">
+      {query ? (
+        <details className="work-disclosure" open={narrowed}>
+          <summary>
+            {filtersCopy.filterSummary}
+            {/* Open by default when something is active, and said in words as
+                well: a narrowing you cannot see is a list that lies about what
+                it contains. */}
+            {narrowed ? <span className="work-disclosure-badge">{filtersCopy.filtersActive}</span> : null}
+          </summary>
+          <WorkFilters locale={locale} query={query} />
+        </details>
+      ) : null}
+      {/*
+        The command console keeps every capability it had and stops occupying the
+        top of the page. It is a real feature — `runTaskCommand` with its own
+        preview and undo — so it is collapsed, never removed.
+      */}
+      <details className="work-disclosure">
+        <summary>{getTaskCommandCopy(locale).console.title}</summary>
+        <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
+      </details>
+    </div>
     {groups.map((group) => (
       <section
         aria-label={group.label ?? undefined}

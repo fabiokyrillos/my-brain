@@ -15,18 +15,18 @@
 
 .assistant-composer-form {
   position: relative;
-  border: 1px solid #b8c4d4;
-  border-radius: 16px;
-  background: white;
-  box-shadow: 0 12px 35px rgba(23, 40, 70, 0.07);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
   overflow: hidden;
 }
 
 .assistant-composer-form > label {
   display: block;
   padding: 14px 20px 0;
-  font: 750 12px var(--font-jetbrains);
-  color: var(--ink-soft);
+  font: var(--type-mono);
+  color: var(--text-secondary);
 }
 
 .assistant-composer-row {
@@ -46,8 +46,8 @@
   resize: vertical;
   padding: 10px 0;
   background: transparent;
-  color: var(--ink);
-  font-size: 15px;
+  color: var(--text-primary);
+  font: var(--type-lead);
   line-height: 1.6;
 }
 
@@ -56,14 +56,14 @@
 }
 
 .assistant-composer-row > textarea::placeholder {
-  color: #8793a5;
+  color: var(--text-muted);
 }
 
 .assistant-composer-submit {
   flex: 0 0 auto;
   border: 0;
-  background: var(--ink);
-  color: white;
+  background: var(--text-primary);
+  color: var(--action-primary-text);
   font-weight: 750;
 }
 
@@ -74,10 +74,10 @@
 .assistant-composer-hint {
   margin: 0;
   padding: 9px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--mist);
-  color: var(--ink-soft);
-  font: 600 10px var(--font-jetbrains);
+  border-top: 1px solid var(--border-default);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
   letter-spacing: 0.03em;
 }
 
@@ -88,9 +88,9 @@
 .assistant-composer-notice {
   margin-top: 16px;
   padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: white;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .assistant-composer-notice h3 {
@@ -101,8 +101,8 @@
 
 .assistant-composer-notice > p {
   margin: 0;
-  color: var(--ink-soft);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font: var(--type-body);
   line-height: 1.6;
 }
 
@@ -113,19 +113,19 @@
   gap: 4px;
   margin: 0 0 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .assistant-composer-echo > span {
-  font: 650 9px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8290a4;
+  color: var(--text-muted);
 }
 
 .assistant-composer-echo > q {
-  color: var(--ink);
-  font-size: 14px;
+  color: var(--text-primary);
+  font: var(--type-body);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -136,15 +136,15 @@
   min-height: 44px;
   margin-top: 14px;
   padding: 11px 16px;
-  border: 1px solid #bcc7d6;
-  border-radius: 11px;
-  color: var(--ink);
-  font-size: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font: var(--type-body);
   font-weight: 700;
 }
 
 .assistant-composer-next:hover {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 /**
@@ -159,20 +159,20 @@
  * they are and what else is on the page with them.
  */
 .chat-page .conversational-questions {
-  border-color: var(--line);
-  background: white;
+  border-color: var(--border-default);
+  background: var(--background-surface);
 }
 
 .chat-page .conversational-questions-header .eyebrow {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .chat-page .conversational-questions .question-card {
-  background: var(--mist);
+  background: var(--background-subtle);
 }
 
 .chat-page .question-answer-form input {
-  background: white;
+  background: var(--background-surface);
 }
 
 /* Inside a thread the composer stays reachable without scrolling back down. */
@@ -211,3 +211,49 @@
     padding: 9px 16px;
   }
 }
+
+/*
+ * The turn's outcome, told apart by route.
+ *
+ * `assistant-composer.tsx` has rendered `data-route` on this region since the
+ * composer existed, and **no rule ever selected it**: a failed knowledge answer,
+ * a refused submission, a proposed memory and a filed capture all painted as the
+ * same neutral card. Four outcomes, one appearance — a producer with no
+ * consumer, and the third this session has found.
+ *
+ * A leading rule rather than a fill: the heading and the detail already say
+ * which outcome this is in words, and `04-estados.md` wants colour as the second
+ * carrier and never the first. `command` is deliberately unstyled — that route
+ * renders nothing here, because `TaskCommandResult` below owns it.
+ */
+.assistant-composer-notice[data-route="knowledge_failed"],
+.assistant-composer-notice[data-route="invalid"] {
+  border-inline-start: 3px solid var(--tone-attention-line);
+}
+.assistant-composer-notice[data-route="memory_intent"] {
+  border-inline-start: 3px solid var(--tone-suggestion-line);
+}
+.assistant-composer-notice[data-route="capture_intent"] {
+  border-inline-start: 3px solid var(--tone-success-line);
+}
+.assistant-composer-notice[data-route="capture_ambiguous"] {
+  border-inline-start: 3px solid var(--tone-information-line);
+}
+
+/*
+ * The read-only previews of what a turn referred to.
+ *
+ * A list, unstyled by default, so the cards themselves — which have their own
+ * grammar in `conversation-cards.css` — are what the reader sees.
+ */
+.assistant-composer-cards { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; padding: 0; list-style: none }
+
+/*
+ * The composer's own words, in the reading face.
+ *
+ * What the owner types is a sentence they wrote, so the field is set in the same
+ * face the thread renders it back in — otherwise the text visibly changes
+ * typeface between typing it and reading it, which is the seam this direction
+ * spends its whole type scale removing.
+ */
+.assistant-composer-row > textarea { font: var(--type-reading-sm) }

@@ -13,9 +13,9 @@
   display: block;
   margin: 0 0 24px;
   padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: white;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .task-command-console > header {
@@ -30,8 +30,8 @@
 
 .task-command-console > header p {
   margin: 0;
-  color: var(--ink-soft);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font: var(--type-body);
   line-height: 1.55;
 }
 
@@ -39,7 +39,7 @@
 .task-command-clarify label {
   display: block;
   margin-bottom: 7px;
-  font: 750 12px var(--font-jetbrains);
+  font: var(--type-mono);
 }
 
 .task-command-input-row {
@@ -52,11 +52,11 @@
 .task-command-clarify > input {
   flex: 1 1 220px;
   min-height: 44px;
-  border: 1px solid #b9c5d5;
-  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   padding: 11px 13px;
-  background: white;
-  color: var(--ink);
+  background: var(--background-surface);
+  color: var(--text-primary);
 }
 
 /* 44px on every control, including inside the dialog and the unified composer.
@@ -72,32 +72,32 @@
   gap: 8px;
   min-height: 44px;
   padding: 11px 16px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-weight: 750;
 }
 
 .task-command-primary {
   border: 0;
-  background: var(--ink);
-  color: white;
+  background: var(--text-primary);
+  color: var(--action-primary-text);
 }
 
 .task-command-secondary {
-  border: 1px solid #b9c5d5;
-  background: white;
-  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
 }
 
 .task-command-destructive {
   border: 0;
-  background: #9b2d24;
-  color: white;
+  background: var(--tone-risk-fg);
+  color: var(--action-primary-text);
 }
 
 .task-command-result {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-default);
 }
 
 /*
@@ -109,7 +109,7 @@
 .task-command-dialog :focus-visible,
 .task-command-console :focus-visible,
 .assistant-composer :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -120,29 +120,29 @@
 
 .task-command-result > p {
   margin: 0 0 10px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   line-height: 1.55;
 }
 
 .task-command-reason {
   font-weight: 650;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .task-command-preview {
   margin: 12px 0;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--mist);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-subtle);
 }
 
 .task-command-notice {
   margin: 0 0 8px;
-  font: 750 10px var(--font-jetbrains);
+  font: var(--type-eyebrow);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .task-command-task-title {
@@ -160,11 +160,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 10px;
-  font-size: 13px;
+  font: var(--type-body);
 }
 
 .task-command-delta dt {
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .task-command-delta dd {
@@ -178,14 +178,14 @@
 .task-command-effects {
   margin: 0 0 10px;
   padding-left: 18px;
-  font-size: 13px;
+  font: var(--type-body);
   line-height: 1.5;
 }
 
 .task-command-gravity {
   margin: 0;
   font-weight: 750;
-  color: #9b2d24;
+  color: var(--tone-risk-fg);
 }
 
 .task-command-candidates fieldset {
@@ -195,7 +195,7 @@
 }
 
 .task-command-candidates legend {
-  font: 750 12px var(--font-jetbrains);
+  font: var(--type-mono);
   padding: 0 0 8px;
 }
 
@@ -206,15 +206,15 @@
   /* The label is the hit area, so it carries the touch-target minimum. */
   min-height: 44px;
   padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   margin-bottom: 8px;
-  background: white;
+  background: var(--background-surface);
   cursor: pointer;
 }
 
 .task-command-candidate:has(input:focus-visible) {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -229,8 +229,8 @@
 
 .task-command-candidate-meta,
 .task-command-evidence {
-  font-size: 12px;
-  color: var(--ink-soft);
+  font: var(--type-caption);
+  color: var(--text-secondary);
 }
 
 /* --- the hand-rolled dialog (2E-A11Y-004) --- */
@@ -241,17 +241,17 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(20, 35, 59, 0.45);
+  background: var(--scrim);
   z-index: 60;
 }
 
 .task-command-dialog {
   width: min(100%, 460px);
   padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: white;
-  box-shadow: 0 24px 70px rgba(20, 35, 59, 0.2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sheet);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-3);
 }
 
 .task-command-dialog h3 {
@@ -261,7 +261,7 @@
 
 .task-command-dialog p {
   margin: 0 0 16px;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   line-height: 1.55;
 }
 
@@ -271,9 +271,9 @@
 
 .task-command-dialog-cancel {
   margin-left: 10px;
-  border: 1px solid #b9c5d5;
-  background: white;
-  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
 }
 
 /* --- the cancelled-task recovery surface (2E-DESTRUCTIVE-006) --- */
@@ -282,9 +282,9 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font-size: 13px;
+  font: var(--type-body);
   font-weight: 700;
-  color: var(--blue);
+  color: var(--link);
 }
 
 .task-command-recovery .list-row {
@@ -297,8 +297,8 @@
 
 .task-command-recovery-meta {
   margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--ink-soft);
+  font: var(--type-caption);
+  color: var(--text-secondary);
 }
 
 /*

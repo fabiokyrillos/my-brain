@@ -30,6 +30,15 @@ export type CalendarCopy = {
     readonly label: string;
     readonly names: Record<CalendarLane, string>;
     readonly descriptions: Record<CalendarLane, string>;
+    /**
+     * The lane's on/off state, as a word inside the link's accessible name.
+     *
+     * The chip used `aria-pressed`, which is invalid on a link and which axe
+     * flagged on the live page. A visually hidden word needs no ARIA at all and
+     * says the same thing to a screen reader.
+     */
+    readonly stateShown: string;
+    readonly stateHidden: string;
   };
   readonly commitment: Record<CalendarCommitment, string>;
   readonly navigation: {
@@ -38,6 +47,15 @@ export type CalendarCopy = {
     readonly today: string;
     readonly atEarliest: string;
     readonly atLatest: string;
+    /**
+     * The only unconditional way into Lembretes.
+     *
+     * Named as a destination rather than as a filter, because it leaves the
+     * calendar rather than narrowing it — a control band word that behaved
+     * differently from every other word in the band would be the band lying
+     * about what it is.
+     */
+    readonly allReminders: string;
   };
   readonly states: {
     readonly empty: string;
@@ -79,6 +97,8 @@ const PT_BR: CalendarCopy = {
   },
   lanes: {
     label: "O que mostrar",
+    stateShown: ", mostrando",
+    stateHidden: ", oculto",
     names: {
       deadline: "Prazos",
       intention: "Intenções",
@@ -106,6 +126,7 @@ const PT_BR: CalendarCopy = {
     today: "Hoje",
     atEarliest: "Este é o começo do período que o calendário cobre.",
     atLatest: "Este é o fim do período que o calendário cobre.",
+    allReminders: "Todos os lembretes",
   },
   states: {
     empty: "Nada marcado para este período.",
@@ -138,6 +159,8 @@ const EN: CalendarCopy = {
   },
   lanes: {
     label: "What to show",
+    stateShown: ", showing",
+    stateHidden: ", hidden",
     names: {
       deadline: "Deadlines",
       intention: "Intentions",
@@ -165,6 +188,7 @@ const EN: CalendarCopy = {
     today: "Today",
     atEarliest: "This is the start of the period the calendar covers.",
     atLatest: "This is the end of the period the calendar covers.",
+    allReminders: "All reminders",
   },
   states: {
     empty: "Nothing scheduled for this period.",

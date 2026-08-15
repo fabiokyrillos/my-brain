@@ -98,6 +98,28 @@ export function mimeTypesForKind(kind: FileKindFilter): readonly string[] | null
   return FILE_KIND_MIME_TYPES[kind];
 }
 
+/**
+ * The kind one file belongs to — the inverse of `mimeTypesForKind`.
+ *
+ * `08-assets-e-conteudo.md` puts a **mono label** where a file-type icon would
+ * go, and the file rows had no type marker of any kind: a PDF, a photo and a
+ * spreadsheet were three identical rows distinguished only by whatever the
+ * model had written about them. A reader scanning for "the spreadsheet" had
+ * nothing to scan.
+ *
+ * Derived from the same map the filter chips use, so the label a row carries and
+ * the chip that would select it can never disagree — and `other` is the
+ * exhaustive complement here exactly as it is there, so an allowlisted type
+ * nobody classified still gets a truthful label instead of none.
+ */
+export function fileKindOf(mimeType: string): FileKindFilter {
+  for (const kind of FILE_KIND_FILTERS) {
+    const types = mimeTypesForKind(kind);
+    if (types?.includes(mimeType)) return kind;
+  }
+  return "other";
+}
+
 /** The allowlist this module classifies against, re-exported for the guard. */
 export const UPLOAD_MIME_ALLOWLIST: readonly string[] = ATTACHMENT_LIMITS.mimeAllowlist;
 

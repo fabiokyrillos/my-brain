@@ -2,6 +2,7 @@ import { BrainCircuit, ChevronRight, Link2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { asMemoryKind } from "@/features/memories/read";
@@ -109,6 +110,8 @@ export default async function MemoriesPage({
         </div>
         <InlineCreateForm action={createRecord} kind="memory" locale={locale} />
       </header>
+
+      <BrainLensTabs active="memories" locale={locale} />
 
       {/*
         The mental model, said once at the top rather than implied by the rows

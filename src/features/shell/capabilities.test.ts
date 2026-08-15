@@ -17,8 +17,10 @@ describe("navigation capabilities", () => {
     const routes = [
       ["/pt-BR/app", "home", "primary"],
       ["/pt-BR/app/capture", "capture", "global"],
-      ["/pt-BR/app/chat", "chat", "primary"],
-      ["/pt-BR/app/chat/conversation-1", "chat", "primary"],
+      // Conversar is a lens of Brain since the redesign, so it classifies in the
+      // `context` group beside the other lenses. The route is unchanged.
+      ["/pt-BR/app/chat", "chat", "context"],
+      ["/pt-BR/app/chat/conversation-1", "chat", "context"],
       ["/pt-BR/app/costs", "costs", "transparency"],
       ["/pt-BR/app/files", "files", "context"],
       ["/pt-BR/app/history", "history", "transparency"],
@@ -63,7 +65,9 @@ describe("navigation capabilities", () => {
   });
 
   it("defines the same ordered hierarchy for desktop and mobile More", () => {
-    expect(primaryNavigationKeys).toEqual(["home", "inbox", "work", "chat"]);
+    // The four the architecture names: Hoje · Registros · Trabalho · Brain.
+    // `library` is the route; "Brain" is what it is called.
+    expect(primaryNavigationKeys).toEqual(["home", "inbox", "work", "library"]);
     expect(moreNavigationGroups).toEqual([
       // EGC.1 puts organizations and contexts beside the two entity destinations
       // they relate, and ahead of the two that are stores rather than graph
@@ -73,7 +77,9 @@ describe("navigation capabilities", () => {
       // navigation, and `2I-SHELL-001`'s four are asserted unchanged above.
       {
         key: "context",
-        items: ["projects", "people", "organizations", "contexts", "memories", "files", "relations"],
+        // `chat` leads the group since the redesign: Conversar is the lens through
+        // which you ask about everything else Brain holds.
+        items: ["chat", "projects", "people", "organizations", "contexts", "memories", "files", "relations"],
       },
       { key: "reflection", items: ["reviews", "questions"] },
       // `2M-CAL-001` puts the calendar here rather than among the primaries:
@@ -96,8 +102,16 @@ describe("navigation capabilities", () => {
       ["/pt-BR/app/today?page=3", "home"],
       ["/pt-BR/app/tasks?page=2", "work"],
       ["/pt-BR/app/waiting?page=4", "work"],
-      ["/pt-BR/app/chat/conversation-1", "chat"],
+      ["/pt-BR/app/library", "library"],
     ] as const;
+
+    /*
+      `chat` is no longer primary, so it has no primary active state to be
+      deterministic about — and asserting an empty result for it would be
+      asserting nothing. The claim that matters is the inverse: standing inside
+      a lens must not light up a rail destination that does not contain it.
+    */
+    expect(primaryNavigationKeys.filter((key) => isNavigationActive("/pt-BR/app/chat/conversation-1", key))).toEqual([]);
 
     for (const [pathname, expectedKey] of cases) {
       expect(primaryNavigationKeys.filter((key) => isNavigationActive(pathname, key))).toEqual([

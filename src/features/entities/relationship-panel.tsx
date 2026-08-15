@@ -76,7 +76,15 @@ export function RelationshipPanel({
 
   return (
     <section className="relation-panel">
-      <h2>{copy.relationships}</h2>
+      {/*
+        `<h3>`, not `<h2>`. Both consumers are the person and project workspaces,
+        and both now name their two columns — *trabalho em aberto* and *o que o
+        Brain sabe* — as the `<h2>`s of the page. A panel that stayed at level
+        two would be the sibling of the column that contains it, which is the
+        outline defect `/app/reviews` shipped: the count was right and the order
+        said the wrong thing about what belongs to what.
+      */}
+      <h3>{copy.relationships}</h3>
       {/*
         EGC-REL-009. Company and relationship-to-owner are two concerns, and the
         page says which is which rather than leaving the owner to work out why
