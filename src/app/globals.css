@@ -40,6 +40,9 @@
    it owns carries the `brain-` prefix, so it cannot collide with the eight
    surfaces it is mounted on top of. */
 @import "./brain.css";
+/* 2O-ENTRY-001. The public entry page, outside `/app` and reachable with no
+   session — the first stylesheet in this list a stranger ever loads. */
+@import "./entry.css";
 
 /* The nine legacy tokens and the two page measures moved to `tokens.css`, where
    they are now aliases over the Papel e Console palette rather than values of

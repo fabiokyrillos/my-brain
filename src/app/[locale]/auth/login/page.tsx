@@ -5,6 +5,7 @@ import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
 import { getResendCopy } from "@/features/auth/copy";
 import { TurnstileWidget } from "@/features/auth/turnstile";
+import { safeReturnPath } from "@/features/entry/return-path";
 import { isLocale } from "@/lib/preferences";
 
 const successMessages = {
@@ -33,12 +34,13 @@ export default async function LoginPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string; message?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; next?: string }>;
 }) {
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const query = await searchParams;
+  const returnPath = safeReturnPath(query.next, locale);
   const pt = locale === "pt-BR";
   const message = successMessages[query.message as keyof typeof successMessages]?.[locale];
 
@@ -52,6 +54,18 @@ export default async function LoginPage({
       {message && <div className="form-success">{message}</div>}
       <form action={signIn} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
+        {/*
+          `2O-ENTRY-007`. The surface that was asked for, carried through the
+          form so that signing in returns there.
+
+          Validated **here as well as** in `signIn`, and neither check makes the
+          other redundant: this one keeps an unusable value out of the document
+          the browser holds, and the one in the action is the boundary that
+          matters, because a hidden input is whatever the client sends. A `next`
+          this page refuses simply is not rendered, and sign-in lands on the
+          app's home — the ordinary behaviour, and the correct loss.
+        */}
+        {returnPath && <input type="hidden" name="next" value={returnPath} />}
         <label>
           E-mail
           <input name="email" type="email" autoComplete="email" required maxLength={254} />

@@ -11,6 +11,7 @@ import {
   signInSchema,
   signUpSchema,
 } from "@/features/auth/schema";
+import { safeReturnPath } from "@/features/entry/return-path";
 import { getAccountCopy } from "@/features/shell/account-copy";
 import type { Locale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
@@ -109,7 +110,23 @@ export async function signIn(formData: FormData) {
   }
 
   await finalizeAuthEvent(supabase, admission.attemptId, "succeeded");
-  redirect(`/${locale}/app`);
+  /*
+   * `2O-ENTRY-007`. Back to the surface that was asked for, or the app's home.
+   *
+   * **This is the trust boundary, and the check here is the one that counts.**
+   * The login page validates `next` too, but that only decides what gets
+   * rendered; this value arrives in a `FormData` field, and a form field is
+   * whatever the client chose to send. `safeReturnPath` is an allowlist — one
+   * leading slash, this locale's own `/app`, no scheme, no control characters —
+   * and everything it does not recognise becomes `null` here rather than a
+   * redirect somebody else chose.
+   *
+   * The failure mode of getting this wrong is an open redirect that fires
+   * **immediately after a successful sign-in**, which is the worst moment for
+   * one: the session cookie is fresh and the visitor has just proved they trust
+   * the page they are on.
+   */
+  redirect(safeReturnPath(formData.get("next")?.toString(), locale) ?? `/${locale}/app`);
 }
 
 /**

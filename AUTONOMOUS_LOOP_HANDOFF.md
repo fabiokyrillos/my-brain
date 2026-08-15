@@ -6436,3 +6436,116 @@ migration may be created or applied, no deploy may run, no secret may change,
 signup may not open, the push investigation stays closed, and **the roadmap
 successor is neither started nor planned**. All of that needs a new owner
 authorization.
+
+## §77 — Phase 2O implementation is AUTHORIZED, and slice 2O.0 makes the capability registry load-bearing (2026-08-15)
+
+**ADR-118.** PR **#230**, merged at **`629ba13`**; head at merge **`fa36af7`**,
+**CI green on both** — five checks on the head, and all three job families on the
+merge SHA. `main` local equals `origin/main` at `629ba13`, worktree clean, no
+open PR.
+
+**Zero migrations created. 94 local = 94 hosted, parity `202608140094`. Signup
+closed. Rollout gate 25 · 3 · 2. CSP unchanged. A13 not retargeted.**
+
+### The authorization, and what was checked rather than asserted
+
+The plan's §8 listed six preconditions. Two were discharged by ADR-116 and
+`OD-2O-9`; the other four were **verified live before a file changed**: `main`
+`57beb06` clean with no open PR, CI green on `e4f2668` (three job families) and
+`57beb06`, **94 = 94 at `202608140094` read from the project rather than from a
+document**, and the rollout gate re-read by *running* `npm run rollout:verify`.
+
+**The re-audit found the tree unmoved where it matters.** The delta from the
+plan's baseline `9cc1175` is documentation and two governance guards — **zero
+product-code files** — so no audit finding had to be re-executed. That is the
+first time in this series the baseline has held still, and it is worth naming
+because the previous three phases each had to re-run findings.
+
+### Two commits, deliberately
+
+`4457d1f` carries the authorization and the guard inversions; `fa36af7` carries
+the slice. That is ADR-112's shape, where the implementation authorization landed
+as its own docs-and-guards commit before the first slice. **Both are green
+independently**, which is why the acceptance-record assertion was added in the
+second rather than the first.
+
+### Two refusals inverted, and neither deleted
+
+`R-2O-7` **inverted**: an acceptance record per delivered slice is now *required*,
+while the phase-closing artifacts stay refused until 2O.8. `R-2O-8` is
+**discharged** — product code is what the authorization is for — with its
+pre-authorization text quoted. The declarations guard turned over with them: it
+refused a governing pair that failed to say implementation was unauthorized, and
+now refuses one that still says it. **Holding the old assertion would have kept a
+false statement in place with a test**, which is precisely what ADR-117 corrected
+one ADR earlier.
+
+### What slice 2O.0 delivered
+
+`2O-ACTIVATION-001` … `-007`, seven of 116.
+
+**Activation is now five ordered, derived, three-valued facts.** `satisfied`,
+`unsatisfied`, **`unreadable`** — and a read that failed is never rendered as a
+fact that is false. Every read is wrapped and independent, so one unreadable table
+leaves the other four answerable. It deliberately does **not** reuse
+`loadCredentialMetadata`, which returns `ABSENT_CREDENTIAL` on error: right for a
+settings panel that gates AI identically either way, wrong where "absent" and
+"unreadable" must be told apart.
+
+**`capabilityRegistry` finally has a consumer.** Sixteen rows had governed nothing
+because its only importer was its own test — so `R-24` was a convention rather
+than a mechanism. `CapabilitySummary` renders it on `/app/settings`.
+
+**`scheduled_reviews` stopped being readable two ways.** It sat at `future` with
+empty evidence while `review-schedule.ts` reads all three review columns, so *"no
+review runs by schedule"* and *"the preference has no consumer"* were both
+readable off one row and only one is true. A new **`uncontrolled`** state says the
+honest thing — *real consumers, no authorized control* — which is also the
+vocabulary ADR-117 requires of `embedding_model`. **That row was not created**: it
+is `2O-AICONFIG-004`'s, in slice 2O.4. Only the vocabulary it will need is here.
+
+**All nine consumer-less columns have rows**; four had none. A `columns` field
+anchors each row to the schema's spelling — without it, a guard asserting *"the
+nine are recorded"* had nothing to resolve `autonomy` to `autonomy_level` and
+**would have passed vacuously**.
+
+### Seven controls, and the seventh is not a test
+
+Six mutations were applied to the real tree and all six fired — a fabricated
+evidence token, an ungoverned control, a control for one of the nine, the page
+dropping the component, the component dropping the registry, and
+`scheduled_reviews` reverting. Every file was restored and the guard verified
+green again.
+
+**The seventh is the type system.** `VisibleSettingsCapabilityKey` is `Extract`ed
+from the registry and the copy record is keyed by it, so flipping a row to
+`visible: true` produced **TS2741 twice — once per locale**. That is why
+`getCapabilityRegistryView` is generic: annotated with the widened
+`CapabilityRegistryView` it returned `key: string`, the consumer needed a cast,
+and **the cast silently removed the guarantee**. `tsc` caught that during the
+slice, which is the argument for not writing the cast.
+
+### Recorded and not repaired, with a destination
+
+`buildSettingsPayload` writes `ai_provider` and `embedding_model` as **literals**
+rather than passing them through, so `2O-ACTIVATION-007`'s *"no save wipes a
+value"* is imprecise for those two. **Carried to slice 2O.4.** ADR-117 forbids
+touching `embedding_model`, and repairing `ai_provider` in a foundations slice
+would be widening on a finding rather than on a requirement.
+
+### What was not claimed
+
+**An authenticated browser render of `/app/settings`.** The plan scopes that
+obligation to 2O.1 – 2O.7 and this slice is outside it. The component is a Server
+Component with no client boundary, the build compiled the route, and eight tests
+render it in both locales — that is compile-time and unit evidence, **not a
+production render**, and the acceptance record says so rather than implying
+otherwise.
+
+### Where this stops
+
+Nowhere yet. Slice 2O.1 follows immediately, re-audited against `629ba13`.
+Signup stays closed, the rollout gate stays 25 · 3 · 2, push stays a parallel
+residual failing with HTTP 403 on a real iPhone and never executed on Android,
+ADR-055 stays neither satisfied nor superseded and expires **2026-10-27**, and
+**the roadmap successor is neither started nor scoped**.

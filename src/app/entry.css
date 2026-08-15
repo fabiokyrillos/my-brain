@@ -1,0 +1,96 @@
+/* ---- The public entry page (2O-ENTRY-001 … -003) --------------------------
+   The one surface a stranger reads before they can verify anything, so it is
+   deliberately plain: a statement, four claims, two documents and one way in.
+
+   Tokens only — an undefined var() voids the whole declaration in silence — and
+   at most one `font:` shorthand per block, because the shorthand resets every
+   property it does not name. Both rules are the redesign's, and both have cost
+   this repository a defect before. */
+
+.entry-page {
+  display: grid;
+  gap: var(--space-8);
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5) var(--space-12);
+}
+
+.entry-header {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.entry-header > h1 {
+  margin: 0;
+  font: var(--type-title-1);
+  color: var(--text-primary);
+}
+
+.entry-claims {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.entry-claims > h2 {
+  margin: 0;
+  font: var(--type-title-2);
+  color: var(--text-primary);
+}
+
+.entry-claims > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.entry-claims li {
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  font: var(--type-body);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.entry-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.entry-documents a,
+.entry-sign-in {
+  /* WCAG 2.2 AA 2.5.8. This page is reached on a phone as often as anywhere,
+     and these are its only controls. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.entry-footer {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-divider);
+}
+
+.entry-closed {
+  margin: 0;
+  max-width: 68ch;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 599px) {
+  .entry-page {
+    gap: var(--space-6);
+    padding: var(--space-6) var(--space-4) var(--space-10);
+  }
+}

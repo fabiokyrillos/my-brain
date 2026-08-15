@@ -32,7 +32,20 @@ test("the cancelled-task recovery route is protected in both locales", async ({ 
     const location = response.headers().location;
     expect(location).toBeDefined();
     const redirected = new URL(location!, "http://localhost:3000");
-    expect(`${redirected.pathname}${redirected.search}`).toBe(target);
+    expect(redirected.pathname).toBe(target);
+    /*
+     * `2O-ENTRY-007` strengthened this rather than relaxing it.
+     *
+     * The assertion used to require the redirect to be *exactly* the login path,
+     * which was an accurate statement of what the product did: it discarded the
+     * surface that had been asked for, so anyone following a link to the
+     * cancelled-task recovery route landed on the app's home instead. The
+     * requested path now travels with the redirect, and what is checked is that
+     * it is **the path that was asked for, query and all** — which the old form
+     * could not express, and which is exactly what this route needs, since
+     * `?page=2` is part of where the visitor was going.
+     */
+    expect(redirected.searchParams.get("next"), `${source} lost the requested surface`).toBe(source);
   }
 });
 
