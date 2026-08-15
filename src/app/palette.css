@@ -144,42 +144,13 @@
   .search-filters select { min-height: 44px; }
 }
 
-/* ---- Library — `2I-LIB-001` … `2I-LIB-008` -------------------------------- */
-
-.library-page { max-width: var(--width-productivity); margin: auto; padding: var(--space-12) var(--gutter) 120px; display: grid; gap: var(--space-6); }
-.library-head { display: grid; gap: var(--space-2); }
-.library-head h1 { margin: 0; font: var(--type-title-1); letter-spacing: -.01em; color: var(--text-primary); }
-.library-head p { margin: 0; font: var(--type-lead); color: var(--text-secondary); }
-/* `2J-ACCESS-006`. This link rendered 16px tall on a Pixel 7 -- below WCAG 2.2
-   AA 2.5.8's 24px minimum -- and shipped in Phase 2I because a jsdom test
-   cannot measure a painted box. `min-height` plus centring is the smallest fix
-   that does not move the link or change its type scale. */
-.library-search-link {
-  justify-self: start;
-  margin-top: var(--space-2);
-  font: var(--type-label);
-  color: var(--link);
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-}
-
-.library-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.library-card {
-  display: grid; gap: var(--space-1); align-content: start;
-  min-height: 104px; padding: var(--space-5);
-  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  transition: background var(--motion-fast) ease-out;
-}
-.library-card:hover { background: var(--background-elevated); }
-.library-card-name { font: var(--type-heading); color: var(--text-primary); }
-.library-card-note { font: var(--type-caption); color: var(--text-secondary); }
-/* A navigation aid, not a metric: it says whether the door leads anywhere. */
-.library-card-count { font: var(--type-mono); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-
-@media (max-width: 899px) {
-  .library-page { padding: 28px 18px calc(var(--page-bottom) + env(safe-area-inset-bottom, 0px)); }
-  .library-grid { grid-template-columns: 1fr; }
-  .library-card { min-height: 88px; }
-}
+/*
+ * Library's eight rules moved to `brain.css` with the surface they styled.
+ *
+ * `.library-page`, `.library-head`, `.library-search-link`, `.library-grid`,
+ * `.library-card` and its three parts had **no remaining selector in the
+ * product** once `/app/library` was recomposed as Brain's overview. Left here
+ * they would have been dead CSS that still looked deliberate: the next reader
+ * would have found a complete card system, assumed a surface used it, and built
+ * against it. The `2J-ACCESS-006` fix on the search link travelled with it.
+ */

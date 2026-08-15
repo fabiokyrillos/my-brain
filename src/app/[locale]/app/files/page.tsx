@@ -13,6 +13,7 @@ import {
   RELATION_LIMIT,
   withProbe,
 } from "@/features/bounds/contracts";
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import {
   loadAttachmentIdsForSubject,
   loadLinkFilterOptions,
@@ -466,6 +467,9 @@ export default async function FilesPage({
           {libraryCopy.searchInFiles}
         </Link>
       </header>
+
+      <BrainLensTabs active="files" locale={locale} />
+
       <p className="quiet-state">{libraryCopy.searchInFilesHint}</p>
 
       <UploadForm action={uploadAttachment} locale={locale} />

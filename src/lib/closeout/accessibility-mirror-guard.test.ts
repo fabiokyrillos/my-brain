@@ -28,6 +28,7 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 const PALETTE = "src/features/palette/command-palette.tsx";
 const SEARCH = "src/features/search/search-surface.tsx";
 const LIBRARY = "src/app/[locale]/app/library/page.tsx";
+const LENS_STRIP = "src/features/library/brain-lenses.tsx";
 const CARD = "src/features/conversation-cards/card.tsx";
 const READ_ONLY = "src/features/conversation-cards/read-only-preview.tsx";
 const CARD_CONTRACT = "src/features/conversation-cards/contracts.ts";
@@ -76,11 +77,31 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     expect(mirror).toContain("for=");
   });
 
-  it("pins Library's card structure, which the touch-target assertion measures", () => {
+  it("pins Brain's panel structure, which the touch-target assertion measures", () => {
     const library = read(LIBRARY);
-    for (const className of ["library-card", "library-grid", "library-card-name"]) {
+    for (const className of ["brain-domains", "brain-domain", "brain-domain-head", "brain-recent"]) {
       expect(library, `${LIBRARY} no longer uses .${className}`).toContain(className);
       expect(mirror, `${MIRROR} no longer mirrors .${className}`).toContain(className);
+    }
+  });
+
+  /**
+   * The lens strip, pinned separately from the overview that shares a file with
+   * nothing.
+   *
+   * It renders on **nine** surfaces, so a target below 44px here is a target
+   * below 44px on nine pages — and it is the one component in Brain that no
+   * page owns, which is exactly the shape whose fixture goes stale unnoticed.
+   * The `Biblioteca` heading this lane carried for two commits after the
+   * destination was renamed is the same failure, one file over.
+   */
+  it("pins the Brain lens strip, which nine surfaces mount", () => {
+    const strip = read(LENS_STRIP);
+    for (const token of ["brain-lenses", "brain-lens", 'aria-current={lens === active ? "page"']) {
+      expect(strip, `${LENS_STRIP} no longer emits ${token}`).toContain(token);
+    }
+    for (const token of ["brain-lenses", "brain-lens", 'aria-current="page"']) {
+      expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
     }
   });
 

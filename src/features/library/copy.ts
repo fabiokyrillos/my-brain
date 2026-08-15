@@ -7,10 +7,31 @@ export type LibraryCopy = {
   readonly title: string;
   readonly intro: string;
   readonly searchLink: string;
-  readonly empty: string;
+  /*
+   * `empty` and `open` were declared here from the start and read by nothing —
+   * the door grid never had an empty state and never labelled a door twice. They
+   * are removed rather than left for a future edit to "use up", because this
+   * branch has now found four separate producers with no consumer and every one
+   * of them was believed to be live. What the overview genuinely needs is below,
+   * and each field there has a call site in the same commit that declares it.
+   */
   readonly recentLabel: string;
-  readonly open: (label: string) => string;
   readonly descriptions: Readonly<Partial<Record<NavigationKey, string>>>;
+  /** The lens strip's accessible name. */
+  readonly lensesLabel: string;
+  /** The first lens — Brain itself, rather than one of its parts. */
+  readonly overviewLens: string;
+  /**
+   * What the overview says when a domain has no rows *and* recency is supported
+   * — distinct from `noRecency`, which says the surface never shows them.
+   */
+  readonly nothingYet: string;
+  /** Said where a count exists but a recent list is deliberately not offered. */
+  readonly noRecency: string;
+  /** Said where the count itself could not be read. Never rendered as a zero. */
+  readonly countUnavailable: string;
+  /** The overview's own section heading, above the domain panels. */
+  readonly holdsHeading: string;
 };
 
 const copy: Record<Locale, LibraryCopy> = {
@@ -25,9 +46,7 @@ const copy: Record<Locale, LibraryCopy> = {
     title: "Brain",
     intro: "Tudo que o Brain sabe sobre o seu mundo, em um lugar só.",
     searchLink: "Buscar em tudo",
-    empty: "Nada aqui ainda.",
     recentLabel: "Recentes",
-    open: (label) => `Abrir ${label}`,
     descriptions: {
       memories: "O que o Brain lembra sobre você.",
       people: "Quem aparece no seu trabalho.",
@@ -43,14 +62,18 @@ const copy: Record<Locale, LibraryCopy> = {
       // mechanism: a conversation is how you ask the Brain about everything above.
       chat: "Perguntar sobre tudo isto.",
     },
+    lensesLabel: "Lentes do Brain",
+    overviewLens: "Visão geral",
+    nothingYet: "Nada aqui ainda.",
+    noRecency: "Sem lista recente por aqui.",
+    countUnavailable: "Não foi possível contar agora.",
+    holdsHeading: "O que o Brain guarda",
   },
   en: {
     title: "Brain",
     intro: "Everything the Brain knows about your world, in one place.",
     searchLink: "Search everything",
-    empty: "Nothing here yet.",
     recentLabel: "Recent",
-    open: (label) => `Open ${label}`,
     descriptions: {
       memories: "What the Brain remembers about you.",
       people: "Who shows up in your work.",
@@ -61,6 +84,12 @@ const copy: Record<Locale, LibraryCopy> = {
       relations: "How these things connect.",
       chat: "Ask about all of this.",
     },
+    lensesLabel: "Brain lenses",
+    overviewLens: "Overview",
+    nothingYet: "Nothing here yet.",
+    noRecency: "No recent list here.",
+    countUnavailable: "Could not count right now.",
+    holdsHeading: "What the Brain holds",
   },
 };
 

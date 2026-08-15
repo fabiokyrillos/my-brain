@@ -6,6 +6,7 @@ import { createOrganization } from "@/features/entities/actions";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityCreateForm } from "@/features/entities/entity-create-form";
 import { loadOrganizations } from "@/features/entities/organizations";
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
@@ -51,6 +52,11 @@ export default async function OrganizationsPage({
         </div>
         <EntityCreateForm action={createOrganization} kind="organization" locale={locale} />
       </header>
+
+      {/* Empresas stays a secondary lens with its list and detail pages intact
+          (ADR-114 Decision 6). What it gains is the strip that says it is part
+          of Brain rather than an unrelated destination. */}
+      <BrainLensTabs active="organizations" locale={locale} />
 
       {items.length ? (
         <div className="list-stack">

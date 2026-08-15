@@ -2,6 +2,7 @@ import { MessageCircleMore } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
@@ -81,6 +82,20 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         the rest of the lifecycle is Slice G.
       */}
       <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="proactive" />
+
+      {/*
+        Conversar is Brain's Conversas lens, and the strip says so — **below**
+        the composer, not above it.
+
+        UX-07's fix is that the composer is the first interactive element with
+        nothing above it competing for the first thing the user types into. A
+        strip of nine links across the top would be nine interactive elements
+        above it, which is the exact shape that requirement removed. So the lens
+        strip sits here, where it still makes the space continuous — you can see
+        that you are inside Brain and step to any other lens — without taking the
+        first focus stop away from the field this page exists for.
+      */}
+      <BrainLensTabs active="chat" locale={locale} />
 
       {items.length ? (
         <section className="conversation-list">

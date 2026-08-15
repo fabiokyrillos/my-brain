@@ -82,6 +82,13 @@ const STYLESHEETS = [
   */
   "chat.css",
   "assistant.css",
+  /*
+    Brain's overview and its lens strip. Without it the strip renders as nine
+    unstyled inline links: the target-size assertion would measure a bare text
+    box and pass, and the contrast scan would read the document default rather
+    than the two greys the strip actually uses to separate current from the rest.
+  */
+  "brain.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -210,26 +217,66 @@ function searchSurface() {
     + `</section>`;
 }
 
-/** Mirrors `src/app/[locale]/app/library/page.tsx:52-73`. */
-function librarySurface() {
-  const cards = [
-    ["Projetos", "Trabalhos em andamento", 4],
-    ["Pessoas", "Quem aparece nos seus registros", 12],
-    ["Memórias", "O que o Brain deve lembrar", 7],
-  ] as const;
-  return `<div class="library-page"><header class="library-head"><h1>Biblioteca</h1>`
-    + `<p>Tudo o que o Brain guarda para você.</p>`
-    + `<a class="library-search-link" href="#">Buscar em tudo</a></header>`
-    + `<ul class="library-grid">`
-    + cards
+/**
+ * Mirrors `src/app/[locale]/app/library/page.tsx` and
+ * `src/features/library/brain-lenses.tsx`.
+ *
+ * The strip is included because it renders on **nine** surfaces, so a target
+ * below 44px here is a target below 44px on nine pages. The `Biblioteca` this
+ * fixture used to say was stale by two commits — the destination has been called
+ * Brain since it entered the rail — which is what a hand-written mirror does when
+ * nothing re-derives it, and is why the guard beside it now pins the strip too.
+ *
+ * Three panels rather than eight, and each covers a different arm: a counted
+ * domain with recent rows, a counted domain that deliberately shows none, and an
+ * uncountable one. A fixture with three identical panels would measure one case
+ * three times.
+ */
+function brainSurface() {
+  const lenses = [
+    "Visão geral",
+    "Pessoas",
+    "Projetos",
+    "Empresas",
+    "Contextos",
+    "Memórias",
+    "Arquivos",
+    "Relações",
+    "Conversar",
+  ];
+  const strip = `<nav class="brain-lenses" aria-label="Lentes do Brain">`
+    + lenses
       .map(
-        ([name, note, count]) =>
-          `<li><a class="library-card" href="#"><span class="library-card-name">${name}</span>`
-          + `<span class="library-card-note">${note}</span>`
-          + `<span class="library-card-count">${count}</span></a></li>`,
+        (label, index) =>
+          `<a class="brain-lens" href="#"${index === 0 ? ' aria-current="page"' : ""}>${label}</a>`,
       )
       .join("")
-    + `</ul></div>`;
+    + `</nav>`;
+
+  const panels = [
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Pessoas</a></h3><span class="brain-domain-count">12</span></div>`
+      + `<p class="brain-domain-note">Quem aparece no seu trabalho.</p>`
+      + `<p class="brain-recent-label">Recentes</p>`
+      + `<ul class="brain-recent"><li><span>Marina Duarte</span></li>`
+      + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
+      + `</ul></article></li>`,
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Contextos</a></h3><span class="brain-domain-count">3</span></div>`
+      + `<p class="brain-domain-note">Áreas da sua vida.</p>`
+      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
+    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Relações</a></h3></div>`
+      + `<p class="brain-domain-note">Como essas coisas se ligam.</p>`
+      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
+  ];
+
+  return `<div class="brain-page"><header class="brain-head"><h1>Brain</h1>`
+    + `<p>Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p>`
+    + `<a class="brain-search-link" href="#">Buscar em tudo</a></header>`
+    + strip
+    + `<section class="brain-holds"><h2>O que o Brain guarda</h2>`
+    + `<ul class="brain-domains">${panels.join("")}</ul></section></div>`;
 }
 
 /**
@@ -615,7 +662,7 @@ const SURFACES = [
   { name: "command palette (closed)", body: () => paletteTrigger() },
   { name: "command palette (open)", body: () => paletteOpen() },
   { name: "global search", body: () => searchSurface() },
-  { name: "Library", body: () => librarySurface() },
+  { name: "Brain overview", body: () => brainSurface() },
   { name: "Conversar cards", body: () => conversationCards() },
   { name: "Conversar controls", body: () => conversationControls() },
   { name: "Conversar resumed", body: () => conversationResumed() },
@@ -749,7 +796,7 @@ test("2J-ACCESS-004: the dialog exposes modal semantics and an accessible name",
 
 test("2J-ACCESS-006: interactive targets meet the minimum rendered size", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch targets are a mobile contract");
-  await render(page, `${paletteTrigger()}${paletteOpen()}${librarySurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
+  await render(page, `${paletteTrigger()}${paletteOpen()}${brainSurface()}${conversationCards()}${conversationControls()}${conversationResumed()}${conversationSources()}${conversationExplanation()}${workList()}${workTaskPanel()}${workBulkBar()}${workFilters()}`);
 
   /*
    * `2L-MOBILE-001` widened this locator. Before slice 2L.4 it measured

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { getRelationsCopy } from "@/features/relations/copy";
 import { loadRelations } from "@/features/relations/data";
@@ -59,6 +60,15 @@ export default async function RelationsPage({ params }: { params: Promise<{ loca
           <p>{copy.pageIntro}</p>
         </div>
       </header>
+
+      {/*
+        The strip does not promote this surface. `2N-RELATION-006` says the graph
+        is never primary navigation, and it still is not: `relations` keeps
+        `visibility: "more"` in `capabilities.ts` and appears in the rail only
+        behind the disclosure. Being a lens of Brain is where it already sat in
+        the registry — this is the strip saying so.
+      */}
+      <BrainLensTabs active="relations" locale={locale} />
 
       {outcome.status === "failed" ? (
         <section className="relations-section">

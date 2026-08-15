@@ -6,6 +6,7 @@ import { createContext } from "@/features/entities/actions";
 import { loadContexts } from "@/features/entities/contexts";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityCreateForm } from "@/features/entities/entity-create-form";
+import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { contextKindLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
@@ -50,6 +51,11 @@ export default async function ContextsPage({
         </div>
         <EntityCreateForm action={createContext} kind="context" locale={locale} />
       </header>
+
+      {/* Contextos is presented as a lens of Brain and keeps its own route and
+          deep links (ADR-114 Decision 6). No entity became a database property
+          and no schema moved to say so. */}
+      <BrainLensTabs active="contexts" locale={locale} />
 
       {items.length ? (
         <div className="list-stack">
