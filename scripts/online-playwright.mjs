@@ -16,6 +16,16 @@ import { getLinkedSupabaseCredentials } from "./linked-supabase.mjs";
 const DISPOSABLE_CREDENTIAL_NAMES = [
   "BYOK_TEST_USER_A_OPENAI_API_KEY",
   "BYOK_TEST_USER_B_OPENAI_API_KEY",
+  /*
+    The owner's own test account, forwarded for the lanes that need a session
+    over *real* data rather than over a disposable account seeded with nothing.
+    The redesign's visual lane is one: an empty surface renders every layout
+    correctly, so a screenshot of one proves nothing about the composition.
+
+    Same rule as the two above — read from `.env.local`, never from a tracked
+    file, and simply not forwarded when absent, so the spec skips itself.
+  */
+  "ONLINE_AUTH_TEST_EMAIL",
 ];
 
 function disposableCredentials() {

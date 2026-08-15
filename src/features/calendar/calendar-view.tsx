@@ -38,6 +38,7 @@ import type {
   TaskDetailDateBounds,
 } from "@/features/task-commands/task-detail-controls";
 
+import { WorkModeTabs } from "@/features/daily-cycle/work-modes";
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
@@ -153,6 +154,15 @@ export function CalendarView({
         <h1 id={headingId}>{copy.title}</h1>
         <p className="calendar-description">{copy.description}</p>
       </header>
+
+      {/*
+        `02-arquitetura-e-rotas.md` makes Calendário a **mode of Trabalho**: it
+        answers *when* about the rows Lista answers *what* about. The tab strip
+        is what makes that relationship visible, and it navigates — the route
+        stays exactly where it was, per the consolidation table's compatibility
+        rule that no existing URL dies at this step.
+      */}
+      <WorkModeTabs active="calendar" locale={locale} />
 
       {/* Orientation. Links, so the URL is the state and the keyboard works. */}
       <nav aria-label={copy.orientation.label} className="calendar-orientation">

@@ -55,6 +55,7 @@ import { useState } from "react";
 import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-day";
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
+import { WorkModeTabs } from "@/features/daily-cycle/work-modes";
 import { BulkBar, type BulkCommandHandler } from "@/features/operations/bulk-bar";
 import { getWorkCopy } from "@/features/operations/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -212,6 +213,12 @@ export function PlannerView({
 
   return (
     <div className="content-page planner-page">
+      {/*
+        Planejar is the third mode of Trabalho (`02-arquitetura-e-rotas.md`): it
+        proposes dates for the rows Lista holds. The tab strip makes that
+        relationship visible; the route is unchanged.
+      */}
+      <WorkModeTabs active="plan" locale={locale} />
       <header className="list-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>

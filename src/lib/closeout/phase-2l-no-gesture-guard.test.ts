@@ -54,6 +54,13 @@ const WORK_SURFACES = [
   "src/features/operations/inline-create-form.tsx",
   "src/features/daily-cycle/work-view.tsx",
   "src/features/daily-cycle/work-filters.tsx",
+  /*
+    The Lista/Calendário/Planejar strip, added by the Papel e Console
+    recomposition. It is exactly the kind of control OD-2L-5 is about — a mode
+    switcher is the first place a swipe gets proposed — and it is three `<Link>`s
+    for that reason.
+  */
+  "src/features/daily-cycle/work-modes.tsx",
   "src/features/daily-cycle/task-detail-view.tsx",
   "src/features/daily-cycle/task-detail-surface.tsx",
   "src/features/daily-cycle/task-panel-close.tsx",

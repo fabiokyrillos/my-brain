@@ -55,6 +55,16 @@ export type WorkFiltersCopy = {
   /** The label a group of rows carries when grouping is on (`2L-VIEW-006`). */
   readonly groupCount: (count: number) => string;
   readonly ungrouped: string;
+  /**
+   * The ListToolbar disclosure (`03-componentes.md`).
+   *
+   * Seven groups of chips is more page than the list they narrow, so they live
+   * behind this. The badge is not decoration: a narrowing you cannot see is a
+   * list that lies about what it contains, so the summary says so in words and
+   * the disclosure opens itself whenever something is active.
+   */
+  readonly filterSummary: string;
+  readonly filtersActive: string;
 };
 
 const ptBR: WorkFiltersCopy = {
@@ -94,6 +104,8 @@ const ptBR: WorkFiltersCopy = {
   positionAdjusted: "A página que você tinha aberto não existe mais aqui. Esta é a mais próxima.",
   groupCount: (count) => `${count} tarefa${count === 1 ? "" : "s"}`,
   ungrouped: "Sem essa relação",
+  filterSummary: "Filtrar, ordenar e agrupar",
+  filtersActive: "filtros ativos",
 };
 
 const en: WorkFiltersCopy = {
@@ -133,6 +145,8 @@ const en: WorkFiltersCopy = {
   positionAdjusted: "The page you had open is no longer here. This is the nearest one.",
   groupCount: (count) => `${count} task${count === 1 ? "" : "s"}`,
   ungrouped: "Without that relationship",
+  filterSummary: "Filter, sort and group",
+  filtersActive: "filters active",
 };
 
 const BY_LOCALE: Record<Locale, WorkFiltersCopy> = { "pt-BR": ptBR, en };
