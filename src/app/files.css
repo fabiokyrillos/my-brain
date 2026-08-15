@@ -9,3 +9,19 @@
    linked people and a person's linked files cannot drift apart visually either. */
 .file-links,.entity-files{border-top:1px solid var(--border-default);padding:14px 18px}.entity-files{border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);padding:18px}.file-links h3,.entity-files h2{margin:0 0 9px;font: var(--type-caption)}.file-link-list{display:grid;gap:9px;margin:0;padding:0;list-style:none}.file-link-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;font: var(--type-caption)}.file-links-unavailable{margin-top:6px;font: var(--type-caption)}
 @media(max-width:600px){.file-card>header{align-items:flex-start;flex-direction:column}.filter-axis-label{flex-basis:100%;min-width:0}.file-card .list-meta{width:100%}.failed-job{align-items:flex-start;flex-direction:column}.failed-job-copy{align-items:flex-start;flex-wrap:wrap}.failed-job-copy strong{flex-basis:100%}.job-retry-controls{align-items:flex-start}.job-retry-wait{text-align:left}}
+
+/*
+ * The type label on a file row (`08-assets-e-conteudo.md`).
+ *
+ * Mono and uppercase, which is this product's idiom for a machine-derived
+ * category rather than something the owner wrote — the same register the
+ * eyebrows and the provenance lines use. Quiet on purpose: it is a scanning aid
+ * beside the status badge, not a second badge competing with it.
+ */
+.file-kind {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

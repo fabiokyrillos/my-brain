@@ -2,8 +2,17 @@ import { ArrowLeft, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { boundedList, PICKER_LIMIT, withProbe } from "@/features/bounds/contracts";
+import { boundedList, PICKER_LIMIT, RECENT_CHANGE_LIMIT, withProbe } from "@/features/bounds/contracts";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
+import { isInvertedValidityWindow } from "@/features/daily-cycle/conflict-detection";
+import { getConflictSectionCopy } from "@/features/daily-cycle/copy";
+import { describeEntityChanges } from "@/features/entities/project-context";
+import { getEntityCopy } from "@/features/entities/copy";
+import { BoundedNotice } from "@/features/bounds/bounded-notice";
+import { getHistoryCopy } from "@/features/history/copy";
+import { HistoryList } from "@/features/history/history-list";
+import { getAgentName } from "@/features/profile/agent-identity";
+import { SectionOriginNote } from "@/features/provenance/provenance-note";
 import {
   deriveClaimProvenance,
   isOpenable,
@@ -53,7 +62,9 @@ export default async function MemoryDetailPage({
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const copy = getMemoryCopy(locale);
-  const { supabase } = await requireUser(locale);
+  const entityCopy = getEntityCopy(locale);
+  const conflictCopy = getConflictSectionCopy(locale);
+  const { supabase, user } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
   // other contextual surface stamp instants from the same source.
   const timeZone = await getOwnerTimeZone();
@@ -70,7 +81,7 @@ export default async function MemoryDetailPage({
 
   // The related rows and the pick-lists load together: the page needs the names
   // to render the relations and the same two lists to offer them for editing.
-  const [personResult, projectResult, entryResult, peopleResult, projectsResult] = await Promise.all([
+  const [personResult, projectResult, entryResult, peopleResult, projectsResult, changeResult, agentName] = await Promise.all([
     memory.person_id
       ? supabase.from("people").select("id,name").eq("id", memory.person_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -93,6 +104,17 @@ export default async function MemoryDetailPage({
     // of guessing it from a full page.
     supabase.from("people").select("id,name").order("name").limit(withProbe(PICKER_LIMIT)),
     supabase.from("projects").select("id,name").order("name").limit(withProbe(PICKER_LIMIT)),
+    /*
+     * *"Histórico sem reescrever revisões"* — the audit trail, scoped to this
+     * memory, by the same read the person and project workspaces make.
+     *
+     * It writes nothing and rewrites nothing. `memories` is edited in place and
+     * carries no revision table; what this shows is the trail of edits every
+     * writer already records, narrated by the History surface's own describer so
+     * one change reads one way wherever it is read.
+     */
+    supabase.from("audit_logs").select("id,action_type,entity_type,entity_id,actor,before_state,after_state,created_at").eq("user_id", user.id).eq("entity_type", "memory").eq("entity_id", memoryId).order("created_at", { ascending: false }).limit(withProbe(RECENT_CHANGE_LIMIT)),
+    getAgentName(),
   ]);
 
   const person = requireSupabaseData(personResult, "load memory person");
@@ -106,6 +128,31 @@ export default async function MemoryDetailPage({
 
   const state = memoryLifecycleState(memory, new Date());
   const kind = asMemoryKind(memory.kind);
+  /*
+   * `2N-CONFLICT-002` — the state `04-estados.md` calls **em conflito**, said on
+   * the surface the queue sends the owner to.
+   *
+   * The detector, the two labels, the explanation and the instruction all
+   * already existed; the needs-attention row said *"Abra a memória e remova a
+   * data de término"*, and the memory then rendered `archived` beside two dates
+   * with no word about the contradiction. That is the defect the detector was
+   * built to end, surviving one click past the queue.
+   *
+   * **Five resolutions are not built, and that is the signed decision rather
+   * than an omission.** `03-componentes.md` draws a conflict block with five;
+   * OD-2N-7 **A** signs derivation from existing data with no conflict table, no
+   * persisted lifecycle and exactly **one** action — `CONFLICT_ACTION_ID` — and
+   * the four missing ones would each be a control that writes something the
+   * schema cannot record. The one real action is the edit form already below.
+   */
+  const hasValidityConflict = isInvertedValidityWindow(memory);
+  const changes = requireSupabaseData(changeResult, "load memory changes") ?? [];
+  const historyCopy = getHistoryCopy(locale, agentName);
+  const formatDateTime = (iso: string) => formatInstant(iso, "dayAndTime", locale, timeZone) ?? "";
+  const boundedChanges = boundedList(
+    describeEntityChanges(changes, historyCopy, formatDateTime),
+    RECENT_CHANGE_LIMIT,
+  );
   /*
    * `2N-KNOWS-007` — read from the current row, and narrowed through the
    * **contract's** predicate rather than `asMemorySensitivity`.
@@ -228,6 +275,37 @@ export default async function MemoryDetailPage({
         </div>
       </header>
 
+      {/*
+        Placed above the facts list, not inside it. A row saying the dates
+        contradict, sitting between two rows that print them as though they were
+        ordinary values, would be the page disagreeing with itself in one table.
+        `role="note"` rather than `alert`: nothing just happened, and this is a
+        standing property of the row the reader navigated to on purpose.
+      */}
+      {hasValidityConflict ? (
+        <section className="memory-conflict" data-memory-conflict="true" role="note">
+          <h2>{conflictCopy.groupLabel}</h2>
+          {/*
+            Both halves, always, and neither marked as the winner
+            (`2N-CONFLICT-002`). The labels are the queue's own, so the row the
+            owner clicked and the page they arrived at name the two dates
+            identically.
+          */}
+          <dl className="conflict-dates">
+            <div>
+              <dt>{conflictCopy.validFromLabel}</dt>
+              <dd>{formatInstant(memory.valid_from, "dayAndTime", locale, timeZone)}</dd>
+            </div>
+            <div>
+              <dt>{conflictCopy.validUntilLabel}</dt>
+              <dd>{formatInstant(memory.valid_until, "dayAndTime", locale, timeZone)}</dd>
+            </div>
+          </dl>
+          <p>{conflictCopy.whyNotDecided}</p>
+          <p>{conflictCopy.whatYouCanDo}</p>
+        </section>
+      ) : null}
+
       <dl className="memory-facts">
         <div>
           <dt>{copy.relatedPerson}</dt>
@@ -332,6 +410,22 @@ export default async function MemoryDetailPage({
         projects={projects}
         state={state}
       />
+
+      {/*
+        The trail of corrections, below the form that makes them — the same band
+        the person and project workspaces carry, mounted rather than rewritten.
+        It is a *history*, not a revision list: `memories` is edited in place and
+        has no revision table, and this writes and rewrites nothing.
+      */}
+      <section className="entity-changes" id="changes">
+        <h2>{entityCopy.recentChanges}</h2>
+        <SectionOriginNote locale={locale} origin="derived" />
+        <p className="section-explainer">{copy.changesExplainer}</p>
+        {boundedChanges.items.length ? (
+          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+        ) : <p className="quiet-state">{copy.changesEmpty}</p>}
+        <BoundedNotice list={boundedChanges} locale={locale} />
+      </section>
 
       {/*
         `2N-CORRECT-002` keeps archiving and removal distinct, and this is the

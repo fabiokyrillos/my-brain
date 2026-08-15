@@ -11,6 +11,7 @@ import {
   PERIOD_FILTERS,
   fileFiltersQuery,
   fileFiltersRecord,
+  fileKindOf,
   filesHref,
   hasActiveFileFilter,
   isActiveFilter,
@@ -206,5 +207,36 @@ describe("one predicate decides both the class and the announcement", () => {
     expect(
       isActiveFilter(filters, "linked", { entityType: "person", entityId: "person-2" }),
     ).toBe(false);
+  });
+});
+
+describe("fileKindOf classifies a row the same way the chips filter it", () => {
+  it("answers with the kind whose map contains the type", () => {
+    expect(fileKindOf("image/png")).toBe("image");
+    expect(fileKindOf("application/pdf")).toBe("document");
+    expect(fileKindOf("text/csv")).toBe("spreadsheet");
+    expect(fileKindOf("text/plain")).toBe("text");
+  });
+
+  it("falls to `other` for an allowlisted type nobody classified", () => {
+    // The exhaustive complement, exactly as `mimeTypesForKind("other")` is. A
+    // hard-coded leftovers list would leave a new allowed type unlabelled.
+    expect(fileKindOf("application/zip")).toBe("other");
+  });
+
+  /*
+   * The invariant that makes the label trustworthy: whatever kind a row is
+   * labelled, selecting that chip must return the row. Derived from the same
+   * map in both directions, so this cannot pass by coincidence — it re-walks
+   * every declared type rather than sampling four.
+   */
+  it("agrees with the filter in both directions, for every classified type", () => {
+    for (const kind of FILE_KIND_FILTERS) {
+      for (const mime of mimeTypesForKind(kind) ?? []) {
+        expect(fileKindOf(mime), `${mime} is labelled ${fileKindOf(mime)} but filtered as ${kind}`).toBe(kind);
+      }
+    }
+    // Non-vacuity: the loop above must actually have types to walk.
+    expect(CLASSIFIED_MIME_TYPES.length).toBeGreaterThan(4);
   });
 });

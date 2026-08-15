@@ -60,6 +60,17 @@ type MemoryCopy = {
   readonly validUntil: string;
   readonly validAlways: string;
 
+  /**
+   * The corrections band (`2N-CORRECT-002`, and the *histórico* half of the
+   * memory workspace).
+   *
+   * Its own two strings rather than the project's, because both name the
+   * subject and the trail's scope: a shared "neste projeto" would have appeared
+   * under a memory. The heading is shared — one section, one name.
+   */
+  readonly changesExplainer: string;
+  readonly changesEmpty: string;
+
   /** Provenance and relations. */
   readonly provenance: string;
   /*
@@ -173,6 +184,8 @@ const copy = {
     // that is currently true.
     validUntil: "Vale até",
     validAlways: "Sem prazo",
+    changesExplainer: "Vem do registro de alterações: correções e arquivamentos desta memória. O texto anterior não é reescrito.",
+    changesEmpty: "Nenhuma alteração registrada nesta memória ainda.",
 
     provenance: "Origem",
     relatedPerson: "Pessoa",
@@ -262,6 +275,8 @@ const copy = {
     // "Was valid until" would put a currently-true fact in the past.
     validUntil: "Valid until",
     validAlways: "No end date",
+    changesExplainer: "From the recorded changes: corrections and archivings of this memory. The earlier text is not rewritten.",
+    changesEmpty: "No change has been recorded on this memory yet.",
 
     provenance: "Origin",
     relatedPerson: "Person",

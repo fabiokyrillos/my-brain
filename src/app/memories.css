@@ -314,3 +314,42 @@
     justify-content: center;
   }
 }
+
+/*
+ * The conflict block on the memory itself (`2N-CONFLICT-002`).
+ *
+ * The same left rule and warm wash the queue's `.conflict-row` uses, and
+ * deliberately so: the owner clicks a row in Hoje that looks like this and
+ * arrives at a page that looks like this. Two shapes for one fact would make the
+ * destination read as a different subject.
+ *
+ * `.conflict-dates` is reused rather than re-declared — it is already the two
+ * labelled values, already collapsing to one column below 180px per track, and
+ * already the `<dl>` that gives each date its own label for a screen reader.
+ */
+.memory-conflict {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--tone-attention-fg);
+  border-radius: var(--radius-md);
+  background: var(--tone-attention-bg);
+}
+
+.memory-conflict > h2 {
+  margin: 0;
+  font: var(--type-heading);
+  color: var(--text-primary);
+}
+
+.memory-conflict p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  max-width: 68ch;
+}
+
+.memory-conflict .conflict-dates {
+  margin: 0;
+}

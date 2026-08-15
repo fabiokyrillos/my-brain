@@ -29,6 +29,7 @@ import { FileFilterBar, type LinkedFilterOption } from "@/features/library/file-
 import {
   CLASSIFIED_MIME_TYPES,
   fileFiltersRecord,
+  fileKindOf,
   hasActiveFileFilter,
   mimeTypesForKind,
   parseFileFilters,
@@ -583,6 +584,16 @@ export default async function FilesPage({
                   </ProtectedContent>
                 </div>
                 <div className="list-meta">
+                  {/*
+                    The type, as a mono label rather than an icon
+                    (`08-assets-e-conteudo.md`). Derived from the same map the
+                    filter chips use, so the word on the row and the chip that
+                    would select it cannot disagree. It is not file content — a
+                    MIME type is a format, not something the document says — so
+                    it sits outside the reveal beside the size fallback that was
+                    already there for the same reason.
+                  */}
+                  <span className="file-kind">{libraryCopy.kinds[fileKindOf(file.mime_type)]}</span>
                   <span className={`status-badge ${file.status}`}>
                     {attachmentStatusLabel(locale, file.status) ??
                       getVocabularyCopy(locale).unknownState}

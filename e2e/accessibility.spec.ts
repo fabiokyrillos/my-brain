@@ -98,6 +98,12 @@ const STYLESHEETS = [
   */
   "timelines.css",
   "entities.css",
+  /*
+    The memory workspace's conflict block. It reuses `.conflict-dates` from
+    `experience.css` and adds its own wash and rule here; without this the axe
+    contrast scan below would read the attention tone as the document default.
+  */
+  "memories.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -1264,4 +1270,71 @@ test.describe("the entity workspace reads as one template", () => {
     const minimum = testInfo.project.name === "mobile" ? 44 : 24;
     expect(box!.height).toBeGreaterThanOrEqual(minimum);
   });
+});
+
+/* ------------------------------------------------------------------ *
+ * The memory in conflict — `2N-CONFLICT-002`, said where the queue sends you.
+ * ------------------------------------------------------------------ */
+
+/** Mirrors the conflict block in `src/app/[locale]/app/memories/[memoryId]/page.tsx`. */
+function memoryConflict() {
+  return `<div class="content-page entity-detail memory-detail">`
+    + `<header class="entity-hero"><div><p class="eyebrow">PREFERÊNCIA</p>`
+    + `<h1 class="memory-content-heading">Prefere reuniões pela manhã.</h1></div></header>`
+    + `<section class="memory-conflict" data-memory-conflict="true" role="note">`
+    + `<h2>Informações que não podem estar certas ao mesmo tempo</h2>`
+    + `<dl class="conflict-dates">`
+    + `<div><dt>Começa em</dt><dd>12 de agosto de 2026, 09:00</dd></div>`
+    + `<div><dt>Deveria terminar em</dt><dd>3 de março de 2026, 09:00</dd></div>`
+    + `</dl>`
+    + `<p>As duas datas foram preservadas exatamente como estavam. Escolher uma delas por conta própria`
+    + ` seria inventar o que você quis dizer.</p>`
+    + `<p>Abra a memória e remova a data de término para desfazer a contradição.</p>`
+    + `</section></div>`;
+}
+
+test.describe("a memory in conflict says so on its own page", () => {
+  test("shows both dates, and marks neither as the winner", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, memoryConflict());
+
+    const block = page.locator("[data-memory-conflict='true']");
+    await expect(block).toHaveCount(1);
+    // `2N-CONFLICT-002`: both halves, always. A block that showed one date would
+    // be the product choosing for the owner, which is the thing it refuses.
+    await expect(block.locator("dd")).toHaveCount(2);
+    // Never the word the product wrongly used before the detector existed.
+    await expect(block).not.toContainText(/arquivad/i);
+  });
+
+  test("carries the warm rule the queue's own row carries", async ({ page }) => {
+    await render(page, memoryConflict());
+    const border = await page.evaluate(() => {
+      const node = document.querySelector(".memory-conflict")!;
+      const style = getComputedStyle(node);
+      return { width: style.borderLeftWidth, colour: style.borderLeftColor, background: style.backgroundColor };
+    });
+    // Resolved, not declared: a `var()` that never resolves leaves the property
+    // invalid and the block indistinguishable from an ordinary section — the
+    // failure twenty references in this repository shipped with.
+    expect(border.width).toBe("3px");
+    expect(border.colour).not.toBe("rgba(0, 0, 0, 0)");
+    expect(border.background).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, memoryConflict());
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on the conflict block in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, memoryConflict(), { reducedMotion: true, theme });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
 });
