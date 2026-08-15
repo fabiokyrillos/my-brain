@@ -373,6 +373,26 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .records-view:hover{border-color:var(--border-strong);color:var(--text-primary)}
 .records-view[aria-current="page"]{background:var(--action-primary);color:var(--action-primary-text);border-color:var(--action-primary)}
 
+/* `BYOK-CAPTURE-002`. A rule, not a card: `03-componentes.md` reserves the boxed
+   treatment for objects, and this is a sentence about the list below it. The
+   tone comes from the left edge and the text stays at full ink, so the notice
+   never depends on colour alone to be read. */
+.records-notice{
+  margin:0 0 var(--space-5);padding:var(--space-3) 0 var(--space-3) var(--space-4);
+  border-left:3px solid var(--tone-attention-line);
+}
+.records-notice p{margin:0;color:var(--text-primary);font:var(--type-body);max-width:var(--width-reading)}
+/* Selector deliberately as specific as the `p` rule above rather than
+   `!important`: the reset it has to beat is a descendant selector, and an
+   `!important` here would be a second, invisible cascade for the next reader. */
+.records-notice .records-notice-actions{display:flex;flex-wrap:wrap;gap:var(--space-4);margin-top:var(--space-2)}
+.records-notice-actions a{
+  display:inline-flex;align-items:center;min-height:var(--touch-target);
+  color:var(--action-primary);font:var(--type-label);text-decoration:underline;
+  text-underline-offset:3px;
+}
+.records-notice-actions a:hover{color:var(--text-primary)}
+
 .records-queue{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);overflow:hidden}
 /* The four tracks, declared once and inherited by the head and every row so a
    column cannot drift between them. */

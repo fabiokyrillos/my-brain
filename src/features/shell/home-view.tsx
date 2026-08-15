@@ -485,6 +485,19 @@ export function HomeView({
             <Section
               title={sections.agenda.title}
               hint={sections.agenda.hint}
+              /*
+                `HomeAgendaProjection.hasMore` documents itself as *"true when the
+                window held more than the panel shows, so the link can say so"* —
+                and until the independent review caught it, nothing read the flag.
+                A panel showing five of nineteen commitments looked exactly like a
+                panel showing all five, and the calendar link read as an
+                alternative rather than as the rest.
+
+                The `+` is the same suffix the end-of-day summary already uses for
+                a bounded count, so the two agree about what a truncated number
+                looks like on this page.
+              */
+              count={`${view.agenda.length}${view.agendaHasMore ? "+" : ""}`}
               action={
                 <Link href={`/${locale}/app/calendar`} className="panel-view-all">
                   {sections.agenda.viewAll}

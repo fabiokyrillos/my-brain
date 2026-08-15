@@ -88,8 +88,22 @@ export default async function ReviewsPage({
     loadReviewListProjection(supabase, { userId: user.id, locale, page }),
   ]);
 
-  return <div className="content-page">
+  return <div className="content-page reviews-page">
     <DayReviewOpened locale={locale} scope={scope} />
+    {/*
+      The page's own name, **first**.
+
+      It used to sit below the day review, so `/app/reviews` opened on a heading
+      two levels down and the `<h1>` arrived after several screens of content.
+      One `<h1>` was already true; the *order* was the half the count did not
+      check, and the outline is what a screen-reader user navigates by.
+    */}
+    <header className="reviews-header">
+      <p className="eyebrow">{pt ? "FECHAMENTO SOB DEMANDA" : "ON-DEMAND REVIEW"}</p>
+      <h1>{pt ? "Revisões" : "Reviews"}</h1>
+      <p className="reviews-lead">{pt ? "Gere uma revisão quando quiser; nada é executado por horário configurado." : "Generate a review when you choose; nothing runs from a configured schedule."}</p>
+    </header>
+
     <DayReviewView
       /*
        * `2M-REVIEW-003`/`-004`. The **existing** command paths, injected — not
@@ -107,9 +121,11 @@ export default async function ReviewsPage({
       undoAction={undoWorkOperation}
     />
 
-    <header className="list-header"><div><p className="eyebrow">{pt ? "FECHAMENTO SOB DEMANDA" : "ON-DEMAND REVIEW"}</p><h1>{pt ? "Revisões" : "Reviews"}</h1><p>{pt ? "Gere uma revisão quando quiser; nada é executado por horário configurado." : "Generate a review when you choose; nothing runs from a configured schedule."}</p></div></header>
-    <div className="review-buttons"><ReviewButton action={generateReview} locale={locale} period="daily" /><ReviewButton action={generateReview} locale={locale} period="weekly_review" /><ReviewButton action={generateReview} locale={locale} period="weekly_plan" /><ReviewButton action={generateReview} locale={locale} period="monthly" /></div>
-    {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h2>{review.title}</h2></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <div className="empty-list"><NotebookTabs size={30} /><strong>{pt ? "Nenhuma revisão ainda" : "No reviews yet"}</strong><p>{pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."}</p></div>}
-    <PaginationLinks locale={locale} path="reviews" page={page} hasNext={hasNext} />
+    <section aria-labelledby="reviews-history" className="reviews-history">
+      <h2 id="reviews-history">{pt ? "Revisões geradas" : "Generated reviews"}</h2>
+      <div className="review-buttons"><ReviewButton action={generateReview} locale={locale} period="daily" /><ReviewButton action={generateReview} locale={locale} period="weekly_review" /><ReviewButton action={generateReview} locale={locale} period="weekly_plan" /><ReviewButton action={generateReview} locale={locale} period="monthly" /></div>
+      {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h3>{review.title}</h3></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <div className="empty-list"><NotebookTabs size={30} /><strong>{pt ? "Nenhuma revisão ainda" : "No reviews yet"}</strong><p>{pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."}</p></div>}
+      <PaginationLinks locale={locale} path="reviews" page={page} hasNext={hasNext} />
+    </section>
   </div>;
 }

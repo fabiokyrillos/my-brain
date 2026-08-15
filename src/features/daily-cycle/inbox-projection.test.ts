@@ -381,4 +381,50 @@ describe("loadInboxProjection: views", () => {
 
     expect(page.items).toHaveLength(2);
   });
+
+  /*
+    The independent review's finding, as two tests over the *status prefilter*
+    rather than over the lifecycle resolver.
+
+    The resolver was always right about both of these — `lifecycle.test.ts` proves
+    it. What was wrong is the SQL superset each view narrows to before the
+    resolver ever runs, which is a filter the existing view tests could not see
+    because every one of them used a status the superset happened to admit.
+  */
+  it("keeps an entry retried on a live schedule in the organizing view", async () => {
+    const { client, stubs } = clientMock({
+      entries: [entry({ id: "retrying", status: "recoverable_error" })],
+      // `fail_entry_interpretation` on a non-terminal failure: the entry moves to
+      // `recoverable_error` and the job keeps a future attempt.
+      jobs: [{ status: "failed", next_attempt_at: "2999-01-01T00:00:00.000Z", payload: { entry_id: "retrying" } }],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1, view: "organizing" });
+
+    expect(page.items.map((item) => item.entryId)).toEqual(["retrying"]);
+    expect(page.items[0]?.productState).toBe("organizing");
+    // The control: the status has to be in the query's own superset, or the row
+    // never reaches the post-filter and this test would pass on an empty page.
+    expect(stubs.entries.in).toHaveBeenCalledWith("status", expect.arrayContaining(["recoverable_error"]));
+  });
+
+  it("gives an entry with no AI credential a view of its own", async () => {
+    const { client, stubs } = clientMock({
+      entries: [
+        entry({ id: "no-key", status: "awaiting_ai_configuration" }),
+        entry({ id: "fine", status: "completed" }),
+      ],
+    });
+
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1, view: "awaiting-ai" });
+
+    expect(page.items.map((item) => item.entryId)).toEqual(["no-key"]);
+    expect(page.items[0]).toMatchObject({
+      productState: "needs_attention",
+      attentionReason: "configure_ai_credential",
+    });
+    // `BYOK-CAPTURE-002` — the row carries the action that actually resolves it.
+    expect(page.items[0]?.availableActions.map((action) => action.id)).toContain("configure_ai_credential");
+    expect(stubs.entries.in).toHaveBeenCalledWith("status", ["awaiting_ai_configuration"]);
+  });
 });

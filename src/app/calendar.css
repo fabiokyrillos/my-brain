@@ -373,12 +373,35 @@
 }
 
 /*
- * The day review's own heading, demoted from `<h1>` to `<h2>`.
+ * The day review's own heading — an `<h2>` under the page's `<h1>`.
  *
- * It renders inside `/app/reviews`, which already owns the page's `<h1>`, so
- * the live page carried two — `07-acessibilidade.md` allows exactly one. The
- * size is kept: a heading level is a statement about the document outline, not
- * about how large the text is, and shrinking it would have changed the reading
- * hierarchy to fix a semantics problem.
+ * It renders inside `/app/reviews`, which owns the page's `<h1>`. The size is
+ * kept: a heading level is a statement about the document outline, not about how
+ * large the text is, and shrinking it would have changed the reading hierarchy
+ * to fix a semantics problem.
  */
 .day-review-title { margin: 0; font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+
+/*
+ * The sections inside the review, now `<h3>`.
+ *
+ * Sized here rather than left to the browser default, which would have made a
+ * demoted heading *look* demoted — the outline moved, the hierarchy on the page
+ * did not.
+ */
+.day-review-page section > h3 { margin: 0 0 var(--space-2); font: var(--type-heading); color: var(--text-primary); }
+
+/*
+ * `/app/reviews` — the page around the review.
+ *
+ * The surface holds two things that are genuinely different in kind: today's
+ * closing, which is a reading of records that already exist, and the history of
+ * reviews the assistant generated when asked. The header names the page, and
+ * each of the two is a titled section under it, so the outline says which is
+ * which instead of leaving the reader to infer it from a gap.
+ */
+.reviews-header { margin-bottom: var(--space-6); }
+.reviews-header h1 { margin: var(--space-2) 0 0; font: 500 clamp(38px,5vw,60px)/1 var(--font-reading); letter-spacing: -.04em; }
+.reviews-lead { margin: var(--space-2) 0 0; color: var(--text-secondary); font: var(--type-lead); max-width: var(--width-reading); }
+.reviews-history { margin-top: var(--space-8); }
+.reviews-history > h2 { margin: 0 0 var(--space-4); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }

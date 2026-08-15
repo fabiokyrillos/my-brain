@@ -185,7 +185,7 @@ export function DayReviewView({
     const heading = copy.sections[source];
     return (
       <section aria-label={heading} className="day-review-section" data-source={source}>
-        <h2>{heading}</h2>
+        <h3>{heading}</h3>
         {projection.sourceStates[source] === "unavailable" ? (
           // `2M-REVIEW-001`. An unreadable source is never rendered as an empty
           // one: "nothing happened" and "I could not read this" are different
@@ -201,19 +201,24 @@ export function DayReviewView({
   }
 
   return (
-    <div className="content-page day-review-page">
+    /*
+      A `<section>` of `/app/reviews`, not a page of its own.
+
+      It was a second `content-page` nested inside the first, with a flat run of
+      `<h2>`s and the page's own `<h1>` *below* all of them — so the document
+      opened at level two and the review's title was a sibling of its own
+      sections rather than their parent. Demoting the `<h1>` (which is what the
+      first repair did) fixed the count and left the order wrong, which is the
+      half of `07-acessibilidade.md` an axe run does not measure.
+
+      The outline now reads: `<h1>` Revisões → `<h2>` this review → `<h3>` its
+      parts → `<h2>` the history below it.
+    */
+    <section aria-labelledby="day-review-title" className="day-review-page">
       <header className="list-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          {/*
-            `<h2>`, not `<h1>`.
-
-            This view renders *inside* `/app/reviews`, which already has an
-            `<h1>` — so the live page carried two, and `07-acessibilidade.md`
-            requires exactly one per page. The review is a section of that page,
-            not a second document, and the outline now says so.
-          */}
-          <h2 className="day-review-title">{copy.title(projection.scope)}</h2>
+          <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope)}</h2>
           <p>{copy.description(projection.scope)}</p>
           {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
           <p className="quiet-state">{copy.nothingScheduled}</p>
@@ -234,7 +239,7 @@ export function DayReviewView({
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
       <section aria-label={copy.schedule.heading} className="day-review-schedule">
-        <h2>{copy.schedule.heading}</h2>
+        <h3>{copy.schedule.heading}</h3>
         {/* `2M-REVIEW-006`. The three preferences, read — and said back. */}
         <p>
           {projection.schedule.dailyAt === null
@@ -256,7 +261,7 @@ export function DayReviewView({
       </section>
 
       <section aria-label={copy.unreadableHeading} className="day-review-unreadable">
-        <h2>{copy.unreadableHeading}</h2>
+        <h3>{copy.unreadableHeading}</h3>
         {projection.unreadable.length === 0 ? (
           <p className="quiet-state">{copy.unreadableNone}</p>
         ) : (
@@ -284,7 +289,7 @@ export function DayReviewView({
       {section(projection.due, "due")}
 
       <section aria-label={copy.sections.captured} className="day-review-section" data-source="captured">
-        <h2>{copy.sections.captured}</h2>
+        <h3>{copy.sections.captured}</h3>
         {projection.sourceStates.captured === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.sections.captured)}</p>
         ) : projection.captured.length === 0 ? (
@@ -312,7 +317,7 @@ export function DayReviewView({
       </section>
 
       <section aria-label={copy.generatedHeading} className="day-review-section" data-source="generated">
-        <h2>{copy.generatedHeading}</h2>
+        <h3>{copy.generatedHeading}</h3>
         {projection.sourceStates.generated === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.generatedHeading)}</p>
         ) : projection.generated === null ? (
@@ -329,7 +334,7 @@ export function DayReviewView({
             <header>
               <div>
                 <span>{projection.generated.periodLabel}</span>
-                <h3>{projection.generated.title}</h3>
+                <h4>{projection.generated.title}</h4>
               </div>
               <span className="status-badge" data-tone={projection.generated.statusTone}>
                 {projection.generated.statusLabel}
@@ -340,6 +345,6 @@ export function DayReviewView({
         )}
         <p><a className="row-action" href={reviewsHref}>{copy.openReviews}</a></p>
       </section>
-    </div>
+    </section>
   );
 }

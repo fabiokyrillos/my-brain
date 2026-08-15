@@ -64,6 +64,10 @@ const COPY = {
     plannerTitle: "Planejar o dia",
     plannedEmpty: "Nada planejado para este dia ainda.",
     reviewTitle: "Revisão do dia",
+    reviewsPageTitle: "Revisões",
+    reviewsPageLead: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
+    reviewsHistory: "Revisões geradas",
+    reviewsHistoryEmpty: "Nenhuma revisão ainda.",
     nothingScheduled: "Nada é executado por horário configurado; esta revisão só existe quando você a abre.",
     unreadableHeading: "O que não pôde ser lido",
     completed: "Concluído",
@@ -84,6 +88,10 @@ const COPY = {
     plannerTitle: "Plan the day",
     plannedEmpty: "Nothing planned for this day yet.",
     reviewTitle: "Day review",
+    reviewsPageTitle: "Reviews",
+    reviewsPageLead: "Generate a review when you choose; nothing runs from a configured schedule.",
+    reviewsHistory: "Generated reviews",
+    reviewsHistoryEmpty: "No reviews yet.",
     nothingScheduled: "Nothing runs from a configured schedule; this review exists only when you open it.",
     unreadableHeading: "What could not be read",
     completed: "Completed",
@@ -209,11 +217,17 @@ function plannerPage(locale: Locale, rows: string[]): string {
 /** The day review, mirroring the page `DayReviewView` renders. */
 function reviewPage(locale: Locale, rows: string[], options: { unreadable?: boolean } = {}): string {
   const copy = COPY[locale];
-  return shell(locale, `<div class="content-page day-review-page">
+  return shell(locale, `<div class="content-page reviews-page">
+    <header class="reviews-header">
+      <p class="eyebrow">FECHAMENTO SOB DEMANDA</p>
+      <h1>${copy.reviewsPageTitle}</h1>
+      <p class="reviews-lead">${copy.reviewsPageLead}</p>
+    </header>
+    <section aria-labelledby="day-review-title" class="day-review-page">
     <header class="list-header">
       <div>
         <p class="eyebrow">FECHAMENTO DO DIA</p>
-        <h2 class="day-review-title">${copy.reviewTitle}</h2>
+        <h2 class="day-review-title" id="day-review-title">${copy.reviewTitle}</h2>
         <p class="quiet-state">${copy.nothingScheduled}</p>
       </div>
       <nav aria-label="Período da revisão" class="day-review-scope-nav">
@@ -223,27 +237,32 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
     </header>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
     <section aria-label="Seu horário de revisão" class="day-review-schedule">
-      <h2>Seu horário de revisão</h2>
+      <h3>Seu horário de revisão</h3>
       <p>Já passou das 22:00, o horário que você escolheu para revisar o dia.</p>
     </section>
     <section aria-label="${copy.unreadableHeading}" class="day-review-unreadable">
-      <h2>${copy.unreadableHeading}</h2>
+      <h3>${copy.unreadableHeading}</h3>
       ${options.unreadable
         ? '<div role="status"><ul><li>Não foi possível ler: Concluído. Esta seção não está vazia — ela não pôde ser lida.</li></ul></div>'
         : '<p class="quiet-state">Todas as fontes desta revisão foram lidas.</p>'}
     </section>
     <section aria-label="${copy.completed}" class="day-review-section" data-source="completed">
-      <h2>${copy.completed}</h2>
+      <h3>${copy.completed}</h3>
       ${rows.length === 0 ? '<p class="quiet-state">Nada foi concluído neste dia.</p>' : `<ul>${rows.join("")}</ul>`}
     </section>
     <section aria-label="Registros capturados" class="day-review-section" data-source="captured">
-      <h2>Registros capturados</h2>
+      <h3>Registros capturados</h3>
       <ul>
         <li class="day-review-item">
           <a href="/pt-BR/app/inbox/e1">Anotei uma ideia</a>
           <p class="day-review-item-meta">14:00</p>
         </li>
       </ul>
+    </section>
+    </section>
+    <section aria-labelledby="reviews-history" class="reviews-history">
+      <h2 id="reviews-history">${copy.reviewsHistory}</h2>
+      <p class="quiet-state">${copy.reviewsHistoryEmpty}</p>
     </section>
   </div>`);
 }
@@ -351,10 +370,13 @@ for (const locale of ["pt-BR", "en"] as const) {
     test("the day review carries the schedule promise and the unreadable section", async ({ page }) => {
       await open(page, reviewPage(locale, [reviewRow({ locale })]));
       /*
-        `level: 2`. The review renders inside `/app/reviews`, which owns the
-        page's one `<h1>` — the live page carried two until this was demoted,
-        which axe caught and `07-acessibilidade.md` forbids.
+        `level: 2`, under the page's one `<h1>` — which is now **above** it.
+
+        The demotion alone left the document opening at level two, so the order
+        is asserted here as well as the level: the first heading in the page has
+        to be the page's own name.
       */
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(COPY[locale].reviewsPageTitle);
       await expect(page.getByRole("heading", { level: 2, name: COPY[locale].reviewTitle })).toBeVisible();
       // `2M-REVIEW-007`, in the browser rather than only in a source scan.
       await expect(page.getByText(COPY[locale].nothingScheduled)).toBeVisible();

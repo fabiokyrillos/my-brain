@@ -223,6 +223,31 @@ describe("HomeView", () => {
     expect(within(agenda).getByText("Orçamento com o João")).toBeInTheDocument();
   });
 
+  /*
+    `agendaHasMore` was computed by the projection, threaded through the view
+    model and read by nothing — the independent review's finding. A panel showing
+    five of nineteen commitments was indistinguishable from a panel showing all
+    five, and the calendar link read as an alternative rather than as the rest.
+
+    Two assertions, because one of them is the control: a bounded panel says so,
+    and an unbounded one must not — a `+` that is always printed would satisfy
+    the first test while telling the same lie in the other direction.
+  */
+  it("marks a truncated agenda so five of nineteen is not read as five", () => {
+    renderHome(viewModel({ agenda: [agendaItem()], agendaHasMore: true }));
+
+    const agenda = screen.getByRole("region", { name: "Adiante" });
+    expect(within(agenda).getByText("1+")).toBeInTheDocument();
+  });
+
+  it("does not mark an agenda that holds everything the window found", () => {
+    renderHome(viewModel({ agenda: [agendaItem()], agendaHasMore: false }));
+
+    const agenda = screen.getByRole("region", { name: "Adiante" });
+    expect(within(agenda).getByText("1")).toBeInTheDocument();
+    expect(within(agenda).queryByText("1+")).not.toBeInTheDocument();
+  });
+
   it("reports an organizing state without claiming anything needs the user", () => {
     renderHome(viewModel({ status: { kind: "organizing", count: 3 }, attention: [] }));
 

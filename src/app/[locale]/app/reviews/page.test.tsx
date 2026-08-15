@@ -82,6 +82,37 @@ describe("ReviewsPage", () => {
     expect(screen.getAllByText(/nothing runs from a configured schedule/i).length).toBeGreaterThan(0);
   });
 
+  /*
+    The independent review's fourth finding. The first repair demoted the day
+    review's `<h1>` to an `<h2>`, which made the *count* right and left the
+    *order* wrong: the page still opened at level two, several screens above its
+    own name.
+
+    Asserted as a level sequence rather than as "there is one h1", because the
+    count is exactly what the previous repair already satisfied.
+  */
+  it("opens on its own name and nests the review under it", async () => {
+    vi.mocked(requireUser).mockResolvedValue({ supabase: {}, user: { id: "user-1" } } as never);
+    vi.mocked(loadDayReviewProjection).mockResolvedValue(dayReview() as never);
+    vi.mocked(loadReviewListProjection).mockResolvedValue({ items: [], hasNext: false });
+
+    const { container } = render(
+      await ReviewsPage({ params: Promise.resolve({ locale: "en" }), searchParams: Promise.resolve({}) }),
+    );
+
+    const headings = Array.from(container.querySelectorAll("h1,h2,h3,h4,h5,h6"));
+    expect(headings[0]?.tagName).toBe("H1");
+    expect(headings[0]).toHaveTextContent("Reviews");
+    expect(headings.filter((heading) => heading.tagName === "H1")).toHaveLength(1);
+    // No level is skipped, in either direction — the failure a heading demotion
+    // trades one violation for is a jump from h2 straight to h4.
+    const levels = headings.map((heading) => Number(heading.tagName.slice(1)));
+    for (const [index, level] of levels.entries()) {
+      if (index === 0) continue;
+      expect(level).toBeLessThanOrEqual(levels[index - 1] + 1);
+    }
+  });
+
   it("fails closed to the day scope rather than guessing from a malformed parameter", async () => {
     vi.mocked(requireUser).mockResolvedValue({ supabase: {}, user: { id: "user-1" } } as never);
     vi.mocked(loadDayReviewProjection).mockResolvedValue(dayReview() as never);

@@ -14,6 +14,8 @@ import { NeedsAttentionList } from "@/features/daily-cycle/needs-attention-list"
 import { getRecordsCopy } from "@/features/daily-cycle/records-copy";
 import { RecordsQueue } from "@/features/daily-cycle/records-queue";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
+import { byokSettingsHref } from "@/features/byok/routes";
+import { loadPendingEntryCount } from "@/features/byok/pending-entries";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
@@ -32,13 +34,36 @@ type RecordsView = "needs-you" | InboxView;
  * `2J`-era chips used `aria-pressed`, which describes a toggle — this is
  * navigation.
  */
-function RecordsViews({ locale, active }: { locale: Locale; active: RecordsView }) {
+function RecordsViews({
+  locale,
+  active,
+  awaitingAiCount,
+}: {
+  locale: Locale;
+  active: RecordsView;
+  /**
+   * `BYOK-CAPTURE-002`. How many entries are waiting on a key, so the chip can
+   * be offered only when it would return something.
+   */
+  awaitingAiCount: number;
+}) {
   const copy = getRecordsCopy(locale).views;
   const views: readonly { readonly id: RecordsView; readonly label: string }[] = [
     { id: "needs-you", label: copy.needsYou },
     { id: "organizing", label: copy.organizing },
     { id: "failed", label: copy.failed },
     { id: "record-only", label: copy.recordOnly },
+    /*
+      Conditional, and the second clause is what stops it being a trap: a deep
+      link to `?view=awaiting-ai` on an account that has since resolved every
+      such entry would otherwise render a chip row in which no chip is current,
+      and `aria-current` would point at nothing. The same rule the attention
+      queue's filter row already follows — never advertise a filter that yields
+      nothing — with the one exception of the view you are standing on.
+    */
+    ...(awaitingAiCount > 0 || active === "awaiting-ai"
+      ? [{ id: "awaiting-ai" as const, label: copy.awaitingAi }]
+      : []),
     { id: "all", label: copy.all },
   ];
 
@@ -66,6 +91,69 @@ function RecordsViews({ locale, active }: { locale: Locale; active: RecordsView 
       ))}
     </nav>
   );
+}
+
+/**
+ * `BYOK-CAPTURE-002`. What the default view says when entries are stuck.
+ *
+ * The independent review's finding was that `awaiting_ai_configuration` reached
+ * no view at all once needs-you became the default: `list_needs_attention` never
+ * selects it, and widening that RPC is a migration this initiative does not
+ * have. It is emphatically a state that needs the owner — the lifecycle resolver
+ * has answered `needs_attention` + `configure_ai_credential` for it since BYOK —
+ * so the queue that is *named* for that has to admit it exists.
+ *
+ * Two links because there are genuinely two acts: look at what is waiting, and
+ * fix the reason it is waiting. Neither is a mutation, so neither confirms.
+ */
+function AwaitingAiNotice({
+  locale,
+  count,
+  /** False on the awaiting-ai view itself, where it would link to this page. */
+  showListLink,
+}: {
+  locale: Locale;
+  count: number;
+  showListLink: boolean;
+}) {
+  const copy = getRecordsCopy(locale).awaitingAiNotice;
+  return (
+    <aside className="records-notice" data-tone="attention">
+      <p>{count === 1 ? copy.one : copy.many.replace("{count}", String(count))}</p>
+      <p className="records-notice-actions">
+        {showListLink ? (
+          <Link href={`/${locale}/app/inbox?view=awaiting-ai`}>{copy.seeThem}</Link>
+        ) : null}
+        <Link href={byokSettingsHref(locale)}>{copy.configure}</Link>
+      </p>
+    </aside>
+  );
+}
+
+/**
+ * The sentence a view that filtered nothing in gets to say.
+ *
+ * A function rather than an inline ternary because the key mapping is no longer
+ * one-to-one — `record-only` and `awaiting-ai` are hyphenated route values over
+ * camel-cased copy keys — and an index expression that has to spell both is
+ * where a fifth view would silently pick the wrong sentence.
+ */
+function emptyCopyFor(view: InboxView, copy: ReturnType<typeof getRecordsCopy>, pt: boolean) {
+  switch (view) {
+    case "all":
+      return {
+        title: pt ? "Nenhum registro ainda" : "No entries yet",
+        body: pt
+          ? "Use a captura rápida para registrar algo sem interromper seu fluxo."
+          : "Use quick capture to save something without breaking your flow.",
+      };
+    case "record-only":
+      return { title: copy.views.recordOnly, body: copy.emptyByView.recordOnly };
+    case "awaiting-ai":
+      return { title: copy.views.awaitingAi, body: copy.emptyByView.awaitingAi };
+    default:
+      return { title: copy.views[view], body: copy.emptyByView[view] };
+  }
 }
 
 function RecordsHeader({ locale, lead }: { locale: Locale; lead: string }) {
@@ -118,15 +206,20 @@ export default async function InboxPage({
     // come from `list_needs_attention` and conflicts are derived from the owner's
     // own memories, so neither can fail the other. Run together because they are
     // independent, not because they are related.
-    const [projection, conflicts] = await Promise.all([
+    const [projection, conflicts, awaitingAi] = await Promise.all([
       loadAttentionProjection(supabase, { locale }),
       loadMemoryConflicts(supabase, { locale, userId: user.id }),
+      // A third independent read, for the third thing the queue cannot see from
+      // the RPC. A `head` count, so no captured text is pulled into a page that
+      // only needs to know whether to raise the notice.
+      loadPendingEntryCount(supabase, user.id),
     ]);
 
     return (
       <div className="content-page records-page">
         <RecordsHeader locale={locale} lead={copy.lead.needsYou} />
-        <RecordsViews locale={locale} active="needs-you" />
+        <RecordsViews locale={locale} active="needs-you" awaitingAiCount={awaitingAi.count} />
+        {awaitingAi.count > 0 ? <AwaitingAiNotice locale={locale} count={awaitingAi.count} showListLink /> : null}
         <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="pull" limit={5} />
         {/*
           Counts conflicts too. Left as `projection.items.length`, a queue whose
@@ -155,24 +248,31 @@ export default async function InboxPage({
   }
 
   const page = parsePage(resolvedSearchParams.page);
-  const projection = await loadInboxProjection(supabase, { locale, page, view });
+  const [projection, awaitingAi] = await Promise.all([
+    loadInboxProjection(supabase, { locale, page, view }),
+    loadPendingEntryCount(supabase, user.id),
+  ]);
 
   /*
     A view that filtered nothing in says which view is empty, not "no entries
     yet" — the first-use copy would be a lie on an account with two hundred
     records and no failures (`04-estados.md`: *vazio por visão*).
   */
-  const emptyCopy = view === "all"
-    ? { title: pt ? "Nenhum registro ainda" : "No entries yet", body: pt ? "Use a captura rápida para registrar algo sem interromper seu fluxo." : "Use quick capture to save something without breaking your flow." }
-    : {
-      title: copy.views[view === "record-only" ? "recordOnly" : view],
-      body: copy.emptyByView[view === "record-only" ? "recordOnly" : view],
-    };
+  const emptyCopy = emptyCopyFor(view, copy, pt);
 
   return (
     <div className="content-page records-page">
       <RecordsHeader locale={locale} lead={copy.lead.all} />
-      <RecordsViews locale={locale} active={view} />
+      <RecordsViews locale={locale} active={view} awaitingAiCount={awaitingAi.count} />
+      {/*
+        On this view the notice is the *fix*, not the announcement: the rows
+        below say which records are stuck, and this is the one link that unsticks
+        them. Raised on needs-you and here, and nowhere else — on "Tudo" it would
+        be a banner about four rows among two hundred.
+      */}
+      {view === "awaiting-ai" && awaitingAi.count > 0 ? (
+        <AwaitingAiNotice locale={locale} count={awaitingAi.count} showListLink={false} />
+      ) : null}
       {projection.items.length ? (
         <RecordsQueue agentName={agentName} items={projection.items} locale={locale} timeZone={timeZone} />
       ) : projection.hasNext ? (

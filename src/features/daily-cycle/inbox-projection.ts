@@ -65,8 +65,17 @@ function toFailClosedInboxItemView(
  * ordering and its own cursor — and the page routes to it before reaching here.
  * Listing it as a value would invite someone to implement it as a filter, which
  * is how one queue would end up with two definitions of "needs you".
+ *
+ * `awaiting-ai` is here for the opposite reason: it is a state the product
+ * *already* resolves to `needs_attention`, and `list_needs_attention` cannot
+ * return it — that RPC's `candidate_entries` never selects
+ * `awaiting_ai_configuration`, and widening it needs a migration this initiative
+ * does not have. While the archive was the default view the state still reached
+ * the owner; once the default became needs-you it reached nobody without typing
+ * a URL. A view of its own is the honest repair available from this side of the
+ * boundary: the same projection, the same mapper, the same actions.
  */
-export const inboxViews = ["all", "organizing", "failed", "record-only"] as const;
+export const inboxViews = ["all", "organizing", "failed", "record-only", "awaiting-ai"] as const;
 export type InboxView = (typeof inboxViews)[number];
 
 export function isInboxView(value: unknown): value is InboxView {
@@ -84,17 +93,39 @@ export function isInboxView(value: unknown): value is InboxView {
  * post-filter below is what actually decides.
  */
 const STATUSES_BY_VIEW: Record<Exclude<InboxView, "all">, readonly string[]> = {
-  // `saved` is here because an entry whose job is pending reads as organizing
-  // while its own status has not moved yet.
-  organizing: ["saved", "interpreting", "reprocessing"],
+  /*
+    `saved` is here because an entry whose job is pending reads as organizing
+    while its own status has not moved yet — and `recoverable_error` for the
+    mirror-image reason, which the independent review caught.
+
+    `fail_entry_interpretation` writes `recoverable_error` on a **non-terminal**
+    failure and the job keeps a future `next_attempt_at`; `resolveDailyCycleLifecycle`
+    reads that live retry and answers `organizing`, because from the owner's side
+    a retry that has not run yet is still the assistant working. The superset
+    omitted the status, so the row was discarded before the post-filter ever ran:
+    an entry that is genuinely being retried appeared in "Tudo" and nowhere else.
+    It is not in `failed` either — that view's post-filter demands
+    `could_not_organize`, which an active retry is not.
+  */
+  organizing: ["saved", "interpreting", "reprocessing", "recoverable_error"],
   failed: ["saved", "recoverable_error", "terminal_error", "completed"],
   "record-only": ["completed"],
+  /*
+    `BYOK-CAPTURE-002`. The one view whose superset is exact rather than a
+    superset: this state is written by `capture_entry_async` and
+    `mark_entry_awaiting_ai_configuration` alone, and `resolveDailyCycleLifecycle`
+    branches on the entry status **above** every job-derived branch, so status and
+    product state cannot disagree here. The post-filter still runs, because a
+    filter that is exact today is a filter nobody re-checks tomorrow.
+  */
+  "awaiting-ai": ["awaiting_ai_configuration"],
 };
 
 const STATE_BY_VIEW: Record<Exclude<InboxView, "all">, (item: InboxItemView) => boolean> = {
   organizing: (item) => item.productState === "organizing",
   failed: (item) => item.productState === "could_not_organize",
   "record-only": (item) => item.isRecordOnly,
+  "awaiting-ai": (item) => item.attentionReason === "configure_ai_credential",
 };
 
 export async function loadInboxProjection(

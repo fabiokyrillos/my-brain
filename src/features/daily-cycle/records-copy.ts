@@ -21,6 +21,12 @@ export type RecordsCopy = {
     readonly organizing: string;
     readonly failed: string;
     readonly recordOnly: string;
+    /**
+     * `BYOK-CAPTURE-002`. Offered only when the account actually holds entries in
+     * this state — a chip that always yields nothing is a control that lies, and
+     * the attention queue's own filter row already follows that rule.
+     */
+    readonly awaitingAi: string;
     readonly all: string;
     /** Names the chip group for assistive technology. */
     readonly label: string;
@@ -43,6 +49,20 @@ export type RecordsCopy = {
     readonly organizing: string;
     readonly failed: string;
     readonly recordOnly: string;
+    readonly awaitingAi: string;
+  };
+  /**
+   * The banner the **needs-you** view raises when entries are waiting on a key.
+   *
+   * It sits on that view rather than only on its own because needs-you is where
+   * the owner lands, and the whole point of the state is that nothing will move
+   * until they act. `{count}` is substituted at the surface.
+   */
+  readonly awaitingAiNotice: {
+    readonly one: string;
+    readonly many: string;
+    readonly seeThem: string;
+    readonly configure: string;
   };
   /**
    * An empty **page** of a view that has more pages.
@@ -67,6 +87,7 @@ export const recordsCopy = {
       organizing: "Organizando",
       failed: "Falhas",
       recordOnly: "Só registro",
+      awaitingAi: "Sem chave de IA",
       all: "Tudo",
       label: "Visões de Registros",
     },
@@ -87,6 +108,13 @@ export const recordsCopy = {
       organizing: "Nada está sendo organizado agora.",
       failed: "Nenhuma falha. Nada ficou pelo caminho.",
       recordOnly: "Nenhum registro sem ação até agora.",
+      awaitingAi: "Nenhum registro esperando por uma chave de IA.",
+    },
+    awaitingAiNotice: {
+      one: "1 registro foi salvo sem ser interpretado, por falta de chave de IA.",
+      many: "{count} registros foram salvos sem ser interpretados, por falta de chave de IA.",
+      seeThem: "Ver esses registros",
+      configure: "Configurar a chave",
     },
     emptyPage: {
       title: "Nada desta visão nesta página",
@@ -104,6 +132,7 @@ export const recordsCopy = {
       organizing: "Organizing",
       failed: "Failures",
       recordOnly: "Record only",
+      awaitingAi: "No AI key",
       all: "All",
       label: "Record views",
     },
@@ -124,6 +153,13 @@ export const recordsCopy = {
       organizing: "Nothing is being organized right now.",
       failed: "No failures. Nothing was left behind.",
       recordOnly: "No record without an action so far.",
+      awaitingAi: "No record is waiting for an AI key.",
+    },
+    awaitingAiNotice: {
+      one: "1 record was saved without being interpreted, for want of an AI key.",
+      many: "{count} records were saved without being interpreted, for want of an AI key.",
+      seeThem: "See those records",
+      configure: "Configure the key",
     },
     emptyPage: {
       title: "Nothing from this view on this page",
