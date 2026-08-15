@@ -2,6 +2,34 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O — Activation, preferences, and control is authorized for PLANNING ONLY (ADR-115), and the audit was run against a tree that moved
+
+**Zero product code. Zero migrations created. 94 local = 94 hosted, parity `202608140094` unchanged, confirmed by a live read-only `migration list --linked`. Signup closed; the rollout gate re-read by running `npm run rollout:verify` and standing at 25 pass · 3 fail · 2 owner-signature. Twelve owner decisions are OPEN and none is signed.**
+
+Baseline `main` `9cc1175`, CI green on that exact merge SHA, worktree clean, no open PR and no competing branch.
+
+### The baseline moved after the predecessor closed, so nothing was carried forward
+
+Phase 2N closed on 2026-08-14 at `9b7cda7`. The **Papel e Console redesign** (ADR-114, PR #227) merged on 2026-08-15 at `9cc1175` — 39 commits, 138 files, +13,345/−1,861, **zero migrations**. Two of this phase's own subjects moved with it: **Dados e IA** now exists as a transparency centre naming and reaching `/app/history`, `/app/costs` and `/app/jobs` with **every URL, filter and deep link preserved**, and Ajustes is a real destination. **The roadmap's Etapa 6 is corrected in six places**, recorded in the audit's §8 rather than applied silently.
+
+### The census was wrong before it was right
+
+The first run of the preference-column census returned **zero consumers** for `personality`, `tone` and `quiet_start` — columns the product demonstrably reads. The cause was the sandbox's working directory, not the product. It was re-run against absolute paths over 920 files, and every figure in the package comes from the corrected run. **The probe was suspected before the product**, which is the standing rule here, and it was right to be.
+
+### What the audit found, each from an executed scan
+
+**There is no landing page** — `src/app/page.tsx` is three lines and an unconditional `redirect("/pt-BR/app")`, so a stranger's first frame is a login form for something unnamed, in Portuguese whatever their browser says. **There is no onboarding** anywhere in `src/`; the single tree-wide match is a remote test fixture. **There is no data export and no session surface.** **Three review-time preferences steer `/app/reviews` and cannot be set by the person they belong to**, while `planning_day` and `planning_time` are retired by decision and must stay retired. **Nine preference columns have no behavioural consumer at all.** **`capabilityRegistry` is imported by exactly two files, one of which is its own test** — a contract that governs nothing, with one row already ambiguous. **`<UniversalState/>` renders on one surface** while ten app pages and thirteen feature components answer in their own words. **And ADR-114 Decision 3 is half-built:** the CSS for an explicit theme choice is complete in both directions, and **nothing in the product ever writes `data-theme`**.
+
+### The package
+
+`docs/initiatives/phase-2o/PHASE_2O_PRD.md` and `..._IMPLEMENTATION_PLAN.md` as the governing pair; `PHASE_2O_CURRENT_EXPERIENCE_AUDIT.md`, `..._UX_GAPS_AND_OPPORTUNITIES.md`, `..._THREAT_MODEL.md` and `..._TRACEABILITY_CONTRACT.md` under `docs/reports/phase-2o/`. **113 requirements across sixteen families and nine slices**, none executed. Estimated **13–18 weeks** against the roadmap's 7–10, and the difference is named rather than absorbed: the universal-state adoption debt over 23 surfaces, the export's tenant boundary across four trigger-validated polymorphic tables, making the capability registry load-bearing, and a screen-reader session no phase has run.
+
+### Budget, refusals and the retarget
+
+Migration ceiling **TWO, obligation ZERO, NON-TRANSFERABLE** — both allocations conditional, **a third a STOP CONDITION**, and **zero created**. `src/lib/closeout/phase-2o-declarations.test.ts` enforces the planning-only posture in both directions, including the **absence** of any closing artifact, with a planted-divergence control on every extraction. **A13 is retargeted in the same commit** — the tenth application of that rule. The published roadmap **ends at Phase 2O**, so what the guard now protects is the next name the lettered series would take, named in a detector and in no governing artifact; a range covering every remaining letter was rejected because `docs/initiatives/phase-2x/` is a real historical directory and would collide.
+
+**Unchanged:** Phase 2N stays COMPLETE and unclaimed; its remainders `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`, `2N-FILES-WRITER`, `2N-MOBILE`, `2N-PRIVACY-FREETEXT` and `2N-RELATION-END-ANNOUNCEMENT` stay open and **unabsorbed**, each offered explicitly by `OD-2O-11` with its cost. Push stays implemented, hosted, **failing with HTTP 403 on a real iPhone and never executed on Android**. **No screen-reader run is executed or claimed.** `T-19`'s retention sweeps stay unscheduled. **ADR-055 stays neither satisfied nor superseded and expires 2026-10-27.** Signup **closed**, rollout **25 · 3 · 2**, and the roadmap successor **not started, not scoped and not named by ADR-115's heading**.
+
 ## 2026-08-15 - PAPEL E CONSOLE, PART FOUR: Brain as a space, the transparency centre, the mobile decision, and the account seen full
 
 **Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** This part is everything on `codex/redesign-papel-e-console` after `4e4a801`. **Not pushed, no PR, no merge.**
