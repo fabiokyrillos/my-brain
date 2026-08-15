@@ -145,7 +145,16 @@ export async function runAssistantTurn(
     return noticed(
       "invalid",
       { heading: copy.tooLongHeading, detail: copy.tooLongDetail, nextStep: null },
-      null,
+      /*
+        The text comes back, and this is the one refusal where that matters
+        most. React resets a form after its action settles, so discarding the
+        echo here meant telling a user their twelve-thousand-character
+        submission was too long **and deleting it** — the composer restores the
+        field from `echo` on a failed turn, and it can only restore what the
+        turn handed back. The empty branch above passes `null` deliberately:
+        there is nothing to lose.
+      */
+      text,
     );
   }
 

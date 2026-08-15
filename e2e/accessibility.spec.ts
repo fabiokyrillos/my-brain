@@ -73,6 +73,15 @@ const STYLESHEETS = [
   // Phase 2K's card grammar. Without it the target-size and focus assertions
   // below would measure an unstyled button and pass for the wrong reason.
   "conversation-cards.css",
+  /*
+    Conversar's own two. They were absent while this lane already rendered a
+    `chat-message` — so every message in it was unstyled markup, and the axe
+    contrast scan over it measured default black-on-white and passed for the
+    wrong reason. The redesign's transcript frame is the first thing here that
+    depends on them.
+  */
+  "chat.css",
+  "assistant.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -97,7 +106,22 @@ async function render(
   await page.setContent(
     `<!doctype html><html lang="pt-BR"${themeAttribute}><head><meta charset="utf-8">`
       + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-      + `<title>Acessibilidade</title><style>${css}</style></head>`
+      /*
+        The three `next/font` variables, stubbed — the same three
+        `layout-contracts.spec.ts` has always stubbed, and absent here until
+        now.
+
+        `tokens.css` declares `--font-reading: var(--font-newsreader), Georgia,
+        serif`, and a `var()` with no declaration and no fallback poisons the
+        custom property it is in. Without these, all three families resolved to
+        the same inherited default, so **every family in this lane was the
+        document default** and any assertion about type would have passed
+        whatever the stylesheet said. Colour and geometry were unaffected, which
+        is why it went unnoticed.
+      */
+      + `<title>Acessibilidade</title><style>`
+      + `:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}`
+      + `${css}</style></head>`
       + `<body><div class="app-shell">${body}</div></body></html>`,
     { waitUntil: "load" },
   );
@@ -316,7 +340,10 @@ function conversationResumed() {
     + `<a class="conversation-resumed-anchor" href="#message-1">Voltar para onde você estava</a>`
     + `</div>`
     + `<a class="conversation-return" href="#">Voltar para a conversa</a>`
-    + `<article class="chat-message assistant" id="message-1"><span>Brain</span><p>Resposta.</p></article>`
+    + `<article class="chat-message assistant" data-role="assistant" id="message-1">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">Brain</span>`
+    + `<time datetime="2026-08-15T12:00:00.000Z">15 de ago., 09:00</time></p>`
+    + `<p class="chat-message-body">Resposta.</p></article>`
     + `</section>`;
 }
 
@@ -899,4 +926,142 @@ test("2L-MOBILE-009: the Work surfaces reflow at 200% zoom", async ({ page }) =>
   }));
   expect(overflow.scrollWidth, "content is clipped at 200% zoom")
     .toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
+/**
+ * Conversar's editorial transcript — the frame that replaced the bubbles.
+ *
+ * Mirrors `src/app/[locale]/app/chat/[conversationId]/page.tsx`. Only the
+ * geometry and the computed type are under test: the objection to the previous
+ * layout was that it set the owner's and the Brain's **prose** in the UI face
+ * and spent the width on alignment, and neither of those is visible to jsdom.
+ */
+function CHAT_TRANSCRIPT() {
+  const message = (role: "user" | "assistant", body: string, id: string) =>
+    `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
+    + `<time datetime="2026-08-15T12:00:00.000Z">15 de ago., 09:00</time></p>`
+    + `<p class="chat-message-body">${body}</p>`
+    + (role === "assistant"
+      ? `<div class="message-sources"><strong>O que eu usei</strong>`
+        + `<a href="/pt-BR/app/inbox/e1">Você escreveu isto em 12 de agosto</a></div>`
+        + `<small>gpt-5-mini</small>`
+      : "")
+    + `</article>`;
+  return `<div class="content-page chat-thread">`
+    + `<a class="back-link" href="#">Conversas</a>`
+    + `<header><p class="eyebrow">BRAIN COM FONTES</p><h1>Contrato da Aurora</h1></header>`
+    + `<div class="message-stream">`
+    + message("user", "O que a Marina disse sobre o contrato da Aurora?", "message-1")
+    + message("assistant", "Você registrou em 12 de agosto que ela pediu a cláusula de rescisão revisada.", "message-2")
+    + `</div></div>`;
+}
+
+test.describe("Conversar reads as a transcript, not as a chat log", () => {
+  test("both turns run in one column at the full measure", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const [user, assistant] = await Promise.all([
+      page.locator('.chat-message[data-role="user"]').boundingBox(),
+      page.locator('.chat-message[data-role="assistant"]').boundingBox(),
+    ]);
+    // No `justify-self: end`: the two turns start at the same edge.
+    expect(Math.abs(user!.x - assistant!.x)).toBeLessThanOrEqual(16);
+    // And neither is capped at a fraction of the column.
+    const stream = await page.locator(".message-stream").boundingBox();
+    expect(assistant!.width).toBeGreaterThan(stream!.width * 0.95);
+  });
+
+  /*
+    The load-bearing one. Both halves are sentences somebody wrote, so both are
+    set in the reading face — which is the single distinction the whole
+    direction is built on. The previous layout set them in the UI face and
+    distinguished the speakers by side and by fill instead.
+  */
+  test("both turns are set in the reading face, and the labels are not", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    /*
+      Compared against what `--font-reading` actually resolves to rather than
+      against the literal "Newsreader": this lane has no `next/font`, so the
+      variable falls back to a generic serif and a name check would fail on a
+      correct page — which is how a guard gets weakened to make it pass.
+    */
+    const faces = await page.evaluate(() => {
+      const family = (selector: string) =>
+        getComputedStyle(document.querySelector(selector)!).fontFamily.toLowerCase();
+      const probe = document.createElement("p");
+      probe.style.font = "var(--type-reading)";
+      document.body.append(probe);
+      const reading = getComputedStyle(probe).fontFamily.toLowerCase();
+      probe.remove();
+      return {
+        reading,
+        userBody: family('[data-role="user"] .chat-message-body'),
+        assistantBody: family('[data-role="assistant"] .chat-message-body'),
+        speaker: family(".chat-message-speaker"),
+      };
+    });
+    expect(faces.userBody).toBe(faces.reading);
+    expect(faces.assistantBody).toBe(faces.reading);
+    // The machine's label around the prose is emphatically not the reading face.
+    expect(faces.speaker).not.toBe(faces.reading);
+  });
+
+  test("the question is marked by an edge, never by a fill", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const user = await page.locator('.chat-message[data-role="user"]').evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { background: style.backgroundColor, edge: style.borderInlineStartWidth };
+    });
+    // The bubble filled this with `--text-primary` and inverted the text.
+    expect(user.background).toBe("rgba(0, 0, 0, 0)");
+    expect(parseFloat(user.edge)).toBeGreaterThan(0);
+  });
+
+  test("an answer carries its sources and the model that wrote it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const assistant = page.locator('.chat-message[data-role="assistant"]');
+    await expect(assistant.locator(".message-sources a")).toHaveAttribute("href", "/pt-BR/app/inbox/e1");
+    await expect(assistant.locator("small")).toHaveText("gpt-5-mini");
+    // A user turn cites nothing, because it asserted nothing.
+    await expect(page.locator('.chat-message[data-role="user"] .message-sources')).toHaveCount(0);
+  });
+
+  test("every turn is dated, so a thread resumed weeks later says so", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    await expect(page.locator(".chat-message time")).toHaveCount(2);
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, CHAT_TRANSCRIPT());
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on the transcript in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, CHAT_TRANSCRIPT(), { reducedMotion: true, theme });
+      await page.addScriptTag({ path: AXE_PATH });
+      const results = await page.evaluate(async () =>
+        // @ts-expect-error injected by addScriptTag
+        await window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }));
+      const violations = (results as { violations: { id: string; nodes: { target: string[] }[] }[] }).violations;
+      expect(
+        violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(" | ")}`),
+      ).toEqual([]);
+    });
+  }
 });

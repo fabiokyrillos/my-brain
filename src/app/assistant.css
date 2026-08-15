@@ -211,3 +211,49 @@
     padding: 9px 16px;
   }
 }
+
+/*
+ * The turn's outcome, told apart by route.
+ *
+ * `assistant-composer.tsx` has rendered `data-route` on this region since the
+ * composer existed, and **no rule ever selected it**: a failed knowledge answer,
+ * a refused submission, a proposed memory and a filed capture all painted as the
+ * same neutral card. Four outcomes, one appearance — a producer with no
+ * consumer, and the third this session has found.
+ *
+ * A leading rule rather than a fill: the heading and the detail already say
+ * which outcome this is in words, and `04-estados.md` wants colour as the second
+ * carrier and never the first. `command` is deliberately unstyled — that route
+ * renders nothing here, because `TaskCommandResult` below owns it.
+ */
+.assistant-composer-notice[data-route="knowledge_failed"],
+.assistant-composer-notice[data-route="invalid"] {
+  border-inline-start: 3px solid var(--tone-attention-line);
+}
+.assistant-composer-notice[data-route="memory_intent"] {
+  border-inline-start: 3px solid var(--tone-suggestion-line);
+}
+.assistant-composer-notice[data-route="capture_intent"] {
+  border-inline-start: 3px solid var(--tone-success-line);
+}
+.assistant-composer-notice[data-route="capture_ambiguous"] {
+  border-inline-start: 3px solid var(--tone-information-line);
+}
+
+/*
+ * The read-only previews of what a turn referred to.
+ *
+ * A list, unstyled by default, so the cards themselves — which have their own
+ * grammar in `conversation-cards.css` — are what the reader sees.
+ */
+.assistant-composer-cards { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; padding: 0; list-style: none }
+
+/*
+ * The composer's own words, in the reading face.
+ *
+ * What the owner types is a sentence they wrote, so the field is set in the same
+ * face the thread renders it back in — otherwise the text visibly changes
+ * typeface between typing it and reading it, which is the seam this direction
+ * spends its whole type scale removing.
+ */
+.assistant-composer-row > textarea { font: var(--type-reading-sm) }
