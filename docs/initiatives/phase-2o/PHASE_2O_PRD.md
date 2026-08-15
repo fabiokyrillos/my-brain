@@ -1,9 +1,19 @@
 # Phase 2O — Activation, preferences, and control (PRD)
 
-**Authorization:** planning only, by **ADR-115**. **Implementation is NOT
-authorized.** No requirement below is authorized for execution, no migration may
-be created during planning, signup does not open, and no successor phase is
-started, scoped or named by this document.
+**Authorization:** planning only, by **ADR-115**; **all twelve owner decisions
+signed by ADR-116** (2026-08-15). **Implementation is NOT authorized.** No
+requirement below is authorized for execution, no migration may be created
+during planning, signup does not open, and no successor phase is started, scoped
+or named by this document.
+
+**What ADR-116 changed, stated once here so no reader has to diff two ADRs.**
+Every decision took its recommendation. Three requirements were **appended** —
+`2O-PREF-013` … `-015`, for the appearance control `OD-2O-2` **A** signed and
+this PRD carried no requirement for — and **nothing was renumbered, reused or
+deleted**. Four requirements are **restated in place**, each carrying an
+`ADR-116` marker: `2O-ACTIVATION-002`, `2O-AICONFIG-004`, `2O-MOBILE-003` and
+`2O-ACCESS-006`. **The second migration allocation has no remaining
+destination** and closes unspent by construction. The total moves **113 → 116**.
 
 **Parent scope:** Etapa 6 of `docs/initiatives/product-ux/MY_BRAIN_MOBILE_FIRST_EXPERIENCE_PRD.md`,
 **as corrected by** `docs/reports/phase-2o/PHASE_2O_CURRENT_EXPERIENCE_AUDIT.md`
@@ -17,7 +27,7 @@ parity `202608140094`, signup closed, rollout gate **25 · 3 · 2**.
 **Evidence:** `docs/reports/phase-2o/` — audit, gaps, threat model, traceability
 contract.
 
-**113 requirements across sixteen families and nine slices.** Nothing is
+**116 requirements across sixteen families and nine slices.** Nothing is
 implemented.
 
 ---
@@ -59,9 +69,13 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
   about an account — locale and timezone set, an AI credential present, an entry
   captured, an interpretation reviewed, a task confirmed. The list is data, not
   prose, and every consumer reads it from that module.
-- **2O-ACTIVATION-002:** Each activation fact is **derived from existing data**
-  and holds no state of its own. No requirement in this phase may introduce a
-  stored onboarding step, cursor or flag unless `OD-2O-3` is signed **B**.
+- **2O-ACTIVATION-002:** *(restated in place by **ADR-116**; the conditional is
+  resolved and nothing is renumbered.)* Each activation fact is **derived from
+  existing data** and holds no state of its own. `OD-2O-3` is signed **A**, so
+  the prohibition is now **absolute**: no requirement in this phase may
+  introduce a stored onboarding step, cursor or flag, and there is no branch
+  under which one becomes permitted. *Superseded text: "…unless `OD-2O-3` is
+  signed **B**."*
 - **2O-ACTIVATION-003:** Each activation fact is **three-valued** — satisfied,
   not satisfied, or *unreadable* — and a read that failed is never rendered as a
   fact that is false. The distinction is asserted in both directions.
@@ -180,6 +194,23 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
   a retry. A partially applied save is impossible: the payload is written once.
 - **2O-PREF-012:** Every preference is revisable at any time with the same
   control that set it, and nothing in this phase creates a one-way choice.
+- **2O-PREF-013:** *(appended by **ADR-116**, which signed `OD-2O-2` **A**.)*
+  The preferences centre offers an **appearance choice** with exactly three
+  states — follow the machine, light, dark — finishing the half of ADR-114
+  Decision 3 that shipped its CSS and never shipped a control.
+- **2O-PREF-014:** The choice is held **client-side only**, in `localStorage`,
+  and is applied **before first paint** so no flash occurs. **No column, no
+  migration, and no change to the CSP header** — the inline application script
+  is possible because `script-src` already carries `'unsafe-inline'`, and
+  `csp.test.ts`'s header shape is unchanged. The stored value is **validated
+  against the closed set of three** before it reaches any DOM attribute, because
+  `localStorage` is writable by any script on the origin and an unvalidated
+  value would be attacker-controlled input.
+- **2O-PREF-015:** An explicit choice **beats `prefers-color-scheme` in both
+  directions**, and the guard proves it in both — light chosen on a dark
+  machine, and dark chosen on a light one. No surface describes the preference
+  as an account setting: **it does not follow the account across devices**, and
+  that is the stated cost of spending no migration.
 
 ### 3.5 `2O-AICONFIG` — understanding and controlling the AI (9)
 
@@ -190,9 +221,15 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
   calls, and that removing it stops them.
 - **2O-AICONFIG-003:** It states which operations are routed to which model,
   reading the routing the product actually uses rather than a second list.
-- **2O-AICONFIG-004:** `embedding_model` has six behavioural consumers and no
-  control. It either gains a control in this phase or gains a registry row
-  recording why not; it may not stay unrecorded.
+- **2O-AICONFIG-004:** *(restated in place by **ADR-116** Decision 6; the
+  disjunction is resolved and nothing is renumbered.)* `embedding_model` has six
+  behavioural consumers and no control. `OD-2O-6` **A** signed controls **only**
+  for the three review preferences, so `embedding_model` gains a **registry row
+  recording why it has none** and **no control**. This is an **interpretation
+  the agent took, not a signature the owner gave** — `OD-2O-6` was framed over
+  *inert* preferences and this one is not inert — and it is the reading that
+  adds no scope. Reversing it costs one form field. *Superseded text: "It either
+  gains a control in this phase or gains a registry row recording why not."*
 - **2O-AICONFIG-005:** `background_model` and `reasoning_model` gain no control
   while they have no consumer, and their registry rows say so.
 - **2O-AICONFIG-006:** The credential surface states what is stored — that the
@@ -316,9 +353,12 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
   375px without horizontal scroll.
 - **2O-MOBILE-002:** Every interactive target this phase creates or changes is
   at least 44×44 CSS pixels.
-- **2O-MOBILE-003:** The 21px target at `online-memories.spec.ts:85` is fixed,
-  **if and only if** `OD-2O-11` admits it; otherwise it stays a named residual
-  and is not silently absorbed.
+- **2O-MOBILE-003:** *(restated in place by **ADR-116**; the condition is
+  resolved and nothing is renumbered.)* `OD-2O-11` **admits it**, so the 21px
+  target at `online-memories.spec.ts:85` **is fixed** — unconditionally, and
+  this is the one place the phase changes a surface it did not create.
+  *Superseded text: "…if and only if `OD-2O-11` admits it; otherwise it stays a
+  named residual."*
 - **2O-MOBILE-004:** Installing the product as an app is explained where a user
   would look for it, using the service worker and PWA support that already ship.
 - **2O-MOBILE-005:** Journeys run on desktop and on a mobile project in both
@@ -338,10 +378,17 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
 - **2O-ACCESS-005:** Contrast is verified on the rendered page rather than in
   jsdom, because jsdom cannot see contrast and a new tint can tip an inherited
   colour below threshold.
-- **2O-ACCESS-006:** **A real screen-reader session is executed against the
-  surfaces this phase ships**, recorded with device, software and version, and
-  its findings are dispositioned. This discharges the residual open since
-  `2L-ACCESS-008`, subject to `OD-2O-12`.
+- **2O-ACCESS-006:** *(restated in place by **ADR-116** Decision 3; nothing is
+  renumbered.)* **A real screen-reader session is executed against the surfaces
+  this phase ships**, recorded with device, software and version, and its
+  findings dispositioned — discharging the residual open since `2L-ACCESS-008`.
+  `OD-2O-12` is signed **B**, so this requirement **does not on its own block
+  closeout**, and the price of that is an absolute prohibition: it may close
+  **`built` only on a recorded execution**. It may **never** be promoted to a
+  pass by documentation, by an emulator, by an automated accessibility scan, or
+  by inference from one. Absent a run it closes **`partial`**, with the
+  remainder stated and a destination — never `built`, and never quietly absent.
+  *Superseded text: "…subject to `OD-2O-12`."*
 
 ### 3.13 `2O-READY` — readiness for a public opening that this phase does not perform (5)
 
@@ -393,7 +440,7 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
 
 ### 3.16 `2O-CLOSE` — closing honestly (4)
 
-- **2O-CLOSE-001:** Every one of the 113 requirements is classified from source
+- **2O-CLOSE-001:** Every one of the 116 requirements is classified from source
   as `built`, `baseline`, `partial`, `not-built-by-rule` or `undelivered`, and a
   `partial` with a vacuous remainder is refused by the generator.
 - **2O-CLOSE-002:** The traceability matrix is generated, never typed, and the
@@ -414,7 +461,7 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
 | `2O-ACTIVATION` | 7 | 2O.0 |
 | `2O-ENTRY` | 8 | 2O.1 |
 | `2O-ONBOARD` | 11 | 2O.2 |
-| `2O-PREF` | 12 | 2O.3 |
+| `2O-PREF` | 15 | 2O.3 |
 | `2O-AICONFIG` | 9 | 2O.4 |
 | `2O-COST` | 7 | 2O.4 |
 | `2O-PRIVACY` | 10 | 2O.5 |
@@ -427,15 +474,47 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
 | `2O-METRICS` | 5 | 2O.8 |
 | `2O-SEC` | 5 | 2O.8 |
 | `2O-CLOSE` | 4 | 2O.8 |
-| **Total** | **113** | **nine slices** |
+| **Total** | **116** | **nine slices** |
+
+`2O-PREF` carries 15 rather than 12 because **ADR-116** appended
+`2O-PREF-013` … `-015` for the appearance control. Every other family is
+unchanged, and no identifier anywhere was renumbered, reused or deleted.
 
 ---
 
-## 5. Owner decisions — OPEN, none signed
+## 5. Owner decisions — ALL TWELVE SIGNED by ADR-116 (2026-08-15)
 
 Twelve decisions change product, scope, migrations, privacy, cost or schedule.
-**None is signed. No requirement above is authorized by this document.** Each is
-stated with options, a recommendation and the consequence of the recommendation.
+**All twelve are signed.** Signing them **does not authorize implementation**:
+Phase 2O remains a planning phase under ADR-115, and every requirement above
+still awaits its own implementation authorization.
+
+| Decision | Signed | Effect |
+|---|---|---|
+| `OD-2O-1` | **A** | a static public entry page, both locales, no signup CTA while closed |
+| `OD-2O-2` | **A** | appearance choice client-side, `localStorage`, no-flash, **no migration** — adds `2O-PREF-013` … `-015` |
+| `OD-2O-3` | **A** | onboarding progress **derived**; `2O-ACTIVATION-002`'s conditional becomes absolute |
+| `OD-2O-4` | **A** | export **synchronous, server-side**, over the deletion enumeration; **no migration** |
+| `OD-2O-5` | **A** | signed-in indicator + **global** sign-out; no administrative device list |
+| `OD-2O-6` | **A** | controls **only** for the three review preferences; resolves `2O-AICONFIG-004` |
+| `OD-2O-7` | **A** | keep the nine columns, no controls, guard the absence |
+| `OD-2O-8` | **A** | activation funnel **only if** a real producer and a real consumer both ship |
+| `OD-2O-9` | signed | **2 allocated · obligation ZERO · NON-TRANSFERABLE**; a third a STOP CONDITION |
+| `OD-2O-10` | **A** | the readiness dossier only |
+| `OD-2O-11` | signed | admits **two**: the 21px target and a real screen-reader run. Everything else declined |
+| `OD-2O-12` | **B** | the screen-reader run does not alone block closeout, and **may never be promoted by documentation, emulation or inference** |
+
+**The options below are kept in full, and deliberately.** A decision whose
+alternatives have been deleted is a decision nobody can review, and the
+declined branch is what makes the signed one legible a year from now. Each is
+stated with its options, the recommendation the agent gave, and the consequence.
+
+**One consequence of the combination, recorded because it is not visible from
+any single signature.** ADR-115 reserved **M2** for exactly one of `OD-2O-2`
+**B**, `OD-2O-3` **B** or `OD-2O-4` **B**. All three are signed **A**, and the
+budget is non-transferable — so **M2 has no destination it may be spent on and
+closes unspent by construction.** That is the correct close, not an omission,
+and spending it elsewhere is a stop condition.
 
 - **OD-2O-1 — a public entry page.**
   **A (recommended)** a static unauthenticated page in both locales, no signup
@@ -532,7 +611,8 @@ stated with options, a recommendation and the consequence of the recommendation.
 
 The phase stops and returns to the owner if any of these is reached.
 
-1. A **third** migration is needed.
+1. A **third** migration is needed — **or M2 is about to be spent at all**,
+   since ADR-116 Decision 4 left it with no signed destination.
 2. Any requirement would need signup opened, the rollout gate altered, a secret
    changed, or `config.toml` pushed.
 3. Any requirement would need new authority for `authenticated` or a new
@@ -542,7 +622,10 @@ The phase stops and returns to the owner if any of these is reached.
 6. An export cannot be made complete, so `2O-PRIVACY-004`'s "complete or refuse"
    cannot hold.
 7. A surface would need a model call to render.
-8. A signed decision from a previous phase would have to be reversed.
+8. A signed decision from a previous phase would have to be reversed — or one
+   of ADR-116's twelve would.
+9. `2O-ACCESS-006` is about to close `built` **without** a recorded execution
+   naming device, software and version.
 
 ---
 

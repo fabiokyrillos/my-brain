@@ -6,10 +6,21 @@ is mechanically forbidden from claiming. Its enforcement lives in
 implementation is authorized — in a generated matrix that may not be typed by
 hand.
 
-The phase is authorized for **planning only** (ADR-115). **All twelve owner
-decisions are OPEN and none is signed.** Twenty-four refusals: **eleven live
-during planning, thirteen armed at implementation.** The planning half is live
-today.
+The phase is authorized for **planning only** (ADR-115), and **all twelve owner
+decisions are SIGNED by ADR-116** (2026-08-15). **Implementation is still not
+authorized** — signing the decisions and authorizing the work are two separate
+acts.
+
+**Twenty-eight refusals: eleven live during planning, seventeen armed at
+implementation.** The planning half is live today.
+
+**R-2O-5 inverted rather than being deleted**, which is this repository's
+standing pattern. Under ADR-115 it refused a document that described an open
+decision as settled. Under ADR-116 the decisions are settled, so it refuses the
+mirror error: a document that re-opens, softens or silently re-decides one. **The
+failure being prevented is unchanged — a document disagreeing with the owner's
+actual signature. Only the direction moved.** Four refusals are **added**
+(`R-2O-25` … `R-2O-28`), each created by a specific signature.
 
 ---
 
@@ -18,7 +29,7 @@ today.
 **R-2O-1 — A requirement may not exist without a classification.**
 Every declared identifier appears exactly once in `PHASE_2O_PRD.md`, in this
 repository's declaration shape `- **2O-FAMILY-000:**`. Duplicates, gaps within a
-family, and identifiers declared outside the PRD are refused. **113 declared.**
+family, and identifiers declared outside the PRD are refused. **116 declared.**
 
 **R-2O-2 — A family name may not contain a digit.**
 `2O-[A-Z]+-\d{3}` is the shape the phase-start detector and the traceability
@@ -33,15 +44,23 @@ an assertion over an empty set passes trivially.
 
 **R-2O-4 — No migration may exist.**
 No file in `supabase/migrations/` may be attributable to this phase during
-planning. The proposed budget is **2 allocated · obligation ZERO · 0 spent ·
-none created**, and it is **unsigned**. An allocation is a destination, not a
-permission.
+planning. The budget is **signed by `OD-2O-9`: 2 allocated · obligation ZERO ·
+0 spent · none created · NON-TRANSFERABLE**. An allocation is a destination, not
+a permission — and **M2 no longer has a destination at all**, because all three
+it was reserved for were signed **A**.
 
-**R-2O-5 — An unsigned decision may not be described as settled.**
-Twelve decisions are open. A document that presents one as decided, that reads a
-recommendation as an outcome, or that marks a requirement authorized before the
-owner answers, is refused. **Recommendations are the agent's; signatures are the
-owner's, and this package contains none.**
+**R-2O-5 — A signed decision may not be silently re-decided.** *(Inverted by
+ADR-116; the pre-signature form is kept below because a deleted refusal records
+nothing.)*
+All twelve are signed. A document that re-opens one, softens it, describes it as
+open, or acts on a branch the owner declined, is refused. **Recommendations are
+the agent's; signatures are the owner's** — and where a signature did not
+cleanly reach a case, the package **states the interpretation and says it is an
+interpretation**, as `2O-AICONFIG-004` does for `embedding_model`, rather than
+resolving it as though the owner had spoken.
+*Pre-signature form, retained: "An unsigned decision may not be described as
+settled — a document that presents one as decided, or reads a recommendation as
+an outcome, is refused."*
 
 **R-2O-6 — The declined options must stay visible.**
 A decision whose alternatives have been deleted is a decision nobody can review.
@@ -142,11 +161,39 @@ operator work. The dossier reads `rollout:verify`'s real output.
 Retargeting belongs to the next authorization's own commit, so the invariant is
 never unenforced in between.
 
+**R-2O-25 — M2 may not be spent, on anything.** *(Added by ADR-116 Decision 4.)*
+Its three reserved destinations were signed **A**, and the budget is
+non-transferable. **M2 closes unspent by construction**, that is the correct
+close rather than an omission, and a migration created to use it up is refused —
+the worst version of the unnecessary-spend defect, because it would be a schema
+change made to improve the appearance of a budget.
+
+**R-2O-26 — The screen-reader run may never be promoted by anything but a run.**
+*(Added by ADR-116 Decision 3.)* `2O-ACCESS-006` may close **`built` only on a
+recorded execution naming device, software and version**. Documentation, an
+emulator, an automated accessibility scan, or an inference from one are each
+refused as evidence. Absent a run it closes **`partial`** with a remainder and a
+destination. Under `OD-2O-12` **B** it does not alone block closeout — and that
+concession is exactly why the evidence rule is absolute.
+
+**R-2O-27 — The CSP may not change.** *(Added by ADR-116 Decision 7.)* The
+appearance control's inline script is possible because `script-src` already
+carries `'unsafe-inline'`, **verified in `next.config.ts` rather than assumed**.
+`csp.test.ts`'s header shape must come out of this phase unchanged; a CSP change
+is a deployment-boundary change and a **stop condition**.
+
+**R-2O-28 — The stored appearance value is untrusted input.** *(Added by
+ADR-116, closing T-16.)* It is validated against the **closed set of three**
+before it reaches any DOM attribute, anything else falls back to
+follow-the-machine, and the inline script never interpolates the stored value
+into its own source. `localStorage` is writable by any script on the origin, so
+a value read from it is attacker-controlled by definition.
+
 ---
 
 ## 3. Classification vocabulary
 
-At closeout every one of the 113 requirements takes exactly one:
+At closeout every one of the 116 requirements takes exactly one:
 
 | Classification | Meaning |
 |---|---|
@@ -164,14 +211,15 @@ refused them since.
 
 ## 4. What a correct close looks like
 
-- 113 declared, 113 classified, 0 unclassified.
+- 116 declared, 116 classified, 0 unclassified.
 - The matrix **generated** by `scripts/generate-phase-2o-traceability.mjs`,
   carrying `Do not edit by hand`, and never typed.
 - Counts in `STATE.md`, `TODO.md` and `CHANGELOG.md` **re-derived from the
   matrix**, never transcribed.
 - Budget reported as allocated versus spent, naming the slice that spent each.
   **An allocation closing unspent is a correct outcome; an unnecessary spend is
-  a defect.**
+  a defect.** **M2 is expected to close unspent** — it has no destination — and
+  M1 closes unspent too if no real producer and consumer ship.
 - The successor re-audited against the tree the phase leaves, and **not
   started**.
 - Every carried residual named with a destination, and none silently absorbed.

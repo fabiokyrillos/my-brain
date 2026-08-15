@@ -3,6 +3,12 @@
 **Status:** planning evidence. Authorizes nothing. Every threat below is stated
 against the surfaces `PHASE_2O_PRD.md` proposes, at baseline `main` `9cc1175`.
 
+**Amended 2026-08-15 by ADR-116**, which signed all twelve decisions. Three
+threats changed shape and **one is new**: `OD-2O-2` **A** puts a value the user
+does not control into a DOM attribute, which is **T-16**. Amendments are marked
+in place; nothing is deleted, because a threat that was considered and narrowed
+is evidence and a threat that vanishes is not.
+
 **Scope.** This phase adds an unauthenticated page, a guided first-run path, a
 consolidated preferences centre, a statement of what is stored, an export, a
 session control, and a telemetry vocabulary. Each is a new way for data to be
@@ -72,7 +78,15 @@ whose `search_path` is unset, is a hole in every tenant at once.
 with an owner decision behind it, a validated caller, and a pgTAP proof against
 a foreign row.
 
-**Closes:** `2O-SEC-002`, `2O-SEC-003`. **Gated by:** `OD-2O-4`.
+**Amended by ADR-116.** `OD-2O-4` is signed **A** — synchronous, server-side,
+over the deletion **enumeration**. Reusing the enumeration is **not** authority
+to reuse or create a definer function, and ADR-116 Decision 7 says so
+explicitly. So the preferred branch is now the only authorized branch: **no new
+definer function**, and if the export cannot be made complete and tenant-safe
+without one, **the slice stops and returns to the owner** rather than granting
+authority quietly.
+
+**Closes:** `2O-SEC-002`, `2O-SEC-003`. **Signed:** `OD-2O-4` **A**.
 
 ---
 
@@ -145,7 +159,13 @@ the user did not choose to end.
 **This phase must add:** explicit confirmation, because the act is irreversible
 in effect, and an audit record of the request.
 
-**Closes:** `2O-PRIVACY-009`, `2O-SEC-004`. **Gated by:** `OD-2O-5`.
+**Amended by ADR-116.** `OD-2O-5` is signed **A**, so the global sign-out **is**
+built and the administrative device list is **not**. The cheap half carries the
+whole of this threat and none of the authority the expensive half would have
+needed: no GoTrue admin, no service-role on an authenticated path, no
+threat-model change beyond this row.
+
+**Closes:** `2O-PRIVACY-009`, `2O-SEC-004`. **Signed:** `OD-2O-5` **A**.
 
 ---
 
@@ -291,6 +311,45 @@ closeout from retargeting.
 
 ---
 
+## T-16 — the stored appearance value is attacker-controlled input
+
+**New, and created by a signature.** `OD-2O-2` **A** was signed on 2026-08-15.
+
+**Asset:** the rendered document, and through it every surface in the product.
+**Actor:** any script running on the origin — an extension, a pasted console
+snippet, or anything that reaches `localStorage`.
+**Path:** the appearance choice is **held in `localStorage` and applied to a DOM
+attribute before first paint**. `localStorage` is not a trusted store: it is
+writable by anything on the origin, it survives sign-out, and its contents are
+attacker-controlled by definition. A value read from it and written into
+`data-theme` — or worse, interpolated into the inline script that applies it —
+is untrusted input reaching the document at the earliest possible moment, before
+any React boundary exists to sanitise it.
+
+**Existing control:** the product's standing rule that **every untrusted
+boundary is validated with an explicit parser**. `localStorage` has not
+previously been one of this product's boundaries, because nothing was read from
+it.
+
+**This phase must add:** validation against the **closed set of three** —
+follow-the-machine, light, dark — before the value reaches any attribute, with
+anything else falling back to follow-the-machine rather than being applied. The
+inline script must **not** interpolate the stored value into its own source.
+
+**A second half, verified rather than assumed.** The inline application script
+is possible without touching the CSP: `next.config.ts` already carries
+`'unsafe-inline'` in `script-src`. That was checked in the tree before this
+threat was written — the alternative conclusion, that `OD-2O-2` **A** needed a
+CSP change and was therefore a deployment-boundary stop condition, would have
+been wrong. `csp.test.ts` holds the header shape and must come out of slice 2O.3
+unchanged; **a CSP change is a stop condition**.
+
+**Closes:** `2O-PREF-014`, `2O-SEC-001`.
+**Severity:** the highest of the new surfaces, because it renders before
+everything else does.
+
+---
+
 ## Carried, with destinations
 
 | Carried | Destination |
@@ -305,4 +364,20 @@ closeout from retargeting.
 | `2N-PRIVACY-FREETEXT` — masking posture for `person_projects.role` | owner posture question |
 | ADR-055 — expires 2026-10-27, neither satisfied nor superseded | restated, not renewed |
 
-**None of these is absorbed by this phase.** `OD-2O-11` offers each explicitly.
+**Amended by ADR-116.** `OD-2O-11` is signed, and it **admits exactly two**: the
+**21px touch target** (`2N-MOBILE`) and a **real screen-reader validation**.
+Both leave this table and enter the phase, at `2O-MOBILE-003` and
+`2O-ACCESS-006`.
+
+**Everything else in the table above stays carried and unabsorbed** — declined
+by name: `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`, `2N-FILES-WRITER`, the
+retention sweeps and their scheduling, and any resolution of ADR-055, which
+stays recorded and unresolved. Declined by the word *"only"*, and named here so
+the exclusion is recorded rather than inferred: `2N-PRIVACY-FREETEXT`,
+`2N-RELATION-END-ANNOUNCEMENT`, and the push HTTP 403 / Android track.
+
+**The screen-reader admission carries a condition, not a promise.** `OD-2O-12`
+**B** means it does not on its own block closeout — and may **never** be
+promoted to a pass by documentation, an emulator, an automated scan, or
+inference from one. Executed and recorded, or recorded as not executed. There is
+no third outcome.

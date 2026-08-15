@@ -2,6 +2,44 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O — all twelve decisions signed (ADR-116), and the second allocation loses its only destinations
+
+**Zero product code. Zero migrations created. 94 local = 94 hosted, parity `202608140094`. Signup closed, rollout gate 25 · 3 · 2. Implementation is STILL NOT authorized** — signing the decisions and authorizing the work are two separate acts, as they were at ADR-104/ADR-105 and ADR-108/ADR-112. **ADR-115 is amended by addition and not rewritten.**
+
+Every decision took its recommendation: `OD-2O-1` **A** · `OD-2O-2` **A** · `OD-2O-3` **A** · `OD-2O-4` **A** · `OD-2O-5` **A** · `OD-2O-6` **A** · `OD-2O-7` **A** · `OD-2O-8` **A** · `OD-2O-9` signed · `OD-2O-10` **A** · `OD-2O-11` signed · `OD-2O-12` **B**.
+
+### Three requirements appended, and nothing renumbered
+
+`OD-2O-2` **A** signed a capability the PRD carried no requirement for, because it had been conditional. `2O-PREF-013` … `-015` declare the **appearance control** — three states, `localStorage`, applied before first paint, **no column and no migration**, and an explicit choice beating `prefers-color-scheme` **in both directions**. That finishes the half of ADR-114 Decision 3 that shipped its CSS and never shipped a control, which was this package's only finding that *contradicted* a signed decision rather than describing an unbuilt one.
+
+**113 → 116**, `2O-PREF` 12 → 15. A guard now holds the **pre-signature family distribution**, so a family that shrank — or one that grew where no decision added scope — fails the build. Exact totals alone would not have caught a family losing one and gaining one.
+
+Four requirements are **restated in place** with an `ADR-116` marker and their superseded text retained: `2O-ACTIVATION-002` (the stored-onboarding prohibition becomes absolute), `2O-AICONFIG-004` (the disjunction resolves), `2O-MOBILE-003` (the 21px target is admitted, unconditional), `2O-ACCESS-006` (non-blocking, and never promotable by anything but a run).
+
+### The second allocation is dead, and that is the expected close
+
+ADR-115 reserved **M2** for exactly one of `OD-2O-2` **B**, `OD-2O-3` **B** or `OD-2O-4` **B**. **All three were signed A**, and the budget is non-transferable — so **M2 has no destination it may be spent on and closes unspent by construction.** That is the correct outcome rather than an omission, **spending it at all is now a STOP CONDITION** (`R-2O-25`), and a reader who sees "2 allocated" and hunts for a second spend finds a refusal instead of a vacancy. `M1` stays live and conditional; if no real producer and consumer ship, **both** close unspent.
+
+### One new threat, created by a signature — and one conclusion of mine that was wrong
+
+**`T-16`.** The appearance value lives in `localStorage`, which any script on the origin can write, and it reaches a DOM attribute **before first paint** — earlier than any React boundary exists to sanitise it. It is attacker-controlled input and must be validated against the closed set of three, with the inline script never interpolating the stored value into its own source.
+
+**And the CSP claim I was about to publish was wrong.** I was going to record the anti-flash script as a deployment-boundary stop condition. Checking `next.config.ts` first showed `script-src` **already carries `'unsafe-inline'`**, so `OD-2O-2` **A** needs no CSP change at all. The header shape must come out of the phase unchanged and a CSP change remains a stop condition (`R-2O-27`) — but the blocker I nearly asserted does not exist.
+
+### Two corrections of my own
+
+**An arithmetic error.** The estimate published with the unsigned package, *13–18 weeks*, never matched the plan's own table, which summed to **13.5–19**. It was typed rather than added. With slice 2O.3 growing for the appearance control the total is **14–19.5**, and the totals are now derived from the column beside them.
+
+**An interpretation, flagged rather than absorbed.** `OD-2O-6` was framed over *inert* preferences; `embedding_model` is not inert — six consumers, no control. The conservative reading gives it a registry row and no control. That is **the agent's interpretation, not the owner's signature**, it adds no scope, and reversing it costs one form field.
+
+### The contract inverts rather than deletes
+
+`R-2O-5` refused a document that described an open decision as settled; the decisions are settled, so it now refuses one that describes a settled decision as open. **The failure being prevented is unchanged — a document disagreeing with the owner's actual signature. Only the direction moved.** Four refusals are added: `R-2O-25` (M2 unspendable), `R-2O-26` (the screen-reader run is unpromotable by documentation, emulation or inference), `R-2O-27` (no CSP change), `R-2O-28` (the appearance value is untrusted input). **Twenty-four → twenty-eight.**
+
+**`OD-2O-11` admits exactly two** — the 21px target and a real screen-reader validation — and declines the rest **by name**: `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`, `2N-FILES-WRITER`, retention sweeps and their scheduling, and any resolution of ADR-055. Declined **by the word "only"** and named so the exclusion is recorded rather than inferred: `2N-PRIVACY-FREETEXT`, `2N-RELATION-END-ANNOUNCEMENT`, and the push HTTP 403 / Android track.
+
+**Unchanged:** 94 migrations, parity `202608140094`, none created; signup **closed**; rollout **25 · 3 · 2**; ADR-055 neither satisfied nor superseded, expiring **2026-10-27**; Phase 2N **COMPLETE** and unclaimed; **A13 is not moved by this commit**; and the roadmap successor stays unauthorized, unscoped and unnamed by ADR-116's heading.
+
 ## 2026-08-15 - PHASE 2O — Activation, preferences, and control is authorized for PLANNING ONLY (ADR-115), and the audit was run against a tree that moved
 
 **Zero product code. Zero migrations created. 94 local = 94 hosted, parity `202608140094` unchanged, confirmed by a live read-only `migration list --linked`. Signup closed; the rollout gate re-read by running `npm run rollout:verify` and standing at 25 pass · 3 fail · 2 owner-signature. Twelve owner decisions are OPEN and none is signed.**

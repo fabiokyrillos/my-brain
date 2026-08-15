@@ -6250,3 +6250,105 @@ scoped and not named by ADR-115's heading**.
 **At the owner's twelve signatures.** The draft PR is open and stays a draft. No
 slice may begin, no migration may be created, no deploy may run and signup may
 not open until implementation has its own authorization.
+
+## §75 — The twelve signatures land, three requirements are appended, and the second allocation dies (2026-08-15)
+
+**ADR-116**, on branch `codex/phase-2o-planning`, into draft PR **#228**. Every
+decision took its recommendation. **Implementation is still not authorized** —
+signing the decisions and authorizing the work are two separate acts, and this
+repository has separated them at ADR-104/ADR-105 and ADR-108/ADR-112 before.
+**ADR-115 is amended by addition and not rewritten.**
+
+**Zero product code. Zero migrations created. 94, parity `202608140094`. Signup
+closed, rollout 25 · 3 · 2. A13 not moved by this commit.**
+
+### What the signatures actually changed, in order of consequence
+
+**1. M2 died, and no single signature shows it.** ADR-115 reserved the second
+allocation for **exactly one** of `OD-2O-2` **B**, `OD-2O-3` **B** or `OD-2O-4`
+**B**. All three were signed **A**. The budget is non-transferable, so **M2 has
+no destination it may be spent on and closes unspent by construction** — the
+correct close, not an omission. `R-2O-25` now refuses spending it at all,
+because the tempting failure is a schema change made to improve the appearance
+of a budget. A reader who sees "2 allocated" and hunts for a second spend finds
+a refusal instead of a vacancy.
+
+**2. Three requirements had to be appended.** `OD-2O-2` **A** signed a
+capability the PRD carried **no requirement for**, because it had been
+conditional and I had not declared one. A signed decision with no requirement is
+scope with no traceability — `2O-CLOSE-001` would have had nothing to classify.
+`2O-PREF-013` … `-015` declare the appearance control; **113 → 116**;
+`2O-PREF` 12 → 15; **nothing renumbered, reused or deleted.** The guard now
+holds the **pre-signature family distribution**, because exact totals alone
+would not catch a family losing one and gaining one.
+
+**3. Four requirements are restated in place, each keeping its superseded
+text** — `2O-ACTIVATION-002`, `2O-AICONFIG-004`, `2O-MOBILE-003`,
+`2O-ACCESS-006`. The pattern is ADR-112's: restate with a marker, renumber
+nothing, and leave the old words visible so a reader can see what moved.
+
+**4. `R-2O-5` inverted rather than being deleted.** It refused a document
+calling an open decision settled; it now refuses one calling a settled decision
+open. **The failure being prevented is unchanged. Only the direction moved.**
+Four refusals added, `R-2O-25` … `R-2O-28`; twenty-four → twenty-eight.
+
+### One threat is new, and a signature created it
+
+**`T-16`.** `OD-2O-2` **A** puts the appearance value in `localStorage` — which
+any script on the origin can write — and applies it to a DOM attribute **before
+first paint**, earlier than any React boundary exists to sanitise it. It is
+attacker-controlled input by definition. Validated against the closed set of
+three, and the inline script never interpolates the stored value into its own
+source.
+
+### A conclusion I nearly published, and did not
+
+I was going to record the anti-flash script as a **CSP stop condition** — an
+inline script under a strict CSP is a deployment-boundary change, and this
+repository has paid for CSP surprises before. **I checked `next.config.ts`
+first.** `script-src` already carries `'unsafe-inline'`, so `OD-2O-2` **A**
+needs no CSP change at all. The blocker I was about to assert does not exist.
+`R-2O-27` keeps the header shape frozen anyway, and the guard now asserts
+`'unsafe-inline'` is still there — so if it is ever removed, the claim fails
+rather than rots.
+
+### Two corrections of my own, both disclosed rather than absorbed
+
+**An arithmetic error I shipped in the previous section.** §74 and the plan
+published **13–18 weeks**. The plan's own table summed to **13.5–19**; the total
+was typed, not added. With 2O.3 growing for the appearance control it is
+**14–19.5**, and the totals are now derived from the column beside them.
+
+**An interpretation, flagged rather than taken as a signature.** `OD-2O-6` was
+framed over *inert* preferences; `embedding_model` is not inert — six
+consumers, no control — and `2O-AICONFIG-004` had offered a disjunction. The
+conservative reading gives it a registry row and no control. That is **the
+agent's reading, not the owner's**, it adds no scope, and reversing it costs one
+form field. Recorded in the ADR, the PRD and the audit so nobody later mistakes
+it for a decision.
+
+### `OD-2O-11`'s "only" is load-bearing
+
+**Admitted, and only these two:** the 21px touch target (`2N-MOBILE` →
+`2O-MOBILE-003`, now unconditional, and the one place the phase changes a
+surface it did not create) and a real screen-reader validation
+(`2O-ACCESS-006`).
+
+**Declined by name:** `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`,
+`2N-FILES-WRITER`, retention sweeps and their scheduling, any resolution of
+ADR-055. **Declined by the word "only", and named so the exclusion is recorded
+rather than inferred:** `2N-PRIVACY-FREETEXT`, `2N-RELATION-END-ANNOUNCEMENT`,
+and the push HTTP 403 / Android track.
+
+**`OD-2O-12` **B** traded a blocking gate for an absolute evidence rule.** The
+screen-reader run does not alone block closeout, and in exchange it may **never**
+be promoted to a pass by documentation, an emulator, an automated scan, or
+inference from one. `2O-ACCESS-006` closes `built` only on a recorded execution
+naming device, software and version; absent one it closes `partial` with a
+destination. There is no third outcome, and `R-2O-26` says so.
+
+### Where this stops
+
+**At an implementation authorization, which ADR-116 deliberately is not.** The PR
+stays a draft. No slice may begin, no migration may be created, no deploy may
+run, and signup may not open.

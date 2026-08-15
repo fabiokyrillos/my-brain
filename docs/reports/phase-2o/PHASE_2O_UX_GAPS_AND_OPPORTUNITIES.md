@@ -253,3 +253,38 @@ both cost owner or operator time, not code.
 - **Opening signup.** Not this phase, not by inference, not by a passing gate.
 - **Inferring a preference from behaviour.** The product's standing posture is
   that ambiguity becomes a pending question, never an invention.
+
+---
+
+## Amendment — 2026-08-15, ADR-116: which branch each gap took
+
+Appended, not applied backwards. Each gap above stated options; the owner
+signed. This records **which branch was taken**, so a reader does not have to
+re-derive it from twelve decisions.
+
+| Gap | Branch signed | Consequence for the gap |
+|---|---|---|
+| G1 — a stranger cannot learn what this is | `OD-2O-1` **A** | built, both locales, **no signup CTA while closed** |
+| G2 — the closed door refuses after the work | — | unchanged; `2O-ENTRY-005` / `-006` |
+| G3 — no first conquest | `OD-2O-3` **A** | **derived**, so resumable by construction and costing no schema |
+| G4 — three preferences cannot be set | `OD-2O-6` **A** | controls built for exactly those three |
+| G5 — nine columns mean nothing | `OD-2O-7` **A** | recorded and guarded; **no controls**, columns kept |
+| G6 — the registry is inert | — | unchanged; `2O-ACTIVATION-004` / `-005` make it load-bearing |
+| G7 — no prospective cost | — | unchanged; ceiling and headroom, never a forecast |
+| G8 — no way to leave with your data | `OD-2O-4` **A** | **synchronous, server-side**, over the deletion enumeration. The cheaper branch, and it carries the timeout risk this gap named: if *complete or refuse* cannot hold, **the slice stops** |
+| G9 — no session control | `OD-2O-5` **A** | the **cheap half only** — indicator plus global sign-out. The device list, and the service-role authority it needed, are declined |
+| G10 — 23 surfaces answer in their own words | — | unchanged; `2O-RECOVER-001` / `-002` |
+| G11 — ADR-114 decided a theme and nothing chose | `OD-2O-2` **A** | **client-side, `localStorage`, no migration.** This gap's own note said it was the only *contradiction* in the document; it now has `2O-PREF-013` … `-015`. Cost recorded: **the choice does not follow the account across devices** |
+| G12 — preferences in four places | — | unchanged; the Dados e IA pattern generalises |
+| G13 — permission asked in the wrong place | — | unchanged, and still bounded by push failing on a real iPhone |
+| G14 — two proofs never executed | `OD-2O-11` + `OD-2O-12` **B** | **both admitted.** The 21px target unconditionally; the screen-reader run non-blocking but **never promotable by documentation, emulation or inference** |
+
+**All five opportunities survive the signatures.** Opportunity 1 — *the deletion
+enumeration is an export in disguise* — is now the signed design rather than a
+suggestion, and opportunity 4 — *onboarding can be entirely derived* — is
+`OD-2O-3` **A**.
+
+**One new non-opportunity, created by a signature.** `OD-2O-2` **A** must not
+grow into a persisted preference by increments. A column for appearance is
+`OD-2O-2` **B**, which was declined, and adding one would spend a migration the
+owner did not authorize on a destination `R-2O-25` forbids.

@@ -430,3 +430,48 @@ And one item the roadmap does not contain at all, which the redesign created:
   and every scan is reproducible: the corpus is `src/` plus
   `supabase/functions/`, generated types excluded where stated, tests counted
   separately where stated.
+
+---
+
+## 11. Amendment — 2026-08-15, ADR-116
+
+**Appended, not applied backwards.** Every measurement in §1–§10 was taken
+against `9cc1175` and stays exactly as measured. What changed is not the tree —
+it is that eight of the findings now have a **destination**, because the owner
+signed all twelve decisions. This section records which, and nothing else.
+
+**No re-measurement was performed and none is claimed.** A capability that "does
+not exist" in §9 still does not exist; it now has a requirement that says who
+will build it.
+
+| §9 row | Measured state | Destination after the signatures |
+|---|---|---|
+| 1 — landing / product explanation | does not exist | `2O-ENTRY-001` … `-004`, `OD-2O-1` **A** |
+| 5 — onboarding | does not exist | `2O-ONBOARD-*`, derived, `OD-2O-3` **A** |
+| 10 — review-schedule controls | exists partially | `2O-PREF-004` … `-006`, `OD-2O-6` **A** |
+| 11 — nine unconsumed columns | does not exist | `2O-ACTIVATION-007`, recorded and guarded, **no controls**, `OD-2O-7` **A** |
+| 14 — model routing controls | exists partially | `2O-AICONFIG-004` — `embedding_model` gets a **registry row, not a control**. See the interpretation note below |
+| 21 — data export | does not exist | `2O-PRIVACY-004` … `-006`, **synchronous**, `OD-2O-4` **A** |
+| 22 — active sessions | does not exist | `2O-PRIVACY-009` — indicator plus **global** sign-out only, `OD-2O-5` **A** |
+| 29 — 44px touch targets | partial, inherited | `2O-MOBILE-003`, **admitted** by `OD-2O-11` |
+| 31 — screen-reader validation | depends on an operational proof | `2O-ACCESS-006`, **admitted**, non-blocking under `OD-2O-12` **B**, and never promotable by anything but a run |
+| 33 — appearance / theme control | does not exist | **`2O-PREF-013` … `-015`, newly declared** — the requirements this audit's §8 divergence had no home for |
+
+**Two rows deliberately did not move.** Row 19 (retention execution) and row 34
+(public-opening readiness) stay owner and operator work: `OD-2O-10` **A**
+produces the dossier and closes no gate, and `OD-2O-11` declined the sweeps.
+Row 35 stays *must not be built by rule*.
+
+**The §8 divergence now has a home, and that is the only thing §8 needed.** The
+ADR-114 Decision 3 contradiction — complete CSS, no control — is what
+`2O-PREF-013` … `-015` exist for. §8's text is unchanged, because it was true
+when written and is still true today: nothing in the product writes
+`data-theme`.
+
+**One interpretation is flagged rather than absorbed.** `OD-2O-6` was framed
+over *inert* preferences; `embedding_model` is not inert. The conservative
+reading — that "controls only for the three review preferences" reaches it too
+— is the one taken, and it is **an interpretation the agent made, not a
+signature the owner gave**. It adds no scope and reversing it costs one form
+field. Recorded here so a future reader does not mistake it for an owner
+decision.

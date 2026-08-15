@@ -92,7 +92,28 @@ function declaredIds(source: string): string[] {
 }
 
 const ids = declaredIds(read(PRD));
-const TOTAL = 113;
+const TOTAL = 116;
+
+/**
+ * The family distribution on the day ADR-115 authorized planning, before any
+ * decision was signed.
+ *
+ * ADR-116 signed all twelve and **appended** three requirements for the
+ * appearance control `OD-2O-2` **A** authorized. The owner's instruction was
+ * explicit: *do not renumber, reuse or delete an already-declared identifier.*
+ * Recording the pre-signature distribution is what makes that checkable — a
+ * family that shrank, or one that grew where no decision added scope, fails
+ * below. Exact counts alone would not catch it: a family could lose one and
+ * gain one and still total correctly.
+ */
+const FAMILY_COUNTS_BEFORE_SIGNATURES: Readonly<Record<string, number>> = {
+  ACTIVATION: 7, ENTRY: 8, ONBOARD: 11, PREF: 12, AICONFIG: 9, COST: 7,
+  PRIVACY: 10, CONSENT: 5, NOTIFY: 7, RECOVER: 7, MOBILE: 5, ACCESS: 6,
+  READY: 5, METRICS: 5, SEC: 5, CLOSE: 4,
+};
+
+/** The only family ADR-116 was allowed to grow, and by how much. */
+const FAMILY_GROWN_BY_SIGNATURES = { family: "PREF", by: 3 } as const;
 
 /**
  * The migration count on the day Phase 2O planning was authorized.
@@ -109,7 +130,7 @@ const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   ACTIVATION: 7,
   ENTRY: 8,
   ONBOARD: 11,
-  PREF: 12,
+  PREF: 15,
   AICONFIG: 9,
   COST: 7,
   PRIVACY: 10,
@@ -179,6 +200,27 @@ describe("Phase 2O declarations: the requirement set is coherent", () => {
     }
   });
 
+  it("renumbered, reused and deleted nothing when ADR-116 appended three", () => {
+    // The owner's instruction, made checkable. Only `2O-PREF` may have grown,
+    // and only by three; every other family must be byte-for-byte the size it
+    // was before any decision was signed.
+    for (const [family, before] of Object.entries(FAMILY_COUNTS_BEFORE_SIGNATURES)) {
+      const now = FAMILY_COUNTS[family];
+      const allowed = family === FAMILY_GROWN_BY_SIGNATURES.family
+        ? before + FAMILY_GROWN_BY_SIGNATURES.by
+        : before;
+      expect(now, `${family} moved from ${before} to ${now}, and only PREF may grow`).toBe(allowed);
+    }
+    // The appended three exist, and the twelve that preceded them still do —
+    // which is what "appended" means and what "renumbered" would break.
+    for (let n = 1; n <= 15; n += 1) {
+      const id = `2O-PREF-${String(n).padStart(3, "0")}`;
+      expect(ids, `${id} is missing`).toContain(id);
+    }
+    expect(read(PRD), "the appended requirements must say which decision added them")
+      .toMatch(/\*\*2O-PREF-013:\*\* \*\(appended by \*\*ADR-116\*\*/);
+  });
+
   it("proves the extraction itself is not returning zero", () => {
     // Every assertion above would pass against an empty array if the shape ever
     // changed. This is the control.
@@ -202,6 +244,53 @@ describe("Phase 2O declarations: the count does not drift where it is quoted", (
   it("fires on a stale count, and ignores another phase's", () => {
     const stale = "**127 requirements across sixteen families**";
     expect([...stale.matchAll(/\*\*(\d+) requirements/g)].map((match) => Number(match[1]))).toEqual([127]);
+  });
+
+  it("catches the count in prose too, not only in the bolded headline form", () => {
+    /*
+     * **The gap this closes, found by reading the diff rather than by a test.**
+     *
+     * ADR-116 moved the total 113 → 116, and `2O-CLOSE-001` — a live
+     * requirement — went on saying *"every one of the 113 requirements"*. The
+     * assertion above did not see it: that pattern matches `**113 requirements`
+     * and this text is `the 113 requirements`, with no asterisks. A count guard
+     * that only knows one spelling of the count is a count guard with a hole,
+     * and this phase's own contract (`R-2O-3`) forbids exactly the drift it let
+     * through.
+     *
+     * Every document in the package is now scanned for any number immediately
+     * followed by "requirements", in either spelling.
+     *
+     * **And this assertion had a hole of its own, found by planting the defect
+     * rather than by reasoning about it.** The first version exempted `113`
+     * whenever the document also contained the phrase `113 → 116` — the
+     * deliberate record of the correction. Every document that records the
+     * correction contains that phrase, so the exemption swallowed the very
+     * occurrence it was meant to let through *around*. Planting
+     * `the 113 requirements` back into the PRD made the test **pass**.
+     *
+     * The exemption was not narrowed; it was **deleted**, because it was never
+     * needed: `113 → 116` has no "requirements" after the number, so the
+     * pattern cannot match inside it. A document-wide exemption for a
+     * per-occurrence problem is how a check comes to pass by containing its own
+     * subject.
+     */
+    for (const document of [PRD, PLAN, AUDIT, GAPS, THREATS, CONTRACT]) {
+      const source = flat(document);
+      for (const [, claim] of source.matchAll(/(\d+)\s+requirements\b/g)) {
+        expect(Number(claim), `${document} states ${claim} requirements, not ${TOTAL}`).toBe(TOTAL);
+      }
+    }
+    // Non-vacuous, in both directions: the pattern sees the prose form, and it
+    // does **not** see the correction record, so no exemption is required.
+    expect([..."every one of the 113 requirements".matchAll(/(\d+)\s+requirements\b/g)]
+      .map((match) => Number(match[1]))).toEqual([113]);
+    expect([..."The total moves **113 → 116**.".matchAll(/(\d+)\s+requirements\b/g)]).toEqual([]);
+  });
+
+  it("declares the same total in the contract's own refusal", () => {
+    // `R-2O-1` states the count as part of the refusal. It went stale once.
+    expect(flat(CONTRACT)).toMatch(new RegExp(`\\*\\*${TOTAL} declared\\.\\*\\*`));
   });
 });
 
@@ -267,7 +356,86 @@ describe("Phase 2O governance: the authorization is planning-only and says so", 
   });
 });
 
-describe("Phase 2O decisions: twelve are open, and none is signed", () => {
+describe("Phase 2O decisions: twelve are SIGNED, and the declined branches stay visible", () => {
+  /*
+   * **Inverted by ADR-116, and kept rather than deleted.**
+   *
+   * Under ADR-115 this block refused a document that read its own
+   * recommendation as an outcome. The decisions are now signed, so it refuses
+   * the mirror error: a document that re-opens one, softens it, or describes it
+   * as open. The failure being prevented is unchanged — a document disagreeing
+   * with the owner's actual signature. Only the direction moved.
+   *
+   * The pre-signature assertion is not removed but re-pointed: a *claim of a
+   * signature* is now legitimate, so what is forbidden is the opposite claim.
+   */
+  const adr116 = (): string => {
+    const decisions = read("docs/DECISIONS.md");
+    const start = decisions.indexOf("## ADR-116");
+    expect(start, "ADR-116 is not recorded").toBeGreaterThan(0);
+    const next = decisions.indexOf("\n## ADR-", start + 1);
+    return decisions.slice(start, next === -1 ? undefined : next);
+  };
+
+  it("records ADR-116 as accepted, and as authorizing no implementation", () => {
+    const body = adr116();
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "ADR-116 must sign all twelve").toMatch(/signs `OD-2O-1` … `OD-2O-12` in full/);
+    expect(body, "signing decisions is not authorizing work")
+      .toMatch(/authorizes no implementation/i);
+    expect(body, "ADR-116 must keep the phase planning-only").toMatch(/remains a \*\*planning phase\*\*/);
+    expect(body, "an authorizing ADR must not name the successor").not.toMatch(/2P/i);
+  });
+
+  it("keeps ADR-115 intact rather than rewritten, and marks what amended it", () => {
+    // The rule this series has been held to since ADR-108: an accepted ADR is
+    // not edited into agreement with a later one.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-115 — The owner authorizes Phase 2O/);
+    expect(decisions, "ADR-115 must point at what superseded it in part")
+      .toMatch(/\*\*Superseded in part by ADR-116\*\*/);
+    expect(decisions, "ADR-115's own ceiling must still read as it did when signed")
+      .toMatch(/\*\*M2\*\* reserved for \*\*exactly one\*\*/);
+  });
+
+  it("records every one of the twelve signatures in the PRD", () => {
+    const prd = flat(PRD);
+    expect(prd).toMatch(/ALL TWELVE SIGNED by ADR-116/);
+    for (const decision of OPEN_DECISIONS) {
+      // Ten decisions were signed as a lettered option; `OD-2O-9` (the budget)
+      // and `OD-2O-11` (the residual list) had no letters to sign, so their
+      // cell reads "signed". Both shapes are accepted and an empty cell is not.
+      expect(prd, `${decision} has no recorded signature`)
+        .toMatch(new RegExp(`\\| \`${decision}\` \\| (\\*\\*[AB]\\*\\*|signed) \\|`));
+    }
+    // Non-vacuous: an unsigned cell really does fail this shape.
+    expect("| `OD-2O-9` |  |").not.toMatch(/\| `OD-2O-9` \| (\*\*[AB]\*\*|signed) \|/);
+  });
+
+  it("never re-opens or softens a signed decision", () => {
+    // The inverted refusal. A recommendation is the agent's and a signature is
+    // the owner's; once given, no document may describe it as still open.
+    for (const document of [PRD, PLAN, AUDIT, GAPS, THREATS, CONTRACT]) {
+      const source = flat(document);
+      for (const forbidden of [
+        /OD-2O-\d+ (is|remains) (still )?open/i,
+        /none is signed/i,
+        /awaiting the owner's signature/i,
+      ]) {
+        expect(source, `${document} re-opens a signed decision`).not.toMatch(forbidden);
+      }
+    }
+    // Non-vacuous: the patterns really match the shape they forbid.
+    expect("OD-2O-4 remains open").toMatch(/OD-2O-\d+ (is|remains) (still )?open/i);
+  });
+
+  it("keeps the interpretation flagged as an interpretation, not a signature", () => {
+    // `OD-2O-6` was framed over inert preferences and `embedding_model` is not
+    // inert. The conservative reading was taken; saying so is the requirement.
+    expect(flat(PRD)).toMatch(/interpretation the agent took, not a signature the owner gave/);
+    expect(adr116()).toMatch(/interpretation, not a signature/);
+  });
+
   it("declares all twelve, each with options and a recommendation", () => {
     const prd = read(PRD);
     for (const decision of OPEN_DECISIONS) {
@@ -291,23 +459,15 @@ describe("Phase 2O decisions: twelve are open, and none is signed", () => {
     expect([...prd.matchAll(/\*\*C\*\*/g)].length).toBeGreaterThanOrEqual(7);
   });
 
-  it("never describes an open decision as signed", () => {
-    // `R-2O-5`. The failure this phase is uniquely exposed to: reading a
-    // recommendation as an outcome. The words that would mark a signature are
-    // asserted absent from every document in the package.
-    for (const document of [PRD, PLAN, AUDIT, GAPS, THREATS, CONTRACT]) {
-      const source = read(document);
-      for (const forbidden of [/OD-2O-\d+ is signed/i, /signed as [ABC]\b/i, /the owner signed/i]) {
-        expect(source, `${document} claims a signature`).not.toMatch(forbidden);
-      }
-    }
-    // Non-vacuous: the pattern really does match the shape it forbids.
-    expect("OD-2O-4 is signed A").toMatch(/OD-2O-\d+ is signed/i);
-  });
-
-  it("says plainly that no decision is signed", () => {
-    expect(read(PRD)).toMatch(/None is signed/);
-    expect(read(CONTRACT)).toMatch(/none is signed/i);
+  it("records the inversion rather than deleting the refusal it replaced", () => {
+    // A deleted refusal records nothing, and the next reader cannot tell a rule
+    // that was satisfied from a rule that was removed. The contract keeps both
+    // forms of `R-2O-5`.
+    const contract = flat(CONTRACT);
+    expect(contract).toMatch(/R-2O-5 — A signed decision may not be silently re-decided/);
+    expect(contract, "the pre-signature form must be retained, not deleted")
+      .toMatch(/Pre-signature form, retained/);
+    expect(contract).toMatch(/Twenty-eight refusals/);
   });
 });
 
@@ -351,6 +511,39 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
 
   it("refuses to pay for another phase's remainders out of either allocation", () => {
     expect(flat(PLAN)).toMatch(/none of the Phase 2N remainders/i);
+  });
+
+  it("records that M2 lost every destination it had, and may not be spent", () => {
+    // The consequence no single signature shows. ADR-115 reserved M2 for
+    // exactly one of three options; ADR-116 signed all three the other way. A
+    // reader who sees "2 allocated" and hunts for a second spend must find this
+    // instead, and a future author must find a refusal rather than a vacancy.
+    expect(flat(PLAN)).toMatch(/NO REMAINING DESTINATION/);
+    expect(flat(PLAN), "closing unspent must be recorded as correct, not as an omission")
+      .toMatch(/M2 closes unspent by construction/);
+    expect(flat(PRD), "the stop condition must name M2 explicitly")
+      .toMatch(/M2 is about to be spent at all/);
+    expect(flat(CONTRACT)).toMatch(/R-2O-25 — M2 may not be spent, on anything/);
+  });
+
+  it("keeps the screen-reader gate unpromotable by anything but a run", () => {
+    // `OD-2O-12` B traded a blocking gate for an absolute evidence rule. If the
+    // concession ever outlives the rule, this is what fails.
+    for (const document of [PRD, PLAN, CONTRACT]) {
+      expect(flat(document), `${document} does not forbid promotion by inference`)
+        .toMatch(/emulator|emulation/i);
+    }
+    expect(flat(PRD)).toMatch(/may close \*\*`built` only on a recorded execution\*\*/);
+    expect(flat(CONTRACT)).toMatch(/R-2O-26 — The screen-reader run may never be promoted/);
+  });
+
+  it("keeps the CSP out of scope, and says why the appearance script does not need it", () => {
+    // Verified in the tree when the threat was written, and asserted here so a
+    // future change to `next.config.ts` makes the claim fail rather than rot.
+    expect(read("next.config.ts"), "script-src no longer carries 'unsafe-inline'")
+      .toMatch(/const script = \[[^\]]*'unsafe-inline'/);
+    expect(flat(THREATS)).toMatch(/already carries\s+`?'unsafe-inline'`? in `script-src`/);
+    expect(flat(CONTRACT)).toMatch(/R-2O-27 — The CSP may not change/);
   });
 });
 
