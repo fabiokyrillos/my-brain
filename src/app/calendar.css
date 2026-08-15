@@ -31,11 +31,18 @@
 /*
  * The control band (`03-componentes.md`).
  *
- * The three rows answer one question between them — which slice of time, and
- * which of it — so they sit in one band above the grid rather than in a stack
- * that pushes the week 320px down its own page. `column-gap` is generous and
- * `row-gap` is not: when the band wraps at a narrow width the rows must read as
- * rows, not as three separate blocks.
+ * The three **control** rows answer one question between them — which slice of
+ * time, and which of it — so they sit in one band rather than in three stacked
+ * rows above the grid.
+ *
+ * The band holds the controls and nothing else. `.calendar-bound`,
+ * `.calendar-partial`, `.calendar-summary` and the outcome region stay below it
+ * and above the grid, because they are **statements about the result**, not ways
+ * to change it — and two of them are live regions, which have no business
+ * inside a row of navigation.
+ *
+ * `column-gap` is generous and `row-gap` is not: when the band wraps at a narrow
+ * width the rows must read as rows, not as three separate blocks.
  */
 .calendar-toolbar {
   display: flex;
@@ -221,10 +228,18 @@
   overflow-wrap: anywhere;
 }
 
+/*
+ * Not sticky, and that is a correction rather than a preference.
+ *
+ * A first draft set `position: sticky; top: 0` here. `.calendar-week-scroll`
+ * declares `overflow-x: auto`, and per CSS Overflow 3 an `overflow-y: visible`
+ * beside a non-visible `overflow-x` computes to `auto` — so the wrapper *is*
+ * the nearest scrollport, its height is its content's height, it never scrolls
+ * vertically, and the header could never move relative to it. The rule painted
+ * a background and nothing else, and the `position: static` override below it
+ * cured a symptom that could not occur.
+ */
 .calendar-week thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   background: var(--background-canvas);
   padding-block: var(--space-2);
 }
@@ -347,10 +362,7 @@
 @media (max-width: 30rem) {
   .calendar-week-scroll { --calendar-week-floor: 77rem; }
   .calendar-week tbody td { height: 6rem; }
-  /* A sticky header inside a horizontally scrolling container on a short
-     viewport takes a quarter of the visible grid; the header scrolls with its
-     column here. */
-  .calendar-week thead th { position: static; }
+
 }
 
 /*
@@ -475,7 +487,13 @@
   .planner-list .planner-item-controls { justify-self: end; min-width: 0; }
 }
 
-.planner-list li + li { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+/* `> ul >`, not a descendant selector. `TaskDetailControls` renders its own
+   `<ul class="task-control-list"><li class="task-control">` inside every row,
+   and `plannedControlsFor` returns two controls for any active task — so a
+   descendant `li + li` drew a full-width rule between two already-bordered
+   control cards inside the row. The daily-surfaces fixture emits one control
+   per row, which is exactly why no browser lane could see it. */
+.planner-list > ul > li + li { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
 .planner-item-head { font: var(--type-reading-sm); color: var(--text-primary); }
 .planner-item-meta { font: var(--type-mono); color: var(--text-muted); }
 

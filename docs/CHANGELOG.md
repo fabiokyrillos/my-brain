@@ -64,6 +64,55 @@ Under Turbopack `next dev`, the RSC request for an intercepted task answers **50
 
 **Every route file involved is untouched by this branch** (`git log main..HEAD -- src/app/[locale]/app/work` is empty) and `next build` compiles the interception without complaint. The lane passes against `next start` and documents the requirement.
 
+### What the independent review of this part found, and one claim it corrected
+
+The review of `0d2bb2c..HEAD` returned nine findings. All nine are fixed above or
+recorded here; none was rejected as a false positive.
+
+Three were the same defect this part had just spent five commits finding
+elsewhere. **A test that could not fail:** the `[...catchAll]` assertion reached
+`/app/work/cancelled` with `page.goto`, a document load, which no parallel-route
+slot survives — `default.tsx` would have answered `null` with that file deleted,
+so the only assertion guarding it passed vacuously. It clicks the in-app link
+now, and stamps the window to prove the navigation was soft. **A capped number
+stated as exact:** the new needs-you notice read `count` and discarded
+`atLeast`, so an owner with seven hundred entries waiting on a key would have
+been told they had exactly five hundred — the unread-`agendaHasMore` defect, in
+the same session that fixed it. **A producer with no consumer:** the notice
+carried `data-tone="attention"` and no rule anywhere selects it.
+
+Two were CSS that silently did nothing. `.planner-list li + li` is a descendant
+selector, and `TaskDetailControls` renders its own `<li>` inside every row — so
+every planner row with two controls drew a stray full-width rule between two
+already-bordered cards. The fixture emits one control per row, which is exactly
+why no browser lane could see it. And `position: sticky` on the week's headers
+could never stick: the scroll wrapper's `overflow-x: auto` makes it the nearest
+scrollport by CSS Overflow 3, its height is its content's height, so it never
+scrolls vertically. Both the sticky rule and the `position: static` override that
+cured its imaginary symptom are gone.
+
+**The `next/font` stub reached one lane and not the other two.** This part found
+that `e2e/accessibility.spec.ts` rendered every family at the document default
+and fixed it — then added fifteen new geometric contracts to `calendar.spec.ts`
+and `daily-surfaces.spec.ts` without carrying the stub across, so those measured
+16px Times. Both are stubbed now.
+
+**And one claim in a commit message was wider than the code.** `a98c8cf` says the
+calendar's control band absorbed "orientation, lanes, navigation, two status
+paragraphs and a summary". It absorbed the three **control** rows; the bound
+notice, the partial-read notice and the summary stayed between the band and the
+grid — correctly, because they are statements about the result rather than ways
+to change it, and two of them are live regions. The comments in
+`calendar-view.tsx` and `calendar.css` now say which.
+
+The remaining two findings were coverage: the guard's mutation control covered
+one of its three derivations, and the fix for the `awaiting_ai_configuration`
+finding had no test above the projection layer. Both closed —
+`shell-mirror-guard.test.ts` now plants a divergence per derivation, and
+`src/app/[locale]/app/inbox/page.test.tsx` covers the notice, the singular, the
+capped count, the conditional chip and the deep-link case where the chip must
+survive its own view being empty.
+
 ### Verification
 
 **7431 unit tests, 269 Playwright across every offline lane and both projects, lint, typecheck, build, `git diff --check` clean.** Authenticated against the **production build**: 20 surfaces at 375/412/768/1024/1440/1920 in both themes and both locales with no horizontal scroll, axe clean in light and dark, and eight new route assertions covering panel-on-soft-navigation, page-on-hard, refresh, back, forward, a shareable URL, the narrow-viewport surface and the catch-all closing the panel.

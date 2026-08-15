@@ -49,6 +49,18 @@ const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
 
+/*
+ * The three `next/font` variables, stubbed.
+ *
+ * `tokens.css` declares `--font-reading: var(--font-newsreader), Georgia,
+ * serif`, and a `var()` with no declaration and no fallback makes the custom
+ * property containing it invalid — which poisons every `--type-*` token that
+ * reads it, which voids every `font: var(--type-*)` declaration including the
+ * one on `body`. Without this the whole fixture renders at the UA default and
+ * every geometric assertion below measures text that is not the product's.
+ */
+const FONT_STUB = ":root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}";
+
 type Locale = "pt-BR" | "en";
 
 /**
@@ -144,7 +156,7 @@ function page(locale: Locale, items: string[]): string {
   const copy = COPY[locale];
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>${css}</style></head><body><main>
+  <style>${FONT_STUB}${css}</style></head><body><main>
   <section aria-labelledby="cal" class="calendar">
     <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
     <nav aria-label="Orientação" class="calendar-orientation"><ul>
@@ -191,7 +203,7 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
     `<li><a data-lane="deadline" data-shown="${shown}" href="?lanes=x">${name}<span class="sr-only">${shown ? "mostrando" : "oculto"}</span></a></li>`;
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>${css}</style></head><body><main>
+  <style>${FONT_STUB}${css}</style></head><body><main>
   <section aria-labelledby="cal" class="calendar">
     <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
     <div class="calendar-toolbar">

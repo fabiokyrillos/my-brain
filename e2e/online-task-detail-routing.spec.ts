@@ -186,13 +186,26 @@ test.describe("the task detail is a panel, a page, and one URL", () => {
     await expect(page.locator(".task-detail-panel")).toBeVisible({ timeout: 30_000 });
 
     /*
-      The `[...catchAll]` slot's whole reason for existing: a parallel route
-      keeps its active subpage across a client-side navigation that no longer
-      matches it, so without that file a user who followed a link to the
-      recovery route would carry the panel there.
+      The `[...catchAll]` slot's whole reason for existing — and it can only be
+      exercised by a **client-side** navigation.
+
+      A parallel route keeps its active subpage across a soft navigation that no
+      longer matches it, and drops everything on a document load. So a
+      `page.goto` here would be answered by `default.tsx` returning `null` and
+      would pass with `[...catchAll]/page.tsx` deleted: an assertion that cannot
+      fail. The recovery link `work-view.tsx` renders unconditionally is a
+      `next/link`, so clicking it is the navigation the slot has to survive.
+
+      The stamp is the proof that it was soft. Without it this test would be
+      trusting `Link` to have done what it says, which is the thing under test.
     */
-    await page.goto("/pt-BR/app/work/cancelled");
+    await page.evaluate(() => { (window as unknown as Record<string, unknown>).__soft = "kept"; });
+    await page.locator("a.task-command-recovery-link").click();
     await expect(page.locator("h1").first()).toBeVisible({ timeout: 30_000 });
+    expect(
+      await page.evaluate(() => (window as unknown as Record<string, unknown>).__soft === "kept"),
+      "the navigation to /app/work/cancelled was a document load, so the slot was never asked to survive it",
+    ).toBe(true);
     await expect(page.locator(".task-detail-panel")).toHaveCount(0);
   });
 

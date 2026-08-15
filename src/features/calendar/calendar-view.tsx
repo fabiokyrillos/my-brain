@@ -167,12 +167,17 @@ export function CalendarView({
       {/*
         The three control rows, in one band.
 
-        They were three stacked rows above the grid — orientation, then lanes,
-        then navigation, then two status paragraphs, then the summary — so on a
-        1440px screen the week itself began about 320px down. They answer one
-        question between them (*which slice of time am I looking at, and which
-        of it*), and `03-componentes.md` puts the controls that scope a view in
-        one band above it rather than in a stack that competes with it.
+        Orientation, lanes and navigation were three stacked rows above the
+        grid. They answer one question between them — *which slice of time am I
+        looking at, and which of it* — and `03-componentes.md` puts the controls
+        that scope a view in one band above it rather than in a stack that
+        competes with it.
+
+        **The three status regions below are deliberately not in the band.** The
+        bound notice, the partial-read notice and the summary are statements
+        about the result rather than ways to change it, and two of them are live
+        regions; folding a live region into a row of navigation is how an
+        announcement ends up read as a control.
 
         Nothing about the controls changed: still links, still the URL, still
         keyboard-operable, still no gesture anywhere.

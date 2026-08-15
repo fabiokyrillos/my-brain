@@ -109,24 +109,42 @@ function RecordsViews({
 function AwaitingAiNotice({
   locale,
   count,
+  /**
+   * `loadPendingEntryCount` caps at `PENDING_ENTRY_COUNT_CEILING` and returns
+   * this flag beside the number, precisely so a capped count is never printed
+   * as an exact one. Reading `count` alone would tell an owner with seven
+   * hundred stuck entries that they have exactly five hundred — the same defect
+   * as the unread `agendaHasMore` this session fixed, in the same session.
+   */
+  atLeast,
   /** False on the awaiting-ai view itself, where it would link to this page. */
   showListLink,
 }: {
   locale: Locale;
   count: number;
+  atLeast: boolean;
   showListLink: boolean;
 }) {
   const copy = getRecordsCopy(locale).awaitingAiNotice;
+  const shown = atLeast ? `${count}+` : String(count);
   return (
-    <aside className="records-notice" data-tone="attention">
-      <p>{count === 1 ? copy.one : copy.many.replace("{count}", String(count))}</p>
+    /*
+      A `<div>`, not an `<aside>`. An `<aside>` inside `<main>` is a
+      `complementary` landmark, and an unnamed one holding a single sentence is
+      an entry in the landmark list that tells a screen-reader user nothing.
+      There is no `data-tone` either: it named a tone no rule selected, which is
+      the producer-with-no-consumer defect this session found three times
+      already. The tone is in the class, where the rule is.
+    */
+    <div className="records-notice">
+      <p>{count === 1 && !atLeast ? copy.one : copy.many.replace("{count}", shown)}</p>
       <p className="records-notice-actions">
         {showListLink ? (
           <Link href={`/${locale}/app/inbox?view=awaiting-ai`}>{copy.seeThem}</Link>
         ) : null}
         <Link href={byokSettingsHref(locale)}>{copy.configure}</Link>
       </p>
-    </aside>
+    </div>
   );
 }
 
@@ -219,7 +237,7 @@ export default async function InboxPage({
       <div className="content-page records-page">
         <RecordsHeader locale={locale} lead={copy.lead.needsYou} />
         <RecordsViews locale={locale} active="needs-you" awaitingAiCount={awaitingAi.count} />
-        {awaitingAi.count > 0 ? <AwaitingAiNotice locale={locale} count={awaitingAi.count} showListLink /> : null}
+        {awaitingAi.count > 0 ? <AwaitingAiNotice atLeast={awaitingAi.atLeast} count={awaitingAi.count} locale={locale} showListLink /> : null}
         <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="pull" limit={5} />
         {/*
           Counts conflicts too. Left as `projection.items.length`, a queue whose
@@ -271,7 +289,7 @@ export default async function InboxPage({
         be a banner about four rows among two hundred.
       */}
       {view === "awaiting-ai" && awaitingAi.count > 0 ? (
-        <AwaitingAiNotice locale={locale} count={awaitingAi.count} showListLink={false} />
+        <AwaitingAiNotice atLeast={awaitingAi.atLeast} count={awaitingAi.count} locale={locale} showListLink={false} />
       ) : null}
       {projection.items.length ? (
         <RecordsQueue agentName={agentName} items={projection.items} locale={locale} timeZone={timeZone} />

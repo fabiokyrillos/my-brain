@@ -48,6 +48,18 @@ const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
 
+/*
+ * The three `next/font` variables, stubbed.
+ *
+ * `tokens.css` declares `--font-reading: var(--font-newsreader), Georgia,
+ * serif`, and a `var()` with no declaration and no fallback makes the custom
+ * property containing it invalid — which poisons every `--type-*` token that
+ * reads it, which voids every `font: var(--type-*)` declaration including the
+ * one on `body`. Without this the whole fixture renders at the UA default and
+ * every geometric assertion below measures text that is not the product's.
+ */
+const FONT_STUB = ":root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}";
+
 type Locale = "pt-BR" | "en";
 
 /**
@@ -192,7 +204,7 @@ function reviewRow(options: { locale: Locale; masked?: boolean; open?: boolean }
 function shell(locale: Locale, body: string): string {
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>${css}</style></head><body><main>${body}</main></body></html>`;
+  <style>${FONT_STUB}${css}</style></head><body><main>${body}</main></body></html>`;
 }
 
 /** The planner, mirroring the page `PlannerView` renders. */

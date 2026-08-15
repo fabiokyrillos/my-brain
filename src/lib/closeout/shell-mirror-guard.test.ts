@@ -91,14 +91,48 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
   });
 
   /*
-    The control. Each assertion above is re-run against a fixture with one
-    label changed; if any of them still passes, it is matching something that
-    cannot vary and proves nothing about the mirror.
+    The controls — one per derivation, because a control that covers one of
+    three assertions leaves the other two able to match something that cannot
+    vary. The first draft here mutated a rail label and re-ran only the rail
+    check; the bar and the overflow panel had no control at all, so a
+    `fixtureList` that returned the derived list for `MOBILE_BAR` would have
+    passed forever.
+
+    Each case plants a single divergence and requires the corresponding
+    assertion to see it.
   */
-  it("fails when the mirror diverges by a single label", () => {
+  it("fails when the rail's mirror diverges by a single label", () => {
     const [first] = primaryNavigationKeys;
     const mutated = FIXTURE.replace(`"${label(first)}"`, '"Alguma outra coisa"');
     expect(mutated).not.toEqual(FIXTURE);
     expect(fixtureList(mutated, "PRIMARY")).not.toEqual(primaryNavigationKeys.map(label));
   });
+
+  it("fails when the bar's mirror diverges by a single label", () => {
+    /*
+      Mutated inside the `MOBILE_BAR` literal only. A blanket `String.replace`
+      would hit the rail's copy of the same word first and leave the bar
+      untouched, which is a mutation that proves nothing — so the literal is
+      isolated before the label is changed.
+    */
+    const [start, rest] = splitAt(FIXTURE, "const MOBILE_BAR = [");
+    const mutated = start + rest.replace(`"${label(mobileBarSlots[0])}"`, '"Alguma outra coisa"');
+    expect(mutated).not.toEqual(FIXTURE);
+    expect(fixtureList(mutated, "MOBILE_BAR")).not.toEqual(mobileBarSlots.map(label));
+  });
+
+  it("fails when the overflow panel drops a demoted destination", () => {
+    const [key] = mobileDemotedKeys;
+    const mutated = FIXTURE.replace(`navLink("${label(key)}")`, 'navLink("Alguma outra coisa")');
+    expect(mutated).not.toEqual(FIXTURE);
+    const demoted = /mobile-nav-demoted[^`]*?<\/div><\/div>/.exec(mutated)?.[0] ?? "";
+    expect(demoted).not.toContain(`navLink("${label(key)}")`);
+  });
 });
+
+/** Splits `source` at the first occurrence of `token`, keeping it on the right. */
+function splitAt(source: string, token: string): readonly [string, string] {
+  const at = source.indexOf(token);
+  if (at === -1) throw new Error(`'${token}' is not in the fixture`);
+  return [source.slice(0, at), source.slice(at)];
+}
