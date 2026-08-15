@@ -8,6 +8,8 @@ import { hasActiveFilters, historyFilterQuery, parseHistoryFilters } from "@/fea
 import { loadHistoryPage } from "@/features/history/projection";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { DataAiTabs } from "@/features/transparency/data-ai-tabs";
+import { getTransparencyCopy } from "@/features/transparency/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
 import { defaultAgentPreferences, isLocale } from "@/lib/preferences";
@@ -87,11 +89,20 @@ export default async function HistoryPage({
     <div className="content-page">
       <header className="list-header">
         <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
+          {/*
+            The eyebrow names the section this surface belongs to, not the
+            abstract virtue it serves. "TRANSPARÊNCIA" was true of all three
+            transparency surfaces and located none of them; **Dados e IA** is
+            where the product now says they live, and the strip below repeats it
+            as a place you can move around in.
+          */}
+          <p className="eyebrow">{getTransparencyCopy(locale).title.toUpperCase()}</p>
           <h1>{copy.title}</h1>
           <p>{copy.intro}</p>
         </div>
       </header>
+
+      <DataAiTabs active="history" locale={locale} />
 
       <HistoryFilterControls copy={copy} filters={filters} locale={locale} />
 

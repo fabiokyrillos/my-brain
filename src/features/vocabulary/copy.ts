@@ -103,6 +103,17 @@ export type VocabularyCopy = {
    * that broke. Showing the raw value "just this once" is how UX-21 started.
    */
   readonly unknownState: string;
+
+  /**
+   * Processamento (`/app/jobs`) — its three strings, here rather than inline.
+   *
+   * The page used to carry all three as `pt ? … : …` ternaries. They belong to
+   * the same vocabulary as `jobStatusLabel` and `jobTypeLabel` that the rows
+   * beside them already read, so one module answers for the whole surface.
+   */
+  readonly attempts: string;
+  readonly jobsEmptyTitle: string;
+  readonly jobsEmptyBody: string;
 };
 
 const ptBR: VocabularyCopy = {
@@ -163,6 +174,9 @@ const ptBR: VocabularyCopy = {
     person: "Pessoa",
   },
   unknownState: "Situação desconhecida",
+  attempts: "Tentativas",
+  jobsEmptyTitle: "Nada em processamento",
+  jobsEmptyBody: "Interpretações e análises de arquivo aparecem aqui enquanto acontecem, e ficam registradas quando falham.",
 };
 
 const en: VocabularyCopy = {
@@ -223,6 +237,9 @@ const en: VocabularyCopy = {
     person: "Person",
   },
   unknownState: "Unknown state",
+  attempts: "Attempts",
+  jobsEmptyTitle: "Nothing being processed",
+  jobsEmptyBody: "Interpretations and file analyses appear here while they happen, and stay recorded when they fail.",
 };
 
 export function getVocabularyCopy(locale: Locale): VocabularyCopy {

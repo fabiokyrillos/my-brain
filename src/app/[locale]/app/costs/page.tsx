@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { parseAICostSummary, type AIUsageRow } from "@/lib/ai/cost-summary";
 import { TEXT_MODEL_LABELS, type TextModelId } from "@/lib/ai/model-routing";
+import { getTransparencyCopy } from "@/features/transparency/copy";
+import { DataAiTabs } from "@/features/transparency/data-ai-tabs";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -129,9 +131,9 @@ export default async function CostsPage({
     <div className="cost-page">
       <header className="cost-hero">
         <div>
-          <p className="eyebrow">
-            {pt ? "CONTROLE DE CONSUMO" : "USAGE CONTROL"}
-          </p>
+          {/* The section this surface belongs to, said the same way on all
+              three — see the history page on why the eyebrow moved. */}
+          <p className="eyebrow">{getTransparencyCopy(locale).title.toUpperCase()}</p>
           <h1>{pt ? "Custos de IA" : "AI costs"}</h1>
           <p>
             {pt
@@ -152,6 +154,8 @@ export default async function CostsPage({
           </Link>
         </div>
       </header>
+
+      <DataAiTabs active="costs" locale={locale} />
 
       <section
         className="cost-profile-strip"

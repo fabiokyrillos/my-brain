@@ -305,3 +305,148 @@
     padding-top: 16px;
   }
 }
+
+/* ---- Dados e IA — the transparency centre's shared chrome ----------------- */
+
+/*
+ * The strip Atividade · Custos · Processamento wear.
+ *
+ * Deliberately the **same shape** as Brain's lens strip rather than Trabalho's
+ * pill track: both are "these separate pages are one place", and two shapes for
+ * one idea would make the reader learn the product twice. It is not the same
+ * class, because the two spaces are not the same and a shared class would let a
+ * change to one silently move the other.
+ *
+ * The way up sits before the tabs, so a reader who arrived on a deep link learns
+ * what this belongs to before they learn what else is in it.
+ */
+.data-ai-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.data-ai-up {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.data-ai-up:hover {
+  color: var(--text-primary);
+}
+
+.data-ai-lenses {
+  display: flex;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.data-ai-lenses::-webkit-scrollbar {
+  display: none;
+}
+
+.data-ai-lens {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  /* Declared at rest so the strip's height does not change with the current
+     tab — the same reason `.brain-lens` reserves it. */
+  border-bottom: 2px solid transparent;
+  transition: color var(--motion-fast) ease-out;
+}
+
+.data-ai-lens:hover {
+  color: var(--text-primary);
+}
+
+/* Marked three ways: `aria-current`, the weight, and the rule. Never colour
+   alone (`04-estados.md`). */
+.data-ai-lens[aria-current="page"] {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ---- The section inside Ajustes ------------------------------------------ */
+
+.data-ai-section {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-divider);
+}
+
+.data-ai-section > h2 {
+  margin: 0;
+  font: var(--type-title-2);
+  color: var(--text-primary);
+}
+
+.data-ai-intro {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  max-width: 68ch;
+}
+
+.data-ai-doors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.data-ai-door {
+  height: 100%;
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  transition: background var(--motion-fast) ease-out;
+}
+
+.data-ai-door:hover {
+  background: var(--background-elevated);
+}
+
+.data-ai-door strong {
+  font: var(--type-heading);
+  color: var(--text-primary);
+}
+
+.data-ai-door span {
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 899px) {
+  /* WCAG 2.2 AA 2.5.8 on the strip, which is the way between the three on a
+     phone. */
+  .data-ai-lens,
+  .data-ai-up {
+    min-height: var(--touch-target);
+  }
+
+  .data-ai-doors {
+    grid-template-columns: 1fr;
+  }
+}

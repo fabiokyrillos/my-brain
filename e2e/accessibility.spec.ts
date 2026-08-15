@@ -104,6 +104,12 @@ const STYLESHEETS = [
     contrast scan below would read the attention tone as the document default.
   */
   "memories.css",
+  /*
+    Dados e IA. The strip and the Ajustes section live here; without it the
+    target-size assertion would measure a bare text box and the contrast scan
+    would read the two greys separating the current tab as one colour.
+  */
+  "history.css",
 ] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -1334,6 +1340,104 @@ test.describe("a memory in conflict says so on its own page", () => {
     test(`axe is clean on the conflict block in ${theme}`, async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await render(page, memoryConflict(), { reducedMotion: true, theme });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Dados e IA — three surfaces, one place.
+ * ------------------------------------------------------------------ */
+
+/** Mirrors `src/features/transparency/data-ai-tabs.tsx` and `data-ai-section.tsx`. */
+function dataAiSurface() {
+  const strip = `<nav class="data-ai-tabs" aria-label="Dados e IA">`
+    + `<a class="data-ai-up" href="#">Ajustes</a>`
+    + `<div class="data-ai-lenses">`
+    + `<a class="data-ai-lens" href="#" aria-current="page">Atividade</a>`
+    + `<a class="data-ai-lens" href="#">Custos</a>`
+    + `<a class="data-ai-lens" href="#">Processamento</a>`
+    + `</div></nav>`;
+
+  const section = `<section class="data-ai-section" aria-labelledby="data-ai-heading">`
+    + `<h2 id="data-ai-heading">Dados e IA</h2>`
+    + `<p class="data-ai-intro">Tudo o que o Brain fez com os seus dados fica aqui.</p>`
+    + `<ul class="data-ai-doors">`
+    + `<li><a class="data-ai-door" href="#"><strong>Atividade</strong>`
+    + `<span>Quem fez o quê, quando e sobre qual objeto.</span></a></li>`
+    + `<li><a class="data-ai-door" href="#"><strong>Custos</strong>`
+    + `<span>Quanto cada operação consumiu, por modelo e por função.</span></a></li>`
+    + `<li><a class="data-ai-door" href="#"><strong>Processamento</strong>`
+    + `<span>O que ainda está sendo processado, e o que falhou.</span></a></li>`
+    + `</ul></section>`;
+
+  return `<div class="content-page"><header class="list-header"><div>`
+    + `<p class="eyebrow">DADOS E IA</p><h1>Histórico de alterações</h1></div></header>`
+    + strip + section + `</div>`;
+}
+
+test.describe("Dados e IA reads as one place", () => {
+  test("marks exactly one lens, and marks it by more than colour", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await render(page, dataAiSurface());
+
+    const current = page.locator('.data-ai-lens[aria-current="page"]');
+    await expect(current).toHaveCount(1);
+
+    // `04-estados.md`: never colour alone. The weight and the rule carry it too,
+    // and both are asserted as *resolved* values rather than as declarations.
+    const marks = await page.evaluate(() => {
+      const node = document.querySelector('.data-ai-lens[aria-current="page"]')!;
+      const other = document.querySelectorAll(".data-ai-lens")[1];
+      const style = getComputedStyle(node);
+      return {
+        weight: style.fontWeight,
+        otherWeight: getComputedStyle(other).fontWeight,
+        rule: style.borderBottomWidth,
+        ruleColour: style.borderBottomColor,
+        otherRuleColour: getComputedStyle(other).borderBottomColor,
+      };
+    });
+    expect(Number(marks.weight)).toBeGreaterThan(Number(marks.otherWeight));
+    expect(marks.rule).toBe("2px");
+    expect(marks.ruleColour).not.toBe(marks.otherRuleColour);
+  });
+
+  test("the strip keeps one height whichever lens is current", async ({ page }) => {
+    // The rule is declared at rest and only recoloured, so switching tabs cannot
+    // move the page by 2px.
+    await render(page, dataAiSurface());
+    const heights = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(".data-ai-lens")).map(
+        (node) => Math.round(node.getBoundingClientRect().height),
+      ));
+    expect(new Set(heights).size).toBe(1);
+  });
+
+  test("every door and tab meets the rendered target minimum", async ({ page }, testInfo) => {
+    await render(page, dataAiSurface());
+    const minimum = testInfo.project.name === "mobile" ? 44 : 24;
+    const targets = page.locator(".data-ai-lens, .data-ai-up, .data-ai-door");
+    const total = await targets.count();
+    expect(total).toBe(7);
+    for (let index = 0; index < total; index += 1) {
+      const box = await targets.nth(index).boundingBox();
+      expect(box!.height, `target ${index} is ${box!.height}px`).toBeGreaterThanOrEqual(minimum);
+    }
+  });
+
+  test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await render(page, dataAiSurface());
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on Dados e IA in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await render(page, dataAiSurface(), { reducedMotion: true, theme });
       expect(await axeViolations(page)).toEqual([]);
     });
   }

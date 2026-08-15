@@ -46,6 +46,7 @@ import {
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { PaginationLinks } from "@/features/shell/pagination-links";
+import { getTransparencyCopy } from "@/features/transparency/copy";
 import { attachmentStatusLabel, getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
@@ -485,6 +486,17 @@ export default async function FilesPage({
             <div>
               <h2 id="failed-jobs-title">{copy.failedTitle}</h2>
               <p>{copy.failedSubtitle}</p>
+              {/*
+                `02-arquitetura-e-rotas.md`: Processamento is *alcançável a
+                partir da falha*. This is the failure, and until now it was the
+                one place in the product that knew something had gone wrong and
+                offered no way to see what. The link is here rather than per row
+                because `/app/jobs` is the whole queue, not one job — a per-row
+                link would promise a detail page that does not exist.
+              */}
+              <Link className="row-action" href={`/${locale}/app/jobs`}>
+                {getTransparencyCopy(locale).openProcessing}
+              </Link>
             </div>
           </header>
           <div className="failed-job-list">
