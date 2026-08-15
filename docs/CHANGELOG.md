@@ -4,7 +4,7 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 ## 2026-08-15 - PAPEL E CONSOLE, PART FOUR: Brain as a space, the transparency centre, the mobile decision, and the account seen full
 
-**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Six commits on `codex/redesign-papel-e-console`, continuing from `4e4a801`. **34 commits on the branch, 137 files, +12 743 / −1 860. Not pushed, no PR, no merge.**
+**Zero migrations. 94 local = 94 hosted, parity `202608140094` unchanged.** Eight commits on `codex/redesign-papel-e-console`, continuing from `4e4a801`. **36 commits on the branch, 138 files, +12 995 / −1 860. Not pushed, no PR, no merge.**
 
 This part closes the six things parts one to three recorded as absences, and the two limitations all three of them carried.
 
@@ -85,6 +85,8 @@ Owner-scoped by shape: the owner id is resolved once and every insert takes `use
 Authenticated against the **production build** with the dense fixture loaded, on **both** Playwright projects: 20 fixed surfaces plus the three id-bearing workspaces, at 375 · 412 · 768 · 1024 · 1440 · 1920, in light and dark, in both locales, with no horizontal scroll anywhere, and axe clean in both themes with the theme asserted before each scan. 138 screenshots per project.
 
 **The workspace block passed on the wrong page on its first run**: the list has an `<h1>` too, so a click that navigated nowhere satisfied a visibility assertion instantly. The URL check beside it caught that; a `waitForURL` fixed it, and the check stays.
+
+**Both strips are proved with a router, not with a component.** `e2e/online-brain-lenses.spec.ts` adds ten authenticated assertions across both projects: every one of the nine lenses as a deep link that lands and marks itself, the same nine links on every surface rather than a per-page subset, back and forward and a **refresh** all keeping the marked tab (the strip is server-rendered from the route, so a tab marked only in client state is a lie the first reload exposes), the overview's panels opening the routes they name, the way up present on all three Dados e IA views, and each of those three landing on **its own URL** when followed from Ajustes — which is the assertion that would catch someone later building the redirect this part refused.
 
 ### What is NOT done, and is not claimed
 
