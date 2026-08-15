@@ -26,12 +26,59 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 .empty-list strong{color:var(--text-primary);font:var(--type-reading-lg);letter-spacing:-.01em}
 .empty-list p{margin:0;font:var(--type-body);max-width:var(--width-reading);line-height:1.6}.row-actions{display:flex;gap:7px}.row-action{border:1px solid var(--border-strong);background:var(--background-surface);border-radius: var(--radius-md);padding:7px 9px;color:var(--text-primary);font: var(--type-caption);font-weight:700}.row-action:hover{background:var(--background-subtle)}.inline-create{display:flex;gap:8px}.inline-create input{min-width:240px;border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:10px 12px}.inline-create button{border:0;border-radius: var(--radius-md);background:var(--text-primary);color:var(--action-primary-text);padding:10px 13px;font-weight:750}.inline-create-feedback{font: var(--type-caption)}.dashboard-task-list{display:grid;gap:0;margin-top:24px}.dashboard-task{display:flex;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--border-default)}.dashboard-task strong{min-width:0;font: var(--type-body)}.dashboard-task span{white-space:nowrap;font:var(--type-eyebrow);color:var(--text-secondary)}
 
-/* Task detail (Slice D1) — the destination `open_task` never had. */
-.task-detail-page{max-width:900px}
+/*
+ * Task detail — the object, recomposed (`03-componentes.md`).
+ *
+ * It was one linear stack seven sections tall: on a 1440px screen the fields
+ * were a 900px-wide row of four, the eleven edit controls came next, and the
+ * account of where the task came from was three screens below the title. The
+ * two things a reader wants — *what can I do with this* and *what is it* — were
+ * interleaved down a single column.
+ *
+ * Two wrappers now, placed by grid: **decide** on the left, **understand** on
+ * the right. Neither is `order`d, so the focus order equals the visual order in
+ * both layouts, and the panel — which is one column at any width — inherits the
+ * DOM order unchanged. That is what makes the split cost the docked panel
+ * nothing at all.
+ *
+ * `max-width` rises to the reading measure plus the side column rather than
+ * staying at 900px: at 900 the two columns would have been 520 and 300, and the
+ * eleven-control grid would have collapsed to one per row.
+ */
+.task-detail-page{max-width:1180px}
 .task-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:24px}
 .task-detail-header>.status-badge{flex:none;white-space:nowrap}
 .task-detail-header h1{font:500 clamp(30px,4vw,44px)/1.1 var(--font-reading);letter-spacing:-.035em;margin:8px 0 10px}
-.task-description{color:var(--text-secondary);line-height:1.6;margin:0;max-width:640px}
+.task-description{color:var(--text-secondary);line-height:1.6;margin:0;max-width:var(--width-reading)}
+
+/* One column until there is genuinely room for two. Below this the wrappers are
+   plain blocks and the page reads exactly as it did. */
+@media(min-width:1080px){
+  .task-detail-page:not(.task-detail-panel) .task-detail-body{
+    display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.9fr);
+    gap:var(--space-8);align-items:start;
+  }
+  /* The side column's first section has no rule above it: at the top of a
+     column a border reads as a box edge rather than as a separator. */
+  .task-detail-page:not(.task-detail-panel) .task-detail-secondary>.task-detail-section:first-child{border-top:0;padding-top:0}
+}
+
+/*
+ * The state, in colour as well as in words (`04-estados.md`: *cor + palavra +
+ * forma*). Every state rendered on the same neutral wash before this, so
+ * "Bloqueada" and "Concluída" were one object with different text.
+ *
+ * The word is always present and is the primary signal; the tint is the second
+ * of the three, never the only one. `not_started` deliberately has no rule — it
+ * is the absence of anything having happened, and the neutral base says that.
+ */
+.status-badge[data-state="completed"]{background:var(--tone-success-bg);color:var(--tone-success-fg)}
+.status-badge[data-state="in_progress"]{background:var(--tone-information-bg);color:var(--tone-information-fg)}
+.status-badge[data-state="waiting_on_someone"],
+.status-badge[data-state="deferred"]{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}
+.status-badge[data-state="blocked"]{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}
+.status-badge[data-state="cancelled"]{background:var(--tone-archived-bg);color:var(--tone-archived-fg)}
+
 .task-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0 0 22px}
 .task-detail-actions .row-actions{display:flex;flex-wrap:wrap;gap:8px}
 .task-detail-actions .row-action{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:9px 14px}
@@ -581,11 +628,37 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .work-shell{display:block}
 .work-shell-main{min-width:0}
 @media(min-width:1024px){
-  .work-shell:has(.task-detail-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,440px);gap:24px;align-items:start}
-  .task-detail-panel{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow-y:auto;border:1px solid var(--border-default);border-radius: var(--radius-lg);padding:20px;background:var(--background-surface)}
+  .work-shell:has(.task-detail-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,460px);gap:var(--space-6);align-items:start}
+  /*
+   * The docked panel is a sheet, not a dialog: it has a border and a surface, it
+   * scrolls inside itself, and it never covers the list. `position:sticky` keeps
+   * it in view while the list scrolls behind it, which is the whole reason to
+   * dock rather than navigate.
+   */
+  .task-detail-panel{
+    position:sticky;top:var(--space-6);max-height:calc(100vh - var(--space-8) * 2);
+    overflow-y:auto;overscroll-behavior:contain;
+    border:1px solid var(--border-default);border-radius:var(--radius-lg);
+    padding:var(--space-5);background:var(--background-surface);
+  }
+  /* One column inside the panel, always: it is 460px at its widest and the
+     grid above would give the side column 180px. The wrapper is a plain block
+     here, so the DOM order is the reading order with nothing to override. */
+  .task-detail-panel .task-detail-body{display:block}
+  /* Tightened for the narrower frame — the same sections, less air, no control
+     removed. `2L-EDIT-007`: the frame may change, the capabilities may not. */
+  .task-detail-panel .task-detail-header{flex-direction:column;gap:var(--space-2);padding-bottom:var(--space-4)}
+  .task-detail-panel .task-detail-header h1{font:500 26px/1.15 var(--font-reading);margin:var(--space-2) 0 var(--space-2)}
+  .task-detail-panel .task-detail-section{padding:var(--space-4) 0}
+  .task-detail-panel .task-fields{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3)}
+  .task-detail-panel .task-control-list{grid-template-columns:1fr}
 }
 @media(max-width:1023px){
   .work-shell:has(.task-detail-panel) .work-shell-main{display:none}
+  /* On a narrow viewport the panel IS the surface, so it must not keep the
+     docked frame — a bordered card inside a page it entirely fills reads as a
+     dialog that lost its backdrop. */
+  .task-detail-panel{border:0;padding:0;background:none}
 }
 .task-panel-close{min-height:44px;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;color:var(--link);font:600 12px var(--font-sans);cursor:pointer}
 .task-panel-close:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}

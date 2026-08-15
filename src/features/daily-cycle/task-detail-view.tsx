@@ -173,126 +173,155 @@ export function TaskDetailView({
             <p className="task-description">{task.description ?? copy.noDescription}</p>
           </ProtectedContent>
         </div>
-        <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
+        {/*
+          `04-estados.md`: *cor + palavra + forma*. The word was already here and
+          the colour was not — every state rendered on the same neutral wash, so
+          "Bloqueada" and "Concluída" were the same object with different text.
+          `data-state` carries it, mapped to the tone tokens in `operations.css`;
+          the word stays the primary signal, so nothing depends on the colour.
+        */}
+        <span className="status-badge" data-state={task.humanState}>
+          {humanStateCopy[task.humanState][pt ? "pt" : "en"]}
+        </span>
       </header>
 
-      {actions}
+      {/*
+        The two columns of a detail surface — `03-componentes.md`, and the same
+        split the record detail took in this redesign: **what you can do** on the
+        left, **what it is and where it came from** on the right.
 
-      <section className="task-detail-section" aria-label={copy.sections.details}>
-        <h2>{copy.sections.details}</h2>
-        <dl className="task-fields">
-          <Field label={copy.fields.due}>
-            {task.dueAt
-              ? dateTime(task.dueAt)
-              : task.noDueReason ?? copy.fields.noDue}
-          </Field>
-          {/*
-            `2M-PLAN-001`. The label and the formatting both come from the
-            declaration, and the second is the substantive change: this field
-            rendered `dateTime(...)` — a day the user chose, presented as a time
-            they reserved, which is precisely what OD-2M-3 A says `planned_at`
-            is not. The field is now shown even when empty, because "no planned
-            day" is an answer and an absent row is not.
-          */}
-          <Field label={getPlannedAtCopy(locale).label}>
-            {formatPlannedDay(task.plannedAt, locale, detail.timezone) ?? getPlannedAtCopy(locale).none}
-          </Field>
-          <Field label={copy.fields.priority}>
-            {task.priority ? priorityCopy[task.priority][pt ? "pt" : "en"] : copy.none}
-          </Field>
-          <Field label={copy.fields.origin}>
-            {task.origin === "brain" ? copy.origins.brain : copy.origins.you}
-          </Field>
-          <Field label={copy.fields.created}>{dateTime(detail.createdAt)}</Field>
-          <Field label={copy.fields.updated}>{dateTime(detail.updatedAt)}</Field>
-          {detail.completedAt ? <Field label={copy.fields.completed}>{dateTime(detail.completedAt)}</Field> : null}
-          {detail.cancelledAt ? <Field label={copy.fields.cancelled}>{dateTime(detail.cancelledAt)}</Field> : null}
-        </dl>
-      </section>
+        Placed by grid rather than reordered by `order`, so the focus order is
+        the DOM order in both layouts. On the panel and on a narrow viewport the
+        wrappers stack and the reading order is unchanged, which is why the split
+        can be pure CSS and costs the panel nothing.
 
-      {controls}
+        The `<dl>` of facts stays in the *left* column with the controls that
+        change those facts. Sending it right would have put a due date in one
+        column and the field that sets it in the other.
+      */}
+      <div className="task-detail-body">
+        <div className="task-detail-primary">
+        {actions}
 
-      <section className="task-detail-section" aria-label={copy.sections.relations}>
-        <h2>{copy.sections.relations}</h2>
-        {hasRelations ? (
-          <dl className="task-relations">
-            <RelationGroup label={copy.relations.projects} items={task.projects} hrefFor={(item) => `/${locale}/app/projects/${item.id}`} />
-            <RelationGroup label={copy.relations.contexts} items={task.contexts} hrefFor={() => null} />
-            <RelationGroup label={copy.relations.people} items={task.people} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
-            <RelationGroup label={copy.relations.waitingOn} items={task.waitingOnPeople} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
-            <RelationGroup label={copy.relations.parent} items={task.parent ? [task.parent] : []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
-            <RelationGroup label={copy.relations.dependsOn} items={task.dependsOn ?? []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
+        <section className="task-detail-section" aria-label={copy.sections.details}>
+          <h2>{copy.sections.details}</h2>
+          <dl className="task-fields">
+            <Field label={copy.fields.due}>
+              {task.dueAt
+                ? dateTime(task.dueAt)
+                : task.noDueReason ?? copy.fields.noDue}
+            </Field>
+            {/*
+              `2M-PLAN-001`. The label and the formatting both come from the
+              declaration, and the second is the substantive change: this field
+              rendered `dateTime(...)` — a day the user chose, presented as a time
+              they reserved, which is precisely what OD-2M-3 A says `planned_at`
+              is not. The field is now shown even when empty, because "no planned
+              day" is an answer and an absent row is not.
+            */}
+            <Field label={getPlannedAtCopy(locale).label}>
+              {formatPlannedDay(task.plannedAt, locale, detail.timezone) ?? getPlannedAtCopy(locale).none}
+            </Field>
+            <Field label={copy.fields.priority}>
+              {task.priority ? priorityCopy[task.priority][pt ? "pt" : "en"] : copy.none}
+            </Field>
+            <Field label={copy.fields.origin}>
+              {task.origin === "brain" ? copy.origins.brain : copy.origins.you}
+            </Field>
+            <Field label={copy.fields.created}>{dateTime(detail.createdAt)}</Field>
+            <Field label={copy.fields.updated}>{dateTime(detail.updatedAt)}</Field>
+            {detail.completedAt ? <Field label={copy.fields.completed}>{dateTime(detail.completedAt)}</Field> : null}
+            {detail.cancelledAt ? <Field label={copy.fields.cancelled}>{dateTime(detail.cancelledAt)}</Field> : null}
           </dl>
-        ) : (
-          <p className="quiet-state">{copy.relations.empty}</p>
-        )}
-      </section>
+        </section>
 
-      <section className="task-detail-section" aria-label={copy.sections.provenance}>
-        <h2>{copy.sections.provenance}</h2>
-        {detail.provenance ? (
-          <>
-            <p className="quiet-state">{copy.provenance.fromEntry}</p>
-            {/*
-              The excerpt is the *entry itself*, which is the record whose
-              classification produced the mask above. Printing it while the
-              title is withheld would make the mask theatre, so it goes through
-              the same contract with its own reveal key — revealing the title
-              does not reveal the note, and vice versa.
-            */}
-            <ProtectedContent
-              locale={locale}
-              revealKey={`${task.taskId}:provenance`}
-              sensitivity={task.sensitivity}
-            >
-              <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
-            </ProtectedContent>
-            <Link className="panel-view-all" href={`/${locale}/app/inbox/${detail.provenance.entryId}`}>
-              {copy.provenance.openEntry}
-            </Link>
-          </>
-        ) : (
-          <>
-            <p className="quiet-state">{copy.provenance.manual}</p>
-            {/*
-              `2L-PRIVACY-004`, stated exactly where a user could otherwise be
-              misled: this is the one screen that tells them the task came from
-              nothing, and therefore the one screen where "so nothing protects
-              it" belongs.
-            */}
-            {isDerivedLevel(task.sensitivity) ? null : (
-              <p className="quiet-state work-protected-note">
-                {getWorkCopy(locale).protected.partialCoverage}
-              </p>
-            )}
-          </>
-        )}
-      </section>
+        {controls}
+        </div>
 
-      <section className="task-detail-section" aria-label={copy.sections.history}>
-        <h2>{copy.sections.history}</h2>
-        {detail.history.length ? (
-          <ol className="task-history">
-            {detail.history.map((entry) => (
-              <li key={entry.id}>
-                <strong>{describeHistoryEntry(copy, entry)}</strong>
-                {/*
-                  `audit_logs.reason` is deliberately not rendered. It is written
-                  by SQL as English prose — "Task created", "User created a task
-                  directly" — so showing it puts untranslated text in front of a
-                  Portuguese reader, and for a task every value it can hold only
-                  restates the action the sentence above already names.
-                  Localizing it would mean changing what the RPCs write, which is
-                  a schema-level decision and not this surface's to take.
-                */}
-                <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="quiet-state">{copy.history.empty}</p>
-        )}
-      </section>
+        <div className="task-detail-secondary">
+        <section className="task-detail-section" aria-label={copy.sections.relations}>
+          <h2>{copy.sections.relations}</h2>
+          {hasRelations ? (
+            <dl className="task-relations">
+              <RelationGroup label={copy.relations.projects} items={task.projects} hrefFor={(item) => `/${locale}/app/projects/${item.id}`} />
+              <RelationGroup label={copy.relations.contexts} items={task.contexts} hrefFor={() => null} />
+              <RelationGroup label={copy.relations.people} items={task.people} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
+              <RelationGroup label={copy.relations.waitingOn} items={task.waitingOnPeople} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
+              <RelationGroup label={copy.relations.parent} items={task.parent ? [task.parent] : []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
+              <RelationGroup label={copy.relations.dependsOn} items={task.dependsOn ?? []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
+            </dl>
+          ) : (
+            <p className="quiet-state">{copy.relations.empty}</p>
+          )}
+        </section>
+
+        <section className="task-detail-section" aria-label={copy.sections.provenance}>
+          <h2>{copy.sections.provenance}</h2>
+          {detail.provenance ? (
+            <>
+              <p className="quiet-state">{copy.provenance.fromEntry}</p>
+              {/*
+                The excerpt is the *entry itself*, which is the record whose
+                classification produced the mask above. Printing it while the
+                title is withheld would make the mask theatre, so it goes through
+                the same contract with its own reveal key — revealing the title
+                does not reveal the note, and vice versa.
+              */}
+              <ProtectedContent
+                locale={locale}
+                revealKey={`${task.taskId}:provenance`}
+                sensitivity={task.sensitivity}
+              >
+                <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
+              </ProtectedContent>
+              <Link className="panel-view-all" href={`/${locale}/app/inbox/${detail.provenance.entryId}`}>
+                {copy.provenance.openEntry}
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="quiet-state">{copy.provenance.manual}</p>
+              {/*
+                `2L-PRIVACY-004`, stated exactly where a user could otherwise be
+                misled: this is the one screen that tells them the task came from
+                nothing, and therefore the one screen where "so nothing protects
+                it" belongs.
+              */}
+              {isDerivedLevel(task.sensitivity) ? null : (
+                <p className="quiet-state work-protected-note">
+                  {getWorkCopy(locale).protected.partialCoverage}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="task-detail-section" aria-label={copy.sections.history}>
+          <h2>{copy.sections.history}</h2>
+          {detail.history.length ? (
+            <ol className="task-history">
+              {detail.history.map((entry) => (
+                <li key={entry.id}>
+                  <strong>{describeHistoryEntry(copy, entry)}</strong>
+                  {/*
+                    `audit_logs.reason` is deliberately not rendered. It is written
+                    by SQL as English prose — "Task created", "User created a task
+                    directly" — so showing it puts untranslated text in front of a
+                    Portuguese reader, and for a task every value it can hold only
+                    restates the action the sentence above already names.
+                    Localizing it would mean changing what the RPCs write, which is
+                    a schema-level decision and not this surface's to take.
+                  */}
+                  <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="quiet-state">{copy.history.empty}</p>
+          )}
+        </section>
+        </div>
+      </div>
     </div>
   );
 }
