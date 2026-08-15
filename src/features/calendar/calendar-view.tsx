@@ -164,6 +164,20 @@ export function CalendarView({
       */}
       <WorkModeTabs active="calendar" locale={locale} />
 
+      {/*
+        The three control rows, in one band.
+
+        They were three stacked rows above the grid — orientation, then lanes,
+        then navigation, then two status paragraphs, then the summary — so on a
+        1440px screen the week itself began about 320px down. They answer one
+        question between them (*which slice of time am I looking at, and which
+        of it*), and `03-componentes.md` puts the controls that scope a view in
+        one band above it rather than in a stack that competes with it.
+
+        Nothing about the controls changed: still links, still the URL, still
+        keyboard-operable, still no gesture anywhere.
+      */}
+      <div className="calendar-toolbar">
       {/* Orientation. Links, so the URL is the state and the keyboard works. */}
       <nav aria-label={copy.orientation.label} className="calendar-orientation">
         <ul>
@@ -201,7 +215,21 @@ export function CalendarView({
                     and the element stays a real link that can be opened in a new
                     tab. OD-2M-6 A is unaffected — the control is still the URL.
                   */
+                  /*
+                    `data-shown`, and it is not cosmetic.
+
+                    Removing the invalid `aria-pressed` also removed the only
+                    thing `calendar.css` keyed the *visible* off-state off —
+                    `.calendar-lanes a[aria-pressed="false"]` stopped matching
+                    anything, and a hidden lane lost its dashed edge and its
+                    reduced opacity. What remained was a `sr-only` word: correct
+                    for a screen reader and **nothing at all** for a sighted
+                    user, which is `2M-ACCESS-005` failed in the opposite
+                    direction from the one it was written for. The state is
+                    carried by a data attribute, which no ARIA rule governs.
+                  */
                   data-lane={lane}
+                  data-shown={shown ? "true" : "false"}
                   href={calendarHref(locale, withLaneToggled(query, lane))}
                   title={copy.lanes.descriptions[lane]}
                 >
@@ -233,6 +261,7 @@ export function CalendarView({
           {copy.navigation.next}
         </Link>
       </nav>
+      </div>
 
       {/* `2M-CAL-006`: reaching the bound is a visible state, not an empty grid. */}
       {bound.atEarliest ? <p className="calendar-bound" role="status">{copy.navigation.atEarliest}</p> : null}
@@ -253,43 +282,62 @@ export function CalendarView({
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
       {query.orientation === "week" ? (
-        <table className="calendar-week">
-          <caption className="visually-hidden">{rangeLabel}</caption>
-          <thead>
-            <tr>
-              {projection.days.map((day) => (
-                <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
-                  <span>{formatDayLabel(day.date, locale)}</span>
-                  {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {projection.days.map((day) => (
-                <td key={day.date} data-today={day.isToday ? "true" : undefined}>
-                  {day.items.length === 0 ? (
-                    <p className="calendar-empty">{emptyMessage}</p>
-                  ) : (
-                    <ul className="calendar-day-items">
-                      {day.items.map((item) => (
-                        <CalendarItem
-                          dateBounds={dateBounds}
-                          item={item}
-                          key={item.id}
-                          locale={locale}
-                          rescheduleAction={recordingAction}
-                          timezone={projection.timezone}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+        /*
+          The scroll container is the **table's parent**, not the table.
+
+          `overflow-x` needs a block box, and the previous rule got one by
+          putting `display:block` on the `<table>` itself. That replaces the
+          table box with a block box and hands the rows to an anonymous table
+          wrapper, so `table-layout: fixed` was inert and the seven columns were
+          sized by their contents: a week with one busy Tuesday rendered as one
+          wide column and six narrow ones, on every viewport, and `min-width`
+          was the only thing keeping them legible.
+
+          With the overflow on a wrapper the table is a table again — seven
+          equal columns that line up with their headers, and a container that
+          scrolls only when the viewport is narrower than the grid's own floor.
+          The `<table>`, `<thead>`, `<th scope="col">` and `<caption>` are
+          untouched, so `2M-ACCESS-002` is unchanged.
+        */
+        <div className="calendar-week-scroll">
+          <table className="calendar-week">
+            <caption className="visually-hidden">{rangeLabel}</caption>
+            <thead>
+              <tr>
+                {projection.days.map((day) => (
+                  <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
+                    <span className="calendar-week-day">{formatDayLabel(day.date, locale)}</span>
+                    {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {projection.days.map((day) => (
+                  <td key={day.date} data-today={day.isToday ? "true" : undefined}>
+                    {day.items.length === 0 ? (
+                      <p className="calendar-empty">{emptyMessage}</p>
+                    ) : (
+                      <ul className="calendar-day-items">
+                        {day.items.map((item) => (
+                          <CalendarItem
+                            dateBounds={dateBounds}
+                            item={item}
+                            key={item.id}
+                            locale={locale}
+                            rescheduleAction={recordingAction}
+                            timezone={projection.timezone}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       ) : (
         <ol className="calendar-days">
           {projection.days.map((day) => (

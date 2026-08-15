@@ -136,16 +136,18 @@ function plannerRow(options: { locale: Locale; masked?: boolean; selectable?: bo
   const body = options.masked
     ? '<span class="protected-content"><button type="button" class="row-action">Mostrar</button></span>'
     : '<a href="/pt-BR/app/work/t1">Entregar o relatório</a>';
-  return `<li class="planner-item">
+  return `<li class="planner-item" data-operation="${options.selectable === false ? "cleared" : "set"}">
     <div class="planner-item-head">
       ${options.selectable === false ? "" : '<input aria-label="Entregar o relatório" class="planner-select" type="checkbox" />'}
       ${body}
     </div>
     <p class="planner-item-meta">Planejado para 11 de ago. de 2026</p>
-    <div class="task-detail-controls task-detail-controls-inline">
-      <ul class="task-control-list">
-        ${controlMarkup({ action: "set_planned", label: "Aplicar", kind: "date" })}
-      </ul>
+    <div class="planner-item-controls">
+      <div class="task-detail-controls task-detail-controls-inline">
+        <ul class="task-control-list">
+          ${controlMarkup({ action: "set_planned", label: "Aplicar", kind: "date" })}
+        </ul>
+      </div>
     </div>
   </li>`;
 }
@@ -197,16 +199,20 @@ function plannerPage(locale: Locale, rows: string[]): string {
       </nav>
     </header>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
-    <section aria-label="Capacidade" class="planner-capacity">
-      <h2>Capacidade</h2>
-      <p>1 item planejado</p>
-      <p class="quiet-state">Nenhuma duração é conhecida.</p>
-      <p role="status">Este dia parece cheio.</p>
-    </section>
-    <section aria-label="Conflitos" class="planner-conflicts">
-      <h2>Conflitos</h2>
-      <p class="quiet-state">Nenhum conflito.</p>
-    </section>
+    <div class="planner-orientation">
+      <section aria-label="Capacidade" class="planner-capacity">
+        <h2>Capacidade</h2>
+        <p class="planner-capacity-count">1 item planejado</p>
+        <p class="quiet-state">Nenhuma duração é conhecida.</p>
+        <p class="planner-overloaded" role="status">Este dia parece cheio.</p>
+      </section>
+      <section aria-label="Conflitos" class="planner-conflicts" data-has-conflicts="true">
+        <h2>Conflitos</h2>
+        <p class="planner-conflict-count">1 conflito neste dia</p>
+        <ul class="planner-conflict-list"><li>Duas tarefas ocupam o mesmo horário.</li></ul>
+        <p class="quiet-state">Nada foi resolvido por conta disso.</p>
+      </section>
+    </div>
     <section aria-label="Planejado" class="planner-list">
       <h2>Planejado</h2>
       ${rows.length === 0 ? `<p class="quiet-state">${copy.plannedEmpty}</p>` : `<ul>${rows.join("")}</ul>`}
@@ -665,5 +671,79 @@ test.describe("2M-REVIEW-003: what the surface proposes, and what it leaves to t
     const values = await options.evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
     expect(values).not.toContain("cancelled");
     expect(values).toContain("waiting");
+  });
+});
+
+/**
+ * The planner, recomposed — `03-componentes.md`.
+ *
+ * Capacity and conflicts read as one orientation band above the work, and the
+ * rows have a fixed grammar (**seleção · tarefa · quando · o que fazer**)
+ * instead of three stacked blocks each.
+ */
+test.describe("the planner orients before it lists", () => {
+  test("capacity and conflicts sit side by side above the first task", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+
+    const [capacity, conflicts, firstRow] = await Promise.all([
+      page.locator(".planner-capacity").boundingBox(),
+      page.locator(".planner-conflicts").boundingBox(),
+      page.locator(".planner-item").first().boundingBox(),
+    ]);
+    // Side by side, not stacked: same top, different left.
+    expect(capacity!.y).toBeCloseTo(conflicts!.y, 0);
+    expect(capacity!.x).toBeLessThan(conflicts!.x);
+    // And both above the work they describe.
+    expect(conflicts!.y + conflicts!.height).toBeLessThanOrEqual(firstRow!.y + 1);
+  });
+
+  test("stacks the band on a phone rather than halving two columns", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+
+    const [capacity, conflicts] = await Promise.all([
+      page.locator(".planner-capacity").boundingBox(),
+      page.locator(".planner-conflicts").boundingBox(),
+    ]);
+    expect(capacity!.x).toBeCloseTo(conflicts!.x, 0);
+    expect(capacity!.y).toBeLessThan(conflicts!.y);
+  });
+
+  /*
+    `2M-PLAN-008`. A conflict is a statement of fact with nothing already
+    applied, so it keeps its whole sentence and gains a rule on the leading
+    edge — never a tint that would be the only carrier, and never an error
+    style implying the user must clear it.
+  */
+  test("a conflict is a sentence with a rule, not a colour", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+
+    const conflicts = page.locator('.planner-conflicts[data-has-conflicts="true"]');
+    await expect(conflicts.locator(".planner-conflict-list li")).toHaveCount(1);
+    await expect(conflicts.locator(".quiet-state")).toHaveText("Nada foi resolvido por conta disso.");
+    const rule = await conflicts.evaluate((node) => getComputedStyle(node).borderInlineStartWidth);
+    expect(parseFloat(rule)).toBeGreaterThan(0);
+  });
+
+  test("a row reads as columns on a desktop and as a stack on a phone", async ({ page }) => {
+    const body = plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, body);
+    let head = await page.locator(".planner-item-head").boundingBox();
+    let meta = await page.locator(".planner-item-meta").boundingBox();
+    expect(head!.y).toBeCloseTo(meta!.y, 0);
+    expect(head!.x).toBeLessThan(meta!.x);
+
+    await page.setViewportSize({ width: 375, height: 800 });
+    await open(page, body);
+    head = await page.locator(".planner-item-head").boundingBox();
+    meta = await page.locator(".planner-item-meta").boundingBox();
+    expect(head!.y).toBeLessThan(meta!.y);
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 });

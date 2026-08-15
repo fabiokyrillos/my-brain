@@ -29,6 +29,32 @@
 }
 
 /*
+ * The control band (`03-componentes.md`).
+ *
+ * The three rows answer one question between them — which slice of time, and
+ * which of it — so they sit in one band above the grid rather than in a stack
+ * that pushes the week 320px down its own page. `column-gap` is generous and
+ * `row-gap` is not: when the band wraps at a narrow width the rows must read as
+ * rows, not as three separate blocks.
+ */
+.calendar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-block: 1px solid var(--border-default);
+}
+
+/* The range and its arrows go last and take the remaining width, so the label
+   sits at the far edge on a wide viewport and starts its own row on a narrow
+   one instead of squeezing between two chip rows. */
+.calendar-toolbar .calendar-navigation {
+  margin-inline-start: auto;
+}
+
+/*
  * The three control rows. Wrapping rather than scrolling: `2M-MOBILE-001`
  * forbids horizontal page scroll at 375 px, and a control row that scrolled
  * would hide destinations behind a gesture the phase refused.
@@ -62,13 +88,33 @@
   text-decoration: none;
 }
 
+.calendar-orientation a,
+.calendar-lanes a {
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
 .calendar-orientation a[aria-current="true"] {
-  border-width: 2px;
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  border-color: var(--action-primary);
   font-weight: 600;
 }
 
-.calendar-lanes a[aria-pressed="false"] {
-  /* Off is said by opacity AND by a dashed edge, never by colour alone. */
+/*
+ * A hidden lane, said by a dashed edge AND by reduced opacity — never by colour
+ * alone (`2M-ACCESS-005`).
+ *
+ * Keyed on `data-shown` because the selector this replaced read
+ * `a[aria-pressed="false"]`, and `aria-pressed` was removed from these links
+ * when axe flagged it as invalid on an anchor. The attribute went and the rule
+ * stayed, matching nothing: a hidden lane became visually identical to a shown
+ * one, and its state survived only in the visually-hidden word beside it.
+ * Correct for a screen reader, and nothing at all for everyone else.
+ */
+.calendar-lanes a[data-shown="false"] {
   border-style: dashed;
   opacity: 0.65;
 }
@@ -80,6 +126,19 @@
 .calendar-range,
 .calendar-summary {
   margin: 0;
+}
+
+/* The range is the band's subject, so it is set in the reading face at the
+   weight a heading would carry — the two arrows beside it are the controls. */
+.calendar-range {
+  font: var(--type-reading);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.calendar-summary {
+  color: var(--text-secondary);
+  font: var(--type-label);
 }
 
 .calendar-bound,
@@ -121,30 +180,83 @@
 
 /*
  * Week: a real table, so assistive technology gets the two-dimensional relation
- * without a single `role` (`2M-ACCESS-002`).
+ * without a single `role` (`2M-ACCESS-002`) — and a real *grid*, which it was
+ * not.
  *
- * It scrolls **inside its own container** rather than scrolling the page, which
- * is what keeps `2M-MOBILE-001` true at 375 px without hiding a column.
+ * `display: block` used to sit on the `<table>` itself, to give `overflow-x`
+ * the block box it needs. That replaces the table box with a block box and
+ * re-parents the rows into an anonymous table wrapper, so `table-layout` never
+ * applied and the seven columns were sized by their contents: a week with one
+ * busy Tuesday rendered as one wide column and six narrow ones, at every width.
+ * The overflow moved to a wrapper; the table is a table again.
+ *
+ * It still scrolls **inside its own container** rather than scrolling the page,
+ * which is what keeps `2M-MOBILE-001` true at 375 px without hiding a column.
  */
+.calendar-week-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* The floor below which the grid stops being readable and starts scrolling:
+     seven columns at the 8.5rem the cells used to carry as `min-width`. */
+  --calendar-week-floor: 59.5rem;
+}
+
 .calendar-week {
   border-collapse: collapse;
-  display: block;
-  overflow-x: auto;
+  /* The whole point: seven columns of equal width, aligned with their headers,
+     regardless of which day is busy. */
+  table-layout: fixed;
   width: 100%;
+  min-width: var(--calendar-week-floor);
 }
 
 .calendar-week th,
 .calendar-week td {
   border: 1px solid var(--border-default);
-  min-width: 8.5rem;
-  padding: var(--space-2, 0.5rem);
+  padding: var(--space-2);
   text-align: start;
   vertical-align: top;
+  /* `fixed` layout does not shrink to content, so a long title has to be told
+     it may break — otherwise it widens the column and defeats the layout. */
+  overflow-wrap: anywhere;
 }
 
+.calendar-week thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--background-canvas);
+  padding-block: var(--space-2);
+}
+
+.calendar-week-day {
+  display: block;
+  font: var(--type-label);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.calendar-week tbody td {
+  /* Enough height that an empty day reads as a day rather than as a seam. */
+  height: 8rem;
+}
+
+/*
+ * Today: a tinted column as well as a heavier edge. Two carriers, and the
+ * column also carries the word `copy.todayLabel` in its header — the third.
+ */
 .calendar-week th[data-today="true"],
 .calendar-week td[data-today="true"] {
   border-width: 2px;
+}
+
+.calendar-week th[data-today="true"] .calendar-week-day {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.calendar-week td[data-today="true"] {
+  background: var(--background-subtle);
 }
 
 .calendar-day-items {
@@ -156,14 +268,31 @@
   padding: 0;
 }
 
+/*
+ * One commitment, as a card small enough to stack seven-across.
+ *
+ * The meta line is mono and quiet, the body is the reading face at full ink —
+ * the same division of labour the whole redesign is built on: what the owner or
+ * the Brain wrote in sentences is set in Newsreader, and the machine's labels
+ * around it are not.
+ */
 .calendar-item {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
+  background: var(--background-surface);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: var(--space-2, 0.5rem);
+  gap: var(--space-1);
+  padding: var(--space-2);
 }
+
+.calendar-item-body {
+  font: var(--type-reading-sm);
+  color: var(--text-primary);
+}
+
+.calendar-item-link { color: inherit; text-decoration: none; }
+.calendar-item-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /*
  * The commitment axis, carried by border weight and style **in addition to**
@@ -181,30 +310,47 @@
 .calendar-item-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
-  font-size: 0.75rem;
+  align-items: baseline;
+  gap: var(--space-2);
+  font: var(--type-mono);
   color: var(--text-muted);
 }
+
+/* The time is the one piece of metadata a reader scans for, so it is the one
+   piece set at full ink. */
+.calendar-item-time { color: var(--text-secondary); }
 
 .calendar-item-body {
   overflow-wrap: anywhere;
 }
 
+/*
+ * An empty day is a quiet line, not a box. `03-componentes.md` reserves the
+ * bordered treatment for objects, and "nothing here" is not one — inside a cell
+ * that already has a border it would have been a box inside a box.
+ */
 .calendar-empty {
   color: var(--text-muted);
   margin: 0;
+  font: var(--type-caption);
 }
 
 /*
  * `2M-MOBILE-001`. One-handed at 375 px and 412 px: the week's own container is
  * what scrolls, the control rows wrap, and nothing on the page is wider than the
  * viewport. `2M-ACCESS`'s reflow case is the same rule read at 200% zoom.
+ *
+ * The floor rises on a phone rather than the columns shrinking: a 5rem column
+ * holding a task title is a column of single words, which is the readability
+ * defect `layout-contracts.spec.ts` exists to catch elsewhere on this product.
  */
 @media (max-width: 30rem) {
-  .calendar-week th,
-  .calendar-week td {
-    min-width: 11rem;
-  }
+  .calendar-week-scroll { --calendar-week-floor: 77rem; }
+  .calendar-week tbody td { height: 6rem; }
+  /* A sticky header inside a horizontally scrolling container on a short
+     viewport takes a quarter of the visible grid; the header scrolls with its
+     column here. */
+  .calendar-week thead th { position: static; }
 }
 
 /*
@@ -303,6 +449,35 @@
   gap: var(--space-1, 0.25rem);
   min-width: 0;
 }
+
+/*
+ * The plan, as rows rather than as stacked blocks.
+ *
+ * Head, meta and controls stacked before this, so twelve available tasks was
+ * thirty-six blocks of prose with no column to scan. Three tracks now — the
+ * task, when it is planned, and what can be done to it — with the row rule
+ * carrying the separation instead of a card border, which `03-componentes.md`
+ * reserves for objects.
+ *
+ * Only above 720px: below it the tracks would each be under 150px and the date
+ * control alone needs more than that, so the row stacks and the grammar becomes
+ * a reading order instead of a set of columns.
+ */
+@media (min-width: 720px) {
+  .planner-list .planner-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(120px, .6fr) minmax(220px, auto);
+    align-items: start;
+    column-gap: var(--space-4);
+    row-gap: var(--space-2);
+  }
+  .planner-list .planner-item-meta { justify-self: start; }
+  .planner-list .planner-item-controls { justify-self: end; min-width: 0; }
+}
+
+.planner-list li + li { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+.planner-item-head { font: var(--type-reading-sm); color: var(--text-primary); }
+.planner-item-meta { font: var(--type-mono); color: var(--text-muted); }
 
 .planner-item-head,
 .day-review-item-head {
@@ -405,3 +580,53 @@
 .reviews-lead { margin: var(--space-2) 0 0; color: var(--text-secondary); font: var(--type-lead); max-width: var(--width-reading); }
 .reviews-history { margin-top: var(--space-8); }
 .reviews-history > h2 { margin: 0 0 var(--space-4); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
+
+/*
+ * The planner's orientation band — capacity and conflicts, side by side.
+ *
+ * They were two stacked sections between the header and the work, putting the
+ * first task about 600px down a page whose subject is the tasks. Both answer
+ * one question — is this day already full, and does anything on it contradict
+ * anything else — so they read as one band above the lists.
+ *
+ * One column below 900px, where two would be under 200px each and the capacity
+ * sentences would break every three words.
+ */
+.planner-orientation {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--border-default);
+}
+@media (min-width: 900px) {
+  .planner-orientation { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-8); }
+}
+.planner-orientation section { margin-block: 0; }
+.planner-orientation h2 { margin: 0 0 var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.planner-orientation p { margin: 0 0 var(--space-1); font: var(--type-body); color: var(--text-secondary); }
+
+/* The two numbers a planner is read for, at full ink in the reading face. */
+.planner-capacity-count,
+.planner-conflict-count { font: var(--type-reading); color: var(--text-primary); }
+
+/*
+ * Overload and conflicts are stated, never colour-only: each keeps its full
+ * sentence and gains a rule on the leading edge. `2M-PLAN-008` is explicit that
+ * a conflict is a fact with nothing already applied, so neither is styled as an
+ * error the user has to clear.
+ */
+.planner-overloaded {
+  margin-top: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+  color: var(--text-primary);
+}
+.planner-conflicts[data-has-conflicts="true"] {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+}
+.planner-conflict-list { margin: var(--space-2) 0; padding-inline-start: var(--space-4); color: var(--text-primary); }
+.planner-conflict-list li { margin-bottom: var(--space-1); font: var(--type-body); }
+
+/* The two lists' own headings, matched to the band above them. */
+.planner-list > h2 { margin: 0 0 var(--space-3); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }

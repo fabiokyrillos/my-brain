@@ -159,10 +159,22 @@ export function PlannerView({
     .filter((item) => isSelected(selection, item.taskId))
     .map((item) => ({ taskId: item.taskId, title: item.title, status: item.status }));
 
+  /**
+   * One row of the plan, in a fixed grammar: **seleção · tarefa · quando ·
+   * o que você pode fazer**.
+   *
+   * The three parts used to stack — head, then a meta line, then the controls —
+   * so a list of twelve available tasks was thirty-six blocks of text with no
+   * column a reader could scan down. `data-operation` is what lets the two lists
+   * share one row shape while the *planned* list omits the checkbox: bulk
+   * planning applies to what is available, and offering it on rows that are
+   * already planned would be offering a verb the ceiling and the preview were
+   * never derived for.
+   */
   function Row({ item, operation }: { item: PlannerItem; operation: "set" | "cleared" }) {
     const controls = plannedControlsFor(item.status);
     return (
-      <li className="planner-item" key={item.taskId}>
+      <li className="planner-item" data-operation={operation} key={item.taskId}>
         <div className="planner-item-head">
           {operation === "set" ? (
             <input
@@ -195,6 +207,7 @@ export function PlannerView({
             : plannedCopy.none}
         </p>
         {controls.length > 0 ? (
+          <div className="planner-item-controls">
           <TaskDetailControls
             action={reporting(action, operation)}
             controls={controls}
@@ -206,6 +219,7 @@ export function PlannerView({
             title={item.title}
             variant="inline"
           />
+          </div>
         ) : null}
       </li>
     );
@@ -240,9 +254,24 @@ export function PlannerView({
       */}
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
+      {/*
+        Capacity and conflicts, side by side above the two lists.
+
+        They were two stacked sections between the header and the work, so on a
+        wide screen the first task was about 600px down a page whose subject is
+        the tasks. Both answer the same question — *is this day already full, and
+        does anything on it contradict anything else* — and `03-componentes.md`
+        puts what orients a view in one band above it.
+
+        Neither says anything new. The counts, the declared availability, the
+        conflict statements and the two disclaimers are the same sentences the
+        projection already produced; what changed is that they read as one
+        orientation rather than as two competing sections.
+      */}
+      <div className="planner-orientation">
       <section aria-label={copy.capacity.heading} className="planner-capacity">
         <h2>{copy.capacity.heading}</h2>
-        <p>{copy.capacity.count(projection.capacity.plannedCount)}</p>
+        <p className="planner-capacity-count">{copy.capacity.count(projection.capacity.plannedCount)}</p>
         <p>
           {projection.capacity.availabilityDeclared && projection.capacity.availableHours !== null
             ? copy.capacity.available(projection.capacity.availableHours)
@@ -253,17 +282,23 @@ export function PlannerView({
           than in a coefficient: nothing here knows how long anything takes.
         */}
         <p className="quiet-state">{copy.capacity.noDuration}</p>
-        {projection.capacity.overloaded ? <p role="status">{copy.capacity.overloaded}</p> : null}
+        {projection.capacity.overloaded ? (
+          <p className="planner-overloaded" role="status">{copy.capacity.overloaded}</p>
+        ) : null}
       </section>
 
-      <section aria-label={copy.conflicts.heading} className="planner-conflicts">
+      <section
+        aria-label={copy.conflicts.heading}
+        className="planner-conflicts"
+        data-has-conflicts={projection.conflicts.length > 0 ? "true" : "false"}
+      >
         <h2>{copy.conflicts.heading}</h2>
         {projection.conflicts.length === 0 ? (
           <p className="quiet-state">{copy.conflicts.none}</p>
         ) : (
           <>
-            <p>{copy.conflicts.count(projection.conflicts.length)}</p>
-            <ul>
+            <p className="planner-conflict-count">{copy.conflicts.count(projection.conflicts.length)}</p>
+            <ul className="planner-conflict-list">
               {projection.conflicts.map((conflict) => (
                 <li key={`${conflict.kind}:${conflict.taskIds.join("-")}`}>
                   {copy.conflicts.statement[conflict.kind]}
@@ -275,6 +310,7 @@ export function PlannerView({
           </>
         )}
       </section>
+      </div>
 
       <section aria-label={copy.planned} className="planner-list">
         <h2>{copy.planned}</h2>

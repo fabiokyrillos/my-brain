@@ -61,11 +61,21 @@ const SURFACES: Record<string, Surface> = {
   calendar: {
     spec: "e2e/calendar.spec.ts",
     components: [
+      /*
+        `calendar-view.tsx` was **missing** from this list, and the omission was
+        load-bearing: the week grid, the control band and the lane chips are all
+        emitted here, and `e2e/calendar.spec.ts` rendered only the day's `<ol>`.
+        So the surface's largest shape was mirrored by nothing and measured by
+        nothing — which is how `.calendar-lanes a[aria-pressed="false"]` went on
+        living in the stylesheet after the attribute it selects was removed from
+        the markup.
+      */
+      "src/features/calendar/calendar-view.tsx",
       "src/features/calendar/calendar-item.tsx",
       "src/features/calendar/calendar-reschedule.tsx",
     ],
     prefix: "calendar-",
-    attributes: ["data-lane", "data-commitment", "data-elapsed"],
+    attributes: ["data-lane", "data-commitment", "data-elapsed", "data-today", "data-shown"],
     copy: { module: "src/features/calendar/copy.ts", keys: ["empty", "unavailable"] },
     minimumClasses: 5,
   },
