@@ -468,10 +468,19 @@ ADR-114 Decision 3 contradiction — complete CSS, no control — is what
 when written and is still true today: nothing in the product writes
 `data-theme`.
 
-**One interpretation is flagged rather than absorbed.** `OD-2O-6` was framed
-over *inert* preferences; `embedding_model` is not inert. The conservative
-reading — that "controls only for the three review preferences" reaches it too
-— is the one taken, and it is **an interpretation the agent made, not a
-signature the owner gave**. It adds no scope and reversing it costs one form
-field. Recorded here so a future reader does not mistake it for an owner
-decision.
+**One interpretation was flagged, and has since been confirmed.** `OD-2O-6` was
+framed over *inert* preferences; `embedding_model` is not inert. The
+conservative reading — that "controls only for the three review preferences"
+reaches it too — was taken by the agent and recorded here **as an agent reading
+rather than an owner signature**, precisely so it could be asked about.
+
+**ADR-117 (2026-08-15) confirms it**, and adds a prohibition the question did
+not contain: `embedding_model` **may not be removed, altered, renamed,
+re-defaulted or migrated** to satisfy the absence of a control. Its registry row
+must say the true thing — **real consumers, no authorized control** — and never
+"no consumer", which the tree-derived `consumerEvidence` guard would fail
+anyway.
+
+*The paragraph above is left in its original form rather than rewritten, because
+"this was the agent's reading" is what was true when the audit was written, and
+the confirmation is a later fact.*

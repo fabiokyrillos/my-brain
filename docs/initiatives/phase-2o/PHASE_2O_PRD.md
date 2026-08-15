@@ -221,15 +221,19 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
   calls, and that removing it stops them.
 - **2O-AICONFIG-003:** It states which operations are routed to which model,
   reading the routing the product actually uses rather than a second list.
-- **2O-AICONFIG-004:** *(restated in place by **ADR-116** Decision 6; the
-  disjunction is resolved and nothing is renumbered.)* `embedding_model` has six
-  behavioural consumers and no control. `OD-2O-6` **A** signed controls **only**
-  for the three review preferences, so `embedding_model` gains a **registry row
-  recording why it has none** and **no control**. This is an **interpretation
-  the agent took, not a signature the owner gave** — `OD-2O-6` was framed over
-  *inert* preferences and this one is not inert — and it is the reading that
-  adds no scope. Reversing it costs one form field. *Superseded text: "It either
-  gains a control in this phase or gains a registry row recording why not."*
+- **2O-AICONFIG-004:** *(restated in place a second time by **ADR-117**;
+  nothing is renumbered.)* `embedding_model` has six behavioural consumers and
+  no control. `OD-2O-6` **A** signed controls **only** for the three review
+  preferences, and **ADR-117 confirms that the word *only* reaches
+  `embedding_model` too** — so it gains a **capability-registry row and no
+  control**. The row records the true thing: **real consumers, no authorized
+  control** — never "no consumer", which would be false, and never "inert",
+  which it is not. **And the column itself may not be removed, altered,
+  renamed, re-defaulted or migrated** to satisfy this: the absence of a control
+  is not a licence to tidy the schema. *Superseded text, first form: "It either
+  gains a control in this phase or gains a registry row recording why not."
+  Second form, under ADR-116: "This is an interpretation the agent took, not a
+  signature the owner gave" — true when written, and settled by ADR-117.*
 - **2O-AICONFIG-005:** `background_model` and `reasoning_model` gain no control
   while they have no consumer, and their registry rows say so.
 - **2O-AICONFIG-006:** The credential surface states what is stored — that the

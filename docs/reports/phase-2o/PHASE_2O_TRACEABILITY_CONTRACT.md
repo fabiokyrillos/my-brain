@@ -11,8 +11,11 @@ decisions are SIGNED by ADR-116** (2026-08-15). **Implementation is still not
 authorized** — signing the decisions and authorizing the work are two separate
 acts.
 
-**Twenty-eight refusals: eleven live during planning, seventeen armed at
-implementation.** The planning half is live today.
+**Twenty-eight numbered refusals — eleven live during planning, seventeen armed
+at implementation — plus one sub-refusal, `R-2O-13b`, added by ADR-117.** The
+planning half is live today. Sub-lettering rather than renumbering is
+deliberate: `R-2O-14` … `R-2O-28` are cited by other documents, and moving them
+to make room would be the renumbering this phase forbids of its requirements.
 
 **R-2O-5 inverted rather than being deleted**, which is this repository's
 standing pattern. Under ADR-115 it refused a document that described an open
@@ -56,8 +59,13 @@ All twelve are signed. A document that re-opens one, softens it, describes it as
 open, or acts on a branch the owner declined, is refused. **Recommendations are
 the agent's; signatures are the owner's** — and where a signature did not
 cleanly reach a case, the package **states the interpretation and says it is an
-interpretation**, as `2O-AICONFIG-004` does for `embedding_model`, rather than
-resolving it as though the owner had spoken.
+interpretation** rather than resolving it as though the owner had spoken. That
+is what `2O-AICONFIG-004` did for `embedding_model`, and **ADR-117 then
+confirmed it** — which is the mechanism working, not a defect: a flagged reading
+is a question the owner can answer, and an absorbed one is a question nobody
+ever sees. **Once confirmed, the flag becomes a false statement about who
+decided, so it is inverted rather than left standing** — with the superseded
+wording quoted, never deleted.
 *Pre-signature form, retained: "An unsigned decision may not be described as
 settled — a document that presents one as decided, or reads a recommendation as
 an outcome, is refused."*
@@ -112,6 +120,13 @@ carry the `R-2O-` prefix precisely so the two can never be confused.)
 **R-2O-13 — `planning_day` and `planning_time` may not gain a control.**
 Retired by `2M-AUDIT-005`. The columns stay and the payload keeps carrying them;
 what may not exist is an input.
+
+**R-2O-13b — `embedding_model` may not gain a control, and may not be touched.**
+*(Added by ADR-117.)* `OD-2O-6` **A**'s *only* reaches it: a registry row saying
+**real consumers, no authorized control**, and no input. The row may not claim
+it has no consumer — it has six, and `2O-ACTIVATION-005`'s tree-derived
+`consumerEvidence` would fail such a row. **And the column may not be removed,
+altered, renamed, re-defaulted or migrated** to tidy away the asymmetry.
 
 **R-2O-14 — A route may not be redirected or ended to achieve consolidation.**
 ADR-114 Decision 6 preserves every current URL. Consolidation uses the Dados e

@@ -2,6 +2,20 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O — the flagged interpretation is confirmed (ADR-117), and the column it is about may not be touched
+
+**Zero product code. Zero migrations created. 94, parity `202608140094`. Signup closed, rollout 25 · 3 · 2. Implementation still not authorized.**
+
+ADR-116 Decision 6 recorded the `embedding_model` reading as **the agent's, not the owner's**, and said so in the ADR, the PRD and the audit rather than resolving it silently — so that it could be asked about. **It has been.** ADR-117 confirms it: `OD-2O-6` **A**'s *only* reaches `embedding_model`, so it gains a **capability-registry row and no control**.
+
+**The row must say the true thing** — *real consumers, no authorized control* — never "no consumer", which is false and which `2O-ACTIVATION-005`'s tree-derived `consumerEvidence` guard would fail anyway.
+
+**And ADR-117 adds a prohibition the question did not contain:** `embedding_model` **may not be removed, altered, renamed, re-defaulted or migrated** to satisfy the absence of a control. The absence of a control is not a licence to tidy the schema. `R-2O-13b` refuses it, lettered rather than numbered so the refusals other documents already cite keep their numbers.
+
+**Why this landed before the merge rather than after it.** Once the owner confirmed the reading, the PRD's *"an interpretation the agent took, not a signature the owner gave"* became **a false statement about who decided — held in place by a guard that asserted it**. Merging it would have put that into `main` under test protection. The assertion inverts with the fact, the superseded wording stays quoted, and ADR-116's own text is left as the record of what was true when it was written.
+
+`2O-AICONFIG-004` is **restated in place for the second time**, with an `ADR-117` marker and both superseded forms retained. **No identifier renumbered, reused or deleted; the total stays 116.**
+
 ## 2026-08-15 - PHASE 2O — all twelve decisions signed (ADR-116), and the second allocation loses its only destinations
 
 **Zero product code. Zero migrations created. 94 local = 94 hosted, parity `202608140094`. Signup closed, rollout gate 25 · 3 · 2. Implementation is STILL NOT authorized** — signing the decisions and authorizing the work are two separate acts, as they were at ADR-104/ADR-105 and ADR-108/ADR-112. **ADR-115 is amended by addition and not rewritten.**

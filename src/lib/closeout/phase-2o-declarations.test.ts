@@ -429,11 +429,43 @@ describe("Phase 2O decisions: twelve are SIGNED, and the declined branches stay 
     expect("OD-2O-4 remains open").toMatch(/OD-2O-\d+ (is|remains) (still )?open/i);
   });
 
-  it("keeps the interpretation flagged as an interpretation, not a signature", () => {
-    // `OD-2O-6` was framed over inert preferences and `embedding_model` is not
-    // inert. The conservative reading was taken; saying so is the requirement.
-    expect(flat(PRD)).toMatch(/interpretation the agent took, not a signature the owner gave/);
+  it("records the interpretation as confirmed, and keeps the flag it superseded", () => {
+    /*
+     * **Inverted by ADR-117, and this is the third inversion in this phase.**
+     *
+     * ADR-116 flagged the `embedding_model` reading as the agent's, and this
+     * assertion held the flag in place. The owner has now confirmed it, so the
+     * flag became a **false statement about who decided** — held in place by a
+     * test, which is the worst version of that failure. The assertion inverts
+     * with the fact rather than being deleted, and the superseded wording stays
+     * quoted in the PRD so the history is legible.
+     */
+    const prd = flat(PRD);
+    expect(prd, "the confirmation must be recorded").toMatch(/ADR-117 confirms/);
+    expect(prd, "the row must not claim the column has no consumer")
+      .toMatch(/real consumers, no authorized control/);
+    expect(prd, "the column may not be touched to satisfy the decision")
+      .toMatch(/may not be removed, altered,\s*renamed, re-defaulted or migrated/);
+    expect(prd, "the superseded flag must stay quoted rather than deleted")
+      .toMatch(/interpretation the agent took, not a signature the owner gave/);
+    // ADR-116's own text is the record of what was true when it was written and
+    // is not edited into agreement with ADR-117.
     expect(adr116()).toMatch(/interpretation, not a signature/);
+  });
+
+  it("records ADR-117 as an accepted confirmation that authorizes nothing", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-117 — The owner confirms the `embedding_model` reading/);
+    const start = decisions.indexOf("## ADR-117");
+    const next = decisions.indexOf("\n## ADR-", start + 1);
+    const body = decisions.slice(start, next === -1 ? undefined : next);
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "a confirmation must add no implementation").toMatch(/authorizes no implementation/i);
+    expect(body, "a confirmation must add no migration").toMatch(/no migration/i);
+    expect(body, "the column must be protected from tidying").toMatch(/may not be removed, altered, renamed/);
+    expect(body, "an ADR in this series must not name the successor").not.toMatch(/2P/i);
+    expect(decisions, "ADR-116 must point at what amended it")
+      .toMatch(/\*\*Amended by ADR-117\*\*/);
   });
 
   it("declares all twelve, each with options and a recommendation", () => {
@@ -467,7 +499,10 @@ describe("Phase 2O decisions: twelve are SIGNED, and the declined branches stay 
     expect(contract).toMatch(/R-2O-5 — A signed decision may not be silently re-decided/);
     expect(contract, "the pre-signature form must be retained, not deleted")
       .toMatch(/Pre-signature form, retained/);
-    expect(contract).toMatch(/Twenty-eight refusals/);
+    expect(contract).toMatch(/Twenty-eight numbered refusals/);
+    // ADR-117's sub-refusal is lettered rather than numbered, so that the
+    // refusals other documents already cite keep their numbers.
+    expect(contract).toMatch(/R-2O-13b — `embedding_model` may not gain a control/);
   });
 });
 
