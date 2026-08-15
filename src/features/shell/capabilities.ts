@@ -1,7 +1,33 @@
 import type { ProductState } from "@/features/daily-cycle/contracts";
 import type { Locale } from "@/lib/preferences";
 
-export type ProductCapabilityState = "operational" | "informative" | "advanced" | "future";
+/**
+ * What a row's state claims, and the one `2O-ACTIVATION-006` had to add.
+ *
+ * `operational` · `informative` · `advanced` — the capability is real and the
+ * product says so, with or without a control behind a disclosure.
+ *
+ * `future` — **no behavioural consumer**. Nothing in the product reads the
+ * column, so no control may exist for it (`R-24`), and the row records that.
+ *
+ * `uncontrolled` — **real consumers, and no authorized control.** This is the
+ * distinction the registry could not previously express, and its absence is the
+ * ambiguity `2O-ACTIVATION-006` exists to remove: `scheduled_reviews` sat at
+ * `future` with empty evidence, so *"no review runs by schedule"* and *"the
+ * scheduling preference has no consumer"* were both readable off one row, and
+ * only one of them is true. `review-schedule.ts` reads all three review columns.
+ *
+ * The state is also what ADR-117 requires of `embedding_model` — *"real
+ * consumers, no authorized control"*, never "no consumer", which would be false,
+ * and never "inert", which it is not. That row belongs to `2O-AICONFIG-004` and
+ * is not created here; the vocabulary it needs is.
+ */
+export type ProductCapabilityState =
+  | "operational"
+  | "informative"
+  | "advanced"
+  | "future"
+  | "uncontrolled";
 export type ProductCapabilitySurface = "shell" | "settings" | "reviews" | "transparency";
 
 export type CapabilityDefinition = Readonly<{
@@ -10,35 +36,130 @@ export type CapabilityDefinition = Readonly<{
   surface: ProductCapabilitySurface;
   consumerEvidence: readonly string[];
   visible: boolean;
+  /**
+   * The persisted columns this row governs, in the schema's own spelling.
+   *
+   * Added by `2O-ACTIVATION-007`. The registry's keys are product words —
+   * `autonomy`, `reasoning_route` — and the columns are `autonomy_level` and
+   * `reasoning_model`, so a guard asserting "the nine consumer-less columns are
+   * recorded" could not resolve one to the other and would have passed
+   * vacuously. This field is the anchor: `capability-registry-guard.test.ts`
+   * checks every name here against the generated database types, and checks
+   * every control the settings form renders against this list.
+   *
+   * Empty for rows that govern a surface rather than a preference.
+   */
+  columns: readonly string[];
 }>;
 
 export const capabilityRegistry = [
-  { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true },
-  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true },
-  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true },
-  { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true },
-  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true },
+  { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true, columns: [] },
+  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true, columns: ["timezone"] },
+  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"] },
+  { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true, columns: ["quiet_start", "quiet_end", "max_followups_per_day", "important_reminder_override"] },
+  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"] },
   // Slice F1 gave it an input and consumers, so it stops being `future`. The
   // evidence is the accessor plus the surfaces that read through it — this row
   // is the honest record of that, and it was honest before, when it said the
   // column had no consumer at all.
-  { key: "identity_names", state: "operational", surface: "settings", consumerEvidence: ["profile/agent-identity", "assistant/copy", "daily-cycle/copy", "shell/home-copy"], visible: true },
-  { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "scheduled_reviews", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false },
-  { key: "manual_reviews", state: "operational", surface: "reviews", consumerEvidence: ["generateReview"], visible: true },
-  { key: "cost_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["get_ai_cost_summary", "ai_usage_events"], visible: true },
-  { key: "history_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["audit_events"], visible: true },
+  { key: "identity_names", state: "operational", surface: "settings", consumerEvidence: ["profile/agent-identity", "assistant/copy", "daily-cycle/copy", "shell/home-copy"], visible: true, columns: ["agent_name"] },
+  /*
+   * `columns: []` is deliberate, and it is what keeps `2O-ACTIVATION-007`'s
+   * count at **nine** rather than ten: `profiles.locale` is not one of the nine
+   * the requirement names, because the product's language comes from the route
+   * rather than from the column.
+   *
+   * And `future` survives one apparent counter-example. `activation-view.ts`
+   * reads `profiles.locale` — but `consumerEvidence` records **behavioural**
+   * consumers, code whose output changes because of the stored value, and that
+   * read only observes whether a value is *set*. Counting a read like that
+   * would let any column acquire a consumer by being looked at.
+   */
+  { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: [] },
+  /*
+   * `2O-ACTIVATION-006`. Disambiguated: the three review-time columns **have** a
+   * consumer — `review-schedule.ts` reads all three and `/app/reviews` renders
+   * the result — and have no control. `future` said the opposite of the first
+   * half and was indistinguishable from the second.
+   *
+   * `visible: false` stays: `OD-2O-6` **A** signs controls for exactly these
+   * three, and `2O-PREF-004` builds them in slice 2O.3. The row's final wording
+   * is fixed by that outcome, as `2O-ACTIVATION-006` says; what changes here is
+   * only that it stops being ambiguous.
+   *
+   * `/app/reviews` states *"nada é executado por horário configurado"*, and that
+   * stays true — these columns say when the surface offers to close the day,
+   * not when something runs.
+   */
+  { key: "scheduled_reviews", state: "uncontrolled", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: false, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"] },
+  { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["autonomy_level"] },
+  { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"] },
+  { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"] },
+  { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"] },
+  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["background_model"] },
+  /*
+   * `2O-ACTIVATION-007`'s remaining four, which had no row at all.
+   *
+   * `OD-2O-7` **A** keeps the columns, offers no control, and guards the
+   * absence. Recording them is the whole of the requirement: a column nobody has
+   * written down is a column a future author gives a control to, having found no
+   * record that its inertness was a decision.
+   *
+   * `privacy_preferences`, `quiet_periods` and `avatar_path` have zero
+   * references outside the generated types. `ai_provider` is written on every
+   * save — `buildSettingsPayload` sends the literal `"openai"` — and read by
+   * nothing, which is inertness with a write path rather than inertness without
+   * one, and is still no consumer.
+   */
+  { key: "privacy_preferences", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_preferences"] },
+  { key: "quiet_periods", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["quiet_periods"] },
+  { key: "avatar", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["avatar_path"] },
+  { key: "ai_provider", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["ai_provider"] },
+  { key: "manual_reviews", state: "operational", surface: "reviews", consumerEvidence: ["generateReview"], visible: true, columns: [] },
+  { key: "cost_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["get_ai_cost_summary", "ai_usage_events"], visible: true, columns: [] },
+  { key: "history_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["audit_events"], visible: true, columns: [] },
 ] as const satisfies readonly CapabilityDefinition[];
+
+/**
+ * The nine columns `2O-ACTIVATION-007` names, derived from the registry rather
+ * than listed a second time.
+ *
+ * A row is one of the nine when it claims **no consumer at all** and governs at
+ * least one column. Deriving it is the point: a second hand-written list would
+ * be a second thing to keep true, and the guard would then be checking the list
+ * against itself.
+ */
+export const consumerlessPreferenceColumns: readonly string[] = capabilityRegistry
+  .filter((capability) => capability.state === "future" && capability.consumerEvidence.length === 0)
+  .flatMap((capability) => capability.columns);
 
 export type CapabilityRegistryView = readonly CapabilityDefinition[];
 
-export function getCapabilityRegistryView(surface: ProductCapabilitySurface): CapabilityRegistryView {
-  return capabilityRegistry.filter((capability) => capability.surface === surface);
+/**
+ * The rows on one surface, **keeping their literal keys**.
+ *
+ * The signature is generic and the predicate is written out, and both are load-
+ * bearing rather than decoration. Annotated as `CapabilityRegistryView` this
+ * widened every `key` to `string`, so the only consumer had to cast before it
+ * could look up its copy — and that cast is exactly what defeats the guarantee
+ * `capability-copy.ts` exists for: **a row that becomes visible fails the build
+ * until someone writes what it does.** A registry that can render a heading of
+ * `undefined` is the failure `transparency/contracts.ts` refused, one surface
+ * over.
+ *
+ * The predicate is explicit because the comparison is against a *parameter*.
+ * TypeScript infers a predicate from `(c) => c.visible` — a literal boolean
+ * field — but not from `c.surface === surface`, so without this the union kept
+ * every surface's keys and the lookup failed on `home_status`. Caught by
+ * `tsc`, which is the point.
+ */
+export function getCapabilityRegistryView<S extends ProductCapabilitySurface>(
+  surface: S,
+): readonly Extract<(typeof capabilityRegistry)[number], { surface: S }>[] {
+  return capabilityRegistry.filter(
+    (capability): capability is Extract<(typeof capabilityRegistry)[number], { surface: S }> =>
+      capability.surface === surface,
+  );
 }
 
 export function deriveHomeOperationalStatus({

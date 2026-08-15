@@ -6,6 +6,7 @@ import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
 import { loadSettingsFormValues } from "@/features/profile/settings-view";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { CapabilitySummary } from "@/features/shell/capability-summary";
 import { DataAiSection } from "@/features/transparency/data-ai-section";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
@@ -41,6 +42,16 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         timeZone={await getOwnerTimeZone()}
       />
       <SettingsForm action={updateProfile} locale={locale} values={values} />
+      {/*
+        `2O-ACTIVATION-004`. The page's own intro claims that only preferences
+        with a verifiable consumer are offered here. Until this section that was
+        prose: `capabilityRegistry` recorded which ones those are and **nothing
+        rendered it**, so the claim and the registry could drift apart with
+        nobody able to tell. It is placed after the controls and before Dados e
+        IA deliberately — here is what you can change, here is what each change
+        does, here is where to see what was done with it.
+      */}
+      <CapabilitySummary locale={locale} />
       {/*
         Dados e IA — `02-arquitetura-e-rotas.md` puts the transparency centre
         inside Ajustes. It is a section that **reaches** the three surfaces

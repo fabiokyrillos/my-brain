@@ -2,6 +2,56 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O SLICE 2O.0 — implementation is authorized (ADR-118), and the capability registry stops being a comment
+
+**Zero migrations created. 94, parity `202608140094`. Signup closed, rollout 25 · 3 · 2. CSP unchanged. A13 not retargeted.**
+
+**Authorization.** ADR-118 authorizes implementation through closeout, over the
+plan ADR-115 authorized, the twelve decisions ADR-116 signed and the
+interpretation ADR-117 confirmed. All six of the plan's §8 preconditions were
+discharged, and the four that were still open were **checked rather than
+asserted**: `main` `57beb06` clean with no open PR, CI green on `e4f2668` (three
+job families) and `57beb06`, 94 local = 94 hosted at `202608140094` read live,
+and the rollout gate re-read by running `rollout:verify`.
+
+### Added
+
+- `src/features/activation/contracts.ts` — activation as five **ordered,
+  derived, three-valued** facts. `unreadable` is a first-class state, and
+  completeness is three-valued for the same reason: `no` only when something was
+  read and found false, `unknown` when something could not be read.
+- `src/features/activation/activation-view.ts` — the server-side derivation.
+  Every read is wrapped and independent, so one unreadable table leaves the other
+  four answerable. It deliberately does not reuse `loadCredentialMetadata`, which
+  collapses an error into `ABSENT_CREDENTIAL`.
+- `src/features/shell/capability-summary.tsx` + `capability-copy.ts` — the
+  capability registry's **first product consumer**, mounted on `/app/settings`.
+  A row that becomes visible fails the build until copy exists, because the copy
+  record is keyed by a type derived from the registry.
+- `src/lib/closeout/capability-registry-guard.test.ts` — the two-directional
+  guard: a row may not claim a consumer that does not exist, and a rendered
+  control may not exist without a row. Both carry planted divergences.
+
+### Changed
+
+- `src/features/shell/capabilities.ts` — a new `uncontrolled` state (*real
+  consumers, no authorized control*), a `columns` anchor in the schema's own
+  spelling, four rows that did not exist, `scheduled_reviews` disambiguated out
+  of `future`, and `consumerlessPreferenceColumns` **derived** rather than listed
+  a second time.
+- `docs/reports/phase-2o/PHASE_2O_TRACEABILITY_CONTRACT.md` — `R-2O-7` inverted
+  (an acceptance record per delivered slice is now required; the phase-closing
+  artifacts stay refused) and `R-2O-8` **discharged**, both with their
+  pre-authorization text retained.
+
+### Recorded, not repaired
+
+`buildSettingsPayload` writes `ai_provider` and `embedding_model` as literals
+rather than passing them through, so `2O-ACTIVATION-007`'s *"no save wipes a
+value"* is imprecise for those two. Carried to slice 2O.4 with a destination:
+ADR-117 forbids touching `embedding_model`, and repairing `ai_provider` here
+would be the slice widening itself on a finding rather than on a requirement.
+
 ## 2026-08-15 - PHASE 2O — the flagged interpretation is confirmed (ADR-117), and the column it is about may not be touched
 
 **Zero product code. Zero migrations created. 94, parity `202608140094`. Signup closed, rollout 25 · 3 · 2. Implementation still not authorized.**
