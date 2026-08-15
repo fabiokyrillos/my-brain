@@ -76,16 +76,43 @@ const PRIMARY = ["Hoje", "Registros", "Trabalho", "Brain"] as const;
  * `mobileDemotedKeys` derives rather than lists.
  */
 const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Mais"] as const;
+/*
+ * The overflow disclosure's five groups.
+ *
+ * **This list was stale by six destinations.** It carried four context members
+ * where the product renders eight, missed Conversar, Empresas, Contextos and
+ * Relações entirely, and had Organização holding only Lembretes when Calendário
+ * had joined it in Phase 2M. Every assertion over the panel was therefore
+ * measuring a navigation the product does not render — the same failure the
+ * `PRIMARY` and `MOBILE_BAR` lists had, found and fixed one commit before this
+ * one, by a guard that only covered those two.
+ *
+ * `shell-mirror-guard.test.ts` now derives this one from `capabilities.ts` and
+ * `messages.ts` too, with a planted-divergence control per group.
+ */
 const GROUPS = [
-  ["Contexto", ["Projetos", "Pessoas", "Memórias", "Arquivos"]],
+  ["Contexto", ["Conversar", "Projetos", "Pessoas", "Empresas", "Contextos", "Memórias", "Arquivos", "Relações"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
-  ["Organização", ["Lembretes"]],
+  ["Organização", ["Calendário", "Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],
   ["Preferências", ["Configurações"]],
 ] as const;
 
+/**
+ * Mirrors `navLink` in `navigation-links.tsx`, including the thing this fixture
+ * never emitted: `aria-current="page"` on the destination you are standing in,
+ * and the `active` class beside it.
+ *
+ * Its absence meant the lane had **no** way to check the active state — a bar
+ * that marked every slot, or none, would have rendered identically here. The
+ * fixture composes Hoje, so Hoje is the current destination.
+ */
+const CURRENT = "Hoje";
+
 function navLink(label: string, className = "nav-item") {
-  return `<a class="${className}" href="#">${ICON}<span>${label}</span></a>`;
+  const active = label === CURRENT;
+  const current = active ? ` aria-current="page"` : "";
+  return `<a class="${className}${active ? " active" : ""}"${current} href="#">${ICON}<span>${label}</span></a>`;
 }
 
 function sideNav() {
@@ -250,6 +277,9 @@ test("usable content width never shrinks as the viewport grows", async ({ page }
  * fewer destinations rather than making the overflow prettier.
  */
 
+const BAR_TARGET_TITLE = (name: string) =>
+  "every bar slot meets the 44px touch minimum at " + name;
+
 test.describe("mobile bottom navigation", () => {
   for (const viewport of VIEWPORTS.filter((entry) => entry.width <= 412)) {
     test(`capture stays centred and in source order at ${viewport.name}`, async ({ page }) => {
@@ -295,6 +325,52 @@ test.describe("mobile bottom navigation", () => {
       ).toBeLessThanOrEqual(2);
     });
   }
+
+  /*
+   * The bar is the only navigation a phone has, so its slots are the targets
+   * that matter most. Asserted at both widths the brief names, because a
+   * five-column grid divides 375 and 412 differently and a slot that clears 44px
+   * at one can fail at the other.
+   */
+  for (const viewport of VIEWPORTS.filter((entry) => entry.width <= 412)) {
+    test(BAR_TARGET_TITLE(viewport.name), async ({ page }) => {
+      await render(page, homeBody(), viewport.width, viewport.height);
+
+      const boxes = await page.evaluate(() => {
+        const nav = document.querySelector(".bottom-nav")!;
+        return [...nav.children].map((element) => {
+          // A disclosure is measured by its summary — the thing a thumb lands
+          // on — not by the panel it opens.
+          const target = element.querySelector("summary") ?? element;
+          const rect = target.getBoundingClientRect();
+          const named = (target.textContent ?? "").trim().split(/\s+/)[0];
+          return { named, width: rect.width, height: rect.height };
+        });
+      });
+
+      expect(boxes.length, "the bar rendered no slots to measure").toBe(5);
+      for (const box of boxes) {
+        expect(box.height, box.named + " is " + box.height.toFixed(1) + "px tall").toBeGreaterThanOrEqual(44);
+        expect(box.width, box.named + " is " + box.width.toFixed(1) + "px wide").toBeGreaterThanOrEqual(44);
+      }
+    });
+  }
+
+  /*
+   * Exactly one destination is current, and the disclosure is current only when
+   * what you are reading lives inside it. Two marks would tell a screen-reader
+   * user they are in two places; none would tell them they are nowhere.
+   */
+  test("marks exactly one slot as the current destination", async ({ page }) => {
+    await render(page, homeBody(), 375, 667);
+    const marked = await page.evaluate(() => {
+      const nav = document.querySelector(".bottom-nav")!;
+      return [...nav.querySelectorAll('[aria-current="page"]')].map(
+        (node) => (node.textContent ?? "").trim().split(/\s+/)[0],
+      );
+    });
+    expect(marked).toHaveLength(1);
+  });
 
   test("the bar reserves the device safe area", async ({ page }) => {
     await render(page, homeBody(), 375, 667);

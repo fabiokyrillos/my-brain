@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   mobileBarSlots,
   mobileDemotedKeys,
+  moreNavigationGroups,
   primaryNavigationKeys,
 } from "@/features/shell/capabilities";
 import { getMessages } from "@/i18n/messages";
@@ -59,6 +60,14 @@ function label(key: string): string {
   const nav = getMessages("pt-BR").nav as Record<string, string>;
   const value = nav[key];
   if (typeof value !== "string") throw new Error(`no pt-BR nav label for '${key}'`);
+  return value;
+}
+
+/** The heading a navigation group renders under, from the same catalogue. */
+function groupLabel(key: string): string {
+  const groups = getMessages("pt-BR").navGroups as Record<string, string>;
+  const value = groups[key];
+  if (typeof value !== "string") throw new Error(`no pt-BR label for the '${key}' group`);
   return value;
 }
 
@@ -128,6 +137,59 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
     const demoted = /mobile-nav-demoted[^`]*?<\/div><\/div>/.exec(mutated)?.[0] ?? "";
     expect(demoted).not.toContain(`navLink("${label(key)}")`);
   });
+});
+
+/**
+ * The disclosure's five groups — the third derivation, and the one that had none.
+ *
+ * `PRIMARY` and `MOBILE_BAR` were derived and controlled one commit ago;
+ * `GROUPS` was not, and it was **stale by six destinations**: four context
+ * members where the product renders eight, no Conversar, Empresas, Contextos or
+ * Relações, and Organização holding only Lembretes after Calendário joined it in
+ * Phase 2M. Every assertion the browser lane made over the panel was measuring a
+ * navigation the product does not render — which is the exact failure the two
+ * lists above were fixed for, surviving in the list nobody checked.
+ */
+describe("the overflow panel's groups mirror the groups the product renders", () => {
+  /** The `GROUPS` literal, as `[groupLabel, [itemLabel, …]]` pairs. */
+  function fixtureGroups(source: string): readonly (readonly [string, readonly string[]])[] {
+    const [, rest] = splitAt(source, "const GROUPS = [");
+    const literal = rest.slice(0, rest.indexOf("] as const;"));
+    return Array.from(literal.matchAll(/\["([^"]+)",\s*\[([^\]]*)\]\]/g)).map(
+      (entry) => [entry[1], Array.from(entry[2].matchAll(/"([^"]+)"/g)).map((item) => item[1])] as const,
+    );
+  }
+
+  const derived = moreNavigationGroups.map(
+    (group) => [groupLabel(group.key), group.items.map(label)] as const,
+  );
+
+  it("lists every group, in order, with every member", () => {
+    expect(fixtureGroups(FIXTURE)).toEqual(derived);
+  });
+
+  it("finds five groups to check, so an empty parse cannot pass", () => {
+    // Non-vacuity: `fixtureGroups` returning `[]` would satisfy `toEqual([])` if
+    // the derivation ever emptied too.
+    expect(fixtureGroups(FIXTURE).length).toBe(5);
+    expect(derived.length).toBe(5);
+  });
+
+  /*
+    One control per group rather than one for the whole list, for the reason the
+    controls above record: a single planted divergence in the first group leaves
+    the other four able to match something that cannot vary.
+  */
+  it.each(moreNavigationGroups.map((group) => group.key))(
+    "fails when the %s group loses a member",
+    (key) => {
+      const group = moreNavigationGroups.find((candidate) => candidate.key === key)!;
+      const [start, rest] = splitAt(FIXTURE, "const GROUPS = [");
+      const mutated = start + rest.replace(`"${label(group.items[0])}"`, '"Alguma outra coisa"');
+      expect(mutated, `the ${key} group's first label was not found to mutate`).not.toEqual(FIXTURE);
+      expect(fixtureGroups(mutated)).not.toEqual(derived);
+    },
+  );
 });
 
 /** Splits `source` at the first occurrence of `token`, keeping it on the right. */

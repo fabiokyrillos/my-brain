@@ -169,6 +169,7 @@ function page(locale: Locale, items: string[]): string {
       <p aria-live="polite" class="calendar-range">sáb., 15 ago.</p>
       <a href="?date=2026-08-15">Hoje</a>
       <a href="?date=2026-08-16" rel="next">Próximo</a>
+    <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
     </nav>
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <ol class="calendar-days"><li class="calendar-day" data-today="true">
@@ -220,6 +221,7 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
         <p aria-live="polite" class="calendar-range">seg., 10 ago. – dom., 16 ago.</p>
         <a href="?date=2026-08-15">Hoje</a>
         <a href="?date=2026-08-17" rel="next">Próximo</a>
+      <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
       </nav>
     </div>
     <p class="calendar-bound" role="status">${copy.atLatest}</p>

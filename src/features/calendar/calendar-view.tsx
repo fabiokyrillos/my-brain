@@ -265,6 +265,20 @@ export function CalendarView({
         >
           {copy.navigation.next}
         </Link>
+        {/*
+          The one link in the product that reaches Lembretes unconditionally.
+
+          `/app/reminders` was reachable **only** from a calendar item that *is*
+          a reminder, or from an entry outcome that produced one — so an account
+          with no reminder had no path to the surface at all, and a route
+          reachable only once it has content is not reachable. It sits here
+          because this is the surface that already draws reminders beside tasks,
+          which makes "see all of them" a truthful offer rather than a menu entry
+          smuggled into a control band.
+        */}
+        <Link className="calendar-reminders-link" href={`/${locale}/app/reminders`}>
+          {copy.navigation.allReminders}
+        </Link>
       </nav>
       </div>
 

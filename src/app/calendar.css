@@ -723,3 +723,36 @@
   background: var(--tone-success-bg);
   color: var(--tone-success-fg);
 }
+
+/*
+ * The one link in the band that leaves the calendar.
+ *
+ * Every other control in `.calendar-navigation` narrows or moves the range; this
+ * one goes to Lembretes. Set apart by a rule and the link colour so a reader can
+ * see, before pressing it, that it is a destination rather than another step —
+ * a band word that behaved differently from every other word in the band would
+ * be the band lying about what it is.
+ */
+.calendar-reminders-link {
+  margin-inline-start: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 1px solid var(--border-divider);
+  color: var(--link);
+}
+
+.calendar-reminders-link:hover {
+  color: var(--link-hover);
+}
+
+@media (max-width: 899px) {
+  /* Wrapped onto its own line, the rule and the inset read as a stray divider,
+     so both go and the target grows to the phone minimum. */
+  .calendar-reminders-link {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: none;
+    min-height: var(--touch-target);
+    display: inline-flex;
+    align-items: center;
+  }
+}

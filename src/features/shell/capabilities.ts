@@ -234,21 +234,48 @@ export const primaryNavigationKeys = navigationCapabilities
  * overflow.* Its default view is now the decision queue, so the premise of the
  * old decision is gone with it.
  *
- * ## The one place this bar departs from the handoff
+ * ## The one place this bar departs from the handoff, and the exact size of it
  *
  * The handoff's bar is `Hoje · Registros · [Capturar] · Trabalho · Brain`, and
  * it adds that *"Mais" deixa de existir*. The first four slots are exactly that.
- * The fifth is **not** `library`, and the reason is a rule that outranks the
- * layout: `more` is the only route to fourteen destinations on a phone —
- * reviews, questions, calendar, reminders, files, memories, relations, people,
- * projects, organizations, contexts, history, costs, settings. The handoff can
- * retire it because its Brain absorbs those as lenses; this codebase keeps every
- * one of them as its own route, so dropping the disclosure would strand them on
- * mobile with no way back. Losing a destination is not a composition change.
+ * The fifth is still `more`, and the reason has changed shape twice — so it is
+ * written here as a **census with a release condition** rather than as a
+ * paragraph that has to be re-argued each time.
  *
- * Brain is therefore one tap further away on a phone than on the desktop rail,
- * which is a real and recorded shortfall against the handoff — not a decision
- * that Brain matters less. It closes when Brain genuinely absorbs the lenses.
+ * The 2026-08-14 version of this comment said `more` was the only route to
+ * **fourteen** destinations. That was true then. Brain's lenses, Trabalho's
+ * modes, Hoje's closing section and Ajustes → Dados e IA have since absorbed
+ * twelve of them, and each has a named in-product path that
+ * `mobile-reachability-guard.test.ts` re-derives from the components on every
+ * run:
+ *
+ * | destination | reached from |
+ * | --- | --- |
+ * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview |
+ * | calendar (and the planner) | Trabalho's mode tabs |
+ * | reviews, questions | Hoje |
+ * | reminders | the calendar's control band |
+ * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
+ *
+ * **One thing is left, and it is the account.** `AccountMenu` is mounted in
+ * exactly two places: the desktop rail's foot, and the mobile overflow panel. On
+ * a phone the top bar carries the palette, the locale switch and notifications —
+ * no avatar, no profile chip. So retiring `more` today would take Ajustes with
+ * it, and with Ajustes the whole of Dados e IA, and **sign-out**. That is not a
+ * destination being one tap further away; it is the way out of the product
+ * disappearing.
+ *
+ * `02-arquitetura-e-rotas.md` already specifies the fix — *Conta e ajustes ·
+ * Avatar no cabeçalho* on mobile. It is not built here because moving the
+ * account surface changes the shell on both viewports, and this initiative's
+ * last delimited part is not where the way out of the product gets rebuilt
+ * unvalidated.
+ *
+ * **The release condition, stated so nobody has to rediscover it:** when
+ * `AccountMenu` is mounted somewhere a phone can reach without the disclosure,
+ * the fifth slot becomes `library` and this comment shrinks to nothing. The
+ * guard fails the moment that census changes, in either direction — a
+ * destination losing its path, or the account gaining one.
  */
 export const mobileBarSlots = ["home", "inbox", "capture", "work", "more"] as const;
 
