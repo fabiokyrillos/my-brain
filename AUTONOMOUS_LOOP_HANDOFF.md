@@ -6352,3 +6352,87 @@ destination. There is no third outcome, and `R-2O-26` says so.
 **At an implementation authorization, which ADR-116 deliberately is not.** The PR
 stays a draft. No slice may begin, no migration may be created, no deploy may
 run, and signup may not open.
+
+## §76 — The Phase 2O planning package is MERGED, and the phase is planned and unimplemented (2026-08-15)
+
+**PR #228**, merged at **`e4f2668`**; head at merge **`9be2f13`**, **CI green on
+all three job families on both** — run `31904719291` on the merge SHA, and the
+five PR checks on the head. `main` local equals `origin/main` at `e4f2668`,
+worktree clean, **no planning PR open**.
+
+This section exists because §74 and §75 were written **before** the merge and
+therefore could not carry the merge SHA or the CI verdict on it. The convention
+this repository has followed since §69 is that a handoff records the PR, the
+merge commit and the CI result; those three facts are here and nowhere else.
+
+### What landed
+
+**Three commits, 3,743 insertions, 13 files, and not one line of product code.**
+
+| | |
+|---|---|
+| Governing pair | `docs/initiatives/phase-2o/PHASE_2O_PRD.md`, `..._IMPLEMENTATION_PLAN.md` |
+| Evidence | `PHASE_2O_CURRENT_EXPERIENCE_AUDIT.md`, `..._UX_GAPS_AND_OPPORTUNITIES.md`, `..._THREAT_MODEL.md`, `..._TRACEABILITY_CONTRACT.md` |
+| Enforcement | `src/lib/closeout/phase-2o-declarations.test.ts`, and the A13 retarget in `phase-2f-documentation.test.ts` |
+| Decisions | **ADR-115** (planning + retarget), **ADR-116** (twelve signatures), **ADR-117** (the confirmed interpretation) |
+
+**116 requirements · sixteen families · nine slices · 14–19.5 weeks · budget 2
+allocated, 0 spent, none created, M2 already without a destination.**
+
+### The state this leaves, stated so the next session does not have to derive it
+
+- **Phase 2O is PLANNED and UNIMPLEMENTED.** Every one of the 116 requirements
+  is declared and none is executed.
+- **Implementation is NOT authorized.** ADR-116 signed the decisions; ADR-117
+  confirmed the one flagged reading. **Neither authorized work.** Starting slice
+  2O.0 needs its own owner decision, and the plan's §8 lists what must be true
+  first: a re-audit at the authorization baseline, CI green on that merge SHA,
+  hosted parity read live, and the authorization itself.
+- **94 migrations, hosted parity `202608140094`**, none created and none
+  applied. **M1** is live and conditional on a real producer *and* consumer;
+  **M2 has no destination and closes unspent by construction** (`R-2O-25`).
+- **Signup closed. Rollout gate 25 · 3 · 2, untouched.**
+- **A13 guards the roadmap successor** and was retargeted by ADR-115's own
+  commit. **It is not moved again by this one.** The roadmap ends at Phase 2O,
+  so what it protects is the next name the lettered series would take — a
+  detector token, in no governing artifact, and named by no ADR heading.
+- **Carried and unabsorbed**, each declined explicitly by `OD-2O-11`:
+  `2N-RELATION-TRIGGER`, `2N-IDENTITY-EXTRACTION`, `2N-FILES-WRITER`,
+  `2N-PRIVACY-FREETEXT`, `2N-RELATION-END-ANNOUNCEMENT`, the retention sweeps,
+  push failing with HTTP 403 on a real iPhone and never executed on Android, and
+  **ADR-055, neither satisfied nor superseded, expiring 2026-10-27**.
+- **Admitted into the phase**, and only these two: the 21px touch target
+  (`2O-MOBILE-003`) and a real screen-reader run (`2O-ACCESS-006`, non-blocking
+  under `OD-2O-12` **B** and **never promotable by documentation, emulation or
+  inference**).
+
+### What this package cost me, recorded because the next reader will pay it too
+
+Four defects were mine, and **none of them was caught by a test**:
+
+1. **A sentinel that contained the token it was protecting.** Shielding
+   `PHASE_2K_2O_` with `@@KEEP_2K_2O@@` during a `2O → 2P` pass rewrote the
+   sentinel itself, so the restore silently matched nothing — and a blind
+   substitution turned *"ADR-115 authorizes Phase 2O"* into *"Phase 2P"* inside
+   the file that exists to prevent unauthorized phase starts.
+2. **An arithmetic error.** The published 13–18 weeks never matched the plan's
+   own table, which summed to 13.5–19. Typed, not added.
+3. **A stale count inside a live requirement.** `2O-CLOSE-001` said *"every one
+   of the 113 requirements"* after the total moved to 116; the count guard only
+   knew the bolded spelling.
+4. **A guard whose exemption swallowed its own subject.** The fix for (3)
+   exempted `113` whenever the document also contained `113 → 116` — which every
+   document recording the correction does. Planting the defect back made the
+   test **pass**. Deleted rather than narrowed, then proved failing and passing.
+
+**Every one was found by reading the diff or by planting the defect.** That is
+the whole argument for both steps, and it is the fourth phase running in which
+the probe was wrong before the product was.
+
+### Where this stops
+
+**Here.** Phase 2O is planned, merged and unimplemented. No slice may begin, no
+migration may be created or applied, no deploy may run, no secret may change,
+signup may not open, the push investigation stays closed, and **the roadmap
+successor is neither started nor planned**. All of that needs a new owner
+authorization.
