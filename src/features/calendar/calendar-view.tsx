@@ -191,12 +191,22 @@ export function CalendarView({
             return (
               <li key={lane}>
                 <Link
-                  aria-pressed={shown ? "true" : "false"}
+                  /*
+                    No `aria-pressed`. It is only valid on `role="button"`, and
+                    axe flagged all five of these on the live page — a link that
+                    claims to be a toggle button is an invalid ARIA attribute,
+                    not a shortcut. The state belongs in the accessible name, so
+                    it is a visually hidden word inside the link: screen readers
+                    hear "Prazos, mostrando", pointer users see the same chip,
+                    and the element stays a real link that can be opened in a new
+                    tab. OD-2M-6 A is unaffected — the control is still the URL.
+                  */
                   data-lane={lane}
                   href={calendarHref(locale, withLaneToggled(query, lane))}
                   title={copy.lanes.descriptions[lane]}
                 >
                   {copy.lanes.names[lane]}
+                  <span className="sr-only">{shown ? copy.lanes.stateShown : copy.lanes.stateHidden}</span>
                 </Link>
               </li>
             );

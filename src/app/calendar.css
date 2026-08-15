@@ -371,3 +371,14 @@
 .day-review-verb select {
   max-width: 100%;
 }
+
+/*
+ * The day review's own heading, demoted from `<h1>` to `<h2>`.
+ *
+ * It renders inside `/app/reviews`, which already owns the page's `<h1>`, so
+ * the live page carried two — `07-acessibilidade.md` allows exactly one. The
+ * size is kept: a heading level is a statement about the document outline, not
+ * about how large the text is, and shrinking it would have changed the reading
+ * hierarchy to fix a semantics problem.
+ */
+.day-review-title { margin: 0; font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }

@@ -30,6 +30,15 @@ export type CalendarCopy = {
     readonly label: string;
     readonly names: Record<CalendarLane, string>;
     readonly descriptions: Record<CalendarLane, string>;
+    /**
+     * The lane's on/off state, as a word inside the link's accessible name.
+     *
+     * The chip used `aria-pressed`, which is invalid on a link and which axe
+     * flagged on the live page. A visually hidden word needs no ARIA at all and
+     * says the same thing to a screen reader.
+     */
+    readonly stateShown: string;
+    readonly stateHidden: string;
   };
   readonly commitment: Record<CalendarCommitment, string>;
   readonly navigation: {
@@ -79,6 +88,8 @@ const PT_BR: CalendarCopy = {
   },
   lanes: {
     label: "O que mostrar",
+    stateShown: ", mostrando",
+    stateHidden: ", oculto",
     names: {
       deadline: "Prazos",
       intention: "Intenções",
@@ -138,6 +149,8 @@ const EN: CalendarCopy = {
   },
   lanes: {
     label: "What to show",
+    stateShown: ", showing",
+    stateHidden: ", hidden",
     names: {
       deadline: "Deadlines",
       intention: "Intentions",

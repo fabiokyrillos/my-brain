@@ -157,6 +157,20 @@ test.describe("Papel e Console, authenticated", () => {
       testInfo.setTimeout(15 * 60_000);
       await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });
 
+      /*
+        Scan with motion reduced.
+
+        The first run of this lane reported three contrast failures on Custos
+        with *blended* values — `#807c77` on `#fdfdfc`, which are neither of the
+        tokens involved. They were an entrance animation caught mid-flight: the
+        settled colours are `#55504a` on `#ffffff`, measured directly. A scanner
+        that races an animation reports the product as broken when the lane is,
+        and the fix is not a longer wait — it is scanning the state the product
+        actually rests in. The product removes those animations under this media
+        query, so this is also the more faithful thing to measure.
+      */
+      await page.emulateMedia({ reducedMotion: "reduce" });
+
       const failures: string[] = [];
       for (const surface of SURFACES) {
         await page.goto(surface.path("pt-BR"));
@@ -181,7 +195,19 @@ test.describe("Papel e Console, authenticated", () => {
               compared instead of argued about.
             */
             .filter((violation) => violation.impact === "serious" || violation.impact === "critical")
-            .map((violation) => `${violation.id} (${violation.nodes.length}) — ${violation.help}`);
+            /*
+              The failing selectors, not only the count. A rule name and a number
+              tell you a page is wrong; the target tells you which element, and
+              without it the next step is guessing at CSS — which is how a fix
+              lands on the wrong rule and the violation survives.
+            */
+            .map((violation) => {
+              const targets = (violation.nodes as Array<{ target: string[]; failureSummary?: string }>)
+                .slice(0, 4)
+                .map((node) => node.target.join(" "))
+                .join(" | ");
+              return `${violation.id} (${violation.nodes.length}) — ${violation.help} → ${targets}`;
+            });
         });
         for (const violation of violations) failures.push(`${surface.name}: ${violation}`);
       }

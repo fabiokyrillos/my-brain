@@ -205,7 +205,15 @@ export function DayReviewView({
       <header className="list-header">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title(projection.scope)}</h1>
+          {/*
+            `<h2>`, not `<h1>`.
+
+            This view renders *inside* `/app/reviews`, which already has an
+            `<h1>` — so the live page carried two, and `07-acessibilidade.md`
+            requires exactly one per page. The review is a section of that page,
+            not a second document, and the outline now says so.
+          */}
+          <h2 className="day-review-title">{copy.title(projection.scope)}</h2>
           <p>{copy.description(projection.scope)}</p>
           {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
           <p className="quiet-state">{copy.nothingScheduled}</p>
@@ -252,11 +260,22 @@ export function DayReviewView({
         {projection.unreadable.length === 0 ? (
           <p className="quiet-state">{copy.unreadableNone}</p>
         ) : (
-          <ul role="status">
-            {projection.unreadable.map((source) => (
-              <li key={source}>{copy.unavailable(copy.sections[source])}</li>
-            ))}
-          </ul>
+          /*
+            `role="status"` on the wrapper, not on the `<ul>`.
+
+            An explicit role *replaces* the element's implicit one, so
+            `<ul role="status">` stops being a list and its `<li>` children have
+            no list parent — which is exactly what axe reported on the live page.
+            The announcement and the list structure are two different jobs, and
+            they now sit on two different elements.
+          */
+          <div role="status">
+            <ul>
+              {projection.unreadable.map((source) => (
+                <li key={source}>{copy.unavailable(copy.sections[source])}</li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 

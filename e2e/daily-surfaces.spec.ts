@@ -213,7 +213,7 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
     <header class="list-header">
       <div>
         <p class="eyebrow">FECHAMENTO DO DIA</p>
-        <h1>${copy.reviewTitle}</h1>
+        <h2 class="day-review-title">${copy.reviewTitle}</h2>
         <p class="quiet-state">${copy.nothingScheduled}</p>
       </div>
       <nav aria-label="Período da revisão" class="day-review-scope-nav">
@@ -229,7 +229,7 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
     <section aria-label="${copy.unreadableHeading}" class="day-review-unreadable">
       <h2>${copy.unreadableHeading}</h2>
       ${options.unreadable
-        ? '<ul role="status"><li>Não foi possível ler: Concluído. Esta seção não está vazia — ela não pôde ser lida.</li></ul>'
+        ? '<div role="status"><ul><li>Não foi possível ler: Concluído. Esta seção não está vazia — ela não pôde ser lida.</li></ul></div>'
         : '<p class="quiet-state">Todas as fontes desta revisão foram lidas.</p>'}
     </section>
     <section aria-label="${copy.completed}" class="day-review-section" data-source="completed">
@@ -350,7 +350,12 @@ for (const locale of ["pt-BR", "en"] as const) {
 
     test("the day review carries the schedule promise and the unreadable section", async ({ page }) => {
       await open(page, reviewPage(locale, [reviewRow({ locale })]));
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(COPY[locale].reviewTitle);
+      /*
+        `level: 2`. The review renders inside `/app/reviews`, which owns the
+        page's one `<h1>` — the live page carried two until this was demoted,
+        which axe caught and `07-acessibilidade.md` forbids.
+      */
+      await expect(page.getByRole("heading", { level: 2, name: COPY[locale].reviewTitle })).toBeVisible();
       // `2M-REVIEW-007`, in the browser rather than only in a source scan.
       await expect(page.getByText(COPY[locale].nothingScheduled)).toBeVisible();
       await expect(page.getByRole("region", { name: COPY[locale].unreadableHeading })).toBeVisible();
