@@ -6940,3 +6940,261 @@ non-empty, because "none are incomplete" is trivially true of an empty list.
 The authenticated browser proof is **run**, not assumed:
 `CI=1 npm run test:e2e:online -- <spec> --project=desktop --workers=1`, then
 `--project=mobile`. It found two of slice 2O.2's six defects.
+
+## §81 — Slice 2O.3 ships, and writing a requirement's test found the requirement was false (2026-08-15)
+
+PR **#236**, merged at **`a8d9382`**; head at merge **`79dea15`**, **CI green on
+both** — all five checks on the head and all three job families on the merge SHA.
+`main` local equals `origin/main` at `a8d9382`, worktree clean, no open PR.
+
+**`2O-PREF-001` … `-015` — 14 `built`, 1 `partial`, 0 `undelivered`. Zero
+migrations created. 94 local = 94 hosted, parity `202608140094`. Signup closed.
+Rollout gate 25 · 3 · 2. CSP unchanged. `embedding_model` untouched. A13 not
+retargeted.**
+
+**41 of 116 requirements delivered.** Slices 2O.0, 2O.1, 2O.2 and 2O.3; five
+remain.
+
+### One divergence in §79's re-audit, corrected rather than carried
+
+§79 says `AccountMenu` *"mounts in exactly two files"*. It mounts in exactly two
+**places, both inside one file** — `app-shell.tsx:79` and `:110`. The PRD's own
+wording (`2O-PREF-003`: *"`AccountMenu`'s two mount points"*) is right, and so is
+the guard, which asserts *"mounts AccountMenu exactly twice"*. **The imprecision
+was the prose, not the tree.** Recorded because a future reader looking for two
+files will not find them.
+
+### What ADR-114 left half-built for months
+
+The CSS for all three appearance states shipped with the redesign, and ADR-115
+Decision 8 recorded a census over 920 files finding **no writer for
+`data-theme`**. The control exists now, and the stylesheet was not touched.
+
+`system` is the **absence** of the attribute, not a third value. Any other value
+leaves the machine in charge by accident today — the media block is written
+`:root:not([data-theme="light"])` — but only absence also leaves
+`:root[data-theme="dark"]` unmatched, and an attribute naming a theme that is not
+rendered is a trap for whoever reads it next.
+
+### The framework's own guide is the vulnerability, not the answer
+
+`node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md`
+demonstrates this exact technique with
+`if(t)document.documentElement.setAttribute("data-theme",t)` — **the stored
+string written straight onto the document with no validation.** That is `T-16`
+verbatim: `localStorage` is writable by anything on the origin, and the value
+reaches the DOM before any React boundary exists.
+
+It was read before a line was written, as `CLAUDE.md` requires. The technique was
+taken and that line was not. `appearance.test.ts` executes **the shipped string
+itself** against a document for three choices, seventeen rejected values
+including XSS payloads, and a `localStorage` that throws — planting the guide's
+version fails four tests.
+
+**And my first version was order-dependent.** `indexOf(v) > 0` is correct only
+while `system` sits at index zero, so a reordering of `appearanceChoices` would
+have silently started writing `data-theme="system"` **with no test failing**,
+because every test used the shipped order. `explicitAppearanceChoices` is derived
+so the question has no order in it, and the old shape is asserted absent.
+
+### `2O-PREF-011` was false, and writing its test is what found that
+
+**React resets an uncontrolled form after a form action returns, and it cannot
+tell a failed save from a successful one** — the action function returned
+normally either way; the failure is in its *value*. So a save that failed for any
+reason wiped every field back to the server's values, and the reader who had just
+retyped four of them was told to *try again* with their work already gone.
+
+`aiProfile` and the model routes never had the problem, because they are React
+state. Everything else in that form is uncontrolled.
+
+Fixed by snapshotting the submission on its way out and restoring it in a
+**layout** effect, so the write lands before paint. Declined: making every field
+controlled (a much larger change to a form that is otherwise correct), and
+round-tripping the reader's draft through the Server Action to be handed straight
+back.
+
+### Widening a guard found a gap older than the phase
+
+§79 recorded that `capability-registry-guard.test.ts` direction B could not see
+`OnboardingRestore`. Rather than adding a second file by hand, the scan is
+**derived from the settings page's own JSX mounts** — and that immediately
+surfaced **`CredentialPanel`, which renders `apiKey` and has had no registry row
+since BYOK shipped**. A hand-written list would have needed someone to think of
+it, and §79 records that for `OnboardingRestore` nobody did.
+
+Three rows added — `ai_credential`, `appearance`, `onboarding_restore` — and a
+`controls` anchor beside `columns`, for exactly the reason `2O-ACTIVATION-007`
+added `columns`: the guard resolves a control by name and a capability with no
+column had nothing to resolve to. **Exempting them was the alternative, and an
+exemption is the too-weak half ADR-067 removed.**
+
+`OnboardingRestore`'s own comment claimed it needed no row. Half of that was
+right — there is no column — and half was wrong: the dismissal cookie has a
+genuine reader, so the registry does have something true to say.
+
+### `scheduled_reviews` reaches its final wording, and the state it leaves stays armed
+
+`2O-ACTIVATION-006` set it to `uncontrolled` and said its final wording belongs to
+`2O-PREF-004`. The controls ship, so the row is `operational` and `visible`, and
+the type system produced **TS2741 once per locale** until the copy existed.
+
+That left `uncontrolled` with **no row at all**, and `capabilityRegistry` is
+`as const`, so `tsc` correctly called the invariant's branch dead code. A cast was
+declined — it is what slice 2O.0 refused when it made
+`getCapabilityRegistryView` generic — and deletion was declined because ADR-117
+needs that vocabulary one slice from now. **The invariant is extracted over the
+widened type and proved against planted rows in both directions**, plus an
+exact-count assertion that will fail when 2O.4 adds `embedding_model`'s row,
+forcing whoever adds it to re-arm the non-vacuity claim deliberately.
+
+### `2O-PREF-002` closes `partial`, and the reason is worth keeping
+
+It names three destinations. Two are routes, both reached, both wearing a strip,
+both keeping every property they had. The third — **the consent record** — has
+**no surface anywhere in the product**: `policy_acceptances` is read by the
+acceptance gate and by `/consent` to decide one sentence, and nothing displays it.
+
+`/{locale}/consent` is deliberately **not** linked. It is an interposition, not a
+record: it redirects to `/{locale}/app` the moment nothing is owed, which is true
+of every account that is up to date, so a link labelled "consent" would bounce
+almost every reader straight back to the cockpit (`R-2O-12`). The documents are
+reached instead.
+
+Classified `partial` because reaching the documents is not reaching the record of
+what you accepted and when. **Phase 2I's audit over-stated shipped UX three
+times, and the cost is a later reader trusting a matrix instead of the product.**
+Remainder named, destination `2O-CONSENT-001`/`-002`, slice 2O.5.
+
+### The owner's two instructions, discharged
+
+**`2O-ONBOARD-005`.** The owner confirmed that reaching the existing credential
+panel by an explicit, contextual link satisfies the requirement, that the form
+must not be embedded or duplicated in the cockpit, and that one write path and
+one mount point must be preserved. **Recorded traceably in the acceptance record
+without reopening anything** — no count moved, no classification moved, slice
+2O.2's record is untouched, and the credential form still has exactly one mount
+point. The same pattern is applied a second time in Conta e dados, now as a
+confirmed pattern rather than an agent's reading.
+
+**`2O-ONBOARD-003`.** Re-evaluated inside this slice and **kept `partial`**. The
+preferences centre already offered a timezone control before 2O.3 and still does;
+the remainder is that **onboarding never asks**, because `2O-ACTIVATION-001`'s
+first fact cannot be false. Closing it on the strength of a control that already
+existed would claim a delivery this slice did not make. Onboarding and activation
+are **not** made to diverge, valid defaults are **not** turned into incomplete
+state, and the destination stays explicit.
+
+### Carried, unabsorbed, with destinations
+
+- **`viewport.themeColor` is declared under `prefers-color-scheme` media only**,
+  so an explicit light choice on a dark machine leaves the browser chrome dark
+  while the page is light. **A consequence of the control this slice adds** →
+  **slice 2O.7**, where the mobile surface is scoped. Widening the
+  highest-severity script in the product on a finding rather than a requirement
+  is what ADR-118's alternatives rejected.
+- **`2O-PREF-002`'s remainder** — the account's own acceptances → slice 2O.5.
+- **`2O-ONBOARD-003`'s remainder** — the path never asks → owner, one form field.
+- **`defaultAgentPreferences.tone` says `direct` while the column defaults to
+  `informal`**, and a census confirms **nothing reads that field**. Changing the
+  literal was declined: it alters a shipped constant on a finding rather than a
+  requirement, and no product path would behave differently.
+- **`ai_provider` and `embedding_model` written as literals** by
+  `buildSettingsPayload` → **slice 2O.4**. ADR-117 Decision 4 forbids touching
+  `embedding_model`.
+- Every Phase 2N residual `OD-2O-11` declined, unchanged and unclaimed; push
+  still failing with HTTP 403 on a real iPhone and **never executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**.
+
+### The re-audit of slice 2O.4, done and recorded
+
+**Seven findings against `a8d9382`.**
+
+1. **`embedding_model` has real behavioural consumers** — `chat/actions.ts:167`,
+   `memories/actions.ts:144`, `operations/actions.ts:202`, plus the worker.
+   ADR-117's reading holds against the tree, and the row is `2O-AICONFIG-004`'s.
+2. **The `uncontrolled` vocabulary it needs is armed and empty.** Slice 2O.3
+   moved `scheduled_reviews` off it, so the state has zero rows and an
+   exact-count assertion. **Adding `embedding_model`'s row will fail that
+   assertion**, which is the intended behaviour: re-arm it deliberately, do not
+   weaken it.
+3. **`reasoning_route` and `background_route` already have `future` rows** with
+   empty evidence. `2O-AICONFIG-005` needs them **said on a surface**, not
+   created.
+4. **The quota configuration is genuinely single-sourced.** `src/lib/quotas.ts`
+   is the source and `quotas-parity.test.ts` compares it **three ways** — PRD
+   §20, the constants, and the `private.quota_ceilings` seed. So
+   `2O-COST-002`'s *"not from a copy"* is satisfiable by reading `QUOTAS`, and
+   the ceiling a page states cannot drift from the one enforced.
+5. **`src/features/quotas/refusal.ts` has no consumer.** A module that maps a
+   database quota error to a named ceiling exists and **nothing calls it**.
+   `2O-COST-003` must **wire it, not rebuild it** — this is the
+   producer-with-no-consumer shape SH.6 already paid for once.
+6. **The BYOK claims already exist and are specific**: encrypted at rest, never
+   shown again, removal immediate in the live system, backups age out on the
+   provider's schedule. `2O-AICONFIG-006` requires **every clause checkable**,
+   and the backup clause is a claim about infrastructure rather than about code.
+7. **Costs ships.** `get_ai_cost_summary` over `ai_usage_events` plus
+   `ai_model_pricing`. `2O-COST-001` is re-asserted, not rebuilt.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.4 — AI
+configuration, usage and cost** (`2O-AICONFIG-001` … `-009`, `2O-COST-001` …
+`-007`, sixteen requirements, **no migration**). Its re-audit against `a8d9382`
+is above.
+
+### The prompt for slice 2O.4, kept here because §80 proved that matters
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.4 — AI
+> configuration, usage and cost** (`2O-AICONFIG-001` … `-009`, `2O-COST-001` …
+> `-007`, sixteen requirements, **no migration**).
+>
+> **Baseline to prove, not presume:** `main` = `origin/main` = **`a8d9382`**,
+> worktree clean, **no open PR**, CI green on all three job families at that SHA,
+> **94 local = 94 hosted, parity `202608140094`**, **41 of 116 delivered**,
+> rollout gate **25 pass · 3 fail · 2 owner-signature**, signup closed, **M1
+> still conditional**, **M2 without a destination and unspendable**, A13 not
+> retargeted.
+>
+> **Before acting:** read `AUTONOMOUS_LOOP_HANDOFF.md` §§77–81 in full; read the
+> acceptance records for slices 2O.0 – 2O.3 under `docs/reports/phase-2o/`;
+> re-read the PRD, the implementation plan, the threat model, the traceability
+> contract and **ADR-115 through ADR-118**. **Re-run the 2O.4 re-audit against
+> whatever `main` actually is** — the seven findings above were taken against
+> `a8d9382`, and a re-audit is the control this phase relies on (ADR-118
+> Decision 1).
+>
+> **Four things this slice must not discover late.** Adding `embedding_model`'s
+> registry row **will fail** `capabilities.test.ts`'s exact-count assertion on
+> the empty `uncontrolled` state — re-arm it deliberately, never weaken it.
+> `src/features/quotas/refusal.ts` **has no consumer**, so `2O-COST-003` wires it
+> rather than rebuilding it. ADR-117 Decision 4 forbids removing, altering,
+> renaming, re-defaulting or migrating `embedding_model` for any reason.
+> `2O-COST-005` forbids forecasting a price, and `2O-AICONFIG-009` forbids any
+> surface making a model call to render itself.
+>
+> Then continue the loop: **2O.4 → merge → CI green on the merge SHA → re-audit
+> 2O.5 → 2O.5 → … → 2O.8 → closeout.** Do not stop after a slice if it is fully
+> merged, CI is green on the merge SHA, no owner decision is pending, no stop
+> condition has fired, and there is enough context to finish the next unit.
+>
+> **If context runs short:** finish the current unit entirely, get CI green on
+> the merge SHA, update this handoff, leave `main` clean with no open PR, stop
+> **only between slices**, and write the next resumption prompt **into this
+> file**.
+>
+> **Run the whole command CI runs when you touch anything shared.** A change to
+> the proxy, a layout or a shared component has the blast radius of the product:
+> `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+> e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts
+> --project=desktop --project=mobile`. It costs about 40 seconds, and slice 2O.3
+> ran it because it changed the root layout.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need the
+> owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a migration
+> outside the signed conditions. **Do not** open signup, resume the push HTTP 403
+> track, or start the successor phase.
