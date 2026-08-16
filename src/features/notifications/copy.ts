@@ -10,6 +10,7 @@
  */
 
 import type { NotificationConsentState } from "./consent-contract";
+import type { ConsentFact, DeliveryFact, PermissionFact } from "./three-facts";
 
 export type NotificationLocale = "pt-BR" | "en";
 
@@ -53,6 +54,45 @@ export type NotificationSettingsCopy = {
   readonly saved: string;
   readonly saveFailed: string;
   readonly permissionRefused: string;
+
+  /* ---- Slice 2O.6 ------------------------------------------------------- */
+
+  /** `2O-NOTIFY-007` — the three facts, each with its own row and its own word. */
+  readonly factsHeading: string;
+  readonly factsIntro: string;
+  readonly consentFactLabel: string;
+  readonly permissionFactLabel: string;
+  readonly deliveryFactLabel: string;
+  readonly consentFactValues: Readonly<Record<ConsentFact, string>>;
+  readonly permissionFactValues: Readonly<Record<PermissionFact, string>>;
+  readonly deliveryFactValues: Readonly<Record<DeliveryFact, string>>;
+  /** `2O-NOTIFY-006` — the operational truth, where it matters. */
+  readonly deliveryCaveat: string;
+  /** `2O-NOTIFY-004` — what a refused browser can actually do about it. */
+  readonly deniedRecovery: string;
+  /** `2O-NOTIFY-003` — how to stop, said at the ask rather than after it. */
+  readonly howToStop: string;
+
+  /** `2O-NOTIFY-005` — the bounds, stated where consent is given. */
+  readonly boundsHeading: string;
+  readonly boundsQuietHours: string;
+  readonly boundsDailyCap: string;
+  /**
+   * `2O-NOTIFY-005` names an **important-reminder override** as the third
+   * bound. There is none: `decideDelivery` refuses inside quiet hours with no
+   * exemption for priority, type or urgency, and the words "important",
+   * "priority" and "urgent" appear nowhere in the governance. So this states
+   * the absence. Writing the requirement's sentence as though the override
+   * existed would claim a capability the product does not have — which is the
+   * single thing this phase forbids most consistently.
+   */
+  readonly boundsNoOverride: string;
+
+  /** `2O-NOTIFY-002` — the invitation at a moment of demonstrated value. */
+  readonly inviteHeading: string;
+  readonly inviteBody: string;
+  readonly inviteAction: string;
+  readonly inviteDismiss: string;
 };
 
 const PT_BR: NotificationSettingsCopy = {
@@ -96,6 +136,41 @@ const PT_BR: NotificationSettingsCopy = {
   saved: "Preferências salvas.",
   saveFailed: "Não foi possível salvar. Nada foi alterado.",
   permissionRefused: "O navegador não autorizou. Nada foi ativado.",
+
+  factsHeading: "Três coisas diferentes",
+  factsIntro: "Estas três não são a mesma coisa, e uma pode estar certa enquanto as outras não estão. Por isso aparecem separadas.",
+  consentFactLabel: "Você pediu",
+  permissionFactLabel: "O navegador permite",
+  deliveryFactLabel: "O aviso chega",
+  consentFactValues: {
+    given: "Sim — você ativou os avisos nesta conta.",
+    withdrawn: "Não — você desativou. Nada é enviado até você pedir de novo.",
+    lapsed: "A inscrição deste aparelho venceu. Sua intenção continua valendo; o registro é que precisa ser refeito.",
+    never_given: "Ainda não. Nada foi ativado.",
+  },
+  permissionFactValues: {
+    granted: "Sim — este navegador autorizou.",
+    denied: "Não. Este navegador recusou, e ele não pergunta de novo a partir da página.",
+    never_asked: "Ainda não perguntamos. Nada é perguntado sem você pedir.",
+    unavailable: "Este navegador não oferece avisos, ou este ambiente ainda não está configurado para enviá-los.",
+    unknown: "Não sabemos. A permissão fica no aparelho e pode mudar nas configurações do navegador sem avisar o produto — dizer “permitido” aqui seria chute.",
+  },
+  deliveryFactValues: {
+    unproven: "Não comprovado. O envio está implementado e publicado, mas nenhuma entrega foi confirmada em aparelho real.",
+  },
+  deliveryCaveat: "Sendo específico, porque isto muda o que você deve esperar: no iPhone o envio falha com HTTP 403, e no Android ele nunca foi executado. Enquanto isso não for resolvido, trate o aviso no aparelho como um extra e não como o caminho pelo qual você fica sabendo das coisas. A lista aqui dentro continua sendo o caminho confiável.",
+  deniedRecovery: "Para reverter, é preciso mudar nas configurações do navegador — o cadeado ou o ícone ao lado do endereço, permissões do site, notificações. A página não consegue perguntar de novo, então o botão fica desativado em vez de fingir que funciona.",
+  howToStop: "Para parar: o botão de desativar nesta mesma página, a qualquer momento, sem passo adicional. Desativar aqui encerra a inscrição no navegador e o registro na conta.",
+
+  boundsHeading: "O que limita esses avisos",
+  boundsQuietHours: "Período silencioso: nada é enviado dentro da janela que você define. O mesmo período vale para os avisos dentro do app.",
+  boundsDailyCap: "Máximo por dia: ao atingir o número que você definir, o resto do dia é recusado. Aparelho e app são contados separadamente.",
+  boundsNoOverride: "Não existe exceção. Nenhum aviso — de nenhum tipo, com nenhuma urgência — passa por cima do período silencioso ou do máximo diário. Se algo importante for recusado, ele continua esperando aqui dentro em vez de tocar o aparelho.",
+
+  inviteHeading: "Quer ser avisado quando chegar a hora?",
+  inviteBody: "Você acabou de agendar algo. Se quiser, o Brain pode avisar no aparelho quando chegar a hora — sem carregar o conteúdo no aviso.",
+  inviteAction: "Ver como funciona",
+  inviteDismiss: "Agora não",
 };
 
 const EN: NotificationSettingsCopy = {
@@ -139,6 +214,41 @@ const EN: NotificationSettingsCopy = {
   saved: "Preferences saved.",
   saveFailed: "Could not save. Nothing was changed.",
   permissionRefused: "The browser did not allow it. Nothing was turned on.",
+
+  factsHeading: "Three different things",
+  factsIntro: "These three are not the same thing, and one can be true while the others are not. That is why they are shown separately.",
+  consentFactLabel: "You asked for it",
+  permissionFactLabel: "The browser allows it",
+  deliveryFactLabel: "The alert arrives",
+  consentFactValues: {
+    given: "Yes — you turned alerts on for this account.",
+    withdrawn: "No — you turned them off. Nothing is sent until you ask again.",
+    lapsed: "This device's subscription expired. Your intent still stands; it is the record that needs renewing.",
+    never_given: "Not yet. Nothing was turned on.",
+  },
+  permissionFactValues: {
+    granted: "Yes — this browser allowed it.",
+    denied: "No. This browser refused, and it will not ask again from the page.",
+    never_asked: "We have not asked. Nothing is asked without you asking first.",
+    unavailable: "This browser does not offer alerts, or this environment is not configured to send them yet.",
+    unknown: "We do not know. Permission lives on the device and can change in browser settings without telling the product — saying “allowed” here would be a guess.",
+  },
+  deliveryFactValues: {
+    unproven: "Unproven. Sending is implemented and deployed, but no delivery has been confirmed on real hardware.",
+  },
+  deliveryCaveat: "Being specific, because it changes what you should expect: on iPhone sending fails with HTTP 403, and on Android it has never been run. Until that is resolved, treat the device alert as a bonus rather than as how you find things out. The list in here stays the reliable path.",
+  deniedRecovery: "To undo it you have to change the browser's own settings — the padlock or icon beside the address, site permissions, notifications. The page cannot ask again, so the button is disabled rather than pretending to work.",
+  howToStop: "To stop: the turn-off button on this same page, at any time, with no further step. Turning it off here ends both the browser subscription and the record on the account.",
+
+  boundsHeading: "What bounds these alerts",
+  boundsQuietHours: "Quiet period: nothing is sent inside the window you set. The same period applies to in-app alerts.",
+  boundsDailyCap: "Daily maximum: once you hit the number you set, the rest of the day is refused. Device and app are counted separately.",
+  boundsNoOverride: "There is no exception. No alert — of any type, at any urgency — overrides the quiet period or the daily maximum. If something important is refused, it keeps waiting in here rather than sounding on your device.",
+
+  inviteHeading: "Want to be told when the time comes?",
+  inviteBody: "You have just scheduled something. If you want it, Brain can tell you on your device when the time comes — without carrying the content in the alert.",
+  inviteAction: "See how it works",
+  inviteDismiss: "Not now",
 };
 
 export function getNotificationSettingsCopy(locale: string): NotificationSettingsCopy {

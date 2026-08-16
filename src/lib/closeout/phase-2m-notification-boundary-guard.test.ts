@@ -75,15 +75,28 @@ const PURE_MODULES = [
   "src/features/notifications/payload.ts",
   "src/features/notifications/copy.ts",
   "src/features/notifications/push-encoding.ts",
+  /*
+   * Slice 2O.6. Both are pure derivations over the consent state — no data
+   * access, no client, no content. They belong on THIS list rather than the
+   * other because the content-carrying scan below is exactly the scan they
+   * should be subject to: a fact vocabulary is where a task title would be
+   * most tempting to interpolate and least noticeable once it was.
+   */
+  "src/features/notifications/three-facts.ts",
+  "src/features/notifications/invitation.ts",
 ];
 
-/** The modules slice 2M.4b earned, by name. */
+/** The modules slice 2M.4b earned, by name, plus slice 2O.6's two surfaces. */
 const DELIVERY_MODULES = [
   "src/features/notifications/actions.ts",
   "src/features/notifications/consent-reader.ts",
   "src/features/notifications/notification-settings.tsx",
   "src/features/notifications/push-controls.tsx",
   "src/features/notifications/schema.ts",
+  // Slice 2O.6. Rendered behind authentication inside the settings surface;
+  // they take props and render copy, and neither reaches a client.
+  "src/features/notifications/notification-facts.tsx",
+  "src/features/notifications/notification-invitation.tsx",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));
@@ -211,12 +224,69 @@ describe("2M-NOTIFY-003: nothing asks the browser for permission yet", () => {
 
   it("says something distinct for each of the five states", () => {
     const copy = read("src/features/notifications/copy.ts");
+    /*
+     * Scoped to the `states:` records, not to the whole file.
+     *
+     * The original matched any four-space-indented `granted:` / `denied:` line,
+     * and slice 2O.6 added a `permissionFactValues` record that legitimately
+     * reuses two of those key names for a **different** vocabulary — the
+     * browser's answer rather than the consent state's. The count went to 14
+     * and the guard read a correct addition as a violation.
+     *
+     * Renaming the new keys was declined: `granted` and `denied` are the
+     * browser's own words for those values, and picking worse names so a regex
+     * stops matching is shaping the product to the test. The predicate is
+     * narrowed to the block it was always about instead, and the controls below
+     * prove the narrowing did not turn it off.
+     */
+    const stateBlocks = [...copy.matchAll(/\n {2}states: \{([\s\S]*?)\n {2}\},/g)].map(
+      (match) => match[1],
+    );
+    // Non-vacuity: two locales, each with a `states:` record. A narrowing that
+    // matched nothing would make every assertion below trivially true.
+    expect(stateBlocks).toHaveLength(2);
+
     const sentences = new Set(
-      [...copy.matchAll(/^\s{4}(granted|denied|unsupported|revoked|expired): "([^"]+)",/gm)].map((match) => match[2]),
+      stateBlocks.flatMap((block) =>
+        [...block.matchAll(/^\s{4}(granted|denied|unsupported|revoked|expired): "([^"]+)",/gm)].map(
+          (match) => match[2],
+        ),
+      ),
     );
     // Two locales × five states, all distinct: a state sharing a sentence with
     // another is a state the user cannot tell apart from it.
     expect(sentences.size).toBe(10);
+  });
+
+  it("the narrowed scan still fails when two states share a sentence", () => {
+    // The control in the other direction, planted against a stand-in with the
+    // real shape. Narrowing a guard is only safe if it can still fire.
+    const planted = `
+  states: {
+    granted: "Same sentence.",
+    denied: "Same sentence.",
+    unsupported: "c",
+    revoked: "d",
+    expired: "e",
+  },
+  states: {
+    granted: "f",
+    denied: "g",
+    unsupported: "h",
+    revoked: "i",
+    expired: "j",
+  },`;
+    const blocks = [...planted.matchAll(/\n {2}states: \{([\s\S]*?)\n {2}\},/g)].map((m) => m[1]);
+    expect(blocks).toHaveLength(2);
+    const sentences = new Set(
+      blocks.flatMap((block) =>
+        [...block.matchAll(/^\s{4}(granted|denied|unsupported|revoked|expired): "([^"]+)",/gm)].map(
+          (match) => match[2],
+        ),
+      ),
+    );
+    // Nine, not ten: the two sharing a sentence collapse, which is the defect.
+    expect(sentences.size).toBe(9);
   });
 });
 

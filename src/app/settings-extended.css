@@ -65,3 +65,63 @@
 /* `2O-COST-004`. What the chosen profile also writes, and offers no control for. */
 .ai-routes-fixed{display:grid;gap:var(--space-2)}
 .ai-routes-fixed-intro{margin:0;max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.55}
+
+/* ---- slice 2O.6: notifications as three facts ---------------------------- */
+
+/* `2O-NOTIFY-007`. Three rows, laid out as three rows — a definition list
+   rather than a status line, because the whole point is that they are separate
+   answers to separate questions and one of them is bad news. */
+.notification-fact-list { display: grid; gap: var(--space-3); margin: var(--space-3) 0 0; }
+.notification-fact {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+.notification-fact dt { font: var(--type-label); color: var(--text-primary); }
+.notification-fact dd { margin: 0; font: var(--type-body); color: var(--text-secondary); }
+
+/* `2O-NOTIFY-006`. Deliberately NOT quieter than the two facts above it: a
+   reader who sees "you asked" and "the browser allows" will conclude alerts
+   work, and this is the line that says they may not. */
+.notification-delivery-caveat { margin-top: var(--space-3); }
+
+/* `2O-NOTIFY-004`. The one recovery this product cannot perform for the reader. */
+.notification-denied-recovery {
+  margin: var(--space-3) 0 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+/* `2O-NOTIFY-005`. Above the control, so the bounds are readable before the
+   decision they bound. */
+.notification-bounds { margin: var(--space-5) 0; }
+.notification-bounds ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); }
+.notification-bounds li { font: var(--type-body); color: var(--text-secondary); }
+
+/* `2O-NOTIFY-002`. An invitation, not an alert: it sits in the page's flow and
+   is dismissible, because a banner the reader cannot silence is a worse ask
+   than no ask. */
+.notification-invitation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+.notification-invitation-copy { display: grid; gap: 2px; min-width: 0; }
+.notification-invitation-copy strong { font: var(--type-heading); letter-spacing: -.01em; }
+.notification-invitation-copy p { margin: 0; font: var(--type-body); color: var(--text-secondary); }
+.notification-invitation-actions { display: flex; gap: var(--space-3); align-items: center; }
+@media (max-width: 899px) {
+  .notification-invitation { flex-direction: column; align-items: stretch; }
+  .notification-invitation-actions { width: 100%; }
+  .notification-invitation-actions > * { flex: 1; }
+}

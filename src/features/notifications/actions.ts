@@ -30,12 +30,20 @@
  * background path and is not reachable from a browser.
  */
 
-import { assertActiveAccount } from "@/lib/auth/require-user";
+import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
+
+import { assertActiveAccount, requireUser } from "@/lib/auth/require-user";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { recordProductEvent } from "@/features/product-analytics/server";
 
 import { notificationConsentStates, type NotificationConsentState } from "./consent-contract";
+import {
+  NOTIFICATION_INVITE_COOKIE,
+  NOTIFICATION_INVITE_DISMISSED_VALUE,
+  inviteCookieOptions,
+} from "./invitation";
 import {
   notificationPreferencesSchema,
   pushSubscriptionSchema,
@@ -212,4 +220,32 @@ export async function updateNotificationPreferences(input: unknown, locale?: unk
     ok: true,
     state: isConsentState(data?.state) ? data.state : "unsupported",
   });
+}
+
+/**
+ * `2O-NOTIFY-002` — dismiss the moment-of-value invitation.
+ *
+ * A cookie rather than a column, following `onboarding/dismissal.ts` for the
+ * same reason: the invitation is rendered by a Server Component, so a value
+ * the server cannot read would render the banner and then hide it — a flash of
+ * exactly the thing the reader asked to stop seeing. `httpOnly` because
+ * nothing in the browser reads it.
+ *
+ * It writes no domain state. Dismissing an invitation is not a notification
+ * preference, and recording it as one would put a row in the consent record
+ * that the delivery decision would then have to be taught to ignore.
+ */
+export async function dismissNotificationInvitation(formData: FormData): Promise<void> {
+  const locale = resolveLocale(formData.get("locale"));
+  // Authenticated, like every other write here — a dismissal is per-account
+  // state even when it lives in a cookie, and an unauthenticated caller has no
+  // invitation to dismiss.
+  await requireUser(locale);
+  const jar = await cookies();
+  jar.set(
+    NOTIFICATION_INVITE_COOKIE,
+    NOTIFICATION_INVITE_DISMISSED_VALUE,
+    inviteCookieOptions(),
+  );
+  revalidatePath(`/${locale}/app/reminders`);
 }
