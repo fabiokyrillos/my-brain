@@ -1,6 +1,7 @@
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { markNotification } from "@/features/agent/actions";
 import { readPushConsent, readVapidPublicKey } from "@/features/notifications/consent-reader";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
@@ -46,6 +47,15 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const consent = await readPushConsent(supabase, user.id);
 
   return <div className="content-page">{/*
+    `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
+    came from. It is first, above the governance section, because a reader who
+    arrived from a deep link or from the bell needs the orientation before the
+    content, not after it.
+
+    Nothing else about the route changes: the pagination, the `?page` deep link
+    and the owner-scoped read are untouched, which is the half of the Dados e IA
+    pattern that matters — no route is redirected and no route ends.
+  */}<AccountDataStrip locale={locale} route="notifications" />{/*
     `2M-NOTIFY-003`/`-008`. The governance section sits above the list it makes
     a promise about, so the promise and the thing it is a promise about are read
     together.

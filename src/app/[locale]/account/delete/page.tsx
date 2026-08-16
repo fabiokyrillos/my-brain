@@ -15,6 +15,7 @@
  */
 
 import { notFound, redirect } from "next/navigation";
+import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { DeletionSurface } from "@/features/account/deletion-surface";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { assertActiveAccount } from "@/lib/auth/require-user";
@@ -48,6 +49,23 @@ export default async function DeleteAccountPage({
    */
   return (
     <main className="auth-stage">
+      {/*
+        `2O-PREF-002`. Ajustes now reaches this page by name, so this page says
+        where it came from — the strip is what stops consolidation being a claim
+        the settings section makes and this route contradicts.
+
+        It is a **link out**, and nothing about the page changes: the CAPTCHA,
+        the re-authentication, the confirmation and the recovery window are all
+        untouched. `assertActiveAccount` above still runs first, so a suspended
+        account never reaches this markup at all.
+
+        One consequence, stated rather than discovered: an account that owes
+        consent can reach this route (deliberately — it is one of the two things
+        such an account may still do) and following this link will interpose
+        `/consent`. That is the gate working, not the link failing, and it is
+        why the strip offers no other destination.
+      */}
+      <AccountDataStrip locale={locale} route="deletion" />
       <DeletionSurface locale={locale} captcha={<TurnstileWidget />} />
     </main>
   );

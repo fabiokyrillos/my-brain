@@ -164,6 +164,23 @@ describe("navigation capabilities", () => {
       { key: "quiet_periods", state: "future", visible: false },
       { key: "avatar", state: "future", visible: false },
       { key: "ai_provider", state: "future", visible: false },
+      /*
+       * `2O-PREF-008`'s three, and only the appearance choice is listed to the
+       * reader.
+       *
+       * `ai_credential` was found by widening the guard from one file to the
+       * settings page's own mounts, not by anyone remembering it — the panel has
+       * been first on that page since BYOK shipped. It is `visible: false`
+       * because `CapabilitySummary` says *what these preferences change* and a
+       * credential is not a preference; `2O-AICONFIG-002` explains it in 2O.4.
+       *
+       * `onboarding_restore` is `visible: false` because its control renders
+       * only when the guide is dismissed, so a permanent paragraph would
+       * describe an affordance the page usually does not offer.
+       */
+      { key: "ai_credential", state: "operational", visible: false },
+      { key: "appearance", state: "operational", visible: true },
+      { key: "onboarding_restore", state: "operational", visible: false },
     ]);
 
     for (const capability of capabilityRegistry.filter((item) => item.visible)) {
@@ -215,7 +232,7 @@ describe("navigation capabilities", () => {
   });
 
   it("still refuses a dishonest `uncontrolled` row, which is why the rule outlived its subject", () => {
-    const base = { surface: "settings", columns: ["x"] } as const;
+    const base = { surface: "settings", columns: ["x"], controls: [] } as const;
     // Valid: real consumers, no control offered.
     expect(stateInvariantFailures({
       ...base, key: "embedding_model", state: "uncontrolled",
