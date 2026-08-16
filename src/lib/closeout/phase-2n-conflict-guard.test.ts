@@ -231,8 +231,8 @@ describe("the new reason is neither a producer without a consumer nor the revers
 describe("2N.4 spends no migration, no RPC and no new authority", () => {
   it("creates no migration", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((file) => file.endsWith(".sql"));
-    expect(migrations).toHaveLength(96);
-    expect(migrations[migrations.length - 1]).toBe("202608160096_fix_person_candidate_fingerprint.sql");
+    expect(migrations).toHaveLength(97);
+    expect(migrations[migrations.length - 1]).toBe("202608160097_fix_person_candidate_undo_json_uuid.sql");
     for (const file of migrations) {
       expect(file, "no migration may belong to this slice").not.toContain("phase_2n_slice_4");
     }

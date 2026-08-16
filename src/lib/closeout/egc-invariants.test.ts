@@ -138,7 +138,7 @@ const REPO = resolve(__dirname, "../../..");
 // deletion `2N-CORRECT-012` forbids. Moved deliberately and visibly in the same
 // commit that adds the migration, which is the only way this pin is allowed to
 // change.
-const AUTHORIZED_MIGRATION_HEAD = "202608160096";
+const AUTHORIZED_MIGRATION_HEAD = "202608160097";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

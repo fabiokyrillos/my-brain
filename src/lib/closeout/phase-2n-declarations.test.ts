@@ -313,7 +313,7 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     expect(
       migrations,
       "a migration appeared that belongs to neither the pre-phase baseline nor this phase",
-    ).toHaveLength(MIGRATIONS_BEFORE_PHASE_2N + mine.length + 2);
+    ).toHaveLength(MIGRATIONS_BEFORE_PHASE_2N + mine.length + 3);
   });
 
   it("gives every proposed migration an exclusive destination", () => {

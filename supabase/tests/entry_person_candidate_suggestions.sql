@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(22);
 
 select has_table('public', 'entry_person_candidate_resolutions', 'person candidate resolution ledger exists');
 select has_function(
@@ -50,6 +50,21 @@ select ok(
     in pg_get_functiondef('public.resolve_entry_person_candidates(uuid,uuid,jsonb,uuid)'::regprocedure)
   ) > 0,
   'person candidate idempotency uses the 64-character SHA-256 fingerprint contract'
+);
+
+select ok(
+  position(
+    'value::text::uuid'
+    in pg_get_functiondef('private.undo_resolve_entry_person_candidates(uuid,uuid)'::regprocedure)
+  ) = 0,
+  'person candidate undo never casts quoted JSON text directly to uuid'
+);
+select ok(
+  position(
+    '#>> ''{}'''
+    in pg_get_functiondef('private.undo_resolve_entry_person_candidates(uuid,uuid)'::regprocedure)
+  ) > 0,
+  'person candidate undo extracts JSON scalar text before casting uuid arrays'
 );
 
 select function_privs_are(
