@@ -32,8 +32,24 @@ export type AiConfigCopy = Readonly<{
   intro: string;
   /** `2O-AICONFIG-002` — whose credential performs the calls, and what removing it does. */
   credential: string;
+  /**
+   * Two gated states, not one — and they are separate because collapsing them
+   * makes the product lie.
+   *
+   * `CredentialStatus` has four members and only `active` performs calls. An
+   * earlier version of this section rendered `credentialAbsent` for everything
+   * that was not `active`, so an account whose key the **provider rejected** was
+   * told *"no key configured"* — false, and false in the direction that sends
+   * the reader to configure a key they already have instead of replacing one.
+   *
+   * `removed` and `absent` are genuinely the same fact to this surface: there is
+   * no key. `invalid` is a different fact with a different action, so it gets
+   * its own sentence and its own verb.
+   */
   credentialAbsent: string;
+  credentialRejected: string;
   credentialAbsentAction: string;
+  credentialRejectedAction: string;
   /** `2O-AICONFIG-003` — the heading over the routing table. */
   routingTitle: string;
   routingIntro: string;
@@ -56,7 +72,10 @@ const ptBR: AiConfigCopy = {
     "Todas as chamadas abaixo usam a sua própria chave da OpenAI e são cobradas na sua conta da OpenAI. Remover a chave interrompe todas elas: nada passa a ser interpretado por outro caminho.",
   credentialAbsent:
     "Nenhuma chave configurada. Enquanto isso, nenhuma das operações abaixo acontece — seus registros continuam sendo salvos e ficam aguardando interpretação.",
+  credentialRejected:
+    "Sua chave foi recusada pelo provedor. Enquanto isso, nenhuma das operações abaixo acontece — seus registros continuam sendo salvos e ficam aguardando interpretação.",
   credentialAbsentAction: "Configurar a chave",
+  credentialRejectedAction: "Substituir a chave",
   routingTitle: "Qual operação usa qual modelo",
   routingIntro:
     "Esta lista é lida do roteamento que o produto realmente usa, e não de uma segunda tabela mantida à parte.",
@@ -112,7 +131,10 @@ const en: AiConfigCopy = {
     "Every call below uses your own OpenAI key and is billed to your OpenAI account. Removing the key stops all of them: nothing falls back to another path.",
   credentialAbsent:
     "No key configured. Until there is one, none of the operations below happens — your records are still saved and wait for interpretation.",
+  credentialRejected:
+    "Your key was rejected by the provider. Until that is fixed, none of the operations below happens — your records are still saved and wait for interpretation.",
   credentialAbsentAction: "Configure the key",
+  credentialRejectedAction: "Replace the key",
   routingTitle: "Which operation uses which model",
   routingIntro:
     "This list is read from the routing the product actually uses, not from a second table kept alongside it.",

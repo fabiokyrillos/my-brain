@@ -267,7 +267,29 @@ The full CI Playwright command — five specs, desktop and mobile — was also r
 
 ---
 
-## 11. One documentation defect found and repaired
+## 11. A defect found by reviewing the shipped component, not by a failure
+
+`AiConfigSection` first took a **boolean** — `credential.status === "active"` —
+for `2O-AICONFIG-008`. `CredentialStatus` has four members, and only `active`
+performs calls, so that reads correctly for the gate and **falsely** for one
+state: `invalid` means the provider **rejected a key that exists**, and the
+section told that reader *"no key configured"* and offered *"Configure the
+key"*.
+
+Both halves were wrong in the same direction — the sentence denied a key the
+account has, and the action sent the reader to create one instead of replacing
+it. It ships as the status, with `removed` and `absent` sharing one sentence
+because they really are one fact to this surface, and `invalid` carrying its
+own sentence and its own verb. Two tests pin it: one asserts each state renders
+the right sentence **and not the other**, and one is exhaustive over the
+non-`active` union so a fifth status cannot fall through to *"your key performs
+these calls"*.
+
+Nothing found this. It was found by re-reading what had already been written,
+which is the same reason `2O-PREF-011` was found in slice 2O.3 — and both are
+arguments for reading the shipped thing rather than the diff.
+
+## 12. One documentation defect found and repaired
 
 `settings/page.tsx` carried a comment stating that `OnboardingRestore` *"needs no
 capability-registry row"* and that *"the registry would have nothing true to say

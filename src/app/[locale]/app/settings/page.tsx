@@ -109,7 +109,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       */}
       <AiConfigSection
         locale={locale}
-        credentialConfigured={credential.status === "active"}
+        credentialStatus={credential.status}
         saved={values}
       />
       {/*

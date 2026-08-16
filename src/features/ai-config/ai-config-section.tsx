@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { CredentialStatus } from "@/features/byok/credential-view";
 import { TEXT_MODEL_LABELS, type TextModelId } from "@/lib/ai/model-routing";
 import type { Locale } from "@/lib/preferences";
 
@@ -36,32 +37,44 @@ import { getAiConfigCopy } from "./copy";
  */
 export function AiConfigSection({
   locale,
-  credentialConfigured,
+  credentialStatus,
   saved,
 }: {
   locale: Locale;
   /**
-   * `2O-AICONFIG-008`. Whether a credential is configured, and **not** its
-   * status, its age or any part of it.
+   * `2O-AICONFIG-008`, and it takes the **status** rather than a boolean.
    *
-   * A boolean is the whole of what this section is allowed to know: it states
-   * that the operations below do not happen and offers one path to fix it. What
-   * went wrong with a key, and when it was last validated, is
-   * `CredentialPanel`'s — one surface owns the credential, and this one links to
-   * it rather than restating it in a second voice.
+   * A boolean was the first shape and it was wrong in a way worth recording:
+   * `active` performs calls and the other three do not, so `status === "active"`
+   * collapses `invalid` into "no key configured" — telling someone whose key the
+   * **provider rejected** to go and configure a key they already have. The
+   * sentence was false and its action pointed the wrong way.
+   *
+   * What it still may not know is anything *about* the key: not its
+   * fingerprint, not when it was validated, not why it failed. Those are
+   * `CredentialPanel`'s, because one surface owns the credential and a second
+   * voice restating it is how two surfaces start disagreeing.
    */
-  credentialConfigured: boolean;
+  credentialStatus: CredentialStatus;
   saved: Readonly<Record<"chatModel" | "extractionModel" | "reviewModel" | "fileModel", string>>;
 }) {
   const copy = getAiConfigCopy(locale);
   const routed = resolveRoutedModels(saved);
+  // `removed` and `absent` are one fact to this surface — there is no key.
+  // `invalid` is a different fact with a different verb.
+  const gate =
+    credentialStatus === "active"
+      ? null
+      : credentialStatus === "invalid"
+        ? { message: copy.credentialRejected, action: copy.credentialRejectedAction }
+        : { message: copy.credentialAbsent, action: copy.credentialAbsentAction };
 
   return (
     <section className="ai-config-section" aria-labelledby="ai-config-heading">
       <h2 id="ai-config-heading">{copy.title}</h2>
       <p className="ai-config-intro">{copy.intro}</p>
 
-      {credentialConfigured ? (
+      {gate === null ? (
         <p className="ai-config-credential">{copy.credential}</p>
       ) : (
         /*
@@ -71,7 +84,7 @@ export function AiConfigSection({
          * attempted, and it carries exactly one action.
          */
         <p className="ai-config-credential absent">
-          {copy.credentialAbsent}{" "}
+          {gate.message}{" "}
           {/*
             `#byok-heading` is the panel's own heading id, which already exists
             because the section is `aria-labelledby` it. Linking to an anchor the
@@ -80,7 +93,7 @@ export function AiConfigSection({
             credential surface — which has exactly one mount point and stays that
             way.
           */}
-          <Link href={`/${locale}/app/settings#byok-heading`}>{copy.credentialAbsentAction}</Link>
+          <Link href={`/${locale}/app/settings#byok-heading`}>{gate.action}</Link>
         </p>
       )}
 
