@@ -7488,3 +7488,241 @@ re-audit against this `main` is above.
 > **Do not** absorb a declined residual, reallocate **M2**, or create a migration
 > outside the signed conditions. **Do not** open signup, resume the push HTTP 403
 > track, or start the successor phase.
+
+## §83 — Slice 2O.5 ships, and the stop condition did not fire because the owner decided it in advance (2026-08-16)
+
+PR **#240**, merged at **`26922bc`**; head at merge **`008a0a5`**, **CI green on
+all three job families on the head**. `main` local equals `origin/main`, worktree
+clean, no open PR.
+
+**`2O-PRIVACY-001` … `-010`, `2O-CONSENT-001` … `-005` — 14 `built`, 1 `partial`,
+0 `undelivered`. Zero migrations created. 94 local = 94 hosted, parity
+`202608140094`. Signup closed. Rollout gate 25 · 3 · 2, re-read by running
+`rollout:verify`. CSP unchanged. `embedding_model` untouched. A13 not
+retargeted. M2 unspent and unallocated.**
+
+**72 of 116 requirements delivered.** Slices 2O.0 – 2O.5; three remain.
+
+### The probable stop condition, resolved by an owner decision taken before the work
+
+§82 recorded `2O-PRIVACY-002` as a **probable stop condition** and it was right.
+Re-running the re-audit against this `main` confirmed the finding **and found a
+third reason nobody had recorded**.
+
+`public.account_owned_row_counts` is unreachable from an authenticated path
+three times over:
+
+1. it raises `42501` unless `coalesce(auth.role(), '') = 'service_role'`;
+2. `202608040072` revoked it from `public`, `anon` and `authenticated` **and
+   carries a postcondition that raises *"a deletion-executor function is
+   reachable by a client role"* if the grant is ever restored** — so granting it
+   fails the **database CI job**, not merely a policy review. This is the half
+   §82 did not have;
+3. ADR-118 Decision 9 names *"a service-role read on an authenticated path"*
+   verbatim.
+
+It also enumerates **dynamically** from `information_schema`, so there is no
+static list to import even if the authority question were settled.
+
+**The owner authorized exactly one interpretation, in advance:** count under the
+requesting user's own identity and the existing RLS; present an explicit, safe
+**projection** of the same conceptual coverage; and prove the projection against
+the real enumeration with an executable guard that fails when a new user-owned
+table appears unmapped or unjustified.
+
+**That was verified before a line was written**, by resolving the migration chain
+including the four `do`-block loops a text scan cannot see — the trap the memory
+`census-must-resolve-do-block-policies` records:
+
+- the deletion enumeration is **50 tables**;
+- **47 are readable by their owner** under an owner-scoped `select` policy — 16
+  by explicit grant, 31 by the loops in `202607160003`/`006`/`007`/`009`;
+- **3 are not**: `account_deletion_attempts`, `error_events`,
+  `rate_limit_events`, each revoked deliberately by Phase 2H. They are
+  abuse-prevention counters and the operator error sink, and an account able to
+  read its own throttle counters can measure the ceiling it is held to.
+
+**No migration, no RPC, no grant, no service-role client, no `SECURITY DEFINER`
+function.** The three exclusions are shown on the surface with their reason, and
+the guard verifies the cited migration really contains the revocation — a
+justification citing a file nobody checked is not a justification.
+
+**And it is proved by execution rather than by argument.** Against the hosted
+project, on the production build, with a real account: **zero categories render
+*"não foi possível ler"***. If one of the forty-seven were unreadable by its
+owner, that assertion fails rather than passing quietly.
+
+### Two producers that had shipped months ago finally have consumers
+
+`src/features/legal/retention.ts` — 188 lines, `RETENTION_SCHEDULE`,
+`retentionLine`, `hasUnenforcedWindow`, `DELETION_RETAINED_FIELDS` — had **zero
+consumers** since SH.6. `revokePushConsent` has had none since slice 2M. Both are
+read now. This repository has paid for the producer-with-no-consumer shape twice
+and it keeps recurring the same way: the mechanism is built correctly and nothing
+is ever pointed at it.
+
+### Five guards fired. None was weakened, and one caught a build error `tsc` cannot see
+
+1. **A `"use server"` module may export only async functions.** Two idle-state
+   consts lived in `actions.ts`. Every export of such a module becomes a
+   server-action reference, so a plain `const` is a **build error** — and
+   TypeScript has no opinion about what a directive means, so `typecheck` passed.
+   `reminders/actions.test.ts` holds the rule repository-wide and caught it.
+2. **The acceptance date carried no `timeZone`.** It would have resolved to the
+   **rendering server's** zone: a consent recorded at 22:00 in São Paulo displays
+   as the next day, on a legal record, from an omission.
+3. **`entity_aliases`' single-reader guard matched a table *name***, because the
+   privacy enumeration lists table names and that file performs no data access at
+   all. **The allowlist was refused** — it grants a file a permission in order to
+   pass a test, and exempts it from the real rule forever. Narrowed to the access
+   shape with a control in both directions.
+4. **The audit-writer inventory grew by one module**, which is what it exists to
+   make visible rather than to forbid. Not new authority: `authenticated` has
+   held INSERT on `audit_logs` since ADR-081.
+5. **The new guard failed against its own documentation, and then against a scope
+   declaration — and the second failure is the one worth carrying.** It forbade
+   the string `account_owned_row_counts`, and `export.ts` **names the function in
+   the archive's own scope declaration**, because `2O-PRIVACY-006` requires the
+   archive to state what it covers and naming the predicate is the truest way to
+   say it. **Failing on the name would have been answered by making the archive
+   vaguer about its own scope** — trading a real property for a passing test. It
+   was narrowed to the **call**, with a control planting exactly that call.
+
+**The lesson worth carrying: an authority guard must forbid the act, not the
+word.** A file that explains why it cannot do something is the most useful file
+for the next reader, and a guard that punishes the explanation gets the
+explanation deleted.
+
+### One test of mine was wrong about the fixture, twice, in opposite ways
+
+The export test's first fixture gave **every** table a `ciphertext`, so *"no
+secret survives anywhere in the archive"* failed against a **correct** export.
+The fixture was wrong, not the product — and a fixture that does not model the
+schema tests a different schema, usually breaking the strongest assertion in the
+file.
+
+The browser journey's first version asserted *"eleven zeros and one non-zero"*
+and was wrong against the hosted project: signing in and accepting the policies
+writes rows in more than one category. A total that must be re-tuned when an
+unrelated write path changes is a test people learn to edit without reading, so
+it asserts the **property** instead — twelve categories each produced a number,
+and at least one is non-zero.
+
+### What is carried, with destinations
+
+- **`2O-PRIVACY-001` closes `partial`.** Eleven of twelve categories link to the
+  surface that shows them; **`product_events` has no page in the product** and
+  the category says so rather than linking to one that does not show it.
+  Inventing a page would be the slice widening itself; a false link is the claim
+  the requirement exists to prevent → **owner**, one page or a decision that the
+  export suffices.
+- **`2O-ACTIVATION-005` direction B has a blind spot this slice found.**
+  `renderedControlNames` extracts controls by `name="…"`, so the three action
+  buttons added here are **invisible to it**. Adding a `name` purely so the guard
+  could see it was **refused** — that is shaping product code to a test → **slice
+  2O.7 or the closeout**, the guard's predicate rather than these components.
+- **`2O-PREF-002`'s remainder CLOSES.** Ajustes reaches the account's own
+  acceptance history and not only the documents.
+- **`2O-ONBOARD-003`** stays `partial`, untouched, outside this slice.
+- **`embedding_model`** untouched (ADR-117 Decision 4); **`viewport.themeColor`**
+  still media-only → slice 2O.7; **`defaultAgentPreferences.tone`** still says
+  `direct` against a column defaulting to `informal`.
+- Every Phase 2N residual `OD-2O-11` declined stays unclaimed; push still failing
+  with HTTP 403 on a real iPhone and **never executed on Android**; ADR-055
+  neither satisfied nor superseded, expiring **2026-10-27**. **No retention sweep
+  scheduled.**
+
+### The re-audit of slice 2O.6, done and recorded
+
+**Three findings against this `main`. Treat them as a starting point and re-run
+them — §82 and this section both exist because a recorded finding was wrong.**
+
+1. **`universal-state.tsx` already exists and already has consumers**, so
+   `2O-RECOVER-001` is **adoption, not construction**. But the adoption is
+   nearly untouched: **only two files in `src` render `UniversalState`** —
+   `work-view.tsx` and `search-surface.tsx`. That number is precise and is the
+   load-bearing fact for the slice's size.
+2. **The plan's census — *"ten app pages and thirteen feature components"* —
+   does not reproduce.** A crude scan for state copy finds **zero pages** (pages
+   delegate to components) and **ten feature components**. That scan is a
+   heuristic over Portuguese and English strings and must be re-derived properly
+   before it drives the work; what is certain is that the plan's *shape* — pages
+   plus components — is wrong for this tree, and `2O-RECOVER-002` requires each
+   exception to be recorded with a reason a guard reads.
+3. **`2O-NOTIFY-006` is now easier to satisfy honestly and harder to satisfy
+   quietly.** Slice 2O.5 shipped the consent record, which states notification
+   consent's state to the account for the first time. The push HTTP 403 track is
+   **not** resumed and must not be; `2O-NOTIFY-006` states the fact and does not
+   resolve it.
+
+**The second risk the plan names is the one to plan for:** an absence assertion
+passes on a page that never rendered, and `2O-RECOVER-007` requires a planted
+fixture marker on every state guard.
+
+### Where this stops
+
+**Between slices, with `main` clean at `26922bc`.** The next unit is **slice
+2O.6 — notifications at the moment of value, and recovery everywhere**
+(`2O-NOTIFY-001` … `-007`, `2O-RECOVER-001` … `-007`, fourteen requirements,
+**no migration**).
+
+### The prompt for slice 2O.6
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.6 —
+> notifications at the moment of value, and recovery everywhere**
+> (`2O-NOTIFY-001` … `-007`, `2O-RECOVER-001` … `-007`, fourteen requirements,
+> **no migration**).
+>
+> **Baseline to prove, not presume:** `main` = `origin/main` = **`26922bc`**,
+> worktree clean, **no open PR**, CI green on all three job families at that SHA,
+> **94 local = 94 hosted, parity `202608140094`**, **72 of 116 delivered**,
+> rollout gate **25 pass · 3 fail · 2 owner-signature**, signup closed, **M1
+> still conditional**, **M2 without a destination and unspendable**, A13 not
+> retargeted, `embedding_model` untouched.
+>
+> **Before acting:** read `AUTONOMOUS_LOOP_HANDOFF.md` §§78–83 in full; read the
+> acceptance records for slices 2O.0 – 2O.5 under `docs/reports/phase-2o/`;
+> re-read the PRD, the implementation plan, the threat model, the traceability
+> contract and **ADR-115 through ADR-118**. **Re-run the 2O.6 re-audit against
+> whatever `main` actually is.** §82 records that re-running it caught two false
+> findings in §81, and §83's own re-audit found the plan's page/component census
+> does not reproduce — treat §83's three findings as a starting point, never as a
+> substitute.
+>
+> **Four things this slice must not discover late.** `universal-state.tsx`
+> **already exists and only two files render it**, so `2O-RECOVER-001` is a large
+> adoption job and not new construction — measure the real census before sizing
+> it. **`2O-RECOVER-007` requires a planted fixture marker on every state
+> guard**, because an absence assertion passes on a page that never rendered.
+> **The push HTTP 403 / Android track is declined by `OD-2O-11` and may not be
+> resumed** — `2O-NOTIFY-006` states the fact and does not resolve it, and
+> claiming a delivery is the failure it forbids. **Consent, permission and
+> delivery are three separate facts** (`2O-NOTIFY-007`) and collapsing them into
+> one indicator is the defect, not a simplification.
+>
+> Then continue the loop: **2O.6 → merge → CI green on the merge SHA → re-audit
+> 2O.7 → 2O.7 → 2O.8 → closeout.** Do not stop after a slice if it is fully
+> merged, CI is green on the merge SHA, no owner decision is pending, no stop
+> condition has fired, and there is enough context to finish the next unit.
+>
+> **If context runs short:** finish the current unit entirely, get CI green on the
+> merge SHA, update this handoff, leave `main` clean with no open PR, stop **only
+> between slices**, and write the next resumption prompt **into this file**.
+>
+> **Run the whole command CI runs when you touch anything shared.**
+> `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+> e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts
+> --project=desktop --project=mobile`. It costs about 40 seconds. For the
+> authenticated lane, start `npm run start` first and run `node
+> scripts/online-playwright.mjs <spec> --project=desktop --workers=1`; restart the
+> server after any rebuild, and **kill port 3000 explicitly** — stopping the task
+> does not stop the server, and an unnoticed `EADDRINUSE` leaves the previous
+> build serving your proof.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need the
+> owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a migration
+> outside the signed conditions. **Do not** open signup, resume the push HTTP 403
+> track, or start the successor phase.
