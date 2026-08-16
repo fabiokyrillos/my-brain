@@ -7726,3 +7726,296 @@ fixture marker on every state guard.
 > **Do not** absorb a declined residual, reallocate **M2**, or create a migration
 > outside the signed conditions. **Do not** open signup, resume the push HTTP 403
 > track, or start the successor phase.
+
+## §84 — Slice 2O.6 ships, and re-running the re-audit found §83 had counted a comment as a consumer (2026-08-16)
+
+PR **#242**, merged at **`8a0659f`**; head at merge **`1ae2100`**,
+**CI green on all three job families on the head**. `main` local equals
+`origin/main`, worktree clean, no open PR.
+
+**`2O-NOTIFY-001` … `-007`, `2O-RECOVER-001` … `-007` — 14 `built`, 0 `partial`,
+0 `undelivered`. Plus `2O-PRIVACY-001` re-evaluated and closed `built` under
+ADR-119. Zero migrations created. 94 local = 94 hosted, parity `202608140094`.
+Signup closed. Rollout gate 25 · 3 · 2. CSP unchanged. `embedding_model`
+untouched. A13 not retargeted. M2 unspent and unallocated.**
+
+**87 of 116 requirements delivered.** Slices 2O.0 – 2O.6; two remain.
+
+### The re-audit caught §83 twice, and the first is a lesson about counting
+
+§83 recorded that *"only two files in `src` render `UniversalState`"* and called
+that number **"precise and the load-bearing fact for the slice's size"**.
+
+**One file rendered it.** `search-surface.tsx`. The second,
+`daily-cycle/work-view.tsx:91`, contains the phrase *"the universal-state
+contract"* **inside a block comment** and imports nothing from the module.
+
+The near-miss underneath is worth more than the correction. The component is
+**`UniversalStateView`**; **`UniversalState` is the type.** A census keyed on
+`UniversalState` matches every file importing the type, the vocabulary module,
+the copy module, two tests and a closeout guard — none of which renders
+anything. This is `grep-line-count-is-not-a-consumer-count` in its recorded
+form, one phase later against a different symbol.
+
+**The second: the plan's census reproduces in total and not in shape.**
+
+| | Plan | Actual |
+|---|---|---|
+| Surface-level state blocks | 23 files (10 pages + 13 components) | **22 files, 26 sites** |
+| …app route files | 10 | **16** |
+| …feature components | 13 | **6** |
+| Error / loading sites | not named | **10** |
+| Section-level absences | not named | **40** |
+
+### `quiet-state` is a typography helper, and that is what the census turns on
+
+It has **58 uses** and they are two different things: section absences
+(*"nothing linked yet"*) and ordinary explanatory prose (the content promise on
+notifications, the provenance line on a task, the note that planning writes
+nothing). Counting all 58 as states converts prose into states; counting none
+misses 40 real ones. They are separated by **what the paragraph says**, and the
+guard re-derives that from the tree rather than trusting the registry.
+
+### Three gaps had to close before adoption was possible at all
+
+1. **A Server Component could not use the module.** `onAction` is a function and
+   cannot cross the RSC boundary, and most of this product's empty states are
+   server-rendered → `actionHref`.
+2. **`error_terminal` could offer nothing.** `recoverable: false` plus a null
+   action label meant the one state that most needs a way out was the only state
+   that could not have one → `offersExit`, so `2O-RECOVER-003` is a property of
+   the **state** rather than a discipline at each call site.
+3. **A section absence is not a surface state.** Five bordered cards on a
+   project page make a populated page read as five failures →
+   `UniversalStateLine`, the same vocabulary at section density emitting the
+   same `data-ux-state`. An exception list was the alternative, and
+   `2O-RECOVER-001` says *wherever it is rendered at all*.
+
+**Adoption went from one file to forty-plus**, with **three** recorded
+exceptions, each carrying a reason and a **liveness check** — a stale exception
+is a permission nobody uses and nobody notices.
+
+### `2O-NOTIFY-005` names a bound whose object does not exist
+
+The requirement asks for quiet hours, the daily cap **and an important-reminder
+override**. **There is no override.** `decideDelivery` refuses inside quiet
+hours with no exemption for type, priority or urgency, and the words
+*important*, *priority* and *urgent* appear nowhere in the governance module —
+checked against the mechanism, not the copy, and asserted by a guard.
+
+The surface **declares the absence**, which is stricter than the requirement
+assumes and serves its stated reason completely. Classified `built`. **The
+premise is false and that is the owner's to settle** — accept the declaration as
+the delivery, or scope an override as new work.
+
+### Five guards fired, none weakened, and the fifth is §83's lesson from the other side
+
+The push boundary guard reported **this slice's own new guard** as carrying four
+push artifacts. It was right: the guard restated the forbidden API names in
+order to assert their absence. Its exemption list is **exactly two files** and
+says, in its own comment, that broadening it is how a guard stops guarding.
+
+§83 recorded *an authority guard must forbid the act, not the word* — and this
+slice then wrote a guard that forbade words. **The duplication was deleted
+rather than exempted**: the repository-wide claim was already held over an
+allowlist of three application files, and what is asserted now is the
+**capability** — neither module touches `navigator` or `window` — which no
+rename defeats and which names no forbidden token.
+
+The other four: the 2I guard's `error_terminal.action === null` (an armed
+assertion, **inverted** with the superseded text quoted and the protected
+property restated more strongly); the notification boundary guard's module-split
+discovery sweep; its state-sentence scan reading 14 where it expected 10,
+because the new `permissionFactValues` record legitimately reuses `granted` and
+`denied` for the **browser's** vocabulary (**narrowed to the `states:` blocks**
+with a planted control, rather than renaming the keys); and the no-gesture
+guard's surface sweep, for the fourth time.
+
+### Four mistakes, and what found each
+
+1. **The error boundary lost its `<h1>`** — the shared component renders its
+   title as a `<p>`, and a full-page state with no heading leaves a
+   screen-reader user nothing to navigate to. `titleAs` exists because of it.
+2. **`AccountMenu` got a second live region** for a sentence it already
+   announced — the double-announcement defect slice 2O.2 shipped once.
+   `announce` exists because of it.
+3. **I converted `needs-attention-error`, and it is not a universal state.** It
+   answers a **click**, which is action feedback and assertive for that reason,
+   and it is the sibling of `retryError` on the line above. A component test
+   caught the politeness change; the conversion was **reverted** and recorded as
+   an exception rather than the test weakened.
+4. **`relation-diagram.test.ts` asserted `querySelector("svg")` was null** and
+   began failing against correct code, because the tone icon is an SVG. The
+   property was never *"no SVG exists"* but *"no diagram is drawn"* — restated
+   that way it is **stronger**, since the old form would have passed on a
+   `<canvas>` diagram.
+
+### Two things about the environment, not the product
+
+**`.push-controls` does not exist where no sender key is configured**, because
+`R-24` makes `PushControls` render an honest sentence instead of a control that
+cannot work. A browser assertion comparing its geometry failed against a
+**correct** page. Ordering is asserted as DOM order now, and holds in both
+environments.
+
+And `project-key-guard.test.ts` failed twice in the full suite while passing in
+every subset: a **mid-write read**, while `DECISIONS.md` and `enumeration.ts`
+were being written. `local-guard-transient-after-edit`, on schedule.
+
+### I called the owner's own commit "unattributed", and the correction matters more than the incident
+
+`a7ad557` swept in a new **`public/icon-384.png`** with `layout.tsx` and
+`manifest.ts` repointed to it. The worktree was clean at preflight, so they had
+appeared mid-session, and I could not attribute them. **`1ae2100` backed them
+out** on the reasoning that a PWA icon is `2O-MOBILE-004`'s subject in slice
+2O.7 and an unattributed change should not ride inside a commit about
+notifications.
+
+**They were the owner's**, committed as **`2da06b5` — "feat: update PWA icon"**
+— to `main` at 12:15 while the slice was being written. `1ae2100`'s commit
+message calls them unattributed, and that sentence is **false**; it is left
+standing rather than rewritten, because the history is the record.
+
+**No harm reached `main`, and the reason is worth understanding rather than
+being relieved about.** The revert restored those three paths to the state of
+the **merge base** `87052ae`, so the branch's *net* effect on them was zero.
+Git therefore took `main`'s side, and `2da06b5` survives intact: `origin/main`
+carries `/icon-384.png` in `layout.tsx`, in `manifest.ts` and as a tracked file,
+verified byte-identical after the merge. Had the revert instead written some
+third value, it would have won the merge and silently undone the owner's work.
+
+**The rule this earns.** A file that appears mid-session in a shared working
+copy is not evidence of anything except a shared working copy. `git log
+origin/main` answers the attribution question in one command, and asking it
+BEFORE reverting costs nothing — while reverting first and asking later
+produces a commit message that is wrong in the permanent record. Check whether
+the remote has moved before concluding a change has no author.
+
+### One documentation hole repaired
+
+**Slice 2O.5 left no changelog entry.** The Definition of Done requires one and
+the log jumped from 2O.4 to this slice. Added retroactively as a pointer to its
+acceptance record rather than rewritten, because duplicating the authoritative
+account creates a second version to keep in step.
+
+### What is carried, with destinations
+
+- **`2O-ACTIVATION-005` direction B's blind spot**, with the three controls
+  **verified against the tree rather than quoted**:
+
+  | Control | File | Why invisible |
+  |---|---|---|
+  | Export the archive | `privacy/export-control.tsx:56` | `<button type="submit">`, no `name` |
+  | Save the produced archive | `privacy/export-control.tsx:64` | `<button type="button">`, no `name` |
+  | Sign out everywhere | `privacy/global-sign-out.tsx:28` | `<button type="submit">`, no `name` |
+
+  **`OnboardingRestore` is NOT one of them** — it carries
+  `name="restoreOnboarding"` and the guard sees it. Three controls across
+  **two** files, both from slice 2O.5. → **slice 2O.7, in the guard's
+  predicate.** **Adding a `name` purely so the guard can see a control is
+  forbidden**; a predicate that can only see named form fields is what is wrong,
+  not three buttons with nothing to name.
+- **`2O-NOTIFY-005`'s third bound has no object** → **owner**.
+- **`2O-ONBOARD-003`** stays `partial`, untouched.
+- **`viewport.themeColor` is still media-only** → slice 2O.7.
+- **`defaultAgentPreferences.tone`** still says `direct` against a column
+  defaulting to `informal`.
+- **`embedding_model`** untouched (ADR-117 Decision 4).
+- Every Phase 2N residual `OD-2O-11` declined stays unclaimed; push still fails
+  with **HTTP 403 on a real iPhone** and has **never been executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**. **No
+  retention sweep scheduled.**
+
+### The re-audit of slice 2O.7, done and recorded
+
+**Four findings against this branch. Treat them as a starting point and re-run
+them — §82, §83 and this section all exist because a recorded finding was
+wrong.**
+
+1. **`2O-MOBILE-003`'s subject may already be fixed.** ADR-116 restated it as
+   *"the 21px target at `online-memories.spec.ts:85` **is fixed**,
+   unconditionally"*. Against this tree that assertion reads
+   `toBeGreaterThanOrEqual(44)`. Either an earlier slice repaired it or the line
+   moved. **Verify what the requirement's object actually is before spending the
+   phase's one licence to change a surface it did not create.**
+2. **`2O-ACCESS-001` is extension, not construction.** An axe harness ships in
+   `e2e/accessibility.spec.ts`, and two online specs already use `AxeBuilder`.
+   The dark run **and its control** are the part to check.
+3. **`2O-ACCESS-004` is largely satisfied already.** `account-data-strip.tsx`
+   uses `aria-current="page"` on the current lens and renders it as a `span`
+   rather than a link, and `account-centre.test.tsx` asserts it. Re-assert; do
+   not rebuild.
+4. **`viewport.themeColor` is confirmed media-only** at `layout.tsx:63-66`, two
+   entries keyed on `prefers-color-scheme`. An explicit light choice on a dark
+   machine still leaves the browser chrome dark. This is the residual slices
+   2O.3 and 2O.4 both routed here.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.7 — mobile
+activation and accessibility** (`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` …
+`-006`, eleven requirements, **no migration**).
+
+### The prompt for slice 2O.7
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.7 — mobile
+> activation and accessibility** (`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` …
+> `-006`, eleven requirements, **no migration**).
+>
+> **Baseline to prove, not presume:** `main` = `origin/main` = the merge SHA at
+> the top of §84, worktree clean, **no open PR**, CI green on all three job
+> families at that SHA, **94 local = 94 hosted, parity `202608140094`**, **87 of
+> 116 delivered**, rollout gate **25 pass · 3 fail · 2 owner-signature**, signup
+> closed, **M1 still conditional**, **M2 without a destination and unspendable**,
+> A13 not retargeted, `embedding_model` untouched.
+>
+> **Before acting:** read `AUTONOMOUS_LOOP_HANDOFF.md` §§80–84 in full; read the
+> acceptance records for slices 2O.0 – 2O.6 under `docs/reports/phase-2o/`;
+> re-read the PRD, the implementation plan, the threat model, the traceability
+> contract and **ADR-115 through ADR-119**. **Re-run the 2O.7 re-audit against
+> whatever `main` actually is.** §84's four findings are a starting point and
+> never a substitute — §83's own census turned out to have counted a comment as
+> a consumer, and §82 caught two false findings in §81.
+>
+> **Five things this slice must not discover late.** **`2O-MOBILE-003`'s object
+> may already be repaired** — the assertion it names now reads 44, so verify
+> before spending the phase's one licence to change a surface it did not create.
+> **`2O-ACCESS-006` may never be promoted to a pass** by documentation, an
+> emulator, an automated scan, or inference from one (ADR-118 Decision 8): it is
+> executed and recorded with device, software and version, or recorded as not
+> executed and closed `partial`, and there is no third outcome. **jsdom cannot
+> see contrast** — `2O-ACCESS-005` requires the rendered page. **The
+> `2O-ACTIVATION-005` blind spot is yours**, three nameless buttons across two
+> files, and the fix belongs in **the guard's predicate**; adding a `name` so a
+> guard can see a button is forbidden. **`viewport.themeColor` is the
+> highest-severity thing this slice touches** — it is media-only, and widening
+> it reaches every route in the product.
+>
+> Then continue the loop: **2O.7 → merge → CI green on the merge SHA → re-audit
+> 2O.8 → 2O.8 → closeout.** Do not stop after a slice if it is fully merged, CI
+> is green on the merge SHA, no owner decision is pending, no stop condition has
+> fired, and there is enough context to finish the next unit.
+>
+> **If context runs short:** finish the current unit entirely, get CI green on
+> the merge SHA, update this handoff, leave `main` clean with no open PR, stop
+> **only between slices**, and write the next resumption prompt **into this
+> file**.
+>
+> **Run the whole command CI runs when you touch anything shared.**
+> `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+> e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts
+> --project=desktop --project=mobile`. It costs about 40 seconds, and this slice
+> changes a stylesheet, so the blast radius is the whole product. For the
+> authenticated lane, start `npm run start` first and run `node
+> scripts/online-playwright.mjs <spec> --project=desktop --workers=1`; restart
+> the server after every rebuild and **kill port 3000 explicitly** — stopping
+> the task does not stop the server, and an unnoticed `EADDRINUSE` leaves the
+> previous build serving your proof.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need the
+> owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a migration
+> outside the signed conditions. **Do not** open signup, resume the push HTTP 403
+> track, or start the successor phase.
