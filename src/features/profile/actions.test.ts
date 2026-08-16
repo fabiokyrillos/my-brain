@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { redirect } from "next/navigation";
+import { getCapabilitySummaryCopy } from "@/features/shell/capability-copy";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "./actions";
 
@@ -31,6 +32,9 @@ function operationalFormData() {
     importantReminderOverride: "on",
     maxFollowupsPerDay: "2",
     responseDetail: "detailed",
+    dailyReviewTime: "22:00",
+    weeklyReviewTime: "19:00",
+    weeklyReviewDay: "5",
     aiProfile: "custom",
     chatModel: "gpt-5.6-luna",
     extractionModel: "gpt-5-mini",
@@ -67,7 +71,25 @@ describe("updateProfile", () => {
 
     const result = await updateProfile({ status: "idle", message: "" }, operationalFormData());
 
-    expect(result).toEqual({ status: "success", message: "Preferences saved." });
+    /*
+     * `2O-PREF-010`. The message used to be "Preferences saved." and nothing
+     * else — true of a save that changed nothing, and silent about what would
+     * now behave differently.
+     *
+     * This fixture's stored row holds no `timezone` and `agent_name: "Brain"`
+     * against a submitted `America/New_York` and `Aurora`, so exactly two
+     * capabilities moved. The sentences are the registry's own, which is why
+     * they are looked up rather than typed here: a copy change must not be able
+     * to make this assertion stale in a way that hides a real regression.
+     */
+    expect(result.status).toBe("success");
+    const copy = getCapabilitySummaryCopy("en");
+    expect(result.message).toContain("Preferences saved.");
+    expect(result.message).toContain(copy.entries.timezone.effect);
+    expect(result.message).toContain(copy.entries.identity_names.effect);
+    // And it says nothing about the preferences that did not move.
+    expect(result.message).not.toContain(copy.entries.quiet_hours.effect);
+    expect(result.message).not.toContain(copy.entries.scheduled_reviews.effect);
     expect(profile.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(preferences.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(rpc).toHaveBeenCalledWith("save_profile_settings", expect.objectContaining({

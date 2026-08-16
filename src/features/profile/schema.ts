@@ -26,6 +26,23 @@ export const profileSchema = z.object({
   importantReminderOverride: z.string().optional().transform((value) => value === "on"),
   maxFollowupsPerDay: z.coerce.number().int().min(0).max(20),
   responseDetail: z.enum(["short", "balanced", "detailed"]),
+  /*
+   * `2O-PREF-004`. The three review preferences that already have a consumer.
+   *
+   * This object is `.strict()`, which is why these lines are not optional
+   * bookkeeping: a control rendered in the form without a key here makes the
+   * whole parse fail and the **entire save** return "review the fields", with no
+   * indication of which one. The strictness is right — it refuses fields nobody
+   * declared — and it makes the form and this schema a single unit that has to
+   * move together.
+   *
+   * `weeklyReviewDay` is coerced because a `<select>` submits a string, and
+   * bounded 0–6 to match `parseReviewWeekday`, which refuses anything outside
+   * that range rather than folding it into a different day.
+   */
+  dailyReviewTime: time,
+  weeklyReviewTime: time,
+  weeklyReviewDay: z.coerce.number().int().min(0).max(6),
   aiProfile: z.enum(["quality", "balanced", "economy", "custom"]),
   chatModel: textModel,
   extractionModel: textModel,

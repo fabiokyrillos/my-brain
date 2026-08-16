@@ -2,6 +2,83 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-15 - PHASE 2O SLICE 2O.3 — one preferences centre, and a theme the reader owns
+
+**`2O-PREF-001` … `-015` — 14 built, 1 partial, 0 undelivered. Zero migrations
+created. 94, parity `202608140094`. Signup closed, rollout 25 · 3 · 2. CSP
+unchanged. `embedding_model` untouched. A13 not retargeted. 41 of 116
+delivered.**
+
+### Added
+
+- `src/features/appearance/` — the appearance choice `OD-2O-2` **A** signed and
+  ADR-114 Decision 3 never got a control for. `contracts.ts` holds the closed
+  set of three, the parser every read goes through, and `APPEARANCE_SCRIPT`, the
+  pre-paint source inlined in `<head>`. `system` is the **absence** of
+  `data-theme`, not a third value: any other value leaves the machine in charge
+  by accident, but only absence also leaves `:root[data-theme="dark"]`
+  unmatched.
+- `src/features/account-centre/` — Conta e dados, the Dados e IA pattern applied
+  a second time. Four doors (notifications, terms, privacy, deletion), derived
+  hrefs, and a strip with the way back worn by both authenticated destinations.
+- `src/features/profile/save-outcome.ts` — what a save changed and what will now
+  behave differently, in `capability-copy.ts`'s own sentences rather than a
+  second set of strings.
+- `src/features/profile/review-preferences-copy.ts` — copy for the three review
+  controls, which says when the reviews page *offers to close the day* and never
+  when something runs.
+- `src/lib/closeout/phase-2o-appearance-guard.test.ts` — the halves no unit test
+  can see: `tokens.css` resolving an explicit choice in both directions, the
+  script's position and hydration suppression, no server-sent `data-theme`, and
+  an unmoved CSP.
+- `e2e/online-preferences-centre.spec.ts` — the authenticated proof, including
+  `prefers-color-scheme` emulated in both directions and the choice surviving a
+  real reload.
+
+### Changed
+
+- `daily_review_time`, `weekly_review_time` and `weekly_review_day` are now
+  **submitted** rather than read from the stored row and written back. That
+  round trip is why `2M-AUDIT-005` found them unchangeable. `planning_day` and
+  `planning_time` still round-trip, deliberately: `2O-PREF-007` does not reverse
+  a signed outcome, and both halves are asserted.
+- `capabilityRegistry` gains a `controls` anchor beside `columns`, and three
+  rows: `appearance`, `onboarding_restore` and **`ai_credential`** — the last
+  found by widening the `2O-PREF-008` guard from one file to the settings page's
+  own mounts. `CredentialPanel` has rendered `apiKey` with no row since BYOK
+  shipped.
+- `scheduled_reviews` moves from `uncontrolled` to `operational` and `visible`,
+  which is the final wording `2O-ACTIVATION-006` deferred to this requirement.
+  The `uncontrolled` state stays declared — ADR-117 needs it for
+  `embedding_model` in slice 2O.4 — and its invariant is extracted over the
+  widened type and proved against planted rows, so the rule outlives its
+  subject.
+- The root layout declares `suppressHydrationWarning` and inlines the appearance
+  script in `<head>`. No CSP change: `'unsafe-inline'` is already in
+  `script-src`.
+
+### Fixed
+
+- **A failed save destroyed the reader's input.** React resets an uncontrolled
+  form after a form action returns and cannot tell a failed save from a
+  successful one — the action returned normally either way; the failure is in
+  its value. The submission is now snapshotted and restored in a layout effect,
+  before paint.
+- **The appearance control polluted its own accessible name.** All three radios
+  answered to "Claro", because a `<small>` inside a `<label>` joins the
+  control's accessible name and *Seguir o aparelho* is described as *acompanha o
+  modo claro ou escuro*. Same correction `ModelSelect` already carries.
+
+### Recorded, not repaired
+
+- `viewport.themeColor` is declared under `prefers-color-scheme` media only, so
+  an explicit light choice on a dark machine leaves the browser chrome dark →
+  **slice 2O.7**.
+- `defaultAgentPreferences.tone` says `direct` while the column defaults to
+  `informal`; nothing reads that field.
+- The account's own policy acceptances have no reader anywhere in the product →
+  `2O-CONSENT-001`/`-002`, **slice 2O.5**. This is `2O-PREF-002`'s remainder.
+
 ## 2026-08-15 - PHASE 2O SLICE 2O.2 — the first conquest, derived and offered
 
 **`2O-ONBOARD-001` … `-011`. Zero migrations created. 94, parity

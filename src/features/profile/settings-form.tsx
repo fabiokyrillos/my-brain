@@ -2,7 +2,7 @@
 
 import { CheckCircle2, LoaderCircle, Save } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useLayoutEffect, useRef, useState } from "react";
 import {
   MODEL_PROFILES,
   TEXT_MODEL_IDS,
@@ -12,6 +12,7 @@ import {
   type TextModelId,
 } from "@/lib/ai/model-routing";
 import type { Locale } from "@/lib/preferences";
+import { getReviewPreferencesCopy } from "./review-preferences-copy";
 import type { SettingsFormValues } from "./settings-contracts";
 import { getTimeZoneOptions } from "./timezones";
 
@@ -75,6 +76,65 @@ function ModelSelect({
   </div>;
 }
 
+/**
+ * `2O-PREF-011`: *"a save that fails … keeps the user's input."*
+ *
+ * ## The defect, which a test found rather than a review
+ *
+ * React resets an uncontrolled form after a form action returns, and it cannot
+ * tell a failed save from a successful one — the action function returned
+ * normally either way; the failure is in its *value*. So a save that failed for
+ * any reason (offline, an expired session, a database error) wiped every field
+ * back to the values the server had sent, and the reader who had just retyped
+ * four of them was told to *try again* with their work already gone.
+ *
+ * `aiProfile` and the model routes never had this problem, because they are React
+ * state. Everything else in this form is uncontrolled.
+ *
+ * ## What is done instead, and why not the alternatives
+ *
+ * The submission is snapshotted on its way out and written back if the outcome
+ * is an error. *Make every field controlled* — declined: it is a much larger
+ * change to a form that is otherwise correct, and it would put a dozen more
+ * `useState` calls in a component whose job is rendering. *Return the submitted
+ * values from the Server Action and re-seed `defaultValue`* — declined: a
+ * `defaultValue` change does not reach a mounted uncontrolled input, so it needs
+ * a `key` remount as well, and it would send the reader's draft on a round trip
+ * to the server to be handed straight back.
+ *
+ * It restores in a **layout** effect, so the write lands before the browser
+ * paints and no reader sees their input blink back to the old values on the way
+ * to being restored.
+ */
+type FormDraft = Readonly<Record<string, string | boolean>>;
+
+function snapshotForm(formData: FormData): FormDraft {
+  const draft: Record<string, string | boolean> = {};
+  for (const [key, value] of formData.entries()) {
+    // Framework metadata, not the reader's input.
+    if (key.startsWith("$ACTION_") || typeof value !== "string") continue;
+    draft[key] = value;
+  }
+  return draft;
+}
+
+function restoreForm(form: HTMLFormElement, draft: FormDraft) {
+  for (const element of Array.from(form.elements)) {
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) continue;
+    if (!element.name || element.type === "hidden") continue;
+    if (element.type === "checkbox" && element instanceof HTMLInputElement) {
+      // An unticked checkbox submits nothing, so absence is the value.
+      element.checked = element.name in draft;
+      continue;
+    }
+    // Radios are React-controlled here (`aiProfile`), so they are left alone —
+    // writing `checked` on them would fight the state that already survived.
+    if (element.type === "radio") continue;
+    const stored = draft[element.name];
+    if (typeof stored === "string") element.value = stored;
+  }
+}
+
 export function SettingsForm({
   action,
   initialState = idleState,
@@ -87,8 +147,24 @@ export function SettingsForm({
   values: SettingsFormValues;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const draftRef = useRef<FormDraft | null>(null);
   const pt = locale === "pt-BR";
+
+  function submit(formData: FormData) {
+    draftRef.current = snapshotForm(formData);
+    return formAction(formData);
+  }
+
+  useLayoutEffect(() => {
+    if (state.status !== "error") return;
+    const form = formRef.current;
+    const draft = draftRef.current;
+    if (form && draft) restoreForm(form, draft);
+  }, [state]);
+
   const zones = getTimeZoneOptions(locale, values.timezone);
+  const reviews = getReviewPreferencesCopy(locale);
   const [aiProfile, setAIProfile] = useState<AIRoutingProfile>(values.aiProfile);
   const [routes, setRoutes] = useState<VisibleAIRoutes>({
     chatModel: values.chatModel,
@@ -137,7 +213,7 @@ export function SettingsForm({
     },
   ];
 
-  return <form action={formAction} className="settings-form">
+  return <form action={submit} className="settings-form" ref={formRef}>
     <input type="hidden" name="locale" value={locale} />
 
     <Section number="01" title={pt ? "Fuso horário" : "Time zone"} description={pt ? "Datas, prazos, revisões manuais e períodos silenciosos usam esta escolha." : "Dates, deadlines, manual reviews, and quiet periods use this setting."} />
@@ -165,8 +241,36 @@ export function SettingsForm({
     <Section number="03" title={pt ? "Silêncio e frequência" : "Quiet hours and frequency"} description={pt ? "Limites aplicados pelo processamento de lembretes e acompanhamentos." : "Limits enforced by reminder and follow-up processing."} />
     <div className="settings-fields"><label htmlFor="quiet-start">{pt ? "Período silencioso começa" : "Quiet period starts"}<input id="quiet-start" name="quietStart" type="time" defaultValue={values.quietStart} /></label><label htmlFor="quiet-end">{pt ? "Período silencioso termina" : "Quiet period ends"}<input id="quiet-end" name="quietEnd" type="time" defaultValue={values.quietEnd} /></label><label htmlFor="max-followups">{pt ? "Máximo de acompanhamentos por dia" : "Maximum follow-ups per day"}<input id="max-followups" name="maxFollowupsPerDay" type="number" min="0" max="20" defaultValue={values.maxFollowupsPerDay} /></label><label className="settings-checkbox"><input name="importantReminderOverride" type="checkbox" defaultChecked={values.importantReminderOverride} /><span>{pt ? "Permitir lembretes importantes durante o silêncio" : "Allow important reminders during quiet hours"}</span></label></div>
 
+    {/*
+      `2O-PREF-004` and `2O-PREF-005`. The three review columns that already had
+      a consumer and never had a control.
+
+      The section's own description repeats `/app/reviews`'s promise verbatim —
+      *nothing runs from a configured schedule* — because this is the one place
+      in the product where a reader could reasonably conclude the opposite. Every
+      label says *offer to close*, never *run*, *send* or *generate*.
+
+      `planning_day` and `planning_time` are absent here, and that absence is
+      `2O-PREF-007` rather than an omission: `2M-AUDIT-005` retired them, and
+      `phase-2m-inert-preferences-guard.test.ts` fails if they reappear.
+    */}
+    <Section number="04" title={reviews.sectionTitle} description={reviews.sectionDescription} />
+    <div className="settings-fields">
+      <div className="settings-field">
+        <label htmlFor="daily-review-time">{reviews.dailyLabel}<input id="daily-review-time" name="dailyReviewTime" type="time" aria-describedby="daily-review-hint" defaultValue={values.dailyReviewTime} /></label>
+        <small id="daily-review-hint">{reviews.dailyHint}</small>
+      </div>
+      <div className="settings-field">
+        <label htmlFor="weekly-review-day">{reviews.weeklyDayLabel}<select id="weekly-review-day" name="weeklyReviewDay" defaultValue={String(values.weeklyReviewDay)}>{reviews.weekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
+      </div>
+      <div className="settings-field">
+        <label htmlFor="weekly-review-time">{reviews.weeklyTimeLabel}<input id="weekly-review-time" name="weeklyReviewTime" type="time" aria-describedby="weekly-review-hint" defaultValue={values.weeklyReviewTime} /></label>
+        <small id="weekly-review-hint">{reviews.weeklyHint}</small>
+      </div>
+    </div>
+
     <details className="settings-advanced">
-      <summary><span>04</span><div><strong>{pt ? "IA avançada" : "Advanced AI"}</strong><small>{pt ? "Roteamento e custos das funções com consumer ativo." : "Routing and costs for functions with active consumers."}</small></div></summary>
+      <summary><span>05</span><div><strong>{pt ? "IA avançada" : "Advanced AI"}</strong><small>{pt ? "Roteamento e custos das funções com consumer ativo." : "Routing and costs for functions with active consumers."}</small></div></summary>
       <div className="settings-advanced-content">
         <fieldset className="ai-profile-fieldset"><legend>{pt ? "Perfil de custo e qualidade" : "Cost and quality profile"}</legend><div className="ai-profile-grid">{profiles.map((profile) => <label key={profile.id} className={`ai-profile-card${aiProfile === profile.id ? " active" : ""}`}><input type="radio" name="aiProfile" value={profile.id} checked={aiProfile === profile.id} onChange={() => chooseProfile(profile.id)} /><span><strong>{profile.title}</strong><small>{profile.description}</small></span></label>)}</div></fieldset>
 

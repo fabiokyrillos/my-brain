@@ -1,3 +1,5 @@
+import { AccountDataSection } from "@/features/account-centre/account-data-section";
+import { AppearanceControl } from "@/features/appearance/appearance-control";
 import { interpretPendingEntries, removeAiCredential, saveAiCredential } from "@/features/byok/actions";
 import { CredentialPanel } from "@/features/byok/credential-panel";
 import { loadCredentialMetadata } from "@/features/byok/credential-view";
@@ -67,6 +69,18 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         IA deliberately — here is what you can change, here is what each change
         does, here is where to see what was done with it.
       */}
+      {/*
+        `2O-PREF-013`. The appearance choice, which ADR-114 Decision 3 specified
+        and never shipped a control for.
+
+        It sits **after** the saved preferences and before the navigational
+        sections, which is where it belongs on both counts: it is a preference,
+        so it goes with the preferences, and it is the only one on this page with
+        no save button — held in this browser, applied the moment it is clicked
+        (`2O-PREF-014`). Putting it inside `SettingsForm` would have given it a
+        submit path it does not have and a payload it does not belong in.
+      */}
+      <AppearanceControl locale={locale} />
       <CapabilitySummary locale={locale} />
       {/*
         Dados e IA — `02-arquitetura-e-rotas.md` puts the transparency centre
@@ -78,6 +92,18 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         surfaces to make room for it.
       */}
       <DataAiSection locale={locale} />
+      {/*
+        `2O-PREF-001` and `2O-PREF-002`. Conta e dados — the same pattern applied
+        a second time, reaching notifications, the policy documents and account
+        deletion.
+
+        Last on the page, deliberately. Everything above it is something the
+        owner came here to change; this section is where they go when they are
+        done — including the one door that ends the account. Dados e IA precedes
+        it because looking at what the product did is the more common errand than
+        leaving.
+      */}
+      <AccountDataSection locale={locale} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -132,6 +132,7 @@ describe("2O-ACTIVATION-005 direction A: a row may not claim a consumer that doe
       consumerEvidence: ["readsAbsolutelyNothing2O", "features/no-such-module/actions"],
       visible: true,
       columns: [],
+      controls: [],
     };
     for (const token of fabricated.consumerEvidence) {
       expect(resolvesInTree(token), `the planted token \`${token}\` resolved`).toBe(false);
@@ -182,6 +183,47 @@ const GOVERNED_COLUMNS: ReadonlySet<string> = new Set<string>(
   capabilityRegistry.flatMap((capability) => capability.columns),
 );
 
+/**
+ * The non-column half, widened for the same reason `GOVERNED_COLUMNS` is.
+ *
+ * `2O-PREF-008` put two controls in the centre that set no column at all — the
+ * appearance choice and the onboarding restore — so a guard that could only
+ * resolve a control to a column would have had to exempt them.
+ */
+const GOVERNED_CONTROLS: ReadonlySet<string> = new Set<string>(
+  capabilityRegistry.flatMap((capability) => capability.controls),
+);
+
+/**
+ * `2O-PREF-008`: **the whole preferences centre**, not one file.
+ *
+ * The list is **derived from the settings page's own JSX**, so a component
+ * mounted there without a row cannot escape by not being listed here — which is
+ * exactly how `OnboardingRestore` went uncovered between slices 2O.2 and 2O.3.
+ * A hand-written array would have needed someone to remember to extend it, and
+ * §79 records that nobody did.
+ */
+const SETTINGS_PAGE = "src/app/[locale]/app/settings/page.tsx";
+
+function centreControlSources(): readonly string[] {
+  const page = readFileSync(join(REPO, SETTINGS_PAGE), "utf8");
+  const mounted = new Set([...page.matchAll(/<([A-Z][A-Za-z]*)\b/g)].map((match) => match[1]));
+  const imports = [...page.matchAll(/import\s*\{([^}]+)\}\s*from\s*"([^"]+)"/g)];
+  const files: string[] = [];
+  for (const [, names, specifier] of imports) {
+    if (!specifier.startsWith("@/")) continue;
+    if (!names.split(",").some((name) => mounted.has(name.trim()))) continue;
+    const relative = specifier.replace(/^@\//, "src/");
+    for (const candidate of [`${relative}.tsx`, `${relative}.ts`]) {
+      if (existsSync(join(REPO, candidate))) {
+        files.push(candidate);
+        break;
+      }
+    }
+  }
+  return files;
+}
+
 describe("2O-ACTIVATION-005 direction B: a rendered control may not exist without a row", () => {
   const controls = renderedControlNames(readFileSync(join(REPO, PREFERENCES_FORM), "utf8"));
 
@@ -193,6 +235,51 @@ describe("2O-ACTIVATION-005 direction B: a rendered control may not exist withou
         `${PREFERENCES_FORM} renders \`${field}\` (\`${column}\`) and no capability row governs it`,
       ).toBe(true);
     }
+  });
+
+  /**
+   * `2O-PREF-008`, and the obligation slice 2O.2 created and §79 recorded.
+   *
+   * The scan reaches every component the settings page mounts, and each control
+   * must resolve **either** to a governed column **or** to a governed control
+   * name. A control that resolves to neither fails, which is the whole point: it
+   * is a preference the product offers and the registry has never heard of.
+   */
+  it("governs every control in the whole centre, not only the form", () => {
+    const sources = centreControlSources();
+    // Non-vacuous, in the direction that matters: the derivation really did find
+    // the page's mounted components, including the two that govern no column.
+    expect(sources, "the settings page's mounts were not resolved").toContain(PREFERENCES_FORM);
+    expect(sources).toContain("src/features/appearance/appearance-control.tsx");
+    expect(sources).toContain("src/features/onboarding/onboarding-restore.tsx");
+
+    let seen = 0;
+    for (const path of sources) {
+      for (const field of renderedControlNames(readFileSync(join(REPO, path), "utf8"))) {
+        seen += 1;
+        expect(
+          GOVERNED_COLUMNS.has(toColumn(field)) || GOVERNED_CONTROLS.has(field),
+          `${path} renders \`${field}\` and no capability row governs it`,
+        ).toBe(true);
+      }
+    }
+    expect(seen, "no control was extracted from the centre at all").toBeGreaterThan(14);
+  });
+
+  it("resolves the two non-column controls through `controls`, not through `columns`", () => {
+    // Stated separately so the mechanism is visible: if either ever acquired a
+    // column, this fails and the row has to say so.
+    for (const control of ["appearance", "restoreOnboarding"]) {
+      expect(GOVERNED_CONTROLS.has(control), `${control} has no row`).toBe(true);
+      expect(GOVERNED_COLUMNS.has(toColumn(control)), `${control} unexpectedly has a column`).toBe(false);
+    }
+  });
+
+  it("rejects a control in the centre that no row governs, by either anchor", () => {
+    const planted = renderedControlNames('<input name="favouriteTheme" />');
+    expect(planted).toEqual(["favouriteTheme"]);
+    expect(GOVERNED_COLUMNS.has(toColumn("favouriteTheme"))).toBe(false);
+    expect(GOVERNED_CONTROLS.has("favouriteTheme")).toBe(false);
   });
 
   it("is non-vacuous: the form really does render the controls it is known to render", () => {
@@ -266,15 +353,40 @@ describe("2O-ACTIVATION-004: the registry is load-bearing", () => {
 
 /* -------------------------------------------------------------------------- */
 
-describe("2O-ACTIVATION-006: `scheduled_reviews` is no longer readable two ways", () => {
+describe("2O-ACTIVATION-006 → 2O-PREF-004: `scheduled_reviews` reaches its final wording", () => {
   const row = capabilityRegistry.find((item) => item.key === "scheduled_reviews");
 
-  it("exists and names the consumer it really has", () => {
+  /**
+   * **Inverted by slice 2O.3, not deleted.** Superseded form, quoted:
+   *
+   * > ``expect(row!.state, "`future` cannot be told from `no control`")
+   * > .toBe("uncontrolled")``
+   *
+   * `2O-ACTIVATION-006` set this row to `uncontrolled` — real consumers, no
+   * authorized control — and said in as many words that its **final wording and
+   * `visible` value belong to `2O-PREF-004`**. Slice 2O.3 built the three
+   * controls `OD-2O-6` **A** signed, so `uncontrolled` became the false reading
+   * and would now be the ambiguity rather than the cure.
+   *
+   * The failure being prevented is unchanged — the registry disagreeing with
+   * the tree about what the owner can control. Only the direction moved.
+   */
+  it("exists, names its real consumer, and now says it is controlled", () => {
     expect(row, "the scheduled_reviews row is gone").toBeDefined();
-    expect(row!.state, "`future` cannot be told from `no control`").toBe("uncontrolled");
+    expect(row!.state, "the controls ship — `uncontrolled` is now false").toBe("operational");
+    expect(row!.visible, "its controls are visible, so the row must be too").toBe(true);
     expect(row!.consumerEvidence.length).toBeGreaterThan(0);
     for (const token of row!.consumerEvidence) {
       expect(resolvesInTree(token), `${token} resolves to nothing`).toBe(true);
+    }
+  });
+
+  it("has the controls that justify the change, in the form itself", () => {
+    // The other half. A row claiming `operational` while the form offers
+    // nothing would be the mirror of the state this inversion just left.
+    const form = readFileSync(join(REPO, "src/features/profile/settings-form.tsx"), "utf8");
+    for (const field of ["dailyReviewTime", "weeklyReviewTime", "weeklyReviewDay"]) {
+      expect(form, `${field} has no control — the row claims otherwise`).toContain(`name="${field}"`);
     }
   });
 

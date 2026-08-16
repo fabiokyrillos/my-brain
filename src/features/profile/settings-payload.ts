@@ -48,12 +48,27 @@ export function buildSettingsPayload(input: ProfileInput, snapshot: SettingsPers
       // already stored — which is exactly why the column never changed.
       agentName: input.agentName,
       followUpIntensity: current?.follow_up_intensity ?? "balanced",
-      dailyReviewTime: shortTime(current?.daily_review_time, "22:00"),
+      /*
+       * `2O-PREF-004`: submitted, no longer passed through.
+       *
+       * These three were read from `current` and written straight back, which is
+       * why `2M-AUDIT-005` found them unchangeable — the payload was a
+       * round-trip. They now carry what the form sent, which is the whole of
+       * giving a column a control.
+       *
+       * The pairing below is the point: `planningDay` and `planningTime` stay
+       * passed through, because `2O-PREF-007` gives them no control and
+       * `2M-AUDIT-005` retired them. Two columns on the same table, written by
+       * the same payload, deliberately treated differently — and
+       * `settings-payload.test.ts` asserts both halves, so removing either
+       * distinction fails.
+       */
+      dailyReviewTime: input.dailyReviewTime,
       personality: input.personality,
       tone: input.tone,
       autonomyLevel: current?.autonomy_level ?? "autonomous",
-      weeklyReviewDay: current?.weekly_review_day ?? 5,
-      weeklyReviewTime: shortTime(current?.weekly_review_time, "19:00"),
+      weeklyReviewDay: input.weeklyReviewDay,
+      weeklyReviewTime: input.weeklyReviewTime,
       planningDay: current?.planning_day ?? 1,
       planningTime: shortTime(current?.planning_time, "08:00"),
       quietStart: input.quietStart,

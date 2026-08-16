@@ -2,7 +2,7 @@
 .settings-advanced{margin:0;border-top:1px solid var(--border-default)}.settings-advanced>summary{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;min-height:56px;padding:12px 30px;cursor:pointer;list-style:none}.settings-advanced>summary::-webkit-details-marker{display:none}.settings-advanced>summary>span{font: var(--type-eyebrow);color:var(--text-secondary)}.settings-advanced>summary>div{display:grid;gap:4px}.settings-advanced>summary strong{font: var(--type-body)}.settings-advanced>summary small{color:var(--text-secondary);font: var(--type-caption);line-height:1.45}.settings-advanced>summary:focus-visible{outline:3px solid var(--focus-ring);outline-offset:-3px}.settings-advanced[open]>summary{background:var(--background-subtle)}.settings-advanced-content{padding-top:24px}.ai-routes-heading a{display:inline-block;margin-top:10px;color:var(--action-primary-text);font: var(--type-caption);font-weight:750;text-decoration:underline;text-underline-offset:3px}
 .ai-profile-fieldset{border:0;margin:0;padding:0 30px 28px}.ai-profile-fieldset legend{padding:0 0 12px;font: var(--type-caption);font-weight:800}.ai-profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ai-profile-card{position:relative;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start;min-height:112px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas);cursor:pointer;transition:border-color var(--motion-standard) var(--ease-enter),background var(--motion-standard) var(--ease-enter),transform var(--motion-standard) var(--ease-enter)}.ai-profile-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}.ai-profile-card.active{border-color:var(--link);background:var(--tone-information-bg);box-shadow:inset 0 0 0 1px var(--tone-information-line)}.ai-profile-card input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link)}.ai-profile-card span{display:grid;gap:6px}.ai-profile-card strong{font: var(--type-caption);line-height:1.25}.ai-profile-card small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-routes{margin:0 30px 30px;border:1px solid var(--border-default);border-radius: var(--radius-lg);overflow:hidden;background:var(--background-surface)}.ai-routes-heading{padding:18px 20px;background:var(--text-primary);color:var(--action-primary-text)}.ai-routes-heading span{font: var(--type-eyebrow);letter-spacing:.12em;color:var(--text-inverse)}.ai-routes-heading p{margin:7px 0 0;color:var(--text-inverse);font: var(--type-caption);line-height:1.5}.ai-route{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,.8fr);gap:24px;align-items:center;padding:16px 20px;border-top:1px solid var(--border-default)}.ai-route-copy{display:grid;gap:4px}.ai-route-copy strong,.ai-route-copy label{font: var(--type-caption);font-weight:750}.ai-route-copy small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-route-control select{width:100%;min-height:42px;border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:9px 11px;background:var(--background-surface);color:var(--text-primary);font: var(--type-caption)}.ai-route-fixed{background:var(--background-subtle)}.embedding-chip{justify-self:end;border-radius: var(--radius-full);padding:7px 10px;background:var(--background-surface);border:1px solid var(--border-default);color:var(--text-secondary);font: var(--type-eyebrow)}
 @media(max-width:850px){.ai-profile-grid{grid-template-columns:1fr 1fr}.ai-route{grid-template-columns:1fr;gap:10px}.embedding-chip{justify-self:start}}
-@media(max-width:600px){.compound-field{grid-template-columns:1fr}.settings-advanced>summary{min-height:56px;padding:10px 20px}.ai-profile-fieldset{padding:0 20px 24px}.ai-profile-grid{grid-template-columns:1fr}.ai-profile-card{min-height:44px}.ai-routes{margin:0 20px 24px}.ai-route{padding:15px}.ai-route-control select{font: var(--type-caption)}.embedding-chip{max-width:100%;white-space:normal;line-height:1.5}}
+@media(max-width:600px){.appearance-options{grid-template-columns:1fr}.appearance-option{min-height:44px}.compound-field{grid-template-columns:1fr}.settings-advanced>summary{min-height:56px;padding:10px 20px}.ai-profile-fieldset{padding:0 20px 24px}.ai-profile-grid{grid-template-columns:1fr}.ai-profile-card{min-height:44px}.ai-routes{margin:0 20px 24px}.ai-route{padding:15px}.ai-route-control select{font: var(--type-caption)}.embedding-chip{max-width:100%;white-space:normal;line-height:1.5}}
 
 /* ---- 2O-ACTIVATION-004: what the visible preferences actually change -------
    A statement, not a form. It sits between the controls and Dados e IA and is
@@ -17,3 +17,30 @@
 .capability-summary-item{display:grid;gap:var(--space-1);padding:var(--space-4);border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
 .capability-summary-item strong{font: var(--type-body);color:var(--text-primary)}
 .capability-summary-item span{max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.5}
+
+/* ---- 2O-PREF-013: the appearance choice ------------------------------------
+   Three radio cards, borrowing `.ai-profile-card`'s shape because it is the
+   same interaction — pick one of a small closed set, see which is picked. Every
+   value is a token that is already used in this file, which is the cheapest way
+   to be sure none of them is undefined: an undefined var() voids the entire
+   declaration and warns nowhere. One `font:` shorthand per block, for the same
+   reason the block above says so. */
+.appearance-section{display:grid;gap:var(--space-3);margin-top:var(--space-8);padding-top:var(--space-6);border-top:1px solid var(--border-divider)}
+.appearance-section>h2{margin:0;font: var(--type-title-2);color:var(--text-primary)}
+.appearance-intro{margin:0;max-width:68ch;font: var(--type-body);color:var(--text-secondary)}
+.appearance-fieldset{border:0;margin:0;padding:0}
+.appearance-fieldset legend{padding:0 0 var(--space-2);font: var(--type-caption);font-weight:800;color:var(--text-primary)}
+.appearance-options{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
+.appearance-option{display:grid;grid-template-columns:18px 1fr;gap:var(--space-2);align-items:start;padding:var(--space-4);border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
+.appearance-option:hover{border-color:var(--border-strong)}
+.appearance-option.active{border-color:var(--link);background:var(--tone-information-bg);box-shadow:inset 0 0 0 1px var(--tone-information-line)}
+.appearance-option input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link);cursor:pointer}
+.appearance-option-copy{display:grid;gap:var(--space-1)}
+/* The label is the click target and the only pointer cursor, because the row is
+   a <div> now: the description was moved out of the label so it stops joining
+   the radio's accessible name. */
+.appearance-option label{font: var(--type-body);color:var(--text-primary);line-height:1.25;font-weight:750;cursor:pointer}
+.appearance-option small{font: var(--type-caption);color:var(--text-secondary);line-height:1.5}
+/* `2O-PREF-015`'s last clause, and it is the sentence that stops this reading
+   as an account setting. Kept legible rather than reduced to fine print. */
+.appearance-scope{margin:0;max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.5}

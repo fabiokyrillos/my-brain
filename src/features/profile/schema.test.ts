@@ -12,6 +12,11 @@ const valid = {
   importantReminderOverride: "on",
   maxFollowupsPerDay: "3",
   responseDetail: "short",
+  // `2O-PREF-004`. Strings, because this fixture is what a `FormData` actually
+  // yields — `weeklyReviewDay` is coerced from a `<select>`'s string value.
+  dailyReviewTime: "22:00",
+  weeklyReviewTime: "19:00",
+  weeklyReviewDay: "5",
   aiProfile: "quality",
   chatModel: "gpt-5.6-terra",
   extractionModel: "gpt-5.6-luna",

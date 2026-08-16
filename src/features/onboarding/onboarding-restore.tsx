@@ -11,16 +11,29 @@ import type { Locale } from "@/lib/preferences";
  * `R-24` — and `R-2O-12` strengthened it rather than relaxing it. So this
  * returns `null` unless the cookie is actually set.
  *
- * It needs no capability-registry row: `capability-registry-guard.test.ts`
- * governs the controls the **preferences form** renders over persisted
- * preference columns, and this reverses a per-browser cookie that governs no
- * column at all. The registry would have nothing true to say about it.
+ * ## It has a registry row after all — `2O-PREF-008`, decided in slice 2O.3
+ *
+ * This comment used to say it needed none, on the grounds that the guard governs
+ * the controls the **preferences form** renders over persisted columns and this
+ * reverses a per-browser cookie. **Half of that was wrong**, and the half that
+ * was right was about `columns` rather than about the row.
+ *
+ * There is no column, so `columns` stays empty. But the cookie has a genuine
+ * reader — `readDismissal` decides whether the guide renders — so the registry
+ * does have something true to say, and `2O-PREF-008`'s word is *every control
+ * in the centre*. The row is `onboarding_restore`, and the submit button carries
+ * `name="restoreOnboarding"` so the guard can resolve it by the same mechanism
+ * it resolves every other control: by name. Exempting it instead would have been
+ * the too-weak half ADR-067 removed.
+ *
+ * The name is inert to the action — `restoreOnboarding` reads only `locale` —
+ * and a named submit button is ordinary HTML rather than a marker invented for
+ * a test.
  *
  * ## Why it lives on `/app/settings`
  *
- * That is the preferences surface today, and slice 2O.3 consolidates it into
- * the preferences centre the requirement names. Putting the control anywhere
- * else now would mean moving it in one slice's time for no gain.
+ * That is the preferences surface, and slice 2O.3 made it the preferences centre
+ * the requirement names. It stays exactly where slice 2O.2 put it.
  */
 
 export function OnboardingRestore({
@@ -43,7 +56,7 @@ export function OnboardingRestore({
       <p>{copy.restore.body}</p>
       <form action={restoreAction}>
         <input type="hidden" name="locale" value={locale} />
-        <button type="submit" className="onboarding-restore-action">
+        <button type="submit" name="restoreOnboarding" className="onboarding-restore-action">
           {copy.restore.action}
         </button>
       </form>

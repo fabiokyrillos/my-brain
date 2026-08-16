@@ -11,6 +11,8 @@ import {
   moreNavigationGroups,
   navigationCapabilities,
   primaryNavigationKeys,
+  type CapabilityDefinition,
+  type ProductCapabilityState,
 } from "./capabilities";
 
 describe("navigation capabilities", () => {
@@ -142,10 +144,16 @@ describe("navigation capabilities", () => {
       { key: "ai_routing", state: "advanced", visible: true },
       { key: "identity_names", state: "operational", visible: true },
       { key: "locale_preference", state: "future", visible: false },
-      // `2O-ACTIVATION-006`: `uncontrolled` rather than `future`, because the
-      // three review columns have a consumer and no control, and `future` could
-      // be read as either.
-      { key: "scheduled_reviews", state: "uncontrolled", visible: false },
+      /*
+       * `2O-PREF-004` finished what `2O-ACTIVATION-006` deferred here.
+       *
+       * That requirement set this row to `uncontrolled` — real consumers, no
+       * authorized control — and said in as many words that its **final wording
+       * and `visible` value** belong to `2O-PREF-004`. The controls now ship, so
+       * `uncontrolled` would be the false reading and `operational` is the true
+       * one.
+       */
+      { key: "scheduled_reviews", state: "operational", visible: true },
       { key: "autonomy", state: "future", visible: false },
       { key: "follow_up_intensity", state: "future", visible: false },
       { key: "privacy_default", state: "future", visible: false },
@@ -156,6 +164,23 @@ describe("navigation capabilities", () => {
       { key: "quiet_periods", state: "future", visible: false },
       { key: "avatar", state: "future", visible: false },
       { key: "ai_provider", state: "future", visible: false },
+      /*
+       * `2O-PREF-008`'s three, and only the appearance choice is listed to the
+       * reader.
+       *
+       * `ai_credential` was found by widening the guard from one file to the
+       * settings page's own mounts, not by anyone remembering it — the panel has
+       * been first on that page since BYOK shipped. It is `visible: false`
+       * because `CapabilitySummary` says *what these preferences change* and a
+       * credential is not a preference; `2O-AICONFIG-002` explains it in 2O.4.
+       *
+       * `onboarding_restore` is `visible: false` because its control renders
+       * only when the guide is dismissed, so a permanent paragraph would
+       * describe an affordance the page usually does not offer.
+       */
+      { key: "ai_credential", state: "operational", visible: false },
+      { key: "appearance", state: "operational", visible: true },
+      { key: "onboarding_restore", state: "operational", visible: false },
     ]);
 
     for (const capability of capabilityRegistry.filter((item) => item.visible)) {
@@ -163,24 +188,83 @@ describe("navigation capabilities", () => {
     }
   });
 
-  it("keeps `future` meaning no consumer, and `uncontrolled` meaning the opposite", () => {
-    // `2O-ACTIVATION-006`. The two states are only worth having if they cannot
-    // be confused, so the invariant is asserted rather than left to the comment.
-    for (const capability of capabilityRegistry) {
-      if (capability.state === "future") {
-        expect(capability.consumerEvidence, `${capability.key} is \`future\` with evidence`).toEqual([]);
-      }
-      if (capability.state === "uncontrolled") {
-        expect(
-          capability.consumerEvidence.length,
-          `${capability.key} is \`uncontrolled\` and names no consumer`,
-        ).toBeGreaterThan(0);
-        expect(capability.visible, `${capability.key} is \`uncontrolled\` and rendered`).toBe(false);
-      }
+  /**
+   * `2O-ACTIVATION-006`'s invariant, restated as a function so it survives its
+   * own subject going away.
+   *
+   * Slice 2O.3 moved `scheduled_reviews` off `uncontrolled` — `2O-PREF-004`
+   * built the controls `OD-2O-6` **A** signed, so *"real consumers, no
+   * authorized control"* stopped being true of it. That left **no row in the
+   * state at all**, and `capabilityRegistry` is `as const`, so `tsc` correctly
+   * reported the old `if (capability.state === "uncontrolled")` branch as
+   * comparing types with no overlap: dead code.
+   *
+   * Three ways out, and the third is taken. *Cast the state to the wide union*
+   * — declined, a cast is precisely what slice 2O.0 refused when it made
+   * `getCapabilityRegistryView` generic, and it would silently remove the
+   * guarantee. *Delete the `uncontrolled` half and re-add it in 2O.4* —
+   * declined, a rule with no test is a convention, and ADR-117 needs this exact
+   * vocabulary one slice from now. *Extract the invariant over the widened
+   * type* — taken: it is checkable against the real registry **and** against
+   * planted rows, so the `uncontrolled` half is proved to still work before it
+   * has a subject rather than after.
+   */
+  function stateInvariantFailures(capability: CapabilityDefinition): readonly string[] {
+    const failures: string[] = [];
+    if (capability.state === "future" && capability.consumerEvidence.length > 0) {
+      failures.push(`${capability.key} is \`future\` with evidence`);
     }
-    // Non-vacuous: both states really are in use.
+    if (capability.state === "uncontrolled") {
+      if (capability.consumerEvidence.length === 0) {
+        failures.push(`${capability.key} is \`uncontrolled\` and names no consumer`);
+      }
+      if (capability.visible) failures.push(`${capability.key} is \`uncontrolled\` and rendered`);
+    }
+    return failures;
+  }
+
+  it("keeps `future` meaning no consumer, across the whole registry", () => {
+    for (const capability of capabilityRegistry) {
+      expect(stateInvariantFailures(capability), capability.key).toEqual([]);
+    }
+    // Non-vacuous: `future` really is in use, so the branch above is exercised.
     expect(capabilityRegistry.some((item) => item.state === "future")).toBe(true);
-    expect(capabilityRegistry.some((item) => item.state === "uncontrolled")).toBe(true);
+  });
+
+  it("still refuses a dishonest `uncontrolled` row, which is why the rule outlived its subject", () => {
+    const base = { surface: "settings", columns: ["x"], controls: [] } as const;
+    // Valid: real consumers, no control offered.
+    expect(stateInvariantFailures({
+      ...base, key: "embedding_model", state: "uncontrolled",
+      consumerEvidence: ["chat/actions"], visible: false,
+    })).toEqual([]);
+    // The two ways it can lie, both caught.
+    expect(stateInvariantFailures({
+      ...base, key: "no_consumer", state: "uncontrolled", consumerEvidence: [], visible: false,
+    })).toHaveLength(1);
+    expect(stateInvariantFailures({
+      ...base, key: "rendered", state: "uncontrolled", consumerEvidence: ["x"], visible: true,
+    })).toHaveLength(1);
+    // And `future` still fails the other way, so neither half is dead.
+    expect(stateInvariantFailures({
+      ...base, key: "future_with_evidence", state: "future", consumerEvidence: ["x"], visible: false,
+    })).toHaveLength(1);
+  });
+
+  it("records that `uncontrolled` is currently empty, and where its next row comes from", () => {
+    /*
+     * Stated rather than left to be discovered. The state has no user until
+     * `2O-AICONFIG-004` gives `embedding_model` its row in slice 2O.4, where
+     * ADR-117 requires exactly this wording — *real consumers, no authorized
+     * control*, never "no consumer", which would be false, and never "inert",
+     * which it is not.
+     *
+     * An exact count, so adding that row fails here and whoever adds it has to
+     * come back and re-arm the non-vacuity claim deliberately.
+     */
+    const states = capabilityRegistry.map((item) => item.state as ProductCapabilityState);
+    expect(states.filter((state) => state === "uncontrolled")).toEqual([]);
+    expect(states.length).toBeGreaterThan(15);
   });
 
   it("derives the nine consumer-less columns `2O-ACTIVATION-007` names", () => {

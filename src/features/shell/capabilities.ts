@@ -50,19 +50,35 @@ export type CapabilityDefinition = Readonly<{
    * Empty for rows that govern a surface rather than a preference.
    */
   columns: readonly string[];
+  /**
+   * The rendered control names this row governs that set **no column**.
+   *
+   * Added by `2O-PREF-008`, and for the same reason `columns` was added by
+   * `2O-ACTIVATION-007`: the guard resolves a control by name, and a capability
+   * with no column had nothing for it to resolve to. Slice 2O.3 put two such
+   * controls in the preferences centre — the appearance choice, which writes a
+   * DOM attribute, and the onboarding restore, which clears a cookie — and
+   * `-008` says **every** control in the centre is backed by a row. Without this
+   * field the guard could only have covered them by exempting them, and an
+   * exemption is the too-weak half ADR-067 removed.
+   *
+   * Empty for rows whose controls are preference columns, which `columns`
+   * already anchors.
+   */
+  controls: readonly string[];
 }>;
 
 export const capabilityRegistry = [
-  { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true, columns: [] },
-  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true, columns: ["timezone"] },
-  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"] },
-  { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true, columns: ["quiet_start", "quiet_end", "max_followups_per_day", "important_reminder_override"] },
-  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"] },
+  { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true, columns: [], controls: [] },
+  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true, columns: ["timezone"], controls: [] },
+  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"], controls: [] },
+  { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true, columns: ["quiet_start", "quiet_end", "max_followups_per_day", "important_reminder_override"], controls: [] },
+  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"], controls: [] },
   // Slice F1 gave it an input and consumers, so it stops being `future`. The
   // evidence is the accessor plus the surfaces that read through it — this row
   // is the honest record of that, and it was honest before, when it said the
   // column had no consumer at all.
-  { key: "identity_names", state: "operational", surface: "settings", consumerEvidence: ["profile/agent-identity", "assistant/copy", "daily-cycle/copy", "shell/home-copy"], visible: true, columns: ["agent_name"] },
+  { key: "identity_names", state: "operational", surface: "settings", consumerEvidence: ["profile/agent-identity", "assistant/copy", "daily-cycle/copy", "shell/home-copy"], visible: true, columns: ["agent_name"], controls: [] },
   /*
    * `columns: []` is deliberate, and it is what keeps `2O-ACTIVATION-007`'s
    * count at **nine** rather than ten: `profiles.locale` is not one of the nine
@@ -75,28 +91,35 @@ export const capabilityRegistry = [
    * read only observes whether a value is *set*. Counting a read like that
    * would let any column acquire a consumer by being looked at.
    */
-  { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: [] },
+  { key: "locale_preference", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: [], controls: [] },
   /*
    * `2O-ACTIVATION-006`. Disambiguated: the three review-time columns **have** a
    * consumer — `review-schedule.ts` reads all three and `/app/reviews` renders
    * the result — and have no control. `future` said the opposite of the first
    * half and was indistinguishable from the second.
    *
-   * `visible: false` stays: `OD-2O-6` **A** signs controls for exactly these
-   * three, and `2O-PREF-004` builds them in slice 2O.3. The row's final wording
-   * is fixed by that outcome, as `2O-ACTIVATION-006` says; what changes here is
-   * only that it stops being ambiguous.
+   * **Slice 2O.3 fixed the final wording, which is what `2O-ACTIVATION-006`
+   * said it would.** `2O-PREF-004` built the three controls `OD-2O-6` **A**
+   * signed, so `uncontrolled` — *real consumers, no authorized control* — is no
+   * longer true of this row and would now be the ambiguity rather than the cure.
+   * It is `operational` and `visible`, like every other row whose preference the
+   * owner can actually change.
+   *
+   * The `uncontrolled` state is **not** removed with it: ADR-117 requires it for
+   * `embedding_model`, which really does have six consumers and no authorized
+   * control, and that row is `2O-AICONFIG-004`'s in slice 2O.4.
    *
    * `/app/reviews` states *"nada é executado por horário configurado"*, and that
    * stays true — these columns say when the surface offers to close the day,
-   * not when something runs.
+   * not when something runs. `2O-PREF-005` puts that sentence on the controls
+   * themselves, and `2O-PREF-006` keeps it asserted in both locales.
    */
-  { key: "scheduled_reviews", state: "uncontrolled", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: false, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"] },
-  { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["autonomy_level"] },
-  { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"] },
-  { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"] },
-  { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"] },
-  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["background_model"] },
+  { key: "scheduled_reviews", state: "operational", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: true, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"], controls: [] },
+  { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["autonomy_level"], controls: [] },
+  { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"], controls: [] },
+  { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"], controls: [] },
+  { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"], controls: [] },
+  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["background_model"], controls: [] },
   /*
    * `2O-ACTIVATION-007`'s remaining four, which had no row at all.
    *
@@ -111,13 +134,65 @@ export const capabilityRegistry = [
    * nothing, which is inertness with a write path rather than inertness without
    * one, and is still no consumer.
    */
-  { key: "privacy_preferences", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_preferences"] },
-  { key: "quiet_periods", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["quiet_periods"] },
-  { key: "avatar", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["avatar_path"] },
-  { key: "ai_provider", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["ai_provider"] },
-  { key: "manual_reviews", state: "operational", surface: "reviews", consumerEvidence: ["generateReview"], visible: true, columns: [] },
-  { key: "cost_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["get_ai_cost_summary", "ai_usage_events"], visible: true, columns: [] },
-  { key: "history_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["audit_events"], visible: true, columns: [] },
+  { key: "privacy_preferences", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_preferences"], controls: [] },
+  { key: "quiet_periods", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["quiet_periods"], controls: [] },
+  { key: "avatar", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["avatar_path"], controls: [] },
+  { key: "ai_provider", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["ai_provider"], controls: [] },
+  /*
+   * `2O-PREF-008`, and a control the widened guard found rather than a control
+   * anybody remembered.
+   *
+   * `CredentialPanel` has been first on `/app/settings` since BYOK shipped, and
+   * it renders `apiKey` — a control in the preferences centre with no registry
+   * row. It was invisible for the same reason `OnboardingRestore` was: the guard
+   * read one file. Widening the scan to the page's own mounts surfaced it
+   * immediately, which is the argument for deriving the list instead of writing
+   * it down.
+   *
+   * `columns: []` — the credential is not an `agent_preferences` column; it is
+   * an encrypted row in `user_ai_credentials` with its own authority path.
+   *
+   * `visible: false`, and deliberately: `CapabilitySummary` says *what these
+   * preferences change*, and a credential is not a preference — it is what makes
+   * the AI work at all. How the product explains the credential is
+   * `2O-AICONFIG-002`'s in slice 2O.4, and this row does not pre-empt it.
+   */
+  { key: "ai_credential", state: "operational", surface: "settings", consumerEvidence: ["byok/credential-view", "byok/actions", "user_ai_credentials"], visible: false, columns: [], controls: ["apiKey"] },
+  /*
+   * `2O-PREF-008` and `2O-PREF-013`. The appearance choice — a real capability
+   * with a real consumer and **no column at all**, which is the case this
+   * registry could not previously express about a *control*.
+   *
+   * Its consumer is the stylesheet: `tokens.css` and `experience.css` both key
+   * off `data-theme`, and what the control writes is that attribute. That is a
+   * behavioural consumer in exactly `R-24`'s sense — change the value and the
+   * rendered product changes — even though nothing is persisted server-side.
+   *
+   * `columns: []` and `controls: ["appearance"]`: `OD-2O-2` **A** signed a
+   * client-held preference with **no column and no migration**, so there is
+   * nothing for `columns` to name and the control's own name is the anchor.
+   */
+  { key: "appearance", state: "operational", surface: "settings", consumerEvidence: ["appearance/contracts", "tokens.css", "experience.css"], visible: true, columns: [], controls: ["appearance"] },
+  /*
+   * `2O-PREF-008` versus `OnboardingRestore`, resolved as a decision.
+   *
+   * Slice 2O.2 put a control on `/app/settings` that governs a **cookie, not a
+   * column**, and recorded that the registry "would have nothing true to say
+   * about it". That was right about `columns` and wrong about the row: the
+   * dismissal cookie has a genuine reader — `readDismissal` decides whether the
+   * guide renders — so the registry has something true to say, and `-008`'s
+   * word is *every*.
+   *
+   * `visible: false`, and that is the one thing here that is not automatic.
+   * `CapabilitySummary` renders the visible rows as *what these preferences
+   * change*, and this control renders **only when the guide is dismissed**
+   * (`R-2O-12`). A permanent paragraph describing a control that is usually
+   * absent would be the summary claiming an affordance the page does not offer.
+   */
+  { key: "onboarding_restore", state: "operational", surface: "settings", consumerEvidence: ["onboarding/onboarding-view", "onboarding/dismissal"], visible: false, columns: [], controls: ["restoreOnboarding"] },
+  { key: "manual_reviews", state: "operational", surface: "reviews", consumerEvidence: ["generateReview"], visible: true, columns: [], controls: [] },
+  { key: "cost_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["get_ai_cost_summary", "ai_usage_events"], visible: true, columns: [], controls: [] },
+  { key: "history_transparency", state: "advanced", surface: "transparency", consumerEvidence: ["audit_events"], visible: true, columns: [], controls: [] },
 ] as const satisfies readonly CapabilityDefinition[];
 
 /**
@@ -377,6 +452,12 @@ export const primaryNavigationKeys = navigationCapabilities
  * | reviews | Hoje, unconditionally |
  * | reminders | the calendar's control band, unconditionally |
  * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
+ * | notifications | the top bar's bell, **and** Ajustes → Conta e dados (`2O-PREF-002`) |
+ *
+ * Slice 2O.3 added the last row and freed no slot. Conta e dados reaches
+ * notifications, the policy documents and account deletion — which is
+ * `2O-PREF-001`'s *one destination* — but the account surface itself did not
+ * move, so the release condition below is exactly where it was.
  *
  * **Two things are left, and the first of them is the account.** `AccountMenu`
  * is mounted in exactly two places: the desktop rail's foot, and the mobile

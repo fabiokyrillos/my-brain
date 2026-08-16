@@ -29,6 +29,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  ACCOUNT_CENTRE_DESTINATIONS,
+  accountCentreLinks,
+} from "../../features/account-centre/contracts";
 import { BRAIN_DOMAIN_LENSES } from "../../features/library/lenses";
 import { mobileBarSlots } from "../../features/shell/capabilities";
 import { TRANSPARENCY_LENSES } from "../../features/transparency/contracts";
@@ -195,6 +199,54 @@ describe("the rest of the census, path by path", () => {
 
   it("a failure reaches Processamento", () => {
     expect(code("src/app/[locale]/app/files/page.tsx")).toContain("/app/jobs");
+  });
+
+  /**
+   * `2O-PREF-003` — the census re-derived in the same change that altered it.
+   *
+   * Slice 2O.3 gave Ajustes a second reaching section. It frees no bar slot and
+   * moves no destination, so `mobileBarSlots` is untouched — but the census this
+   * file exists to keep honest now has three more rows, and a census that is
+   * only updated when it happens to be noticed is the shape `questions` was in
+   * before this guard caught it.
+   *
+   * Notifications gains a **second** in-product path: the bell in the top bar
+   * already reached it, and Ajustes → Conta e dados now does too. That is the
+   * row most worth writing down, because a future edit that removes the bell
+   * would otherwise look like it orphaned the destination.
+   */
+  it("Ajustes reaches notifications, the policy documents and account deletion", () => {
+    const section = code("src/features/account-centre/account-data-section.tsx");
+    expect(section).toContain("ACCOUNT_CENTRE_DESTINATIONS.flatMap");
+    expect(section).toContain("accountCentreLinks(locale, destination)");
+    expect(code("src/app/[locale]/app/settings/page.tsx")).toContain("<AccountDataSection");
+
+    // Resolved rather than asserted as strings, so a route that moves cannot
+    // leave this passing against a path that no longer exists.
+    const hrefs = ACCOUNT_CENTRE_DESTINATIONS.flatMap((destination) =>
+      accountCentreLinks("pt-BR", destination).map((link) => link.href),
+    );
+    expect(hrefs).toContain("/pt-BR/app/notifications");
+    expect(hrefs).toContain("/pt-BR/account/delete");
+    expect(hrefs.filter((href) => href.includes("/legal/"))).toHaveLength(2);
+  });
+
+  it("and both authenticated destinations carry the way back, so the reach is two-way", () => {
+    /*
+     * The half that makes consolidation real rather than claimed. Without it a
+     * reader arriving on `/app/notifications` from the bell or a deep link has
+     * no path to the rest of their settings — which on a phone means the
+     * disclosure, and the disclosure is the thing this census is about.
+     */
+    for (const path of [
+      "src/app/[locale]/app/notifications/page.tsx",
+      "src/app/[locale]/account/delete/page.tsx",
+    ]) {
+      expect(code(path), `${path} lost its way back to Ajustes`).toContain("<AccountDataStrip");
+    }
+    expect(code("src/features/account-centre/account-data-strip.tsx")).toContain(
+      'getNavigationHref(locale, "settings")',
+    );
   });
 });
 

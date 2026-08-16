@@ -25,6 +25,9 @@ describe("loadSettingsFormValues", () => {
       important_reminder_override: false,
       max_followups_per_day: 2,
       response_detail: "detailed",
+      daily_review_time: "21:15:00",
+      weekly_review_time: "18:45:00",
+      weekly_review_day: 3,
       ai_profile: "balanced",
       chat_model: "gpt-5.6-luna",
       extraction_model: "gpt-5-mini",
@@ -47,13 +50,30 @@ describe("loadSettingsFormValues", () => {
       importantReminderOverride: false,
       maxFollowupsPerDay: 2,
       responseDetail: "detailed",
+      // `HH:MM:SS` in the column, `HH:MM` in the form — the same narrowing
+      // `quietStart` takes, because `<input type="time">` refuses seconds.
+      dailyReviewTime: "21:15",
+      weeklyReviewTime: "18:45",
+      weeklyReviewDay: 3,
       aiProfile: "balanced",
       chatModel: "gpt-5.6-luna",
       extractionModel: "gpt-5-mini",
       reviewModel: "gpt-5.6-luna",
       fileModel: "gpt-5-mini",
     });
-    expect(values).not.toHaveProperty("dailyReviewTime");
-    expect(values).not.toHaveProperty("privacyDefault");
+    /*
+     * `dailyReviewTime` used to be asserted absent here, alongside
+     * `privacyDefault`, because neither had a control. `2O-PREF-004` gave it
+     * one — it has a proved consumer in `day-review/review-schedule.ts` — so the
+     * assertion is now made against the columns that still have none.
+     *
+     * `privacyDefault` stays, and `planningDay` and `planningTime` join it:
+     * `OD-2O-7` **A** keeps the nine consumer-less columns without a control,
+     * and `2O-PREF-007` keeps the two retired ones retired. A loader that
+     * started returning them would be the first half of a control appearing.
+     */
+    for (const absent of ["privacyDefault", "planningDay", "planningTime", "autonomyLevel", "followUpIntensity"]) {
+      expect(values, absent).not.toHaveProperty(absent);
+    }
   });
 });
