@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   title: { default: "My Brain", template: "%s · My Brain" },
   description: "Seu contexto, organizado e atento.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon-384.png", apple: "/icon-384.png" },
+  icons: { icon: "/brain-icon.svg", apple: "/brain-icon.svg" },
 };
 
 export const viewport: Viewport = {
