@@ -76,6 +76,8 @@
     "test:remote:interpretations": "node scripts/remote-interpretation-revisions-smoke.mjs",
     "test:remote:jobs": "node scripts/remote-job-reliability-smoke.mjs",
     "test:remote:product-events": "node scripts/remote-product-events-smoke.mjs",
+    "test:remote:person-candidates": "node scripts/remote-person-candidate-suggestions-smoke.mjs",
+    "test:remote:person-candidates:cleanup": "node scripts/verify-person-candidate-suggestions-cleanup.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "verify:deletion-captcha": "node scripts/verify-deletion-captcha-surface.mjs",
