@@ -31,12 +31,15 @@
 .appearance-fieldset{border:0;margin:0;padding:0}
 .appearance-fieldset legend{padding:0 0 var(--space-2);font: var(--type-caption);font-weight:800;color:var(--text-primary)}
 .appearance-options{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
-.appearance-option{display:grid;grid-template-columns:18px 1fr;gap:var(--space-2);align-items:start;padding:var(--space-4);border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);cursor:pointer}
+.appearance-option{display:grid;grid-template-columns:18px 1fr;gap:var(--space-2);align-items:start;padding:var(--space-4);border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
 .appearance-option:hover{border-color:var(--border-strong)}
 .appearance-option.active{border-color:var(--link);background:var(--tone-information-bg);box-shadow:inset 0 0 0 1px var(--tone-information-line)}
-.appearance-option input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link)}
-.appearance-option span{display:grid;gap:var(--space-1)}
-.appearance-option strong{font: var(--type-body);color:var(--text-primary);line-height:1.25}
+.appearance-option input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link);cursor:pointer}
+.appearance-option-copy{display:grid;gap:var(--space-1)}
+/* The label is the click target and the only pointer cursor, because the row is
+   a <div> now: the description was moved out of the label so it stops joining
+   the radio's accessible name. */
+.appearance-option label{font: var(--type-body);color:var(--text-primary);line-height:1.25;font-weight:750;cursor:pointer}
 .appearance-option small{font: var(--type-caption);color:var(--text-secondary);line-height:1.5}
 /* `2O-PREF-015`'s last clause, and it is the sentence that stops this reading
    as an account setting. Kept legible rather than reduced to fine print. */

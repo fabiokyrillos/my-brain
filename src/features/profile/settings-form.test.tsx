@@ -158,6 +158,96 @@ describe("SettingsForm", () => {
     expect([...formData.keys()]).not.toContain("planningTime");
   });
 
+  /**
+   * `2O-PREF-009` — advanced preferences are **disclosed**, not hidden.
+   *
+   * The distinction the requirement draws: a reader can reach every one of them,
+   * and none is the default view. A `<details>` with no `open` satisfies both —
+   * closed on arrival, one activation away, and present in the DOM the whole
+   * time, so find-in-page and a screen reader's element list both reach it.
+   * Rendering it conditionally would have been hiding.
+   */
+  it("discloses the advanced preferences without hiding them", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="pt-BR" values={values} />);
+
+    const disclosure = screen.getByText("IA avançada").closest("details");
+    expect(disclosure, "the advanced section is not a disclosure").not.toBeNull();
+    expect(disclosure, "advanced is the default view").not.toHaveAttribute("open");
+    // In the DOM while closed: reachable, not conditional.
+    expect(screen.getByLabelText("Chat principal")).toBeInTheDocument();
+
+    await user.click(screen.getByText("IA avançada").closest("summary")!);
+    expect(disclosure).toHaveAttribute("open");
+
+    // And everything that is *not* advanced is open on arrival, so the disclosure
+    // is a ceiling on complexity rather than a place preferences go to hide.
+    for (const control of ["Fuso horário", "Tom", "Fechamento do dia a partir de"]) {
+      expect(screen.getByLabelText(control).closest("details"), control).toBeNull();
+    }
+  });
+
+  /**
+   * `2O-PREF-011` — a failed save says so, keeps the input, and offers a retry.
+   *
+   * The input surviving is a property of the action **returning** rather than
+   * redirecting or revalidating: React keeps the form it is holding. Asserted
+   * against a value the reader typed, because the fixture's defaults would pass
+   * this even if the form had been rebuilt from scratch.
+   */
+  it("keeps what the reader typed when the save fails, and offers the retry", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(async () => ({
+      status: "error" as const,
+      message: "Não foi possível salvar. Tente novamente.",
+    })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="pt-BR" values={values} />);
+
+    const agentName = screen.getByLabelText("Nome do assistente");
+    await user.clear(agentName);
+    await user.type(agentName, "Aurora");
+    await user.selectOptions(screen.getByLabelText("Tom"), "professional");
+    await user.click(screen.getByRole("button", { name: "Salvar preferências" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    // It says so, as an alert rather than a status — a failure the reader must
+    // notice, not a result they may.
+    expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível salvar");
+    // The input is still theirs.
+    expect(agentName).toHaveValue("Aurora");
+    expect(screen.getByLabelText("Tom")).toHaveValue("professional");
+    // And the retry is the same control, still enabled.
+    expect(screen.getByRole("button", { name: "Salvar preferências" })).toBeEnabled();
+  });
+
+  /**
+   * `2O-PREF-012` — every preference is revisable with the same control that set
+   * it, and nothing here is one-way.
+   */
+  it("lets every preference be set back with the control that set it", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="pt-BR" values={values} />);
+
+    const tone = screen.getByLabelText("Tom");
+    await user.selectOptions(tone, "professional");
+    expect(tone).toHaveValue("professional");
+    await user.selectOptions(tone, "direct");
+    expect(tone).toHaveValue("direct");
+
+    const override = screen.getByRole("checkbox");
+    const initial = (override as HTMLInputElement).checked;
+    await user.click(override);
+    expect((override as HTMLInputElement).checked).toBe(!initial);
+    await user.click(override);
+    expect((override as HTMLInputElement).checked).toBe(initial);
+
+    // No control disables itself after use, which is what a one-way choice
+    // looks like in a form.
+    for (const control of screen.getAllByRole("combobox")) expect(control).toBeEnabled();
+  });
+
   it("announces the localized result returned by the server", () => {
     const action = vi.fn(async () => ({ status: "success" as const, message: "Preferences saved." })) as ProfileFormAction;
     render(<SettingsForm action={action} initialState={{ status: "success", message: "Preferences saved." }} locale="en" values={values} />);

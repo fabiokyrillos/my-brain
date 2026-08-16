@@ -452,6 +452,12 @@ export const primaryNavigationKeys = navigationCapabilities
  * | reviews | Hoje, unconditionally |
  * | reminders | the calendar's control band, unconditionally |
  * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
+ * | notifications | the top bar's bell, **and** Ajustes → Conta e dados (`2O-PREF-002`) |
+ *
+ * Slice 2O.3 added the last row and freed no slot. Conta e dados reaches
+ * notifications, the policy documents and account deletion — which is
+ * `2O-PREF-001`'s *one destination* — but the account surface itself did not
+ * move, so the release condition below is exactly where it was.
  *
  * **Two things are left, and the first of them is the account.** `AccountMenu`
  * is mounted in exactly two places: the desktop rail's foot, and the mobile

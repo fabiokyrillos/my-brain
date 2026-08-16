@@ -2,7 +2,7 @@
 
 import { CheckCircle2, LoaderCircle, Save } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useLayoutEffect, useRef, useState } from "react";
 import {
   MODEL_PROFILES,
   TEXT_MODEL_IDS,
@@ -76,6 +76,65 @@ function ModelSelect({
   </div>;
 }
 
+/**
+ * `2O-PREF-011`: *"a save that fails … keeps the user's input."*
+ *
+ * ## The defect, which a test found rather than a review
+ *
+ * React resets an uncontrolled form after a form action returns, and it cannot
+ * tell a failed save from a successful one — the action function returned
+ * normally either way; the failure is in its *value*. So a save that failed for
+ * any reason (offline, an expired session, a database error) wiped every field
+ * back to the values the server had sent, and the reader who had just retyped
+ * four of them was told to *try again* with their work already gone.
+ *
+ * `aiProfile` and the model routes never had this problem, because they are React
+ * state. Everything else in this form is uncontrolled.
+ *
+ * ## What is done instead, and why not the alternatives
+ *
+ * The submission is snapshotted on its way out and written back if the outcome
+ * is an error. *Make every field controlled* — declined: it is a much larger
+ * change to a form that is otherwise correct, and it would put a dozen more
+ * `useState` calls in a component whose job is rendering. *Return the submitted
+ * values from the Server Action and re-seed `defaultValue`* — declined: a
+ * `defaultValue` change does not reach a mounted uncontrolled input, so it needs
+ * a `key` remount as well, and it would send the reader's draft on a round trip
+ * to the server to be handed straight back.
+ *
+ * It restores in a **layout** effect, so the write lands before the browser
+ * paints and no reader sees their input blink back to the old values on the way
+ * to being restored.
+ */
+type FormDraft = Readonly<Record<string, string | boolean>>;
+
+function snapshotForm(formData: FormData): FormDraft {
+  const draft: Record<string, string | boolean> = {};
+  for (const [key, value] of formData.entries()) {
+    // Framework metadata, not the reader's input.
+    if (key.startsWith("$ACTION_") || typeof value !== "string") continue;
+    draft[key] = value;
+  }
+  return draft;
+}
+
+function restoreForm(form: HTMLFormElement, draft: FormDraft) {
+  for (const element of Array.from(form.elements)) {
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) continue;
+    if (!element.name || element.type === "hidden") continue;
+    if (element.type === "checkbox" && element instanceof HTMLInputElement) {
+      // An unticked checkbox submits nothing, so absence is the value.
+      element.checked = element.name in draft;
+      continue;
+    }
+    // Radios are React-controlled here (`aiProfile`), so they are left alone —
+    // writing `checked` on them would fight the state that already survived.
+    if (element.type === "radio") continue;
+    const stored = draft[element.name];
+    if (typeof stored === "string") element.value = stored;
+  }
+}
+
 export function SettingsForm({
   action,
   initialState = idleState,
@@ -88,7 +147,22 @@ export function SettingsForm({
   values: SettingsFormValues;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const draftRef = useRef<FormDraft | null>(null);
   const pt = locale === "pt-BR";
+
+  function submit(formData: FormData) {
+    draftRef.current = snapshotForm(formData);
+    return formAction(formData);
+  }
+
+  useLayoutEffect(() => {
+    if (state.status !== "error") return;
+    const form = formRef.current;
+    const draft = draftRef.current;
+    if (form && draft) restoreForm(form, draft);
+  }, [state]);
+
   const zones = getTimeZoneOptions(locale, values.timezone);
   const reviews = getReviewPreferencesCopy(locale);
   const [aiProfile, setAIProfile] = useState<AIRoutingProfile>(values.aiProfile);
@@ -139,7 +213,7 @@ export function SettingsForm({
     },
   ];
 
-  return <form action={formAction} className="settings-form">
+  return <form action={submit} className="settings-form" ref={formRef}>
     <input type="hidden" name="locale" value={locale} />
 
     <Section number="01" title={pt ? "Fuso horário" : "Time zone"} description={pt ? "Datas, prazos, revisões manuais e períodos silenciosos usam esta escolha." : "Dates, deadlines, manual reviews, and quiet periods use this setting."} />

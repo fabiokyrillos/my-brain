@@ -641,6 +641,7 @@ describe("Phase 2O: every delivered slice leaves an acceptance record", () => {
       "PHASE_2O_SLICE_00_ACCEPTANCE.md",
       "PHASE_2O_SLICE_01_ACCEPTANCE.md",
       "PHASE_2O_SLICE_02_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_03_ACCEPTANCE.md",
     ];
     for (const record of DELIVERED) {
       expect(reports, `a delivered slice left no acceptance record: ${record}`).toContain(record);

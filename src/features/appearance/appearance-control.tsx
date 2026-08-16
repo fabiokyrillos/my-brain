@@ -84,23 +84,40 @@ export function AppearanceControl({ locale }: { locale: Locale }) {
       <fieldset className="appearance-fieldset">
         <legend>{copy.legend}</legend>
         <div className="appearance-options">
+          {/*
+            The description sits **outside** the label and is linked by
+            `aria-describedby` — the pattern `settings-form.tsx` records and
+            `ModelSelect` was corrected to.
+
+            A `<small>` nested inside a `<label>` joins the control's accessible
+            *name*, because the label's whole subtree is the name. Here that was
+            not cosmetic: "Seguir o aparelho" is described as *"acompanha o modo
+            claro ou escuro"*, so all three radios answered to "Claro" and a
+            screen-reader user would have heard the same two words on every
+            option. Split, the label names the control and the description is
+            announced as a description.
+          */}
           {appearanceChoices.map((option) => (
-            <label
+            <div
               key={option}
               className={`appearance-option${choice === option ? " active" : ""}`}
             >
               <input
-                type="radio"
-                name="appearance"
-                value={option}
+                aria-describedby={`appearance-${option}-description`}
                 checked={choice === option}
+                id={`appearance-${option}`}
+                name="appearance"
                 onChange={() => choose(option)}
+                type="radio"
+                value={option}
               />
-              <span>
-                <strong>{copy.options[option].label}</strong>
-                <small>{copy.options[option].description}</small>
+              <span className="appearance-option-copy">
+                <label htmlFor={`appearance-${option}`}>{copy.options[option].label}</label>
+                <small id={`appearance-${option}-description`}>
+                  {copy.options[option].description}
+                </small>
               </span>
-            </label>
+            </div>
           ))}
         </div>
       </fieldset>
