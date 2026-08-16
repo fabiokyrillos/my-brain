@@ -19,7 +19,17 @@ async function owner(index) {
   const created = data(await admin.auth.admin.createUser({ email, password, email_confirm: true }), `create owner ${index}`).user;
   users.push(created.id);
   const client = createClient(credentials.url, credentials.publishableKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  data(await client.auth.signInWithPassword({ email, password }), `sign in owner ${index}`);
+  const link = data(
+    await admin.auth.admin.generateLink({ type: "recovery", email }),
+    `mint owner ${index} session`,
+  );
+  const hashedToken = link.properties?.hashed_token;
+  assert(hashedToken, `owner ${index} recovery token was not returned`);
+  const verified = data(
+    await client.auth.verifyOtp({ type: "recovery", token_hash: hashedToken }),
+    `exchange owner ${index} session`,
+  );
+  assert(verified.session?.access_token, `owner ${index} session was not returned`);
   return { client, user: created };
 }
 function extraction() {

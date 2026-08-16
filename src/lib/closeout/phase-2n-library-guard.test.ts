@@ -175,9 +175,9 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     // M1 (`…0093`) and M3 (`…0094`) are spent and deployed; M2 is reserved for
     // 2N.7 and a fourth is a stop condition. So the newest migration in the tree
     // is still M3's.
-    expect(migrations.length).toBe(95);
+    expect(migrations.length).toBe(96);
     expect(migrations.sort().at(-1)).toBe(
-      "202608160095_entry_person_candidate_suggestions.sql",
+      "202608160096_fix_person_candidate_fingerprint.sql",
     );
   });
 

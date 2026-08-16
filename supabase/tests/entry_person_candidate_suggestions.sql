@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(20);
 
 select has_table('public', 'entry_person_candidate_resolutions', 'person candidate resolution ledger exists');
 select has_function(
@@ -32,6 +32,17 @@ select policies_are(
 );
 select table_privs_are('public', 'entry_person_candidate_resolutions', 'authenticated', array['SELECT']);
 select table_privs_are('public', 'entry_person_candidate_resolutions', 'anon', array[]::text[]);
+
+select unlike(
+  pg_get_functiondef('public.resolve_entry_person_candidates(uuid,uuid,jsonb,uuid)'::regprocedure),
+  '%request_fingerprint := md5(%',
+  'person candidate idempotency never uses the rejected 32-character MD5 fingerprint'
+);
+select like(
+  pg_get_functiondef('public.resolve_entry_person_candidates(uuid,uuid,jsonb,uuid)'::regprocedure),
+  '%extensions.digest(%sha256%',
+  'person candidate idempotency uses the 64-character SHA-256 fingerprint contract'
+);
 
 select function_privs_are(
   'public',

@@ -175,6 +175,7 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // "scheduling is authorization" rule fails loudly rather than by review.
       "202608140094_phase_2n_slice_3_entity_deletion.sql",
       "202608160095_entry_person_candidate_suggestions.sql",
+      "202608160096_fix_person_candidate_fingerprint.sql",
     ]);
   });
 });
