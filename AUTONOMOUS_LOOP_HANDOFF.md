@@ -7198,3 +7198,293 @@ is above.
 > **Do not** absorb a declined residual, reallocate **M2**, or create a migration
 > outside the signed conditions. **Do not** open signup, resume the push HTTP 403
 > track, or start the successor phase.
+## §82 — Slice 2O.4 ships, and re-running the re-audit is what found two of §81's findings were false (2026-08-16)
+
+PR **#238**, merged at **`f69d4fc`**; head at merge **`5221c7d`**, **CI
+green on both** — all five checks on the head and all three job families on the
+merge SHA. `main` local equals `origin/main`, worktree clean, no open PR.
+
+**`2O-AICONFIG-001` … `-009`, `2O-COST-001` … `-007` — 14 `built`, 2 `baseline`,
+0 `partial`, 0 `undelivered`. Zero migrations created. 94 local = 94 hosted,
+parity `202608140094`. Signup closed. Rollout gate 25 · 3 · 2. CSP unchanged.
+`embedding_model` untouched. A13 not retargeted.**
+
+**57 of 116 requirements delivered.** Slices 2O.0 – 2O.4; four remain.
+
+### Two of §81's seven findings were false, and re-running the re-audit is the only reason that is known
+
+ADR-118 Decision 1 makes the per-slice re-audit **the** control this phase relies
+on. This is the first slice where it changed the work, and it changed it twice.
+
+**Finding 5 was false.** §81 recorded that `src/features/quotas/refusal.ts` *"has
+no consumer"*, called it *"the producer-with-no-consumer shape SH.6 already paid
+for once"*, and instructed that `2O-COST-003` must **wire it, not rebuild it**.
+Against `main`, `quotaRefusal` is called from **`capture/actions.ts`** and from
+**`agent/actions.ts` in three places** — the upload's post-insert refusal, its
+job insert, and a pre-check — and every one renders through
+`quotaRefusalMessage`. The copy already interpolates each ceiling from `QUOTAS`
+and already says when the two daily windows reset.
+
+So `2O-COST-003` **ships**, and closes **`baseline`**. Following the instruction
+as written would have produced a second refusal path for one database contract:
+the producer-with-no-consumer defect **inverted**, and worse — a producer with no
+consumer is merely invisible, while two consumers can disagree.
+
+**Finding 6 was partly false.** §81 read the BYOK claims as *"already specific"*.
+`2O-AICONFIG-006` names **three** clauses — encrypted at rest, never returned to
+the browser, **never logged** — and the third was said **nowhere**, while being
+true. A true thing the product does not say is a promise the reader cannot rely
+on.
+
+**The other five held exactly**, and finding 1 understated itself: it named three
+consumers of `embedding_model` and there are more.
+
+### Two armed assertions fired. Neither was weakened, and only one was predicted
+
+Slice 2O.3 left `uncontrolled` empty behind an **exact count**, deliberately, so
+that whoever added `embedding_model`'s row could not do it without noticing. It
+fired on the first run.
+
+**Two weakenings were available and both were refused.** `toHaveLength(1)` and
+`toBeGreaterThanOrEqual(1)` are each satisfied by a **second** `uncontrolled` row
+that no owner signed, and ADR-117 authorized exactly one. The count stays exact
+and now names its member **and its column**.
+
+And the re-armed claim is **stronger than the one it replaced**. While the state
+was empty, the invariant's `uncontrolled` branch could only be exercised by
+planted rows; it has a real subject now, so a second test asserts the branch is
+exercised by the shipped registry **and** still fails when that real row is
+mutated to lie, in both directions.
+
+**A second armed assertion fired that §81 did not predict.**
+`capability-registry-guard.test.ts` held *"no row names `embedding_model` at
+all"* — two claims in one assertion. *Not one of the nine* is still true and is
+untouched; *no row names it* expressed slice 2O.0's deliberate **absence**, which
+`2O-ACTIVATION-006` said was `2O-AICONFIG-004`'s to fill. Only that half
+inverted, with the superseded form quoted, plus a **new** assertion against the
+rendered form — because the registry records what a row claims and that records
+what the page does.
+
+**The lesson worth carrying: an assertion that bundles two claims fires as one
+and must be split before it is inverted.** Inverting the whole thing would have
+dropped the half ADR-117 actually protects.
+
+### Writing the `R-2O-18` guard found two price claims the re-audit had not
+
+1. A hand-written `text-embedding-3-small · $0.02 / 1M` row in the settings form.
+2. **A whole tariff table rendered inside every `<option>` of every model
+   select** — `$2.50 in · $15 out / 1M` and two more.
+
+The second is the defect. It is a **second copy of `ai_model_pricing`** carrying
+neither `pricing_version` nor `source_url`, so a reader could not audit it and
+could not tell it from the real one — while the applied price is snapshotted into
+`ai_usage_events` on **every call** and that literal was updated by hand or not
+at all. This repository has paid for a hand-kept copy of a vocabulary before:
+`product_events`' writer list froze at `202607280061` and silently refused newer
+events for weeks.
+
+**The catalogue was not removed from the product.** `/app/costs` renders it from
+the table with version and source URL, and the routing block already links there.
+What was deleted is a claim the form could not back.
+
+### `ai_provider` repaired, `embedding_model` deliberately not, and the difference is an ADR
+
+Both were written as literals by `buildSettingsPayload`, so every save discarded
+whatever the row held.
+
+`ai_provider` is repaired, and the authority is **ADR-118's own alternatives**,
+which rejected fixing it in slice 2O.0 because *"it belongs to `2O-AICONFIG`'s
+slice"*. Nothing reads the column, so nothing behaves differently today — but
+*today* is not the guarantee `2O-ACTIVATION-007` asks for. The registry row stays
+`future` and stays one of the nine: a pass-through creates no consumer.
+
+`embedding_model` is **not touched**. ADR-117 Decision 4 forbids removing,
+altering, renaming, re-defaulting or migrating it, and turning a literal into a
+pass-through is a change to how the column is written. The shortfall is named,
+and `settings-payload.test.ts` now **asserts the literal** — so a later phase
+authorized to fix it will fail that test and be pointed at the ADR that has to
+move first.
+
+### Two zones on one page, and neither described as the other
+
+`2O-COST-006` asks every figure to carry its period **and the zone it was
+computed in**. The periods were named and the zone was passed to
+`get_ai_cost_summary` and never said, so "Hoje" was a day the reader could not
+identify.
+
+The quota windows are a **different zone**: `private.utc_day_start()` is
+`date_trunc('day', now() at time zone 'UTC')`, so the daily ceilings reset at UTC
+midnight and not at the owner's. Both are stated separately. Calling the quota
+day "your day" would have been the invention, and this is the first surface in
+the product where the local-day contract and a UTC window appear together.
+
+### Eleven mutations, eleven fired, and two of them were the harness being wrong
+
+Every guard was proved able to fail against the real tree, each restored
+byte-for-byte and the restore verified against a SHA-256 digest.
+
+**Two survived the first run and neither was a weak guard.** One mutation added a
+new property instead of changing `visible`; the other's needle was mis-encoded.
+Both were fixed **in the harness**. Reading `SURVIVED` as *"the guard is weak"*
+would have led to weakening a guard that was working — the inverse of the failure
+this series usually records, and worth naming because the reflex runs the other
+way.
+
+**And a legitimate guard caught a new test.** `BYOK-GUARD-005` asserts crypto
+locality by scanning for the quoted cipher name; writing that literal in
+`byok-claims.test.ts` made the file look like a third crypto core. **Adding it to
+the allowlist was refused** — that grants a permission to a file in order to fix
+a test — and the assertion was rewritten as a pattern instead.
+
+### What only the browser could answer
+
+`e2e/online-ai-configuration.spec.ts` — **four journeys, desktop and mobile,
+against the production build and the hosted project**, disposable account removed
+in `afterAll`. The RSC boundary (two new Server Components really render);
+**`2O-AICONFIG-009` read off the wire** rather than off the source, which the unit
+scan cannot do; `2O-COST-002` against a real account, where `0 de 300` is a
+**read** and is asserted apart from a failed one; and `2O-COST-005` in the
+rendered DOM. The full CI Playwright command was also run: **287 passed**.
+
+### A defect found by re-reading the shipped component, and an operational trap
+
+**`AiConfigSection` first took a boolean.** `credential.status === "active"`
+reads correctly for the gate and **falsely for one state**: `invalid` means the
+provider rejected a key that **exists**, and the section told that reader *"no
+key configured"* and offered *"Configure the key"*. Both halves were wrong in
+the same direction — the sentence denied a key the account has, and the action
+sent them to create one instead of replacing it. It ships as the status, with
+`removed` and `absent` sharing one sentence and `invalid` carrying its own verb.
+**Nothing found this**; re-reading what had already been written did, which is
+how slice 2O.3 found `2O-PREF-011`.
+
+**And the operational trap, because it can silently invalidate a browser proof.**
+`TaskStop` does **not** kill the Next server process. Port 3000 stays held, the
+next `npm run start` fails with `EADDRINUSE`, and — this is the dangerous part —
+if that failure is not noticed, the **old server keeps serving the previous
+build** and a journey run after a rebuild tests the binary from before the fix
+with nothing to say so. Kill the listener explicitly:
+`Get-NetTCPConnection -LocalPort 3000 -State Listen | … Stop-Process -Force`.
+This is the second form of *"restart the authenticated lane after every
+rebuild"* — the first was remembering to; this one is that stopping it may not
+have worked.
+
+### Carried, unabsorbed, with destinations
+
+- **`embedding_model` is still written as a literal.** Not repairable in this
+  phase (ADR-117 Decision 4), and now asserted → **owner**.
+- **`viewport.themeColor` is declared under `prefers-color-scheme` media only** →
+  **slice 2O.7**.
+- **`2O-PREF-002`'s remainder** — the account's own acceptances have no surface →
+  **slice 2O.5**, `2O-CONSENT-001`/`-002`. Not touched here.
+- **`2O-ONBOARD-003`'s remainder.** Re-evaluated inside this slice and **kept
+  `partial`**: the only way to close it is to make onboarding and activation
+  disagree about one fact, which `2O-ONBOARD-002` forbids → **owner, one form
+  field**.
+- **`defaultAgentPreferences.tone` says `direct` while the column defaults to
+  `informal`**, and nothing reads the field.
+- Every Phase 2N residual `OD-2O-11` declined, unchanged and unclaimed; push
+  still failing with HTTP 403 on a real iPhone and **never executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**.
+
+### Two documentation defects repaired
+
+`settings/page.tsx` carried a comment asserting the **opposite of the tree** —
+that `OnboardingRestore` needed no registry row, after slice 2O.3 added one and
+fixed the copy of that reasoning in `capabilities.ts` while leaving this one
+standing. And `TODO.md`'s active line was **one slice stale**, still describing
+slice 2O.2 and 26 of 116.
+
+### The re-audit of slice 2O.5, done and recorded
+
+**Four findings against this `main`, and the first is a probable stop condition.**
+
+1. **`2O-PRIVACY-002` cannot do what it appears to ask.** It requires the surface
+   to derive its categories *"from the same enumeration the deletion path uses"*.
+   That enumeration is `public.account_owned_row_counts`, and it is
+   **`service_role`-only** — it raises unless `auth.role() = 'service_role'` — and
+   it enumerates **dynamically** from `information_schema`: every `public` base
+   table carrying a `user_id` column. Calling it from an authenticated path is
+   **exactly** what ADR-118 Decision 9 names a stop condition (*"a service-role
+   read on an authenticated path"*), and its only consumer today is the
+   `delete-account` Edge Function. The shape that keeps the authority unchanged is
+   to count under RLS and prove by guard that the category set matches what the
+   deletion enumeration scans — but that is a design decision, not a detail, and
+   it must be taken deliberately.
+2. **No export exists anywhere in the product.** `2O-PRIVACY-004` is new
+   construction, synchronous and server-side under `OD-2O-4` **A**, and
+   `2O-SEC-003` is not a formality: the export reads across four polymorphic
+   relation tables whose ownership is validated by trigger rather than by a
+   foreign key.
+3. **`policy_acceptances` has readers and no display surface** — the acceptance
+   gate and `/consent`, which decides one sentence. This is precisely
+   `2O-PREF-002`'s remainder, destination `2O-CONSENT-001`/`-002`.
+4. **`signOut` already revokes at the provider**, and `ProtectedContent` and the
+   sensitivity contract both ship. **`RETENTION_DAYS` has no UI consumer**, so the
+   retention posture `2O-PRIVACY` asks to be reachable is a new surface.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.5 — privacy,
+consent and control of the data** (`2O-PRIVACY-001` … `-010`, `2O-CONSENT-001` …
+`-005`, fifteen requirements, **no migration**). The plan calls it *"the largest
+slice, and the one with the most risk"* and *"the tenant-boundary slice"*. Its
+re-audit against this `main` is above.
+
+### The prompt for slice 2O.5
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.5 — privacy,
+> consent and control of the data** (`2O-PRIVACY-001` … `-010`, `2O-CONSENT-001`
+> … `-005`, fifteen requirements, **no migration**).
+>
+> **Baseline to prove, not presume:** `main` = `origin/main` = the merge SHA
+> recorded at the top of §82, worktree clean, **no open PR**, CI green on all
+> three job families at that SHA, **94 local = 94 hosted, parity
+> `202608140094`**, **57 of 116 delivered**, rollout gate **25 pass · 3 fail · 2
+> owner-signature**, signup closed, **M1 still conditional**, **M2 without a
+> destination and unspendable**, A13 not retargeted, `embedding_model` untouched.
+>
+> **Before acting:** read `AUTONOMOUS_LOOP_HANDOFF.md` §§77–82 in full; read the
+> acceptance records for slices 2O.0 – 2O.4 under `docs/reports/phase-2o/`;
+> re-read the PRD, the implementation plan, the threat model (**T-1, T-2, T-3 and
+> T-4 all belong to this slice**), the traceability contract and **ADR-115
+> through ADR-118**. **Re-run the 2O.5 re-audit against whatever `main` actually
+> is.** §82 records that re-running it is what caught two false findings in §81 —
+> treat §82's four findings as a starting point, never as a substitute.
+>
+> **Four things this slice must not discover late.**
+> `public.account_owned_row_counts` — the deletion enumeration `2O-PRIVACY-002`
+> names — is **`service_role`-only** and enumerates dynamically from
+> `information_schema`; reading it from an authenticated path is a **stop
+> condition** under ADR-118 Decision 9, and so is any new `SECURITY DEFINER`
+> function or new authority for `authenticated`. **`OD-2O-4` A signed the export
+> synchronous and server-side**: an export that needs a job, storage or a
+> migration is a stop condition. **An export is complete or it refuses**
+> (`R-2O-19`), and completeness is derived from the deletion enumeration, not
+> asserted. **`2O-PRIVACY-003` inherits the sensitivity contract** — a category
+> may state how many rows exist without revealing content.
+>
+> Then continue the loop: **2O.5 → merge → CI green on the merge SHA → re-audit
+> 2O.6 → 2O.6 → … → 2O.8 → closeout.** Do not stop after a slice if it is fully
+> merged, CI is green on the merge SHA, no owner decision is pending, no stop
+> condition has fired, and there is enough context to finish the next unit.
+>
+> **If context runs short:** finish the current unit entirely, get CI green on the
+> merge SHA, update this handoff, leave `main` clean with no open PR, stop **only
+> between slices**, and write the next resumption prompt **into this file**.
+>
+> **Run the whole command CI runs when you touch anything shared.**
+> `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+> e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts
+> --project=desktop --project=mobile`. It costs about 40 seconds. For the
+> authenticated lane, start `npm run start` first and run `node
+> scripts/online-playwright.mjs <spec> --project=desktop --workers=1`; restart the
+> server after any rebuild.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need the
+> owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a migration
+> outside the signed conditions. **Do not** open signup, resume the push HTTP 403
+> track, or start the successor phase.
