@@ -44,6 +44,10 @@
    session — the first stylesheet in this list a stranger ever loads. */
 @import "./entry.css";
 
+/* 2O-ONBOARD-001. The guided path's panel on the cockpit, and its reversal
+   control on the preferences surface. */
+@import "./onboarding.css";
+
 /* The nine legacy tokens and the two page measures moved to `tokens.css`, where
    they are now aliases over the Papel e Console palette rather than values of
    their own (ADR-114). Declaring them here as well would shadow that bridge and

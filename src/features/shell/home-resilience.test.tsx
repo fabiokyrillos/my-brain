@@ -32,6 +32,7 @@ const loadInboxProjection = vi.fn();
 const loadAttentionProjection = vi.fn();
 const loadMemoryConflicts = vi.fn();
 const loadHomeAgendaProjection = vi.fn();
+const loadOnboardingPath = vi.fn();
 
 vi.mock("@/features/daily-cycle/work-projection", () => ({
   loadWorkProjection: (...args: unknown[]) => loadWorkProjection(...args),
@@ -70,6 +71,25 @@ vi.mock("@/features/daily-cycle/home-agenda", () => ({
   EMPTY_HOME_AGENDA: { items: [], hasMore: false, timezone: "UTC" },
   HOME_AGENDA_LIMIT: 5,
 }));
+/*
+  `2O-ONBOARD-001` makes Hoje compose **seven** independent reads. The guided
+  path is an *offer*, and an offer that could take the cockpit down with it
+  would be exactly the imposition the requirement forbids — so it gets the same
+  isolation as the other six.
+
+  Mocked rather than left alone for a second reason: `onboarding-view.ts` is
+  `server-only` and this suite renders `HomeDashboard` as a client module, so an
+  unmocked import fails the whole **file** — zero tests, which reports as a
+  failing file and not as a failing assertion. Every server module this
+  dashboard reaches is mocked here for that reason.
+*/
+vi.mock("@/features/onboarding/onboarding-view", () => ({
+  loadOnboardingPath: (...args: unknown[]) => loadOnboardingPath(...args),
+}));
+vi.mock("@/features/onboarding/actions", () => ({
+  dismissOnboarding: vi.fn(),
+  restoreOnboarding: vi.fn(),
+}));
 
 import { HomeDashboard } from "./home-dashboard";
 
@@ -80,6 +100,17 @@ function healthy() {
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });
   loadMemoryConflicts.mockResolvedValue({ items: [], bounded: false, limit: 20 });
   loadHomeAgendaProjection.mockResolvedValue({ items: [], hasMore: false, timezone: "America/Sao_Paulo" });
+  // A finished path: the panel renders nothing, which is the healthy shape for
+  // every other test in this file that is not about onboarding.
+  loadOnboardingPath.mockResolvedValue({
+    steps: [],
+    nextStep: null,
+    satisfiedCount: 0,
+    total: 0,
+    complete: "yes",
+    credential: "satisfied",
+    offered: false,
+  });
 }
 
 beforeEach(() => {
@@ -100,6 +131,7 @@ const PROJECTIONS = [
   ["attention", loadAttentionProjection],
   ["conflicts", loadMemoryConflicts],
   ["agenda", loadHomeAgendaProjection],
+  ["onboarding", loadOnboardingPath],
 ] as const;
 
 describe("2J-HOJE-010: a failing section degrades that section only", () => {
@@ -111,6 +143,37 @@ describe("2J-HOJE-010: a failing section degrades that section only", () => {
     // The greeting is the page. If this is present, Hoje rendered.
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     // And the thing the user came for is still there.
+    expect(screen.getByTestId("capture")).toBeInTheDocument();
+  });
+
+  it("renders the guided path when it loads, so its absence above is a failure and not a default", async () => {
+    // Without this, every assertion in the `onboarding` row of `PROJECTIONS`
+    // would pass over a panel that never renders under any circumstances.
+    loadOnboardingPath.mockResolvedValue({
+      steps: [
+        { key: "entry_captured", order: 1, state: "unsatisfied", destination: "capture", needsCredential: false },
+      ],
+      nextStep: { key: "entry_captured", order: 1, state: "unsatisfied", destination: "capture", needsCredential: false },
+      satisfiedCount: 0,
+      total: 1,
+      complete: "no",
+      credential: "satisfied",
+      offered: true,
+    });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(container.querySelector('[data-onboarding="offered"]')).not.toBeNull();
+    expect(screen.getByTestId("capture")).toBeInTheDocument();
+  });
+
+  it("renders no guided path when its read throws, and keeps the cockpit", async () => {
+    loadOnboardingPath.mockRejectedValue(new Error("onboarding unavailable"));
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(container.querySelector('[data-onboarding="offered"]')).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(screen.getByTestId("capture")).toBeInTheDocument();
   });
 

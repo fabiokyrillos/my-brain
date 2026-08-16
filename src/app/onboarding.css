@@ -1,0 +1,213 @@
+/* ---- The guided path (2O-ONBOARD-001 … -011) -------------------------------
+   A panel in the page flow beneath the composer, never a modal and never a
+   gate, because the requirement is *offered, never imposed*.
+
+   Tokens only — an undefined var() voids the whole declaration in silence — and
+   at most one `font:` shorthand per block, because the shorthand resets every
+   property it does not name. Both rules are the redesign's, and both have cost
+   this repository a defect before.
+
+   State is carried by **text and border, never by colour alone**. That is the
+   accessible answer and it is also the safe one: jsdom cannot see contrast, so
+   a new tint here would only be caught by axe on the real page, and this phase
+   has an inherited touch-target defect already waiting in 2O.7 without adding a
+   contrast one beside it. */
+
+.onboarding {
+  display: grid;
+  gap: var(--space-5);
+  margin: var(--space-8) 0 0;
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.onboarding-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.onboarding-head > h2 {
+  margin: 0;
+  font: var(--type-title-2);
+  color: var(--text-primary);
+}
+
+.onboarding-intro {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.onboarding-progress {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+.onboarding-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.onboarding-recovery {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+
+.onboarding-recovery > h3 {
+  margin: 0;
+  font: var(--type-heading);
+  color: var(--text-primary);
+}
+
+.onboarding-recovery > p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.onboarding-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  counter-reset: onboarding-step;
+}
+
+.onboarding-step {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+}
+
+/* The step being offered now. A left rule rather than a fill, so the row stays
+   on the same background every other row uses and nothing depends on a tint. */
+.onboarding-step[aria-current="step"] {
+  border-inline-start: 3px solid var(--text-primary);
+}
+
+.onboarding-step[data-state="satisfied"] {
+  opacity: 0.72;
+}
+
+.onboarding-step-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.onboarding-step-title {
+  margin: 0;
+  font: var(--type-heading);
+  color: var(--text-primary);
+}
+
+.onboarding-step-state {
+  font: var(--type-label);
+  color: var(--text-secondary);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.onboarding-step-body {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.onboarding-step-action,
+.onboarding-recovery-action {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  /* `2N-MOBILE`'s 21px target is an admitted residual for slice 2O.7. Nothing
+     this slice ships may add a second one. */
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-label);
+  text-decoration: none;
+}
+
+.onboarding-step-action:hover,
+.onboarding-recovery-action:hover {
+  background: var(--action-primary-hover);
+}
+
+.onboarding-dismiss {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-divider);
+}
+
+.onboarding-dismiss-action,
+.onboarding-restore-action {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--type-label);
+  cursor: pointer;
+}
+
+.onboarding-dismiss-hint {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+.onboarding-restore {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  margin: var(--space-8) 0 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.onboarding-restore > h2 {
+  margin: 0;
+  font: var(--type-title-2);
+  color: var(--text-primary);
+}
+
+.onboarding-restore > p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.onboarding-step-action:focus-visible,
+.onboarding-recovery-action:focus-visible,
+.onboarding-dismiss-action:focus-visible,
+.onboarding-restore-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
