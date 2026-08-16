@@ -252,7 +252,7 @@ subject. Comments are now stripped first.
 | Requirement | Status | Evidence |
 |---|---|---|
 | `2O-PREF-001` | **built** | Ajustes holds credential, preferences, restore, appearance, summary, Dados e IA and Conta e dados; browser journey asserts the page renders and reaches each |
-| `2O-PREF-002` | **built** | `account-centre/contracts.ts`; four doors; strip on both authenticated routes; `account-centre.test.tsx` asserts no route redirected and pagination kept |
+| `2O-PREF-002` | **partial** | four doors, strip on both authenticated routes, no route redirected and pagination kept — but **the acceptance record itself is not reached**, because it has no surface anywhere in the product. See below. |
 | `2O-PREF-003` | **built** | `mobile-reachability-guard.test.ts` re-derived; census gains a row; guard proved to fail in **three** planted directions |
 | `2O-PREF-004` | **built** | schema, view, payload and form; `settings-payload.test.ts` asserts the three come from the form and `planning_*` from the row |
 | `2O-PREF-005` | **built** | `review-preferences-copy.ts`; the section repeats `/app/reviews`'s promise; asserted in both locales |
@@ -267,8 +267,32 @@ subject. Comments are now stripped first.
 | `2O-PREF-014` | **built** | `localStorage`, pre-paint script in `<head>`, closed-set validation, **no CSP change** |
 | `2O-PREF-015` | **built** | both directions asserted in the guard against `tokens.css` and in the browser against a real emulated machine; the surface states it does not follow the account |
 
-**15 `built`, 0 `partial`, 0 `undelivered`.**
+**14 `built`, 1 `partial`, 0 `undelivered`.**
 **41 of 116 requirements delivered** across slices 2O.0, 2O.1, 2O.2 and 2O.3.
+
+### `2O-PREF-002` is `partial`, and the remainder is named
+
+The requirement lists three things reached from Ajustes: notifications, account
+deletion and **the consent record**. Two are routes, and both are reached, wear
+a strip and kept every property they had.
+
+The third is not, and cannot be by this slice: **the consent record has no
+surface anywhere in the product.** `policy_acceptances` is read by the
+acceptance gate and by `/consent` to decide one sentence, and nothing displays
+it. What is reached instead is the two policy *documents*, which is the thing
+that exists and is `2O-CONSENT-003`'s *"reachable in one step"*.
+
+**Classified `partial` rather than `built`**, because reaching the documents is
+not reaching the record of what you accepted and when, and calling it `built`
+would claim a delivery this slice did not make. This repository has over-stated
+shipped UX before — Phase 2I's audit did it three times — and the cost of that
+is a later reader trusting a matrix instead of the product.
+
+**Remainder:** the account's own acceptances — which document, at which
+version, on which date — are not shown in the preferences centre.
+**Destination:** `2O-CONSENT-001` and `-002`, **slice 2O.5**, which the PRD
+already scopes for exactly this. The section is shaped so that record slots
+into it without moving anything.
 
 ### `2O-ONBOARD-003` — re-evaluated here, and it stays `partial`
 
@@ -319,6 +343,7 @@ which is now the confirmed pattern rather than an agent's reading.
 | Migrations | **none created**; 94 = 94, parity `202608140094` |
 | CSP | unchanged; `csp.test.ts` untouched |
 | Browser proof | `e2e/online-preferences-centre.spec.ts`, authenticated, desktop and mobile |
+| CI's five-spec E2E command | **287 passed, 5 skipped, desktop and mobile** — run locally because this slice changed the **root layout**, which is the largest blast radius in the product. §78's fourth mistake was running one spec when CI runs five. |
 
 **Local baseline note.** Three test *files* fail on Windows with a shebang parse
 error and zero failing tests, which is the recorded local baseline since
@@ -331,8 +356,9 @@ error and zero failing tests, which is the recorded local baseline since
 - **It did not create a migration.** `OD-2O-2` **A** is the reason there is
   none, and M2 has no destination.
 - **It did not touch `embedding_model`**, the CSP, signup or the rollout gate.
-- **It did not display the consent record** — no reader exists; `2O-CONSENT-001`
-  and `-002`, slice 2O.5.
+- **It did not display the consent record** — no reader exists anywhere in the
+  product; `2O-CONSENT-001` and `-002`, slice 2O.5. This is `2O-PREF-002`'s
+  named remainder and the reason it closes `partial`.
 - **It did not correct `viewport.themeColor`.** `layout.tsx` declares the
   browser-chrome colour under `prefers-color-scheme` media only, so an explicit
   light choice on a dark machine leaves the chrome dark while the page is light.
