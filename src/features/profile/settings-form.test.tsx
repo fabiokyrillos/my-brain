@@ -13,6 +13,9 @@ const values = {
   importantReminderOverride: true,
   maxFollowupsPerDay: 3,
   responseDetail: "short" as const,
+  dailyReviewTime: "22:00",
+  weeklyReviewTime: "19:00",
+  weeklyReviewDay: 5,
   aiProfile: "quality" as const,
   chatModel: "gpt-5.6-terra" as const,
   extractionModel: "gpt-5.6-luna" as const,
@@ -34,14 +37,26 @@ describe("SettingsForm", () => {
     expect(screen.getByLabelText("Período silencioso começa")).toHaveValue("22:30");
     expect(screen.getByRole("button", { name: "Salvar preferências" })).toHaveAttribute("type", "submit");
 
+    /*
+     * `2O-PREF-004` removed two names from this list, and the removal is the
+     * point rather than a concession.
+     *
+     * "Resumo diário" and "Revisão semanal" were here because
+     * `daily_review_time`, `weekly_review_time` and `weekly_review_day` had no
+     * control. They have one now, under labels that say what they actually do
+     * (see below), so asserting their old names are absent would be asserting
+     * nothing — the strings were never rendered under those words either.
+     *
+     * Everything else stays, and `2O-PREF-007` is why "Planejamento semanal"
+     * is still here: `2M-AUDIT-005` retired `planning_day` and `planning_time`,
+     * and this phase does not reverse a signed outcome.
+     */
     for (const hiddenControl of [
       "Seu nome",
       "Nome do agente",
       "Idioma",
       "Nível de autonomia",
       "Intensidade das cobranças",
-      "Resumo diário",
-      "Revisão semanal",
       "Planejamento semanal",
       "Privacidade padrão",
       "Raciocínio avançado",
@@ -49,6 +64,38 @@ describe("SettingsForm", () => {
     ]) {
       expect(screen.queryByLabelText(hiddenControl)).not.toBeInTheDocument();
     }
+  });
+
+  /**
+   * `2O-PREF-004` and `2O-PREF-005` — the three controls, and what they promise.
+   *
+   * The values are asserted because a control that renders but ignores the
+   * stored value is the shape `2M-AUDIT-005` found: a field that looks like a
+   * preference and round-trips a constant.
+   */
+  it("renders the three review preferences and says they schedule nothing", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="pt-BR" values={values} />);
+
+    expect(screen.getByLabelText("Fechamento do dia a partir de")).toHaveValue("22:00");
+    expect(screen.getByLabelText("Fechamento da semana a partir de")).toHaveValue("19:00");
+    expect(screen.getByLabelText("Dia do fechamento da semana")).toHaveValue("5");
+
+    // `2O-PREF-005`: the section repeats the promise `/app/reviews` makes, so a
+    // reader cannot conclude from these fields that something now runs.
+    expect(screen.getByText(/Nada é executado por horário configurado/i)).toBeInTheDocument();
+    for (const control of ["Fechamento do dia a partir de", "Dia do fechamento da semana", "Fechamento da semana a partir de"]) {
+      expect(screen.getByLabelText(control)).toBeInTheDocument();
+    }
+  });
+
+  it("offers the same three in English, with the same promise", () => {
+    const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
+    render(<SettingsForm action={action} locale="en" values={values} />);
+
+    expect(screen.getByLabelText("Offer to close the day from")).toHaveValue("22:00");
+    expect(screen.getByLabelText("Day the week closes")).toHaveValue("5");
+    expect(screen.getByText(/Nothing runs from a configured schedule/i)).toBeInTheDocument();
   });
 
   it("keeps real model routing behind an accessible Advanced disclosure", async () => {
@@ -85,6 +132,7 @@ describe("SettingsForm", () => {
       "agentName",
       "aiProfile",
       "chatModel",
+      "dailyReviewTime",
       "extractionModel",
       "fileModel",
       "importantReminderOverride",
@@ -97,7 +145,17 @@ describe("SettingsForm", () => {
       "reviewModel",
       "timezone",
       "tone",
+      "weeklyReviewDay",
+      "weeklyReviewTime",
     ]);
+    /*
+     * `2O-PREF-007`, asserted as a submitted-key absence rather than only as a
+     * missing label. A hidden input carrying `planningDay` would render no label
+     * and pass the check above, and `profileSchema` is `.strict()` — so it would
+     * fail every save with "review the fields" and no clue which one.
+     */
+    expect([...formData.keys()]).not.toContain("planningDay");
+    expect([...formData.keys()]).not.toContain("planningTime");
   });
 
   it("announces the localized result returned by the server", () => {

@@ -780,7 +780,26 @@ describe("Phase 2O: the audit's own claims stay falsifiable", () => {
     expect(flat(AUDIT)).toMatch(/Nothing in the product ever writes `data-theme`/);
   });
 
-  it("keeps the three consumed review preferences named as consumed and uncontrolled", () => {
+  /**
+   * **Inverted by slice 2O.3, not deleted** — the pattern `R-2O-5`, `R-2O-7` and
+   * `2O-AICONFIG-004` have already taken in this phase.
+   *
+   * Superseded form, quoted so the next reader can tell a rule that was
+   * satisfied from a rule that was removed:
+   *
+   * > `expect(form, "${column} now has a control — reconcile the audit and
+   * > OD-2O-6").not.toContain(column)`
+   *
+   * That was correct while the audit said these three were *consumed and
+   * uncontrolled*, which was true of the tree until `2O-PREF-004` built the
+   * controls `OD-2O-6` **A** signed. Holding the old assertion would keep a
+   * false statement in place with a test — the exact failure ADR-117 corrected
+   * one ADR earlier.
+   *
+   * **The failure being prevented is unchanged: the audit disagreeing with the
+   * tree. Only the direction moved.**
+   */
+  it("gives the three consumed review preferences the controls `OD-2O-6` A signed", () => {
     // Non-vacuous in the direction that matters: the consumer really is there,
     // so an audit that stopped being true would fail here rather than in prose.
     const schedule = read("src/features/day-review/review-schedule.ts");
@@ -789,8 +808,20 @@ describe("Phase 2O: the audit's own claims stay falsifiable", () => {
     }
     const form = read("src/features/profile/settings-form.tsx");
     for (const column of ["dailyReviewTime", "weeklyReviewTime", "weeklyReviewDay"]) {
-      expect(form, `${column} now has a control — reconcile the audit and OD-2O-6`).not.toContain(column);
+      expect(form, `${column} lost its control — 2O-PREF-004 requires one`).toContain(`name="${column}"`);
     }
+    /*
+     * And the registry row moves with them. `2O-ACTIVATION-006` fixed
+     * `scheduled_reviews` at `uncontrolled` *and said its final wording and
+     * `visible` value belong to `2O-PREF-004`* — so a slice that shipped the
+     * controls and left the row claiming there is no authorized control would
+     * have made the registry lie about a surface it governs.
+     */
+    const registry = read("src/features/shell/capabilities.ts");
+    const row = registry.match(/\{ key: "scheduled_reviews",[^}]*\}/)?.[0] ?? "";
+    expect(row, "the scheduled_reviews row is gone").not.toBe("");
+    expect(row, "the row still says uncontrolled while three controls ship").toContain('state: "operational"');
+    expect(row, "the row is still hidden while its controls are visible").toContain("visible: true");
   });
 
   it("keeps `planning_day` and `planning_time` retired, as `2M-AUDIT-005` decided", () => {

@@ -82,16 +82,23 @@ export const capabilityRegistry = [
    * the result — and have no control. `future` said the opposite of the first
    * half and was indistinguishable from the second.
    *
-   * `visible: false` stays: `OD-2O-6` **A** signs controls for exactly these
-   * three, and `2O-PREF-004` builds them in slice 2O.3. The row's final wording
-   * is fixed by that outcome, as `2O-ACTIVATION-006` says; what changes here is
-   * only that it stops being ambiguous.
+   * **Slice 2O.3 fixed the final wording, which is what `2O-ACTIVATION-006`
+   * said it would.** `2O-PREF-004` built the three controls `OD-2O-6` **A**
+   * signed, so `uncontrolled` — *real consumers, no authorized control* — is no
+   * longer true of this row and would now be the ambiguity rather than the cure.
+   * It is `operational` and `visible`, like every other row whose preference the
+   * owner can actually change.
+   *
+   * The `uncontrolled` state is **not** removed with it: ADR-117 requires it for
+   * `embedding_model`, which really does have six consumers and no authorized
+   * control, and that row is `2O-AICONFIG-004`'s in slice 2O.4.
    *
    * `/app/reviews` states *"nada é executado por horário configurado"*, and that
    * stays true — these columns say when the surface offers to close the day,
-   * not when something runs.
+   * not when something runs. `2O-PREF-005` puts that sentence on the controls
+   * themselves, and `2O-PREF-006` keeps it asserted in both locales.
    */
-  { key: "scheduled_reviews", state: "uncontrolled", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: false, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"] },
+  { key: "scheduled_reviews", state: "operational", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: true, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"] },
   { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["autonomy_level"] },
   { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"] },
   { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"] },

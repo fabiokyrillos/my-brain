@@ -65,6 +65,16 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
         name: "Nome do assistente",
         effect: "Muda como o assistente se chama nas telas e nas próprias respostas.",
       },
+      /*
+       * `2O-PREF-004` made this row visible, and `2O-PREF-005` decides how it is
+       * worded. The effect is what the reviews page *offers*, never what runs —
+       * this list is read by someone deciding whether to change a preference, so
+       * it is the last place that should imply a scheduler exists.
+       */
+      scheduled_reviews: {
+        name: "Revisões",
+        effect: "Define a partir de quando a página de revisões oferece fechar o dia e a semana. Nada é executado por horário.",
+      },
     },
   },
   en: {
@@ -92,6 +102,10 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
       identity_names: {
         name: "Assistant name",
         effect: "Changes what the assistant is called on screen and in its own answers.",
+      },
+      scheduled_reviews: {
+        name: "Reviews",
+        effect: "Sets when the reviews page starts offering to close the day and the week. Nothing runs on a schedule.",
       },
     },
   },

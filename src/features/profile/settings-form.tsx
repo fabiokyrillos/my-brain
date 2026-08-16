@@ -12,6 +12,7 @@ import {
   type TextModelId,
 } from "@/lib/ai/model-routing";
 import type { Locale } from "@/lib/preferences";
+import { getReviewPreferencesCopy } from "./review-preferences-copy";
 import type { SettingsFormValues } from "./settings-contracts";
 import { getTimeZoneOptions } from "./timezones";
 
@@ -89,6 +90,7 @@ export function SettingsForm({
   const [state, formAction, pending] = useActionState(action, initialState);
   const pt = locale === "pt-BR";
   const zones = getTimeZoneOptions(locale, values.timezone);
+  const reviews = getReviewPreferencesCopy(locale);
   const [aiProfile, setAIProfile] = useState<AIRoutingProfile>(values.aiProfile);
   const [routes, setRoutes] = useState<VisibleAIRoutes>({
     chatModel: values.chatModel,
@@ -165,8 +167,36 @@ export function SettingsForm({
     <Section number="03" title={pt ? "Silêncio e frequência" : "Quiet hours and frequency"} description={pt ? "Limites aplicados pelo processamento de lembretes e acompanhamentos." : "Limits enforced by reminder and follow-up processing."} />
     <div className="settings-fields"><label htmlFor="quiet-start">{pt ? "Período silencioso começa" : "Quiet period starts"}<input id="quiet-start" name="quietStart" type="time" defaultValue={values.quietStart} /></label><label htmlFor="quiet-end">{pt ? "Período silencioso termina" : "Quiet period ends"}<input id="quiet-end" name="quietEnd" type="time" defaultValue={values.quietEnd} /></label><label htmlFor="max-followups">{pt ? "Máximo de acompanhamentos por dia" : "Maximum follow-ups per day"}<input id="max-followups" name="maxFollowupsPerDay" type="number" min="0" max="20" defaultValue={values.maxFollowupsPerDay} /></label><label className="settings-checkbox"><input name="importantReminderOverride" type="checkbox" defaultChecked={values.importantReminderOverride} /><span>{pt ? "Permitir lembretes importantes durante o silêncio" : "Allow important reminders during quiet hours"}</span></label></div>
 
+    {/*
+      `2O-PREF-004` and `2O-PREF-005`. The three review columns that already had
+      a consumer and never had a control.
+
+      The section's own description repeats `/app/reviews`'s promise verbatim —
+      *nothing runs from a configured schedule* — because this is the one place
+      in the product where a reader could reasonably conclude the opposite. Every
+      label says *offer to close*, never *run*, *send* or *generate*.
+
+      `planning_day` and `planning_time` are absent here, and that absence is
+      `2O-PREF-007` rather than an omission: `2M-AUDIT-005` retired them, and
+      `phase-2m-inert-preferences-guard.test.ts` fails if they reappear.
+    */}
+    <Section number="04" title={reviews.sectionTitle} description={reviews.sectionDescription} />
+    <div className="settings-fields">
+      <div className="settings-field">
+        <label htmlFor="daily-review-time">{reviews.dailyLabel}<input id="daily-review-time" name="dailyReviewTime" type="time" aria-describedby="daily-review-hint" defaultValue={values.dailyReviewTime} /></label>
+        <small id="daily-review-hint">{reviews.dailyHint}</small>
+      </div>
+      <div className="settings-field">
+        <label htmlFor="weekly-review-day">{reviews.weeklyDayLabel}<select id="weekly-review-day" name="weeklyReviewDay" defaultValue={String(values.weeklyReviewDay)}>{reviews.weekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
+      </div>
+      <div className="settings-field">
+        <label htmlFor="weekly-review-time">{reviews.weeklyTimeLabel}<input id="weekly-review-time" name="weeklyReviewTime" type="time" aria-describedby="weekly-review-hint" defaultValue={values.weeklyReviewTime} /></label>
+        <small id="weekly-review-hint">{reviews.weeklyHint}</small>
+      </div>
+    </div>
+
     <details className="settings-advanced">
-      <summary><span>04</span><div><strong>{pt ? "IA avançada" : "Advanced AI"}</strong><small>{pt ? "Roteamento e custos das funções com consumer ativo." : "Routing and costs for functions with active consumers."}</small></div></summary>
+      <summary><span>05</span><div><strong>{pt ? "IA avançada" : "Advanced AI"}</strong><small>{pt ? "Roteamento e custos das funções com consumer ativo." : "Routing and costs for functions with active consumers."}</small></div></summary>
       <div className="settings-advanced-content">
         <fieldset className="ai-profile-fieldset"><legend>{pt ? "Perfil de custo e qualidade" : "Cost and quality profile"}</legend><div className="ai-profile-grid">{profiles.map((profile) => <label key={profile.id} className={`ai-profile-card${aiProfile === profile.id ? " active" : ""}`}><input type="radio" name="aiProfile" value={profile.id} checked={aiProfile === profile.id} onChange={() => chooseProfile(profile.id)} /><span><strong>{profile.title}</strong><small>{profile.description}</small></span></label>)}</div></fieldset>
 

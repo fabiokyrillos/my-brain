@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { APPEARANCE_SCRIPT } from "@/features/appearance/contracts";
 import { RegisterServiceWorker } from "@/features/pwa/register-service-worker";
 import "./globals.css";
 import "./mobile-navigation.css";
@@ -69,10 +70,41 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
+    /*
+     * `suppressHydrationWarning` is for `data-theme` and nothing else
+     * (`2O-PREF-014`).
+     *
+     * The server cannot know the appearance choice — it is held in
+     * `localStorage`, which does not exist during server rendering — so the HTML
+     * ships with no `data-theme` at all, meaning "follow the machine". The
+     * inline script below then adds or removes the attribute while the browser
+     * is still parsing, before the first paint and long before React loads.
+     *
+     * React would otherwise see an attribute on `<html>` that its own output
+     * does not have and treat it as a hydration mismatch: it recovers by
+     * client-rendering from the nearest boundary, which discards the DOM the
+     * script corrected and produces exactly the flash this is built to prevent.
+     * `suppressHydrationWarning` tells React the DOM wins here, which is the
+     * truth — the script knows something the server could not.
+     *
+     * `node_modules/next/dist/docs/01-app/02-guides/
+     * preventing-flash-before-hydration.md` is the source for this shape, and
+     * `appearance/contracts.ts` records the one place its example is unsafe.
+     */
     <html
       lang="pt-BR"
+      suppressHydrationWarning
       className={`${plexSans.variable} ${newsreader.variable} ${plexMono.variable} h-full antialiased`}
     >
+      <head>
+        {/*
+          First in `<head>`, so it runs before the stylesheets are applied and
+          before anything is painted. It needs no nonce: `next.config.ts` already
+          carries `'unsafe-inline'` in `script-src`, and `R-2O-27` makes changing
+          the CSP a stop condition rather than an option.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <RegisterServiceWorker />
         {children}
