@@ -415,8 +415,8 @@ export function TaskCandidateForm({
 
             return (
               <div
+                className="task-candidate-decision-card"
                 key={candidate.key}
-                style={{ display: "grid", gap: 9 }}
               >
                 <label className="candidate-item">
                   <input
@@ -445,58 +445,42 @@ export function TaskCandidateForm({
                 </label>
                 <fieldset
                   aria-disabled={!checked || pending}
-                  style={{
-                    border: "1px solid var(--line)",
-                    borderRadius: 12,
-                    display: "grid",
-                    gap: 6,
-                    margin: 0,
-                    minWidth: 0,
-                    padding: 12,
-                  }}
+                  className="candidate-disposition"
                 >
-                  <legend style={{ padding: "0 7px", fontSize: 12, fontWeight: 800 }}>
+                  <legend>
                     {localized.decision(candidate.title)}
                   </legend>
-                  {candidateDispositionValues.map((value) => {
-                    const option = localized.dispositions[value];
-                    return (
-                      <label
-                        key={value}
-                        style={{
-                          alignItems: "center",
-                          display: "grid",
-                          gap: 8,
-                          gridTemplateColumns: "44px minmax(0, 1fr)",
-                          minHeight: 44,
-                        }}
-                      >
-                        <input
-                          aria-label={option.label}
-                          checked={disposition === value}
-                          disabled={!checked || pending}
-                          name={`candidate-disposition-${index}`}
-                          onChange={() => {
-                            setDispositionsByIndex((current) => {
-                              const next = new Map(current);
-                              next.set(index, value);
-                              return next;
-                            });
-                            setAnnouncement(
-                              localized.decisionChanged(candidate.title, option.label),
-                            );
-                          }}
-                          style={{ minHeight: 44, minWidth: 44 }}
-                          type="radio"
-                          value={value}
-                        />
-                        <span style={{ display: "grid", gap: 2 }}>
-                          <strong>{option.label}</strong>
-                          <small>{option.help}</small>
-                        </span>
-                      </label>
-                    );
-                  })}
+                  <div className="candidate-disposition-grid">
+                    {candidateDispositionValues.map((value) => {
+                      const option = localized.dispositions[value];
+                      return (
+                        <label className="candidate-disposition-option" key={value}>
+                          <input
+                            aria-label={option.label}
+                            checked={disposition === value}
+                            disabled={!checked || pending}
+                            name={`candidate-disposition-${index}`}
+                            onChange={() => {
+                              setDispositionsByIndex((current) => {
+                                const next = new Map(current);
+                                next.set(index, value);
+                                return next;
+                              });
+                              setAnnouncement(
+                                localized.decisionChanged(candidate.title, option.label),
+                              );
+                            }}
+                            type="radio"
+                            value={value}
+                          />
+                          <span>
+                            <strong>{option.label}</strong>
+                            <small>{option.help}</small>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </fieldset>
                 <CandidateEditor
                   candidate={candidate}

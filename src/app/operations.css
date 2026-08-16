@@ -309,7 +309,7 @@ a.home-agenda-link:hover{background:var(--background-subtle)}
 .status-badge.needs_attention{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}.status-badge.could_not_organize{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.status-badge.saved,.status-badge.organizing{background:var(--tone-information-bg);color:var(--link)}.status-badge.ready{background:var(--tone-success-bg);color:var(--tone-success-fg)}.list-attention-hint{color:var(--text-secondary)}
 
 /* Phase 2X.9: decision-first progressive disclosure review */
-.entry-review{display:grid;gap:18px;max-width:760px}
+.entry-review{display:grid;gap:18px;width:100%}
 .review-facts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0}
 .review-facts div{display:flex;gap:5px;align-items:baseline;border:1px solid var(--border-strong);border-radius: var(--radius-full);padding:6px 10px;background:var(--background-subtle);font:var(--type-eyebrow);color:var(--text-secondary)}
 .review-facts dt,.review-facts dd{margin:0}
@@ -383,8 +383,7 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .record-detail-columns{display:grid;gap:var(--space-5)}
 .record-decision,.record-explanation{display:grid;gap:var(--space-4);align-content:start;min-width:0}
 @media(min-width:1080px){
-  /* 1fr + the entry panel's own 372px measure from the direction's scale. */
-  .record-detail-columns{grid-template-columns:minmax(0,1fr) 372px;gap:var(--space-6);align-items:start}
+  .record-detail-columns{grid-template-columns:minmax(560px,1.35fr) minmax(320px,.65fr);gap:var(--space-6);align-items:start}
 }
 .record-decision .review-understanding{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);padding:var(--space-5)}
 .review-understanding-body{margin:var(--space-4) 0 0;font:var(--type-reading);color:var(--text-primary)}
@@ -392,6 +391,27 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
    acted on, and a second column of equal weight would compete with the bar. */
 .record-explanation{font-size:13px}
 .record-explanation .section-heading h2{font:var(--type-heading)}
+
+/* One decision surface per task: summary, choice and optional edit stay in a
+   single visual unit instead of reading as three repeated cards. */
+.task-candidate-decision-card{display:grid;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-canvas)}
+.task-candidate-decision-card>.candidate-item{padding:0;border:0;border-radius:0;background:transparent}
+.task-candidate-decision-card>.candidate-item:hover{background:transparent}
+.candidate-disposition{min-width:0;margin:0;padding:0;border:0}
+.candidate-disposition>legend{padding:0 0 var(--space-2);font:var(--type-eyebrow);color:var(--text-secondary)}
+.candidate-disposition-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.candidate-disposition-option{position:relative;display:grid;min-width:0;min-height:72px;padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--background-surface);cursor:pointer}
+.candidate-disposition-option:has(input:checked){border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link);background:var(--tone-information-bg)}
+.candidate-disposition-option:has(input:focus-visible){outline:3px solid var(--focus-ring);outline-offset:2px}
+.candidate-disposition-option>input{position:absolute;opacity:0;pointer-events:none}
+.candidate-disposition-option>span{display:grid;gap:3px;align-content:start}
+.candidate-disposition-option strong{font:var(--type-caption);color:var(--text-primary)}
+.candidate-disposition-option small{font:var(--type-eyebrow);line-height:1.35;color:var(--text-secondary)}
+.task-candidate-decision-card>.candidate-editor{padding:var(--space-3)!important;border-color:var(--border-default)!important;background:var(--background-surface)}
+@media(max-width:760px){
+  .candidate-disposition-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .task-candidate-decision-card{padding:var(--space-3)}
+}
 
 /*
  * Registros as a decision queue — Papel e Console, mockup 03 frame 03.

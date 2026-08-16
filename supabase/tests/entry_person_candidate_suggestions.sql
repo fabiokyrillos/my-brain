@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(18);
 
-select has_table('public', 'entry_person_candidate_resolutions');
+select has_table('public', 'entry_person_candidate_resolutions', 'person candidate resolution ledger exists');
 select has_function(
   'public',
   'resolve_entry_person_candidates',
@@ -14,12 +14,12 @@ select has_function(
   array['uuid', 'uuid']
 );
 
-select col_is_pk('public', 'entry_person_candidate_resolutions', array['interpretation_id', 'candidate_index']);
-select col_not_null('public', 'entry_person_candidate_resolutions', 'user_id');
-select col_not_null('public', 'entry_person_candidate_resolutions', 'entry_id');
-select col_not_null('public', 'entry_person_candidate_resolutions', 'disposition');
-select col_not_null('public', 'entry_person_candidate_resolutions', 'original_name');
-select col_not_null('public', 'entry_person_candidate_resolutions', 'operation_key');
+select col_is_pk('public', 'entry_person_candidate_resolutions', array['interpretation_id', 'candidate_index'], 'candidate identity is interpretation-scoped');
+select col_not_null('public', 'entry_person_candidate_resolutions', 'user_id', 'candidate resolution owner is required');
+select col_not_null('public', 'entry_person_candidate_resolutions', 'entry_id', 'candidate resolution entry is required');
+select col_not_null('public', 'entry_person_candidate_resolutions', 'disposition', 'candidate resolution disposition is required');
+select col_not_null('public', 'entry_person_candidate_resolutions', 'original_name', 'candidate resolution original name is required');
+select col_not_null('public', 'entry_person_candidate_resolutions', 'operation_key', 'candidate resolution operation key is required');
 
 select ok(
   (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.entry_person_candidate_resolutions'::regclass),

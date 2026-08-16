@@ -231,6 +231,16 @@ begin
   exception when others then failures := failures || ('entry_interpretations: ' || sqlerrm); end;
 
   begin
+    insert into public.entry_person_candidate_resolutions (
+      interpretation_id, candidate_index, user_id, entry_id, disposition,
+      original_name, operation_key
+    ) values (
+      v_interp, 0, p_user, v_entry, 'rejected',
+      'Drill candidate ' || p_tag, gen_random_uuid()
+    );
+  exception when others then failures := failures || ('entry_person_candidate_resolutions: ' || sqlerrm); end;
+
+  begin
     insert into public.entry_embeddings (user_id, entry_id, content, embedding, model)
     values (
       p_user, v_entry, 'Drill embedding ' || p_tag,
