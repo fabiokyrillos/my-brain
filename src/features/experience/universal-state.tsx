@@ -227,8 +227,15 @@ export function UniversalStateView({
 export type UniversalStateLineProps = {
   readonly state: UniversalState;
   readonly locale: string;
-  /** The section's own sentence. Sections almost always have one. */
-  readonly description?: string;
+  /**
+   * The section's own sentence. Sections almost always have one.
+   *
+   * A node rather than a string because three of the converted sections lead
+   * with a bolded heading — `<strong>{copy.emptyHeading}</strong> {body}` —
+   * and flattening that to a string would have lost emphasis the surface
+   * already had.
+   */
+  readonly description?: React.ReactNode;
   readonly actionHref?: string;
   readonly actionLabel?: string;
   readonly className?: string;

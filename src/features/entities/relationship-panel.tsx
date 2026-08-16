@@ -21,6 +21,8 @@
  */
 
 import { LoaderCircle, Pencil, Plus, X } from "lucide-react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { useActionState, useId, useState } from "react";
 
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
@@ -117,7 +119,7 @@ export function RelationshipPanel({
           ))}
         </ul>
       ) : (
-        <p className="quiet-state">{copy.relationshipsEmpty}</p>
+        <UniversalStateLine description={copy.relationshipsEmpty} locale={locale} state="empty" />
       )}
 
       <BoundedNotice list={bound} locale={locale} />

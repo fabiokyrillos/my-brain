@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -65,12 +67,12 @@ export function LinkedSubjectsSection({
     <section className="file-links" data-link-direction="file-to-subject">
       <h3>{copy.linkedHeading}</h3>
       {outcome.status === "failed" ? (
-        <p className="quiet-state" data-link-state="failed" role="note">
-          {copy.linkedFailed}
-        </p>
+        <div data-link-state="failed">
+          <UniversalStateLine description={copy.linkedFailed} locale={locale} state="error_recoverable" />
+        </div>
       ) : subjects.items.length === 0 ? (
         <div data-link-state="empty">
-          <p className="quiet-state">{copy.linkedEmpty}</p>
+          <UniversalStateLine description={copy.linkedEmpty} locale={locale} state="empty" />
           {/*
             The remainder, said to the user rather than only to the acceptance
             record. `2N-FILES-009` ships as a real read path whose emptiness is
@@ -127,12 +129,12 @@ export function LinkedFilesSection({
           workspace column, whose own heading is the `<h2>`. */}
       <h3>{copy.linkedFilesHeading}</h3>
       {outcome.status === "failed" ? (
-        <p className="quiet-state" data-link-state="failed" role="note">
-          {copy.linkedFilesFailed}
-        </p>
+        <div data-link-state="failed">
+          <UniversalStateLine description={copy.linkedFilesFailed} locale={locale} state="error_recoverable" />
+        </div>
       ) : files.items.length === 0 ? (
         <div data-link-state="empty">
-          <p className="quiet-state">{copy.linkedFilesEmpty}</p>
+          <UniversalStateLine description={copy.linkedFilesEmpty} locale={locale} state="empty" />
           <p className="quiet-state file-links-unavailable">{copy.linkedNoWriter}</p>
         </div>
       ) : (

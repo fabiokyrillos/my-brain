@@ -34,6 +34,8 @@
 
 import Link from "next/link";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import { describeRelationshipType } from "@/features/entities/relationship-vocabulary";
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -85,9 +87,16 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
     return (
       <section aria-labelledby="relations-list-heading" className="relations-section">
         <h2 id="relations-list-heading">{copy.listHeading}</h2>
-        <p className="quiet-state" data-relations-empty="true">
-          <strong>{copy.emptyHeading}</strong> {copy.emptyBody}
-        </p>
+        {/* The wrapper keeps `data-relations-empty`, which
+            `online-phase-2n-relations.spec.ts` locates. The state moved into
+            the vocabulary; the anchor a shipped journey holds did not. */}
+        <div data-relations-empty="true">
+          <UniversalStateLine
+            description={<><strong>{copy.emptyHeading}</strong> {copy.emptyBody}</>}
+            locale={locale}
+            state="empty"
+          />
+        </div>
       </section>
     );
   }

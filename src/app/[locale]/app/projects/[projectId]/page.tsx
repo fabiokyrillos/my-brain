@@ -1,4 +1,5 @@
 import { ArrowLeft, FolderKanban } from "lucide-react";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createOrganizationForSubject, updateProject } from "@/features/entities/actions";
@@ -423,7 +424,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <p className="section-explainer">{copy.recentChangesExplainer}</p>
         {boundedChanges.items.length ? (
           <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <p className="quiet-state">{copy.recentChangesEmpty}</p>}
+        ) : <UniversalStateLine description={copy.recentChangesEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedChanges} locale={locale} />
       </section>
 
@@ -477,7 +478,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 );
               })}
             </div>
-          ) : <p className="quiet-state">{copy.linkedTasksEmpty}</p>}
+          ) : <UniversalStateLine description={copy.linkedTasksEmpty} locale={locale} state="empty" />}
           <BoundedNotice list={boundedTasks} locale={locale} />
         </section>
         {/*
@@ -552,7 +553,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </article>
             ))}
           </div>
-        ) : <p className="quiet-state">{copy.decisionsEmpty}</p>}
+        ) : <UniversalStateLine description={copy.decisionsEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedDecisions} locale={locale} />
       </section>
 
@@ -596,7 +597,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </article>
             );
           })
-        ) : <p className="quiet-state">{copy.projectMemoriesEmpty}</p>}
+        ) : <UniversalStateLine description={copy.projectMemoriesEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedMemories} locale={locale} />
       </section>
 
@@ -647,7 +648,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </article>
             ))}
           </div>
-        ) : <p className="quiet-state">{copy.timelineEmpty}</p>}
+        ) : <UniversalStateLine description={copy.timelineEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedEntries} locale={locale} />
       </section>
 

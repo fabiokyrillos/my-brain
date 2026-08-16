@@ -52,6 +52,8 @@
  */
 
 import { useState } from "react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-day";
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
@@ -294,7 +296,7 @@ export function PlannerView({
       >
         <h2>{copy.conflicts.heading}</h2>
         {projection.conflicts.length === 0 ? (
-          <p className="quiet-state">{copy.conflicts.none}</p>
+          <UniversalStateLine description={copy.conflicts.none} locale={locale} state="empty" />
         ) : (
           <>
             <p className="planner-conflict-count">{copy.conflicts.count(projection.conflicts.length)}</p>
@@ -315,7 +317,7 @@ export function PlannerView({
       <section aria-label={copy.planned} className="planner-list">
         <h2>{copy.planned}</h2>
         {projection.planned.length === 0 ? (
-          <p className="quiet-state">{copy.plannedEmpty}</p>
+          <UniversalStateLine description={copy.plannedEmpty} locale={locale} state="empty" />
         ) : (
           <ul>{projection.planned.map((item) => <Row item={item} key={item.taskId} operation="cleared" />)}</ul>
         )}
@@ -324,7 +326,7 @@ export function PlannerView({
       <section aria-label={copy.available} className="planner-list">
         <h2>{copy.available}</h2>
         {projection.available.length === 0 ? (
-          <p className="quiet-state">{copy.availableEmpty}</p>
+          <UniversalStateLine description={copy.availableEmpty} locale={locale} state="empty" />
         ) : (
           <>
             <div className="work-bulk-select-all">
