@@ -6850,3 +6850,93 @@ preferences centre** (`2O-PREF-001` … `-015`, fifteen requirements, no migrati
 since `OD-2O-2` **A** is what removed it). Its re-audit against `37d1661` is
 above. It is the largest slice attempted so far and it restructures navigation,
 so it was **not started** rather than started and abandoned mid-way.
+
+## §80 — The resumption prompt for slice 2O.3, kept here because the last one was not (2026-08-15)
+
+§79 records that the resumption prompt the previous session produced **was never
+pasted and was not recoverable from this file**. This section is the fix, and it
+is a fix rather than a note: the prompt lives in the repository, so the next
+session needs nothing but a pointer to it.
+
+**Baseline to verify before anything else — do not presume these.**
+
+| Fact | Value at the time of writing |
+|---|---|
+| `main` = `origin/main` | `8c2eafb` (handoff §79's merge) |
+| Slice 2O.2's merge | `37d1661`, CI green on all three job families |
+| Worktree | clean; **no open PR** |
+| Migrations | **94 local = 94 hosted, parity `202608140094`, none created by this phase** |
+| Delivered | **26 of 116** — slices 2O.0, 2O.1, 2O.2 |
+| Rollout gate | 25 pass · 3 fail · 2 owner-signature, untouched |
+
+### The prompt
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.3 — one
+> preferences centre** (`2O-PREF-001` … `-015`, fifteen requirements, **no
+> migration**, since `OD-2O-2` **A** is what removed it).
+>
+> **Before acting:** prove the baseline above against the tree rather than
+> presuming it; read `AUTONOMOUS_LOOP_HANDOFF.md` §§77–80 in full; read the
+> acceptance records for slices 2O.0, 2O.1 and 2O.2 under
+> `docs/reports/phase-2o/`; re-read the PRD, the implementation plan, the threat
+> model, the traceability contract and **ADR-115 through ADR-118**; confirm no
+> later work has moved `main`. **If anything diverges, re-audit slice 2O.3
+> before implementing.**
+>
+> §79 carries a re-audit of 2O.3 against `37d1661`. **Re-run it against whatever
+> `main` actually is** — a re-audit is the control this phase relies on, and
+> ADR-118 Decision 1 requires one per slice.
+>
+> Then continue the loop: **2O.3 → merge → CI green on the merge SHA → re-audit
+> 2O.4 → 2O.4 → … → 2O.8 → closeout.** Re-audit the next slice against the
+> `main` the previous one produced. **Do not reimplement capabilities that
+> already exist.**
+>
+> Do not stop after a slice if it is fully merged, CI is green on the merge SHA,
+> no owner decision is pending, no stop condition has fired, and there is enough
+> context to finish the next unit.
+>
+> **If context runs short:** finish the current unit entirely, get CI green on
+> the merge SHA, update this handoff, leave `main` clean with no open PR, stop
+> **only between slices**, and write the next resumption prompt **into this file**.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need the
+> owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a migration
+> outside the signed conditions. **Do not** open signup, resume the push HTTP 403
+> track, or start the successor phase.
+
+### What slice 2O.3 must not discover late
+
+- **`2O-PREF-008` versus `OnboardingRestore`.** Slice 2O.2 put a control on
+  `/app/settings` that governs a **cookie, not a column**, and
+  `capability-registry-guard.test.ts` direction B **cannot see it** — it scans
+  `src/features/profile/settings-form.tsx` only, by `name=` attributes mapped to
+  columns. Give it a `columns: []` row, as `home_status` and `manual_reviews`
+  have, or record why it is outside `-008`. **A decision, not an oversight.**
+- **Three findings routed here with their reasons in §79:**
+  `2O-ONBOARD-003`'s remainder; the entry locale negotiated in 2O.1 and never
+  written to `profiles`; and `defaultAgentPreferences.tone` reading `direct`
+  while the column defaults to `informal`.
+- **`scheduled_reviews`'s final wording and `visible` value** are `2O-PREF-004`'s,
+  and the `uncontrolled` vocabulary it needs already exists.
+- **The CSP may not change** (`R-2O-27`). `'unsafe-inline'` is already in
+  `script-src` at `next.config.ts:37`, so the appearance script does not need one;
+  if it turns out to, **the slice stops**.
+- **`localStorage` is still used nowhere in this repository.** `2O-PREF-014` is
+  its first use, and `R-2O-28` makes the stored value attacker-controlled input
+  by definition.
+
+### Two probes worth reusing, and one that lies
+
+`gh api repos/:owner/:repo/commits/<sha>/status --jq .state` returned **`success`
+on a merge SHA while two of the three CI jobs were still queued** — it reports
+commit *statuses*, and Actions jobs are *check-runs*. Wait on the check-runs
+collection, require every entry `completed`, and assert the collection is
+non-empty, because "none are incomplete" is trivially true of an empty list.
+
+The authenticated browser proof is **run**, not assumed:
+`CI=1 npm run test:e2e:online -- <spec> --project=desktop --workers=1`, then
+`--project=mobile`. It found two of slice 2O.2's six defects.
