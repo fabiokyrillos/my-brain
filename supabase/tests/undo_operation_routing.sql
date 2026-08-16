@@ -85,12 +85,13 @@ select is(
       'confirm_entry_task_candidates',
       'confirm_entry_task_candidates_v5',
       'confirm_entry_task_candidates_v6',
+      'resolve_entry_person_candidates',
       'resolve_pending_question_v1',
       'resolve_pending_question_v2',
       'resolve_pending_question_v3'
     )
   ),
-  8,
+  9,
   'every recordable operation has a registered handler'
 );
 
