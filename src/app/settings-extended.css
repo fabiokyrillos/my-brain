@@ -44,3 +44,24 @@
 /* `2O-PREF-015`'s last clause, and it is the sentence that stops this reading
    as an account setting. Kept legible rather than reduced to fine print. */
 .appearance-scope{margin:0;max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.5}
+/* `2O-AICONFIG-001`…`-005`, `-008`. Where AI is used, on the page that configures it. */
+.ai-config-section{display:grid;gap:var(--space-3);margin-top:var(--space-8);padding-top:var(--space-6);border-top:1px solid var(--border-divider)}
+.ai-config-section>h2{margin:0;font: var(--type-title-2);color:var(--text-primary)}
+.ai-config-intro{margin:0;max-width:68ch;font: var(--type-body);color:var(--text-secondary)}
+.ai-config-credential{margin:0;max-width:68ch;padding:var(--space-3) var(--space-4);border-radius: var(--radius-md);background:var(--background-subtle);font: var(--type-caption);color:var(--text-secondary);line-height:1.6}
+.ai-config-credential.absent{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}
+.ai-config-credential.absent a{color:inherit;text-decoration:underline;font-weight:750}
+.ai-config-routing-heading{margin:var(--space-2) 0 0;font: var(--type-caption);font-weight:750;color:var(--text-primary)}
+.ai-config-routing-intro{margin:0;max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.55}
+.ai-config-routes{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
+.ai-config-route{display:grid;gap:var(--space-1);padding:var(--space-4);border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
+.ai-config-route.unconsumed{background:var(--background-subtle)}
+.ai-config-route strong{font: var(--type-body);color:var(--text-primary)}
+.ai-config-route-effect{max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.5}
+.ai-config-route-model{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.ai-config-route-model-label{font: var(--type-eyebrow);letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.ai-config-route-model code{padding:2px 8px;border-radius: var(--radius-full);background:var(--background-subtle);font: var(--type-caption);color:var(--text-primary)}
+.ai-config-route-disposition{max-width:68ch;font: var(--type-caption);color:var(--text-muted);line-height:1.5}
+/* `2O-COST-004`. What the chosen profile also writes, and offers no control for. */
+.ai-routes-fixed{display:grid;gap:var(--space-2)}
+.ai-routes-fixed-intro{margin:0;max-width:68ch;font: var(--type-caption);color:var(--text-secondary);line-height:1.55}

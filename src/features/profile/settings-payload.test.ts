@@ -118,4 +118,45 @@ describe("buildSettingsPayload", () => {
       embeddingModel: "text-embedding-3-small",
     });
   });
+
+  describe("2O-AICONFIG: the two columns slice 2O.0 recorded as literals", () => {
+    it("passes `ai_provider` through instead of overwriting it", () => {
+      // The repair. A stored value survives a save, which is
+      // `2O-ACTIVATION-007`'s *"no save wipes a value"* — and the column stays
+      // consumer-less, so this changes what is written and nothing else.
+      const payload = buildSettingsPayload(input, {
+        ...snapshot,
+        preferences: { ...snapshot.preferences, ai_provider: "anthropic" },
+      });
+      expect(payload.preferences.aiProvider).toBe("anthropic");
+    });
+
+    it("falls back to `openai` only when the row holds nothing", () => {
+      expect(
+        buildSettingsPayload(input, { ...snapshot, preferences: null }).preferences.aiProvider,
+      ).toBe("openai");
+    });
+
+    it("leaves `embedding_model` written as a literal, which ADR-117 requires", () => {
+      /*
+       * The shortfall this slice deliberately did **not** repair, asserted so it
+       * cannot be closed by accident.
+       *
+       * ADR-117 Decision 4 forbids removing, altering, renaming, re-defaulting
+       * or migrating the column, and `R-2O-13b` repeats it. Turning this literal
+       * into a pass-through is a change to how the column is written, so it is
+       * outside what the owner signed — and `2O-AICONFIG-004` asked for a
+       * registry row, which is what shipped.
+       *
+       * A stored value that differs is overwritten, and that is the named,
+       * non-vacuous remainder. If a later phase is authorized to fix it, this
+       * test fails and points at the ADR that has to move first.
+       */
+      const payload = buildSettingsPayload(input, {
+        ...snapshot,
+        preferences: { ...snapshot.preferences, embedding_model: "text-embedding-3-large" },
+      });
+      expect(payload.preferences.embeddingModel).toBe("text-embedding-3-small");
+    });
+  });
 });

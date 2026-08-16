@@ -3,3 +3,23 @@
 @media(max-width:600px){.cost-page{padding:38px 18px 110px}.cost-hero h1{font-size:45px}.cost-profile-strip{grid-template-columns:1fr;gap:5px}.cost-metrics{grid-template-columns:1fr 1fr}.cost-metrics article{min-height:124px;padding:16px}.cost-metrics strong{font-size:23px}.spend-trace,.cost-panel,.recent-costs,.pricing-catalog{padding:17px}.trace-legend,.pricing-grid{grid-template-columns:1fr}.cost-empty{padding:45px 22px}.cost-footnote{align-items:flex-start}}
 @media(prefers-reduced-motion:no-preference){.cost-metrics article,.spend-trace{animation:rise var(--motion-emphasis) var(--ease-enter) both}.cost-metrics article:nth-child(2){animation-delay:.05s}.cost-metrics article:nth-child(3){animation-delay:.1s}.cost-metrics article:nth-child(4){animation-delay:.15s}}
 .cost-metrics strong{font-size:clamp(22px,2.35vw,31px);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* `2O-COST-006`. The zone the periods above were computed in, said once. */
+.cost-zone{margin:14px 0 0;font: var(--type-caption);color:var(--text-secondary)}
+/* `2O-COST-007`. A failed read, styled as a state rather than as a value. */
+.cost-metrics.unreadable{grid-template-columns:1fr}
+.cost-metrics.unreadable article.primary{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}
+.cost-metrics.unreadable article.primary span,.cost-metrics.unreadable article.primary small{color:var(--tone-attention-fg)}
+.cost-metrics.unreadable article.primary strong{font:500 clamp(20px,2.4vw,28px) var(--font-reading);letter-spacing:-.03em}
+.cost-read-failed{margin:14px 0 0;padding:12px 14px;border-radius: var(--radius-md);background:var(--tone-attention-bg);color:var(--tone-attention-fg);font: var(--type-caption);line-height:1.55}
+/* `2O-COST-002`. The ceilings the database enforces, beside the spend. */
+.quota-section{margin-top:14px;padding:22px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
+.quota-section>h2{margin:0;font-size:16px;letter-spacing:-.02em}
+.quota-intro{margin:6px 0 0;max-width:68ch;color:var(--text-secondary);font: var(--type-caption);line-height:1.6}
+.quota-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.quota-item{display:grid;gap:4px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas)}
+.quota-item strong{font: var(--type-caption)}
+.quota-figure{color:var(--text-primary);font: var(--type-eyebrow);font-variant-numeric:tabular-nums}
+.quota-figure.unreadable{color:var(--tone-attention-fg);font: var(--type-caption);line-height:1.5}
+.quota-window{color:var(--text-secondary);font: var(--type-caption)}
+@media(max-width:900px){.quota-list{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.quota-section{padding:17px}.quota-list{grid-template-columns:1fr}}

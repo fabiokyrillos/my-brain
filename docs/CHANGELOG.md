@@ -2,6 +2,97 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-16 - PHASE 2O SLICE 2O.4 — the product says what it does with a model, and what it costs
+
+**`2O-AICONFIG-001` … `-009`, `2O-COST-001` … `-007` — 14 built, 2 baseline, 0
+partial, 0 undelivered. Zero migrations created. 94, parity `202608140094`.
+Signup closed, rollout 25 · 3 · 2. CSP unchanged. `embedding_model` untouched.
+A13 not retargeted. 57 of 116 delivered.**
+
+### Added
+
+- **`src/features/ai-config/`** — the AI routing contract, its copy and
+  `AiConfigSection` on `/app/settings`. `AI_ROUTE_CONTRACTS` carries, per
+  operation, the column the call sites really read, **where** they read it and
+  the model they fall back to; `contracts.test.ts` checks all three against the
+  tree in **both directions**, so a default changed in the code without changing
+  the statement fails the build, and a column that acquires a reader cannot stay
+  undeclared. Three dispositions — `controlled`, `uncontrolled`, `unconsumed` —
+  because *"no control"* is true of the last two and only one of them also means
+  *"nothing happens differently because of this value"*.
+- **`embedding_route`** in `capabilityRegistry`: `uncontrolled`, four
+  behavioural consumers, `visible: false`, no control. `2O-AICONFIG-004` and
+  ADR-117 Decisions 1 and 2, and the whole of what this phase does about that
+  column.
+- **`src/features/quotas/usage.ts` and `quota-section.tsx`** — the ceilings the
+  database enforces and how much of each is used, on `/app/costs`. Ceilings from
+  `QUOTAS`; usage from the trigger's own predicates, read out of
+  `202608050076` by the guard so the two cannot drift.
+- **`getQuotaStatusCopy`**, keyed by the same `QuotaDetail` as the refusal copy,
+  so the sentence before a ceiling refuses and the sentence during a refusal
+  cannot describe two different limits.
+- **`e2e/online-ai-configuration.spec.ts`** — four authenticated journeys,
+  desktop and mobile, against the production build.
+
+### Changed
+
+- **`buildSettingsPayload` passes `ai_provider` through** instead of writing the
+  literal `"openai"`, so a save no longer discards a stored value
+  (`2O-ACTIVATION-007`). ADR-118's own alternatives routed this repair to
+  `2O-AICONFIG`'s slice. The registry row stays `future` and stays one of the
+  nine — a pass-through creates no consumer.
+- **The BYOK honesty statement gains its third clause** — *never written to a
+  log* — which `2O-AICONFIG-006` names and which was true and unsaid.
+  `byok-claims.test.ts` resolves every clause to something in the
+  implementation, and keeps refusing the operator-proof promise the architecture
+  cannot back.
+- **`removeConfirm` states what happens to entries already captured**, matching
+  the drain's **two** real behaviours: work already queued resumes by itself
+  once a key exists, and records captured without one enqueue no job and are
+  interpreted only when asked.
+- **The costs page renders a failed read as a failed read** (`2O-COST-007`).
+  `requireSupabaseData` threw, which took the whole route to the error boundary —
+  never zero, but never a partial page either. Three reads now degrade
+  independently.
+- **The costs page declares the zone its periods were computed in**
+  (`2O-COST-006`), and the quota section declares **UTC** separately, because
+  `private.utc_day_start()` is what the triggers count against.
+
+### Removed
+
+- **Two hardcoded price claims from the preferences form** (`2O-COST-005`,
+  `R-2O-18`): a hand-written `text-embedding-3-small · $0.02 / 1M` row, and a
+  whole tariff table rendered inside **every `<option>` of every model select**.
+  The second was a second copy of `ai_model_pricing` carrying neither
+  `pricing_version` nor `source_url`, while the applied price is snapshotted
+  into `ai_usage_events` on every call. The catalogue is unchanged on
+  `/app/costs`, where it is read from the table.
+
+### Fixed
+
+- **A comment in `settings/page.tsx` that asserted the opposite of the tree** —
+  it claimed `OnboardingRestore` needed no registry row after slice 2O.3 added
+  one.
+- **`TODO.md`'s active line was one slice stale**, still describing slice 2O.2
+  and 26 of 116.
+
+### Governance
+
+- **`2O-COST-003` and `2O-COST-001` close `baseline`.** The re-audit recorded in
+  §81 that `src/features/quotas/refusal.ts` had **no consumer** and that
+  `2O-COST-003` must wire it. Against `main` it has two — `capture/actions.ts`
+  and `agent/actions.ts` in three places — and the copy already names each
+  ceiling from `QUOTAS` and says when the daily windows reset. Re-asserted rather
+  than rebuilt.
+- **`capabilities.test.ts`'s exact-count assertion was re-armed, not weakened.**
+  `toHaveLength(1)` and `toBeGreaterThanOrEqual` were both refused: each is
+  satisfied by a second `uncontrolled` row nobody signed.
+- **A second armed assertion fired** in `capability-registry-guard.test.ts`; only
+  the half that expressed slice 2O.0's deliberate absence was inverted.
+- **Eleven mutations applied to the real tree, eleven fired**, each restored
+  byte-for-byte against a SHA-256 digest. Two were malformed on the first run and
+  were fixed in the harness, not in the guards.
+
 ## 2026-08-15 - PHASE 2O SLICE 2O.3 — one preferences centre, and a theme the reader owns
 
 **`2O-PREF-001` … `-015` — 14 built, 1 partial, 0 undelivered. Zero migrations

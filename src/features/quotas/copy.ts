@@ -91,6 +91,76 @@ export function getQuotaRefusalCopy(locale: Locale, detail: QuotaDetail): QuotaR
   return (locale === "pt-BR" ? ptBR : en)[detail];
 }
 
+/**
+ * The same ceilings, said **before** they refuse — `2O-COST-002`.
+ *
+ * ## One vocabulary, two voices
+ *
+ * Keyed by `QuotaDetail`, exactly like the refusal copy above, and that is the
+ * mechanism rather than tidiness: the sentence a user reads when a ceiling
+ * stops them and the row they read on Custos beforehand are the **same
+ * ceiling**, so they take the same name. A separate list of "limits" would be
+ * free to describe a limit the trigger does not enforce, which is the failure
+ * `SH-QUOTA-010` exists to prevent one layer up.
+ *
+ * The titles differ from the refusals' on purpose. *"Limite diário de registros
+ * atingido"* is a statement about something that just happened; a row on a page
+ * nobody has hit yet must not say it has been reached.
+ */
+export type QuotaStatusCopy = {
+  readonly title: string;
+  /** When the figure resets, or what frees it. Never a promise of a time it does not keep. */
+  readonly window: string;
+};
+
+const statusPtBR: Record<QuotaDetail, QuotaStatusCopy> = {
+  QUOTA_ENTRIES_PER_DAY: { title: "Registros por dia", window: "Zera à meia-noite UTC" },
+  QUOTA_LIVE_JOBS: { title: "Trabalhos na fila", window: "Libera quando terminam" },
+  QUOTA_STORAGE_BYTES: { title: "Espaço de arquivos", window: "Libera quando você remove arquivos" },
+  QUOTA_STORAGE_OBJECTS: { title: "Arquivos guardados", window: "Libera quando você remove arquivos" },
+  QUOTA_ATTACHMENTS_PER_DAY: { title: "Arquivos por dia", window: "Zera à meia-noite UTC" },
+  QUOTA_ATTACHMENTS_PER_ENTRY: { title: "Anexos por registro", window: "Vale para cada registro" },
+};
+
+const statusEn: Record<QuotaDetail, QuotaStatusCopy> = {
+  QUOTA_ENTRIES_PER_DAY: { title: "Records per day", window: "Resets at UTC midnight" },
+  QUOTA_LIVE_JOBS: { title: "Queued work", window: "Frees up as jobs finish" },
+  QUOTA_STORAGE_BYTES: { title: "File storage", window: "Frees up when you remove files" },
+  QUOTA_STORAGE_OBJECTS: { title: "Stored files", window: "Frees up when you remove files" },
+  QUOTA_ATTACHMENTS_PER_DAY: { title: "Files per day", window: "Resets at UTC midnight" },
+  QUOTA_ATTACHMENTS_PER_ENTRY: { title: "Attachments per record", window: "Applies to each record" },
+};
+
+export function getQuotaStatusCopy(locale: Locale, detail: QuotaDetail): QuotaStatusCopy {
+  return (locale === "pt-BR" ? statusPtBR : statusEn)[detail];
+}
+
+/** Chrome for the whole section, so the page holds no locale ternary of its own. */
+export const quotaSectionCopy: Record<Locale, {
+  readonly title: string;
+  readonly intro: string;
+  readonly listLabel: string;
+  readonly ofCeiling: string;
+  readonly unreadable: string;
+}> = {
+  "pt-BR": {
+    title: "Limites da conta",
+    intro:
+      "Estes são os limites que o banco de dados aplica de verdade — os mesmos números que aparecem quando uma ação é recusada. As janelas diárias viram à meia-noite UTC, e não no seu fuso.",
+    listLabel: "Limites e uso",
+    ofCeiling: "de",
+    unreadable: "Não foi possível ler este número agora.",
+  },
+  en: {
+    title: "Account limits",
+    intro:
+      "These are the limits the database really enforces — the same numbers that appear when an action is refused. Daily windows turn over at UTC midnight, not in your own zone.",
+    listLabel: "Limits and usage",
+    ofCeiling: "of",
+    unreadable: "This number could not be read right now.",
+  },
+};
+
 /** The one-line form the inline action states use. */
 export function quotaRefusalMessage(locale: Locale, detail: QuotaDetail): string {
   const copy = getQuotaRefusalCopy(locale, detail);

@@ -11,6 +11,8 @@ import {
   type AIProfilePreset,
   type TextModelId,
 } from "@/lib/ai/model-routing";
+import { AI_ROUTE_CONTRACTS, routeModelsForProfile } from "@/features/ai-config/contracts";
+import { getAiConfigCopy } from "@/features/ai-config/copy";
 import type { Locale } from "@/lib/preferences";
 import { getReviewPreferencesCopy } from "./review-preferences-copy";
 import type { SettingsFormValues } from "./settings-contracts";
@@ -27,14 +29,29 @@ function Section({ number, title, description }: { number: string; title: string
   return <div className="settings-section-heading"><span>{number}</span><div><h2>{title}</h2><p>{description}</p></div></div>;
 }
 
-function modelPrice(model: TextModelId, pt: boolean) {
-  const prices = {
-    "gpt-5.6-terra": "$2.50 in · $15 out / 1M",
-    "gpt-5.6-luna": "$1 in · $6 out / 1M",
-    "gpt-5-mini": "$0.25 in · $2 out / 1M",
-  } as const;
-  return pt ? prices[model].replace("in", "entrada").replace("out", "saída") : prices[model];
-}
+/*
+ * `modelPrice` was here, and `2O-COST-005` is why it is not.
+ *
+ * It held a hardcoded tariff per model — `$2.50 in · $15 out / 1M` and two more
+ * — rendered inside every `<option>` of every model select. Three problems, and
+ * the third is the one that makes it a defect rather than a preference:
+ *
+ * 1. It **states a price before the call**, which is what `R-2O-18` refuses:
+ *    prices are provider facts recorded at call time.
+ * 2. It is a **second copy** of `ai_model_pricing`, carrying neither
+ *    `pricing_version` nor `source_url`, so it could not be audited and could
+ *    not be told apart from the real one by a reader.
+ * 3. It could **silently disagree with what is actually charged**. The applied
+ *    price is snapshotted into `ai_usage_events` on every call; this literal was
+ *    updated by hand or not at all. This repository has paid for a hand-kept
+ *    copy of a vocabulary before — `product_events`' writer list froze and
+ *    refused newer events for weeks, and nobody noticed.
+ *
+ * The catalogue is **not** removed from the product: `/app/costs` renders it
+ * from `ai_model_pricing` with its version and its source URL, and the routing
+ * block already links there. So this deletes a claim the form could not back and
+ * keeps the one the product can.
+ */
 
 function ModelSelect({
   id,
@@ -42,7 +59,6 @@ function ModelSelect({
   label,
   description,
   value,
-  pt,
   onChange,
 }: {
   id: string;
@@ -50,7 +66,8 @@ function ModelSelect({
   label: string;
   description: string;
   value: TextModelId;
-  pt: boolean;
+  // `pt` left with `modelPrice`: the only locale-dependent text in this control
+  // was the tariff's "in"/"out", and the option is now just the model's name.
   onChange: (route: TextRouteKey, model: TextModelId) => void;
 }) {
   /**
@@ -70,7 +87,7 @@ function ModelSelect({
     </span>
     <span className="ai-route-control">
       <select aria-describedby={`${id}-description`} id={id} name={name} value={value} onChange={(event) => onChange(name, event.target.value as TextModelId)}>
-        {TEXT_MODEL_IDS.map((model) => <option key={model} value={model}>{TEXT_MODEL_LABELS[model]} · {modelPrice(model, pt)}</option>)}
+        {TEXT_MODEL_IDS.map((model) => <option key={model} value={model}>{TEXT_MODEL_LABELS[model]}</option>)}
       </select>
     </span>
   </div>;
@@ -165,6 +182,10 @@ export function SettingsForm({
 
   const zones = getTimeZoneOptions(locale, values.timezone);
   const reviews = getReviewPreferencesCopy(locale);
+  // Shared with `AiConfigSection`, deliberately: the form and the statement
+  // below it must call the same route by the same name, or the page describes
+  // one product in two vocabularies.
+  const aiConfig = getAiConfigCopy(locale);
   const [aiProfile, setAIProfile] = useState<AIRoutingProfile>(values.aiProfile);
   const [routes, setRoutes] = useState<VisibleAIRoutes>({
     chatModel: values.chatModel,
@@ -275,11 +296,35 @@ export function SettingsForm({
         <fieldset className="ai-profile-fieldset"><legend>{pt ? "Perfil de custo e qualidade" : "Cost and quality profile"}</legend><div className="ai-profile-grid">{profiles.map((profile) => <label key={profile.id} className={`ai-profile-card${aiProfile === profile.id ? " active" : ""}`}><input type="radio" name="aiProfile" value={profile.id} checked={aiProfile === profile.id} onChange={() => chooseProfile(profile.id)} /><span><strong>{profile.title}</strong><small>{profile.description}</small></span></label>)}</div></fieldset>
 
         <div className="ai-routes"><div className="ai-routes-heading"><span>{pt ? "ROTEAMENTO POR FUNÇÃO" : "ROUTING BY FUNCTION"}</span><p>{pt ? "Somente funções com execução comprovada aparecem aqui." : "Only functions with proven execution appear here."}</p><Link href={`/${locale}/app/costs`}>{pt ? "Ver custos de IA" : "View AI costs"}</Link></div>
-          <ModelSelect id="chat-model" name="chatModel" label={pt ? "Chat principal" : "Main chat"} description={pt ? "Respostas, contexto e conversa do dia a dia." : "Answers, context, and daily conversation."} value={routes.chatModel} pt={pt} onChange={changeRoute} />
-          <ModelSelect id="extraction-model" name="extractionModel" label={pt ? "Captura e organização" : "Capture and organization"} description={pt ? "Classifica entradas e extrai tarefas, pessoas e datas." : "Classifies entries and extracts tasks, people, and dates."} value={routes.extractionModel} pt={pt} onChange={changeRoute} />
-          <ModelSelect id="review-model" name="reviewModel" label={pt ? "Revisões e resumos" : "Reviews and summaries"} description={pt ? "Revisões geradas manualmente a partir dos seus registros." : "Reviews generated on demand from your records."} value={routes.reviewModel} pt={pt} onChange={changeRoute} />
-          <ModelSelect id="file-model" name="fileModel" label={pt ? "Análise de arquivos" : "File analysis"} description={pt ? "Imagens, PDFs, documentos e planilhas." : "Images, PDFs, documents, and spreadsheets."} value={routes.fileModel} pt={pt} onChange={changeRoute} />
-          <div className="ai-route ai-route-fixed"><span className="ai-route-copy"><strong>{pt ? "Busca semântica" : "Semantic search"}</strong><small>{pt ? "Informativo: o modelo fixo encontra memórias relacionadas e não é configurável." : "Informational: the fixed model finds related memories and is not configurable."}</small></span><span className="embedding-chip">text-embedding-3-small · $0.02 / 1M</span></div>
+          <ModelSelect id="chat-model" name="chatModel" label={pt ? "Chat principal" : "Main chat"} description={pt ? "Respostas, contexto e conversa do dia a dia." : "Answers, context, and daily conversation."} value={routes.chatModel} onChange={changeRoute} />
+          <ModelSelect id="extraction-model" name="extractionModel" label={pt ? "Captura e organização" : "Capture and organization"} description={pt ? "Classifica entradas e extrai tarefas, pessoas e datas." : "Classifies entries and extracts tasks, people, and dates."} value={routes.extractionModel} onChange={changeRoute} />
+          <ModelSelect id="review-model" name="reviewModel" label={pt ? "Revisões e resumos" : "Reviews and summaries"} description={pt ? "Revisões geradas manualmente a partir dos seus registros." : "Reviews generated on demand from your records."} value={routes.reviewModel} onChange={changeRoute} />
+          <ModelSelect id="file-model" name="fileModel" label={pt ? "Análise de arquivos" : "File analysis"} description={pt ? "Imagens, PDFs, documentos e planilhas." : "Images, PDFs, documents, and spreadsheets."} value={routes.fileModel} onChange={changeRoute} />
+          {/*
+            `2O-COST-004` and `2O-AICONFIG-005`. The routes the chosen profile
+            **also writes** and the form has no control for.
+
+            This replaces a hand-written row that named one of the three and
+            carried the literal `$0.02 / 1M` beside it. That price was a second
+            copy of a provider fact — `ai_model_pricing` is where the applied
+            price lives, and the catalogue on Custos renders it from there — so
+            it could drift from what is actually charged while looking
+            authoritative. `2O-COST-005` and `R-2O-18` make prices facts recorded
+            at call time, and a tariff typed into a settings form is neither.
+
+            Derived from `AI_ROUTE_CONTRACTS`, so a route that gains or loses a
+            consumer changes this list without anyone editing it, and the model
+            shown is the one the preset will save — which is what makes the
+            statement true *before* the save rather than after.
+          */}
+          <div className="ai-routes-fixed">
+            <p className="ai-routes-fixed-intro">{aiConfig.profileIntro}</p>
+            {AI_ROUTE_CONTRACTS.filter((route) => route.disposition !== "controlled").map((route) => {
+              const preset = aiProfile === "custom" ? null : routeModelsForProfile(aiProfile);
+              const model = preset?.[route.column] ?? route.fallbackModel;
+              return <div key={route.column} className="ai-route ai-route-fixed"><span className="ai-route-copy"><strong>{aiConfig.routes[route.column].name}</strong><small>{aiConfig.dispositions[route.disposition]}</small></span>{model ? <span className="embedding-chip">{model}</span> : null}</div>;
+            })}
+          </div>
         </div>
       </div>
     </details>
