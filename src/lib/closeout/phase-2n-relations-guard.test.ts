@@ -94,7 +94,7 @@ describe("2N-RELATION-003: this slice persists nothing and infers nothing", () =
      */
     expect(migrations.filter((file) => /phase_2n_slice_6/i.test(file))).toEqual([]);
     // The phase's ceiling, restated where a slice could break it.
-    expect(migrations).toHaveLength(96);
+    expect(migrations).toHaveLength(97);
   });
 
   it("mutation control: the narrowed migration scan still refuses this slice's own", () => {
