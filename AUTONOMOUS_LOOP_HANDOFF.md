@@ -6669,3 +6669,184 @@ all four surfaces it must *mount rather than reimplement* are present —
 `byok/credential-panel.tsx`, `profile/settings-form.tsx`, `capture/actions.ts`
 and the activation contract slice 2O.0 delivered. Its two declared dependencies,
 2O.0 and 2O.1, are both merged with CI green on their merge SHAs.
+
+## §79 — Slice 2O.2 ships, and running the browser proof found a step that can never be pending (2026-08-15)
+
+PR **#233**, merged at **`37d1661`**; head at merge **`0f39876`**, **CI green on
+both** — all three job families on the head and on the merge SHA. `main` local
+equals `origin/main` at `37d1661`, worktree clean, no open PR.
+
+**`2O-ONBOARD-001` … `-011` — 10 `built`, 1 `partial`, 0 `undelivered`. Zero
+migrations created. 94 local = 94 hosted, parity `202608140094`. Signup closed.
+Rollout gate 25 · 3 · 2. CSP unchanged. `embedding_model` untouched. A13 not
+retargeted.**
+
+**26 of 116 requirements delivered.** Slices 2O.0, 2O.1 and 2O.2; six remain.
+
+### The instruction that arrived incomplete, and what was used instead
+
+The resumption prompt this session was told to treat as governing **was never
+pasted** — the message carried the placeholder. It is also **not recoverable
+from the repository**: §78 ends at *"Where this stops"* and contains no such
+text. What was used instead is §78's own designation of the next unit, plus the
+loop and the constraints the operator's message did carry. Recorded because the
+next reader will otherwise look for a document that does not exist. **If a
+resumption prompt is meant to survive, it belongs in the handoff.**
+
+### What a new account met before this
+
+Nothing. There was no onboarding anywhere in the tree — a first sign-in landed
+on the cockpit, and the owner discovered the capture box, the credential panel
+and the confirmation queue by exploration.
+
+`/app` now renders **seven ordered steps**, below the composer and never in
+front of it.
+
+### Seven steps, five of which are activation facts
+
+`2O-ONBOARD-002` requires the path to render from `2O-ACTIVATION-001`'s ordered
+facts, and that contract declares **exactly five**. `2O-ONBOARD-004` asks for an
+assistant-identity step and `-008` for a first-memory step, and **neither is one
+of the five**.
+
+They were added **as steps, not as facts**. Widening `activationFacts` would
+change a contract slice 2O.0 delivered — on a requirement that never asked for
+it — and every future consumer would inherit two facts it has no use for. What
+`-002` actually demands is asserted directly: `pathMirrorsActivationOrder`
+checks the five appear in the path in exactly activation's order, with **a
+planted reordering and a planted deletion** proving it can fail.
+
+### Running the browser proof is what found the real defect
+
+**`2O-ACTIVATION-001`'s first fact can never be false.** `profiles.locale` and
+`profiles.timezone` are `not null` with defaults
+(`202607160001_phase1_identity.sql:11-12`) and `handle_new_user` creates the
+row, so *locale and timezone set* is true from the moment an account exists. The
+authenticated journey reported **one satisfied step on a brand-new account** and
+I had asserted zero. Slice 2O.0's read is correct for what the requirement says;
+the consequence only becomes visible when something renders it.
+
+Three responses, and the third was taken. *Change the shipped fact* —
+**declined**, it reinterprets a requirement whose word is *set* and alters a
+contract another guard holds. *Derive the step a second way inside the path* —
+**declined as the worse option**, because the path would say "pending" while
+activation says satisfied, which is the disagreement `-002` forbids, and
+comparing against the defaults would leave **a Brazilian owner in São Paulo
+unable to satisfy it** — those defaults are *correct* for most of this product's
+users, not merely tolerable. *Carry the fact through unchanged and classify
+`2O-ONBOARD-003` `partial`* — **taken**, with the remainder named and a
+destination.
+
+**Not a stop condition.** ADR-118 Decision 9's last clause covers a requirement
+that *contradicts another in a way that changes the product*; these two are
+consistent as written, and the outcome is a shortfall to classify rather than a
+contradiction to escalate. It is recorded so the owner can decide otherwise for
+the price of one form field.
+
+### Dismissal is a cookie, and the cost is stated rather than discovered
+
+A column is forbidden absolutely — `OD-2O-3` **A** makes `2O-ACTIVATION-002`
+absolute and ADR-118 Decision 9 makes onboarding-needing-persistence a **stop
+condition** — so dismissal is per-browser state and the only question was which
+kind. `localStorage` with a pre-paint script was **declined**: it is `OD-2O-2`
+**A**'s machinery for the *appearance* preference, and it would import a CSP
+question (`R-2O-27`) that a cookie never raises. `httpOnly` also makes it
+strictly safer than the alternative `R-2O-28` had to treat as
+attacker-controlled.
+
+**The cost: dismissal does not follow the account across devices, and on a
+shared browser it is shared** — the same cost ADR-116 Decision 8 stated for the
+appearance choice. **The path's progress does follow**, because it is derived,
+and the journey proves it in a second browser context with no cookies at all.
+
+### The plan's second risk, answered in its strongest form
+
+Not *"the right action is called"* but **the feature writes nothing at all**: no
+write verb on any `.from(…)` chain, no `.rpc(`, and no import of
+`updateProfile`, `saveAiCredential` or `captureEntry`. Guarded with planted
+violations in both directions — including a control proving the dismissal
+cookie's own `delete` is **not** a domain write, which the first version of that
+guard got wrong and would have made `2O-ONBOARD-010` unimplementable.
+
+### Six mistakes, two of which only the browser could find
+
+1. **A test that claimed to prove a structurally unreachable branch.** The
+   credential step precedes everything that needs a credential, so `nextStep` can
+   never be *offered* a blocked step and the refusal never changes the answer.
+   Replaced by the real property — **exhaustive over 2187 combinations**, with
+   both non-vacuity checks — plus the **structural assertion** that would fail if
+   a future step were inserted where the refusal became load-bearing.
+2. **The guard read `jar.delete()` as a domain write.**
+3. **A second `role="status"` on a page that already had one.** Removing it was
+   right on the merits: the notice renders *with* the page, so it announces
+   nothing.
+4. **A test file that reported 0 tests while the summary said nothing failed** —
+   `home-resilience.test.tsx`, on `server-only`. The silent shape this repository
+   has been bitten by. It now mocks the loader and has the non-vacuity assertion
+   it lacked.
+5. **The journey asserted a number I assumed rather than the product's answer**
+   (above).
+6. **A journey that waited for a click instead of its effect.** Fixed by waiting
+   for the reversal control to disappear — which *is* the action landing, and
+   asserts that property at the same time instead of spending a timeout.
+
+### One interpretation, recorded rather than left to be noticed
+
+`2O-ONBOARD-005` says *mounting* the existing credential panel. The step
+**links** to `/app/settings`, where that panel is deliberately first on the page.
+The family's consistent concern is the second half of each of its sentences —
+*no second write path*, *not by reimplementing it*, *using the existing surface*
+— and linking satisfies it in the strongest form. Embedding was declined for
+three reasons, none of them convenience: a secret input on the cockpit, two
+extra reads on the busiest page, and two mount points for one credential form.
+**Reversing it costs one component move.**
+
+### Carried, unabsorbed, with destinations
+
+- **`2O-ONBOARD-003`'s remainder** — the path never asks for locale and timezone,
+  because the fact cannot be false → **slice 2O.3**.
+- **`defaultAgentPreferences.tone` is `direct` while the column defaults to
+  `informal`.** Latent — no product path reads that field, its live consumers are
+  `timezone` and `agentName` — but deriving the identity step from it would have
+  read a brand-new account as already personalised → **slice 2O.3**.
+- **Slice 2O.1 negotiates the entry locale and writes nothing**, so an account
+  created from an English browser still carries `pt-BR` in `profiles` →
+  **slice 2O.3**.
+- **`ai_provider` and `embedding_model` written as literals** by
+  `buildSettingsPayload` → **slice 2O.4**. ADR-117 forbids touching
+  `embedding_model`.
+- **`scheduled_reviews`'s final wording and `visible` value** → `2O-PREF-004`,
+  slice 2O.3.
+- Every Phase 2N residual `OD-2O-11` declined, unchanged and unclaimed; push
+  still failing with HTTP 403 on a real iPhone and **never executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**.
+
+### The re-audit of slice 2O.3, done and recorded
+
+**Every premise holds against `37d1661`.** `'unsafe-inline'` is in `script-src`
+(`next.config.ts:37`), so `2O-PREF-014`'s inline script needs **no CSP change** —
+read from the tree, not assumed. `csp.test.ts`, `mobile-reachability-guard.test.ts`
+and the `/app/reviews` schedule copy all exist and are guarded. `AccountMenu`
+mounts in exactly two files. `features/transparency/` carries the Dados e IA
+pattern to generalize. `/app/notifications` and `/[locale]/account/delete` exist.
+
+**`localStorage` is still used nowhere**, so `2O-PREF-014` remains the first use
+in this repository — slice 2O.2's dismissal is a cookie and deliberately did not
+take that ground.
+
+**One obligation slice 2O.2 creates for 2O.3, recorded so it is a decision and
+not an oversight.** `OnboardingRestore` now renders on `/app/settings`, and
+`2O-PREF-008` says *every control in the centre is backed by a
+`capabilityRegistry` row*. The current guard **does not reach it** — verified:
+direction B scans `src/features/profile/settings-form.tsx` only, by `name=`
+attributes mapped to columns, and this control governs no column. So 2O.3 must
+either give it a `columns: []` row, as `home_status` and `manual_reviews` have,
+or record why it is outside `-008`'s scope.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.3 — one
+preferences centre** (`2O-PREF-001` … `-015`, fifteen requirements, no migration,
+since `OD-2O-2` **A** is what removed it). Its re-audit against `37d1661` is
+above. It is the largest slice attempted so far and it restructures navigation,
+so it was **not started** rather than started and abandoned mid-way.
