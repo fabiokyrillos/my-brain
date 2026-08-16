@@ -104,7 +104,7 @@ CSP change. `embedding_model` untouched. Signup untouched.**
 
 ---
 
-## 3. The three decisions this slice had to take, and what each declined
+## 3. The four decisions this slice had to take, and what each declined
 
 ### 3.1 Seven steps, five of which are activation facts
 
@@ -162,6 +162,28 @@ default**, re-read from the migration by a guard.
 **The residual, stated:** an owner who deliberately wants every default never
 satisfies this step, and their exit is `2O-ONBOARD-010`'s dismissal. The only
 alternative is a stored *"I saw this"* flag, which is forbidden absolutely.
+
+### 3.4 A step *reaches* the existing surface rather than embedding it, and that is an interpretation
+
+`2O-ONBOARD-005` says the path offers AI configuration **by mounting the
+existing credential panel, not by reimplementing it**. A step that links to
+`/app/settings`, where that panel is deliberately the first thing on the page,
+is not literally a mount. **Stated here rather than left for a reader to
+notice.**
+
+The family's consistent concern is the second half of every one of its
+sentences: `-004` says *"the same Server Action and the same schema — no second
+write path"*, `-005` says *"not by reimplementing it"*, `-007` says *"using the
+existing selective-confirmation surface"*. Linking satisfies that concern in its
+strongest form — there is no second implementation to keep in sync, and the
+guard asserts the feature renders no password input and re-mounts no panel.
+
+**Embedding was declined** for three reasons, none of them convenience: it puts
+a secret input on the cockpit; it makes the busiest page in the product load
+credential metadata and a pending-entry count on every render; and two mount
+points for one credential form is the beginning of the drift `-005` exists to
+prevent. **Reversing this costs one component move**, and the owner may prefer
+it.
 
 ---
 
@@ -284,7 +306,7 @@ property at the same time, instead of spending a timeout.
 | `-002` rendered from the activation facts | **built** | the view calls `loadActivationProgress`; `pathMirrorsActivationOrder` with two planted failures |
 | `-003` asked at the point it matters, never again once set | **partial** | the *never again once set* half is built and asserted in both locales (a satisfied step renders its state and **no action**, with the unsatisfied case proving the absence means something). **The remainder: the path never asks at all**, because `profiles.locale` and `profiles.timezone` are `not null` with defaults and `handle_new_user` creates the row, so `2O-ACTIVATION-001`'s first fact is true from the moment the account exists. **Destination: slice 2O.3** — see §4.5 |
 | `-004` identity through the same action and schema | **built** | the step links to `settings-form.tsx`; the feature imports `updateProfile` nowhere, and writes nothing anywhere |
-| `-005` mount the existing credential panel | **built** | the step resolves through `byokSettingsHref`; the feature renders no password input and re-mounts no panel |
+| `-005` mount the existing credential panel | **built**, on the interpretation recorded at §3.4 | the step resolves through `byokSettingsHref` — the same route the `awaiting_ai_configuration` recovery uses — and the feature renders no password input and re-mounts no panel. It **reaches** the panel rather than embedding it; the declined alternative and its cost are at §3.4 |
 | `-006` a first capture that does not block | **built** | copy states the words are stored before any model runs and control returns immediately; asserted in both locales |
 | `-007` review through the existing surface | **built** | the step reaches `/app/inbox`; copy states nothing is created without the owner's act |
 | `-008` a first task and a first memory, each optional | **built** | two steps, each reaching an existing route, each skippable — every step is |
