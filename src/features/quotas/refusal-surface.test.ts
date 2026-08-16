@@ -60,11 +60,13 @@ const SOURCES = productSources();
 describe("2O-COST-003: the refusal module has real consumers", () => {
   it("is called from product code, not only from its own test", () => {
     const callers = SOURCES.paths.filter(
-      (path, index) =>
+      (path) =>
+        // The module's own directory is excluded: `copy.ts` imports the type and
+        // the module defines the function, and neither is a consumer. A caller
+        // outside it is what makes `2O-COST-003` true of the product rather than
+        // of the feature folder.
         !path.startsWith("src/features/quotas/") &&
-        SOURCES.text.split("\n").length > 0 &&
-        readFileSync(join(REPO, path), "utf8").includes("quotaRefusal(") &&
-        index >= 0,
+        readFileSync(join(REPO, path), "utf8").includes("quotaRefusal("),
     );
     expect(callers.sort()).toEqual([
       "src/features/agent/actions.ts",
