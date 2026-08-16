@@ -74,6 +74,36 @@ export const capabilityRegistry = [
   { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"], controls: [] },
   { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true, columns: ["quiet_start", "quiet_end", "max_followups_per_day", "important_reminder_override"], controls: [] },
   { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"], controls: [] },
+  /*
+   * `2O-AICONFIG-004`, and the row ADR-117 was written to make possible.
+   *
+   * It sits directly below `ai_routing` on purpose: those five columns have
+   * consumers **and** controls, this one has consumers and **no authorized
+   * control**, and putting the two rows apart would hide the only asymmetry in
+   * the product's model routing.
+   *
+   * `uncontrolled` is the state `2O-ACTIVATION-006` added and slice 2O.3 left
+   * with no subject. It says the true thing and refuses the two false ones:
+   * **not** `future`, which would claim no consumer when there are four
+   * behavioural readers; **not** `operational`, which would imply the owner can
+   * change it. `consumerEvidence` is what makes the first refusal enforceable —
+   * `2O-ACTIVATION-005`'s tree-derived guard fails a row claiming a consumer
+   * that does not exist, and `capabilities.test.ts` fails an `uncontrolled` row
+   * claiming none at all.
+   *
+   * `visible: false`, and that is the requirement rather than a choice.
+   * `CapabilitySummary` renders *what these preferences change* — a list of
+   * things the owner can act on — and this is precisely the one they cannot.
+   * Where it **is** said is `AiConfigSection`, which states the disposition
+   * without offering an input, because `2O-AICONFIG-004` asks for a record and
+   * `R-2O-13b` forbids the control.
+   *
+   * `columns: ["embedding_model"]` anchors it, and the column itself is
+   * untouched: ADR-117 Decision 4 forbids removing, altering, renaming,
+   * re-defaulting or migrating it, and this row is the whole of what this phase
+   * does about it.
+   */
+  { key: "embedding_route", state: "uncontrolled", surface: "settings", consumerEvidence: ["chat/actions", "memories/actions", "operations/actions", "process-jobs/entry"], visible: false, columns: ["embedding_model"], controls: [] },
   // Slice F1 gave it an input and consumers, so it stops being `future`. The
   // evidence is the accessor plus the surfaces that read through it — this row
   // is the honest record of that, and it was honest before, when it said the
@@ -130,9 +160,15 @@ export const capabilityRegistry = [
    *
    * `privacy_preferences`, `quiet_periods` and `avatar_path` have zero
    * references outside the generated types. `ai_provider` is written on every
-   * save — `buildSettingsPayload` sends the literal `"openai"` — and read by
-   * nothing, which is inertness with a write path rather than inertness without
-   * one, and is still no consumer.
+   * save and read by nothing, which is inertness with a write path rather than
+   * inertness without one, and is still no consumer.
+   *
+   * **The write changed in slice 2O.4 and the state did not.** It used to send
+   * the literal `"openai"`; `2O-AICONFIG` repaired that to a pass-through, so a
+   * save no longer discards a stored value. That is `2O-ACTIVATION-007`'s *"no
+   * save wipes a value"*, and it creates **no** consumer — nothing reads the
+   * column before or after — so this row stays `future` with empty evidence and
+   * stays one of the nine.
    */
   { key: "privacy_preferences", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_preferences"], controls: [] },
   { key: "quiet_periods", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["quiet_periods"], controls: [] },

@@ -142,6 +142,15 @@ describe("navigation capabilities", () => {
       { key: "response_style", state: "operational", visible: true },
       { key: "quiet_hours", state: "operational", visible: true },
       { key: "ai_routing", state: "advanced", visible: true },
+      /*
+       * `2O-AICONFIG-004`, and the state's first real subject.
+       *
+       * Directly below `ai_routing`, which is the only other row about model
+       * routing and the one that has controls. Four behavioural readers and no
+       * authorized control is exactly what `uncontrolled` was added to say, and
+       * ADR-117 Decision 1 made that reading the owner's rather than an agent's.
+       */
+      { key: "embedding_route", state: "uncontrolled", visible: false },
       { key: "identity_names", state: "operational", visible: true },
       { key: "locale_preference", state: "future", visible: false },
       /*
@@ -251,20 +260,63 @@ describe("navigation capabilities", () => {
     })).toHaveLength(1);
   });
 
-  it("records that `uncontrolled` is currently empty, and where its next row comes from", () => {
+  /**
+   * `uncontrolled` has its subject — the re-arming slice 2O.3 demanded.
+   *
+   * *(Inverted by `2O-AICONFIG-004`, and kept rather than deleted.)* The prior
+   * form asserted the state was **empty** and named where its next row would
+   * come from. It fired the moment `embedding_route` was added, which is
+   * precisely what it was written to do: slice 2O.3 chose an exact count over a
+   * loose one **so that whoever added the row could not do it without noticing**,
+   * and §81 recorded that the correct response is to re-arm the claim
+   * deliberately rather than weaken it.
+   *
+   * *Superseded form, retained: "records that `uncontrolled` is currently empty,
+   * and where its next row comes from" —* `expect(states.filter((state) => state
+   * === "uncontrolled")).toEqual([])`.
+   *
+   * Weakening it was the alternative and would have looked like
+   * `toHaveLength(1)` or a `toBeGreaterThanOrEqual`. Both are satisfied by a
+   * second `uncontrolled` row that nobody signed, and ADR-117 authorized exactly
+   * one. The count stays exact and now names its member, so a row added without
+   * an owner decision still fails here.
+   */
+  it("holds `uncontrolled` at exactly the one row ADR-117 authorized", () => {
+    const uncontrolled = capabilityRegistry.filter(
+      (item) => (item.state as ProductCapabilityState) === "uncontrolled",
+    );
+    expect(uncontrolled.map((item) => item.key)).toEqual(["embedding_route"]);
+    expect(uncontrolled.flatMap((item) => item.columns)).toEqual(["embedding_model"]);
+    // The row says the true thing rather than either false one: it names real
+    // consumers (not `future`'s "none") and offers no control (not
+    // `operational`'s "yours to change").
+    expect(uncontrolled[0]!.consumerEvidence.length).toBeGreaterThan(0);
+    expect(uncontrolled[0]!.visible).toBe(false);
+    expect(uncontrolled[0]!.controls).toEqual([]);
+    expect(capabilityRegistry.length).toBeGreaterThan(15);
+  });
+
+  it("re-arms the non-vacuity the exact count was protecting", () => {
     /*
-     * Stated rather than left to be discovered. The state has no user until
-     * `2O-AICONFIG-004` gives `embedding_model` its row in slice 2O.4, where
-     * ADR-117 requires exactly this wording — *real consumers, no authorized
-     * control*, never "no consumer", which would be false, and never "inert",
-     * which it is not.
+     * The claim that had to be re-armed, and it is stronger than the one it
+     * replaces rather than merely different.
      *
-     * An exact count, so adding that row fails here and whoever adds it has to
-     * come back and re-arm the non-vacuity claim deliberately.
+     * While the state was empty, `stateInvariantFailures`'s `uncontrolled`
+     * branch could only be exercised by **planted** rows — the test below this
+     * one. It now has a real subject, so the branch is exercised by the shipped
+     * registry, and this asserts that rather than assuming it.
      */
-    const states = capabilityRegistry.map((item) => item.state as ProductCapabilityState);
-    expect(states.filter((state) => state === "uncontrolled")).toEqual([]);
-    expect(states.length).toBeGreaterThan(15);
+    const real = capabilityRegistry.filter(
+      (item) => (item.state as ProductCapabilityState) === "uncontrolled",
+    );
+    expect(real.length).toBeGreaterThan(0);
+    for (const capability of real) {
+      expect(stateInvariantFailures(capability), capability.key).toEqual([]);
+    }
+    // And the branch still fails on a real registry row mutated to lie, which
+    // is what proves the pass above is not the invariant having gone quiet.
+    expect(stateInvariantFailures({ ...real[0]!, consumerEvidence: [] })).toHaveLength(1);
+    expect(stateInvariantFailures({ ...real[0]!, visible: true })).toHaveLength(1);
   });
 
   it("derives the nine consumer-less columns `2O-ACTIVATION-007` names", () => {

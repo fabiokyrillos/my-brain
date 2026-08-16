@@ -92,14 +92,14 @@ const ptBR: ByokCopy = {
     intro:
       "Os recursos de IA usam a sua própria chave da OpenAI. O uso é cobrado diretamente na sua conta da OpenAI.",
     honesty:
-      "A chave é guardada criptografada e nunca é exibida novamente. Remover é imediato no sistema ativo; cópias de backup expiram no prazo do provedor.",
+      "A chave é guardada criptografada e nunca é exibida novamente. Depois de salva, ela não volta para o navegador e não é escrita em nenhum log. Remover é imediato no sistema ativo; cópias de backup expiram no prazo do provedor.",
     fieldLabel: "Chave da API",
     fieldHint: "Cole a chave. Ela é validada com uma chamada mínima antes de ser salva.",
     save: "Salvar chave",
     rotate: "Substituir chave",
     remove: "Remover chave",
     removeConfirm:
-      "Remover a chave desativa os recursos de IA até que você configure outra. Continuar?",
+      "Remover a chave desativa os recursos de IA até que você configure outra. Nada é apagado: os registros já capturados continuam salvos, com as interpretações que já tiverem. Os registros capturados sem chave ficam aguardando e só são interpretados quando você pedir; o que já estava na fila volta a andar sozinho assim que houver uma chave nova. Continuar?",
     statusConfigured: "Configurada",
     statusInvalid: "Recusada pelo provedor",
     statusAbsent: "Nenhuma chave configurada",
@@ -145,14 +145,14 @@ const en: ByokCopy = {
     intro:
       "The AI features use your own OpenAI key. Usage is billed directly to your OpenAI account.",
     honesty:
-      "The key is stored encrypted and is never shown again. Removal is immediate in the live system; backups age out on the provider's schedule.",
+      "The key is stored encrypted and is never shown again. Once saved it does not come back to the browser and is never written to a log. Removal is immediate in the live system; backups age out on the provider's schedule.",
     fieldLabel: "API key",
     fieldHint: "Paste the key. It is validated with one minimal call before it is saved.",
     save: "Save key",
     rotate: "Replace key",
     remove: "Remove key",
     removeConfirm:
-      "Removing the key turns off the AI features until you configure another one. Continue?",
+      "Removing the key turns off the AI features until you configure another one. Nothing is deleted: records you already captured stay saved, with whatever interpretation they already have. Records captured without a key wait and are interpreted only when you ask; anything already queued resumes on its own as soon as a new key exists. Continue?",
     statusConfigured: "Configured",
     statusInvalid: "Rejected by the provider",
     statusAbsent: "No key configured",

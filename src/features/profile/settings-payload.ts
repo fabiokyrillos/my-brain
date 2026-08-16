@@ -76,7 +76,30 @@ export function buildSettingsPayload(input: ProfileInput, snapshot: SettingsPers
       importantReminderOverride: input.importantReminderOverride,
       maxFollowupsPerDay: input.maxFollowupsPerDay,
       responseDetail: input.responseDetail,
-      aiProvider: "openai",
+      /*
+       * `2O-ACTIVATION-007`'s *"no save wipes a value"*, made true for this
+       * column — carried from slice 2O.0 and repaired here.
+       *
+       * It was the literal `"openai"`, so every save overwrote whatever the row
+       * held. Nothing reads the column, so nothing behaved differently today —
+       * but *today* is not the guarantee the requirement asks for, and a write
+       * that discards a stored value is the defect whether or not anyone has
+       * noticed the loss yet. It now matches every other consumer-less column on
+       * this payload: pass the stored value through, and fall back only when
+       * there is nothing to pass.
+       *
+       * **Repairing it here rather than in 2O.0 is ADR-118's own routing.** Its
+       * alternatives rejected *"correct `ai_provider`'s hardcoded write while
+       * cataloguing it"* because the finding *"belongs to `2O-AICONFIG`'s
+       * slice"*. This is that slice.
+       *
+       * `embedding_model` below is the same shape and is **deliberately not
+       * touched**: ADR-117 Decision 4 forbids removing, altering, renaming,
+       * re-defaulting or migrating it, and passing a stored value through where
+       * a literal stands today is a change to how the column is written. The
+       * shortfall stays named rather than absorbed.
+       */
+      aiProvider: current?.ai_provider ?? "openai",
       aiProfile: input.aiProfile,
       chatModel: preset?.chatModel ?? input.chatModel,
       extractionModel: preset?.extractionModel ?? input.extractionModel,

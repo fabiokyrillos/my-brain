@@ -471,12 +471,53 @@ describe("2O-ACTIVATION-007: the nine consumer-less columns are recorded and unc
     expect(form).not.toContain("planningTime");
   });
 
-  it("keeps `embedding_model` out of the nine, because it has six consumers", () => {
-    // `R-2O-13b` / ADR-117. It is **not** consumer-less, so recording it here
-    // would be the false claim the ADR forbids. Its row is `2O-AICONFIG-004`'s
-    // work in slice 2O.4 and is deliberately absent from this slice.
+  /**
+   * `2O-AICONFIG-004` delivers the row, and the half that mattered is unchanged.
+   *
+   * *(Inverted in part by slice 2O.4, and kept rather than deleted.)* Two things
+   * were asserted here, and only one of them was about `R-2O-13b`.
+   *
+   * **`embedding_model` is still not one of the nine**, and that is the claim
+   * ADR-117 forbids getting wrong: it has four behavioural readers, so recording
+   * it as consumer-less would be the false statement. That assertion is
+   * untouched below.
+   *
+   * The second — *"no row names it at all"* — expressed slice 2O.0's deliberate
+   * **absence**, and `2O-ACTIVATION-006` said in as many words that the row was
+   * `2O-AICONFIG-004`'s. It is now satisfied rather than broken, so it inverts:
+   * the row must exist, must be `uncontrolled`, and must still be outside the
+   * nine.
+   *
+   * *Superseded form, retained:* `expect(capabilityRegistry.flatMap((item) =>
+   * item.columns)).not.toContain("embedding_model")`.
+   */
+  it("gives `embedding_model` its row and still keeps it out of the nine", () => {
+    // Unchanged, and the reason it is unchanged: `consumerlessPreferenceColumns`
+    // derives from `future` + no evidence, and this column has readers.
     expect(consumerlessPreferenceColumns).not.toContain("embedding_model");
-    expect(capabilityRegistry.flatMap((item) => item.columns)).not.toContain("embedding_model");
+
+    const row = capabilityRegistry.find((item) =>
+      (item.columns as readonly string[]).includes("embedding_model"),
+    );
+    expect(row, "`2O-AICONFIG-004` requires a row recording why there is no control").toBeDefined();
+    expect(row!.state).toBe("uncontrolled");
+    expect(row!.visible, "a row for a column nobody can change is not a rendered promise").toBe(false);
+    expect(row!.controls, "`R-2O-13b` forbids a control").toEqual([]);
+    expect(row!.consumerEvidence.length, "never `no consumer`, which would be false").toBeGreaterThan(0);
+  });
+
+  it("offers no input for `embedding_model` anywhere in the preferences centre", () => {
+    /*
+     * `R-2O-13b`, asserted against the rendered form rather than against the
+     * registry, because the registry is what the row *says* and this is what the
+     * page *does*. The same shape `planning_day` and `planning_time` are held to
+     * one test above.
+     */
+    for (const path of [PREFERENCES_FORM, "src/app/[locale]/app/settings/page.tsx"]) {
+      const source = readFileSync(join(REPO, path), "utf8");
+      expect(source, `${path} renders an embedding control`).not.toMatch(/name="embeddingModel"/);
+      expect(source, `${path} names the column`).not.toContain("embedding_model");
+    }
   });
 
   it("does not remove, rename or re-default the column ADR-117 protects", () => {

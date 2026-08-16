@@ -16,6 +16,8 @@ import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 import { getAgentName } from "@/features/profile/agent-identity";
+import { QuotaSection } from "@/features/quotas/quota-section";
+import { loadQuotaUsage } from "@/features/quotas/usage";
 
 type PriceRow = {
   id: string;
@@ -120,10 +122,29 @@ export default async function CostsPage({
       .order("input_usd_per_million", { ascending: false }),
   ]);
   const preferences = requireSupabaseData(preferencesResult, "load cost preferences");
-  const summary = parseAICostSummary(requireSupabaseData(summaryResult, "aggregate AI costs"));
-  const usage = (requireSupabaseData(usageResult, "load recent AI usage") ?? []) as AIUsageRow[];
-  const pricing = (requireSupabaseData(pricingResult, "load AI pricing") ?? []) as PriceRow[];
-  const totalBreakdown = Math.max(summary.allTimeCostNanoUsd, 1);
+  /*
+   * `2O-COST-007` — *"a cost read that fails renders as a failed read, never as
+   * zero"*.
+   *
+   * This was `requireSupabaseData`, which throws and takes the whole route to
+   * the error boundary. That never rendered zero, so the requirement's worst
+   * outcome was already avoided — but it did not render a *failed read* either:
+   * the page vanished, including the profile, the limits and the pricing table,
+   * none of which had failed.
+   *
+   * `null` now means the aggregate could not be read, and it is a value the
+   * markup handles rather than an exception the page dies of. The other two
+   * reads keep `?? []` because an empty list of recent calls and an empty
+   * catalogue are both **legible as empty**, and their failure states are
+   * rendered from their own results below.
+   */
+  const summary = summaryResult.error ? null : parseAICostSummary(summaryResult.data);
+  const usage = (usageResult.error ? [] : usageResult.data ?? []) as AIUsageRow[];
+  const pricing = (pricingResult.error ? [] : pricingResult.data ?? []) as PriceRow[];
+  const usageUnreadable = Boolean(usageResult.error);
+  const pricingUnreadable = Boolean(pricingResult.error);
+  const totalBreakdown = Math.max(summary?.allTimeCostNanoUsd ?? 0, 1);
+  const quotaUsage = await loadQuotaUsage(supabase, user.id, new Date());
   const activeProfile = (preferences?.ai_profile ??
     "quality") as keyof typeof profileLabels;
 
@@ -172,6 +193,38 @@ export default async function CostsPage({
         </p>
       </section>
 
+      {/*
+        `2O-COST-006`. Every figure below carries the period it covers — Hoje,
+        Este mês, Desde o início — and this is the zone those periods were
+        computed in, which was the half that was missing: the timezone was
+        passed to `get_ai_cost_summary` and never said out loud, so "Hoje" was a
+        day the reader could not identify. The quota window below is **UTC** and
+        says so separately, because the two really are different windows.
+      */}
+      <p className="cost-zone">
+        {pt
+          ? `Períodos calculados no fuso da sua conta (${timezone}).`
+          : `Periods computed in your account's zone (${timezone}).`}
+      </p>
+
+      {summary === null ? (
+        /*
+         * `2O-COST-007`. A failed read, said as one. Not four zeroed cards —
+         * which would state that nothing has been spent, a claim this page
+         * cannot make when it could not read the ledger.
+         */
+        <section className="cost-metrics unreadable" aria-label={pt ? "Resumo de custos" : "Cost summary"}>
+          <article className="primary">
+            <span>{pt ? "Resumo indisponível" : "Summary unavailable"}</span>
+            <strong>{pt ? "Não foi possível ler" : "Could not be read"}</strong>
+            <small>
+              {pt
+                ? "O total não foi calculado. Isto não significa custo zero."
+                : "The total was not computed. This does not mean zero cost."}
+            </small>
+          </article>
+        </section>
+      ) : (
       <section
         className="cost-metrics"
         aria-label={pt ? "Resumo de custos" : "Cost summary"}
@@ -203,8 +256,17 @@ export default async function CostsPage({
           <small>{pt ? "entrada + saída" : "input + output"}</small>
         </article>
       </section>
+      )}
 
-      {summary.unpricedCalls > 0 && (
+      {/*
+        `2O-COST-002`. The ceilings the database really enforces, beside the
+        spend they bound. On Custos rather than in Ajustes because this is where
+        an owner already comes to ask *how much*, and a limit is the other half
+        of that question.
+      */}
+      <QuotaSection locale={locale} usage={quotaUsage} />
+
+      {summary !== null && summary.unpricedCalls > 0 && (
         <div className="cost-warning">
           <AlertTriangle size={17} />
           <div>
@@ -220,7 +282,7 @@ export default async function CostsPage({
         </div>
       )}
 
-      {summary.allTimeCalls === 0 ? (
+      {summary === null ? null : summary.allTimeCalls === 0 ? (
         <section className="cost-empty">
           <Coins size={29} />
           <strong>
@@ -348,6 +410,19 @@ export default async function CostsPage({
               </div>
               <small>{pt ? "As 20 mais recentes" : "Most recent 20"}</small>
             </header>
+            {/*
+              `2O-COST-007` again, one section down. An empty table and an
+              unreadable one look identical, and only one of them means "no calls
+              were made" — so the failed read says so rather than letting the
+              absence of rows do the talking.
+            */}
+            {usageUnreadable && (
+              <p className="cost-read-failed" role="status">
+                {pt
+                  ? "Não foi possível ler as últimas chamadas. A lista abaixo está vazia por falha de leitura, não por ausência de consumo."
+                  : "Recent calls could not be read. The list below is empty because the read failed, not because nothing was used."}
+              </p>
+            )}
             <div className="cost-table-wrap">
               <table>
                 <thead>
@@ -421,6 +496,13 @@ export default async function CostsPage({
           </div>
           <small>{pricing[0]?.pricing_version ?? "—"}</small>
         </header>
+        {pricingUnreadable && (
+          <p className="cost-read-failed" role="status">
+            {pt
+              ? "Não foi possível ler o catálogo de preços. Nenhum preço foi inventado para preencher a lacuna."
+              : "The pricing catalog could not be read. No price was invented to fill the gap."}
+          </p>
+        )}
         <div className="pricing-grid">
           {pricing.map((price) => (
             <a

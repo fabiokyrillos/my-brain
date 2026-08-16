@@ -1,4 +1,5 @@
 import { AccountDataSection } from "@/features/account-centre/account-data-section";
+import { AiConfigSection } from "@/features/ai-config/ai-config-section";
 import { AppearanceControl } from "@/features/appearance/appearance-control";
 import { interpretPendingEntries, removeAiCredential, saveAiCredential } from "@/features/byok/actions";
 import { CredentialPanel } from "@/features/byok/credential-panel";
@@ -52,8 +53,17 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         `2O-ONBOARD-010`'s reversal. It renders only when the guide is actually
         dismissed, so it is never a control that changes nothing (`R-2O-12`),
         and it governs a per-browser cookie rather than a persisted preference
-        column — which is why it needs no capability-registry row and why the
-        registry would have nothing true to say about it.
+        column.
+
+        **The second half of this comment used to be wrong and is corrected
+        here.** It said the control "needs no capability-registry row" and that
+        "the registry would have nothing true to say about it". Half of that was
+        right — there is no column — and half was wrong: the dismissal cookie has
+        a real reader, so `2O-PREF-008` reaches it. Slice 2O.3 added the
+        `onboarding_restore` row with `controls: ["restoreOnboarding"]` and fixed
+        the copy of this reasoning in `capabilities.ts`, and left this one
+        standing. A comment asserting the opposite of the tree is the shape
+        `R-2O-16` exists to catch, so it is repaired rather than deleted.
       */}
       <OnboardingRestore
         locale={locale}
@@ -82,6 +92,26 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       */}
       <AppearanceControl locale={locale} />
       <CapabilitySummary locale={locale} />
+      {/*
+        `2O-AICONFIG-001` … `-005` and `-008`. What the product does with a
+        model, stated after the controls that change it.
+
+        It follows `CapabilitySummary` rather than preceding it because the two
+        answer different questions in a deliberate order: *what can I change
+        here*, then *what is being done with it*. And it precedes Dados e IA,
+        which is where the owner goes to see what each of those calls cost —
+        routing, then spend.
+
+        It takes `credential.status` rather than loading anything of its own:
+        `2O-AICONFIG-008` needs one boolean, the page already has it, and a
+        second read of the credential row would be a second place for the
+        product's answer about the key to come from.
+      */}
+      <AiConfigSection
+        locale={locale}
+        credentialStatus={credential.status}
+        saved={values}
+      />
       {/*
         Dados e IA — `02-arquitetura-e-rotas.md` puts the transparency centre
         inside Ajustes. It is a section that **reaches** the three surfaces
