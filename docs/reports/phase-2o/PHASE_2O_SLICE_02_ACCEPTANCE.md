@@ -165,7 +165,10 @@ alternative is a stored *"I saw this"* flag, which is forbidden absolutely.
 
 ---
 
-## 4. Four things I got wrong, and how each was caught
+## 4. Six things I got wrong, and how each was caught
+
+**Two of the six were found only by running the browser proof**, which is the
+argument for the obligation existing at all.
 
 ### 4.1 A test that claimed to prove an unreachable branch
 
@@ -217,13 +220,69 @@ never renders at all) and **does not** when it throws.
 
 ---
 
+### 4.5 The browser proof found a step that can never be pending — and it is not this slice's step
+
+The first run of the authenticated journey failed on a number: the panel
+reported **one** step already satisfied on a **brand-new account**, and I had
+asserted zero.
+
+It is right and I was wrong. `profiles.locale` and `profiles.timezone` are
+`not null` with defaults (`202607160001_phase1_identity.sql:11-12`) and
+`handle_new_user` inserts the row, so `2O-ACTIVATION-001`'s first fact —
+*locale and timezone set* — is true from the moment the account exists and
+**can never be false**. Slice 2O.0's read is correct for what the requirement
+says; the consequence only becomes visible when something renders it.
+
+**Three ways to respond, and why the third was taken.**
+
+*Change the activation fact to derive "chosen" rather than "present"*
+(**declined**): it reinterprets a requirement that shipped, whose word is *set*,
+and it changes a contract another slice's guard holds.
+
+*Derive this one step differently inside the path* (**declined, and it is the
+worse of the two**): the path would then say "pending" while activation says
+satisfied, which is precisely the disagreement `2O-ONBOARD-002` forbids. And
+there is no honest signal to derive it from — comparing against the defaults, as
+the identity step does, would mean **a Brazilian owner in São Paulo can never
+satisfy it**, and those defaults are correct for most of this product's users
+rather than merely tolerable.
+
+*Carry the fact through unchanged, and classify `2O-ONBOARD-003` `partial`*
+(**taken**): the half about not asking twice is delivered and asserted; the half
+about asking is not, because there is nothing that could make it ask. The
+remainder is named, non-vacuous and has a destination.
+
+**This is not a stop condition.** ADR-118 Decision 9's last clause covers *a
+requirement that contradicts another in a way that changes the product*; these
+two are consistent as written, and the outcome is a shortfall to be classified
+rather than a contradiction to be escalated. It is recorded here so the owner can
+decide otherwise cheaply.
+
+**A neighbouring fact, recorded because the next slice will meet it.** Slice
+2O.1 negotiates the visitor's locale from `Accept-Language` at the door but
+**writes nothing**, so an account created from an English browser still carries
+`pt-BR` in `profiles`. That belongs to the preferences centre, not here.
+
+### 4.6 A journey that waited for a click instead of for its effect
+
+The dismissal journey clicked *"show the guide again"* and navigated
+immediately. `click()` resolves when the event is dispatched, so it raced the
+Server Action and the cookie was still there.
+
+Fixed by waiting on the **effect**, and on the one that means something: the
+reversal control renders only while there is something to reverse, so its
+disappearance *is* the action having landed — and asserting it proves that
+property at the same time, instead of spending a timeout.
+
+---
+
 ## 5. Requirement by requirement
 
 | Req | Outcome | Evidence |
 |---|---|---|
 | `-001` offered, never imposed | **built** | a `<section>` in the page flow, no dialog/portal/route/redirect — guarded; the composer renders **before** it in `home-view.tsx`, asserted by document order in the guard and by `compareDocumentPosition` in the browser |
 | `-002` rendered from the activation facts | **built** | the view calls `loadActivationProgress`; `pathMirrorsActivationOrder` with two planted failures |
-| `-003` asked at the point it matters, never again once set | **built** | a satisfied step renders its state and **no action** — asserted in both locales, with the unsatisfied case proving the absence means something |
+| `-003` asked at the point it matters, never again once set | **partial** | the *never again once set* half is built and asserted in both locales (a satisfied step renders its state and **no action**, with the unsatisfied case proving the absence means something). **The remainder: the path never asks at all**, because `profiles.locale` and `profiles.timezone` are `not null` with defaults and `handle_new_user` creates the row, so `2O-ACTIVATION-001`'s first fact is true from the moment the account exists. **Destination: slice 2O.3** — see §4.5 |
 | `-004` identity through the same action and schema | **built** | the step links to `settings-form.tsx`; the feature imports `updateProfile` nowhere, and writes nothing anywhere |
 | `-005` mount the existing credential panel | **built** | the step resolves through `byokSettingsHref`; the feature renders no password input and re-mounts no panel |
 | `-006` a first capture that does not block | **built** | copy states the words are stored before any model runs and control returns immediately; asserted in both locales |
@@ -233,7 +292,9 @@ never renders at all) and **does not** when it throws.
 | `-010` dismissible, reversibly | **built** | cookie set and deleted through two gated actions; the reversal renders only when there is something to reverse; proved across a reload |
 | `-011` no capability claimed that is absent | **built** | `blocked` is claimed **only** on a credential known absent, never on one that could not be read; the blocked step carries no action; the recovery resolves to the same route `awaiting_ai_configuration` links to |
 
-**11 built, 0 partial, 0 undelivered.**
+**10 built, 1 partial, 0 undelivered.** The `partial` carries a named,
+non-vacuous remainder and a destination, which is what the traceability
+contract's vocabulary requires of one.
 
 ---
 
@@ -266,6 +327,10 @@ lane proves is the RSC boundary, and it must be **run** for that claim to exist.
   `buildSettingsPayload` → slice 2O.4, unchanged from §77 and §78.
 - **No repair of `defaultAgentPreferences.tone`** → slice 2O.3, newly recorded
   here (§1.3).
+- **No change to `2O-ACTIVATION-001`'s first fact**, and no second derivation of
+  it inside the path → `2O-ONBOARD-003`'s remainder, slice 2O.3 (§4.5).
+- **No write of the negotiated entry locale into `profiles`** → slice 2O.3
+  (§4.5).
 - **No `scheduled_reviews` wording change** → `2O-PREF-004`, slice 2O.3.
 - **No appearance control.** `OD-2O-2` **A** is slice 2O.3's, and this slice's
   cookie is not it.

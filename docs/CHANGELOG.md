@@ -56,6 +56,16 @@ All notable technical changes are recorded here. The format follows Keep a Chang
   defaults to `informal`. Latent — no product path reads that field — but
   deriving the identity step from it would have read a brand-new account as
   already personalised. **Destination: slice 2O.3.**
+- **`2O-ACTIVATION-001`'s first fact can never be false.** `profiles.locale` and
+  `profiles.timezone` are `not null` with defaults and `handle_new_user` creates
+  the row, so *locale and timezone set* is true from the moment an account
+  exists — found by **running** the authenticated browser proof, which reported
+  one satisfied step on a brand-new account. The shipped fact is not changed and
+  the path does not derive it a second way; **`2O-ONBOARD-003` closes `partial`**
+  with the remainder named. **Destination: slice 2O.3.**
+- Slice 2O.1 negotiates the visitor's locale at the door but writes nothing, so
+  an account created from an English browser still carries `pt-BR` in
+  `profiles`. **Destination: slice 2O.3.**
 
 ## 2026-08-15 - PHASE 2O SLICE 2O.1 — the product says what it is, and the closed door says so first
 

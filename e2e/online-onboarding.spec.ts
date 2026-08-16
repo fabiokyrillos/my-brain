@@ -78,10 +78,30 @@ test.describe("the guided path is offered to a new account and never imposed on 
     await expect(panel).toBeVisible();
     await expect(panel.getByRole("heading", { name: "Um caminho até o primeiro resultado" })).toBeVisible();
 
-    // Seven steps, none satisfied on an account that has done nothing.
     await expect(panel.locator("[data-step]")).toHaveCount(7);
-    await expect(panel.locator('[data-step][data-state="satisfied"]')).toHaveCount(0);
-    await expect(panel.locator(".onboarding-progress")).toHaveAttribute("data-done", "0");
+
+    /*
+     * **Exactly one step is already satisfied on an account that has done
+     * nothing**, and this journey is where that was discovered.
+     *
+     * `profiles.locale` and `profiles.timezone` are `not null` with defaults
+     * (`202607160001_phase1_identity.sql:11-12`) and `handle_new_user` creates
+     * the row, so `2O-ACTIVATION-001`'s first fact — *locale and timezone set*
+     * — is true from the moment the account exists and **can never be false**.
+     * Asserted rather than worked around, because the number this journey
+     * expects is the product's real answer and pinning it means a change to
+     * that read fails here.
+     *
+     * The consequence for `2O-ONBOARD-003` — the path never asks — is recorded
+     * in the acceptance record, where that requirement closes `partial` with a
+     * named remainder and a destination.
+     */
+    await expect(panel.locator('[data-step][data-state="satisfied"]')).toHaveCount(1);
+    await expect(panel.locator('[data-step="locale_and_timezone"]')).toHaveAttribute(
+      "data-state",
+      "satisfied",
+    );
+    await expect(panel.locator(".onboarding-progress")).toHaveAttribute("data-done", "1");
 
     /*
      * The requirement is *offered, never imposed*, and this is the assertion
@@ -178,7 +198,22 @@ test.describe("the guided path is offered to a new account and never imposed on 
     await expect(page.locator('[data-onboarding="offered"]')).toHaveCount(0);
 
     await page.goto("/pt-BR/app/settings");
-    await page.getByRole("button", { name: "Mostrar o guia de novo" }).click();
+    const restore = page.locator(".onboarding-restore");
+    await expect(restore).toBeVisible();
+    await restore.getByRole("button", { name: "Mostrar o guia de novo" }).click();
+
+    /*
+     * Wait for the *effect*, not for the click. `click()` resolves as soon as
+     * the event is dispatched, and navigating straight afterwards raced the
+     * Server Action — the first run of this journey failed here with the panel
+     * still absent, because the cookie had not been deleted yet.
+     *
+     * This is the right thing to wait on rather than a timeout: the control
+     * renders only while there is something to reverse, so its disappearance
+     * *is* the action having landed, and it asserts that property at the same
+     * time.
+     */
+    await expect(restore).toHaveCount(0);
 
     await page.goto("/pt-BR/app");
     await expect(page.locator('[data-onboarding="offered"]')).toBeVisible();
